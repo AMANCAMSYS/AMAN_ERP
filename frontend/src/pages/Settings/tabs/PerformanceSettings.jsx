@@ -10,7 +10,7 @@ const PerformanceSettings = ({ settings, handleSettingChange }) => {
     const clearCache = () => {
         // Simulate clearing cache
         localStorage.removeItem('aman_cache');
-        showToast(t('settings.performance.cache_cleared') || 'تم مسح الذاكرة المؤقتة بنجاح', 'success');
+        showToast(t('settings.performance.cache_cleared'), 'success');
     };
 
     return (
@@ -19,7 +19,7 @@ const PerformanceSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Zap size={20} className="text-primary" />
-                    {t('settings.performance.cache_title') || 'التخزين المؤقت والأداء'}
+                    {t('settings.performance.cache_title')}
                 </h3>
 
                 <div className="flex items-center gap-3 mb-6">
@@ -32,17 +32,17 @@ const PerformanceSettings = ({ settings, handleSettingChange }) => {
                     />
                     <div>
                         <label className="cursor-pointer font-medium block" htmlFor="perf_enable_caching">
-                            {t('settings.performance.enable_cache') || 'تفعيل التخزين المؤقت المحلي (Local Caching)'}
+                            {t('settings.performance.enable_cache')}
                         </label>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.performance.cache_hint') || 'يساعد في تسريع تحميل المنتجات في نقطة البيع.'}
+                            {t('settings.performance.cache_hint')}
                         </p>
                     </div>
                 </div>
 
                 <button className="btn btn-outline btn-warning gap-2" onClick={clearCache}>
                     <Database size={18} />
-                    {t('settings.performance.clear_cache_btn') || 'مسح الذاكرة المؤقتة الآن'}
+                    {t('settings.performance.clear_cache_btn')}
                 </button>
             </div>
         </div>

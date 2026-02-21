@@ -55,12 +55,12 @@ const ManufacturingHome = () => {
 
     const getStatusBadge = (status) => {
         const map = {
-            draft: { label: t('draft') || 'مسودة', bg: 'rgb(254, 243, 199)', color: 'rgb(217, 119, 6)', emoji: '⏳' },
-            planned: { label: t('planned') || 'مخطط', bg: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', emoji: '📅' },
-            confirmed: { label: t('confirmed') || 'مؤكد', bg: 'rgb(224, 231, 255)', color: 'rgb(67, 56, 202)', emoji: '👍' },
-            in_progress: { label: t('in_progress') || 'قيد التنفيذ', bg: 'rgb(254, 249, 195)', color: 'rgb(161, 98, 7)', emoji: '⚙️' },
-            completed: { label: t('completed') || 'مكتمل', bg: 'rgb(220, 252, 231)', color: 'rgb(22, 163, 74)', emoji: '✅' },
-            cancelled: { label: t('cancelled') || 'ملغى', bg: 'rgb(254, 226, 226)', color: 'rgb(220, 38, 38)', emoji: '❌' }
+            draft: { label: t('draft'), bg: 'rgb(254, 243, 199)', color: 'rgb(217, 119, 6)', emoji: '⏳' },
+            planned: { label: t('planned'), bg: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', emoji: '📅' },
+            confirmed: { label: t('confirmed'), bg: 'rgb(224, 231, 255)', color: 'rgb(67, 56, 202)', emoji: '👍' },
+            in_progress: { label: t('in_progress'), bg: 'rgb(254, 249, 195)', color: 'rgb(161, 98, 7)', emoji: '⚙️' },
+            completed: { label: t('completed'), bg: 'rgb(220, 252, 231)', color: 'rgb(22, 163, 74)', emoji: '✅' },
+            cancelled: { label: t('cancelled'), bg: 'rgb(254, 226, 226)', color: 'rgb(220, 38, 38)', emoji: '❌' }
         };
         const s = map[status] || { label: status, bg: 'rgba(107, 114, 128, 0.082)', color: 'rgb(107, 114, 128)', emoji: '' };
         return (
@@ -85,7 +85,7 @@ const ManufacturingHome = () => {
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="btn btn-primary" onClick={() => navigate('/manufacturing/orders')}>
-                            <FaPlus /> {t('manufacturing.new_order') || 'أمر تصنيع جديد'}
+                            <FaPlus /> {t('manufacturing.new_order')}
                         </button>
                     </div>
                 </div>
@@ -94,11 +94,11 @@ const ManufacturingHome = () => {
             {/* Metrics Grid */}
             <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                 <div className="metric-card">
-                    <div className="metric-label">{t('manufacturing.active_orders') || 'أوامر قيد التنفيذ'}</div>
+                    <div className="metric-label">{t('manufacturing.active_orders')}</div>
                     <div className="metric-value text-blue-600">{stats.activeOrders}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('manufacturing.completed_orders') || 'أوامر مكتملة'}</div>
+                    <div className="metric-label">{t('manufacturing.completed_orders')}</div>
                     <div className="metric-value text-green-600">{stats.completedOrders}</div>
                 </div>
                 <div className="metric-card">
@@ -106,11 +106,11 @@ const ManufacturingHome = () => {
                     <div className="metric-value">{stats.workCenters}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('manufacturing.routes') || 'المسارات'}</div>
+                    <div className="metric-label">{t('manufacturing.routes')}</div>
                     <div className="metric-value">{stats.routes}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('manufacturing.active_boms') || 'قوائم المواد النشطة'}</div>
+                    <div className="metric-label">{t('manufacturing.active_boms')}</div>
                     <div className="metric-value">{stats.boms}</div>
                 </div>
             </div>
@@ -119,8 +119,8 @@ const ManufacturingHome = () => {
             <div className="tabs mt-4">
                 {['overview', 'orders'].map(tab => (
                     <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-                        {tab === 'overview' && (t('manufacturing.dashboard.overview') || 'نظرة عامة')}
-                        {tab === 'orders' && (t('manufacturing.production_orders') || 'أوامر التصنيع')}
+                        {tab === 'overview' && (t('manufacturing.dashboard.overview'))}
+                        {tab === 'orders' && (t('manufacturing.production_orders'))}
                     </button>
                 ))}
             </div>
@@ -131,40 +131,40 @@ const ManufacturingHome = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
                         {/* Quick Actions */}
                         <div className="card">
-                            <h3 className="section-title">{t('common.actions') || 'إجراءات سريعة'}</h3>
+                            <h3 className="section-title">{t('common.actions')}</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
                                 <Link to="/manufacturing/orders" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaClipboardList /> {t('manufacturing.manage_orders') || 'إدارة أوامر التصنيع'}
+                                    <FaClipboardList /> {t('manufacturing.manage_orders')}
                                 </Link>
                                 <Link to="/manufacturing/work-centers" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaIndustry /> {t('manufacturing.manage_work_centers') || 'إدارة محطات العمل'}
+                                    <FaIndustry /> {t('manufacturing.manage_work_centers')}
                                 </Link>
                                 <Link to="/manufacturing/routes" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaRoute /> {t('manufacturing.manage_routes') || 'إدارة المسارات'}
+                                    <FaRoute /> {t('manufacturing.manage_routes')}
                                 </Link>
                                 <Link to="/manufacturing/boms" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaLayerGroup /> {t('manufacturing.manage_boms') || 'إدارة قوائم المواد'}
+                                    <FaLayerGroup /> {t('manufacturing.manage_boms')}
                                 </Link>
                                 <Link to="/manufacturing/job-cards" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaIdCard /> {t('manufacturing.job_cards.title', 'بطاقات العمل')}
+                                    <FaIdCard /> {t('manufacturing.job_cards.title')}
                                 </Link>
                                 <Link to="/manufacturing/mrp" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaBoxes /> {t('manufacturing.mrp.title', 'تخطيط المتطلبات (MRP)')}
+                                    <FaBoxes /> {t('manufacturing.mrp.title')}
                                 </Link>
                                 <Link to="/manufacturing/equipment" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaTools /> {t('manufacturing.equipment_maintenance', 'المعدات والصيانة')}
+                                    <FaTools /> {t('manufacturing.equipment_maintenance')}
                                 </Link>
                                 <Link to="/manufacturing/schedule" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaCalendarAlt /> {t('manufacturing.production_schedule', 'جدولة الإنتاج')}
+                                    <FaCalendarAlt /> {t('manufacturing.production_schedule')}
                                 </Link>
                             </div>
                         </div>
 
                         {/* Recent Orders */}
                         <div className="card">
-                            <h3 className="section-title">{t('manufacturing.recent_orders') || 'أحدث أوامر التصنيع'}</h3>
+                            <h3 className="section-title">{t('manufacturing.recent_orders')}</h3>
                             {stats.orders.length === 0 ? (
-                                <p className="text-muted mt-3 text-center py-8">{t('manufacturing.no_orders') || 'لا توجد أوامر تصنيع بعد'}</p>
+                                <p className="text-muted mt-3 text-center py-8">{t('manufacturing.no_orders')}</p>
                             ) : (
                                 <div className="data-table-container mt-3">
                                     <table className="data-table">
@@ -202,9 +202,9 @@ const ManufacturingHome = () => {
             {activeTab === 'orders' && (
                 <div className="card mt-4">
                     <div className="text-center py-8">
-                        <p className="text-gray-500 mb-4">{t('manufacturing.orders_tab_desc') || 'عرض وإدارة جميع أوامر التصنيع'}</p>
+                        <p className="text-gray-500 mb-4">{t('manufacturing.orders_tab_desc')}</p>
                         <button className="btn btn-primary" onClick={() => navigate('/manufacturing/orders')}>
-                            {t('manufacturing.go_to_orders') || 'الذهاب إلى صفحة الأوامر'} <FaArrowRight className="ml-2" />
+                            {t('manufacturing.go_to_orders')} <FaArrowRight className="ml-2" />
                         </button>
                     </div>
                 </div>

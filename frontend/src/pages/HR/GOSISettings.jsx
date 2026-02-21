@@ -59,8 +59,8 @@ const GOSISettings = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'التأمينات الاجتماعية (GOSI)' : 'Social Insurance (GOSI)'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'إعدادات وحسابات التأمينات الاجتماعية' : 'GOSI settings and calculations'}</p>
+                    <h1 className="workspace-title">{t('hr.gosi.social_insurance_gosi')}</h1>
+                    <p className="workspace-subtitle">{t('hr.gosi.gosi_settings_and_calculations')}</p>
                 </div>
             </div>
 
@@ -68,70 +68,70 @@ const GOSISettings = () => {
             <div className="card" style={{ marginBottom: '1rem', padding: '0.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('settings')}>
-                        <Shield size={16} /> {isRTL ? 'الإعدادات' : 'Settings'}
+                        <Shield size={16} /> {t('hr.gosi.settings')}
                     </button>
                     <button className={`btn ${activeTab === 'calc' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setActiveTab('calc'); fetchCalc(); }}>
-                        <Calculator size={16} /> {isRTL ? 'الحسابات' : 'Calculations'}
+                        <Calculator size={16} /> {t('hr.gosi.calculations')}
                     </button>
                 </div>
             </div>
 
             {activeTab === 'settings' && (
                 <div className="card" style={{ maxWidth: 600 }}>
-                    <h3 style={{ marginBottom: '1.5rem', color: '#1a1a2e' }}>{isRTL ? 'نسب الاشتراك' : 'Contribution Rates'}</h3>
+                    <h3 style={{ marginBottom: '1.5rem', color: '#1a1a2e' }}>{t('hr.gosi.contribution_rates')}</h3>
                     <div className="form-group">
-                        <label>{isRTL ? 'نسبة حصة الموظف (%)' : 'Employee Share (%)'}</label>
+                        <label>{t('hr.gosi.employee_share')}</label>
                         <input type="number" step="0.25" className="form-input" value={form.employee_share_percentage} onChange={e => setForm({ ...form, employee_share_percentage: parseFloat(e.target.value) })} />
                     </div>
                     <div className="form-group">
-                        <label>{isRTL ? 'نسبة حصة صاحب العمل (%)' : 'Employer Share (%)'}</label>
+                        <label>{t('hr.gosi.employer_share')}</label>
                         <input type="number" step="0.25" className="form-input" value={form.employer_share_percentage} onChange={e => setForm({ ...form, employer_share_percentage: parseFloat(e.target.value) })} />
                     </div>
                     <div className="form-group">
-                        <label>{isRTL ? 'نسبة خطر المهنة (%)' : 'Occupational Hazard (%)'}</label>
+                        <label>{t('hr.gosi.occupational_hazard')}</label>
                         <input type="number" step="0.25" className="form-input" value={form.occupational_hazard_percentage} onChange={e => setForm({ ...form, occupational_hazard_percentage: parseFloat(e.target.value) })} />
                     </div>
                     <div className="form-group">
-                        <label>{isRTL ? 'الحد الأقصى للراتب المؤمن عليه' : 'Max Insurable Salary'}</label>
+                        <label>{t('hr.gosi.max_insurable_salary')}</label>
                         <input type="number" className="form-input" value={form.max_insurable_salary} onChange={e => setForm({ ...form, max_insurable_salary: parseFloat(e.target.value) })} />
                     </div>
                     <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-                        <label style={{ margin: 0 }}>{isRTL ? 'مفعّل' : 'Active'}</label>
+                        <label style={{ margin: 0 }}>{t('hr.gosi.active')}</label>
                     </div>
 
                     {/* Summary card */}
                     <div style={{ background: '#f0f4ff', borderRadius: 8, padding: '1rem', marginTop: '1rem', marginBottom: '1rem' }}>
                         <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}>
-                            <strong>{isRTL ? 'إجمالي على الموظف:' : 'Total Employee:'}</strong> {form.employee_share_percentage}%
+                            <strong>{t('hr.gosi.total_employee')}</strong> {form.employee_share_percentage}%
                         </p>
                         <p style={{ margin: '0.25rem 0', fontSize: '0.9rem' }}>
-                            <strong>{isRTL ? 'إجمالي على صاحب العمل:' : 'Total Employer:'}</strong> {(form.employer_share_percentage + form.occupational_hazard_percentage).toFixed(2)}%
+                            <strong>{t('hr.gosi.total_employer')}</strong> {(form.employer_share_percentage + form.occupational_hazard_percentage).toFixed(2)}%
                         </p>
                     </div>
 
                     <button className="btn btn-primary" onClick={handleSave} style={{ width: '100%' }}>
-                        <Save size={16} /> {isRTL ? 'حفظ الإعدادات' : 'Save Settings'}
+                        <Save size={16} /> {t('hr.gosi.save_settings')}
                     </button>
                 </div>
             )}
 
             {activeTab === 'calc' && (
                 <div className="card">
-                    <h3 style={{ marginBottom: '1rem' }}>{isRTL ? 'حسابات GOSI الشهرية' : 'Monthly GOSI Calculations'}</h3>
+                    <h3 style={{ marginBottom: '1rem' }}>{t('hr.gosi.monthly_gosi_calculations')}</h3>
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                                <th>{isRTL ? 'الراتب الأساسي' : 'Basic Salary'}</th>
-                                <th>{isRTL ? 'حصة الموظف' : 'Employee Share'}</th>
-                                <th>{isRTL ? 'حصة صاحب العمل' : 'Employer Share'}</th>
-                                <th>{isRTL ? 'الإجمالي' : 'Total'}</th>
+                                <th>{t('hr.gosi.employee')}</th>
+                                <th>{t('hr.gosi.basic_salary')}</th>
+                                <th>{t('hr.gosi.employee_share_2')}</th>
+                                <th>{t('hr.gosi.employer_share_2')}</th>
+                                <th>{t('hr.gosi.total')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {calculations.length === 0 ? (
-                                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد بيانات' : 'No data'}</td></tr>
+                                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.gosi.no_data')}</td></tr>
                             ) : calculations.map((c, i) => (
                                 <tr key={i}>
                                     <td style={{ fontWeight: 600 }}>{c.employee_name || `#${c.employee_id}`}</td>

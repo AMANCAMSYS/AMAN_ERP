@@ -70,26 +70,26 @@ const CustodyManagement = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'إدارة العهد' : 'Custody Management'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'تتبع عهد الموظفين (أجهزة/مفاتيح/سيارات)' : 'Track employee custody items'}</p>
+                    <h1 className="workspace-title">{t('hr.custody.custody_management')}</h1>
+                    <p className="workspace-subtitle">{t('hr.custody.track_employee_custody_items')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ employee_id: '', item_name: '', item_type: 'laptop', serial_number: '', assigned_date: '', notes: '' }); setShowModal(true); }}>
-                    <Plus size={16} /> {isRTL ? 'عهدة جديدة' : 'New Custody'}
+                    <Plus size={16} /> {t('hr.custody.new_custody')}
                 </button>
             </div>
 
             {/* Summary cards */}
             <div className="metrics-grid" style={{ marginBottom: '1rem' }}>
                 <div className="metric-card">
-                    <div className="metric-label">{isRTL ? 'إجمالي العهد' : 'Total Items'}</div>
+                    <div className="metric-label">{t('hr.custody.total_items')}</div>
                     <div className="metric-value" style={{ color: '#2563eb' }}>{items.length}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{isRTL ? 'عهد فعالة' : 'Active'}</div>
+                    <div className="metric-label">{t('hr.custody.active')}</div>
                     <div className="metric-value" style={{ color: '#16a34a' }}>{items.filter(i => i.status === 'assigned' || !i.return_date).length}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{isRTL ? 'تم الإرجاع' : 'Returned'}</div>
+                    <div className="metric-label">{t('hr.custody.returned')}</div>
                     <div className="metric-value" style={{ color: '#6b7280' }}>{items.filter(i => i.status === 'returned' || i.return_date).length}</div>
                 </div>
             </div>
@@ -99,37 +99,37 @@ const CustodyManagement = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                            <th>{isRTL ? 'الصنف' : 'Item'}</th>
-                            <th>{isRTL ? 'النوع' : 'Type'}</th>
-                            <th>{isRTL ? 'الرقم التسلسلي' : 'Serial'}</th>
-                            <th>{isRTL ? 'تاريخ التسليم' : 'Assigned'}</th>
-                            <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.custody.employee')}</th>
+                            <th>{t('hr.custody.item')}</th>
+                            <th>{t('hr.custody.type')}</th>
+                            <th>{t('hr.custody.serial')}</th>
+                            <th>{t('hr.custody.assigned')}</th>
+                            <th>{t('hr.custody.status')}</th>
+                            <th>{t('hr.custody.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.custody.loading')}</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد عهد' : 'No custody items'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.custody.no_custody_items')}</td></tr>
                         ) : items.map((item, i) => (
                             <tr key={item.id}>
                                 <td>{i + 1}</td>
                                 <td style={{ fontWeight: 600 }}>{item.employee_name || `#${item.employee_id}`}</td>
                                 <td>{item.item_name}</td>
-                                <td>{itemTypes.find(it => it.value === item.item_type)?.[isRTL ? 'ar' : 'en'] || item.item_type}</td>
+                                <td>{itemTypes.find(it => it.value === item.item_type)?.[t('hr.custody.en')] || item.item_type}</td>
                                 <td>{item.serial_number || '-'}</td>
                                 <td>{item.assigned_date || '-'}</td>
                                 <td>
                                     <span className={`badge ${item.status === 'returned' || item.return_date ? 'badge-success' : 'badge-warning'}`}>
-                                        {item.status === 'returned' || item.return_date ? (isRTL ? 'تم الإرجاع' : 'Returned') : (isRTL ? 'عند الموظف' : 'Assigned')}
+                                        {item.status === 'returned' || item.return_date ? (t('hr.custody.returned')) : (t('hr.custody.assigned_2'))}
                                     </span>
                                 </td>
                                 <td>
                                     <div style={{ display: 'flex', gap: '0.25rem' }}>
                                         {!item.return_date && item.status !== 'returned' && (
-                                            <button className="btn btn-sm btn-success" onClick={() => { setReturnItem(item); setReturnForm({ return_notes: '', condition: 'good' }); setShowReturnModal(true); }} title={isRTL ? 'إرجاع' : 'Return'}>
+                                            <button className="btn btn-sm btn-success" onClick={() => { setReturnItem(item); setReturnForm({ return_notes: '', condition: 'good' }); setShowReturnModal(true); }} title={t('hr.custody.return')}>
                                                 <RotateCcw size={14} />
                                             </button>
                                         )}
@@ -146,21 +146,21 @@ const CustodyManagement = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل عهدة' : 'Edit Custody') : (isRTL ? 'عهدة جديدة' : 'New Custody')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.custody.edit_custody')) : (t('hr.custody.new_custody'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <label>{t('hr.custody.employee')}</label>
                             <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
-                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                <option value="">{t('hr.custody.select')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'اسم الصنف' : 'Item Name'}</label>
+                                <label>{t('hr.custody.item_name')}</label>
                                 <input className="form-input" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'النوع' : 'Type'}</label>
+                                <label>{t('hr.custody.type')}</label>
                                 <select className="form-input" value={form.item_type} onChange={e => setForm({ ...form, item_type: e.target.value })}>
                                     {itemTypes.map(it => <option key={it.value} value={it.value}>{isRTL ? it.ar : it.en}</option>)}
                                 </select>
@@ -168,21 +168,21 @@ const CustodyManagement = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'الرقم التسلسلي' : 'Serial Number'}</label>
+                                <label>{t('hr.custody.serial_number')}</label>
                                 <input className="form-input" value={form.serial_number} onChange={e => setForm({ ...form, serial_number: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'تاريخ التسليم' : 'Assigned Date'}</label>
+                                <label>{t('hr.custody.assigned_date')}</label>
                                 <DateInput className="form-input" value={form.assigned_date} onChange={e => setForm({ ...form, assigned_date: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'ملاحظات' : 'Notes'}</label>
+                            <label>{t('hr.custody.notes')}</label>
                             <textarea className="form-input" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.custody.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.custody.save')}</button>
                         </div>
                     </div>
                 </div>
@@ -192,23 +192,23 @@ const CustodyManagement = () => {
             {showReturnModal && (
                 <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-                        <h2 className="modal-title">{isRTL ? 'إرجاع العهدة' : 'Return Custody'}</h2>
+                        <h2 className="modal-title">{t('hr.custody.return_custody')}</h2>
                         <p style={{ color: '#666', marginBottom: '1rem' }}>{isRTL ? `إرجاع: ${returnItem?.item_name}` : `Returning: ${returnItem?.item_name}`}</p>
                         <div className="form-group">
-                            <label>{isRTL ? 'حالة الصنف' : 'Condition'}</label>
+                            <label>{t('hr.custody.condition')}</label>
                             <select className="form-input" value={returnForm.condition} onChange={e => setReturnForm({ ...returnForm, condition: e.target.value })}>
-                                <option value="good">{isRTL ? 'جيد' : 'Good'}</option>
-                                <option value="damaged">{isRTL ? 'تالف' : 'Damaged'}</option>
-                                <option value="needs_repair">{isRTL ? 'يحتاج إصلاح' : 'Needs Repair'}</option>
+                                <option value="good">{t('hr.custody.good')}</option>
+                                <option value="damaged">{t('hr.custody.damaged')}</option>
+                                <option value="needs_repair">{t('hr.custody.needs_repair')}</option>
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'ملاحظات الإرجاع' : 'Return Notes'}</label>
+                            <label>{t('hr.custody.return_notes')}</label>
                             <textarea className="form-input" rows="2" value={returnForm.return_notes} onChange={e => setReturnForm({ ...returnForm, return_notes: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowReturnModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-success" onClick={handleReturn}>{isRTL ? 'تأكيد الإرجاع' : 'Confirm Return'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowReturnModal(false)}>{t('hr.custody.cancel')}</button>
+                            <button className="btn btn-success" onClick={handleReturn}>{t('hr.custody.confirm_return')}</button>
                         </div>
                     </div>
                 </div>

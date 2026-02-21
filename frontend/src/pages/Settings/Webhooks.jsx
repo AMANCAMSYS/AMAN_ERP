@@ -3,6 +3,7 @@ import { externalAPI } from '../../utils/api';
 import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
 
 const EMPTY_FORM = {
   name: '',
@@ -13,6 +14,7 @@ const EMPTY_FORM = {
 };
 
 export default function Webhooks() {
+  const { t } = useTranslation();
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [availableEvents, setAvailableEvents] = useState([]);
@@ -92,20 +94,20 @@ export default function Webhooks() {
       fetchWebhooks();
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء الحفظ');
+      alert(t('settings.webhooks.error_save'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الويب هوك؟')) return;
+    if (!window.confirm(t('settings.webhooks.confirm_delete'))) return;
     try {
       await externalAPI.deleteWebhook(id);
       fetchWebhooks();
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء الحذف');
+      alert(t('settings.webhooks.error_delete'));
     }
   };
 
@@ -140,27 +142,27 @@ export default function Webhooks() {
   return (
     <div className="workspace fade-in">
       <div className="workspace-header">
-        <h1 className="workspace-title">الويب هوك</h1>
+        <h1 className="workspace-title">{t('settings.webhooks.title')}</h1>
         <button className="btn btn-primary" onClick={openCreate}>
-          + إنشاء ويب هوك جديد
+          + {t('settings.webhooks.create_new')}
         </button>
       </div>
 
       {loading ? (
-        <p>جاري التحميل...</p>
+        <p>{t('common.loading')}</p>
       ) : webhooks.length === 0 ? (
-        <div className="empty-state">لا توجد ويب هوك حالياً</div>
+        <div className="empty-state">{t('settings.webhooks.no_webhooks')}</div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
-              <th>الاسم</th>
-              <th>الرابط</th>
-              <th>الأحداث</th>
-              <th>المحاولات</th>
-              <th>المهلة</th>
-              <th>الحالة</th>
-              <th>إجراءات</th>
+              <th>{t('common.name')}</th>
+              <th>{t('settings.webhooks.url')}</th>
+              <th>{t('settings.webhooks.events')}</th>
+              <th>{t('settings.webhooks.retries')}</th>
+              <th>{t('settings.webhooks.timeout')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -178,29 +180,29 @@ export default function Webhooks() {
                   ))}
                 </td>
                 <td>{wh.retry_count}</td>
-                <td>{wh.timeout_seconds}ث</td>
+                <td>{wh.timeout_seconds}{t('settings.webhooks.seconds_abbr')}</td>
                 <td>
                   {wh.is_active ? (
-                    <span className="badge badge-success">مفعّل</span>
+                    <span className="badge badge-success">{t('settings.webhooks.active')}</span>
                   ) : (
-                    <span className="badge badge-danger">معطّل</span>
+                    <span className="badge badge-danger">{t('settings.webhooks.inactive')}</span>
                   )}
                 </td>
                 <td style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   <button className="btn btn-secondary" onClick={() => openEdit(wh)}>
-                    تعديل
+                    {t('common.edit')}
                   </button>
                   <button className="btn btn-secondary" onClick={() => openLogs(wh)}>
-                    السجلات
+                    {t('settings.webhooks.logs')}
                   </button>
                   <button
                     className="btn btn-secondary"
                     onClick={() => handleToggleActive(wh)}
                   >
-                    {wh.is_active ? 'تعطيل' : 'تفعيل'}
+                    {wh.is_active ? t('settings.webhooks.deactivate') : t('settings.webhooks.activate')}
                   </button>
                   <button className="btn btn-danger" onClick={() => handleDelete(wh.id)}>
-                    حذف
+                    {t('common.delete')}
                   </button>
                 </td>
               </tr>
@@ -214,14 +216,14 @@ export default function Webhooks() {
         <div className="modal-overlay" onClick={() => setShowFormModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingId ? 'تعديل الويب هوك' : 'إنشاء ويب هوك جديد'}</h2>
+              <h2>{editingId ? t('settings.webhooks.edit_title') : t('settings.webhooks.create_new')}</h2>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-section">
                   <div className="form-grid">
                     <div className="form-group">
-                      <label>الاسم</label>
+                      <label>{t('common.name')}</label>
                       <input
                         type="text"
                         value={form.name}
@@ -230,7 +232,7 @@ export default function Webhooks() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>الرابط (URL)</label>
+                      <label>{t('settings.webhooks.url_label')}</label>
                       <input
                         type="url"
                         value={form.url}
@@ -240,7 +242,7 @@ export default function Webhooks() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>عدد المحاولات</label>
+                      <label>{t('settings.webhooks.retry_count')}</label>
                       <input
                         type="number"
                         min={0}
@@ -249,7 +251,7 @@ export default function Webhooks() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>المهلة (ثواني)</label>
+                      <label>{t('settings.webhooks.timeout_seconds')}</label>
                       <input
                         type="number"
                         min={1}
@@ -259,9 +261,9 @@ export default function Webhooks() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>الأحداث</label>
+                    <label>{t('settings.webhooks.events')}</label>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-                      {availableEvents.length === 0 && <span>لا توجد أحداث متاحة</span>}
+                      {availableEvents.length === 0 && <span>{t('settings.webhooks.no_events')}</span>}
                       {availableEvents.map((evt) => {
                         const evtValue = typeof evt === 'string' ? evt : evt.value ?? evt.name ?? evt;
                         return (
@@ -282,14 +284,14 @@ export default function Webhooks() {
               <div className="modal-footer">
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'جاري الحفظ...' : editingId ? 'تحديث' : 'إنشاء'}
+                    {submitting ? t('common.saving') : editingId ? t('common.update') : t('common.create')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => setShowFormModal(false)}
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>
@@ -303,22 +305,22 @@ export default function Webhooks() {
         <div className="modal-overlay" onClick={() => setLogsWebhook(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
             <div className="modal-header">
-              <h2>سجلات: {logsWebhook.name}</h2>
+              <h2>{t('settings.webhooks.logs_for')}: {logsWebhook.name}</h2>
             </div>
             <div className="modal-body">
               {logsLoading ? (
-                <p>جاري التحميل...</p>
+                <p>{t('common.loading')}</p>
               ) : logs.length === 0 ? (
-                <div className="empty-state">لا توجد سجلات</div>
+                <div className="empty-state">{t('settings.webhooks.no_logs')}</div>
               ) : (
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>الحدث</th>
-                      <th>رمز الحالة</th>
-                      <th>النتيجة</th>
-                      <th>المحاولة</th>
-                      <th>التاريخ</th>
+                      <th>{t('settings.webhooks.event')}</th>
+                      <th>{t('settings.webhooks.status_code')}</th>
+                      <th>{t('settings.webhooks.result')}</th>
+                      <th>{t('settings.webhooks.attempt')}</th>
+                      <th>{t('common.date')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -328,9 +330,9 @@ export default function Webhooks() {
                         <td style={{ direction: 'ltr' }}>{log.status_code ?? '—'}</td>
                         <td>
                           {log.success ? (
-                            <span className="badge badge-success">ناجح</span>
+                            <span className="badge badge-success">{t('settings.webhooks.success')}</span>
                           ) : (
-                            <span className="badge badge-danger">فشل</span>
+                            <span className="badge badge-danger">{t('settings.webhooks.failed')}</span>
                           )}
                         </td>
                         <td>{log.attempt ?? '—'}</td>
@@ -343,7 +345,7 @@ export default function Webhooks() {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setLogsWebhook(null)}>
-                إغلاق
+                {t('common.close')}
               </button>
             </div>
           </div>

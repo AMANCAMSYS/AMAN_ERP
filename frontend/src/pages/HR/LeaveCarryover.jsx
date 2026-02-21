@@ -27,7 +27,7 @@ const LeaveCarryover = () => {
             await hrImprovementsAPI.calculateLeaveCarryover({ employee_id: parseInt(carryForm.employee_id), year: parseInt(carryForm.from_year) });
             showToast(t('hr.leave_carried_success'), 'success');
             setShowCarryover(false); if (employeeId) fetchBalance(employeeId);
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     return (

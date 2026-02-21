@@ -47,7 +47,7 @@ const StockAdjustmentForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.warehouse_id || !formData.product_id || formData.new_quantity === '') {
-            setError(t('common.fill_required', 'يرجى ملء جميع الحقول المطلوبة'));
+            setError(t('common.fill_required'));
             return;
         }
 
@@ -174,7 +174,7 @@ const StockAdjustmentForm = () => {
                                 onChange={handleChange}
                                 className="form-input"
                                 style={{ height: '100px' }}
-                                placeholder={t('common.notes_placeholder', 'ملاحظات إضافية حول التعديل...')}
+                                placeholder={t('common.notes_placeholder')}
                             />
                         </div>
 

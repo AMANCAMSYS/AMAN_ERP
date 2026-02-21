@@ -33,7 +33,7 @@ export default function ContractDetails() {
             setContract(res.data)
         } catch (err) {
             console.error('Failed to fetch contract', err)
-            showToast(t('contracts.details.load_error') || 'فشل في تحميل العقد', 'error')
+            showToast(t('contracts.details.load_error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -43,11 +43,11 @@ export default function ContractDetails() {
         setActionLoading(true)
         try {
             await contractsAPI.renewContract(id)
-            showToast(t('contracts.details.renewed_success') || 'تم تجديد العقد بنجاح', 'success')
+            showToast(t('contracts.details.renewed_success'), 'success')
             setShowRenewModal(false)
             fetchContract()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('contracts.details.renew_error') || 'فشل في تجديد العقد', 'error')
+            showToast(err.response?.data?.detail || t('contracts.details.renew_error'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -57,11 +57,11 @@ export default function ContractDetails() {
         setActionLoading(true)
         try {
             await contractsAPI.cancelContract(id)
-            showToast(t('contracts.details.cancelled_success') || 'تم إلغاء العقد', 'success')
+            showToast(t('contracts.details.cancelled_success'), 'success')
             setShowCancelModal(false)
             fetchContract()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('contracts.details.cancel_error') || 'فشل في إلغاء العقد', 'error')
+            showToast(err.response?.data?.detail || t('contracts.details.cancel_error'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -72,17 +72,17 @@ export default function ContractDetails() {
         try {
             const res = await contractsAPI.generateInvoice(id)
             showToast(
-                `${t('contracts.details.invoice_generated') || 'تم إنشاء الفاتورة'}: ${res.data.invoice_number}`, 'success'
+                `${t('contracts.details.invoice_generated')}: ${res.data.invoice_number}`, 'success'
             )
         } catch (err) {
-            showToast(err.response?.data?.detail || t('contracts.details.invoice_error') || 'فشل في إنشاء الفاتورة', 'error')
+            showToast(err.response?.data?.detail || t('contracts.details.invoice_error'), 'error')
         } finally {
             setActionLoading(false)
         }
     }
 
     if (loading) return <div className="page-center"><span className="loading"></span></div>
-    if (!contract) return <div className="page-center"><p>{t('contracts.details.not_found') || 'العقد غير موجود'}</p></div>
+    if (!contract) return <div className="page-center"><p>{t('contracts.details.not_found')}</p></div>
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -95,30 +95,30 @@ export default function ContractDetails() {
 
     const getStatusLabel = (status) => {
         switch (status) {
-            case 'active': return t('contracts.details.status_active') || 'نشط'
-            case 'expired': return t('contracts.details.status_expired') || 'منتهي'
-            case 'cancelled': return t('contracts.details.status_cancelled') || 'ملغي'
+            case 'active': return t('contracts.details.status_active')
+            case 'expired': return t('contracts.details.status_expired')
+            case 'cancelled': return t('contracts.details.status_cancelled')
             default: return status
         }
     }
 
     const getTypeLabel = (type) => {
         switch (type) {
-            case 'subscription': return t('contracts.details.type_subscription') || 'اشتراك'
-            case 'fixed': return t('contracts.details.type_fixed') || 'ثابت'
-            case 'recurring': return t('contracts.details.type_recurring') || 'متكرر'
-            case 'sales': return t('contracts.details.type_sales') || 'مبيعات'
-            case 'purchase': return t('contracts.details.type_purchase') || 'مشتريات'
+            case 'subscription': return t('contracts.details.type_subscription')
+            case 'fixed': return t('contracts.details.type_fixed')
+            case 'recurring': return t('contracts.details.type_recurring')
+            case 'sales': return t('contracts.details.type_sales')
+            case 'purchase': return t('contracts.details.type_purchase')
             default: return type
         }
     }
 
     const getIntervalLabel = (interval) => {
         switch (interval) {
-            case 'monthly': return t('contracts.details.interval_monthly') || 'شهري'
-            case 'quarterly': return t('contracts.details.interval_quarterly') || 'ربع سنوي'
-            case 'semi_annual': return t('contracts.details.interval_semi_annual') || 'نصف سنوي'
-            case 'annual': return t('contracts.details.interval_annual') || 'سنوي'
+            case 'monthly': return t('contracts.details.interval_monthly')
+            case 'quarterly': return t('contracts.details.interval_quarterly')
+            case 'semi_annual': return t('contracts.details.interval_semi_annual')
+            case 'annual': return t('contracts.details.interval_annual')
             default: return interval
         }
     }
@@ -156,16 +156,16 @@ export default function ContractDetails() {
                     {contract.status === 'active' && (
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <button className="btn btn-secondary" onClick={() => navigate(`/sales/contracts/${id}/edit`)}>
-                                <Edit2 size={16} /> {t('contracts.details.edit') || 'تعديل'}
+                                <Edit2 size={16} /> {t('contracts.details.edit')}
                             </button>
                             <button className="btn btn-primary" onClick={handleGenerateInvoice} disabled={actionLoading}>
-                                <FileText size={16} /> {t('contracts.details.generate_invoice') || 'إنشاء فاتورة'}
+                                <FileText size={16} /> {t('contracts.details.generate_invoice')}
                             </button>
                             <button className="btn btn-secondary" onClick={() => setShowRenewModal(true)}>
-                                <RefreshCw size={16} /> {t('contracts.details.renew') || 'تجديد'}
+                                <RefreshCw size={16} /> {t('contracts.details.renew')}
                             </button>
                             <button className="btn btn-danger" onClick={() => setShowCancelModal(true)}>
-                                <XCircle size={16} /> {t('contracts.details.cancel') || 'إلغاء'}
+                                <XCircle size={16} /> {t('contracts.details.cancel')}
                             </button>
                         </div>
                     )}
@@ -182,7 +182,7 @@ export default function ContractDetails() {
             {contract.status === 'active' && daysRemaining !== null && daysRemaining <= 0 && (
                 <div className="alert alert-error mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={18} />
-                    {t('contracts.details.expired_alert') || '⚠️ هذا العقد منتهي الصلاحية ويحتاج تجديد أو إلغاء'}
+                    {t('contracts.details.expired_alert')}
                 </div>
             )}
 
@@ -193,7 +193,7 @@ export default function ContractDetails() {
                         <DollarSign size={20} style={{ color: 'var(--primary)' }} />
                     </div>
                     <div className="metric-content">
-                        <span className="metric-label">{t('contracts.details.total_value') || 'قيمة العقد'}</span>
+                        <span className="metric-label">{t('contracts.details.total_value')}</span>
                         <span className="metric-value">{formatNumber(contract.total_amount)} {contract.currency}</span>
                     </div>
                 </div>
@@ -202,7 +202,7 @@ export default function ContractDetails() {
                         <User size={20} style={{ color: '#2e7d32' }} />
                     </div>
                     <div className="metric-content">
-                        <span className="metric-label">{t('contracts.details.client') || 'العميل'}</span>
+                        <span className="metric-label">{t('contracts.details.client')}</span>
                         <span className="metric-value" style={{ fontSize: '1rem' }}>{contract.party_name}</span>
                     </div>
                 </div>
@@ -211,7 +211,7 @@ export default function ContractDetails() {
                         <Calendar size={20} style={{ color: '#e65100' }} />
                     </div>
                     <div className="metric-content">
-                        <span className="metric-label">{t('contracts.details.period') || 'الفترة'}</span>
+                        <span className="metric-label">{t('contracts.details.period')}</span>
                         <span className="metric-value" style={{ fontSize: '0.9rem' }}>
                             {formatShortDate(contract.start_date)} — {contract.end_date ? formatShortDate(contract.end_date) : '∞'}
                         </span>
@@ -222,7 +222,7 @@ export default function ContractDetails() {
                         <RefreshCw size={20} style={{ color: '#1565c0' }} />
                     </div>
                     <div className="metric-content">
-                        <span className="metric-label">{t('contracts.details.billing_cycle') || 'دورة الفوترة'}</span>
+                        <span className="metric-label">{t('contracts.details.billing_cycle')}</span>
                         <span className="metric-value" style={{ fontSize: '1rem' }}>{getIntervalLabel(contract.billing_interval)}</span>
                     </div>
                 </div>
@@ -231,38 +231,38 @@ export default function ContractDetails() {
             {/* Contract Info */}
             <div className="grid grid-2 mb-4">
                 <div className="card">
-                    <h3 className="section-title">{t('contracts.details.info') || 'معلومات العقد'}</h3>
+                    <h3 className="section-title">{t('contracts.details.info')}</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.contract_number') || 'رقم العقد'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.contract_number')}</label>
                             <p style={{ fontWeight: 'bold' }}>{contract.contract_number}</p>
                         </div>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.type') || 'النوع'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.type')}</label>
                             <p>{getTypeLabel(contract.contract_type)}</p>
                         </div>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.start_date') || 'تاريخ البدء'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.start_date')}</label>
                             <p>{formatShortDate(contract.start_date)}</p>
                         </div>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.end_date') || 'تاريخ الانتهاء'}</label>
-                            <p>{contract.end_date ? formatShortDate(contract.end_date) : t('contracts.details.no_end_date') || 'غير محدد'}</p>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.end_date')}</label>
+                            <p>{contract.end_date ? formatShortDate(contract.end_date) : t('contracts.details.no_end_date')}</p>
                         </div>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.days_remaining') || 'الأيام المتبقية'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.days_remaining')}</label>
                             <p style={{ color: daysRemaining <= 30 ? '#e65100' : 'inherit', fontWeight: daysRemaining <= 30 ? 'bold' : 'normal' }}>
-                                {daysRemaining !== null ? (daysRemaining > 0 ? `${daysRemaining} ${t('contracts.details.days') || 'يوم'}` : t('contracts.details.expired_label') || 'منتهي') : '—'}
+                                {daysRemaining !== null ? (daysRemaining > 0 ? `${daysRemaining} ${t('contracts.details.days')}` : t('contracts.details.expired_label')) : '—'}
                             </p>
                         </div>
                         <div>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.currency') || 'العملة'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.currency')}</label>
                             <p>{contract.currency}</p>
                         </div>
                     </div>
                     {contract.notes && (
                         <div style={{ marginTop: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' }}>
-                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.notes') || 'ملاحظات'}</label>
+                            <label className="form-label" style={{ fontWeight: 'normal', color: '#888' }}>{t('contracts.details.notes')}</label>
                             <p>{contract.notes}</p>
                         </div>
                     )}
@@ -270,18 +270,18 @@ export default function ContractDetails() {
 
                 {/* Totals */}
                 <div className="card">
-                    <h3 className="section-title">{t('contracts.details.financial_summary') || 'الملخص المالي'}</h3>
+                    <h3 className="section-title">{t('contracts.details.financial_summary')}</h3>
                     <div style={{ marginTop: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                            <span>{t('contracts.details.subtotal') || 'المجموع الفرعي'}</span>
+                            <span>{t('contracts.details.subtotal')}</span>
                             <span>{formatNumber(subtotal)} {contract.currency}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee' }}>
-                            <span>{t('contracts.details.tax') || 'الضريبة'}</span>
+                            <span>{t('contracts.details.tax')}</span>
                             <span>{formatNumber(taxTotal)} {contract.currency}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                            <span>{t('contracts.details.grand_total') || 'الإجمالي'}</span>
+                            <span>{t('contracts.details.grand_total')}</span>
                             <span style={{ color: 'var(--primary)' }}>{formatNumber(contract.total_amount)} {contract.currency}</span>
                         </div>
                     </div>
@@ -290,16 +290,16 @@ export default function ContractDetails() {
 
             {/* Items Table */}
             <div className="card">
-                <h3 className="section-title">{t('contracts.details.items') || 'بنود العقد'} ({(contract.items || []).length})</h3>
+                <h3 className="section-title">{t('contracts.details.items')} ({(contract.items || []).length})</h3>
                 <table className="data-table">
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{t('contracts.details.item_desc') || 'الوصف'}</th>
-                            <th>{t('contracts.details.quantity') || 'الكمية'}</th>
-                            <th>{t('contracts.details.unit_price') || 'سعر الوحدة'}</th>
-                            <th>{t('contracts.details.tax_rate') || 'الضريبة %'}</th>
-                            <th>{t('contracts.details.item_total') || 'الإجمالي'}</th>
+                            <th>{t('contracts.details.item_desc')}</th>
+                            <th>{t('contracts.details.quantity')}</th>
+                            <th>{t('contracts.details.unit_price')}</th>
+                            <th>{t('contracts.details.tax_rate')}</th>
+                            <th>{t('contracts.details.item_total')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -316,7 +316,7 @@ export default function ContractDetails() {
                         {(contract.items || []).length === 0 && (
                             <tr>
                                 <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
-                                    {t('contracts.details.no_items') || 'لا توجد بنود'}
+                                    {t('contracts.details.no_items')}
                                 </td>
                             </tr>
                         )}
@@ -327,18 +327,18 @@ export default function ContractDetails() {
             {/* Cancel Modal */}
             {showCancelModal && (
                 <SimpleModal
-                    title={t('contracts.details.cancel_title') || 'إلغاء العقد'}
+                    title={t('contracts.details.cancel_title')}
                     onClose={() => setShowCancelModal(false)}
                 >
                     <p style={{ marginBottom: '16px' }}>
-                        {t('contracts.details.cancel_confirm') || 'هل أنت متأكد من إلغاء هذا العقد؟ لا يمكن التراجع عن هذا الإجراء.'}
+                        {t('contracts.details.cancel_confirm')}
                     </p>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setShowCancelModal(false)} disabled={actionLoading}>
-                            {t('common.close') || 'إغلاق'}
+                            {t('common.close')}
                         </button>
                         <button className="btn btn-danger" onClick={handleCancel} disabled={actionLoading}>
-                            {actionLoading ? t('common.loading') || '...' : t('contracts.details.confirm_cancel') || 'تأكيد الإلغاء'}
+                            {actionLoading ? t('common.loading') || '...' : t('contracts.details.confirm_cancel')}
                         </button>
                     </div>
                 </SimpleModal>
@@ -347,22 +347,22 @@ export default function ContractDetails() {
             {/* Renew Modal */}
             {showRenewModal && (
                 <SimpleModal
-                    title={t('contracts.details.renew_title') || 'تجديد العقد'}
+                    title={t('contracts.details.renew_title')}
                     onClose={() => setShowRenewModal(false)}
                 >
                     <p style={{ marginBottom: '16px' }}>
-                        {t('contracts.details.renew_confirm') || 'سيتم تجديد العقد لفترة جديدة بناءً على دورة الفوترة الحالية.'}
+                        {t('contracts.details.renew_confirm')}
                     </p>
                     <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', marginBottom: '16px' }}>
-                        <p><strong>{t('contracts.details.billing_cycle') || 'دورة الفوترة'}:</strong> {getIntervalLabel(contract.billing_interval)}</p>
-                        <p><strong>{t('contracts.details.current_end') || 'تاريخ الانتهاء الحالي'}:</strong> {contract.end_date ? formatShortDate(contract.end_date) : '—'}</p>
+                        <p><strong>{t('contracts.details.billing_cycle')}:</strong> {getIntervalLabel(contract.billing_interval)}</p>
+                        <p><strong>{t('contracts.details.current_end')}:</strong> {contract.end_date ? formatShortDate(contract.end_date) : '—'}</p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setShowRenewModal(false)} disabled={actionLoading}>
-                            {t('common.close') || 'إغلاق'}
+                            {t('common.close')}
                         </button>
                         <button className="btn btn-primary" onClick={handleRenew} disabled={actionLoading}>
-                            {actionLoading ? t('common.loading') || '...' : t('contracts.details.confirm_renew') || 'تأكيد التجديد'}
+                            {actionLoading ? t('common.loading') || '...' : t('contracts.details.confirm_renew')}
                         </button>
                     </div>
                 </SimpleModal>

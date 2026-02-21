@@ -38,7 +38,7 @@ const ExpensesSettings = ({ settings, handleSettingChange, currency }) => {
                             value={settings.default_expense_category || ''}
                             onChange={(e) => handleSettingChange('default_expense_category', e.target.value)}
                         >
-                            <option value="">{t('common.select') || 'اختر...'}</option>
+                            <option value="">{t('common.select')}</option>
                             <option value="general">{t('settings.expenses.cat_general') || '{t("settings.expenses.general_expenses")}'}</option>
                             <option value="travel">{t('settings.expenses.cat_travel') || '{t("settings.expenses.travel")}'}</option>
                             <option value="office">{t('settings.expenses.cat_office') || '{t("settings.expenses.office_supplies")}'}</option>

@@ -122,7 +122,7 @@ export default function PeriodComparison() {
             }
             setResult(res.data)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setLoading(false)
         }

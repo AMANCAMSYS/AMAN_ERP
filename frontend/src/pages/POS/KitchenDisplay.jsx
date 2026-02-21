@@ -25,7 +25,7 @@ const KitchenDisplay = () => {
             await posAPI.updateKitchenOrderStatus(id, { status });
             showToast(t('pos.status_updated'), 'success');
             fetchOrders();
-        } catch (err) { showToast('Error', 'error'); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const statusConfig = {

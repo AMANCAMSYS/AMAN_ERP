@@ -91,15 +91,15 @@ const BudgetItems = () => {
                 }));
 
             if (items.length === 0) {
-                toast.error(t('accounting.budgets.no_items', 'لا توجد بنود للحفظ'));
+                toast.error(t('accounting.budgets.no_items'));
                 return;
             }
 
             await budgetsAPI.setItems(id, items);
-            toast.success(t('accounting.budgets.items_saved', 'تم حفظ بنود الميزانية بنجاح'));
+            toast.success(t('accounting.budgets.items_saved'));
         } catch (error) {
             console.error(error);
-            toast.error(t('common.error_saving', 'حدث خطأ أثناء الحفظ'));
+            toast.error(t('common.error_saving'));
         } finally {
             setSaving(false);
         }

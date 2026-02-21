@@ -30,7 +30,7 @@ const Payslips = () => {
             await hrImprovementsAPI.generatePayslip({ employee_id: parseInt(genForm.employee_id), month: parseInt(genForm.month), year: parseInt(genForm.year) });
             showToast(t('hr.payslip_generated'), 'success');
             setShowGenerate(false); fetchPayslips();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     return (

@@ -20,7 +20,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group">
-                <label className="form-label" htmlFor="company_name">{t('settings.company.name') || 'اسم الشركة'}</label>
+                <label className="form-label" htmlFor="company_name">{t('settings.company.name')}</label>
                 <input
                     type="text"
                     id="company_name"
@@ -34,7 +34,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="company_name_en">{t('settings.company.name_en') || 'اسم الشركة (إنجليزي)'}</label>
+                <label className="form-label" htmlFor="company_name_en">{t('settings.company.name_en')}</label>
                 <input
                     type="text"
                     id="company_name_en"
@@ -47,7 +47,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="email">{t('settings.company.email') || 'البريد الإلكتروني'}</label>
+                <label className="form-label" htmlFor="email">{t('settings.company.email')}</label>
                 <input
                     type="email"
                     id="email"
@@ -61,7 +61,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="phone">{t('settings.company.phone') || 'الهاتف'}</label>
+                <label className="form-label" htmlFor="phone">{t('settings.company.phone')}</label>
                 <input
                     type="text"
                     id="phone"
@@ -75,7 +75,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group md:col-span-2">
-                <label className="form-label" htmlFor="address">{t('settings.company.address') || 'العنوان'}</label>
+                <label className="form-label" htmlFor="address">{t('settings.company.address')}</label>
                 <textarea
                     id="address"
                     name="address"
@@ -88,24 +88,24 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label">{t('settings.company.country') || 'الدولة'}</label>
+                <label className="form-label">{t('settings.company.country')}</label>
                 <div className="form-input" style={{ background: 'var(--bg-main)', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '20px' }}>{countryInfo?.flag || '🌍'}</span>
                     <span>{countryInfo?.name || country || '-'}</span>
                 </div>
-                <small className="text-muted">{t('settings.company.country_note') || 'يتم تحديد الدولة عند التسجيل'}</small>
+                <small className="text-muted">{t('settings.company.country_note')}</small>
             </div>
 
             <div className="form-group">
-                <label className="form-label">{t('settings.company.base_currency') || 'العملة الأساسية'}</label>
+                <label className="form-label">{t('settings.company.base_currency')}</label>
                 <div className="form-input" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
                     {currency || '-'}
                 </div>
-                <small className="text-muted">{t('settings.company.currency_note') || 'العملة الأساسية تُحدد عند التسجيل'}</small>
+                <small className="text-muted">{t('settings.company.currency_note')}</small>
             </div>
 
             <div className="form-group">
-                <label className="form-label">{t('settings.company.plan') || 'خطة الاشتراك'}</label>
+                <label className="form-label">{t('settings.company.plan')}</label>
                 <input
                     type="text"
                     name="plan_type"

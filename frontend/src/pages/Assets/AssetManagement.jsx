@@ -38,12 +38,12 @@ const AssetManagement = () => {
             await assetsAPI.createTransfer({ asset_id: parseInt(transferForm.asset_id), from_branch_id: parseInt(transferForm.from_branch_id), to_branch_id: parseInt(transferForm.to_branch_id), notes: transferForm.notes });
             showToast(t('assets.transfer_created'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleApproveTransfer = async (id) => {
         try { await assetsAPI.approveTransfer(id); showToast(t('assets.approved_toast'), 'success'); fetchData(); }
-        catch (err) { showToast('Error', 'error'); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleCreateRevaluation = async (e) => {
@@ -52,7 +52,7 @@ const AssetManagement = () => {
             await assetsAPI.createRevaluation({ asset_id: parseInt(revalForm.asset_id), new_value: parseFloat(revalForm.new_value), reason: revalForm.reason });
             showToast(t('assets.revaluation_recorded'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const tabs = [

@@ -52,7 +52,7 @@ function Register() {
         setError('')
 
         if (formData.admin_password !== formData.admin_password_confirm) {
-            setError(t('auth.password_mismatch') || 'كلمات المرور غير متطابقة')
+            setError(t('auth.password_mismatch'))
             setLoading(false)
             return
         }
@@ -242,27 +242,27 @@ function Register() {
                         <h3 className="section-title">{t('auth.settings')}</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label" htmlFor="country">{t('auth.country') || 'الدولة'} *</label>
+                                <label className="form-label" htmlFor="country">{t('auth.country')} *</label>
                                 <select name="country" id="country" className="form-input" value={formData.country} onChange={handleChange} required>
-                                    <option value="SY">🇸🇾 {t('countries.SY') || 'سوريا'}</option>
-                                    <option value="SA">🇸🇦 {t('countries.SA') || 'السعودية'}</option>
-                                    <option value="AE">🇦🇪 {t('countries.AE') || 'الإمارات'}</option>
-                                    <option value="EG">🇪🇬 {t('countries.EG') || 'مصر'}</option>
-                                    <option value="KW">🇰🇼 {t('countries.KW') || 'الكويت'}</option>
-                                    <option value="TR">🇹🇷 {t('countries.TR') || 'تركيا'}</option>
+                                    <option value="SY">🇸🇾 {t('countries.SY')}</option>
+                                    <option value="SA">🇸🇦 {t('countries.SA')}</option>
+                                    <option value="AE">🇦🇪 {t('countries.AE')}</option>
+                                    <option value="EG">🇪🇬 {t('countries.EG')}</option>
+                                    <option value="KW">🇰🇼 {t('countries.KW')}</option>
+                                    <option value="TR">🇹🇷 {t('countries.TR')}</option>
                                 </select>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="currency">{t('auth.currency')}</label>
                                 <select name="currency" id="currency" className="form-input" value={formData.currency} onChange={handleChange}>
-                                    <option value="SYP">{t('auth.register.syp') || 'ليرة سورية (SYP)'}</option>
-                                    <option value="SAR">{t('auth.register.sar') || 'ريال سعودي (SAR)'}</option>
-                                    <option value="USD">{t('auth.register.usd') || 'دولار أمريكي (USD)'}</option>
-                                    <option value="AED">{t('auth.register.aed') || 'درهم إماراتي (AED)'}</option>
-                                    <option value="EGP">{t('auth.register.egp') || 'جنيه مصري (EGP)'}</option>
-                                    <option value="KWD">{t('auth.register.kwd') || 'دينار كويتي (KWD)'}</option>
-                                    <option value="TRY">{t('auth.register.try_currency') || 'ليرة تركية (TRY)'}</option>
-                                    <option value="EUR">{t('auth.register.eur') || 'يورو (EUR)'}</option>
+                                    <option value="SYP">{t('auth.register.syp')}</option>
+                                    <option value="SAR">{t('auth.register.sar')}</option>
+                                    <option value="USD">{t('auth.register.usd')}</option>
+                                    <option value="AED">{t('auth.register.aed')}</option>
+                                    <option value="EGP">{t('auth.register.egp')}</option>
+                                    <option value="KWD">{t('auth.register.kwd')}</option>
+                                    <option value="TRY">{t('auth.register.try_currency')}</option>
+                                    <option value="EUR">{t('auth.register.eur')}</option>
                                 </select>
                             </div>
                         </div>
@@ -316,7 +316,7 @@ function Register() {
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label" htmlFor="admin_password_confirm">{t('auth.password_confirm') || 'تأكيد كلمة المرور'} *</label>
+                                <label className="form-label" htmlFor="admin_password_confirm">{t('auth.password_confirm')} *</label>
                                 <input type="password" name="admin_password_confirm" id="admin_password_confirm" className="form-input"
                                     placeholder={t("auth.register.confirm_password_ph")} required minLength={8}
                                     value={formData.admin_password_confirm} onChange={handleChange} autoComplete="new-password" />

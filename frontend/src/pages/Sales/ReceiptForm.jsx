@@ -231,7 +231,7 @@ function ReceiptForm() {
             return;
         }
         if (!formData.payment_method) {
-            toastEmitter.emit(t('sales.receipts.form.errors.payment_method_required') || 'يرجى اختيار طريقة الدفع', 'error');
+            toastEmitter.emit(t('sales.receipts.form.errors.payment_method_required'), 'error');
             return;
         }
 

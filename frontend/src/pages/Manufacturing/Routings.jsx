@@ -125,10 +125,10 @@ const Routings = () => {
                 // Update not fully implemented in backend for ops yet, but assuming full replace or smart update
                 // For now, let's just create logic. Assuming updateRoute exists and handles this.
                 await manufacturingAPI.updateRoute(editId, payload);
-                toastEmitter.emit(t('Updated Successfully'), 'success');
+                toastEmitter.emit(t('common.updated_successfully'), 'success');
             } else {
                 await manufacturingAPI.createRoute(payload);
-                toastEmitter.emit(t('Created Successfully'), 'success');
+                toastEmitter.emit(t('common.created_successfully'), 'success');
             }
             setShowModal(false);
             fetchData();
@@ -164,7 +164,7 @@ const Routings = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                             <div>
                                 <h3 style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-main)', marginBottom: '2px' }}>{route.name}</h3>
-                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{route.product_name || t('manufacturing.no_product_linked') || 'غير مرتبط بمنتج'}</p>
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{route.product_name || t('manufacturing.no_product_linked')}</p>
                             </div>
                             <button onClick={() => handleOpenModal(route)} className="table-action-btn" title={t('common.edit')}>
                                 <FaEdit />
@@ -187,7 +187,7 @@ const Routings = () => {
                                     </div>
                                 ))}
                                 {(route.operations?.length > 3) && (
-                                    <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--primary)' }}>+{route.operations.length - 3} {t('common.more') || 'أخرى'}</div>
+                                    <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--primary)' }}>+{route.operations.length - 3} {t('common.more')}</div>
                                 )}
                             </div>
                         </div>

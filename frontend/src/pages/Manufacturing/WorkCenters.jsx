@@ -92,10 +92,10 @@ const WorkCenters = () => {
 
             if (isEditing) {
                 await manufacturingAPI.updateWorkCenter(editId, payload);
-                toastEmitter.emit(t('Updated Successfully'), 'success');
+                toastEmitter.emit(t('common.updated_successfully'), 'success');
             } else {
                 await manufacturingAPI.createWorkCenter(payload);
-                toastEmitter.emit(t('Created Successfully'), 'success');
+                toastEmitter.emit(t('common.created_successfully'), 'success');
             }
             setShowModal(false);
             fetchData();
@@ -146,7 +146,7 @@ const WorkCenters = () => {
                                     <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '12px', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-secondary)' }}>{wc.code}</span>
                                 </td>
                                 <td style={{ color: 'var(--success)', fontWeight: 600 }}>{wc.cost_per_hour}</td>
-                                <td>{wc.capacity_per_day} {t('common.hours') || 'ساعة'}</td>
+                                <td>{wc.capacity_per_day} {t('common.hours')}</td>
                                 <td>
                                     {costCenters.find(c => c.id === wc.cost_center_id)?.center_name || '-'}
                                 </td>

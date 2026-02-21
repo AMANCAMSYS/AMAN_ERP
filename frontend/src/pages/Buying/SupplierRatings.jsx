@@ -31,7 +31,7 @@ const SupplierRatings = () => {
             });
             showToast(t('buying.rating_submitted'), 'success');
             setShowModal(false); fetchRatings();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const renderStars = (rating) => {

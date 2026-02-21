@@ -116,7 +116,7 @@ function QualityInspections() {
             })
             fetchInspections()
         } catch (err) {
-            setError(err.response?.data?.detail || 'حدث خطأ')
+            setError(err.response?.data?.detail || t('common.error_occurred'))
         } finally {
             setSaving(false)
         }
@@ -142,7 +142,7 @@ function QualityInspections() {
             setSelectedInspection(null)
             fetchInspections()
         } catch (err) {
-            setError(err.response?.data?.detail || 'حدث خطأ')
+            setError(err.response?.data?.detail || t('common.error_occurred'))
         } finally {
             setSaving(false)
         }
@@ -150,10 +150,10 @@ function QualityInspections() {
 
     const getStatusBadge = (status) => {
         const map = {
-            pending: { label: 'قيد الانتظار', cls: 'badge-warning' },
-            in_progress: { label: 'جاري الفحص', cls: 'badge-primary' },
-            completed: { label: 'مكتمل', cls: 'badge-success' },
-            failed: { label: 'فشل', cls: 'badge-danger' }
+            pending: { label: t('stock.quality.pending'), cls: 'badge-warning' },
+            in_progress: { label: t('stock.quality.in_progress'), cls: 'badge-primary' },
+            completed: { label: t('stock.quality.completed'), cls: 'badge-success' },
+            failed: { label: t('stock.quality.status_failed'), cls: 'badge-danger' }
         }
         const s = map[status] || { label: status, cls: 'badge-secondary' }
         return <span className={`badge ${s.cls}`}>{s.label}</span>
@@ -162,16 +162,16 @@ function QualityInspections() {
     const getResultBadge = (result) => {
         if (!result) return '-'
         const map = {
-            passed: { label: '✅ ناجح', cls: 'badge-success' },
-            failed: { label: '❌ فاشل', cls: 'badge-danger' },
-            conditional: { label: '⚠️ مشروط', cls: 'badge-warning' }
+            passed: { label: `✅ ${t('stock.quality.result_passed')}`, cls: 'badge-success' },
+            failed: { label: `❌ ${t('stock.quality.result_failed')}`, cls: 'badge-danger' },
+            conditional: { label: `⚠️ ${t('stock.quality.result_conditional')}`, cls: 'badge-warning' }
         }
         const s = map[result] || { label: result, cls: 'badge-secondary' }
         return <span className={`badge ${s.cls}`}>{s.label}</span>
     }
 
     const getTypeName = (type) => {
-        const map = { incoming: 'وارد', outgoing: 'صادر', in_process: 'أثناء التصنيع', random: 'عشوائي' }
+        const map = { incoming: t('stock.quality.incoming'), outgoing: t('stock.quality.outgoing'), in_process: t('stock.quality.in_process'), random: t('stock.quality.random') }
         return map[type] || type
     }
 
@@ -179,11 +179,11 @@ function QualityInspections() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div>
-                    <h1 className="workspace-title">🔬 {t('stock.quality.title', 'فحوصات الجودة')}</h1>
-                    <p className="workspace-subtitle">{t('stock.quality.subtitle', 'إدارة فحوصات جودة المنتجات والدفعات')}</p>
+                    <h1 className="workspace-title">🔬 {t('stock.quality.title')}</h1>
+                    <p className="workspace-subtitle">{t('stock.quality.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                    + إنشاء فحص جديد
+                    + {t('stock.quality.create_new')}
                 </button>
             </div>
 
@@ -194,7 +194,7 @@ function QualityInspections() {
                         <path d="M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/>
                         <path d="M17.8 20a9 9 0 1 0 -11.6 0"/>
                     </svg>
-                    <div className="small text-muted">إجمالي الفحوصات</div>
+                    <div className="small text-muted">{t('stock.quality.total_inspections')}</div>
                     <div className="fw-bold fs-4">{total}</div>
                 </div>
                 <div className="card p-3 text-center">
@@ -202,7 +202,7 @@ function QualityInspections() {
                         <circle cx="12" cy="12" r="10"/>
                         <path d="M12 6v6l4 2"/>
                     </svg>
-                    <div className="small text-muted">قيد الانتظار</div>
+                    <div className="small text-muted">{t('stock.quality.pending')}</div>
                     <div className="fw-bold fs-4 text-warning">
                         {inspections.filter(i => i.status === 'pending').length}
                     </div>
@@ -212,7 +212,7 @@ function QualityInspections() {
                         <path d="M21.801 10A10 10 0 1 1 17 3.335"/>
                         <path d="m9 11 3 3L22 4"/>
                     </svg>
-                    <div className="small text-muted">ناجحة</div>
+                    <div className="small text-muted">{t('stock.quality.passed')}</div>
                     <div className="fw-bold fs-4 text-success">
                         {inspections.filter(i => i.result === 'passed').length}
                     </div>
@@ -223,7 +223,7 @@ function QualityInspections() {
                         <path d="m15 9-6 6"/>
                         <path d="m9 9 6 6"/>
                     </svg>
-                    <div className="small text-muted">فاشلة</div>
+                    <div className="small text-muted">{t('stock.quality.failed')}</div>
                     <div className="fw-bold fs-4 text-danger">
                         {inspections.filter(i => i.result === 'failed').length}
                     </div>
@@ -235,18 +235,18 @@ function QualityInspections() {
                 <div className="form-row" style={{ gap: '12px', flexWrap: 'wrap' }}>
                     <select className="form-input" style={{ maxWidth: '180px' }}
                         value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">كل الحالات</option>
-                        <option value="pending">قيد الانتظار</option>
-                        <option value="in_progress">جاري الفحص</option>
-                        <option value="completed">مكتمل</option>
+                        <option value="">{t('common.all_statuses')}</option>
+                        <option value="pending">{t('stock.quality.pending')}</option>
+                        <option value="in_progress">{t('stock.quality.in_progress')}</option>
+                        <option value="completed">{t('stock.quality.completed')}</option>
                     </select>
                     <select className="form-input" style={{ maxWidth: '180px' }}
                         value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-                        <option value="">كل الأنواع</option>
-                        <option value="incoming">وارد</option>
-                        <option value="outgoing">صادر</option>
-                        <option value="in_process">أثناء التصنيع</option>
-                        <option value="random">عشوائي</option>
+                        <option value="">{t('stock.quality.all_types')}</option>
+                        <option value="incoming">{t('stock.quality.incoming')}</option>
+                        <option value="outgoing">{t('stock.quality.outgoing')}</option>
+                        <option value="in_process">{t('stock.quality.in_process')}</option>
+                        <option value="random">{t('stock.quality.random')}</option>
                     </select>
                 </div>
             </div>
@@ -257,23 +257,23 @@ function QualityInspections() {
                     <table className="data-table">
                         <thead>
                             <tr style={{ background: 'var(--bg-secondary)' }}>
-                                <th style={{ width: '10%' }}>رقم الفحص</th>
-                                <th style={{ width: '18%' }}>المنتج</th>
-                                <th style={{ width: '12%' }}>المستودع</th>
-                                <th style={{ width: '10%' }}>النوع</th>
-                                <th style={{ width: '10%' }}>حجم العينة</th>
-                                <th style={{ width: '10%' }}>الحالة</th>
-                                <th style={{ width: '10%' }}>النتيجة</th>
-                                <th style={{ width: '12%' }}>التاريخ</th>
-                                <th style={{ width: '8%' }}>إجراءات</th>
+                                <th style={{ width: '10%' }}>{t('stock.quality.inspection_number')}</th>
+                                <th style={{ width: '18%' }}>{t('common.product')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.quality.warehouse')}</th>
+                                <th style={{ width: '10%' }}>{t('stock.quality.type')}</th>
+                                <th style={{ width: '10%' }}>{t('stock.quality.sample_size')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '10%' }}>{t('stock.quality.result')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.quality.date')}</th>
+                                <th style={{ width: '8%' }}>{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>جاري التحميل...</td></tr>
+                                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</td></tr>
                             ) : inspections.length === 0 ? (
                                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                                    لا توجد فحوصات مسجلة
+                                    {t('stock.quality.no_inspections')}
                                 </td></tr>
                             ) : inspections.map(insp => (
                                 <tr key={insp.id}>
@@ -289,7 +289,7 @@ function QualityInspections() {
                                         {insp.status !== 'completed' && (
                                             <button className="btn btn-sm btn-primary"
                                                 onClick={() => openCompleteModal(insp)}
-                                                title="إكمال الفحص">
+                                                title={t('stock.quality.complete_inspection')}>
                                                 ✓
                                             </button>
                                         )}
@@ -307,27 +307,27 @@ function QualityInspections() {
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}
                         style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
-                            <h2>إنشاء فحص جودة جديد</h2>
+                            <h2>{t('stock.quality.create_inspection')}</h2>
                             <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCreate}>
                             {error && <div className="alert alert-error mb-4">{error}</div>}
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">المنتج *</label>
+                                    <label className="form-label">{t('common.product')} *</label>
                                     <select className="form-input" required value={form.product_id}
                                         onChange={(e) => setForm({ ...form, product_id: e.target.value })}>
-                                        <option value="">-- اختر المنتج --</option>
+                                        <option value="">{t('stock.quality.select_product')}</option>
                                         {products.filter(p => p.item_type === 'product').map(p => (
                                             <option key={p.id} value={p.id}>{p.item_name} ({p.item_code})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">المستودع *</label>
+                                    <label className="form-label">{t('stock.quality.warehouse')} *</label>
                                     <select className="form-input" required value={form.warehouse_id}
                                         onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}>
-                                        <option value="">-- اختر المستودع --</option>
+                                        <option value="">{t('stock.quality.select_warehouse')}</option>
                                         {warehouses.map(w => (
                                             <option key={w.id} value={w.id}>{w.warehouse_name}</option>
                                         ))}
@@ -336,24 +336,24 @@ function QualityInspections() {
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">نوع الفحص</label>
+                                    <label className="form-label">{t('stock.quality.inspection_type')}</label>
                                     <select className="form-input" value={form.inspection_type}
                                         onChange={(e) => setForm({ ...form, inspection_type: e.target.value })}>
-                                        <option value="incoming">وارد</option>
-                                        <option value="outgoing">صادر</option>
-                                        <option value="in_process">أثناء التصنيع</option>
-                                        <option value="random">عشوائي</option>
+                                        <option value="incoming">{t('stock.quality.incoming')}</option>
+                                        <option value="outgoing">{t('stock.quality.outgoing')}</option>
+                                        <option value="in_process">{t('stock.quality.in_process')}</option>
+                                        <option value="random">{t('stock.quality.random')}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">حجم العينة</label>
+                                    <label className="form-label">{t('stock.quality.sample_size')}</label>
                                     <input type="number" className="form-input" min="1"
                                         value={form.sample_size}
                                         onChange={(e) => setForm({ ...form, sample_size: e.target.value })} />
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">ملاحظات</label>
+                                <label className="form-label">{t('common.notes')}</label>
                                 <textarea className="form-input" rows="2" value={form.notes}
                                     onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                             </div>
@@ -361,31 +361,31 @@ function QualityInspections() {
                             {/* Criteria */}
                             <div style={{ marginTop: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                    <h3>معايير الفحص</h3>
+                                    <h3>{t('stock.quality.criteria')}</h3>
                                     <button type="button" className="btn btn-sm btn-secondary" onClick={addCriteria}>
-                                        + إضافة معيار
+                                        + {t('stock.quality.add_criteria')}
                                     </button>
                                 </div>
                                 {form.criteria.map((c, i) => (
                                     <div key={i} className="form-row" style={{ alignItems: 'flex-end', gap: '8px', marginBottom: '8px' }}>
                                         <div className="form-group" style={{ flex: 2 }}>
-                                            {i === 0 && <label className="form-label">اسم المعيار</label>}
+                                            {i === 0 && <label className="form-label">{t('stock.quality.criteria_name')}</label>}
                                             <input type="text" className="form-input" value={c.criteria_name}
                                                 onChange={(e) => updateCriteria(i, 'criteria_name', e.target.value)}
-                                                placeholder="مثال: الوزن، اللون..." />
+                                                placeholder={t('stock.quality.criteria_placeholder')} />
                                         </div>
                                         <div className="form-group" style={{ flex: 1.5 }}>
-                                            {i === 0 && <label className="form-label">القيمة المتوقعة</label>}
+                                            {i === 0 && <label className="form-label">{t('stock.quality.expected_value')}</label>}
                                             <input type="text" className="form-input" value={c.expected_value}
                                                 onChange={(e) => updateCriteria(i, 'expected_value', e.target.value)} />
                                         </div>
                                         <div className="form-group" style={{ flex: 1 }}>
-                                            {i === 0 && <label className="form-label">الحد الأدنى</label>}
+                                            {i === 0 && <label className="form-label">{t('stock.quality.min_value')}</label>}
                                             <input type="number" step="0.01" className="form-input" value={c.min_value}
                                                 onChange={(e) => updateCriteria(i, 'min_value', e.target.value)} />
                                         </div>
                                         <div className="form-group" style={{ flex: 1 }}>
-                                            {i === 0 && <label className="form-label">الحد الأقصى</label>}
+                                            {i === 0 && <label className="form-label">{t('stock.quality.max_value')}</label>}
                                             <input type="number" step="0.01" className="form-input" value={c.max_value}
                                                 onChange={(e) => updateCriteria(i, 'max_value', e.target.value)} />
                                         </div>
@@ -399,10 +399,10 @@ function QualityInspections() {
 
                             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'إنشاء الفحص'}
+                                    {saving ? t('common.saving') : t('stock.quality.create_btn')}
                                 </button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         </form>
@@ -416,37 +416,37 @@ function QualityInspections() {
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}
                         style={{ maxWidth: '500px', width: '90%' }}>
                         <div className="modal-header">
-                            <h2>إكمال الفحص - {selectedInspection.inspection_number}</h2>
+                            <h2>{t('stock.quality.complete_inspection')} - {selectedInspection.inspection_number}</h2>
                             <button className="modal-close" onClick={() => setShowCompleteModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleComplete}>
                             {error && <div className="alert alert-error mb-4">{error}</div>}
                             <div className="form-group">
-                                <label className="form-label">النتيجة *</label>
+                                <label className="form-label">{t('stock.quality.result')} *</label>
                                 <select className="form-input" required value={completeForm.result}
                                     onChange={(e) => setCompleteForm({ ...completeForm, result: e.target.value })}>
-                                    <option value="passed">✅ ناجح</option>
-                                    <option value="failed">❌ فاشل</option>
-                                    <option value="conditional">⚠️ مقبول بشروط</option>
+                                    <option value="passed">✅ {t('stock.quality.result_passed')}</option>
+                                    <option value="failed">❌ {t('stock.quality.result_failed')}</option>
+                                    <option value="conditional">⚠️ {t('stock.quality.result_conditional')}</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">كمية العيوب</label>
+                                <label className="form-label">{t('stock.quality.defect_quantity')}</label>
                                 <input type="number" className="form-input" min="0"
                                     value={completeForm.defect_quantity}
                                     onChange={(e) => setCompleteForm({ ...completeForm, defect_quantity: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">ملاحظات الفاحص</label>
+                                <label className="form-label">{t('stock.quality.inspector_notes')}</label>
                                 <textarea className="form-input" rows="3" value={completeForm.inspector_notes}
                                     onChange={(e) => setCompleteForm({ ...completeForm, inspector_notes: e.target.value })} />
                             </div>
                             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'إكمال الفحص'}
+                                    {saving ? t('common.saving') : t('stock.quality.complete_inspection')}
                                 </button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCompleteModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         </form>

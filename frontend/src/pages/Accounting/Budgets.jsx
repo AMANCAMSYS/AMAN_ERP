@@ -82,7 +82,7 @@ const Budgets = () => {
     const handleActivate = async (id) => {
         try {
             await budgetsAPI.activate(id);
-            toast.success(t('accounting.budgets.activated', 'تم تفعيل الميزانية'));
+            toast.success(t('accounting.budgets.activated'));
             fetchAll();
         } catch (error) {
             toast.error(error.response?.data?.detail || t('common.error'));
@@ -90,10 +90,10 @@ const Budgets = () => {
     };
 
     const handleClose = async (id) => {
-        if (!window.confirm(t('accounting.budgets.confirm_close', 'هل تريد إغلاق هذه الميزانية؟'))) return;
+        if (!window.confirm(t('accounting.budgets.confirm_close'))) return;
         try {
             await budgetsAPI.close(id);
-            toast.success(t('accounting.budgets.closed_success', 'تم إغلاق الميزانية'));
+            toast.success(t('accounting.budgets.closed_success'));
             fetchAll();
         } catch (error) {
             toast.error(error.response?.data?.detail || t('common.error'));
@@ -124,7 +124,7 @@ const Budgets = () => {
                         </button>
                         <div>
                             <h1 className="workspace-title">{t('accounting.budgets.title')}</h1>
-                            <p className="text-muted small mb-0">{t('accounting.budgets.subtitle', 'إدارة الميزانيات ومتابعة الأداء المالي')}</p>
+                            <p className="text-muted small mb-0">{t('accounting.budgets.subtitle')}</p>
                         </div>
                     </div>
                     <button onClick={() => setIsModalOpen(true)} className="btn btn-primary">
@@ -139,27 +139,27 @@ const Budgets = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                     <div className="card p-3 text-center">
                         <BarChart2 size={24} className="text-primary mb-2" />
-                        <div className="small text-muted">{t('accounting.budgets.stats.total', 'إجمالي الميزانيات')}</div>
+                        <div className="small text-muted">{t('accounting.budgets.stats.total')}</div>
                         <div className="fw-bold fs-4">{stats.total_budgets}</div>
                         <div className="small text-muted">
-                            {t('accounting.budgets.stats.active', 'نشطة')}: {stats.active_count} | {t('accounting.budgets.stats.draft', 'مسودة')}: {stats.draft_count}
+                            {t('accounting.budgets.stats.active')}: {stats.active_count} | {t('accounting.budgets.stats.draft')}: {stats.draft_count}
                         </div>
                     </div>
                     <div className="card p-3 text-center">
                         <TrendingUp size={24} className="text-primary mb-2" />
-                        <div className="small text-muted">{t('accounting.budgets.stats.total_planned', 'إجمالي المخطط')}</div>
+                        <div className="small text-muted">{t('accounting.budgets.stats.total_planned')}</div>
                         <div className="fw-bold fs-4">{formatNumber(stats.total_planned)}</div>
                         <div className="small text-muted">{currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <TrendingDown size={24} className="text-warning mb-2" />
-                        <div className="small text-muted">{t('accounting.budgets.stats.total_actual', 'إجمالي الفعلي')}</div>
+                        <div className="small text-muted">{t('accounting.budgets.stats.total_actual')}</div>
                         <div className="fw-bold fs-4">{formatNumber(stats.total_actual)}</div>
                         <div className="small text-muted">{currency} • {stats.overall_usage_pct}%</div>
                     </div>
                     <div className="card p-3 text-center">
                         <AlertTriangle size={24} className={stats.overrun_items_count > 0 ? 'text-danger mb-2' : 'text-success mb-2'} />
-                        <div className="small text-muted">{t('accounting.budgets.stats.overruns', 'تجاوزات')}</div>
+                        <div className="small text-muted">{t('accounting.budgets.stats.overruns')}</div>
                         <div className={`fw-bold fs-4 ${stats.overrun_items_count > 0 ? 'text-danger' : 'text-success'}`}>
                             {stats.overrun_items_count}
                         </div>
@@ -174,19 +174,19 @@ const Budgets = () => {
                     <div className="card-body p-3">
                         <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
                             <AlertTriangle size={18} className="text-danger" />
-                            {t('accounting.budgets.overrun_alerts', 'تنبيهات تجاوز الميزانية')}
+                            {t('accounting.budgets.overrun_alerts')}
                             <span className="badge bg-danger rounded-pill">{alerts.length}</span>
                         </h6>
                         <div className="table-responsive" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                             <table className="data-table" style={{ fontSize: '13px' }}>
                                 <thead>
                                     <tr>
-                                        <th>{t('accounting.budgets.budget_name', 'الميزانية')}</th>
-                                        <th>{t('accounting.account_name', 'الحساب')}</th>
-                                        <th className="text-center">{t('reports.budget_vs_actual.planned', 'المخطط')}</th>
-                                        <th className="text-center">{t('reports.budget_vs_actual.actual', 'الفعلي')}</th>
-                                        <th className="text-center">{t('accounting.budgets.usage', 'الاستخدام')}</th>
-                                        <th className="text-center">{t('common.status_title', 'الحالة')}</th>
+                                        <th>{t('accounting.budgets.budget_name')}</th>
+                                        <th>{t('accounting.account_name')}</th>
+                                        <th className="text-center">{t('reports.budget_vs_actual.planned')}</th>
+                                        <th className="text-center">{t('reports.budget_vs_actual.actual')}</th>
+                                        <th className="text-center">{t('accounting.budgets.usage')}</th>
+                                        <th className="text-center">{t('common.status_title')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -214,9 +214,9 @@ const Budgets = () => {
                                             </td>
                                             <td className="text-center">
                                                 <span className={`badge ${alert.severity === 'critical' ? 'bg-danger' : 'bg-warning text-dark'}`} style={{ fontSize: '11px' }}>
-                                                    {alert.severity === 'critical' ? '🔴 ' + t('accounting.budgets.over_budget', 'تجاوز') :
-                                                     alert.severity === 'danger' ? '🟠 ' + t('accounting.budgets.near_limit', 'قرب الحد') :
-                                                     '🟡 ' + t('accounting.budgets.warning_label', 'تحذير')}
+                                                    {alert.severity === 'critical' ? '🔴 ' + t('accounting.budgets.over_budget') :
+                                                     alert.severity === 'danger' ? '🟠 ' + t('accounting.budgets.near_limit') :
+                                                     '🟡 ' + t('accounting.budgets.warning_label')}
                                                 </span>
                                             </td>
                                         </tr>
@@ -293,7 +293,7 @@ const Budgets = () => {
                                                 style={{ borderRadius: '8px', fontSize: '12px' }}
                                             >
                                                 <PlayCircle size={14} className="me-1" />
-                                                {t('accounting.budgets.activate', 'تفعيل')}
+                                                {t('accounting.budgets.activate')}
                                             </button>
                                         )}
                                         {budget.status === 'active' && (
@@ -303,7 +303,7 @@ const Budgets = () => {
                                                 style={{ borderRadius: '8px', fontSize: '12px' }}
                                             >
                                                 <Lock size={14} className="me-1" />
-                                                {t('accounting.budgets.close_budget', 'إغلاق')}
+                                                {t('accounting.budgets.close_budget')}
                                             </button>
                                         )}
                                         {budget.status !== 'active' && (
@@ -342,7 +342,7 @@ const Budgets = () => {
                                         type="text" className="form-input" required
                                         value={formData.name}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        placeholder={t('accounting.budgets.name_placeholder', 'مثال: ميزانية 2026')}
+                                        placeholder={t('accounting.budgets.name_placeholder')}
                                     />
                                 </div>
                                 <div className="row g-3">

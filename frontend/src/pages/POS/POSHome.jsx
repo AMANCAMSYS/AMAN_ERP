@@ -226,26 +226,26 @@ const POSHome = () => {
             {/* POS Features */}
             <div className="modules-grid" style={{ maxWidth: '800px', margin: '2rem auto' }}>
                 <div className="card section-card">
-                    <h3 className="section-title">{isRTL ? 'ميزات نقاط البيع' : 'POS Features'}</h3>
+                    <h3 className="section-title">{t('pos.home.pos_features')}</h3>
                     <div className="links-list">
                         <div className="link-item" onClick={() => navigate('/pos/promotions')}>
                             <span className="link-icon">🎁</span>
-                            {isRTL ? 'العروض والخصومات' : 'Promotions & Discounts'}
+                            {t('pos.home.promotions_discounts')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/pos/loyalty')}>
                             <span className="link-icon">⭐</span>
-                            {isRTL ? 'برامج الولاء' : 'Loyalty Programs'}
+                            {t('pos.home.loyalty_programs')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/pos/tables')}>
                             <span className="link-icon">🪑</span>
-                            {isRTL ? 'إدارة الطاولات' : 'Table Management'}
+                            {t('pos.home.table_management')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/pos/kitchen')}>
                             <span className="link-icon">👨‍🍳</span>
-                            {isRTL ? 'شاشة المطبخ' : 'Kitchen Display'}
+                            {t('pos.home.kitchen_display')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                     </div>

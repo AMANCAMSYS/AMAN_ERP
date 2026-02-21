@@ -122,7 +122,7 @@ export default function CurrencyList() {
                 currency_id: selectedCurrency.id,
                 ...rateData
             })
-            showToast(t('accounting.currencies.rate_updated', 'تم تحديث سعر الصرف'), 'success')
+            showToast(t('accounting.currencies.rate_updated'), 'success')
             setShowRateModal(false)
             fetchCurrencies()
         } catch (error) {
@@ -156,7 +156,7 @@ export default function CurrencyList() {
                             <DollarSign size={28} className="text-primary" />
                             {t('common.currencies')}
                         </h1>
-                        <p className="workspace-subtitle">{t('accounting.currencies.subtitle', 'إدارة العملات وأسعار الصرف')}</p>
+                        <p className="workspace-subtitle">{t('accounting.currencies.subtitle')}</p>
                     </div>
                     <button className="btn btn-primary shadow-sm" onClick={() => openModal()}>
                         <Plus size={18} />
@@ -167,11 +167,11 @@ export default function CurrencyList() {
 
             <div className="metrics-grid mb-4">
                 <div className="metric-card">
-                    <div className="metric-label">{t('accounting.currencies.total_count', 'إجمالي العملات')}</div>
+                    <div className="metric-label">{t('accounting.currencies.total_count')}</div>
                     <div className="metric-value text-primary">{currencies.length}</div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('accounting.currencies.base_currency', 'العملة الأساسية')}</div>
+                    <div className="metric-label">{t('accounting.currencies.base_currency')}</div>
                     <div className="metric-value text-success">
                         {currencies.find(c => c.is_base)?.code || getCurrency()}
                     </div>
@@ -196,11 +196,11 @@ export default function CurrencyList() {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th className="bg-transparent">{t('accounting.currencies.table.code', 'الرمز')}</th>
-                                <th className="bg-transparent">{t('accounting.currencies.table.name', 'الاسم')}</th>
-                                <th className="bg-transparent text-center">{t('accounting.currencies.table.symbol', 'الرمز المختصر')}</th>
-                                <th className="bg-transparent text-center">{t('accounting.currencies.table.is_base', 'الأساسية')}</th>
-                                <th className="bg-transparent text-end">{t('accounting.currencies.table.rate', 'سعر الصرف')}</th>
+                                <th className="bg-transparent">{t('accounting.currencies.table.code')}</th>
+                                <th className="bg-transparent">{t('accounting.currencies.table.name')}</th>
+                                <th className="bg-transparent text-center">{t('accounting.currencies.table.symbol')}</th>
+                                <th className="bg-transparent text-center">{t('accounting.currencies.table.is_base')}</th>
+                                <th className="bg-transparent text-end">{t('accounting.currencies.table.rate')}</th>
                                 <th className="bg-transparent text-center" style={{ width: '120px' }}>{t('common.actions')}</th>
                             </tr>
                         </thead>
@@ -228,7 +228,7 @@ export default function CurrencyList() {
                                                 onClick={() => openRateModal(curr)}
                                                 className="btn-icon ms-2"
                                                 style={{ width: '28px', height: '28px' }}
-                                                title={t('accounting.currencies.update_rate', 'تحديث السعر')}
+                                                title={t('accounting.currencies.update_rate')}
                                             >
                                                 <History size={14} />
                                             </button>
@@ -267,7 +267,7 @@ export default function CurrencyList() {
                     <div className="modal-content" style={{ maxWidth: '480px' }}>
                         <div className="modal-header">
                             <h2 className="modal-title">
-                                {editingCurrency ? t('accounting.currencies.form.edit_title', 'تعديل عملة') : t('accounting.currencies.form.add_title', 'إضافة عملة')}
+                                {editingCurrency ? t('accounting.currencies.form.edit_title') : t('accounting.currencies.form.add_title')}
                             </h2>
                             <button onClick={() => setShowModal(false)} className="btn-icon border-0 bg-transparent"><X size={20} /></button>
                         </div>
@@ -275,7 +275,7 @@ export default function CurrencyList() {
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body p-4">
                                 <div className="form-group">
-                                    <label className="form-label">{t('accounting.currencies.form.code', 'رمز العملة (ISO)')} *</label>
+                                    <label className="form-label">{t('accounting.currencies.form.code')} *</label>
                                     <input
                                         type="text"
                                         maxLength="3"
@@ -291,7 +291,7 @@ export default function CurrencyList() {
                                 <div className="row g-3">
                                     <div className="col-md-6">
                                         <div className="form-group mb-3">
-                                            <label className="form-label">{t('accounting.currencies.form.name_ar', 'الاسم (عربي)')} *</label>
+                                            <label className="form-label">{t('accounting.currencies.form.name_ar')} *</label>
                                             <input
                                                 type="text"
                                                 className="form-input"
@@ -303,7 +303,7 @@ export default function CurrencyList() {
                                     </div>
                                     <div className="col-md-6">
                                         <div className="form-group mb-3">
-                                            <label className="form-label">{t('accounting.currencies.form.name_en', 'الاسم (English)')}</label>
+                                            <label className="form-label">{t('accounting.currencies.form.name_en')}</label>
                                             <input
                                                 type="text"
                                                 className="form-input"
@@ -316,7 +316,7 @@ export default function CurrencyList() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">{t('accounting.currencies.form.symbol', 'الرمز المختصر ($/€)')}</label>
+                                    <label className="form-label">{t('accounting.currencies.form.symbol')}</label>
                                     <input
                                         type="text"
                                         className="form-input w-25"
@@ -337,9 +337,9 @@ export default function CurrencyList() {
                                             style={{ width: '20px', height: '20px' }}
                                         />
                                         <div>
-                                            <span className="d-block fw-bold text-dark">{t('accounting.currencies.form.set_base', 'تعيين كعملة أساسية')}</span>
+                                            <span className="d-block fw-bold text-dark">{t('accounting.currencies.form.set_base')}</span>
                                             <span className="text-muted small">
-                                                {t('accounting.currencies.form.base_hint', 'سيتم استخدام هذه العملة كأساس لجميع التقارير.')}
+                                                {t('accounting.currencies.form.base_hint')}
                                             </span>
                                         </div>
                                     </label>
@@ -361,7 +361,7 @@ export default function CurrencyList() {
                     <div className="modal-content" style={{ maxWidth: '550px' }}>
                         <div className="modal-header">
                             <div>
-                                <h2 className="modal-title">{t('accounting.currencies.rate.title', 'تحديث سعر الصرف')}</h2>
+                                <h2 className="modal-title">{t('accounting.currencies.rate.title')}</h2>
                                 <p className="text-muted small mb-0">{selectedCurrency.name} ({selectedCurrency.code})</p>
                             </div>
                             <button onClick={() => setShowRateModal(false)} className="btn-icon border-0 bg-transparent"><X size={20} /></button>
@@ -371,7 +371,7 @@ export default function CurrencyList() {
                             <form onSubmit={handleRateSubmit} className="bg-light p-4 rounded-3 border mb-4">
                                 <div className="row g-3">
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">{t('accounting.currencies.rate.new_rate', 'سعر الصرف الجديد')}</label>
+                                        <label className="form-label fw-bold">{t('accounting.currencies.rate.new_rate')}</label>
                                         <div style={{ position: 'relative' }}>
                                             <input
                                                 type="number"
@@ -398,7 +398,7 @@ export default function CurrencyList() {
                                         </small>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="form-label fw-bold">{t('accounting.currencies.rate.date', 'تاريخ السريان')}</label>
+                                        <label className="form-label fw-bold">{t('accounting.currencies.rate.date')}</label>
                                         <input
                                            
                                             className="form-input w-100"
@@ -410,20 +410,20 @@ export default function CurrencyList() {
                                     <div className="col-12 mt-3">
                                         <button type="submit" className="btn btn-success w-100 d-flex justify-content-center align-items-center gap-2">
                                             <RefreshCw size={18} />
-                                            {t('common.update') || 'تحديث'}
+                                            {t('common.update')}
                                         </button>
                                     </div>
                                 </div>
                             </form>
 
-                            <h3 className="fw-bold text-dark mb-3 small">{t('accounting.currencies.rate.history', 'سجل الأسعار التاريخي')}</h3>
+                            <h3 className="fw-bold text-dark mb-3 small">{t('accounting.currencies.rate.history')}</h3>
                             <div className="data-table-container shadow-none border">
                                 <table className="data-table">
                                     <thead className="bg-light">
                                         <tr>
-                                            <th className="py-2">{t('accounting.currencies.rate.history_date', 'التاريخ')}</th>
-                                            <th className="py-2">{t('accounting.currencies.rate.history_rate', 'السعر')}</th>
-                                            <th className="py-2">{t('accounting.currencies.rate.history_source', 'المصدر')}</th>
+                                            <th className="py-2">{t('accounting.currencies.rate.history_date')}</th>
+                                            <th className="py-2">{t('accounting.currencies.rate.history_rate')}</th>
+                                            <th className="py-2">{t('accounting.currencies.rate.history_source')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

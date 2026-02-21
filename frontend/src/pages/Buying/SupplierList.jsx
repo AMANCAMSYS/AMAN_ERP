@@ -69,7 +69,7 @@ function SupplierList() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th style={{ width: '12%' }}>{t('buying.suppliers.table.code') || 'رقم المورد'}</th>
+                            <th style={{ width: '12%' }}>{t('buying.suppliers.table.code')}</th>
                             <th style={{ width: '28%' }}>{t('buying.suppliers.table.name')}</th>
                             <th style={{ width: '20%' }}>{t('buying.suppliers.table.contact')}</th>
                             <th style={{ width: '20%' }}>{t('buying.suppliers.table.balance')}</th>

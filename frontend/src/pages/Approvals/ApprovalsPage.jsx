@@ -354,7 +354,7 @@ const ApprovalsPage = () => {
                     <div className="alert alert-info bg-primary/5 border-primary/20 text-sm">
                         <AlertCircle size={18} className="text-primary" />
                         <div>
-                            {isRTL ? 'تأكيد اتخاذ إجراء على هذا الطلب' : 'Confirm action on this request'}
+                            {t('approvals.approvals.confirm_action_on_this_request')}
                         </div>
                     </div>
 

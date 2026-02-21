@@ -169,7 +169,7 @@ function ExpenseForm() {
                             </select>
                             {form.treasury_id && (
                                 <div className="mt-2 text-sm">
-                                    <span className="text-secondary">{t('treasury.available_balance') || 'الرصيد المتاح'}: </span>
+                                    <span className="text-secondary">{t('treasury.available_balance')}: </span>
                                     <span className={`fw-bold ${accounts.find(a => a.id.toString() === form.treasury_id.toString())?.current_balance < 0 ? 'text-danger' : 'text-success'}`}>
                                         {formatNumber(accounts.find(a => a.id.toString() === form.treasury_id.toString())?.current_balance)} {currency}
                                     </span>

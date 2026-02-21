@@ -1,17 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { crmAPI, salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
-
-const stageOptions = [
-    { value: 'lead', label: 'عميل محتمل' },
-    { value: 'qualified', label: 'مؤهل' },
-    { value: 'proposal', label: 'عرض سعر' },
-    { value: 'negotiation', label: 'تفاوض' },
-    { value: 'won', label: 'مكسوبة' },
-    { value: 'lost', label: 'خاسرة' }
-]
 
 const stageBadgeStyles = {
     lead: 'badge-info',
@@ -32,7 +24,18 @@ const stageBadgeColors = {
 }
 
 function Opportunities() {
+    const { t } = useTranslation()
     const currency = getCurrency()
+
+    const stageOptions = [
+        { value: 'lead', label: t('crm.stage_lead') },
+        { value: 'qualified', label: t('crm.stage_qualified') },
+        { value: 'proposal', label: t('crm.stage_proposal') },
+        { value: 'negotiation', label: t('crm.stage_negotiation') },
+        { value: 'won', label: t('crm.stage_won') },
+        { value: 'lost', label: t('crm.stage_lost') }
+    ]
+
     const [opportunities, setOpportunities] = useState([])
     const [customers, setCustomers] = useState([])
     const [loading, setLoading] = useState(true)
@@ -128,7 +131,7 @@ function Opportunities() {
             fetchOpportunities()
         } catch (err) {
             console.error('Failed to save opportunity', err)
-            alert(err.response?.data?.detail || 'حدث خطأ أثناء الحفظ')
+            alert(err.response?.data?.detail || t('crm.save_error'))
         }
     }
 
@@ -139,7 +142,7 @@ function Opportunities() {
             fetchOpportunities()
         } catch (err) {
             console.error('Failed to delete opportunity', err)
-            alert(err.response?.data?.detail || 'حدث خطأ أثناء الحذف')
+            alert(err.response?.data?.detail || t('crm.delete_error'))
         }
     }
 
@@ -151,20 +154,20 @@ function Opportunities() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
-                <h1 className="workspace-title">الفرص البيعية</h1>
-                <p className="workspace-subtitle">إدارة ومتابعة فرص المبيعات</p>
+                <h1 className="workspace-title">{t('crm.opportunities_title')}</h1>
+                <p className="workspace-subtitle">{t('crm.opportunities_desc')}</p>
             </div>
 
             {/* Toolbar */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" onClick={openCreate}>+ فرصة جديدة</button>
+                <button className="btn btn-primary" onClick={openCreate}>+ {t('crm.new_opportunity')}</button>
                 <select
                     className="search-bar"
                     style={{ maxWidth: 200 }}
                     value={filterStage}
                     onChange={e => setFilterStage(e.target.value)}
                 >
-                    <option value="">جميع المراحل</option>
+                    <option value="">{t('crm.all_stages')}</option>
                     {stageOptions.map(s => (
                         <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
@@ -173,21 +176,21 @@ function Opportunities() {
 
             {/* Table */}
             {loading ? (
-                <div className="empty-state">جاري التحميل...</div>
+                <div className="empty-state">{t('common.loading')}</div>
             ) : opportunities.length === 0 ? (
-                <div className="empty-state">لا توجد فرص بيعية</div>
+                <div className="empty-state">{t('crm.no_opportunities')}</div>
             ) : (
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>العنوان</th>
-                            <th>العميل</th>
-                            <th>المرحلة</th>
-                            <th>الاحتمالية</th>
-                            <th>القيمة المتوقعة</th>
-                            <th>تاريخ الإغلاق المتوقع</th>
-                            <th>المسؤول</th>
-                            <th>إجراءات</th>
+                            <th>{t('crm.title_label')}</th>
+                            <th>{t('common.customer')}</th>
+                            <th>{t('crm.stage')}</th>
+                            <th>{t('crm.probability')}</th>
+                            <th>{t('crm.expected_value')}</th>
+                            <th>{t('crm.expected_close')}</th>
+                            <th>{t('crm.responsible')}</th>
+                            <th>{t('common.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -209,8 +212,8 @@ function Opportunities() {
                                 <td>{opp.assigned_name || '-'}</td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6 }}>
-                                        <button className="btn btn-secondary" onClick={() => openEdit(opp)}>تعديل</button>
-                                        <button className="btn btn-danger" onClick={() => setDeleteConfirm(opp.id)}>حذف</button>
+                                        <button className="btn btn-secondary" onClick={() => openEdit(opp)}>{t('crm.edit')}</button>
+                                        <button className="btn btn-danger" onClick={() => setDeleteConfirm(opp.id)}>{t('common.delete')}</button>
                                     </div>
                                 </td>
                             </tr>
@@ -223,11 +226,11 @@ function Opportunities() {
             {deleteConfirm && (
                 <div className="modal-overlay" style={overlayStyle}>
                     <div className="card" style={modalBoxStyle}>
-                        <h3 style={{ marginBottom: 16 }}>تأكيد الحذف</h3>
-                        <p>هل أنت متأكد من حذف هذه الفرصة البيعية؟</p>
+                        <h3 style={{ marginBottom: 16 }}>{t('crm.confirm_delete')}</h3>
+                        <p>{t('crm.confirm_delete_opportunity')}</p>
                         <div className="form-actions" style={{ marginTop: 16 }}>
-                            <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>حذف</button>
-                            <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>إلغاء</button>
+                            <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
+                            <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
                         </div>
                     </div>
                 </div>
@@ -237,12 +240,12 @@ function Opportunities() {
             {showModal && (
                 <div className="modal-overlay" style={overlayStyle}>
                     <div className="card" style={{ ...modalBoxStyle, maxWidth: 600 }}>
-                        <h3 style={{ marginBottom: 16 }}>{isEdit ? 'تعديل الفرصة' : 'فرصة جديدة'}</h3>
+                        <h3 style={{ marginBottom: 16 }}>{isEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h3>
                         <form onSubmit={handleSubmit}>
                             <div className="form-section">
                                 <div className="form-grid">
                                     <div className="form-group">
-                                        <label>العنوان</label>
+                                        <label>{t('crm.title_label')}</label>
                                         <input
                                             type="text"
                                             name="title"
@@ -252,16 +255,16 @@ function Opportunities() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>العميل</label>
+                                        <label>{t('common.customer')}</label>
                                         <select name="customer_id" value={formData.customer_id} onChange={handleChange}>
-                                            <option value="">-- اختر العميل --</option>
+                                            <option value="">{t('crm.select_customer')}</option>
                                             {customers.map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>المرحلة</label>
+                                        <label>{t('crm.stage')}</label>
                                         <select name="stage" value={formData.stage} onChange={handleChange} required>
                                             {stageOptions.map(s => (
                                                 <option key={s.value} value={s.value}>{s.label}</option>
@@ -269,7 +272,7 @@ function Opportunities() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>الاحتمالية (%)</label>
+                                        <label>{t('crm.probability')} (%)</label>
                                         <input
                                             type="number"
                                             name="probability"
@@ -280,7 +283,7 @@ function Opportunities() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>القيمة المتوقعة</label>
+                                        <label>{t('crm.expected_value')}</label>
                                         <input
                                             type="number"
                                             name="expected_value"
@@ -291,7 +294,7 @@ function Opportunities() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>تاريخ الإغلاق المتوقع</label>
+                                        <label>{t('crm.expected_close')}</label>
                                         <input
                                             type="date"
                                             name="expected_close_date"
@@ -300,7 +303,7 @@ function Opportunities() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>المصدر</label>
+                                        <label>{t('crm.source')}</label>
                                         <input
                                             type="text"
                                             name="source"
@@ -309,7 +312,7 @@ function Opportunities() {
                                         />
                                     </div>
                                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>ملاحظات</label>
+                                        <label>{t('common.notes')}</label>
                                         <textarea
                                             name="notes"
                                             rows={3}
@@ -321,10 +324,10 @@ function Opportunities() {
                             </div>
                             <div className="form-actions" style={{ marginTop: 16 }}>
                                 <button type="submit" className="btn btn-primary">
-                                    {isEdit ? 'تحديث' : 'إنشاء'}
+                                    {isEdit ? t('common.update') : t('common.create')}
                                 </button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         </form>

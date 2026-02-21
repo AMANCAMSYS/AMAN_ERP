@@ -23,11 +23,11 @@ export default function ReportBuilder() {
 
     // Available Tables (Mock for now, or could be fetched)
     const availableTables = [
-        { id: 'projects', label: t('reports.tables.projects', 'المشاريع'), columns: ['id', 'project_name', 'status', 'start_date', 'end_date', 'budget', 'manager_id'] },
-        { id: 'tasks', label: t('reports.tables.tasks', 'المهام'), columns: ['id', 'project_id', 'task_name', 'status', 'start_date', 'end_date', 'planned_hours', 'actual_hours'] },
-        { id: 'sales_invoices', label: t('reports.tables.sales', 'فواتير المبيعات'), columns: ['id', 'invoice_number', 'customer_id', 'invoice_date', 'total_amount', 'status'] },
-        { id: 'expenses', label: t('reports.tables.expenses', 'المصاريف'), columns: ['id', 'project_id', 'expense_date', 'amount', 'category', 'description'] },
-        { id: 'customers', label: t('reports.tables.customers', 'العملاء'), columns: ['id', 'name', 'email', 'phone', 'city'] },
+        { id: 'projects', label: t('reports.tables.projects'), columns: ['id', 'project_name', 'status', 'start_date', 'end_date', 'budget', 'manager_id'] },
+        { id: 'tasks', label: t('reports.tables.tasks'), columns: ['id', 'project_id', 'task_name', 'status', 'start_date', 'end_date', 'planned_hours', 'actual_hours'] },
+        { id: 'sales_invoices', label: t('reports.tables.sales'), columns: ['id', 'invoice_number', 'customer_id', 'invoice_date', 'total_amount', 'status'] },
+        { id: 'expenses', label: t('reports.tables.expenses'), columns: ['id', 'project_id', 'expense_date', 'amount', 'category', 'description'] },
+        { id: 'customers', label: t('reports.tables.customers'), columns: ['id', 'name', 'email', 'phone', 'city'] },
     ];
 
     const [config, setConfig] = useState({
@@ -89,7 +89,7 @@ export default function ReportBuilder() {
 
     const handlePreview = async () => {
         if (config.columns.length === 0) {
-            toastEmitter.emit(t('reports.errors.no_columns', 'اختر عموداً واحداً على الأقل'), 'error');
+            toastEmitter.emit(t('reports.errors.no_columns'), 'error');
             return;
         }
         setLoading(true);
@@ -97,7 +97,7 @@ export default function ReportBuilder() {
             const res = await customReportsAPI.preview(config);
             setPreviewData(res.data);
         } catch (err) {
-            toastEmitter.emit(t('common.error', 'خطأ في المعاينة'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -105,15 +105,15 @@ export default function ReportBuilder() {
 
     const handleSave = async () => {
         if (!config.name) {
-            toastEmitter.emit(t('reports.errors.name_required', 'اسم التقرير مطلوب'), 'error');
+            toastEmitter.emit(t('reports.errors.name_required'), 'error');
             return;
         }
         try {
             await customReportsAPI.create(config);
-            toastEmitter.emit(t('common.saved', 'تم الحفظ'), 'success');
+            toastEmitter.emit(t('common.saved'), 'success');
             fetchSavedReports();
         } catch (err) {
-            toastEmitter.emit(t('common.save_error', 'خطأ في الحفظ'), 'error');
+            toastEmitter.emit(t('common.save_error'), 'error');
         }
     };
 
@@ -148,16 +148,16 @@ export default function ReportBuilder() {
                             <ArrowRight size={20} style={{ transform: isRTL ? 'none' : 'scaleX(-1)' }} />
                         </button>
                         <div>
-                            <h1 className="workspace-title mb-0">{t('reports.builder_title', 'منشئ التقارير المخصص')}</h1>
-                            <p className="workspace-subtitle mb-0">{t('reports.builder_subtitle', 'صمم تقاريرك الخاصة بسهولة')}</p>
+                            <h1 className="workspace-title mb-0">{t('reports.builder_title')}</h1>
+                            <p className="workspace-subtitle mb-0">{t('reports.builder_subtitle')}</p>
                         </div>
                     </div>
                     <div className="d-flex gap-2">
                         <button className="btn btn-light" onClick={() => setShowSavedList(!showSavedList)}>
-                            <FileText size={16} /> {t('reports.saved_reports', 'التقارير المحفوظة')}
+                            <FileText size={16} /> {t('reports.saved_reports')}
                         </button>
                         <button className="btn btn-primary" onClick={handleSave}>
-                            <Save size={16} /> {t('common.save', 'حفظ')}
+                            <Save size={16} /> {t('common.save')}
                         </button>
                     </div>
                 </div>
@@ -168,17 +168,17 @@ export default function ReportBuilder() {
                 <div className="col-lg-4">
                     <div className="card section-card border-0 shadow-sm mb-4">
                         <div className="card-body">
-                            <h5 className="section-title mb-3"><Database size={16} /> {t('reports.data_source', 'مصدر البيانات')}</h5>
+                            <h5 className="section-title mb-3"><Database size={16} /> {t('reports.data_source')}</h5>
 
                             <div className="mb-3">
-                                <label className="form-label">{t('reports.report_name', 'اسم التقرير')}</label>
+                                <label className="form-label">{t('reports.report_name')}</label>
                                 <input type="text" className="form-input" value={config.name}
                                     onChange={e => setConfig({ ...config, name: e.target.value })}
-                                    placeholder={t('reports.report_name_placeholder', 'مثال: تقرير مبيعات الشهر')} />
+                                    placeholder={t('reports.report_name_placeholder')} />
                             </div>
 
                             <div className="mb-3">
-                                <label className="form-label">{t('reports.select_table', 'اختر الجدول')}</label>
+                                <label className="form-label">{t('reports.select_table')}</label>
                                 <select className="form-input" value={config.table_name}
                                     onChange={e => setConfig({ ...config, table_name: e.target.value, columns: [] })}>
                                     {availableTables.map(t => (
@@ -191,7 +191,7 @@ export default function ReportBuilder() {
 
                     <div className="card section-card border-0 shadow-sm mb-4">
                         <div className="card-body">
-                            <h5 className="section-title mb-3"><Columns size={16} /> {t('reports.columns', 'الأعمدة')}</h5>
+                            <h5 className="section-title mb-3"><Columns size={16} /> {t('reports.columns')}</h5>
                             <div className="d-flex flex-wrap gap-2">
                                 {availableTables.find(t => t.id === config.table_name)?.columns.map(col => (
                                     <button
@@ -210,7 +210,7 @@ export default function ReportBuilder() {
                         <div className="card-body">
                             <h5 className="section-title mb-3">
                                 <div className="d-flex justify-content-between align-items-center w-100">
-                                    <span><Filter size={16} /> {t('reports.filters', 'الفلاتر')}</span>
+                                    <span><Filter size={16} /> {t('reports.filters')}</span>
                                     <button className="btn btn-sm btn-light btn-icon" onClick={handleAddFilter}><Plus size={14} /></button>
                                 </div>
                             </h5>
@@ -232,11 +232,11 @@ export default function ReportBuilder() {
                                 </div>
                             ))}
                             {Object.keys(config.filters).length === 0 && (
-                                <p className="text-muted small text-center">{t('reports.no_filters', 'لا توجد فلاتر')}</p>
+                                <p className="text-muted small text-center">{t('reports.no_filters')}</p>
                             )}
 
                             <button className="btn btn-success w-100 mt-3" onClick={handlePreview} disabled={loading}>
-                                <Play size={16} /> {loading ? t('common.loading', 'جاري التحميل...') : t('reports.preview', 'معاينة التقرير')}
+                                <Play size={16} /> {loading ? t('common.loading') : t('reports.preview')}
                             </button>
                         </div>
                     </div>
@@ -247,17 +247,17 @@ export default function ReportBuilder() {
                     {showSavedList ? (
                         <div className="card section-card border-0 shadow-sm">
                             <div className="card-body">
-                                <h5 className="section-title mb-4">{t('reports.saved_reports', 'التقارير المحفوظة')}</h5>
+                                <h5 className="section-title mb-4">{t('reports.saved_reports')}</h5>
                                 {savedReports.length === 0 ? (
-                                    <p className="text-muted text-center">{t('common.no_data', 'لا يوجد بيانات')}</p>
+                                    <p className="text-muted text-center">{t('common.no_data')}</p>
                                 ) : (
                                     <div className="table-responsive">
                                         <table className="table">
                                             <thead>
                                                 <tr>
-                                                    <th>{t('common.name', 'الاسم')}</th>
-                                                    <th>{t('common.description', 'الوصف')}</th>
-                                                    <th>{t('common.created_at', 'تاريخ الإنشاء')}</th>
+                                                    <th>{t('common.name')}</th>
+                                                    <th>{t('common.description')}</th>
+                                                    <th>{t('common.created_at')}</th>
                                                     <th></th>
                                                 </tr>
                                             </thead>
@@ -286,10 +286,10 @@ export default function ReportBuilder() {
                         <div className="card section-card border-0 shadow-sm h-100">
                             <div className="card-body">
                                 <div className="d-flex justify-content-between align-items-center mb-4">
-                                    <h5 className="section-title mb-0">{t('reports.results', 'النتائج')}</h5>
+                                    <h5 className="section-title mb-0">{t('reports.results')}</h5>
                                     {previewData && (
                                         <button className="btn btn-sm btn-outline-secondary">
-                                            <Download size={14} /> {t('common.export', 'تصدير')}
+                                            <Download size={14} /> {t('common.export')}
                                         </button>
                                     )}
                                 </div>
@@ -299,7 +299,7 @@ export default function ReportBuilder() {
                                 ) : !previewData ? (
                                     <div className="text-center py-5 text-muted">
                                         <Database size={48} className="mb-3 opacity-25" />
-                                        <p>{t('reports.click_preview', 'اضبط الإعدادات واضغط على معاينة')}</p>
+                                        <p>{t('reports.click_preview')}</p>
                                     </div>
                                 ) : (
                                     <div className="data-table-container">
@@ -322,7 +322,7 @@ export default function ReportBuilder() {
                                             </tbody>
                                         </table>
                                         <div className="mt-3 text-muted small">
-                                            {t('reports.showing_rows', 'عرض أول 50 صف')}
+                                            {t('reports.showing_rows')}
                                         </div>
                                     </div>
                                 )}

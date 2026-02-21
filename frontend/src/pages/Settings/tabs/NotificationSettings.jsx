@@ -33,11 +33,11 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Server size={20} className="text-primary" />
-                    {t('settings.notifications.smtp_title') || 'إعدادات خادم البريد (SMTP)'}
+                    {t('settings.notifications.smtp_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.notifications.smtp_host') || 'عنوان الخادم (Host)'}</label>
+                        <label className="form-label">{t('settings.notifications.smtp_host')}</label>
                         <input
                             type="text"
                             className="form-input ltr"
@@ -47,7 +47,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.notifications.smtp_port') || 'المنفذ (Port)'}</label>
+                        <label className="form-label">{t('settings.notifications.smtp_port')}</label>
                         <input
                             type="number"
                             className="form-input ltr"
@@ -57,7 +57,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.notifications.smtp_user') || 'اسم المستخدم (Email)'}</label>
+                        <label className="form-label">{t('settings.notifications.smtp_user')}</label>
                         <input
                             type="email"
                             className="form-input ltr"
@@ -66,7 +66,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.notifications.smtp_pass') || 'كلمة المرور (Password/App Key)'}</label>
+                        <label className="form-label">{t('settings.notifications.smtp_pass')}</label>
                         <input
                             type="password"
                             className="form-input ltr"
@@ -84,7 +84,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         disabled={testing}
                     >
                         {testing ? <span className="loading loading-spinner loading-xs"></span> : <CheckCircle size={18} />}
-                        {t('settings.notifications.test_conn') || 'اختبار الاتصال'}
+                        {t('settings.notifications.test_conn')}
                     </button>
                 </div>
             </div>
@@ -93,7 +93,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Mail size={20} className="text-primary" />
-                    {t('settings.notifications.sms_title') || 'إعدادات الرسائل النصية (SMS)'}
+                    {t('settings.notifications.sms_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
@@ -143,7 +143,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Bell size={20} className="text-primary" />
-                    {t('settings.notifications.alerts_title') || 'التنبيهات التلقائية'}
+                    {t('settings.notifications.alerts_title')}
                 </h3>
                 <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -155,7 +155,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                             onChange={(e) => handleSettingChange('notify_low_stock', e.target.checked.toString())}
                         />
                         <label className="cursor-pointer font-medium" htmlFor="notify_low_stock">
-                            {t('settings.notifications.notify_low_stock') || 'إرسال تنبيه عند وصول المخزون للحد الأدنى'}
+                            {t('settings.notifications.notify_low_stock')}
                         </label>
                     </div>
 
@@ -168,7 +168,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                             onChange={(e) => handleSettingChange('notify_new_invoice', e.target.checked.toString())}
                         />
                         <label className="cursor-pointer font-medium" htmlFor="notify_new_invoice">
-                            {t('settings.notifications.notify_new_invoice') || 'إرسال نسخة من الفاتورة للعميل (إذا توفر الإيميل)'}
+                            {t('settings.notifications.notify_new_invoice')}
                         </label>
                     </div>
                 </div>

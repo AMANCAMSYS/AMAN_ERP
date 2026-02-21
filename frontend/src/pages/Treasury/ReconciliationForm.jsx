@@ -126,7 +126,7 @@ const ReconciliationForm = () => {
             const res = await reconciliationAPI.importPreview(id, file);
             setImportPreview(res.data);
         } catch (error) {
-            toastEmitter.emit(error.response?.data?.detail || 'خطأ في تحليل الملف', 'error');
+            toastEmitter.emit(error.response?.data?.detail || t('treasury.reconciliation.parse_error'), 'error');
         } finally {
             setImportLoading(false);
             e.target.value = '';

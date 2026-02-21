@@ -55,7 +55,7 @@ const BranchesSettings = ({ settings, handleSettingChange }) => {
                             value={settings.main_branch_id || ''}
                             onChange={(e) => handleSettingChange('main_branch_id', e.target.value)}
                         >
-                            <option value="">{t('common.select') || 'اختر {t("settings.branches.main_branch")}...'}</option>
+                            <option value="">{t('common.select')}</option>
                             {branches.map(branch => (
                                 <option key={branch.id} value={branch.id}>
                                     {branch.branch_name} {branch.branch_code ? `(${branch.branch_code})` : ''}

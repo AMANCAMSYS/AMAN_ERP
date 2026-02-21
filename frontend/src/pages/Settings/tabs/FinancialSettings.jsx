@@ -33,7 +33,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="currency">{t('settings.company.currency') || 'العملة'}</label>
+                <label className="form-label" htmlFor="currency">{t('settings.company.currency')}</label>
                 <input
                     type="text"
                     id="currency"
@@ -57,8 +57,8 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
                     value={settings.vat_enabled || 'true'}
                     onChange={(e) => handleSettingChange('vat_enabled', e.target.value)}
                 >
-                    <option value="true">{t('common.yes') || 'نعم'}</option>
-                    <option value="false">{t('common.no') || 'لا'}</option>
+                    <option value="true">{t('common.yes')}</option>
+                    <option value="false">{t('common.no')}</option>
                 </select>
             </div>
 

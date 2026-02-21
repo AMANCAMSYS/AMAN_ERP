@@ -84,11 +84,11 @@ const TrainingPrograms = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'برامج التدريب' : 'Training Programs'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'إدارة برامج تدريب وتطوير الموظفين' : 'Manage employee training programs'}</p>
+                    <h1 className="workspace-title">{t('hr.training.training_programs')}</h1>
+                    <p className="workspace-subtitle">{t('hr.training.manage_employee_training_programs')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ name: '', name_en: '', description: '', trainer: '', start_date: '', end_date: '', location: '', max_participants: 20 }); setShowModal(true); }}>
-                    <Plus size={16} /> {isRTL ? 'برنامج جديد' : 'New Program'}
+                    <Plus size={16} /> {t('hr.training.new_program')}
                 </button>
             </div>
 
@@ -97,20 +97,20 @@ const TrainingPrograms = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'البرنامج' : 'Program'}</th>
-                            <th>{isRTL ? 'المدرب' : 'Trainer'}</th>
-                            <th>{isRTL ? 'من' : 'From'}</th>
-                            <th>{isRTL ? 'إلى' : 'To'}</th>
-                            <th>{isRTL ? 'المكان' : 'Location'}</th>
-                            <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.training.program')}</th>
+                            <th>{t('hr.training.trainer')}</th>
+                            <th>{t('hr.training.from')}</th>
+                            <th>{t('hr.training.to')}</th>
+                            <th>{t('hr.training.location')}</th>
+                            <th>{t('hr.training.status')}</th>
+                            <th>{t('hr.training.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.training.loading')}</td></tr>
                         ) : programs.length === 0 ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد برامج تدريب' : 'No training programs'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.training.no_training_programs')}</td></tr>
                         ) : programs.map((p, i) => (
                             <tr key={p.id}>
                                 <td>{i + 1}</td>
@@ -122,7 +122,7 @@ const TrainingPrograms = () => {
                                 <td>{getStatusBadge(p.status)}</td>
                                 <td>
                                     <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                        <button className="btn btn-sm btn-secondary" onClick={() => openParticipants(p)} title={isRTL ? 'المشاركون' : 'Participants'}><Users size={14} /></button>
+                                        <button className="btn btn-sm btn-secondary" onClick={() => openParticipants(p)} title={t('hr.training.participants')}><Users size={14} /></button>
                                         <button className="btn btn-sm btn-secondary" onClick={() => { setEditItem(p); setForm({ name: p.name, name_en: p.name_en || '', description: p.description || '', trainer: p.trainer || '', start_date: p.start_date || '', end_date: p.end_date || '', location: p.location || '', max_participants: p.max_participants || 20 }); setShowModal(true); }}><Edit2 size={14} /></button>
                                     </div>
                                 </td>
@@ -136,46 +136,46 @@ const TrainingPrograms = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل برنامج' : 'Edit Program') : (isRTL ? 'برنامج جديد' : 'New Program')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.training.edit_program')) : (t('hr.training.new_program'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'اسم البرنامج' : 'Program Name'}</label>
+                            <label>{t('hr.training.program_name')}</label>
                             <input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الاسم بالإنجليزي' : 'Name (EN)'}</label>
+                            <label>{t('hr.training.name_en')}</label>
                             <input className="form-input" value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'المدرب' : 'Trainer'}</label>
+                            <label>{t('hr.training.trainer')}</label>
                             <input className="form-input" value={form.trainer} onChange={e => setForm({ ...form, trainer: e.target.value })} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'تاريخ البداية' : 'Start Date'}</label>
+                                <label>{t('hr.training.start_date')}</label>
                                 <DateInput className="form-input" value={formatDate(form.start_date)} onChange={e => setForm({ ...form, start_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'تاريخ النهاية' : 'End Date'}</label>
+                                <label>{t('hr.training.end_date')}</label>
                                 <DateInput className="form-input" value={formatDate(form.end_date)} onChange={e => setForm({ ...form, end_date: e.target.value })} />
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'المكان' : 'Location'}</label>
+                                <label>{t('hr.training.location')}</label>
                                 <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'الحد الأقصى' : 'Max'}</label>
+                                <label>{t('hr.training.max')}</label>
                                 <input type="number" className="form-input" value={form.max_participants} onChange={e => setForm({ ...form, max_participants: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الوصف' : 'Description'}</label>
+                            <label>{t('hr.training.description')}</label>
                             <textarea className="form-input" rows="2" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.training.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.training.save')}</button>
                         </div>
                     </div>
                 </div>
@@ -188,20 +188,20 @@ const TrainingPrograms = () => {
                         <h2 className="modal-title">{isRTL ? `المشاركون - ${selectedProgram?.name}` : `Participants - ${selectedProgram?.name}`}</h2>
                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                             <select className="form-input" value={partForm.employee_id} onChange={e => setPartForm({ employee_id: e.target.value })} style={{ flex: 1 }}>
-                                <option value="">{isRTL ? '-- اختر موظف --' : '-- Select Employee --'}</option>
+                                <option value="">{t('hr.training.select_employee')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                             <button className="btn btn-primary" onClick={addParticipant}><Plus size={16} /></button>
                         </div>
                         {participants.length === 0 ? (
-                            <p style={{ textAlign: 'center', color: '#666', padding: '1rem' }}>{isRTL ? 'لا يوجد مشاركون' : 'No participants'}</p>
+                            <p style={{ textAlign: 'center', color: '#666', padding: '1rem' }}>{t('hr.training.no_participants')}</p>
                         ) : (
                             <table className="data-table">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                                        <th>{isRTL ? 'الحالة' : 'Status'}</th>
+                                        <th>{t('hr.training.employee')}</th>
+                                        <th>{t('hr.training.status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -209,14 +209,14 @@ const TrainingPrograms = () => {
                                         <tr key={p.id || i}>
                                             <td>{i + 1}</td>
                                             <td>{p.employee_name || `#${p.employee_id}`}</td>
-                                            <td><span className={`badge ${p.status === 'completed' ? 'badge-success' : 'badge-info'}`}>{p.status === 'completed' ? (isRTL ? 'أكمل' : 'Completed') : (isRTL ? 'مسجل' : 'Enrolled')}</span></td>
+                                            <td><span className={`badge ${p.status === 'completed' ? 'badge-success' : 'badge-info'}`}>{p.status === 'completed' ? (t('hr.training.completed')) : (t('hr.training.enrolled'))}</span></td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         )}
                         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowParticipantsModal(false)}>{isRTL ? 'إغلاق' : 'Close'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowParticipantsModal(false)}>{t('hr.training.close')}</button>
                         </div>
                     </div>
                 </div>

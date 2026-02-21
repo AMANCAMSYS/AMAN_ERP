@@ -126,17 +126,17 @@ function SalesHome() {
                         </div>
                         <div className="link-item" onClick={() => navigate('/sales/contracts')}>
                             <span className="link-icon">📄</span>
-                            {t('sales.menu.contracts') || 'العقود والاشتراكات'}
+                            {t('sales.menu.contracts')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/sales/credit-notes')}>
                             <span className="link-icon">📋</span>
-                            {t('sales.menu.credit_notes') || 'إشعارات دائنة'}
+                            {t('sales.menu.credit_notes')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/sales/debit-notes')}>
                             <span className="link-icon">📝</span>
-                            {t('sales.menu.debit_notes') || 'إشعارات مدينة'}
+                            {t('sales.menu.debit_notes')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/sales/commissions')}>

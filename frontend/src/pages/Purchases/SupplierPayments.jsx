@@ -27,7 +27,7 @@ function SupplierPayments() {
             setPayments(res.data);
         } catch (error) {
             console.error('Error fetching payments:', error);
-            toastEmitter.emit(t('buying.payments.error_loading') || 'فشل تحميل سندات الصرف', 'error');
+            toastEmitter.emit(t('buying.payments.error_loading'), 'error');
         } finally {
             setLoading(false);
         }
@@ -92,7 +92,7 @@ function SupplierPayments() {
                                     <td>{payment.supplier_name}</td>
                                     <td className="font-bold">{Number(payment.amount).toLocaleString()} {currency}</td>
                                     <td>
-                                        {payment.payment_method === 'cash' ? t('buying.payments.form.payment_methods.cash') || 'نقداً' : payment.payment_method === 'bank' ? t('buying.payments.form.payment_methods.bank') || 'بنك' : t('buying.payments.form.payment_methods.check') || 'شيك'}
+                                        {payment.payment_method === 'cash' ? t('buying.payments.form.payment_methods.cash') : payment.payment_method === 'bank' ? t('buying.payments.form.payment_methods.bank') : t('buying.payments.form.payment_methods.check')}
                                     </td>
                                     <td>
                                         <span className={`badge ${payment.status === 'posted' ? 'badge-success' : 'badge-secondary'}`}>
@@ -103,7 +103,7 @@ function SupplierPayments() {
                                         <button className="btn btn-secondary btn-sm" onClick={(e) => {
                                             e.stopPropagation();
                                             navigate(`/buying/payments/${payment.id}`);
-                                        }}>{t('common.actions') || 'عرض'}</button>
+                                        }}>{t('common.actions')}</button>
                                     </td>
                                 </tr>
                             ))

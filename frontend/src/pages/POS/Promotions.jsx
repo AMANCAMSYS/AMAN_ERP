@@ -42,7 +42,7 @@ const Promotions = () => {
             setShowModal(false);
             setForm({ name: '', type: 'percentage', value: '', min_order_amount: '', coupon_code: '', start_date: '', end_date: '', is_active: true, buy_x: '', get_y: '', category_id: '' });
             fetchPromotions();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleDelete = async (id) => {
@@ -51,7 +51,7 @@ const Promotions = () => {
             await posAPI.deletePromotion(id);
             showToast(t('pos.deleted'), 'success');
             fetchPromotions();
-        } catch (err) { showToast('Error', 'error'); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleValidateCoupon = async () => {

@@ -83,7 +83,7 @@ export default function ProjectDetails() {
                 setInvoiceForm(prev => ({ ...prev, description: `Project Invoice: ${res.data.project_name}` }));
             }
         } catch (err) {
-            toastEmitter.emit(t('common.load_error', 'خطأ في تحميل البيانات'), 'error');
+            toastEmitter.emit(t('common.load_error'), 'error');
             navigate('/projects');
         } finally {
             setLoading(false);
@@ -100,7 +100,7 @@ export default function ProjectDetails() {
     const handleDelete = async () => {
         try {
             await projectsAPI.delete(id);
-            toastEmitter.emit(t('projects.messages.deleted', 'تم حذف المشروع'), 'success');
+            toastEmitter.emit(t('projects.messages.deleted'), 'success');
             navigate('/projects');
         } catch (err) {
             toastEmitter.emit(err.response?.data?.detail || t('common.save_error'), 'error');
@@ -119,7 +119,7 @@ export default function ProjectDetails() {
                 start_date: taskForm.start_date || null,
                 end_date: taskForm.end_date || null,
             });
-            toastEmitter.emit(t('projects.messages.task_added', 'تم إضافة المهمة'), 'success');
+            toastEmitter.emit(t('projects.messages.task_added'), 'success');
             setShowTaskModal(false);
             setTaskForm({ task_name: '', description: '', start_date: '', end_date: '', planned_hours: '', status: 'pending' });
             fetchProject();
@@ -151,7 +151,7 @@ export default function ProjectDetails() {
     // Expense handler
     const handleAddExpense = async () => {
         if (!expenseForm.amount || parseFloat(expenseForm.amount) <= 0) {
-            toastEmitter.emit(t('projects.errors.amount_required', 'المبلغ مطلوب'), 'error');
+            toastEmitter.emit(t('projects.errors.amount_required'), 'error');
             return;
         }
         setSubmitting(true);
@@ -161,7 +161,7 @@ export default function ProjectDetails() {
                 amount: parseFloat(expenseForm.amount),
                 treasury_id: expenseForm.treasury_id ? parseInt(expenseForm.treasury_id) : null,
             });
-            toastEmitter.emit(t('projects.messages.expense_added', 'تم تسجيل المصروف وإنشاء القيد'), 'success');
+            toastEmitter.emit(t('projects.messages.expense_added'), 'success');
             setShowExpenseModal(false);
             setExpenseForm({ expense_type: 'other', expense_date: new Date().toISOString().split('T')[0], amount: '', description: '', treasury_id: '' });
             fetchProject();
@@ -175,7 +175,7 @@ export default function ProjectDetails() {
     // Revenue handler
     const handleAddRevenue = async () => {
         if (!revenueForm.amount || parseFloat(revenueForm.amount) <= 0) {
-            toastEmitter.emit(t('projects.errors.amount_required', 'المبلغ مطلوب'), 'error');
+            toastEmitter.emit(t('projects.errors.amount_required'), 'error');
             return;
         }
         setSubmitting(true);
@@ -184,7 +184,7 @@ export default function ProjectDetails() {
                 ...revenueForm,
                 amount: parseFloat(revenueForm.amount),
             });
-            toastEmitter.emit(t('projects.messages.revenue_added', 'تم تسجيل الإيراد وإنشاء القيد'), 'success');
+            toastEmitter.emit(t('projects.messages.revenue_added'), 'success');
             setShowRevenueModal(false);
             setRevenueForm({ revenue_type: 'milestone', revenue_date: new Date().toISOString().split('T')[0], amount: '', description: '' });
             fetchProject();
@@ -198,7 +198,7 @@ export default function ProjectDetails() {
     // Invoice Handler
     const handleCreateInvoice = async () => {
         if (!invoiceForm.amount || parseFloat(invoiceForm.amount) <= 0) {
-            toastEmitter.emit(t('projects.errors.amount_required', 'المبلغ مطلوب'), 'error');
+            toastEmitter.emit(t('projects.errors.amount_required'), 'error');
             return;
         }
         setSubmitting(true);
@@ -220,7 +220,7 @@ export default function ProjectDetails() {
             };
 
             await projectsAPI.createInvoice(id, payload);
-            toastEmitter.emit(t('projects.messages.invoice_created', 'تم إنشاء الفاتورة'), 'success');
+            toastEmitter.emit(t('projects.messages.invoice_created'), 'success');
             setShowInvoiceModal(false);
             setInvoiceForm({ ...invoiceForm, amount: '', notes: '' });
             fetchProject(); // Updates revenue
@@ -249,10 +249,10 @@ export default function ProjectDetails() {
 
         try {
             await projectsAPI.uploadDocument(id, formData);
-            toastEmitter.emit(t('projects.messages.upload_success', 'تم رفع الملف'), 'success');
+            toastEmitter.emit(t('projects.messages.upload_success'), 'success');
             fetchDocuments();
         } catch (err) {
-            toastEmitter.emit(t('common.upload_error', 'فشل الرفع'), 'error');
+            toastEmitter.emit(t('common.upload_error'), 'error');
         } finally {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
@@ -261,21 +261,21 @@ export default function ProjectDetails() {
     const handleDeleteDocument = async (docId) => {
         try {
             await projectsAPI.deleteDocument(id, docId);
-            toastEmitter.emit(t('common.deleted', 'تم الحذف'), 'success');
+            toastEmitter.emit(t('common.deleted'), 'success');
             fetchDocuments();
         } catch (err) {
-            toastEmitter.emit(t('common.delete_error', 'فشل الحذف'), 'error');
+            toastEmitter.emit(t('common.delete_error'), 'error');
         }
     };
 
     const getStatusBadge = (status) => {
         const map = {
-            planning: { label: t('projects.status.planning', 'تخطيط'), class: 'badge-info' },
-            in_progress: { label: t('projects.status.in_progress', 'قيد التنفيذ'), class: 'badge-warning' },
-            completed: { label: t('projects.status.completed', 'مكتمل'), class: 'badge-success' },
-            on_hold: { label: t('projects.status.on_hold', 'متوقف'), class: 'badge-secondary' },
-            cancelled: { label: t('projects.status.cancelled', 'ملغي'), class: 'badge-danger' },
-            pending: { label: t('projects.task_status.pending', 'معلقة'), class: 'badge-secondary' },
+            planning: { label: t('projects.status.planning'), class: 'badge-info' },
+            in_progress: { label: t('projects.status.in_progress'), class: 'badge-warning' },
+            completed: { label: t('projects.status.completed'), class: 'badge-success' },
+            on_hold: { label: t('projects.status.on_hold'), class: 'badge-secondary' },
+            cancelled: { label: t('projects.status.cancelled'), class: 'badge-danger' },
+            pending: { label: t('projects.task_status.pending'), class: 'badge-secondary' },
         };
         const s = map[status] || { label: status, class: 'badge-secondary' };
         return <span className={`badge ${s.class}`}>{s.label}</span>;
@@ -283,21 +283,21 @@ export default function ProjectDetails() {
 
     const getExpenseTypeLabel = (type) => {
         const map = {
-            materials: t('projects.expense_types.materials', 'مواد'),
-            labor: t('projects.expense_types.labor', 'عمالة'),
-            services: t('projects.expense_types.services', 'خدمات'),
-            travel: t('projects.expense_types.travel', 'سفر'),
-            other: t('projects.expense_types.other', 'أخرى'),
+            materials: t('projects.expense_types.materials'),
+            labor: t('projects.expense_types.labor'),
+            services: t('projects.expense_types.services'),
+            travel: t('projects.expense_types.travel'),
+            other: t('projects.expense_types.other'),
         };
         return map[type] || type;
     };
 
     const getRevenueTypeLabel = (type) => {
         const map = {
-            milestone: t('projects.revenue_types.milestone', 'إنجاز مرحلة'),
-            invoice: t('projects.revenue_types.invoice', 'فاتورة'),
-            advance: t('projects.revenue_types.advance', 'دفعة مقدمة'),
-            other: t('projects.revenue_types.other', 'أخرى'),
+            milestone: t('projects.revenue_types.milestone'),
+            invoice: t('projects.revenue_types.invoice'),
+            advance: t('projects.revenue_types.advance'),
+            other: t('projects.revenue_types.other'),
         };
         return map[type] || type;
     };
@@ -335,7 +335,7 @@ export default function ProjectDetails() {
                     </div>
                     <div className="header-actions d-flex gap-2">
                         <button className="btn btn-light" onClick={() => navigate(`/projects/${id}/edit`)}>
-                            <Edit2 size={16} /> {t('common.edit', 'تعديل')}
+                            <Edit2 size={16} /> {t('common.edit')}
                         </button>
                         <button className="btn btn-danger" onClick={() => setShowDeleteConfirm(true)}>
                             <Trash2 size={16} />
@@ -352,7 +352,7 @@ export default function ProjectDetails() {
                     </div>
                     <div className="metric-info">
                         <span className="metric-value">{formatNumber(fs.planned_budget || 0)}</span>
-                        <span className="metric-label">{t('projects.metrics.budget', 'الميزانية')}</span>
+                        <span className="metric-label">{t('projects.metrics.budget')}</span>
                     </div>
                 </div>
                 <div className="metric-card">
@@ -361,7 +361,7 @@ export default function ProjectDetails() {
                     </div>
                     <div className="metric-info">
                         <span className="metric-value">{formatNumber(fs.total_expenses || 0)}</span>
-                        <span className="metric-label">{t('projects.metrics.expenses', 'المصاريف')}</span>
+                        <span className="metric-label">{t('projects.metrics.expenses')}</span>
                     </div>
                 </div>
                 <div className="metric-card">
@@ -370,7 +370,7 @@ export default function ProjectDetails() {
                     </div>
                     <div className="metric-info">
                         <span className="metric-value">{formatNumber(fs.total_revenues || 0)}</span>
-                        <span className="metric-label">{t('projects.metrics.revenues', 'الإيرادات')}</span>
+                        <span className="metric-label">{t('projects.metrics.revenues')}</span>
                     </div>
                 </div>
                 <div className="metric-card">
@@ -381,7 +381,7 @@ export default function ProjectDetails() {
                         <span className="metric-value" style={{ color: fs.profit_loss >= 0 ? '#28a745' : '#dc3545' }}>
                             {formatNumber(fs.profit_loss || 0)}
                         </span>
-                        <span className="metric-label">{t('projects.metrics.profit_loss', 'الربح/الخسارة')}</span>
+                        <span className="metric-label">{t('projects.metrics.profit_loss')}</span>
                     </div>
                 </div>
             </div>
@@ -390,7 +390,7 @@ export default function ProjectDetails() {
             <div className="card section-card border-0 shadow-sm mb-4">
                 <div className="card-body">
                     <div className="d-flex justify-content-between mb-2">
-                        <span className="fw-medium">{t('projects.fields.progress', 'نسبة الإنجاز')}</span>
+                        <span className="fw-medium">{t('projects.fields.progress')}</span>
                         <span className="fw-bold">{progress.toFixed(0)}%</span>
                     </div>
                     <div style={{ height: 12, borderRadius: 6, background: '#e9ecef', overflow: 'hidden' }}>
@@ -402,10 +402,10 @@ export default function ProjectDetails() {
                     </div>
                     <div className="d-flex justify-content-between mt-2">
                         <small className="text-muted">
-                            {t('projects.fields.budget_consumed', 'الميزانية المستهلكة')}: {(fs.budget_consumed_pct || 0).toFixed(1)}%
+                            {t('projects.fields.budget_consumed')}: {(fs.budget_consumed_pct || 0).toFixed(1)}%
                         </small>
                         <small className="text-muted">
-                            {tasks.filter(t => t.status === 'completed').length}/{tasks.length} {t('projects.fields.tasks_completed', 'مهمة مكتملة')}
+                            {tasks.filter(t => t.status === 'completed').length}/{tasks.length} {t('projects.fields.tasks_completed')}
                         </small>
                     </div>
                 </div>
@@ -417,14 +417,14 @@ export default function ProjectDetails() {
                     <button key={tab}
                         className={`btn ${activeTab === tab ? 'btn-primary' : 'btn-light'}`}
                         onClick={() => setActiveTab(tab)}>
-                        {tab === 'overview' && <><FolderKanban size={16} /> {t('projects.tabs.overview', 'نظرة عامة')}</>}
-                        {tab === 'tasks' && <><ClipboardList size={16} /> {t('projects.tabs.tasks', 'المهام')} ({tasks.length})</>}
-                        {tab === 'gantt' && <><Calendar size={16} /> {t('projects.tabs.gantt', 'الجدول الزمني')}</>}
-                        {tab === 'timesheets' && <><Clock size={16} /> {t('projects.tabs.timesheets', 'سجلات الوقت')}</>}
-                        {tab === 'documents' && <><FileText size={16} /> {t('projects.tabs.documents', 'المستندات')}</>}
-                        {tab === 'expenses' && <><TrendingDown size={16} /> {t('projects.tabs.expenses', 'المصاريف')} ({expenses.length})</>}
-                        {tab === 'revenues' && <><TrendingUp size={16} /> {t('projects.tabs.revenues', 'الإيرادات')} ({revenues.length})</>}
-                        {tab === 'financials' && <><DollarSign size={16} /> {t('projects.tabs.financials', 'المالية')}</>}
+                        {tab === 'overview' && <><FolderKanban size={16} /> {t('projects.tabs.overview')}</>}
+                        {tab === 'tasks' && <><ClipboardList size={16} /> {t('projects.tabs.tasks')} ({tasks.length})</>}
+                        {tab === 'gantt' && <><Calendar size={16} /> {t('projects.tabs.gantt')}</>}
+                        {tab === 'timesheets' && <><Clock size={16} /> {t('projects.tabs.timesheets')}</>}
+                        {tab === 'documents' && <><FileText size={16} /> {t('projects.tabs.documents')}</>}
+                        {tab === 'expenses' && <><TrendingDown size={16} /> {t('projects.tabs.expenses')} ({expenses.length})</>}
+                        {tab === 'revenues' && <><TrendingUp size={16} /> {t('projects.tabs.revenues')} ({revenues.length})</>}
+                        {tab === 'financials' && <><DollarSign size={16} /> {t('projects.tabs.financials')}</>}
                     </button>
                 ))}
             </div>
@@ -436,29 +436,29 @@ export default function ProjectDetails() {
                         <div className="row g-4">
                             <div className="col-md-6">
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.type', 'نوع المشروع')}</small>
-                                    <span className="fw-medium">{project.project_type === 'external' ? t('projects.types.external', 'خارجي') : project.project_type === 'consulting' ? t('projects.types.consulting', 'استشاري') : t('projects.types.internal', 'داخلي')}</span>
+                                    <small className="text-muted d-block">{t('projects.fields.type')}</small>
+                                    <span className="fw-medium">{project.project_type === 'external' ? t('projects.types.external') : project.project_type === 'consulting' ? t('projects.types.consulting') : t('projects.types.internal')}</span>
                                 </div>
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.customer', 'العميل')}</small>
-                                    <span className="fw-medium">{project.customer_name || t('common.not_specified', 'غير محدد')}</span>
+                                    <small className="text-muted d-block">{t('projects.fields.customer')}</small>
+                                    <span className="fw-medium">{project.customer_name || t('common.not_specified')}</span>
                                 </div>
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.manager', 'مدير المشروع')}</small>
-                                    <span className="fw-medium">{project.manager_name || t('common.not_specified', 'غير محدد')}</span>
+                                    <small className="text-muted d-block">{t('projects.fields.manager')}</small>
+                                    <span className="fw-medium">{project.manager_name || t('common.not_specified')}</span>
                                 </div>
                             </div>
                             <div className="col-md-6">
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.start_date', 'تاريخ البدء')}</small>
+                                    <small className="text-muted d-block">{t('projects.fields.start_date')}</small>
                                     <span className="fw-medium">{formatDate(project.start_date)}</span>
                                 </div>
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.end_date', 'تاريخ الانتهاء')}</small>
+                                    <small className="text-muted d-block">{t('projects.fields.end_date')}</small>
                                     <span className="fw-medium">{formatDate(project.end_date)}</span>
                                 </div>
                                 <div className="mb-3">
-                                    <small className="text-muted d-block">{t('projects.fields.description', 'الوصف')}</small>
+                                    <small className="text-muted d-block">{t('projects.fields.description')}</small>
                                     <span className="fw-medium">{project.description || '-'}</span>
                                 </div>
                             </div>
@@ -471,23 +471,23 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.tasks', 'المهام')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.tasks')}</h5>
                             <button className="btn btn-primary btn-sm" onClick={() => setShowTaskModal(true)}>
-                                <Plus size={16} /> {t('projects.add_task', 'إضافة مهمة')}
+                                <Plus size={16} /> {t('projects.add_task')}
                             </button>
                         </div>
                         {tasks.length === 0 ? (
-                            <div className="text-center py-5 text-muted">{t('projects.no_tasks', 'لا توجد مهام بعد')}</div>
+                            <div className="text-center py-5 text-muted">{t('projects.no_tasks')}</div>
                         ) : (
                             <div className="data-table-container">
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('projects.task_fields.name', 'المهمة')}</th>
-                                            <th>{t('projects.task_fields.status', 'الحالة')}</th>
-                                            <th>{t('projects.task_fields.progress', 'التقدم')}</th>
-                                            <th>{t('projects.task_fields.hours', 'الساعات')}</th>
-                                            <th>{t('projects.task_fields.assigned', 'المسؤول')}</th>
+                                            <th>{t('projects.task_fields.name')}</th>
+                                            <th>{t('projects.task_fields.status')}</th>
+                                            <th>{t('projects.task_fields.progress')}</th>
+                                            <th>{t('projects.task_fields.hours')}</th>
+                                            <th>{t('projects.task_fields.assigned')}</th>
                                             <th></th>
                                         </tr>
                                     </thead>
@@ -503,7 +503,7 @@ export default function ProjectDetails() {
                                                     <div className="d-flex gap-1">
                                                         {task.status !== 'completed' && (
                                                             <button className="btn btn-icon btn-sm btn-light"
-                                                                title={t('projects.complete_task', 'إكمال')}
+                                                                title={t('projects.complete_task')}
                                                                 onClick={() => handleUpdateTaskStatus(task.id, 'completed')}>
                                                                 <CheckCircle2 size={14} />
                                                             </button>
@@ -528,7 +528,7 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.gantt', 'الجدول الزمني')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.gantt')}</h5>
                         </div>
                         <GanttChart tasks={tasks} />
                     </div>
@@ -539,7 +539,7 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.timesheets', 'سجلات الوقت')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.timesheets')}</h5>
                         </div>
                         <Timesheets projectId={id} tasks={tasks} />
                     </div>
@@ -550,14 +550,14 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.documents', 'المستندات')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.documents')}</h5>
                             <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current.click()}>
-                                <Plus size={16} /> {t('common.upload', 'رفع ملف')}
+                                <Plus size={16} /> {t('common.upload')}
                             </button>
                             <input type="file" ref={fileInputRef} className="d-none" onChange={handleFileUpload} />
                         </div>
                         {documents.length === 0 ? (
-                            <div className="text-center py-5 text-muted">{t('common.no_data', 'لا توجد مستندات بعد')}</div>
+                            <div className="text-center py-5 text-muted">{t('common.no_data')}</div>
                         ) : (
                             <div className="row g-3">
                                 {documents.map(doc => (
@@ -589,23 +589,23 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.expenses', 'المصاريف')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.expenses')}</h5>
                             <button className="btn btn-primary btn-sm" onClick={() => setShowExpenseModal(true)}>
-                                <Plus size={16} /> {t('projects.add_expense', 'تسجيل مصروف')}
+                                <Plus size={16} /> {t('projects.add_expense')}
                             </button>
                         </div>
                         {expenses.length === 0 ? (
-                            <div className="text-center py-5 text-muted">{t('projects.no_expenses', 'لا توجد مصاريف بعد')}</div>
+                            <div className="text-center py-5 text-muted">{t('projects.no_expenses')}</div>
                         ) : (
                             <div className="data-table-container">
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('projects.expense_fields.date', 'التاريخ')}</th>
-                                            <th>{t('projects.expense_fields.type', 'النوع')}</th>
-                                            <th>{t('projects.expense_fields.description', 'الوصف')}</th>
-                                            <th>{t('projects.expense_fields.amount', 'المبلغ')}</th>
-                                            <th>{t('projects.expense_fields.by', 'بواسطة')}</th>
+                                            <th>{t('projects.expense_fields.date')}</th>
+                                            <th>{t('projects.expense_fields.type')}</th>
+                                            <th>{t('projects.expense_fields.description')}</th>
+                                            <th>{t('projects.expense_fields.amount')}</th>
+                                            <th>{t('projects.expense_fields.by')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -630,28 +630,28 @@ export default function ProjectDetails() {
                 <div className="card section-card border-0 shadow-sm">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
-                            <h5 className="section-title">{t('projects.tabs.revenues', 'الإيرادات')}</h5>
+                            <h5 className="section-title">{t('projects.tabs.revenues')}</h5>
                             <div className="d-flex gap-2">
                                 <button className="btn btn-outline-primary btn-sm" onClick={() => setShowInvoiceModal(true)}>
-                                    <File size={16} /> {t('projects.create_invoice', 'إنشاء فاتورة')}
+                                    <File size={16} /> {t('projects.create_invoice')}
                                 </button>
                                 <button className="btn btn-primary btn-sm" onClick={() => setShowRevenueModal(true)}>
-                                    <Plus size={16} /> {t('projects.add_revenue', 'تسجيل إيراد')}
+                                    <Plus size={16} /> {t('projects.add_revenue')}
                                 </button>
                             </div>
                         </div>
                         {revenues.length === 0 ? (
-                            <div className="text-center py-5 text-muted">{t('projects.no_revenues', 'لا توجد إيرادات بعد')}</div>
+                            <div className="text-center py-5 text-muted">{t('projects.no_revenues')}</div>
                         ) : (
                             <div className="data-table-container">
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('projects.revenue_fields.date', 'التاريخ')}</th>
-                                            <th>{t('projects.revenue_fields.type', 'النوع')}</th>
-                                            <th>{t('projects.revenue_fields.description', 'الوصف')}</th>
-                                            <th>{t('projects.revenue_fields.amount', 'المبلغ')}</th>
-                                            <th>{t('projects.revenue_fields.by', 'بواسطة')}</th>
+                                            <th>{t('projects.revenue_fields.date')}</th>
+                                            <th>{t('projects.revenue_fields.type')}</th>
+                                            <th>{t('projects.revenue_fields.description')}</th>
+                                            <th>{t('projects.revenue_fields.amount')}</th>
+                                            <th>{t('projects.revenue_fields.by')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -678,31 +678,31 @@ export default function ProjectDetails() {
                     <div className="col-md-6">
                         <div className="card section-card border-0 shadow-sm h-100">
                             <div className="card-body">
-                                <h5 className="section-title mb-4">{t('projects.financials.cost_structure', 'هيكل التكاليف')}</h5>
+                                <h5 className="section-title mb-4">{t('projects.financials.cost_structure')}</h5>
                                 <div className="d-flex flex-column gap-3">
                                     <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
                                         <div className="d-flex align-items-center gap-2">
                                             <div className="rounded-circle bg-primary" style={{ width: 10, height: 10 }}></div>
-                                            <span>{t('projects.expense_types.labor', 'عمالة')}</span>
+                                            <span>{t('projects.expense_types.labor')}</span>
                                         </div>
                                         <div className="fw-bold">{formatNumber(fs.cost_breakdown?.labor || 0)}</div>
                                     </div>
                                     <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
                                         <div className="d-flex align-items-center gap-2">
                                             <div className="rounded-circle bg-warning" style={{ width: 10, height: 10 }}></div>
-                                            <span>{t('projects.expense_types.materials', 'مواد')}</span>
+                                            <span>{t('projects.expense_types.materials')}</span>
                                         </div>
                                         <div className="fw-bold">{formatNumber(fs.cost_breakdown?.materials || 0)}</div>
                                     </div>
                                     <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
                                         <div className="d-flex align-items-center gap-2">
                                             <div className="rounded-circle bg-info" style={{ width: 10, height: 10 }}></div>
-                                            <span>{t('projects.financials.overhead', 'مصاريف غير مباشرة')}</span>
+                                            <span>{t('projects.financials.overhead')}</span>
                                         </div>
                                         <div className="fw-bold">{formatNumber(fs.cost_breakdown?.indirect_overhead || 0)}</div>
                                     </div>
                                     <div className="mt-3 pt-3 border-top d-flex justify-content-between">
-                                        <span className="fw-bold">{t('common.total', 'الإجمالي')}</span>
+                                        <span className="fw-bold">{t('common.total')}</span>
                                         <span className="fw-bold">{formatNumber(fs.total_expenses || 0)}</span>
                                     </div>
                                 </div>
@@ -714,15 +714,15 @@ export default function ProjectDetails() {
                     <div className="col-md-6">
                         <div className="card section-card border-0 shadow-sm h-100">
                             <div className="card-body">
-                                <h5 className="section-title mb-4">{t('projects.financials.profitability', 'الربحية')}</h5>
+                                <h5 className="section-title mb-4">{t('projects.financials.profitability')}</h5>
                                 <div className="text-center py-4">
                                     <div className="display-4 fw-bold mb-2" style={{ color: fs.net_profit >= 0 ? '#28a745' : '#dc3545' }}>
                                         {formatNumber(fs.net_profit || 0)}
                                     </div>
-                                    <div className="text-muted mb-4">{t('projects.financials.net_profit', 'صافي الربح')}</div>
+                                    <div className="text-muted mb-4">{t('projects.financials.net_profit')}</div>
 
                                     <div className="d-inline-block px-4 py-2 rounded-pill bg-light border">
-                                        <span className="text-muted me-2">{t('projects.financials.margin', 'هامش الربح')}:</span>
+                                        <span className="text-muted me-2">{t('projects.financials.margin')}:</span>
                                         <span className={`fw-bold ${fs.margin_pct >= 20 ? 'text-success' : fs.margin_pct > 0 ? 'text-warning' : 'text-danger'}`}>
                                             {fs.margin_pct || 0}%
                                         </span>
@@ -738,38 +738,38 @@ export default function ProjectDetails() {
             <SimpleModal
                 isOpen={showTaskModal}
                 onClose={() => setShowTaskModal(false)}
-                title={t('projects.add_task', 'إضافة مهمة')}
+                title={t('projects.add_task')}
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setShowTaskModal(false)}>{t('common.cancel', 'إلغاء')}</button>
-                        <button className="btn btn-primary" onClick={handleAddTask} disabled={submitting}>{submitting ? t('common.saving', 'جاري الحفظ...') : t('common.save', 'حفظ')}</button>
+                        <button className="btn btn-secondary" onClick={() => setShowTaskModal(false)}>{t('common.cancel')}</button>
+                        <button className="btn btn-primary" onClick={handleAddTask} disabled={submitting}>{submitting ? t('common.saving') : t('common.save')}</button>
                     </>
                 }
             >
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.task_fields.name', 'اسم المهمة')} *</label>
+                    <label className="form-label">{t('projects.task_fields.name')} *</label>
                     <input type="text" className="form-input" value={taskForm.task_name}
                         onChange={e => setTaskForm({ ...taskForm, task_name: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.task_fields.description', 'الوصف')}</label>
+                    <label className="form-label">{t('projects.task_fields.description')}</label>
                     <textarea className="form-input" rows={2} value={taskForm.description}
                         onChange={e => setTaskForm({ ...taskForm, description: e.target.value })} />
                 </div>
                 <div className="row g-3">
                     <div className="col-6">
-                        <label className="form-label">{t('projects.fields.start_date', 'البدء')}</label>
+                        <label className="form-label">{t('projects.fields.start_date')}</label>
                         <DateInput className="form-input" value={formatDate(taskForm.start_date)}
                             onChange={e => setTaskForm({ ...taskForm, start_date: e.target.value })} />
                     </div>
                     <div className="col-6">
-                        <label className="form-label">{t('projects.fields.end_date', 'الانتهاء')}</label>
+                        <label className="form-label">{t('projects.fields.end_date')}</label>
                         <DateInput className="form-input" value={formatDate(taskForm.end_date)}
                             onChange={e => setTaskForm({ ...taskForm, end_date: e.target.value })} />
                     </div>
                 </div>
                 <div className="mt-3">
-                    <label className="form-label">{t('projects.task_fields.hours', 'الساعات المخططة')}</label>
+                    <label className="form-label">{t('projects.task_fields.hours')}</label>
                     <input type="number" className="form-input" value={taskForm.planned_hours}
                         onChange={e => setTaskForm({ ...taskForm, planned_hours: e.target.value })}
                         min="0" step="0.5" placeholder="0" dir="ltr" />
@@ -780,55 +780,55 @@ export default function ProjectDetails() {
             <SimpleModal
                 isOpen={showExpenseModal}
                 onClose={() => setShowExpenseModal(false)}
-                title={t('projects.add_expense', 'تسجيل مصروف')}
+                title={t('projects.add_expense')}
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setShowExpenseModal(false)}>{t('common.cancel', 'إلغاء')}</button>
-                        <button className="btn btn-primary" onClick={handleAddExpense} disabled={submitting}>{submitting ? t('common.saving', 'جاري الحفظ...') : t('projects.confirm_expense', 'تسجيل المصروف وإنشاء القيد')}</button>
+                        <button className="btn btn-secondary" onClick={() => setShowExpenseModal(false)}>{t('common.cancel')}</button>
+                        <button className="btn btn-primary" onClick={handleAddExpense} disabled={submitting}>{submitting ? t('common.saving') : t('projects.confirm_expense')}</button>
                     </>
                 }
             >
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.expense_fields.type', 'نوع المصروف')} *</label>
+                    <label className="form-label">{t('projects.expense_fields.type')} *</label>
                     <select className="form-input" value={expenseForm.expense_type}
                         onChange={e => setExpenseForm({ ...expenseForm, expense_type: e.target.value })}>
-                        <option value="materials">{t('projects.expense_types.materials', 'مواد')}</option>
-                        <option value="labor">{t('projects.expense_types.labor', 'عمالة')}</option>
-                        <option value="services">{t('projects.expense_types.services', 'خدمات')}</option>
-                        <option value="travel">{t('projects.expense_types.travel', 'سفر')}</option>
-                        <option value="other">{t('projects.expense_types.other', 'أخرى')}</option>
+                        <option value="materials">{t('projects.expense_types.materials')}</option>
+                        <option value="labor">{t('projects.expense_types.labor')}</option>
+                        <option value="services">{t('projects.expense_types.services')}</option>
+                        <option value="travel">{t('projects.expense_types.travel')}</option>
+                        <option value="other">{t('projects.expense_types.other')}</option>
                     </select>
                 </div>
                 <div className="row g-3 mb-3">
                     <div className="col-6">
-                        <label className="form-label">{t('projects.expense_fields.date', 'التاريخ')} *</label>
+                        <label className="form-label">{t('projects.expense_fields.date')} *</label>
                         <DateInput className="form-input" value={expenseForm.expense_date}
                             onChange={e => setExpenseForm({ ...expenseForm, expense_date: e.target.value })} />
                     </div>
                     <div className="col-6">
-                        <label className="form-label">{t('projects.expense_fields.amount', 'المبلغ')} *</label>
+                        <label className="form-label">{t('projects.expense_fields.amount')} *</label>
                         <input type="number" className="form-input" value={expenseForm.amount}
                             onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                             min="0" step="0.01" placeholder="0.00" dir="ltr" />
                     </div>
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.expense_fields.treasury', 'من الخزينة')}</label>
+                    <label className="form-label">{t('projects.expense_fields.treasury')}</label>
                     <select className="form-input" value={expenseForm.treasury_id}
                         onChange={e => setExpenseForm({ ...expenseForm, treasury_id: e.target.value })}>
-                        <option value="">{t('projects.fields.default_cash', 'الصندوق الرئيسي (افتراضي)')}</option>
+                        <option value="">{t('projects.fields.default_cash')}</option>
                         {treasuryAccounts.map(ta => (
                             <option key={ta.id} value={ta.id}>{ta.name} ({formatNumber(ta.current_balance)})</option>
                         ))}
                     </select>
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.expense_fields.description', 'الوصف')}</label>
+                    <label className="form-label">{t('projects.expense_fields.description')}</label>
                     <textarea className="form-input" rows={2} value={expenseForm.description}
                         onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} />
                 </div>
                 <div className="alert alert-info small">
-                    💡 {t('projects.expense_note', 'سيتم إنشاء قيد محاسبي تلقائي: مدين حساب المصاريف، دائن حساب النقدية')}
+                    💡 {t('projects.expense_note')}
                 </div>
             </SimpleModal>
 
@@ -836,44 +836,44 @@ export default function ProjectDetails() {
             <SimpleModal
                 isOpen={showRevenueModal}
                 onClose={() => setShowRevenueModal(false)}
-                title={t('projects.add_revenue', 'تسجيل إيراد')}
+                title={t('projects.add_revenue')}
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setShowRevenueModal(false)}>{t('common.cancel', 'إلغاء')}</button>
-                        <button className="btn btn-primary" onClick={handleAddRevenue} disabled={submitting}>{submitting ? t('common.saving', 'جاري الحفظ...') : t('projects.confirm_revenue', 'تسجيل الإيراد وإنشاء القيد')}</button>
+                        <button className="btn btn-secondary" onClick={() => setShowRevenueModal(false)}>{t('common.cancel')}</button>
+                        <button className="btn btn-primary" onClick={handleAddRevenue} disabled={submitting}>{submitting ? t('common.saving') : t('projects.confirm_revenue')}</button>
                     </>
                 }
             >
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.revenue_fields.type', 'نوع الإيراد')} *</label>
+                    <label className="form-label">{t('projects.revenue_fields.type')} *</label>
                     <select className="form-input" value={revenueForm.revenue_type}
                         onChange={e => setRevenueForm({ ...revenueForm, revenue_type: e.target.value })}>
-                        <option value="milestone">{t('projects.revenue_types.milestone', 'إنجاز مرحلة')}</option>
-                        <option value="invoice">{t('projects.revenue_types.invoice', 'فاتورة')}</option>
-                        <option value="advance">{t('projects.revenue_types.advance', 'دفعة مقدمة')}</option>
-                        <option value="other">{t('projects.revenue_types.other', 'أخرى')}</option>
+                        <option value="milestone">{t('projects.revenue_types.milestone')}</option>
+                        <option value="invoice">{t('projects.revenue_types.invoice')}</option>
+                        <option value="advance">{t('projects.revenue_types.advance')}</option>
+                        <option value="other">{t('projects.revenue_types.other')}</option>
                     </select>
                 </div>
                 <div className="row g-3 mb-3">
                     <div className="col-6">
-                        <label className="form-label">{t('projects.revenue_fields.date', 'التاريخ')} *</label>
+                        <label className="form-label">{t('projects.revenue_fields.date')} *</label>
                         <DateInput className="form-input" value={revenueForm.revenue_date}
                             onChange={e => setRevenueForm({ ...revenueForm, revenue_date: e.target.value })} />
                     </div>
                     <div className="col-6">
-                        <label className="form-label">{t('projects.revenue_fields.amount', 'المبلغ')} *</label>
+                        <label className="form-label">{t('projects.revenue_fields.amount')} *</label>
                         <input type="number" className="form-input" value={revenueForm.amount}
                             onChange={e => setRevenueForm({ ...revenueForm, amount: e.target.value })}
                             min="0" step="0.01" placeholder="0.00" dir="ltr" />
                     </div>
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('projects.revenue_fields.description', 'الوصف')}</label>
+                    <label className="form-label">{t('projects.revenue_fields.description')}</label>
                     <textarea className="form-input" rows={2} value={revenueForm.description}
                         onChange={e => setRevenueForm({ ...revenueForm, description: e.target.value })} />
                 </div>
                 <div className="alert alert-info small">
-                    💡 {t('projects.revenue_note', 'سيتم إنشاء قيد محاسبي تلقائي: مدين العملاء/النقدية، دائن الإيرادات')}
+                    💡 {t('projects.revenue_note')}
                 </div>
             </SimpleModal>
 
@@ -881,44 +881,44 @@ export default function ProjectDetails() {
             <SimpleModal
                 isOpen={showInvoiceModal}
                 onClose={() => setShowInvoiceModal(false)}
-                title={t('projects.create_invoice', 'إنشاء فاتورة مبيعات')}
+                title={t('projects.create_invoice')}
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setShowInvoiceModal(false)}>{t('common.cancel', 'إلغاء')}</button>
-                        <button className="btn btn-primary" onClick={handleCreateInvoice} disabled={submitting}>{submitting ? t('common.saving', 'جاري الحفظ...') : t('common.create', 'إنشاء')}</button>
+                        <button className="btn btn-secondary" onClick={() => setShowInvoiceModal(false)}>{t('common.cancel')}</button>
+                        <button className="btn btn-primary" onClick={handleCreateInvoice} disabled={submitting}>{submitting ? t('common.saving') : t('common.create')}</button>
                     </>
                 }
             >
                 <div className="row g-3 mb-3">
                     <div className="col-6">
-                        <label className="form-label">{t('common.date', 'التاريخ')} *</label>
+                        <label className="form-label">{t('common.date')} *</label>
                         <DateInput className="form-input" value={formatDate(invoiceForm.invoice_date)}
                             onChange={e => setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })} />
                     </div>
                     <div className="col-6">
-                        <label className="form-label">{t('common.due_date', 'تاريخ الاستحقاق')} *</label>
+                        <label className="form-label">{t('common.due_date')} *</label>
                         <DateInput className="form-input" value={formatDate(invoiceForm.due_date)}
                             onChange={e => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })} />
                     </div>
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('common.description', 'الوصف')} *</label>
+                    <label className="form-label">{t('common.description')} *</label>
                     <input type="text" className="form-input" value={invoiceForm.description}
                         onChange={e => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('common.amount', 'المبلغ')} *</label>
+                    <label className="form-label">{t('common.amount')} *</label>
                     <input type="number" className="form-input" value={invoiceForm.amount}
                         onChange={e => setInvoiceForm({ ...invoiceForm, amount: e.target.value })}
                         min="0" step="0.01" placeholder="0.00" dir="ltr" />
                 </div>
                 <div className="mb-3">
-                    <label className="form-label">{t('common.notes', 'ملاحظات')}</label>
+                    <label className="form-label">{t('common.notes')}</label>
                     <textarea className="form-input" rows={2} value={invoiceForm.notes}
                         onChange={e => setInvoiceForm({ ...invoiceForm, notes: e.target.value })} />
                 </div>
                 <div className="alert alert-info small">
-                    💡 {t('projects.invoice_note', 'سيتم إنشاء فاتورة مبيعات في النظام وقيد استحقاق على العميل.')}
+                    💡 {t('projects.invoice_note')}
                 </div>
             </SimpleModal>
 
@@ -926,15 +926,15 @@ export default function ProjectDetails() {
             <SimpleModal
                 isOpen={showDeleteConfirm}
                 onClose={() => setShowDeleteConfirm(false)}
-                title={t('projects.confirm_delete', 'حذف المشروع')}
+                title={t('projects.confirm_delete')}
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setShowDeleteConfirm(false)}>{t('common.cancel', 'إلغاء')}</button>
-                        <button className="btn btn-danger" onClick={handleDelete}>{t('common.delete', 'حذف')}</button>
+                        <button className="btn btn-secondary" onClick={() => setShowDeleteConfirm(false)}>{t('common.cancel')}</button>
+                        <button className="btn btn-danger" onClick={handleDelete}>{t('common.delete')}</button>
                     </>
                 }
             >
-                <p>{t('projects.delete_warning', 'هل أنت متأكد من حذف هذا المشروع؟ سيتم حذف جميع المهام والبيانات المرتبطة.')}</p>
+                <p>{t('projects.delete_warning')}</p>
             </SimpleModal>
         </div>
     );

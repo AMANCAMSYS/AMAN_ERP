@@ -156,8 +156,8 @@ const Branches = () => {
                         <tr>
                             <th>{t('branches.name')}</th>
                             <th>{t('branches.code')}</th>
-                            <th>{t('branches.country') || 'الدولة'}</th>
-                            <th>{t('branches.currency') || 'العملة'}</th>
+                            <th>{t('branches.country')}</th>
+                            <th>{t('branches.currency')}</th>
                             <th>{t('branches.city')}</th>
                             <th>{t('branches.status')}</th>
                             <th>{t('common.actions')}</th>
@@ -259,27 +259,27 @@ const Branches = () => {
                             />
                         </div>
                         <div className="col-md-4 mb-3">
-                            <label className="form-label">{t('branches.country') || 'الدولة'} *</label>
+                            <label className="form-label">{t('branches.country')} *</label>
                             <select
                                 className="form-input"
                                 value={formData.country_code || ''}
                                 onChange={e => handleCountryChange(e.target.value)}
                                 required
                             >
-                                <option value="">{t('common.select') || '-- اختر --'}</option>
+                                <option value="">{t('common.select')}</option>
                                 {COUNTRIES.map(c => (
                                     <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.name_en})</option>
                                 ))}
                             </select>
                         </div>
                         <div className="col-md-4 mb-3">
-                            <label className="form-label">{t('branches.currency') || 'العملة الافتراضية'}</label>
+                            <label className="form-label">{t('branches.currency')}</label>
                             <select
                                 className="form-input"
                                 value={formData.default_currency || ''}
                                 onChange={e => setFormData({ ...formData, default_currency: e.target.value })}
                             >
-                                <option value="">{t('common.select') || '-- اختر --'}</option>
+                                <option value="">{t('common.select')}</option>
                                 {/* Always include all country currencies + extras from API */}
                                 {[
                                     ...ALL_CURRENCIES,

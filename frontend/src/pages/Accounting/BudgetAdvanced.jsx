@@ -38,7 +38,7 @@ const BudgetAdvanced = () => {
             await budgetImprovementsAPI.createCostCenterBudget({ cost_center_id: parseInt(ccForm.cost_center_id), budget_id: parseInt(ccForm.budget_id), amount: parseFloat(ccForm.amount) });
             showToast(t('budget.cc_budget_created'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleCreateMY = async (e) => {
@@ -47,7 +47,7 @@ const BudgetAdvanced = () => {
             await budgetImprovementsAPI.createMultiYearBudget({ name: myForm.name, start_year: parseInt(myForm.start_year), end_year: parseInt(myForm.end_year), annual_amount: parseFloat(myForm.annual_amount) });
             showToast(t('budget.multi_year_created'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleCompare = async () => {

@@ -65,11 +65,11 @@ const PerformanceReviews = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'تقييم الأداء' : 'Performance Reviews'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'تقييم أداء الموظفين' : 'Employee performance evaluations'}</p>
+                    <h1 className="workspace-title">{t('hr.performance.performance_reviews')}</h1>
+                    <p className="workspace-subtitle">{t('hr.performance.employee_performance_evaluations')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ employee_id: '', review_period: 'annual', review_date: '', performance_score: 3, reviewer_notes: '', goals: '', strengths: '', improvements: '' }); setShowModal(true); }}>
-                    <Plus size={16} /> {isRTL ? 'تقييم جديد' : 'New Review'}
+                    <Plus size={16} /> {t('hr.performance.new_review')}
                 </button>
             </div>
 
@@ -78,24 +78,24 @@ const PerformanceReviews = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                            <th>{isRTL ? 'الفترة' : 'Period'}</th>
-                            <th>{isRTL ? 'التاريخ' : 'Date'}</th>
-                            <th>{isRTL ? 'التقييم' : 'Score'}</th>
-                            <th>{isRTL ? 'ملاحظات' : 'Notes'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.performance.employee')}</th>
+                            <th>{t('hr.performance.period')}</th>
+                            <th>{t('hr.performance.date')}</th>
+                            <th>{t('hr.performance.score')}</th>
+                            <th>{t('hr.performance.notes')}</th>
+                            <th>{t('hr.performance.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.performance.loading')}</td></tr>
                         ) : reviews.length === 0 ? (
-                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد تقييمات' : 'No reviews'}</td></tr>
+                            <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.performance.no_reviews')}</td></tr>
                         ) : reviews.map((r, i) => (
                             <tr key={r.id}>
                                 <td>{i + 1}</td>
                                 <td style={{ fontWeight: 600 }}>{r.employee_name || `#${r.employee_id}`}</td>
-                                <td>{periods.find(p => p.value === r.review_period)?.[isRTL ? 'ar' : 'en'] || r.review_period}</td>
+                                <td>{periods.find(p => p.value === r.review_period)?.[t('hr.performance.en')] || r.review_period}</td>
                                 <td>{r.review_date}</td>
                                 <td>{renderStars(r.performance_score)}</td>
                                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reviewer_notes || '-'}</td>
@@ -111,28 +111,28 @@ const PerformanceReviews = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل تقييم' : 'Edit Review') : (isRTL ? 'تقييم جديد' : 'New Review')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.performance.edit_review')) : (t('hr.performance.new_review'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <label>{t('hr.performance.employee')}</label>
                             <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
-                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                <option value="">{t('hr.performance.select')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'فترة التقييم' : 'Review Period'}</label>
+                                <label>{t('hr.performance.review_period')}</label>
                                 <select className="form-input" value={form.review_period} onChange={e => setForm({ ...form, review_period: e.target.value })}>
                                     {periods.map(p => <option key={p.value} value={p.value}>{isRTL ? p.ar : p.en}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'التاريخ' : 'Date'}</label>
+                                <label>{t('hr.performance.date')}</label>
                                 <DateInput className="form-input" value={form.review_date} onChange={e => setForm({ ...form, review_date: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'التقييم (1-5)' : 'Score (1-5)'}</label>
+                            <label>{t('hr.performance.score_15')}</label>
                             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                 {[1, 2, 3, 4, 5].map(n => (
                                     <button key={n} type="button" onClick={() => setForm({ ...form, performance_score: n })} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
@@ -143,20 +143,20 @@ const PerformanceReviews = () => {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'نقاط القوة' : 'Strengths'}</label>
+                            <label>{t('hr.performance.strengths')}</label>
                             <textarea className="form-input" rows="2" value={form.strengths} onChange={e => setForm({ ...form, strengths: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'نقاط التحسين' : 'Improvements'}</label>
+                            <label>{t('hr.performance.improvements')}</label>
                             <textarea className="form-input" rows="2" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'ملاحظات المقيّم' : 'Reviewer Notes'}</label>
+                            <label>{t('hr.performance.reviewer_notes')}</label>
                             <textarea className="form-input" rows="2" value={form.reviewer_notes} onChange={e => setForm({ ...form, reviewer_notes: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.performance.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.performance.save')}</button>
                         </div>
                     </div>
                 </div>

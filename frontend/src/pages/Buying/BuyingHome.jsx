@@ -111,12 +111,12 @@ function BuyingHome() {
                         </div>
                         <div className="link-item" onClick={() => navigate('/buying/credit-notes')}>
                             <span className="link-icon">📋</span>
-                            {t('buying.home.links.credit_notes') || 'إشعارات دائنة'}
+                            {t('buying.home.links.credit_notes')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/buying/debit-notes')}>
                             <span className="link-icon">📝</span>
-                            {t('buying.home.links.debit_notes') || 'إشعارات مدينة'}
+                            {t('buying.home.links.debit_notes')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/buying/rfq')}>

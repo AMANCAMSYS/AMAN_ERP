@@ -3,10 +3,12 @@ import { externalAPI } from '../../utils/api';
 import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { useTranslation } from 'react-i18next';
 
 const PERMISSION_OPTIONS = ['read', 'write', 'invoices', 'reports', 'inventory'];
 
 export default function ApiKeys() {
+  const { t } = useTranslation();
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -60,20 +62,20 @@ export default function ApiKeys() {
       fetchKeys();
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء إنشاء المفتاح');
+      alert(t('settings.api_keys.error_create'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المفتاح؟')) return;
+    if (!window.confirm(t('settings.api_keys.confirm_delete'))) return;
     try {
       await externalAPI.deleteApiKey(id);
       fetchKeys();
     } catch (e) {
       console.error(e);
-      alert('حدث خطأ أثناء الحذف');
+      alert(t('settings.api_keys.error_delete'));
     }
   };
 
@@ -85,9 +87,9 @@ export default function ApiKeys() {
   return (
     <div className="workspace fade-in">
       <div className="workspace-header">
-        <h1 className="workspace-title">مفاتيح API</h1>
+        <h1 className="workspace-title">{t('settings.api_keys.title')}</h1>
         <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-          + إنشاء مفتاح جديد
+          + {t('settings.api_keys.create_new')}
         </button>
       </div>
 
@@ -101,7 +103,7 @@ export default function ApiKeys() {
             marginBottom: 16,
           }}
         >
-          <strong>⚠️ تم إنشاء المفتاح بنجاح — انسخه الآن، لن يظهر مرة أخرى:</strong>
+          <strong>⚠️ {t('settings.api_keys.key_created_warning')}</strong>
           <pre
             style={{
               background: '#fff',
@@ -117,28 +119,28 @@ export default function ApiKeys() {
             {newKeyResult.key}
           </pre>
           <button className="btn btn-secondary" onClick={() => setNewKeyResult(null)}>
-            إغلاق
+            {t('common.close')}
           </button>
         </div>
       )}
 
       {loading ? (
-        <p>جاري التحميل...</p>
+        <p>{t('common.loading')}</p>
       ) : keys.length === 0 ? (
-        <div className="empty-state">لا توجد مفاتيح API حالياً</div>
+        <div className="empty-state">{t('settings.api_keys.no_keys')}</div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
-              <th>الاسم</th>
-              <th>البادئة</th>
-              <th>الصلاحيات</th>
-              <th>الحد</th>
-              <th>تاريخ الانتهاء</th>
-              <th>آخر استخدام</th>
-              <th>عدد الاستخدام</th>
-              <th>الحالة</th>
-              <th>إجراءات</th>
+              <th>{t('common.name')}</th>
+              <th>{t('settings.api_keys.prefix')}</th>
+              <th>{t('settings.api_keys.permissions')}</th>
+              <th>{t('settings.api_keys.rate_limit')}</th>
+              <th>{t('settings.api_keys.expiry_date')}</th>
+              <th>{t('settings.api_keys.last_used')}</th>
+              <th>{t('settings.api_keys.usage_count')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -159,14 +161,14 @@ export default function ApiKeys() {
                 <td>{k.usage_count ?? 0}</td>
                 <td>
                   {k.is_active ? (
-                    <span className="badge badge-success">مفعّل</span>
+                    <span className="badge badge-success">{t('settings.api_keys.active')}</span>
                   ) : (
-                    <span className="badge badge-danger">معطّل</span>
+                    <span className="badge badge-danger">{t('settings.api_keys.inactive')}</span>
                   )}
                 </td>
                 <td>
                   <button className="btn btn-danger" onClick={() => handleDelete(k.id)}>
-                    حذف
+                    {t('common.delete')}
                   </button>
                 </td>
               </tr>
@@ -179,14 +181,14 @@ export default function ApiKeys() {
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>إنشاء مفتاح API جديد</h2>
+              <h2>{t('settings.api_keys.create_modal_title')}</h2>
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
                 <div className="form-section">
                   <div className="form-grid">
                     <div className="form-group">
-                      <label>الاسم</label>
+                      <label>{t('common.name')}</label>
                       <input
                         type="text"
                         value={form.name}
@@ -195,7 +197,7 @@ export default function ApiKeys() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>الحد لكل دقيقة</label>
+                      <label>{t('settings.api_keys.rate_limit_per_minute')}</label>
                       <input
                         type="number"
                         min={1}
@@ -206,7 +208,7 @@ export default function ApiKeys() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>تاريخ الانتهاء (اختياري)</label>
+                      <label>{t('settings.api_keys.expiry_date_optional')}</label>
                       <input
                         type="date"
                         value={form.expires_at}
@@ -215,7 +217,7 @@ export default function ApiKeys() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>الصلاحيات</label>
+                    <label>{t('settings.api_keys.permissions')}</label>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
                       {PERMISSION_OPTIONS.map((perm) => (
                         <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -234,14 +236,14 @@ export default function ApiKeys() {
               <div className="modal-footer">
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? 'جاري الإنشاء...' : 'إنشاء'}
+                    {submitting ? t('settings.api_keys.creating') : t('common.create')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => setShowCreateModal(false)}
                   >
-                    إلغاء
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>

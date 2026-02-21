@@ -99,7 +99,7 @@ const RoleManagement = () => {
             );
             fetchData();
         } catch (error) {
-            toastEmitter.emit(isRTL ? 'فشل تهيئة الأدوار الافتراضية' : 'Failed to init default roles', 'error');
+            toastEmitter.emit(t('admin.roles.init_failed'), 'error');
         } finally {
             setInitLoading(false);
         }
@@ -175,22 +175,22 @@ const RoleManagement = () => {
         try {
             if (editingRole) {
                 await api.put(`/roles/${editingRole.id}`, formData, { params });
-                toastEmitter.emit(isRTL ? 'تم تحديث الدور بنجاح' : 'Role updated successfully', 'success');
+                toastEmitter.emit(t('admin.roles.updated'), 'success');
             } else {
                 await api.post('/roles/', formData, { params });
-                toastEmitter.emit(isRTL ? 'تم إنشاء الدور بنجاح' : 'Role created successfully', 'success');
+                toastEmitter.emit(t('admin.roles.created'), 'success');
             }
             closeModal();
             fetchData();
         } catch (error) {
             console.error('Error saving role:', error);
-            toastEmitter.emit(isRTL ? 'حدث خطأ أثناء الحفظ' : 'Error saving role', 'error');
+            toastEmitter.emit(t('admin.roles.save_error'), 'error');
         }
     };
 
     const handleDelete = async (role) => {
         if (role.is_system_role) {
-            toastEmitter.emit(isRTL ? 'لا يمكن حذف الأدوار الافتراضية للنظام' : 'Cannot delete system roles', 'error');
+            toastEmitter.emit(t('admin.roles.cannot_delete_system'), 'error');
             return;
         }
         if (!window.confirm(t('admin.roles.confirm_delete', { name: isRTL ? (role.role_name_ar || role.role_name) : role.role_name }))) return;
@@ -200,7 +200,7 @@ const RoleManagement = () => {
 
         try {
             await api.delete(`/roles/${role.id}`, { params });
-            toastEmitter.emit(isRTL ? 'تم حذف الدور' : 'Role deleted', 'success');
+            toastEmitter.emit(t('admin.roles.deleted'), 'success');
             fetchData();
         } catch (error) {
             console.error('Error deleting role:', error);
@@ -249,16 +249,16 @@ const RoleManagement = () => {
         <div className="role-management-container">
             <div className="role-header">
                 <div>
-                    <h1><LucideIcons.Shield size={28} style={{ verticalAlign: 'middle', marginLeft: isRTL ? 8 : 0, marginRight: isRTL ? 0 : 8 }} /> {t('roles.title', 'إدارة الأدوار والصلاحيات')}</h1>
-                    <p className="subtitle">{t('roles.subtitle', 'إنشاء وتعديل أدوار المستخدمين وصلاحياتهم')}</p>
+                    <h1><LucideIcons.Shield size={28} style={{ verticalAlign: 'middle', marginLeft: isRTL ? 8 : 0, marginRight: isRTL ? 0 : 8 }} /> {t('roles.title')}</h1>
+                    <p className="subtitle">{t('roles.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                     <button className="btn-secondary" onClick={handleInitDefaults} disabled={initLoading || (user?.role === 'system_admin' && !selectedCompany)}>
                         <LucideIcons.RefreshCw size={16} className={initLoading ? 'spin' : ''} />
-                        {' '}{t('roles.initDefaults', 'تهيئة الأدوار الافتراضية')}
+                        {' '}{t('roles.initDefaults')}
                     </button>
                     <button className="btn-primary" onClick={() => openModal()} disabled={user?.role === 'system_admin' && !selectedCompany}>
-                        <LucideIcons.Plus size={16} /> {t('roles.addRole', 'إضافة دور جديد')}
+                        <LucideIcons.Plus size={16} /> {t('roles.addRole')}
                     </button>
                 </div>
             </div>
@@ -266,13 +266,13 @@ const RoleManagement = () => {
             {user?.role === 'system_admin' && (
                 <div className="company-selector-panel">
                     <LucideIcons.Building size={18} />
-                    <label>{t('companies.title', 'الشركة')}:</label>
+                    <label>{t('companies.title')}:</label>
                     <select
                         value={selectedCompany}
                         onChange={(e) => setSelectedCompany(e.target.value)}
                         className="company-select"
                     >
-                        <option value="">-- {t('audit.select_company', 'اختر شركة لرؤية أدوارها')} --</option>
+                        <option value="">-- {t('audit.select_company')} --</option>
                         {Array.isArray(companies) && companies.map(c => (
                             <option key={c.id} value={c.id}>{c.company_name} ({c.id})</option>
                         ))}
@@ -281,14 +281,14 @@ const RoleManagement = () => {
             )}
 
             {loading ? (
-                <div className="loading"><LucideIcons.Loader2 className="spin" size={24} /> {t('common.loading', 'جاري التحميل...')}</div>
+                <div className="loading"><LucideIcons.Loader2 className="spin" size={24} /> {t('common.loading')}</div>
             ) : (
                 <div className="roles-grid">
                     {roles.length === 0 ? (
                         <div className="no-data">
                             {user?.role === 'system_admin' && !selectedCompany
-                                ? t('roles.selectCompanyToView', 'يرجى اختيار شركة لعرض أدوارها')
-                                : t('common.no_data', 'لا توجد بيانات')}
+                                ? t('roles.selectCompanyToView')
+                                : t('common.no_data')}
                         </div>
                     ) : (
                         roles.map(role => (
@@ -307,14 +307,14 @@ const RoleManagement = () => {
                                     </div>
                                     {role.is_system_role && (
                                         <span className="system-badge">
-                                            <LucideIcons.Lock size={12} /> {t('roles.systemRole', 'افتراضي')}
+                                            <LucideIcons.Lock size={12} /> {t('roles.systemRole')}
                                         </span>
                                     )}
                                 </div>
                                 <div className="role-permissions">
                                     <span className="perm-count">
                                         <LucideIcons.Key size={14} style={{ verticalAlign: 'middle' }} />
-                                        {' '}{role.permissions?.includes('*') ? t('roles.fullAccess', 'صلاحيات كاملة') : `${role.permissions?.length || 0} ${t('roles.permissions', 'صلاحية')}`}
+                                        {' '}{role.permissions?.includes('*') ? t('roles.fullAccess') : `${role.permissions?.length || 0} ${t('roles.permissions')}`}
                                     </span>
                                     <div className="perm-preview">
                                         {(role.permissions || []).slice(0, 4).map(p => (
@@ -330,16 +330,16 @@ const RoleManagement = () => {
                                         className="btn-edit"
                                         onClick={() => openModal(role)}
                                         disabled={role.is_system_role}
-                                        title={role.is_system_role ? (isRTL ? 'لا يمكن تعديل الأدوار الافتراضية' : 'Cannot edit system roles') : ''}
+                                        title={role.is_system_role ? (t('admin.roles.cannot_edit_system_roles')) : ''}
                                     >
-                                        <LucideIcons.Pencil size={14} /> {t('common.edit', 'تعديل')}
+                                        <LucideIcons.Pencil size={14} /> {t('common.edit')}
                                     </button>
                                     <button
                                         className="btn-delete"
                                         onClick={() => handleDelete(role)}
                                         disabled={role.is_system_role}
                                     >
-                                        <LucideIcons.Trash2 size={14} /> {t('common.delete', 'حذف')}
+                                        <LucideIcons.Trash2 size={14} /> {t('common.delete')}
                                     </button>
                                 </div>
                             </div>
@@ -355,8 +355,8 @@ const RoleManagement = () => {
                         <div className="modal-header">
                             <h2>
                                 {editingRole
-                                    ? <><LucideIcons.Pencil size={20} /> {t('roles.editRole', 'تعديل الدور')}</>
-                                    : <><LucideIcons.Plus size={20} /> {t('roles.addRole', 'إضافة دور جديد')}</>}
+                                    ? <><LucideIcons.Pencil size={20} /> {t('roles.editRole')}</>
+                                    : <><LucideIcons.Plus size={20} /> {t('roles.addRole')}</>}
                             </h2>
                             <button className="modal-close" onClick={closeModal}><LucideIcons.X size={20} /></button>
                         </div>
@@ -364,7 +364,7 @@ const RoleManagement = () => {
                         <form onSubmit={handleSubmit}>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>{t('roles.roleName', 'اسم الدور (إنجليزي)')}</label>
+                                    <label>{t('roles.roleName')}</label>
                                     <input
                                         type="text"
                                         name="role_name"
@@ -375,7 +375,7 @@ const RoleManagement = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>{t('roles.roleNameAr', 'اسم الدور (عربي)')}</label>
+                                    <label>{t('roles.roleNameAr')}</label>
                                     <input
                                         type="text"
                                         name="role_name_ar"
@@ -387,13 +387,13 @@ const RoleManagement = () => {
                             </div>
 
                             <div className="form-group">
-                                <label>{t('roles.description', 'الوصف')}</label>
+                                <label>{t('roles.description')}</label>
                                 <textarea
                                     name="description"
                                     value={formData.description}
                                     onChange={handleInputChange}
                                     rows={2}
-                                    placeholder={isRTL ? 'وصف مختصر لهذا الدور...' : 'Brief description of this role...'}
+                                    placeholder={t('admin.roles.brief_description_of_this_role')}
                                 />
                             </div>
 
@@ -401,7 +401,7 @@ const RoleManagement = () => {
                                 <div className="permissions-header">
                                     <h3>
                                         <LucideIcons.Key size={18} />
-                                        {' '}{t('roles.selectPermissions', 'اختر الصلاحيات')}
+                                        {' '}{t('roles.selectPermissions')}
                                         <span className="perm-counter">{totalSelected}/{totalPerms}</span>
                                     </h3>
                                     <div className="perm-actions">
@@ -411,14 +411,14 @@ const RoleManagement = () => {
                                                 type="text"
                                                 value={searchTerm}
                                                 onChange={e => setSearchTerm(e.target.value)}
-                                                placeholder={isRTL ? 'بحث في الصلاحيات...' : 'Search permissions...'}
+                                                placeholder={t('admin.roles.search_permissions')}
                                             />
                                         </div>
                                         <button type="button" className="btn-select-all" onClick={selectAllPermissions}>
-                                            <LucideIcons.CheckSquare size={14} /> {t('roles.selectAll', 'تحديد الكل')}
+                                            <LucideIcons.CheckSquare size={14} /> {t('roles.selectAll')}
                                         </button>
                                         <button type="button" className="btn-clear-all" onClick={clearAllPermissions}>
-                                            <LucideIcons.Square size={14} /> {t('roles.clearAll', 'إلغاء الكل')}
+                                            <LucideIcons.Square size={14} /> {t('roles.clearAll')}
                                         </button>
                                     </div>
                                 </div>
@@ -450,8 +450,8 @@ const RoleManagement = () => {
                                                             onClick={(e) => { e.stopPropagation(); toggleSectionPermissions(sectionKey, perms); }}
                                                         >
                                                             {allSelected
-                                                                ? <><LucideIcons.CheckSquare size={14} /> {isRTL ? 'إلغاء القسم' : 'Deselect'}</>
-                                                                : <><LucideIcons.Square size={14} /> {isRTL ? 'تحديد القسم' : 'Select All'}</>}
+                                                                ? <><LucideIcons.CheckSquare size={14} /> {t('admin.roles.deselect')}</>
+                                                                : <><LucideIcons.Square size={14} /> {t('admin.roles.select_all')}</>}
                                                         </button>
                                                         <LucideIcons.ChevronDown size={16} className={`chevron ${isCollapsed ? 'collapsed' : ''}`} />
                                                     </div>
@@ -481,10 +481,10 @@ const RoleManagement = () => {
 
                             <div className="modal-footer">
                                 <button type="button" className="btn-cancel" onClick={closeModal}>
-                                    {t('common.cancel', 'إلغاء')}
+                                    {t('common.cancel')}
                                 </button>
                                 <button type="submit" className="btn-save">
-                                    <LucideIcons.Save size={16} /> {t('common.save', 'حفظ')}
+                                    <LucideIcons.Save size={16} /> {t('common.save')}
                                 </button>
                             </div>
                         </form>

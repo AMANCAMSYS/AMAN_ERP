@@ -14,7 +14,7 @@ export default function GanttChart({ tasks = [] }) {
     const validTasks = useMemo(() => tasks.filter(t => t.start_date && t.end_date), [tasks]);
 
     if (validTasks.length === 0) {
-        return <div className="text-center py-5 text-muted">{t('projects.gantt.no_tasks', 'لا توجد مهام بجدول زمني محدد لعرضها')}</div>;
+        return <div className="text-center py-5 text-muted">{t('projects.gantt.no_tasks')}</div>;
     }
 
     // Calculate Timeline Range

@@ -61,7 +61,7 @@ export default function OpeningBalances() {
             showToast(res.data.message || (t('opening.saved')), 'success')
             fetchData()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setSaving(false)
         }

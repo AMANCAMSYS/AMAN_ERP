@@ -11,7 +11,7 @@ const ProjectsSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Briefcase size={20} className="text-primary" />
-                    {t('settings.projects.main_title') || 'إعدادات إدارة المشاريع'}
+                    {t('settings.projects.main_title')}
                 </h3>
 
                 <div className="flex items-center gap-3 mb-6">
@@ -24,10 +24,10 @@ const ProjectsSettings = ({ settings, handleSettingChange }) => {
                     />
                     <div>
                         <label className="cursor-pointer font-medium block" htmlFor="projects_enabled">
-                            {t('settings.projects.enable_module') || 'تفعيل وحدة إدارة المشاريع'}
+                            {t('settings.projects.enable_module')}
                         </label>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.projects.enable_hint') || 'عند التفعيل، ستظهر قائمة المشاريع في القائمة الجانبية.'}
+                            {t('settings.projects.enable_hint')}
                         </p>
                     </div>
                 </div>
@@ -36,7 +36,7 @@ const ProjectsSettings = ({ settings, handleSettingChange }) => {
                     <div className="form-group">
                         <label className="form-label mb-2 flex items-center gap-2">
                             <Hash size={16} />
-                            {t('settings.projects.prefix') || 'بادئة ترميز المشاريع'}
+                            {t('settings.projects.prefix')}
                         </label>
                         <input
                             type="text"
@@ -53,7 +53,7 @@ const ProjectsSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Clock size={20} className="text-primary" />
-                    {t('settings.projects.time_title') || 'تتبع الوقت والمهام'}
+                    {t('settings.projects.time_title')}
                 </h3>
                 <div className="flex items-center gap-3">
                     <input
@@ -64,7 +64,7 @@ const ProjectsSettings = ({ settings, handleSettingChange }) => {
                         onChange={(e) => handleSettingChange('project_timesheet_required', e.target.checked.toString())}
                     />
                     <label className="cursor-pointer font-medium" htmlFor="project_timesheet_required">
-                        {t('settings.projects.require_timesheets') || 'إلزام الموظفين بتسجيل الجداول الزمنية (Timesheets)'}
+                        {t('settings.projects.require_timesheets')}
                     </label>
                 </div>
             </div>

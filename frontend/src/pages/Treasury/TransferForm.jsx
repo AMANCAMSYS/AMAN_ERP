@@ -127,7 +127,7 @@ function TransferForm() {
                             </select>
                             {form.treasury_id && (
                                 <div className="mt-2 text-sm">
-                                    <span className="text-secondary">{t('treasury.available_balance') || 'الرصيد المتاح'}: </span>
+                                    <span className="text-secondary">{t('treasury.available_balance')}: </span>
                                     <span className="fw-bold text-success">
                                         {formatNumber(accounts.find(a => a.id.toString() === form.treasury_id.toString())?.current_balance)} {currency}
                                     </span>
@@ -151,7 +151,7 @@ function TransferForm() {
                             </select>
                             {form.target_treasury_id && (
                                 <div className="mt-2 text-sm">
-                                    <span className="text-secondary">{t('treasury.available_balance') || 'الرصيد المتاح'}: </span>
+                                    <span className="text-secondary">{t('treasury.available_balance')}: </span>
                                     <span className="fw-bold text-success">
                                         {formatNumber(accounts.find(a => a.id.toString() === form.target_treasury_id.toString())?.current_balance)} {currency}
                                     </span>

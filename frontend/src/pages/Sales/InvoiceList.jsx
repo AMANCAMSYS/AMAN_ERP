@@ -22,7 +22,7 @@ function InvoiceList() {
                 const response = await salesAPI.listInvoices({ branch_id: currentBranch?.id })
                 setInvoices(response.data)
             } catch (err) {
-                setError(t('common.error_loading') || 'فشل في تحميل الفواتير')
+                setError(t('common.error_loading'))
                 console.error(err)
             } finally {
                 setLoading(false)

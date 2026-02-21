@@ -172,7 +172,7 @@ function SalesOrderForm() {
             return
         }
         if (formData.expected_delivery_date < formData.order_date) {
-            setError(t('sales.orders.form.errors.delivery_before_order') || 'تاريخ التسليم المتوقع لا يمكن أن يكون قبل تاريخ الطلب')
+            setError(t('sales.orders.form.errors.delivery_before_order'))
             return
         }
 

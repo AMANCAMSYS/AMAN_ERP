@@ -36,11 +36,11 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
                             onChange={(e) => handleSettingChange('purchases_payment_term', e.target.value)}
                         >
                             <option value="0">{t('common.immediate') || '{t("settings.purchases.cash_payment")}'}</option>
-                            <option value="15">15 {t('common.days') || 'يوم'}</option>
-                            <option value="30">30 {t('common.days') || 'يوم'}</option>
-                            <option value="45">45 {t('common.days') || 'يوم'}</option>
-                            <option value="60">60 {t('common.days') || 'يوم'}</option>
-                            <option value="90">90 {t('common.days') || 'يوم'}</option>
+                            <option value="15">15 {t('common.days')}</option>
+                            <option value="30">30 {t('common.days')}</option>
+                            <option value="45">45 {t('common.days')}</option>
+                            <option value="60">60 {t('common.days')}</option>
+                            <option value="90">90 {t('common.days')}</option>
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
                             {t('settings.purchases.term_hint') || '{t("settings.purchases.payment_period_note")}'}
@@ -64,7 +64,7 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
                                 value={settings.purchases_default_supplier || ''}
                                 onChange={(e) => handleSettingChange('purchases_default_supplier', e.target.value)}
                             >
-                                <option value="">{t('common.select') || 'اختر...'}</option>
+                                <option value="">{t('common.select')}</option>
                                 {suppliers.map(supplier => (
                                     <option key={supplier.id} value={supplier.id}>
                                         {supplier.name}

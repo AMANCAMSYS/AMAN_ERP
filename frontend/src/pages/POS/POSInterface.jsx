@@ -539,9 +539,9 @@ const POSInterface = () => {
                                                 if (d && !isNaN(d)) {
                                                     const val = Number(d);
                                                     if (val < 0) {
-                                                        showToast('الخصم لا يمكن أن يكون سالباً', 'warning');
+                                                        showToast(t('pos.discount_negative'), 'warning');
                                                     } else if (val > cartTotals.subtotal) {
-                                                        showToast('الخصم لا يمكن أن يتجاوز إجمالي المبيعات', 'warning');
+                                                        showToast(t('pos.discount_exceeds_total'), 'warning');
                                                     } else {
                                                         setGlobalDiscount(val);
                                                     }
@@ -752,19 +752,19 @@ const POSInterface = () => {
                                         <strong>{session?.opening_balance?.toLocaleString()} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--base-200)', paddingTop: '4px' }}>
-                                        <span>{t('pos.total_actual_sales') || 'إجمالي المبيعات (كل الُطرق)'}:</span>
+                                        <span>{t('pos.total_actual_sales')}:</span>
                                         <strong style={{ fontWeight: '500' }}>{session?.total_sales?.toLocaleString() || 0} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>{t('pos.total_cash_sales') || 'المبيعات النقدية'}:</span>
+                                        <span>{t('pos.total_cash_sales')}:</span>
                                         <strong style={{ color: '#059669' }}>+{session?.total_cash?.toLocaleString() || 0} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>{t('pos.total_bank_sales') || 'مبيعات الشبكة/البنك'}:</span>
+                                        <span>{t('pos.total_bank_sales')}:</span>
                                         <strong style={{ color: '#2563eb' }}>{session?.total_bank?.toLocaleString() || 0} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: session?.total_returns_cash > 0 ? 'var(--pos-danger)' : 'inherit' }}>
-                                        <span>{t('pos.total_returns_cash') || 'مرتجعات نقدية (-)'}:</span>
+                                        <span>{t('pos.total_returns_cash')}:</span>
                                         <strong>-{session?.total_returns_cash?.toLocaleString() || 0} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '2px solid var(--base-300)' }}>
@@ -774,7 +774,7 @@ const POSInterface = () => {
                                         </strong>
                                     </div>
                                     <div style={{ fontSize: '11px', color: 'var(--base-content-secondary)', marginTop: '4px', textAlign: 'center' }}>
-                                        * {t('pos.expected_cash_note') || 'النقد المتوقع = رصيد الافتتاح + المبيعات النقدية - المرتجعات النقدية'}
+                                        * {t('pos.expected_cash_note')}
                                     </div>
                                 </div>
                             </div>

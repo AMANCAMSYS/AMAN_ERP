@@ -83,7 +83,7 @@ function SupplierForm() {
     }
 
     const handleDelete = async () => {
-        if (!window.confirm(t('buying.suppliers.delete_confirm', 'هل أنت متأكد من حذف هذا المورد؟'))) return
+        if (!window.confirm(t('buying.suppliers.delete_confirm'))) return
         try {
             await inventoryAPI.deleteSupplier(id)
             navigate('/buying/suppliers')
@@ -96,7 +96,7 @@ function SupplierForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
-                <h1 className="workspace-title">{isEdit ? t('buying.suppliers.form.title_edit', 'تعديل بيانات المورد') : t('buying.suppliers.form.title_new')}</h1>
+                <h1 className="workspace-title">{isEdit ? t('buying.suppliers.form.title_edit') : t('buying.suppliers.form.title_new')}</h1>
             </div>
 
             <div className="card" style={{ maxWidth: '800px' }}>
@@ -131,7 +131,7 @@ function SupplierForm() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">{t('common.currency', 'العملة')}</label>
+                                <label className="form-label">{t('common.currency')}</label>
                                 <select
                                     name="currency"
                                     className="form-input"

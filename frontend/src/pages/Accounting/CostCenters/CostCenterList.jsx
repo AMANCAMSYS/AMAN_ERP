@@ -103,7 +103,7 @@ const CostCenterList = () => {
                         </button>
                         <div>
                             <h1 className="workspace-title">{t('cost_centers.title')}</h1>
-                            <p className="workspace-subtitle">{t('cost_centers.subtitle', 'إدارة وتتبع مصروفات الأقسام والمشاريع')}</p>
+                            <p className="workspace-subtitle">{t('cost_centers.subtitle')}</p>
                         </div>
                     </div>
                     <button

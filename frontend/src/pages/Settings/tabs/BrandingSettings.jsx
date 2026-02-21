@@ -29,10 +29,10 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             handleSettingChange('company_logo', response.data.logo_url);
-            showToast(t('settings.branding.logo_success') || 'تم رفع الشعار بنجاح', 'success');
+            showToast(t('settings.branding.logo_success'), 'success');
         } catch (err) {
             console.error("Logo upload failed", err);
-            showToast(t('settings.branding.logo_error') || 'فشل رفع الشعار', 'error');
+            showToast(t('settings.branding.logo_error'), 'error');
         } finally {
             setUploading(false);
         }
@@ -49,7 +49,7 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ImageIcon size={20} className="text-primary" />
-                    {t('settings.branding.logo_title') || 'شعار الشركة'}
+                    {t('settings.branding.logo_title')}
                 </h3>
                 <div className="flex flex-col md:flex-row items-center gap-8">
                     <div className="relative group">
@@ -63,7 +63,7 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
                             ) : (
                                 <div className="text-base-content/30 flex flex-col items-center">
                                     <Upload size={32} />
-                                    <span className="text-xs mt-2">{t('settings.branding.no_logo') || 'لا يوجد شعار'}</span>
+                                    <span className="text-xs mt-2">{t('settings.branding.no_logo')}</span>
                                 </div>
                             )}
 
@@ -86,11 +86,11 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
 
                     <div className="flex-1 space-y-4">
                         <p className="text-sm text-base-content/60 leading-relaxed">
-                            {t('settings.branding.logo_hint') || 'يفضل رفع شعار بخلفية شفافة (PNG) وبأبعاد مربعة 512x512 بكسل كحد أقصى للحصول على أفضل جودة.'}
+                            {t('settings.branding.logo_hint')}
                         </p>
                         <label className="btn btn-primary btn-outline gap-2">
                             <Upload size={18} />
-                            {t('settings.branding.upload_btn') || 'اختيار صورة'}
+                            {t('settings.branding.upload_btn')}
                             <input
                                 type="file"
                                 className="hidden"
@@ -107,11 +107,11 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-primary"></div>
-                    {t('settings.branding.theme_title') || 'هوية النظام (الألوان)'}
+                    {t('settings.branding.theme_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.branding.primary_color') || 'اللون الأساسي'}</label>
+                        <label className="form-label">{t('settings.branding.primary_color')}</label>
                         <div className="flex items-center gap-3">
                             <input
                                 type="color"
@@ -129,7 +129,7 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
                     </div>
                 </div>
                 <p className="text-xs text-base-content/40 mt-4">
-                    {t('settings.branding.theme_hint') || '* سيتم تطبيق هذه الألوان تدريجياً على كافة واجهات النظام والتقارير.'}
+                    {t('settings.branding.theme_hint')}
                 </p>
             </div>
         </div>

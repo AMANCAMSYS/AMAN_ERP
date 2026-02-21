@@ -81,12 +81,12 @@ function BudgetReport() {
                             <ArrowLeft size={20} />
                         </button>
                         <div>
-                            <h1 className="workspace-title">{t('reports.budget_vs_actual.title') || 'مقارنة الميزانية مع الفعلي'}</h1>
+                            <h1 className="workspace-title">{t('reports.budget_vs_actual.title')}</h1>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <div style={{ minWidth: '180px' }}>
-                            <label className="form-label">{t('reports.budget_vs_actual.select_budget') || 'الميزانية'}</label>
+                            <label className="form-label">{t('reports.budget_vs_actual.select_budget')}</label>
                             <select
                                 className="form-input w-full"
                                 value={selectedBudgetId}
@@ -128,11 +128,11 @@ function BudgetReport() {
                         <thead>
                             <tr>
                                 <th>{t('accounting.coa.account')}</th>
-                                <th className="text-center">{t('reports.budget_vs_actual.planned') || 'المخطط لها'} ({currency})</th>
-                                <th className="text-center">{t('reports.budget_vs_actual.actual') || 'الفعلي'} ({currency})</th>
-                                <th className="text-center">{t('reports.budget_vs_actual.variance') || 'الانحراف'} (%)</th>
-                                <th className="text-center">{t('common.status_title') || 'الحالة'}</th>
-                                <th className="text-center">{t('reports.budget_vs_actual.performance') || 'الأداء'}</th>
+                                <th className="text-center">{t('reports.budget_vs_actual.planned')} ({currency})</th>
+                                <th className="text-center">{t('reports.budget_vs_actual.actual')} ({currency})</th>
+                                <th className="text-center">{t('reports.budget_vs_actual.variance')} (%)</th>
+                                <th className="text-center">{t('common.status_title')}</th>
+                                <th className="text-center">{t('reports.budget_vs_actual.performance')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -161,11 +161,11 @@ function BudgetReport() {
                                         <td className="text-center">
                                             {isOverBudget ? (
                                                 <span className="badge badge-danger">
-                                                    ⚠️ {t('accounting.budgets.over_budget') || 'تجاوز الموازنة'}
+                                                    ⚠️ {t('accounting.budgets.over_budget')}
                                                 </span>
                                             ) : (
                                                 <span className="badge badge-success">
-                                                    ✅ {t('accounting.budgets.within_budget') || 'ضمن الموازنة'}
+                                                    ✅ {t('accounting.budgets.within_budget')}
                                                 </span>
                                             )}
                                         </td>

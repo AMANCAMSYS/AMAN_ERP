@@ -59,8 +59,8 @@ const ResourceManagement = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div>
-                    <h1 className="workspace-title">{t('projects.resource_allocation', 'تخصيص الموارد')}</h1>
-                    <p className="workspace-subtitle">{t('projects.resource_subtitle', 'متابعة ضغط العمل وتوزيع المهام على الموظفين')}</p>
+                    <h1 className="workspace-title">{t('projects.resource_allocation')}</h1>
+                    <p className="workspace-subtitle">{t('projects.resource_subtitle')}</p>
                 </div>
 
                 {/* Date Navigation */}
@@ -79,17 +79,17 @@ const ResourceManagement = () => {
                         className="btn btn-outline-secondary btn-sm ms-2"
                         onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 6 }))}
                     >
-                        {t('common.current_week', 'الأسبوع الحالي')}
+                        {t('common.current_week')}
                     </button>
                 </div>
             </div>
 
             {/* Legend */}
             <div className="d-flex gap-3 mb-3 text-small">
-                <div className="d-flex align-items-center gap-1"><span className="badge bg-success-subtle text-dark border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_light', '< 6 ساعات')}</div>
-                <div className="d-flex align-items-center gap-1"><span className="badge bg-success border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_optimal', '6-8 ساعات')}</div>
-                <div className="d-flex align-items-center gap-1"><span className="badge bg-warning border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_heavy', '8-10 ساعات')}</div>
-                <div className="d-flex align-items-center gap-1"><span className="badge bg-danger border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_overload', '> 10 ساعات')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-success-subtle text-dark border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_light')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-success border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_optimal')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-warning border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_heavy')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-danger border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_overload')}</div>
             </div>
 
             {/* Allocation Matrix */}
@@ -99,21 +99,21 @@ const ResourceManagement = () => {
                         <table className="table table-hover align-middle mb-0 resource-matrix">
                             <thead className="bg-light">
                                 <tr>
-                                    <th style={{ width: '250px' }} className="ps-4 py-3">{t('common.employee', 'الموظف')}</th>
+                                    <th style={{ width: '250px' }} className="ps-4 py-3">{t('common.employee')}</th>
                                     {weekDays.map(day => (
                                         <th key={day.toISOString()} className="text-center py-3" style={{ minWidth: '100px' }}>
                                             <div className="small text-muted text-uppercase">{format(day, 'EEE', { locale })}</div>
                                             <div className="fw-bold">{format(day, 'd', { locale })}</div>
                                         </th>
                                     ))}
-                                    <th className="text-center py-3">{t('common.total', 'الإجمالي')}</th>
+                                    <th className="text-center py-3">{t('common.total')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.loading', 'جاري التحميل...')}</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.loading')}</td></tr>
                                 ) : resources.length === 0 ? (
-                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.no_data', 'لا توجد بيانات')}</td></tr>
+                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.no_data')}</td></tr>
                                 ) : (
                                     resources.map(res => {
                                         const totalWeekly = weekDays.reduce((acc, day) => acc + getDailyLoad(res, day), 0);

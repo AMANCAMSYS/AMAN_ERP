@@ -67,7 +67,7 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
                             value={settings.default_warehouse || ''}
                             onChange={(e) => handleSettingChange('default_warehouse', e.target.value)}
                         >
-                            <option value="">{t('common.select') || 'اختر...'}</option>
+                            <option value="">{t('common.select')}</option>
                             {warehouses.map(w => (
                                 <option key={w.id} value={w.id.toString()}>{w.name}</option>
                             ))}
@@ -98,7 +98,7 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
                             <option value="fifo">FIFO ({t("settings.inventory.fifo")})</option>
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.inventory.valuation_hint') || 'طريقة حساب تكلفة البضاعة المباعة (مثبتة حالياً على {t("settings.inventory.weighted_avg")}).'}
+                            {t('settings.inventory.valuation_hint')}
                         </p>
                     </div>
                 </div>

@@ -321,7 +321,7 @@ const CompanySettings = () => {
                                                 onClick={() => setSearchParams({})}
                                                 className="btn btn-ghost"
                                             >
-                                                {t('common.cancel') || 'إلغاء'}
+                                                {t('common.cancel')}
                                             </button>
                                             <button
                                                 type="submit"

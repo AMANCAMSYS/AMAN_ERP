@@ -60,35 +60,35 @@ const NotesPayable = () => {
 
     const handleCreate = async () => {
         if (!form.note_number || !form.amount || !form.due_date) {
-            toastEmitter.emit('يرجى ملء الحقول المطلوبة', 'error'); return;
+            toastEmitter.emit(t('treasury.notes.fill_required'), 'error'); return;
         }
         try {
             await notesAPI.createPayable({ ...form, amount: parseFloat(form.amount), branch_id: currentBranch?.id });
-            toastEmitter.emit('تم إنشاء ورقة الدفع بنجاح', 'success');
+            toastEmitter.emit(t('treasury.notes_payable.created'), 'success');
             setShowCreate(false);
             setForm({ note_number: '', beneficiary_name: '', bank_name: '', amount: '', currency: getCurrency(),
                 issue_date: new Date().toISOString().split('T')[0], due_date: '', maturity_date: '',
                 party_id: '', treasury_account_id: '', notes: '' });
             loadData();
-        } catch (e) { toastEmitter.emit(e.response?.data?.detail || 'خطأ', 'error'); }
+        } catch (e) { toastEmitter.emit(e.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handlePay = async () => {
         try {
             await notesAPI.payPayable(showPay.id, payForm);
-            toastEmitter.emit('تم سداد ورقة الدفع', 'success');
+            toastEmitter.emit(t('treasury.notes_payable.paid'), 'success');
             setShowPay(null);
             loadData();
-        } catch (e) { toastEmitter.emit(e.response?.data?.detail || 'خطأ', 'error'); }
+        } catch (e) { toastEmitter.emit(e.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleProtest = async () => {
         try {
             await notesAPI.protestPayable(showProtest.id, protestForm);
-            toastEmitter.emit('تم رفض ورقة الدفع', 'success');
+            toastEmitter.emit(t('treasury.notes_payable.rejected'), 'success');
             setShowProtest(null);
             loadData();
-        } catch (e) { toastEmitter.emit(e.response?.data?.detail || 'خطأ', 'error'); }
+        } catch (e) { toastEmitter.emit(e.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const fmt = (n) => Number(n || 0).toLocaleString('en', { minimumFractionDigits: 2 });

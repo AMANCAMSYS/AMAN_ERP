@@ -31,7 +31,7 @@ export default function ProductionOrderDetails() {
             setOrder(res.data)
         } catch (err) {
             console.error('Failed to fetch order', err)
-            showToast(t('manufacturing.details.load_error', 'فشل في تحميل أمر الإنتاج'), 'error')
+            showToast(t('manufacturing.details.load_error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -41,10 +41,10 @@ export default function ProductionOrderDetails() {
         setActionLoading(true)
         try {
             await api.post(`/manufacturing/orders/${id}/start`)
-            showToast(t('manufacturing.details.started', 'تم بدء أمر الإنتاج'), 'success')
+            showToast(t('manufacturing.details.started'), 'success')
             fetchOrder()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error_occurred', 'حدث خطأ'), 'error')
+            showToast(err.response?.data?.detail || t('common.error_occurred'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -54,11 +54,11 @@ export default function ProductionOrderDetails() {
         setActionLoading(true)
         try {
             await api.post(`/manufacturing/orders/${id}/complete`)
-            showToast(t('manufacturing.order_completed', 'تم إتمام أمر التصنيع بنجاح'), 'success')
+            showToast(t('manufacturing.order_completed'), 'success')
             setShowCompleteModal(false)
             fetchOrder()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error_occurred', 'حدث خطأ'), 'error')
+            showToast(err.response?.data?.detail || t('common.error_occurred'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -68,11 +68,11 @@ export default function ProductionOrderDetails() {
         setActionLoading(true)
         try {
             await api.post(`/manufacturing/orders/${id}/cancel`)
-            showToast(t('manufacturing.details.cancelled', 'تم إلغاء أمر الإنتاج'), 'success')
+            showToast(t('manufacturing.details.cancelled'), 'success')
             setShowCancelModal(false)
             fetchOrder()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error_occurred', 'حدث خطأ'), 'error')
+            showToast(err.response?.data?.detail || t('common.error_occurred'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -83,7 +83,7 @@ export default function ProductionOrderDetails() {
             <div className="workspace flex items-center justify-center fade-in">
                 <div className="text-center">
                     <span className="loading"></span>
-                    <p className="text-slate-500">{t('common.loading', 'جاري التحميل...')}</p>
+                    <p className="text-slate-500">{t('common.loading')}</p>
                 </div>
             </div>
         )
@@ -94,10 +94,10 @@ export default function ProductionOrderDetails() {
             <div className="workspace fade-in">
                 <div className="text-center" style={{ padding: '80px 0' }}>
                     <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏭</div>
-                    <h3 style={{ color: '#666', marginBottom: '8px' }}>{t('manufacturing.details.not_found', 'أمر الإنتاج غير موجود')}</h3>
+                    <h3 style={{ color: '#666', marginBottom: '8px' }}>{t('manufacturing.details.not_found')}</h3>
                     <button className="btn btn-primary mt-3" onClick={() => navigate('/manufacturing/orders')}>
                         {isRTL ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
-                        {t('manufacturing.details.back_to_list', 'العودة للقائمة')}
+                        {t('manufacturing.details.back_to_list')}
                     </button>
                 </div>
             </div>
@@ -139,7 +139,7 @@ export default function ProductionOrderDetails() {
                                 <span style={{ padding: '8px', borderRadius: '12px', background: '#fff8e1' }}>
                                     <Factory size={24} style={{ color: '#d97706' }} />
                                 </span>
-                                {t('manufacturing.details.title', 'أمر إنتاج')} #{order.id}
+                                {t('manufacturing.details.title')} #{order.id}
                                 {getStatusBadge(order.status)}
                             </h1>
                             <p className="text-muted small mb-0" style={{ marginTop: '4px' }}>
@@ -151,7 +151,7 @@ export default function ProductionOrderDetails() {
                         <div style={{ display: 'flex', gap: '8px' }}>
                             {order.status === 'draft' && (
                                 <button className="btn btn-primary" onClick={handleStart} disabled={actionLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Play size={16} /> {t('manufacturing.start_production', 'بدء الإنتاج')}
+                                    <Play size={16} /> {t('manufacturing.start_production')}
                                 </button>
                             )}
                             {(order.status === 'in_progress' || order.status === 'draft') && (
@@ -159,10 +159,10 @@ export default function ProductionOrderDetails() {
                                     className="btn btn-success"
                                     onClick={() => setShowCompleteModal(true)}
                                     disabled={actionLoading || !order.all_materials_sufficient}
-                                    title={!order.all_materials_sufficient ? t('manufacturing.details.insufficient_materials', 'المواد الخام غير كافية') : ''}
+                                    title={!order.all_materials_sufficient ? t('manufacturing.details.insufficient_materials') : ''}
                                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                                 >
-                                    <CheckCircle size={16} /> {t('manufacturing.complete_production', 'إتمام')}
+                                    <CheckCircle size={16} /> {t('manufacturing.complete_production')}
                                 </button>
                             )}
                             <button
@@ -170,10 +170,10 @@ export default function ProductionOrderDetails() {
                                 onClick={() => navigate(`/manufacturing/mrp/${id}`)}
                                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                             >
-                                <AlertTriangle size={16} /> {t('manufacturing.mrp.title', 'تخطيط المواد')}
+                                <AlertTriangle size={16} /> {t('manufacturing.mrp.title')}
                             </button>
                             <button className="btn btn-outline-danger" onClick={() => setShowCancelModal(true)} disabled={actionLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <XCircle size={16} /> {t('common.cancel', 'إلغاء')}
+                                <XCircle size={16} /> {t('common.cancel')}
                             </button>
                         </div>
                     )}
@@ -184,7 +184,7 @@ export default function ProductionOrderDetails() {
             {isActionable && !order.all_materials_sufficient && (
                 <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '12px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', color: '#856404' }}>
                     <AlertTriangle size={18} />
-                    <span>{t('manufacturing.details.materials_warning', '⚠️ بعض المواد الخام غير كافية في المخزون. لا يمكن إتمام الإنتاج.')}</span>
+                    <span>{t('manufacturing.details.materials_warning')}</span>
                 </div>
             )}
 
@@ -197,7 +197,7 @@ export default function ProductionOrderDetails() {
                                 <Factory size={22} style={{ color: '#f59e0b' }} />
                             </div>
                             <div>
-                                <div className="text-muted small">{t('manufacturing.cycles', 'عدد الدورات')}</div>
+                                <div className="text-muted small">{t('manufacturing.cycles')}</div>
                                 <div className="fw-bold fs-5">{formatNumber(order.quantity)}</div>
                             </div>
                         </div>
@@ -210,7 +210,7 @@ export default function ProductionOrderDetails() {
                                 <Package size={22} style={{ color: '#2e7d32' }} />
                             </div>
                             <div>
-                                <div className="text-muted small">{t('manufacturing.total_output', 'إجمالي الإنتاج')}</div>
+                                <div className="text-muted small">{t('manufacturing.total_output')}</div>
                                 <div className="fw-bold fs-5">{formatNumber(order.total_output)}</div>
                             </div>
                         </div>
@@ -223,7 +223,7 @@ export default function ProductionOrderDetails() {
                                 <DollarSign size={22} style={{ color: '#1565c0' }} />
                             </div>
                             <div>
-                                <div className="text-muted small">{t('manufacturing.details.total_cost', 'التكلفة الكلية')}</div>
+                                <div className="text-muted small">{t('manufacturing.details.total_cost')}</div>
                                 <div className="fw-bold fs-5">{formatNumber(order.total_material_cost)}</div>
                             </div>
                         </div>
@@ -236,7 +236,7 @@ export default function ProductionOrderDetails() {
                                 <DollarSign size={22} style={{ color: '#c62828' }} />
                             </div>
                             <div>
-                                <div className="text-muted small">{t('manufacturing.details.unit_cost', 'تكلفة الوحدة')}</div>
+                                <div className="text-muted small">{t('manufacturing.details.unit_cost')}</div>
                                 <div className="fw-bold fs-5">{formatNumber(order.unit_production_cost)}</div>
                             </div>
                         </div>
@@ -250,31 +250,31 @@ export default function ProductionOrderDetails() {
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
                             <h6 className="fw-bold mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                📋 {t('manufacturing.details.order_info', 'معلومات الأمر')}
+                                📋 {t('manufacturing.details.order_info')}
                             </h6>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('manufacturing.bom', 'قائمة المواد')}</div>
+                                    <div className="text-muted small mb-1">{t('manufacturing.bom')}</div>
                                     <div className="fw-semibold">{order.bom_name}</div>
                                 </div>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('manufacturing.product', 'المنتج النهائي')}</div>
+                                    <div className="text-muted small mb-1">{t('manufacturing.product')}</div>
                                     <div className="fw-semibold">{order.finished_product_name}</div>
                                 </div>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('common.start_date', 'تاريخ البدء')}</div>
+                                    <div className="text-muted small mb-1">{t('common.start_date')}</div>
                                     <div className="fw-semibold">{order.start_date ? formatShortDate(order.start_date) : '—'}</div>
                                 </div>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('common.end_date', 'تاريخ الانتهاء')}</div>
+                                    <div className="text-muted small mb-1">{t('common.end_date')}</div>
                                     <div className="fw-semibold">{order.end_date ? formatShortDate(order.end_date) : '—'}</div>
                                 </div>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('common.created_at', 'تاريخ الإنشاء')}</div>
+                                    <div className="text-muted small mb-1">{t('common.created_at')}</div>
                                     <div className="fw-semibold">{order.created_at ? formatShortDate(order.created_at) : '—'}</div>
                                 </div>
                                 <div>
-                                    <div className="text-muted small mb-1">{t('manufacturing.quantity', 'الكمية المطلوبة')}</div>
+                                    <div className="text-muted small mb-1">{t('manufacturing.quantity')}</div>
                                     <div className="fw-semibold">{formatNumber(order.quantity)}</div>
                                 </div>
                             </div>
@@ -286,35 +286,35 @@ export default function ProductionOrderDetails() {
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
                             <h6 className="fw-bold mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                💰 {t('manufacturing.details.cost_breakdown', 'تحليل التكلفة')}
+                                💰 {t('manufacturing.details.cost_breakdown')}
                             </h6>
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.details.material_count', 'عدد المواد الخام')}</span>
+                                    <span className="text-muted">{t('manufacturing.details.material_count')}</span>
                                     <span className="fw-bold">{order.materials.length}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.details.total_material_cost', 'إجمالي تكلفة المواد')}</span>
+                                    <span className="text-muted">{t('manufacturing.details.total_material_cost')}</span>
                                     <span className="fw-bold">{formatNumber(order.total_material_cost)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.details.material_cost', 'تكلفة المواد')}</span>
+                                    <span className="text-muted">{t('manufacturing.details.material_cost')}</span>
                                     <span className="fw-bold">{formatCurrency((order.total_material_cost || 0))}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.details.labor_overhead_cost', 'تكلفة العمالة والمصاريف')}</span>
+                                    <span className="text-muted">{t('manufacturing.details.labor_overhead_cost')}</span>
                                     <span className="fw-bold">{formatCurrency((order.total_labor_overhead_cost || 0))}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.details.total_cost', 'التكلفة الكلية')}</span>
+                                    <span className="text-muted">{t('manufacturing.details.total_cost')}</span>
                                     <span className="fw-bold text-success">{formatCurrency((order.total_production_cost || 0))}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <span className="text-muted">{t('manufacturing.total_output', 'إجمالي الإنتاج')}</span>
+                                    <span className="text-muted">{t('manufacturing.total_output')}</span>
                                     <span className="fw-bold">{formatNumber(order.total_output)}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', fontWeight: 'bold', fontSize: '1.05rem' }}>
-                                    <span>{t('manufacturing.details.unit_cost', 'تكلفة الوحدة')}</span>
+                                    <span>{t('manufacturing.details.unit_cost')}</span>
                                     <span style={{ color: 'var(--primary, #3b82f6)' }}>{formatNumber(order.unit_production_cost)}</span>
                                 </div>
                             </div>
@@ -327,7 +327,7 @@ export default function ProductionOrderDetails() {
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                 <div className="card-body p-4 pb-0">
                     <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        📦 {t('manufacturing.raw_materials', 'المواد الخام')}
+                        📦 {t('manufacturing.raw_materials')}
                         <span className="badge bg-primary-subtle text-primary rounded-pill">{order.materials.length}</span>
                     </h6>
                 </div>
@@ -336,14 +336,14 @@ export default function ProductionOrderDetails() {
                         <thead>
                             <tr>
                                 <th style={{ paddingRight: '16px', paddingLeft: '16px' }}>#</th>
-                                <th>{t('manufacturing.material_name', 'اسم المادة')}</th>
-                                <th className="text-center">{t('manufacturing.details.bom_qty', 'كمية BOM')}</th>
-                                <th className="text-center">{t('manufacturing.details.total_needed', 'الكمية المطلوبة')}</th>
-                                <th className="text-center">{t('manufacturing.waste', 'الهالك')} %</th>
-                                <th className="text-center">{t('manufacturing.details.unit_cost_label', 'سعر الوحدة')}</th>
-                                <th className="text-center">{t('manufacturing.details.line_cost', 'التكلفة')}</th>
-                                <th className="text-center">{t('manufacturing.details.available', 'المتوفر')}</th>
-                                <th className="text-center">{t('common.status_title', 'الحالة')}</th>
+                                <th>{t('manufacturing.material_name')}</th>
+                                <th className="text-center">{t('manufacturing.details.bom_qty')}</th>
+                                <th className="text-center">{t('manufacturing.details.total_needed')}</th>
+                                <th className="text-center">{t('manufacturing.waste')} %</th>
+                                <th className="text-center">{t('manufacturing.details.unit_cost_label')}</th>
+                                <th className="text-center">{t('manufacturing.details.line_cost')}</th>
+                                <th className="text-center">{t('manufacturing.details.available')}</th>
+                                <th className="text-center">{t('common.status_title')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -363,11 +363,11 @@ export default function ProductionOrderDetails() {
                                     <td className="text-center">
                                         {m.sufficient ? (
                                             <span className="badge bg-success-subtle text-success" style={{ padding: '4px 10px' }}>
-                                                ✓ {t('manufacturing.details.sufficient', 'كافي')}
+                                                ✓ {t('manufacturing.details.sufficient')}
                                             </span>
                                         ) : (
                                             <span className="badge bg-danger-subtle text-danger" style={{ padding: '4px 10px' }}>
-                                                ✗ {t('manufacturing.details.insufficient', 'غير كافي')}
+                                                ✗ {t('manufacturing.details.insufficient')}
                                             </span>
                                         )}
                                     </td>
@@ -382,21 +382,21 @@ export default function ProductionOrderDetails() {
             <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                 <div className="card-body p-4 pb-0 d-flex justify-content-between">
                     <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        ⚙️ {t('manufacturing.operations', 'عمليات الإنتاج')}
+                        ⚙️ {t('manufacturing.operations')}
                     </h6>
                     <Link to="/manufacturing/job-cards" className="text-primary small fw-bold">
-                        {t('manufacturing.view_all_job_cards', 'عرض جميع بطاقات العمل')}
+                        {t('manufacturing.view_all_job_cards')}
                     </Link>
                 </div>
                 <div className="table-responsive">
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th style={{ paddingRight: '16px', paddingLeft: '16px' }}>{t('common.sequence', 'التسلسل')}</th>
-                                <th>{t('manufacturing.operation', 'العملية')}</th>
-                                <th>{t('manufacturing.work_center', 'مركز العمل')}</th>
-                                <th>{t('common.status', 'الحالة')}</th>
-                                <th className="text-center">{t('common.actions', 'الإجراءات')}</th>
+                                <th style={{ paddingRight: '16px', paddingLeft: '16px' }}>{t('common.sequence')}</th>
+                                <th>{t('manufacturing.operation')}</th>
+                                <th>{t('manufacturing.work_center')}</th>
+                                <th>{t('common.status')}</th>
+                                <th className="text-center">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -428,7 +428,7 @@ export default function ProductionOrderDetails() {
                             )) : (
                                 <tr>
                                     <td colSpan="5" className="text-center text-muted py-4">
-                                        {t('manufacturing.no_operations', 'لا توجد عمليات معرفة لهذا الأمر')}
+                                        {t('manufacturing.no_operations')}
                                     </td>
                                 </tr>
                             )}
@@ -442,18 +442,18 @@ export default function ProductionOrderDetails() {
                 <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
                     <div className="card-body p-4 pb-0">
                         <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            📊 {t('manufacturing.details.inventory_movements', 'حركات المخزون')}
+                            📊 {t('manufacturing.details.inventory_movements')}
                         </h6>
                     </div>
                     <div className="table-responsive">
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('manufacturing.product', 'المنتج')}</th>
-                                    <th className="text-center">{t('manufacturing.details.movement_type', 'نوع الحركة')}</th>
-                                    <th className="text-center">{t('manufacturing.quantity', 'الكمية')}</th>
-                                    <th className="text-center">{t('manufacturing.details.unit_cost_label', 'سعر الوحدة')}</th>
-                                    <th className="text-center">{t('manufacturing.details.line_cost', 'التكلفة')}</th>
+                                    <th>{t('manufacturing.product')}</th>
+                                    <th className="text-center">{t('manufacturing.details.movement_type')}</th>
+                                    <th className="text-center">{t('manufacturing.quantity')}</th>
+                                    <th className="text-center">{t('manufacturing.details.unit_cost_label')}</th>
+                                    <th className="text-center">{t('manufacturing.details.line_cost')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -463,8 +463,8 @@ export default function ProductionOrderDetails() {
                                         <td className="text-center">
                                             <span className={`badge ${txn.transaction_type === 'manufacturing_output' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}`} style={{ padding: '4px 10px' }}>
                                                 {txn.transaction_type === 'manufacturing_output'
-                                                    ? t('manufacturing.details.output_type', 'إنتاج')
-                                                    : t('manufacturing.details.consume_type', 'استهلاك')}
+                                                    ? t('manufacturing.details.output_type')
+                                                    : t('manufacturing.details.consume_type')}
                                             </span>
                                         </td>
                                         <td className="text-center" style={{ color: txn.quantity < 0 ? '#c62828' : '#2e7d32', fontWeight: '600' }}>
@@ -483,23 +483,23 @@ export default function ProductionOrderDetails() {
             {/* Complete Modal */}
             {showCompleteModal && (
                 <SimpleModal
-                    title={t('manufacturing.complete_production', 'إتمام أمر الإنتاج')}
+                    title={t('manufacturing.complete_production')}
                     onClose={() => setShowCompleteModal(false)}
                 >
                     <p style={{ marginBottom: '12px' }}>
-                        {t('manufacturing.details.complete_confirm', 'سيتم خصم المواد الخام من المخزون وإضافة المنتج النهائي. هل أنت متأكد؟')}
+                        {t('manufacturing.details.complete_confirm')}
                     </p>
                     <div style={{ background: '#f8f9fa', padding: '14px', borderRadius: '10px', marginBottom: '16px' }}>
-                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.product', 'المنتج')}:</strong> {order.finished_product_name}</p>
-                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.total_output', 'الإنتاج')}:</strong> {formatNumber(order.total_output)} {t('manufacturing.unit', 'وحدة')}</p>
-                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.details.total_cost', 'التكلفة')}:</strong> {formatNumber(order.total_material_cost)}</p>
+                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.product')}:</strong> {order.finished_product_name}</p>
+                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.total_output')}:</strong> {formatNumber(order.total_output)} {t('manufacturing.unit')}</p>
+                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.details.total_cost')}:</strong> {formatNumber(order.total_material_cost)}</p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setShowCompleteModal(false)} disabled={actionLoading}>
-                            {t('common.close', 'إغلاق')}
+                            {t('common.close')}
                         </button>
                         <button className="btn btn-success" onClick={handleComplete} disabled={actionLoading}>
-                            {actionLoading ? '...' : t('manufacturing.details.confirm_complete', 'تأكيد الإتمام')}
+                            {actionLoading ? '...' : t('manufacturing.details.confirm_complete')}
                         </button>
                     </div>
                 </SimpleModal>
@@ -508,18 +508,18 @@ export default function ProductionOrderDetails() {
             {/* Cancel Modal */}
             {showCancelModal && (
                 <SimpleModal
-                    title={t('manufacturing.details.cancel_title', 'إلغاء أمر الإنتاج')}
+                    title={t('manufacturing.details.cancel_title')}
                     onClose={() => setShowCancelModal(false)}
                 >
                     <p style={{ marginBottom: '16px' }}>
-                        {t('manufacturing.details.cancel_confirm', 'هل أنت متأكد من إلغاء أمر الإنتاج هذا؟')}
+                        {t('manufacturing.details.cancel_confirm')}
                     </p>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" onClick={() => setShowCancelModal(false)} disabled={actionLoading}>
-                            {t('common.close', 'إغلاق')}
+                            {t('common.close')}
                         </button>
                         <button className="btn btn-danger" onClick={handleCancel} disabled={actionLoading}>
-                            {actionLoading ? '...' : t('manufacturing.details.confirm_cancel', 'تأكيد الإلغاء')}
+                            {actionLoading ? '...' : t('manufacturing.details.confirm_cancel')}
                         </button>
                     </div>
                 </SimpleModal>

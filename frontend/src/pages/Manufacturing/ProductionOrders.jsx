@@ -105,7 +105,7 @@ const ProductionOrders = () => {
             };
 
             await manufacturingAPI.createOrder(payload);
-            toastEmitter.emit(t('Created Successfully'), 'success');
+            toastEmitter.emit(t('common.created_successfully'), 'success');
             setShowModal(false);
             fetchData();
 
@@ -178,7 +178,7 @@ const ProductionOrders = () => {
                         {orders.length === 0 ? (
                             <tr>
                                 <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
-                                    {t('no_orders_found') || 'لا توجد أوامر تصنيع'}
+                                    {t('no_orders_found')}
                                 </td>
                             </tr>
                         ) : (

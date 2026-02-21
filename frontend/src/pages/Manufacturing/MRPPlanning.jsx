@@ -51,10 +51,10 @@ export default function MRPPlanning() {
                 <div>
                     <h1 className="workspace-title flex items-center gap-2">
                         <Boxes size={24} className="text-primary" />
-                        {t('manufacturing.mrp.title', 'تخطيط متطلبات المواد (MRP)')}
+                        {t('manufacturing.mrp.title')}
                     </h1>
                     <p className="workspace-subtitle">
-                        {t('manufacturing.mrp.planning_desc', 'تحليل توفر المواد الخام المطلوبة لأوامر الإنتاج الجارية')}
+                        {t('manufacturing.mrp.planning_desc')}
                     </p>
                 </div>
             </div>
@@ -64,7 +64,7 @@ export default function MRPPlanning() {
                     <Search size={16} />
                     <input
                         type="text"
-                        placeholder={t('common.search', 'بحث...')}
+                        placeholder={t('common.search')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -75,12 +75,12 @@ export default function MRPPlanning() {
                 <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('common.id', 'الرقم')}</th>
-                                <th>{t('products.product', 'المنتج')}</th>
-                                <th>{t('manufacturing.bom', 'قائمة المواد')}</th>
-                                <th className="text-center">{t('common.quantity', 'الكمية')}</th>
-                                <th className="text-center">{t('common.status', 'الحالة')}</th>
-                                <th className="text-center">{t('common.actions', 'الإجراءات')}</th>
+                                <th>{t('common.id')}</th>
+                                <th>{t('products.product')}</th>
+                                <th>{t('manufacturing.bom')}</th>
+                                <th className="text-center">{t('common.quantity')}</th>
+                                <th className="text-center">{t('common.status')}</th>
+                                <th className="text-center">{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -88,7 +88,7 @@ export default function MRPPlanning() {
                                 <tr>
                                     <td colSpan="6" className="text-center py-5 text-muted">
                                         <Package size={48} className="mb-3 opacity-20" />
-                                        <p>{t('manufacturing.mrp.no_active_orders', 'لا توجد أوامر إنتاج نشطة بحاجة لتخطيط')}</p>
+                                        <p>{t('manufacturing.mrp.no_active_orders')}</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -108,7 +108,7 @@ export default function MRPPlanning() {
                                                 className="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
                                                 onClick={() => navigate(`/manufacturing/mrp/${order.id}`)}
                                             >
-                                                {t('manufacturing.check_availability', 'تحقق من توفر المواد')}
+                                                {t('manufacturing.check_availability')}
                                                 {isRTL ? <ArrowRight size={14} /> : <ArrowRight size={14} />}
                                             </button>
                                         </td>

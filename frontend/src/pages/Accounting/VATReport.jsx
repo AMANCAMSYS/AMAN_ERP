@@ -49,8 +49,8 @@ function VATReport() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
-                        <h1 className="workspace-title">📊 {t('accounting.vat_report.title') || 'تقرير ضريبة القيمة المضافة'}</h1>
-                        <p className="workspace-subtitle">{t('accounting.vat_report.subtitle') || 'ملخص الضريبة المحصلة والمدفوعة للفترة'}</p>
+                        <h1 className="workspace-title">📊 {t('accounting.vat_report.title')}</h1>
+                        <p className="workspace-subtitle">{t('accounting.vat_report.subtitle')}</p>
                     </div>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <CustomDatePicker
@@ -64,7 +64,7 @@ function VATReport() {
                             onChange={(d) => setDates({ ...dates, end: d })}
                         />
                         <button className="btn btn-secondary" onClick={() => window.print()} style={{ alignSelf: 'flex-end', height: '42px' }}>
-                            🖨️ {t('common.print') || 'طباعة'}
+                            🖨️ {t('common.print')}
                         </button>
                     </div>
                 </div>
@@ -76,21 +76,21 @@ function VATReport() {
                 <>
                     <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.vat_report.output_vat') || 'ضريبة المخرجات (المبيعات)'}</div>
+                            <div className="metric-label">{t('accounting.vat_report.output_vat')}</div>
                             <div className="metric-value text-secondary">{formatNumber(report.output_vat.vat)} <small>{currency}</small></div>
-                            <div className="metric-change">{t('accounting.vat_report.taxable_amount') || 'المبلغ الخاضع'}: {formatNumber(report.output_vat.taxable)}</div>
+                            <div className="metric-change">{t('accounting.vat_report.taxable_amount')}: {formatNumber(report.output_vat.taxable)}</div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.vat_report.input_vat') || 'ضريبة المدخلات (المشتريات)'}</div>
+                            <div className="metric-label">{t('accounting.vat_report.input_vat')}</div>
                             <div className="metric-value text-primary">{formatNumber(report.input_vat.vat)} <small>{currency}</small></div>
-                            <div className="metric-change">{t('accounting.vat_report.taxable_amount') || 'المبلغ الخاضع'}: {formatNumber(report.input_vat.taxable)}</div>
+                            <div className="metric-change">{t('accounting.vat_report.taxable_amount')}: {formatNumber(report.input_vat.taxable)}</div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.vat_report.net_vat') || 'صافي الضريبة (المستحق)'}</div>
+                            <div className="metric-label">{t('accounting.vat_report.net_vat')}</div>
                             <div className={`metric-value ${report.net_vat_payable >= 0 ? 'text-error' : 'text-success'}`}>
                                 {formatNumber(Math.abs(report.net_vat_payable))} <small>{currency}</small>
                             </div>
-                            <div className="metric-change">{report.net_vat_payable >= 0 ? (t('accounting.vat_report.payable') || 'مستحق للدفع') : (t('accounting.vat_report.refundable') || 'مستحق للاسترداد')}</div>
+                            <div className="metric-change">{report.net_vat_payable >= 0 ? (t('accounting.vat_report.payable')) : (t('accounting.vat_report.refundable'))}</div>
                         </div>
                     </div>
 

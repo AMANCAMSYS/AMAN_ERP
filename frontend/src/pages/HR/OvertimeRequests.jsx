@@ -60,11 +60,11 @@ const OvertimeRequests = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'طلبات العمل الإضافي' : 'Overtime Requests'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'إدارة ساعات العمل الإضافي' : 'Manage overtime hours'}</p>
+                    <h1 className="workspace-title">{t('hr.overtime.overtime_requests')}</h1>
+                    <p className="workspace-subtitle">{t('hr.overtime.manage_overtime_hours')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-                    <Plus size={16} /> {isRTL ? 'طلب جديد' : 'New Request'}
+                    <Plus size={16} /> {t('hr.overtime.new_request')}
                 </button>
             </div>
 
@@ -73,20 +73,20 @@ const OvertimeRequests = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                            <th>{isRTL ? 'التاريخ' : 'Date'}</th>
-                            <th>{isRTL ? 'الساعات' : 'Hours'}</th>
-                            <th>{isRTL ? 'المضاعف' : 'Rate'}</th>
-                            <th>{isRTL ? 'السبب' : 'Reason'}</th>
-                            <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.overtime.employee')}</th>
+                            <th>{t('hr.overtime.date')}</th>
+                            <th>{t('hr.overtime.hours')}</th>
+                            <th>{t('hr.overtime.rate')}</th>
+                            <th>{t('hr.overtime.reason')}</th>
+                            <th>{t('hr.overtime.status')}</th>
+                            <th>{t('hr.overtime.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.overtime.loading')}</td></tr>
                         ) : items.length === 0 ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد طلبات' : 'No requests'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.overtime.no_requests')}</td></tr>
                         ) : items.map((item, i) => (
                             <tr key={item.id}>
                                 <td>{i + 1}</td>
@@ -99,8 +99,8 @@ const OvertimeRequests = () => {
                                 <td>
                                     {item.status === 'pending' && (
                                         <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                            <button className="btn btn-sm btn-success" onClick={() => handleApprove(item.id, 'approved')} title={isRTL ? 'موافقة' : 'Approve'}><Check size={14} /></button>
-                                            <button className="btn btn-sm btn-danger" onClick={() => handleApprove(item.id, 'rejected')} title={isRTL ? 'رفض' : 'Reject'}><X size={14} /></button>
+                                            <button className="btn btn-sm btn-success" onClick={() => handleApprove(item.id, 'approved')} title={t('hr.overtime.approve')}><Check size={14} /></button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleApprove(item.id, 'rejected')} title={t('hr.overtime.reject')}><X size={14} /></button>
                                         </div>
                                     )}
                                 </td>
@@ -113,38 +113,38 @@ const OvertimeRequests = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{isRTL ? 'طلب عمل إضافي' : 'Overtime Request'}</h2>
+                        <h2 className="modal-title">{t('hr.overtime.overtime_request')}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <label>{t('hr.overtime.employee')}</label>
                             <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
-                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                <option value="">{t('hr.overtime.select')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'التاريخ' : 'Date'}</label>
+                                <label>{t('hr.overtime.date')}</label>
                                 <DateInput className="form-input" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'الساعات' : 'Hours'}</label>
+                                <label>{t('hr.overtime.hours')}</label>
                                 <input type="number" step="0.5" className="form-input" value={form.hours} onChange={e => setForm({ ...form, hours: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'معدل المضاعفة' : 'Rate Multiplier'}</label>
+                            <label>{t('hr.overtime.rate_multiplier')}</label>
                             <select className="form-input" value={form.rate_multiplier} onChange={e => setForm({ ...form, rate_multiplier: e.target.value })}>
-                                <option value="1.5">1.5× ({isRTL ? 'عادي' : 'Regular'})</option>
-                                <option value="2">2× ({isRTL ? 'عطلة' : 'Holiday'})</option>
+                                <option value="1.5">1.5× ({t('hr.overtime.regular')})</option>
+                                <option value="2">2× ({t('hr.overtime.holiday')})</option>
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'السبب' : 'Reason'}</label>
+                            <label>{t('hr.overtime.reason')}</label>
                             <textarea className="form-input" rows="2" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'إرسال' : 'Submit'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.overtime.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.overtime.submit')}</button>
                         </div>
                     </div>
                 </div>

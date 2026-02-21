@@ -24,7 +24,7 @@ export default function ClosingEntries() {
             const res = await accountingAPI.previewClosingEntries({ start_date: startDate, end_date: endDate })
             setPreview(res.data)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -48,7 +48,7 @@ export default function ClosingEntries() {
             showToast(res.data.message || (t('closing.generated')), 'success')
             setPreview(null)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setGenerating(false)
         }

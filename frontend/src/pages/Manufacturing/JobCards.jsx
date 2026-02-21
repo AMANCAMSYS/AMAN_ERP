@@ -41,7 +41,7 @@ export default function JobCards() {
             showToast(t(`manufacturing.job_card.${action}_success`, 'تم تحديث العملية بنجاح'), 'success')
             fetchOperations()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error_occurred', 'حدث خطأ'), 'error')
+            showToast(err.response?.data?.detail || t('common.error_occurred'), 'error')
         } finally {
             setActionLoading(null)
         }
@@ -64,16 +64,16 @@ export default function JobCards() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <h1 className="workspace-title">
-                    <Clock size={24} className="text-primary" /> {t('manufacturing.job_cards.title', 'بطاقات العمل والإنتاج')}
+                    <Clock size={24} className="text-primary" /> {t('manufacturing.job_cards.title')}
                 </h1>
-                <p className="text-muted">{t('manufacturing.job_cards.subtitle', 'تتبع الوقت والعمليات الجارية في المصنع')}</p>
+                <p className="text-muted">{t('manufacturing.job_cards.subtitle')}</p>
             </div>
 
             <div className="modules-grid">
                 {operations.length === 0 ? (
                     <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
-                        <h3 style={{ color: 'var(--text-secondary)' }}>{t('manufacturing.job_cards.no_active', 'لا توجد عمليات جارية حالياً')}</h3>
+                        <h3 style={{ color: 'var(--text-secondary)' }}>{t('manufacturing.job_cards.no_active')}</h3>
                     </div>
                 ) : (
                     operations.map(op => {
@@ -94,12 +94,12 @@ export default function JobCards() {
 
                                     <div style={{ background: 'var(--bg-hover)', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.planned_time', 'الوقت المخطط')}:</span>
-                                            <span style={{ fontWeight: 700, fontSize: '13px' }}>{op.planned_cycle_time} {t('common.minutes', 'دقيقة')}</span>
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.planned_time')}:</span>
+                                            <span style={{ fontWeight: 700, fontSize: '13px' }}>{op.planned_cycle_time} {t('common.minutes')}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.actual_time', 'الوقت الفعلي')}:</span>
-                                            <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--primary)' }}>{Math.round(op.actual_run_time || 0)} {t('common.minutes', 'دقيقة')}</span>
+                                            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.actual_time')}:</span>
+                                            <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--primary)' }}>{Math.round(op.actual_run_time || 0)} {t('common.minutes')}</span>
                                         </div>
                                     </div>
 
@@ -111,7 +111,7 @@ export default function JobCards() {
                                                 disabled={actionLoading === op.id}
                                                 onClick={() => handleAction(op.id, 'start')}
                                             >
-                                                <Play size={16} /> {t('common.start', 'بدء')}
+                                                <Play size={16} /> {t('common.start')}
                                             </button>
                                         ) : (
                                             <>
@@ -121,18 +121,18 @@ export default function JobCards() {
                                                     disabled={actionLoading === op.id}
                                                     onClick={() => handleAction(op.id, 'pause')}
                                                 >
-                                                    <Pause size={16} /> {t('common.pause', 'إيقاف')}
+                                                    <Pause size={16} /> {t('common.pause')}
                                                 </button>
                                                 <button
                                                     className="btn btn-success"
                                                     style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                                     disabled={actionLoading === op.id}
                                                     onClick={() => {
-                                                        const qty = prompt(t('manufacturing.job_cards.enter_qty', 'أدخل الكمية المنجزة'), op.planned_quantity || 1)
+                                                        const qty = prompt(t('manufacturing.job_cards.enter_qty'), op.planned_quantity || 1)
                                                         if (qty) handleAction(op.id, 'complete', qty)
                                                     }}
                                                 >
-                                                    <CheckCircle size={16} /> {t('common.complete', 'إتمام')}
+                                                    <CheckCircle size={16} /> {t('common.complete')}
                                                 </button>
                                             </>
                                         )}

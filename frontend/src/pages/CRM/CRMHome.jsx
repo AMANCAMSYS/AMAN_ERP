@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { crmAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
 
 function CRMHome() {
+    const { t } = useTranslation()
     const navigate = useNavigate()
     const currency = getCurrency()
     const [loading, setLoading] = useState(true)
@@ -40,10 +42,10 @@ function CRMHome() {
     }, [])
 
     const stageLabels = {
-        lead: 'عميل محتمل',
-        qualified: 'مؤهل',
-        proposal: 'عرض سعر',
-        negotiation: 'تفاوض'
+        lead: t('crm.stage_lead'),
+        qualified: t('crm.stage_qualified'),
+        proposal: t('crm.stage_proposal'),
+        negotiation: t('crm.stage_negotiation')
     }
 
     const stageColors = {
@@ -56,32 +58,32 @@ function CRMHome() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
-                <h1 className="workspace-title">إدارة علاقات العملاء</h1>
-                <p className="workspace-subtitle">متابعة الفرص البيعية وتذاكر الدعم الفني</p>
+                <h1 className="workspace-title">{t('crm.title')}</h1>
+                <p className="workspace-subtitle">{t('crm.subtitle')}</p>
             </div>
 
             {/* Metrics */}
             <div className="metrics-grid">
                 <div className="metric-card">
-                    <div className="metric-label">إجمالي الفرص</div>
+                    <div className="metric-label">{t('crm.total_opportunities')}</div>
                     <div className="metric-value text-primary">
                         {loading ? '...' : pipeline.total_opportunities}
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">قيمة خط الأنابيب</div>
+                    <div className="metric-label">{t('crm.pipeline_value')}</div>
                     <div className="metric-value text-success">
                         {loading ? '...' : formatNumber(pipeline.total_value)} <small>{currency}</small>
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">تذاكر مفتوحة</div>
+                    <div className="metric-label">{t('crm.open_tickets')}</div>
                     <div className="metric-value text-warning">
                         {loading ? '...' : ticketStats.open}
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">تذاكر حرجة</div>
+                    <div className="metric-label">{t('crm.critical_tickets')}</div>
                     <div className="metric-value text-danger">
                         {loading ? '...' : ticketStats.critical}
                     </div>
@@ -92,28 +94,28 @@ function CRMHome() {
             <div className="nav-grid" style={{ marginTop: 24 }}>
                 <div className="nav-card" onClick={() => navigate('/crm/opportunities')}>
                     <div className="nav-icon">💼</div>
-                    <div className="nav-title">الفرص البيعية</div>
-                    <div className="nav-desc">إدارة ومتابعة الفرص البيعية وخط الأنابيب</div>
+                    <div className="nav-title">{t('crm.opportunities')}</div>
+                    <div className="nav-desc">{t('crm.opportunities_subtitle')}</div>
                 </div>
                 <div className="nav-card" onClick={() => navigate('/crm/tickets')}>
                     <div className="nav-icon">🎫</div>
-                    <div className="nav-title">تذاكر الدعم</div>
-                    <div className="nav-desc">متابعة تذاكر الدعم الفني وخدمة العملاء</div>
+                    <div className="nav-title">{t('crm.support_tickets')}</div>
+                    <div className="nav-desc">{t('crm.support_subtitle')}</div>
                 </div>
             </div>
 
             {/* Pipeline Summary */}
             <div className="card section-card" style={{ marginTop: 24 }}>
-                <h3 className="section-title">ملخص خط الأنابيب</h3>
+                <h3 className="section-title">{t('crm.pipeline_summary')}</h3>
                 {loading ? (
-                    <div className="empty-state">جاري التحميل...</div>
+                    <div className="empty-state">{t('common.loading')}</div>
                 ) : (
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>المرحلة</th>
-                                <th>عدد الفرص</th>
-                                <th>القيمة</th>
+                                <th>{t('crm.stage')}</th>
+                                <th>{t('crm.opportunity_count')}</th>
+                                <th>{t('crm.value')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -137,7 +139,7 @@ function CRMHome() {
                             {(!pipeline.stages || pipeline.stages.length === 0) && (
                                 <tr>
                                     <td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>
-                                        لا توجد بيانات
+                                        {t('common.no_data')}
                                     </td>
                                 </tr>
                             )}

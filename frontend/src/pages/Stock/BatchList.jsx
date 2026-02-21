@@ -87,7 +87,7 @@ function BatchList() {
             setForm({ product_id: '', warehouse_id: '', batch_number: '', manufacturing_date: '', expiry_date: '', quantity: '', unit_cost: '', notes: '' })
             fetchBatches()
         } catch (err) {
-            setError(err.response?.data?.detail || 'حدث خطأ')
+            setError(err.response?.data?.detail || t('common.error_occurred'))
         } finally {
             setSaving(false)
         }
@@ -95,10 +95,10 @@ function BatchList() {
 
     const getStatusBadge = (status) => {
         const map = {
-            active: { label: 'نشط', cls: 'badge-success' },
-            expired: { label: 'منتهي', cls: 'badge-danger' },
-            consumed: { label: 'مستهلك', cls: 'badge-secondary' },
-            recalled: { label: 'مسترجع', cls: 'badge-warning' }
+            active: { label: t('stock.batch.active'), cls: 'badge-success' },
+            expired: { label: t('stock.batch.expired'), cls: 'badge-danger' },
+            consumed: { label: t('stock.batch.consumed'), cls: 'badge-secondary' },
+            recalled: { label: t('stock.batch.recalled'), cls: 'badge-warning' }
         }
         const s = map[status] || { label: status, cls: 'badge-secondary' }
         return <span className={`badge ${s.cls}`}>{s.label}</span>
@@ -107,20 +107,20 @@ function BatchList() {
     const getDaysRemaining = (expiryDate) => {
         if (!expiryDate) return null
         const days = Math.ceil((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24))
-        if (days < 0) return <span style={{ color: 'var(--danger)' }}>منتهي منذ {Math.abs(days)} يوم</span>
-        if (days <= 30) return <span style={{ color: 'var(--warning)' }}>متبقي {days} يوم</span>
-        return <span style={{ color: 'var(--success)' }}>متبقي {days} يوم</span>
+        if (days < 0) return <span style={{ color: 'var(--danger)' }}>{t('stock.batch.expired_since', { days: Math.abs(days) })}</span>
+        if (days <= 30) return <span style={{ color: 'var(--warning)' }}>{t('stock.batch.days_remaining', { days })}</span>
+        return <span style={{ color: 'var(--success)' }}>{t('stock.batch.days_remaining', { days })}</span>
     }
 
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div>
-                    <h1 className="workspace-title">📦 {t('stock.batches.title', 'إدارة الدفعات')}</h1>
-                    <p className="workspace-subtitle">{t('stock.batches.subtitle', 'تتبع الدفعات وأرقام اللوت وتواريخ الصلاحية')}</p>
+                    <h1 className="workspace-title">📦 {t('stock.batches.title')}</h1>
+                    <p className="workspace-subtitle">{t('stock.batches.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                    + {t('stock.batches.add', 'إضافة دفعة')}
+                    + {t('stock.batches.add')}
                 </button>
             </div>
 
@@ -132,7 +132,7 @@ function BatchList() {
                         <path d="M3 6h18"/>
                         <path d="M16 10a4 4 0 0 1-8 0"/>
                     </svg>
-                    <div className="small text-muted">إجمالي الدفعات</div>
+                    <div className="small text-muted">{t('stock.batch.total_batches')}</div>
                     <div className="fw-bold fs-4">{total}</div>
                 </div>
                 <div className="card p-3 text-center">
@@ -140,7 +140,7 @@ function BatchList() {
                         <path d="M21.801 10A10 10 0 1 1 17 3.335"/>
                         <path d="m9 11 3 3L22 4"/>
                     </svg>
-                    <div className="small text-muted">دفعات نشطة</div>
+                    <div className="small text-muted">{t('stock.batch.active_batches')}</div>
                     <div className="fw-bold fs-4 text-success">{batches.filter(b => b.status === 'active').length}</div>
                 </div>
                 <div className="card p-3 text-center">
@@ -148,7 +148,7 @@ function BatchList() {
                         <circle cx="12" cy="12" r="10"/>
                         <path d="M12 6v6l4 2"/>
                     </svg>
-                    <div className="small text-muted">قريبة الانتهاء</div>
+                    <div className="small text-muted">{t('stock.batch.near_expiry')}</div>
                     <div className="fw-bold fs-4 text-warning">
                         {batches.filter(b => b.expiry_date && new Date(b.expiry_date) <= new Date(Date.now() + 30*24*60*60*1000) && new Date(b.expiry_date) > new Date()).length}
                     </div>
@@ -159,7 +159,7 @@ function BatchList() {
                         <path d="M12 9v4"/>
                         <path d="M12 17h.01"/>
                     </svg>
-                    <div className="small text-muted">منتهية الصلاحية</div>
+                    <div className="small text-muted">{t('stock.batch.expired_items')}</div>
                     <div className="fw-bold fs-4 text-danger">
                         {batches.filter(b => b.expiry_date && new Date(b.expiry_date) < new Date()).length}
                     </div>
@@ -170,18 +170,18 @@ function BatchList() {
             <div className="card mb-4">
                 <div className="form-row" style={{ gap: '12px', flexWrap: 'wrap' }}>
                     <input type="text" className="form-input" style={{ maxWidth: '250px' }}
-                        placeholder="🔍 بحث بالرقم أو المنتج..."
+                        placeholder={t('stock.batch.search_placeholder')}
                         value={search} onChange={(e) => setSearch(e.target.value)} />
                     <select className="form-input" style={{ maxWidth: '180px' }}
                         value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">كل الحالات</option>
-                        <option value="active">نشط</option>
-                        <option value="expired">منتهي</option>
-                        <option value="consumed">مستهلك</option>
+                        <option value="">{t('common.all_statuses')}</option>
+                        <option value="active">{t('stock.batch.active')}</option>
+                        <option value="expired">{t('stock.batch.expired')}</option>
+                        <option value="consumed">{t('stock.batch.consumed')}</option>
                     </select>
                     <select className="form-input" style={{ maxWidth: '200px' }}
                         value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)}>
-                        <option value="">كل المستودعات</option>
+                        <option value="">{t('stock.batch.all_warehouses')}</option>
                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouse_name}</option>)}
                     </select>
                 </div>
@@ -193,22 +193,22 @@ function BatchList() {
                     <table className="data-table">
                         <thead>
                             <tr style={{ background: 'var(--bg-secondary)' }}>
-                                <th style={{ width: '12%' }}>رقم الدفعة</th>
-                                <th style={{ width: '20%' }}>المنتج</th>
-                                <th style={{ width: '12%' }}>المستودع</th>
-                                <th style={{ width: '10%' }}>الكمية</th>
-                                <th style={{ width: '12%' }}>تاريخ التصنيع</th>
-                                <th style={{ width: '12%' }}>تاريخ الانتهاء</th>
-                                <th style={{ width: '12%' }}>المتبقي</th>
-                                <th style={{ width: '10%' }}>الحالة</th>
+                                <th style={{ width: '12%' }}>{t('stock.batch.batch_number')}</th>
+                                <th style={{ width: '20%' }}>{t('common.product')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.batch.warehouse')}</th>
+                                <th style={{ width: '10%' }}>{t('common.quantity')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.batch.manufacturing_date')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.batch.expiry_date')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.batch.remaining')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>جاري التحميل...</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</td></tr>
                             ) : batches.length === 0 ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                                    لا توجد دفعات مسجلة
+                                    {t('stock.batch.no_batches')}
                                 </td></tr>
                             ) : batches.map(batch => (
                                 <tr key={batch.id} style={{ cursor: 'pointer' }}
@@ -234,27 +234,27 @@ function BatchList() {
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}
                         style={{ maxWidth: '700px', width: '90%' }}>
                         <div className="modal-header">
-                            <h2>إضافة دفعة جديدة</h2>
+                            <h2>{t('stock.batch.add_batch')}</h2>
                             <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCreate}>
                             {error && <div className="alert alert-error mb-4">{error}</div>}
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">المنتج *</label>
+                                    <label className="form-label">{t('common.product')} *</label>
                                     <select className="form-input" required value={form.product_id}
                                         onChange={(e) => setForm({ ...form, product_id: e.target.value })}>
-                                        <option value="">-- اختر المنتج --</option>
+                                        <option value="">{t('stock.batch.select_product')}</option>
                                         {products.filter(p => p.item_type === 'product').map(p => (
                                             <option key={p.id} value={p.id}>{p.item_name} ({p.item_code})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">المستودع *</label>
+                                    <label className="form-label">{t('stock.batch.warehouse')} *</label>
                                     <select className="form-input" required value={form.warehouse_id}
                                         onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}>
-                                        <option value="">-- اختر المستودع --</option>
+                                        <option value="">{t('stock.batch.select_warehouse')}</option>
                                         {warehouses.map(w => (
                                             <option key={w.id} value={w.id}>{w.warehouse_name}</option>
                                         ))}
@@ -263,13 +263,13 @@ function BatchList() {
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">رقم الدفعة *</label>
+                                    <label className="form-label">{t('stock.batch.batch_number')} *</label>
                                     <input type="text" className="form-input" required value={form.batch_number}
                                         onChange={(e) => setForm({ ...form, batch_number: e.target.value })}
-                                        placeholder="مثال: BATCH-2026-001" />
+                                        placeholder={t('stock.batch.batch_number_placeholder')} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">الكمية</label>
+                                    <label className="form-label">{t('common.quantity')}</label>
                                     <input type="number" className="form-input" min="0" step="0.01"
                                         value={form.quantity}
                                         onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
@@ -277,35 +277,35 @@ function BatchList() {
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ التصنيع</label>
+                                    <label className="form-label">{t('stock.batch.manufacturing_date')}</label>
                                     <DateInput className="form-input" value={form.manufacturing_date}
                                         onChange={(e) => setForm({ ...form, manufacturing_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ الانتهاء</label>
+                                    <label className="form-label">{t('stock.batch.expiry_date')}</label>
                                     <DateInput className="form-input" value={form.expiry_date}
                                         onChange={(e) => setForm({ ...form, expiry_date: e.target.value })} />
                                 </div>
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">تكلفة الوحدة</label>
+                                    <label className="form-label">{t('stock.batch.unit_cost')}</label>
                                     <input type="number" className="form-input" min="0" step="0.01"
                                         value={form.unit_cost}
                                         onChange={(e) => setForm({ ...form, unit_cost: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">ملاحظات</label>
+                                    <label className="form-label">{t('common.notes')}</label>
                                     <input type="text" className="form-input" value={form.notes}
                                         onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                                 </div>
                             </div>
                             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'إنشاء الدفعة'}
+                                    {saving ? t('common.saving') : t('stock.batch.create_batch')}
                                 </button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         </form>

@@ -57,7 +57,7 @@ const EmployeeDocuments = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm(isRTL ? 'هل أنت متأكد من الحذف؟' : 'Are you sure?')) return;
+        if (!window.confirm(t('hr.documents.are_you_sure'))) return;
         try { await hrAdvancedAPI.deleteDocument(id); fetchData(); } catch (e) { console.error(e); }
     };
 
@@ -70,22 +70,22 @@ const EmployeeDocuments = () => {
     const getExpiryBadge = (expiryDate) => {
         const days = getDaysUntilExpiry(expiryDate);
         if (days === null) return null;
-        if (days < 0) return <span className="badge badge-danger">{isRTL ? 'منتهي' : 'Expired'}</span>;
+        if (days < 0) return <span className="badge badge-danger">{t('hr.documents.expired')}</span>;
         if (days <= 30) return <span className="badge badge-danger">{isRTL ? `${days} يوم` : `${days} days`}</span>;
         if (days <= 60) return <span className="badge badge-warning">{isRTL ? `${days} يوم` : `${days} days`}</span>;
         if (days <= 90) return <span className="badge badge-info">{isRTL ? `${days} يوم` : `${days} days`}</span>;
-        return <span className="badge badge-success">{isRTL ? 'ساري' : 'Valid'}</span>;
+        return <span className="badge badge-success">{t('hr.documents.valid')}</span>;
     };
 
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'مستندات الموظفين' : 'Employee Documents'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'تتبع الجوازات والإقامات والمستندات' : 'Track passports, iqamas and documents'}</p>
+                    <h1 className="workspace-title">{t('hr.documents.employee_documents')}</h1>
+                    <p className="workspace-subtitle">{t('hr.documents.track_passports_iqamas_and_documents')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ employee_id: '', document_type: 'passport', document_number: '', issue_date: '', expiry_date: '', notes: '' }); setShowModal(true); }}>
-                    <Plus size={16} /> {isRTL ? 'مستند جديد' : 'New Document'}
+                    <Plus size={16} /> {t('hr.documents.new_document')}
                 </button>
             </div>
 
@@ -94,7 +94,7 @@ const EmployeeDocuments = () => {
                 <div className="card" style={{ background: '#fff3cd', borderColor: '#ffc107', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#856404' }}>
                         <AlertTriangle size={20} />
-                        <strong>{isRTL ? 'تنبيه: مستندات قريبة من الانتهاء' : 'Warning: Documents expiring soon'}</strong>
+                        <strong>{t('hr.documents.warning_documents_expiring_soon')}</strong>
                     </div>
                 </div>
             )}
@@ -104,25 +104,25 @@ const EmployeeDocuments = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                            <th>{isRTL ? 'نوع المستند' : 'Type'}</th>
-                            <th>{isRTL ? 'رقم المستند' : 'Doc Number'}</th>
-                            <th>{isRTL ? 'تاريخ الإصدار' : 'Issue Date'}</th>
-                            <th>{isRTL ? 'تاريخ الانتهاء' : 'Expiry Date'}</th>
-                            <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.documents.employee')}</th>
+                            <th>{t('hr.documents.type')}</th>
+                            <th>{t('hr.documents.doc_number')}</th>
+                            <th>{t('hr.documents.issue_date')}</th>
+                            <th>{t('hr.documents.expiry_date')}</th>
+                            <th>{t('hr.documents.status')}</th>
+                            <th>{t('hr.documents.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.documents.loading')}</td></tr>
                         ) : docs.length === 0 ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد مستندات' : 'No documents'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.documents.no_documents')}</td></tr>
                         ) : docs.map((d, i) => (
                             <tr key={d.id} style={getDaysUntilExpiry(d.expiry_date) !== null && getDaysUntilExpiry(d.expiry_date) <= 30 ? { background: '#fff5f5' } : {}}>
                                 <td>{i + 1}</td>
                                 <td style={{ fontWeight: 600 }}>{d.employee_name || `#${d.employee_id}`}</td>
-                                <td>{docTypes.find(dt => dt.value === d.document_type)?.[isRTL ? 'ar' : 'en'] || d.document_type}</td>
+                                <td>{docTypes.find(dt => dt.value === d.document_type)?.[t('hr.documents.en')] || d.document_type}</td>
                                 <td>{d.document_number}</td>
                                 <td>{d.issue_date || '-'}</td>
                                 <td>{d.expiry_date || '-'}</td>
@@ -142,41 +142,41 @@ const EmployeeDocuments = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل مستند' : 'Edit Document') : (isRTL ? 'مستند جديد' : 'New Document')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.documents.edit_document')) : (t('hr.documents.new_document'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <label>{t('hr.documents.employee')}</label>
                             <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
-                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                <option value="">{t('hr.documents.select')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'نوع المستند' : 'Document Type'}</label>
+                            <label>{t('hr.documents.document_type')}</label>
                             <select className="form-input" value={form.document_type} onChange={e => setForm({ ...form, document_type: e.target.value })}>
                                 {docTypes.map(dt => <option key={dt.value} value={dt.value}>{isRTL ? dt.ar : dt.en}</option>)}
                             </select>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'رقم المستند' : 'Document Number'}</label>
+                            <label>{t('hr.documents.document_number')}</label>
                             <input className="form-input" value={form.document_number} onChange={e => setForm({ ...form, document_number: e.target.value })} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'تاريخ الإصدار' : 'Issue Date'}</label>
+                                <label>{t('hr.documents.issue_date')}</label>
                                 <DateInput className="form-input" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'تاريخ الانتهاء' : 'Expiry Date'}</label>
+                                <label>{t('hr.documents.expiry_date')}</label>
                                 <DateInput className="form-input" value={form.expiry_date} onChange={e => setForm({ ...form, expiry_date: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'ملاحظات' : 'Notes'}</label>
+                            <label>{t('hr.documents.notes')}</label>
                             <textarea className="form-input" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.documents.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.documents.save')}</button>
                         </div>
                     </div>
                 </div>

@@ -44,8 +44,8 @@ function TaxAudit() {
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
                 <div>
-                    <h1 className="workspace-title">{t('reports.tax_audit.title') || 'تقرير التدقيق الضريبي'}</h1>
-                    <p className="workspace-subtitle">{t('reports.tax_audit.subtitle') || 'سجل تفصيلي لجميع الحسابات الخاضعة للضريبة للفترة'}</p>
+                    <h1 className="workspace-title">{t('reports.tax_audit.title')}</h1>
+                    <p className="workspace-subtitle">{t('reports.tax_audit.subtitle')}</p>
                 </div>
                 <div className="display-flex gap-2">
                     <button className="btn btn-secondary" onClick={() => window.print()}>
@@ -97,9 +97,9 @@ function TaxAudit() {
                                     <th>{t('common.number')}</th>
                                     <th>{t('common.type')}</th>
                                     <th>{t('common.party')}</th>
-                                    <th>{t('reports.tax_audit.tax_number') || 'الرقم الضريبي'}</th>
-                                    <th style={{ textAlign: 'left' }}>{t('reports.tax_audit.taxable') || 'المبلغ الخاضع للضريبة'}</th>
-                                    <th style={{ textAlign: 'left' }}>{t('reports.tax_audit.vat') || 'مبلغ الضريبة'}</th>
+                                    <th>{t('reports.tax_audit.tax_number')}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('reports.tax_audit.taxable')}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('reports.tax_audit.vat')}</th>
                                 </tr>
                             </thead>
                             <tbody>

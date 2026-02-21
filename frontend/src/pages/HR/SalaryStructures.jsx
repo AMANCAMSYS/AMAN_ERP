@@ -63,7 +63,7 @@ const SalaryStructures = () => {
     };
 
     const handleDeleteStructure = async (id) => {
-        if (!window.confirm(isRTL ? 'هل أنت متأكد من الحذف؟' : 'Are you sure?')) return;
+        if (!window.confirm(t('hr.salary_structures.are_you_sure'))) return;
         try {
             await hrAdvancedAPI.deleteSalaryStructure(id);
             fetchData();
@@ -74,8 +74,8 @@ const SalaryStructures = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'هياكل الرواتب والمكونات' : 'Salary Structures & Components'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'إدارة هياكل ومكونات الرواتب' : 'Manage salary structures and components'}</p>
+                    <h1 className="workspace-title">{t('hr.salary_structures.salary_structures_components')}</h1>
+                    <p className="workspace-subtitle">{t('hr.salary_structures.manage_salary_structures_and_components')}</p>
                 </div>
             </div>
 
@@ -83,10 +83,10 @@ const SalaryStructures = () => {
             <div className="card" style={{ marginBottom: '1rem', padding: '0.5rem' }}>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className={`btn ${activeTab === 'structures' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('structures')}>
-                        {isRTL ? '📋 هياكل الرواتب' : '📋 Structures'}
+                        {t('hr.salary_structures.structures')}
                     </button>
                     <button className={`btn ${activeTab === 'components' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('components')}>
-                        {isRTL ? '🧩 المكونات' : '🧩 Components'}
+                        {t('hr.salary_structures.components')}
                     </button>
                 </div>
             </div>
@@ -95,7 +95,7 @@ const SalaryStructures = () => {
                 <>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
                         <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ name: '', name_en: '', description: '' }); setShowStructureModal(true); }}>
-                            <Plus size={16} /> {isRTL ? 'هيكل جديد' : 'New Structure'}
+                            <Plus size={16} /> {t('hr.salary_structures.new_structure')}
                         </button>
                     </div>
                     <div className="card">
@@ -103,25 +103,25 @@ const SalaryStructures = () => {
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>{isRTL ? 'الاسم' : 'Name'}</th>
-                                    <th>{isRTL ? 'الاسم (EN)' : 'Name (EN)'}</th>
-                                    <th>{isRTL ? 'الوصف' : 'Description'}</th>
-                                    <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                                    <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                                    <th>{t('hr.salary_structures.name')}</th>
+                                    <th>{t('hr.salary_structures.name_en')}</th>
+                                    <th>{t('hr.salary_structures.description')}</th>
+                                    <th>{t('hr.salary_structures.status')}</th>
+                                    <th>{t('hr.salary_structures.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.salary_structures.loading')}</td></tr>
                                 ) : structures.length === 0 ? (
-                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد هياكل رواتب' : 'No salary structures'}</td></tr>
+                                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.salary_structures.no_salary_structures')}</td></tr>
                                 ) : structures.map((s, i) => (
                                     <tr key={s.id}>
                                         <td>{i + 1}</td>
                                         <td style={{ fontWeight: 600 }}>{s.name}</td>
                                         <td>{s.name_en}</td>
                                         <td>{s.description || '-'}</td>
-                                        <td><span className={`badge ${s.is_active ? 'badge-success' : 'badge-danger'}`}>{s.is_active ? (isRTL ? 'نشط' : 'Active') : (isRTL ? 'غير نشط' : 'Inactive')}</span></td>
+                                        <td><span className={`badge ${s.is_active ? 'badge-success' : 'badge-danger'}`}>{s.is_active ? (t('hr.salary_structures.active')) : (t('hr.salary_structures.inactive'))}</span></td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.25rem' }}>
                                                 <button className="btn btn-sm btn-secondary" onClick={() => { setEditItem(s); setForm({ name: s.name, name_en: s.name_en || '', description: s.description || '' }); setShowStructureModal(true); }}><Edit2 size={14} /></button>
@@ -140,7 +140,7 @@ const SalaryStructures = () => {
                 <>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
                         <button className="btn btn-primary" onClick={() => { setEditItem(null); setCompForm({ name: '', name_en: '', type: 'earning', calculation_type: 'fixed', default_amount: 0, is_taxable: true }); setShowComponentModal(true); }}>
-                            <Plus size={16} /> {isRTL ? 'مكون جديد' : 'New Component'}
+                            <Plus size={16} /> {t('hr.salary_structures.new_component')}
                         </button>
                     </div>
                     <div className="card">
@@ -148,25 +148,25 @@ const SalaryStructures = () => {
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>{isRTL ? 'الاسم' : 'Name'}</th>
-                                    <th>{isRTL ? 'النوع' : 'Type'}</th>
-                                    <th>{isRTL ? 'طريقة الحساب' : 'Calculation'}</th>
-                                    <th>{isRTL ? 'المبلغ الافتراضي' : 'Default Amount'}</th>
-                                    <th>{isRTL ? 'خاضع للضريبة' : 'Taxable'}</th>
-                                    <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                                    <th>{t('hr.salary_structures.name')}</th>
+                                    <th>{t('hr.salary_structures.type')}</th>
+                                    <th>{t('hr.salary_structures.calculation')}</th>
+                                    <th>{t('hr.salary_structures.default_amount')}</th>
+                                    <th>{t('hr.salary_structures.taxable')}</th>
+                                    <th>{t('hr.salary_structures.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.salary_structures.loading')}</td></tr>
                                 ) : components.length === 0 ? (
-                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد مكونات' : 'No components'}</td></tr>
+                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.salary_structures.no_components')}</td></tr>
                                 ) : components.map((c, i) => (
                                     <tr key={c.id}>
                                         <td>{i + 1}</td>
                                         <td style={{ fontWeight: 600 }}>{c.name}</td>
-                                        <td><span className={`badge ${c.type === 'earning' ? 'badge-success' : 'badge-danger'}`}>{c.type === 'earning' ? (isRTL ? 'علاوة' : 'Earning') : (isRTL ? 'استقطاع' : 'Deduction')}</span></td>
-                                        <td>{c.calculation_type === 'fixed' ? (isRTL ? 'ثابت' : 'Fixed') : c.calculation_type === 'percentage' ? (isRTL ? 'نسبة' : '%') : (isRTL ? 'صيغة' : 'Formula')}</td>
+                                        <td><span className={`badge ${c.type === 'earning' ? 'badge-success' : 'badge-danger'}`}>{c.type === 'earning' ? (t('hr.salary_structures.earning')) : (t('hr.salary_structures.deduction'))}</span></td>
+                                        <td>{c.calculation_type === 'fixed' ? (t('hr.salary_structures.fixed')) : c.calculation_type === 'percentage' ? (t('hr.salary_structures.')) : (t('hr.salary_structures.formula'))}</td>
                                         <td>{c.default_amount?.toLocaleString() || 0}</td>
                                         <td>{c.is_taxable ? '✅' : '❌'}</td>
                                         <td>
@@ -184,22 +184,22 @@ const SalaryStructures = () => {
             {showStructureModal && (
                 <div className="modal-overlay" onClick={() => setShowStructureModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل هيكل' : 'Edit Structure') : (isRTL ? 'هيكل جديد' : 'New Structure')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.salary_structures.edit_structure')) : (t('hr.salary_structures.new_structure'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الاسم بالعربي' : 'Name (AR)'}</label>
+                            <label>{t('hr.salary_structures.name_ar')}</label>
                             <input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الاسم بالإنجليزي' : 'Name (EN)'}</label>
+                            <label>{t('hr.salary_structures.name_en_2')}</label>
                             <input className="form-input" value={form.name_en} onChange={e => setForm({ ...form, name_en: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الوصف' : 'Description'}</label>
+                            <label>{t('hr.salary_structures.description')}</label>
                             <textarea className="form-input" rows="3" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowStructureModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSaveStructure}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowStructureModal(false)}>{t('hr.salary_structures.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSaveStructure}>{t('hr.salary_structures.save')}</button>
                         </div>
                     </div>
                 </div>
@@ -209,43 +209,43 @@ const SalaryStructures = () => {
             {showComponentModal && (
                 <div className="modal-overlay" onClick={() => setShowComponentModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل مكون' : 'Edit Component') : (isRTL ? 'مكون جديد' : 'New Component')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.salary_structures.edit_component')) : (t('hr.salary_structures.new_component'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الاسم' : 'Name'}</label>
+                            <label>{t('hr.salary_structures.name')}</label>
                             <input className="form-input" value={compForm.name} onChange={e => setCompForm({ ...compForm, name: e.target.value })} />
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الاسم EN' : 'Name EN'}</label>
+                            <label>{t('hr.salary_structures.name_en_3')}</label>
                             <input className="form-input" value={compForm.name_en} onChange={e => setCompForm({ ...compForm, name_en: e.target.value })} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'النوع' : 'Type'}</label>
+                                <label>{t('hr.salary_structures.type')}</label>
                                 <select className="form-input" value={compForm.type} onChange={e => setCompForm({ ...compForm, type: e.target.value })}>
-                                    <option value="earning">{isRTL ? 'علاوة' : 'Earning'}</option>
-                                    <option value="deduction">{isRTL ? 'استقطاع' : 'Deduction'}</option>
+                                    <option value="earning">{t('hr.salary_structures.earning')}</option>
+                                    <option value="deduction">{t('hr.salary_structures.deduction')}</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'طريقة الحساب' : 'Calculation'}</label>
+                                <label>{t('hr.salary_structures.calculation')}</label>
                                 <select className="form-input" value={compForm.calculation_type} onChange={e => setCompForm({ ...compForm, calculation_type: e.target.value })}>
-                                    <option value="fixed">{isRTL ? 'ثابت' : 'Fixed'}</option>
-                                    <option value="percentage">{isRTL ? 'نسبة مئوية' : 'Percentage'}</option>
-                                    <option value="formula">{isRTL ? 'صيغة' : 'Formula'}</option>
+                                    <option value="fixed">{t('hr.salary_structures.fixed')}</option>
+                                    <option value="percentage">{t('hr.salary_structures.percentage')}</option>
+                                    <option value="formula">{t('hr.salary_structures.formula')}</option>
                                 </select>
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'المبلغ الافتراضي' : 'Default Amount'}</label>
+                            <label>{t('hr.salary_structures.default_amount')}</label>
                             <input type="number" className="form-input" value={compForm.default_amount} onChange={e => setCompForm({ ...compForm, default_amount: parseFloat(e.target.value) || 0 })} />
                         </div>
                         <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <input type="checkbox" checked={compForm.is_taxable} onChange={e => setCompForm({ ...compForm, is_taxable: e.target.checked })} />
-                            <label style={{ margin: 0 }}>{isRTL ? 'خاضع للضريبة' : 'Taxable'}</label>
+                            <label style={{ margin: 0 }}>{t('hr.salary_structures.taxable')}</label>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowComponentModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSaveComponent}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowComponentModal(false)}>{t('hr.salary_structures.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSaveComponent}>{t('hr.salary_structures.save')}</button>
                         </div>
                     </div>
                 </div>

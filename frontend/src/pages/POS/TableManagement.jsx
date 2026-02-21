@@ -27,22 +27,22 @@ const TableManagement = () => {
             await posAPI.createTable({ ...form, capacity: parseInt(form.capacity) });
             showToast(t('pos.table_added'), 'success');
             setShowModal(false); setForm({ table_number: '', capacity: 4, zone: '' }); fetchTables();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleSeat = async (id) => {
         try { await posAPI.seatTable(id, { customer_name: '' }); showToast(t('pos.seated'), 'success'); fetchTables(); }
-        catch (err) { showToast('Error', 'error'); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleClear = async (id) => {
         try { await posAPI.clearTable(id); showToast(t('pos.table_cleared'), 'success'); fetchTables(); }
-        catch (err) { showToast('Error', 'error'); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleDelete = async (id) => {
         if (!confirm(t('pos.delete_table_confirm'))) return;
-        try { await posAPI.deleteTable(id); fetchTables(); } catch (err) { showToast('Error', 'error'); }
+        try { await posAPI.deleteTable(id); fetchTables(); } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const statusColors = { available: 'bg-green-100 text-green-700', occupied: 'bg-red-100 text-red-700', reserved: 'bg-yellow-100 text-yellow-700' };

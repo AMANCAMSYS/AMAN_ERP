@@ -56,20 +56,20 @@ function TaxReturnDetails() {
             setShowFileModal(false)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || 'خطأ')
+            alert(err.response?.data?.detail || t('common.error'))
         } finally {
             setActionLoading(false)
         }
     }
 
     const handleCancel = async () => {
-        if (!confirm(t('taxes.confirm_cancel') || 'هل أنت متأكد من إلغاء هذا الإقرار؟')) return
+        if (!confirm(t('taxes.confirm_cancel'))) return
         setActionLoading(true)
         try {
             await taxesAPI.cancelReturn(id)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || 'خطأ')
+            alert(err.response?.data?.detail || t('common.error'))
         } finally {
             setActionLoading(false)
         }
@@ -90,7 +90,7 @@ function TaxReturnDetails() {
             setShowPayModal(false)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || 'خطأ')
+            alert(err.response?.data?.detail || t('common.error'))
         } finally {
             setActionLoading(false)
         }
@@ -98,10 +98,10 @@ function TaxReturnDetails() {
 
     const getStatusBadge = (status) => {
         const map = {
-            draft: { label: t('taxes.status_draft') || 'مسودة', bg: 'rgb(254, 243, 199)', color: 'rgb(217, 119, 6)', emoji: '⏳' },
-            filed: { label: t('taxes.status_filed') || 'مقدم', bg: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', emoji: '📤' },
-            paid: { label: t('taxes.status_paid') || 'مدفوع', bg: 'rgb(220, 252, 231)', color: 'rgb(22, 163, 74)', emoji: '✅' },
-            cancelled: { label: t('taxes.status_cancelled') || 'ملغى', bg: 'rgb(254, 226, 226)', color: 'rgb(220, 38, 38)', emoji: '❌' }
+            draft: { label: t('taxes.status_draft'), bg: 'rgb(254, 243, 199)', color: 'rgb(217, 119, 6)', emoji: '⏳' },
+            filed: { label: t('taxes.status_filed'), bg: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', emoji: '📤' },
+            paid: { label: t('taxes.status_paid'), bg: 'rgb(220, 252, 231)', color: 'rgb(22, 163, 74)', emoji: '✅' },
+            cancelled: { label: t('taxes.status_cancelled'), bg: 'rgb(254, 226, 226)', color: 'rgb(220, 38, 38)', emoji: '❌' }
         }
         const s = map[status] || { label: status, bg: 'rgba(107, 114, 128, 0.082)', color: 'rgb(107, 114, 128)', emoji: '' }
         return <span style={{ background: s.bg, color: s.color, padding: '6px 16px', borderRadius: '20px', fontSize: '14px', fontWeight: '600', whiteSpace: 'nowrap' }}>
@@ -110,7 +110,7 @@ function TaxReturnDetails() {
     }
 
     const paymentMethodLabel = (method) => {
-        const map = { bank_transfer: t('taxes.bank_transfer') || 'تحويل بنكي', cash: t('taxes.cash') || 'نقدي', cheque: t('taxes.cheque') || 'شيك' }
+        const map = { bank_transfer: t('taxes.bank_transfer'), cash: t('taxes.cash'), cheque: t('taxes.cheque') }
         return map[method] || method
     }
 
@@ -124,9 +124,9 @@ function TaxReturnDetails() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
-                        <h1 className="workspace-title">📋 {t('taxes.return_details') || 'تفاصيل الإقرار الضريبي'}</h1>
+                        <h1 className="workspace-title">📋 {t('taxes.return_details')}</h1>
                         <p className="workspace-subtitle" style={{ fontFamily: 'monospace', fontSize: '16px' }}>
-                            {data.return_number} — {t('taxes.period') || 'الفترة'}: {data.tax_period}
+                            {data.return_number} — {t('taxes.period')}: {data.tax_period}
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -134,25 +134,25 @@ function TaxReturnDetails() {
                         {data.status === 'draft' && (
                             <>
                                 <button className="btn btn-primary" onClick={() => setShowFileModal(true)} disabled={actionLoading}>
-                                    📤 {t('taxes.file_return') || 'تقديم الإقرار'}
+                                    📤 {t('taxes.file_return')}
                                 </button>
                                 <button className="btn btn-danger" onClick={handleCancel} disabled={actionLoading}>
-                                    ❌ {t('common.cancel') || 'إلغاء'}
+                                    ❌ {t('common.cancel')}
                                 </button>
                             </>
                         )}
                         {data.status === 'filed' && data.remaining_amount > 0 && (
                             <>
                                 <button className="btn btn-success" onClick={() => setShowPayModal(true)} disabled={actionLoading}>
-                                    💰 {t('taxes.record_payment') || 'تسجيل دفعة'}
+                                    💰 {t('taxes.record_payment')}
                                 </button>
                                 <button className="btn btn-danger" onClick={handleCancel} disabled={actionLoading}>
-                                    ❌ {t('common.cancel') || 'إلغاء'}
+                                    ❌ {t('common.cancel')}
                                 </button>
                             </>
                         )}
                         <button className="btn btn-secondary" onClick={() => navigate('/taxes')}>
-                            ← {t('common.back') || 'رجوع'}
+                            ← {t('common.back')}
                         </button>
                     </div>
                 </div>
@@ -161,29 +161,29 @@ function TaxReturnDetails() {
             {/* Summary Cards */}
             <div className="metrics-grid mt-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                 <div className="metric-card">
-                    <div className="metric-label">{t('taxes.taxable_amount') || 'المبلغ الخاضع'}</div>
+                    <div className="metric-label">{t('taxes.taxable_amount')}</div>
                     <div className="metric-value">{formatNumber(data.taxable_amount)} <small>{currency}</small></div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('taxes.tax_amount') || 'مبلغ الضريبة'}</div>
+                    <div className="metric-label">{t('taxes.tax_amount')}</div>
                     <div className="metric-value text-secondary">{formatNumber(data.tax_amount)} <small>{currency}</small></div>
                 </div>
                 {(data.penalty_amount > 0 || data.interest_amount > 0) && (
                     <div className="metric-card">
-                        <div className="metric-label">{t('taxes.penalties') || 'غرامات + فوائد'}</div>
+                        <div className="metric-label">{t('taxes.penalties')}</div>
                         <div className="metric-value text-error">{formatNumber(parseFloat(data.penalty_amount || 0) + parseFloat(data.interest_amount || 0))} <small>{currency}</small></div>
                     </div>
                 )}
                 <div className="metric-card" style={{ borderColor: 'var(--primary)' }}>
-                    <div className="metric-label" style={{ fontWeight: 'bold' }}>{t('taxes.total_amount') || 'الإجمالي المستحق'}</div>
+                    <div className="metric-label" style={{ fontWeight: 'bold' }}>{t('taxes.total_amount')}</div>
                     <div className="metric-value text-primary" style={{ fontSize: '28px' }}>{formatNumber(data.total_amount)} <small>{currency}</small></div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('taxes.paid_amount') || 'المدفوع'}</div>
+                    <div className="metric-label">{t('taxes.paid_amount')}</div>
                     <div className="metric-value text-success">{formatNumber(data.paid_amount)} <small>{currency}</small></div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('taxes.remaining') || 'المتبقي'}</div>
+                    <div className="metric-label">{t('taxes.remaining')}</div>
                     <div className={`metric-value ${data.remaining_amount > 0 ? 'text-error' : 'text-success'}`}>
                         {formatNumber(data.remaining_amount)} <small>{currency}</small>
                     </div>
@@ -192,32 +192,32 @@ function TaxReturnDetails() {
 
             {/* Info Card */}
             <div className="card mt-4">
-                <h3 className="section-title">{t('taxes.return_info') || 'معلومات الإقرار'}</h3>
+                <h3 className="section-title">{t('taxes.return_info')}</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '12px' }}>
-                    <div><strong>{t('taxes.return_number') || 'رقم الإقرار'}:</strong> <span style={{ fontFamily: 'monospace' }}>{data.return_number}</span></div>
-                    <div><strong>{t('taxes.period') || 'الفترة'}:</strong> {data.tax_period}</div>
-                    <div><strong>{t('taxes.tax_type') || 'نوع الضريبة'}:</strong> {data.tax_type === 'vat' ? 'ضريبة القيمة المضافة' : data.tax_type}</div>
-                    <div><strong>{t('taxes.due_date') || 'تاريخ الاستحقاق'}:</strong> {data.due_date || '-'}</div>
-                    <div><strong>{t('taxes.filed_date') || 'تاريخ التقديم'}:</strong> {data.filed_date || '-'}</div>
-                    <div><strong>{t('taxes.created_by') || 'أنشئ بواسطة'}:</strong> {data.created_by_name || '-'}</div>
-                    {data.notes && <div style={{ gridColumn: 'span 2' }}><strong>{t('taxes.notes') || 'ملاحظات'}:</strong> {data.notes}</div>}
+                    <div><strong>{t('taxes.return_number')}:</strong> <span style={{ fontFamily: 'monospace' }}>{data.return_number}</span></div>
+                    <div><strong>{t('taxes.period')}:</strong> {data.tax_period}</div>
+                    <div><strong>{t('taxes.tax_type')}:</strong> {data.tax_type === 'vat' ? 'ضريبة القيمة المضافة' : data.tax_type}</div>
+                    <div><strong>{t('taxes.due_date')}:</strong> {data.due_date || '-'}</div>
+                    <div><strong>{t('taxes.filed_date')}:</strong> {data.filed_date || '-'}</div>
+                    <div><strong>{t('taxes.created_by')}:</strong> {data.created_by_name || '-'}</div>
+                    {data.notes && <div style={{ gridColumn: 'span 2' }}><strong>{t('taxes.notes')}:</strong> {data.notes}</div>}
                 </div>
             </div>
 
             {/* Payments Table */}
             <div className="card mt-4">
-                <h3 className="section-title">{t('taxes.payments') || 'المدفوعات'}</h3>
+                <h3 className="section-title">{t('taxes.payments')}</h3>
                 {data.payments && data.payments.length > 0 ? (
                     <div className="data-table-container mt-3">
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('taxes.payment_number') || 'رقم الدفعة'}</th>
-                                    <th>{t('common.date') || 'التاريخ'}</th>
-                                    <th style={{ textAlign: 'left' }}>{t('taxes.amount') || 'المبلغ'}</th>
-                                    <th>{t('taxes.payment_method') || 'طريقة الدفع'}</th>
-                                    <th>{t('taxes.reference') || 'المرجع'}</th>
-                                    <th>{t('common.status') || 'الحالة'}</th>
+                                    <th>{t('taxes.payment_number')}</th>
+                                    <th>{t('common.date')}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.amount')}</th>
+                                    <th>{t('taxes.payment_method')}</th>
+                                    <th>{t('taxes.reference')}</th>
+                                    <th>{t('common.status')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -238,7 +238,7 @@ function TaxReturnDetails() {
                                         <td>{p.reference || <span className="text-muted">—</span>}</td>
                                         <td>
                                             <span style={{ background: 'rgb(220, 252, 231)', color: 'rgb(22, 163, 74)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                                                ✅ {p.status === 'confirmed' ? (t('taxes.confirmed') || 'مؤكد') : p.status}
+                                                ✅ {p.status === 'confirmed' ? (t('taxes.confirmed')) : p.status}
                                             </span>
                                         </td>
                                     </tr>
@@ -247,7 +247,7 @@ function TaxReturnDetails() {
                         </table>
                     </div>
                 ) : (
-                    <p className="text-muted mt-3">{t('taxes.no_payments') || 'لا توجد مدفوعات مسجلة'}</p>
+                    <p className="text-muted mt-3">{t('taxes.no_payments')}</p>
                 )}
             </div>
 
@@ -256,31 +256,31 @@ function TaxReturnDetails() {
                 <div className="modal-backdrop" onClick={() => setShowFileModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
-                            <h3>📤 {t('taxes.file_return') || 'تقديم الإقرار الضريبي'}</h3>
+                            <h3>📤 {t('taxes.file_return')}</h3>
                             <button className="btn-close" onClick={() => setShowFileModal(false)}>✕</button>
                         </div>
                         <div className="modal-body">
-                            <p>{t('taxes.file_confirm_msg') || 'سيتم تغيير حالة الإقرار من "مسودة" إلى "مقدم". يمكنك إضافة غرامات أو فوائد إن وجدت.'}</p>
+                            <p>{t('taxes.file_confirm_msg')}</p>
                             <div className="form-group mt-3">
-                                <label className="form-label">{t('taxes.penalty_amount') || 'مبلغ الغرامة'}</label>
+                                <label className="form-label">{t('taxes.penalty_amount')}</label>
                                 <input type="number" className="form-control" min="0" step="0.01"
                                     value={fileForm.penalty_amount}
                                     onChange={e => setFileForm({...fileForm, penalty_amount: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.interest_amount') || 'مبلغ الفوائد'}</label>
+                                <label className="form-label">{t('taxes.interest_amount')}</label>
                                 <input type="number" className="form-control" min="0" step="0.01"
                                     value={fileForm.interest_amount}
                                     onChange={e => setFileForm({...fileForm, interest_amount: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="alert alert-info mt-2">
-                                {t('taxes.new_total') || 'الإجمالي الجديد'}: <strong>{formatNumber(parseFloat(data.tax_amount || 0) + (fileForm.penalty_amount || 0) + (fileForm.interest_amount || 0))} {currency}</strong>
+                                {t('taxes.new_total')}: <strong>{formatNumber(parseFloat(data.tax_amount || 0) + (fileForm.penalty_amount || 0) + (fileForm.interest_amount || 0))} {currency}</strong>
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowFileModal(false)}>{t('common.cancel') || 'إلغاء'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowFileModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-primary" onClick={handleFile} disabled={actionLoading}>
-                                {actionLoading ? '...' : (t('taxes.submit') || 'تقديم')}
+                                {actionLoading ? '...' : (t('taxes.submit'))}
                             </button>
                         </div>
                     </div>
@@ -292,40 +292,40 @@ function TaxReturnDetails() {
                 <div className="modal-backdrop" onClick={() => setShowPayModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h3>💰 {t('taxes.record_payment') || 'تسجيل دفعة ضريبية'}</h3>
+                            <h3>💰 {t('taxes.record_payment')}</h3>
                             <button className="btn-close" onClick={() => setShowPayModal(false)}>✕</button>
                         </div>
                         <div className="modal-body">
                             <div className="alert alert-info">
-                                {t('taxes.remaining') || 'المتبقي'}: <strong>{formatNumber(data.remaining_amount)} {currency}</strong>
+                                {t('taxes.remaining')}: <strong>{formatNumber(data.remaining_amount)} {currency}</strong>
                             </div>
                             <div className="form-group mt-3">
-                                <label className="form-label">{t('taxes.amount') || 'المبلغ'} *</label>
+                                <label className="form-label">{t('taxes.amount')} *</label>
                                 <input type="number" className="form-control" min="0.01" step="0.01"
                                     max={data.remaining_amount}
                                     value={payForm.amount}
                                     onChange={e => setPayForm({...payForm, amount: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.payment_date') || 'تاريخ الدفع'} *</label>
+                                <label className="form-label">{t('taxes.payment_date')} *</label>
                                 <DateInput className="form-control" value={payForm.payment_date}
                                     onChange={e => setPayForm({...payForm, payment_date: e.target.value})} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.payment_method') || 'طريقة الدفع'}</label>
+                                <label className="form-label">{t('taxes.payment_method')}</label>
                                 <select className="form-control" value={payForm.payment_method}
                                     onChange={e => setPayForm({...payForm, payment_method: e.target.value})}>
-                                    <option value="bank_transfer">{t('taxes.bank_transfer') || 'تحويل بنكي'}</option>
-                                    <option value="cash">{t('taxes.cash') || 'نقدي'}</option>
-                                    <option value="cheque">{t('taxes.cheque') || 'شيك'}</option>
+                                    <option value="bank_transfer">{t('taxes.bank_transfer')}</option>
+                                    <option value="cash">{t('taxes.cash')}</option>
+                                    <option value="cheque">{t('taxes.cheque')}</option>
                                 </select>
                             </div>
                             {treasuryAccounts.length > 0 && (
                                 <div className="form-group">
-                                    <label className="form-label">{t('taxes.treasury_account') || 'حساب الخزينة'}</label>
+                                    <label className="form-label">{t('taxes.treasury_account')}</label>
                                     <select className="form-control" value={payForm.treasury_account_id || ''}
                                         onChange={e => setPayForm({...payForm, treasury_account_id: e.target.value})}>
-                                        <option value="">{t('taxes.auto_select') || '— تلقائي —'}</option>
+                                        <option value="">{t('taxes.auto_select')}</option>
                                         {treasuryAccounts.map(ta => (
                                             <option key={ta.id} value={ta.id}>{ta.name} ({ta.currency})</option>
                                         ))}
@@ -333,21 +333,21 @@ function TaxReturnDetails() {
                                 </div>
                             )}
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.reference') || 'رقم المرجع'}</label>
+                                <label className="form-label">{t('taxes.reference')}</label>
                                 <input className="form-control" value={payForm.reference}
                                     onChange={e => setPayForm({...payForm, reference: e.target.value})}
-                                    placeholder={t('taxes.ref_placeholder') || 'رقم الإيصال أو التحويل'} />
+                                    placeholder={t('taxes.ref_placeholder')} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.notes') || 'ملاحظات'}</label>
+                                <label className="form-label">{t('taxes.notes')}</label>
                                 <textarea className="form-control" rows="2" value={payForm.notes}
                                     onChange={e => setPayForm({...payForm, notes: e.target.value})} />
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowPayModal(false)}>{t('common.cancel') || 'إلغاء'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowPayModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-success" onClick={handlePay} disabled={actionLoading || payForm.amount <= 0}>
-                                {actionLoading ? '...' : (t('taxes.confirm_payment') || 'تأكيد الدفع')}
+                                {actionLoading ? '...' : (t('taxes.confirm_payment'))}
                             </button>
                         </div>
                     </div>

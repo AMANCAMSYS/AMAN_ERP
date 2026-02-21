@@ -28,7 +28,7 @@ export default function MRPView() {
             setMrp(res.data)
         } catch (err) {
             console.error('Failed to fetch MRP', err)
-            showToast(t('manufacturing.mrp.load_error', 'فشل في حساب متطلبات المواد'), 'error')
+            showToast(t('manufacturing.mrp.load_error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -46,7 +46,7 @@ export default function MRPView() {
                         {isRTL ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
                     </button>
                     <div>
-                        <h1 className="workspace-title">{t('manufacturing.mrp.title', 'تخطيط متطلبات المواد')}</h1>
+                        <h1 className="workspace-title">{t('manufacturing.mrp.title')}</h1>
                         <p className="text-muted small">{mrp.plan_name}</p>
                     </div>
                 </div>
@@ -57,12 +57,12 @@ export default function MRPView() {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{t('manufacturing.material_name', 'اسم المادة')}</th>
-                                <th className="text-center">{t('manufacturing.mrp.required', 'المطلوب')}</th>
-                                <th className="text-center">{t('manufacturing.mrp.on_hand', 'المتوفر')}</th>
-                                <th className="text-center">{t('manufacturing.mrp.shortage', 'العجز')}</th>
-                                <th className="text-center">{t('manufacturing.mrp.action', 'الإجراء المقترح')}</th>
-                                <th className="text-center">{t('common.status', 'الحالة')}</th>
+                                <th>{t('manufacturing.material_name')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.required')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.on_hand')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.shortage')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.action')}</th>
+                                <th className="text-center">{t('common.status')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -79,11 +79,11 @@ export default function MRPView() {
                                     <td className="text-center">
                                         {item.suggested_action === 'purchase_order' ? (
                                             <span className="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1">
-                                                <ShoppingCart size={12} /> {t('manufacturing.mrp.create_po', 'طلب شراء')}
+                                                <ShoppingCart size={12} /> {t('manufacturing.mrp.create_po')}
                                             </span>
                                         ) : (
                                             <span className="badge bg-success-subtle text-success">
-                                                {t('manufacturing.mrp.stock_available', 'مخزون متاح')}
+                                                {t('manufacturing.mrp.stock_available')}
                                             </span>
                                         )}
                                     </td>
@@ -103,11 +103,11 @@ export default function MRPView() {
 
             <div className="mt-4 d-flex justify-content-end gap-2">
                 <button className="btn btn-outline-primary" onClick={() => window.print()}>
-                    {t('common.print', 'طباعة التقرير')}
+                    {t('common.print')}
                 </button>
                 {mrp.items.some(i => i.shortage_quantity > 0) && (
                     <button className="btn btn-primary">
-                        {t('manufacturing.mrp.generate_all_pos', 'توليد طلبات الشراء لجميع المواد')}
+                        {t('manufacturing.mrp.generate_all_pos')}
                     </button>
                 )}
             </div>

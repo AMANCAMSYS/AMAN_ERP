@@ -54,11 +54,11 @@ export default function ProjectList() {
 
     const getStatusBadge = (status) => {
         const map = {
-            planning: { label: t('projects.status.planning', 'تخطيط'), class: 'badge-info' },
-            in_progress: { label: t('projects.status.in_progress', 'قيد التنفيذ'), class: 'badge-warning' },
-            completed: { label: t('projects.status.completed', 'مكتمل'), class: 'badge-success' },
-            on_hold: { label: t('projects.status.on_hold', 'متوقف'), class: 'badge-secondary' },
-            cancelled: { label: t('projects.status.cancelled', 'ملغي'), class: 'badge-danger' },
+            planning: { label: t('projects.status.planning'), class: 'badge-info' },
+            in_progress: { label: t('projects.status.in_progress'), class: 'badge-warning' },
+            completed: { label: t('projects.status.completed'), class: 'badge-success' },
+            on_hold: { label: t('projects.status.on_hold'), class: 'badge-secondary' },
+            cancelled: { label: t('projects.status.cancelled'), class: 'badge-danger' },
         };
         const s = map[status] || { label: status, class: 'badge-secondary' };
         return <span className={`badge ${s.class}`}>{s.label}</span>;
@@ -76,15 +76,15 @@ export default function ProjectList() {
             <div className="workspace-header">
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div>
-                        <h1 className="workspace-title">{t('projects.title', 'إدارة المشاريع')}</h1>
-                        <p className="workspace-subtitle">{t('projects.subtitle', 'تتبع المشاريع والمهام والتكاليف والإيرادات')}</p>
+                        <h1 className="workspace-title">{t('projects.title')}</h1>
+                        <p className="workspace-subtitle">{t('projects.subtitle')}</p>
                     </div>
                     <div className="header-actions d-flex gap-2">
                         <button className="btn btn-outline-primary" onClick={() => navigate('/projects/resources')}>
-                            <FolderKanban size={18} /> {t('projects.resource_allocation', 'تخصيص الموارد')}
+                            <FolderKanban size={18} /> {t('projects.resource_allocation')}
                         </button>
                         <button className="btn btn-primary" onClick={() => navigate('/projects/new')}>
-                            <Plus size={18} /> {t('projects.new', 'مشروع جديد')}
+                            <Plus size={18} /> {t('projects.new')}
                         </button>
                     </div>
                 </div>
@@ -97,7 +97,7 @@ export default function ProjectList() {
                         <FolderKanban size={24} color="white" />
                     </div>
                     <div className="metric-info">
-                        <span className="metric-label">{t('projects.metrics.total', 'إجمالي المشاريع')}</span>
+                        <span className="metric-label">{t('projects.metrics.total')}</span>
                         <span className="metric-value text-dark">{summary.total_projects || 0}</span>
                     </div>
                 </div>
@@ -106,7 +106,7 @@ export default function ProjectList() {
                         <Clock size={24} color="white" />
                     </div>
                     <div className="metric-info">
-                        <span className="metric-label">{t('projects.metrics.in_progress', 'قيد التنفيذ')}</span>
+                        <span className="metric-label">{t('projects.metrics.in_progress')}</span>
                         <span className="metric-value text-dark">{summary.in_progress || 0}</span>
                     </div>
                 </div>
@@ -115,7 +115,7 @@ export default function ProjectList() {
                         <CheckCircle2 size={24} color="white" />
                     </div>
                     <div className="metric-info">
-                        <span className="metric-label">{t('projects.metrics.completed', 'مكتملة')}</span>
+                        <span className="metric-label">{t('projects.metrics.completed')}</span>
                         <span className="metric-value text-dark">{summary.completed || 0}</span>
                     </div>
                 </div>
@@ -124,7 +124,7 @@ export default function ProjectList() {
                         <TrendingUp size={24} color="white" />
                     </div>
                     <div className="metric-info">
-                        <span className="metric-label">{t('projects.metrics.total_budget', 'إجمالي الميزانية')}</span>
+                        <span className="metric-label">{t('projects.metrics.total_budget')}</span>
                         <span className="metric-value text-dark" style={{ fontSize: '20px' }}>{formatNumber(summary.total_budget || 0)}</span>
                     </div>
                 </div>
@@ -139,7 +139,7 @@ export default function ProjectList() {
                             <input
                                 type="text"
                                 className="form-input"
-                                placeholder={t('common.search', 'بحث...')}
+                                placeholder={t('common.search')}
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
@@ -150,12 +150,12 @@ export default function ProjectList() {
                             value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}
                         >
-                            <option value="">{t('common.all', 'الكل')}</option>
-                            <option value="planning">{t('projects.status.planning', 'تخطيط')}</option>
-                            <option value="in_progress">{t('projects.status.in_progress', 'قيد التنفيذ')}</option>
-                            <option value="completed">{t('projects.status.completed', 'مكتمل')}</option>
-                            <option value="on_hold">{t('projects.status.on_hold', 'متوقف')}</option>
-                            <option value="cancelled">{t('projects.status.cancelled', 'ملغي')}</option>
+                            <option value="">{t('common.all')}</option>
+                            <option value="planning">{t('projects.status.planning')}</option>
+                            <option value="in_progress">{t('projects.status.in_progress')}</option>
+                            <option value="completed">{t('projects.status.completed')}</option>
+                            <option value="on_hold">{t('projects.status.on_hold')}</option>
+                            <option value="cancelled">{t('projects.status.cancelled')}</option>
                         </select>
                     </div>
 
@@ -163,15 +163,15 @@ export default function ProjectList() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('projects.fields.code', 'رمز المشروع')}</th>
-                                    <th>{t('projects.fields.name', 'اسم المشروع')}</th>
-                                    <th>{t('projects.fields.customer', 'العميل')}</th>
-                                    <th>{t('projects.fields.manager', 'مدير المشروع')}</th>
-                                    <th>{t('projects.fields.status', 'الحالة')}</th>
-                                    <th>{t('projects.fields.progress', 'التقدم')}</th>
-                                    <th>{t('projects.fields.budget', 'الميزانية')}</th>
-                                    <th>{t('projects.fields.expenses', 'المصاريف')}</th>
-                                    <th>{t('projects.fields.tasks', 'المهام')}</th>
+                                    <th>{t('projects.fields.code')}</th>
+                                    <th>{t('projects.fields.name')}</th>
+                                    <th>{t('projects.fields.customer')}</th>
+                                    <th>{t('projects.fields.manager')}</th>
+                                    <th>{t('projects.fields.status')}</th>
+                                    <th>{t('projects.fields.progress')}</th>
+                                    <th>{t('projects.fields.budget')}</th>
+                                    <th>{t('projects.fields.expenses')}</th>
+                                    <th>{t('projects.fields.tasks')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -184,7 +184,7 @@ export default function ProjectList() {
                                 ) : filteredProjects.length === 0 ? (
                                     <tr>
                                         <td colSpan="9" className="text-center py-5 text-muted">
-                                            {t('common.no_data', 'لا توجد بيانات')}
+                                            {t('common.no_data')}
                                         </td>
                                     </tr>
                                 ) : paginatedItems.map(project => {

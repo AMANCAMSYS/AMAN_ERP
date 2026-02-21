@@ -163,7 +163,7 @@ function PaymentForm() {
     const handleRecordCurrencyChange = async (newCurrency) => {
         let shouldClear = false;
         if (formData.allocations.length > 0) {
-            if (!window.confirm(t('buying.payments.form.validation.confirm_currency_change') || 'تغيير العملة سيؤدي إلى مسح التوزيعات الحالية. هل تريد الاستمرار؟')) {
+            if (!window.confirm(t('buying.payments.form.validation.confirm_currency_change'))) {
                 return;
             }
             shouldClear = true;
@@ -287,7 +287,7 @@ function PaymentForm() {
         }
 
         if (!formData.payment_method) {
-            toastEmitter.emit(t('buying.payments.form.validation.payment_method_required') || 'يرجى اختيار طريقة الدفع', 'error');
+            toastEmitter.emit(t('buying.payments.form.validation.payment_method_required'), 'error');
             return;
         }
 
@@ -321,7 +321,7 @@ function PaymentForm() {
             navigate('/buying/payments');
         } catch (error) {
             console.error('Error creating payment:', error);
-            toastEmitter.emit(t('buying.payments.form.error_saving') || 'فشل إنشاء سند الصرف: ' + (error.response?.data?.detail || error.message), 'error');
+            toastEmitter.emit(t('buying.payments.form.error_saving') + (error.response?.data?.detail || error.message), 'error');
         } finally {
             setLoading(false);
         }
@@ -368,7 +368,7 @@ function PaymentForm() {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">{t('buying.payments.form.payment_currency') || 'عملة السند'}</label>
+                                <label className="form-label">{t('buying.payments.form.payment_currency')}</label>
                                 <select
                                     value={recordCurrency}
                                     onChange={(e) => handleRecordCurrencyChange(e.target.value)}
@@ -569,7 +569,7 @@ function PaymentForm() {
 
                                             {/* ROW 1: Bank/Cash Account */}
                                             <label className="text-sm font-medium text-gray-700">
-                                                {formData.payment_method === 'cash' ? (t('buying.payments.form.cash_account') || 'الصندوق/الخزينة') : (t('buying.payments.form.bank_account') || 'الحساب البنكي')}
+                                                {formData.payment_method === 'cash' ? (t('buying.payments.form.cash_account')) : (t('buying.payments.form.bank_account'))}
                                             </label>
                                             <select
                                                 required
@@ -577,7 +577,7 @@ function PaymentForm() {
                                                 onChange={handleTreasuryChange}
                                                 className="form-input border-purple-200 w-full"
                                             >
-                                                <option value="">{formData.payment_method === 'cash' ? (t('buying.payments.form.select_cash') || 'اختر الصندوق') : (t('buying.payments.form.select_bank') || 'اختر البنك')}</option>
+                                                <option value="">{formData.payment_method === 'cash' ? (t('buying.payments.form.select_cash')) : (t('buying.payments.form.select_bank'))}</option>
                                                 {treasuryAccounts
                                                     .filter(acc => formData.payment_method === 'cash' ? acc.account_type === 'cash' : acc.account_type === 'bank')
                                                     .map(acc => (
@@ -593,8 +593,8 @@ function PaymentForm() {
                                                 <>
                                                     <label className="text-sm font-medium text-purple-700">
                                                         {treasuryAccounts.find(acc => acc.id == formData.bank_account_id)?.currency === baseCurrency
-                                                            ? (t('buying.payments.form.exchange_rate') || 'سعر الصرف')
-                                                            : (t('buying.payments.form.transaction_rate') || 'سعر معاملة التحويل')}
+                                                            ? (t('buying.payments.form.exchange_rate'))
+                                                            : (t('buying.payments.form.transaction_rate'))}
                                                     </label>
                                                     <div className="relative">
                                                         <input
@@ -629,7 +629,7 @@ function PaymentForm() {
                                             ) && (
                                                     <>
                                                         <label className="text-sm font-medium text-gray-600">
-                                                            {t('buying.payments.form.document_exchange_rate') || 'سعر صرف السند (للمحاسبة)'}
+                                                            {t('buying.payments.form.document_exchange_rate')}
                                                         </label>
                                                         <div className="relative">
                                                             <input
@@ -649,7 +649,7 @@ function PaymentForm() {
                                             {formData.bank_account_id && treasuryAccounts.find(acc => acc.id == formData.bank_account_id)?.currency !== recordCurrency && (
                                                 <>
                                                     <label className="text-xs text-purple-800">
-                                                        {t('common.equivalent') || 'المقابل الفعلي المسحوب من الرصيد'}:
+                                                        {t('common.equivalent')}:
                                                     </label>
                                                     <div className="font-bold font-mono text-sm text-purple-800 bg-purple-50 p-2 rounded border border-purple-100 text-center">
                                                         {(formData.amount * transactionRate).toLocaleString()} {treasuryAccounts.find(acc => acc.id == formData.bank_account_id)?.currency}

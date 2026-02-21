@@ -42,7 +42,7 @@ const SalesCommissions = () => {
             await salesAPI.createCommissionRule({ salesperson_id: parseInt(ruleForm.salesperson_id), rate: parseFloat(ruleForm.rate), min_amount: parseFloat(ruleForm.min_amount) || 0 });
             showToast(t('sales.rule_created'), 'success');
             setShowRuleModal(false); fetchAll();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleCalculate = async () => {
@@ -50,7 +50,7 @@ const SalesCommissions = () => {
             const res = await salesAPI.calculateCommissions({});
             showToast(t('sales.calculated_commissions') + ` (${res.data?.count || 0})`, 'success');
             fetchAll();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     return (

@@ -139,7 +139,7 @@ export default function RecurringTemplates() {
             resetForm()
             fetchTemplates()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -150,7 +150,7 @@ export default function RecurringTemplates() {
             showToast(t('recurring.deleted'), 'success')
             fetchTemplates()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -164,7 +164,7 @@ export default function RecurringTemplates() {
             )
             fetchTemplates()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setGenerating(null)
         }
@@ -180,7 +180,7 @@ export default function RecurringTemplates() {
             )
             fetchTemplates()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 

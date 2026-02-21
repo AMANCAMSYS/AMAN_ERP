@@ -135,16 +135,16 @@ const JournalEntryForm = () => {
                         </button>
                         <div>
                             <h1 className="workspace-title">{t('accounting.home.links.journal_entry')}</h1>
-                            <p className="workspace-subtitle">{t('accounting.journal.subtitle', 'تسجيل القيود اليومية المحاسبية المزدوجة')}</p>
+                            <p className="workspace-subtitle">{t('accounting.journal.subtitle')}</p>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={(e) => handleSubmit(e, 'draft')} className="btn btn-secondary" disabled={loading}>
-                            {loading ? '...' : (t('accounting.journal.save_draft', 'حفظ مسودة'))}
+                            {loading ? '...' : (t('accounting.journal.save_draft'))}
                         </button>
                         <button onClick={(e) => handleSubmit(e, 'posted')} className="btn btn-primary" disabled={loading}>
                             <Save size={18} style={{ marginLeft: '8px' }} />
-                            {loading ? t('common.saving') : t('accounting.journal.post', 'ترحيل')}
+                            {loading ? t('common.saving') : t('accounting.journal.post')}
                         </button>
                     </div>
                 </div>
@@ -162,7 +162,7 @@ const JournalEntryForm = () => {
                                 />
                             </div>
                             <div className="col-md-2 mb-3">
-                                <label className="form-label">{t('common.exchange_rate') || 'سعر الصرف'}</label>
+                                <label className="form-label">{t('common.exchange_rate')}</label>
                                 <input
                                     type="number"
                                     step="0.000001"
@@ -316,7 +316,7 @@ const JournalEntryForm = () => {
 
                     {Math.abs(difference) > 0.01 && (
                         <div className="badge bg-danger-subtle text-danger p-2" style={{ borderRadius: '8px' }}>
-                            {t('accounting.trial_balance.metrics.difference', 'الفرق')}: {formatNumber(difference)}
+                            {t('accounting.trial_balance.metrics.difference')}: {formatNumber(difference)}
                         </div>
                     )}
                 </div>

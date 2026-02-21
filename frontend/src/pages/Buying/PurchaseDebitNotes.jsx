@@ -105,8 +105,8 @@ function PurchaseDebitNotes() {
     const calcTotal = () => calcSubtotal() + calcTax()
 
     const handleCreate = async () => {
-        if (!form.party_id) return alert('يجب تحديد المورد')
-        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return alert('يجب إضافة بند واحد على الأقل بمبلغ')
+        if (!form.party_id) return alert(t('buying.debit_notes.supplier_required'))
+        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return alert(t('buying.debit_notes.line_required'))
         try {
             setSaving(true)
             await purchasesAPI.createDebitNote({
@@ -117,7 +117,7 @@ function PurchaseDebitNotes() {
             setShowCreate(false)
             fetchList()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            alert(err.response?.data?.detail || t('buying.debit_notes.error_occurred'))
         } finally { setSaving(false) }
     }
 
@@ -131,7 +131,7 @@ function PurchaseDebitNotes() {
 
     const statusBadge = (s) => {
         const map = { posted: 'badge-success', paid: 'badge-success', unpaid: 'badge-danger', partial: 'badge-warning', draft: 'badge-secondary' }
-        const labels = { posted: 'مرحّل', paid: 'مدفوع', unpaid: 'غير مدفوع', partial: 'جزئي', draft: 'مسودة' }
+        const labels = { posted: t('buying.debit_notes.status_posted'), paid: t('buying.debit_notes.status_paid'), unpaid: t('buying.debit_notes.status_unpaid'), partial: t('buying.debit_notes.status_partial'), draft: t('buying.debit_notes.status_draft') }
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>
     }
 
@@ -142,39 +142,39 @@ function PurchaseDebitNotes() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div>
-                        <h1 className="workspace-title">📝 إشعارات مدينة (مشتريات)</h1>
-                        <p className="workspace-subtitle">Purchase Debit Notes - زيادة رصيد المورد (مصاريف إضافية)</p>
+                        <h1 className="workspace-title">📝 {t('buying.debit_notes.title')}</h1>
+                        <p className="workspace-subtitle">{t('buying.debit_notes.subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary" onClick={openCreate}>+ إنشاء إشعار مدين</button>
+                    <button className="btn btn-primary" onClick={openCreate}>+ {t('buying.debit_notes.create_debit_note')}</button>
                 </div>
             </div>
 
             <div className="card" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-                <input className="form-input" placeholder="بحث برقم الإشعار..." value={search}
+                <input className="form-input" placeholder={t('buying.debit_notes.search_placeholder')} value={search}
                     onChange={e => setSearch(e.target.value)} style={{ maxWidth: 250 }} />
                 <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ maxWidth: 180 }}>
-                    <option value="">جميع الحالات</option>
-                    <option value="posted">مرحّل</option>
-                    <option value="draft">مسودة</option>
+                    <option value="">{t('common.all_statuses')}</option>
+                    <option value="posted">{t('common.posted')}</option>
+                    <option value="draft">{t('common.draft')}</option>
                 </select>
-                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>الإجمالي: {total}</div>
+                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>{t('common.total')}: {total}</div>
             </div>
 
             <div className="card card-flush" style={{ overflow: 'auto' }}>
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم الإشعار</th>
-                            <th>المورد</th>
-                            <th>التاريخ</th>
-                            <th>الفاتورة المرتبطة</th>
-                            <th>المبلغ</th>
-                            <th>الحالة</th>
+                            <th>{t('buying.debit_notes.note_number')}</th>
+                            <th>{t('common.supplier')}</th>
+                            <th>{t('common.date')}</th>
+                            <th>{t('buying.debit_notes.related_invoice')}</th>
+                            <th>{t('common.amount')}</th>
+                            <th>{t('common.status')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.length === 0 ? (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>لا توجد إشعارات مدينة</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>{t('buying.debit_notes.no_debit_notes')}</td></tr>
                         ) : items.map(item => (
                             <tr key={item.id} onClick={() => viewDetail(item.id)} style={{ cursor: 'pointer' }}>
                                 <td style={{ fontWeight: 'bold' }}>{item.invoice_number}</td>
@@ -194,51 +194,51 @@ function PurchaseDebitNotes() {
                 <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 1200, width: '95%', maxHeight: '95vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>إنشاء إشعار مدين (مشتريات)</h2>
+                            <h2>{t('buying.debit_notes.create_title')}</h2>
                             <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                                 <div>
-                                    <label className="form-label">المورد *</label>
+                                    <label className="form-label">{t('common.supplier')} *</label>
                                     <select className="form-input" value={form.party_id} onChange={e => {
                                         setForm(f => ({ ...f, party_id: e.target.value, related_invoice_id: '' }))
                                         loadSupplierInvoices(e.target.value)
                                     }}>
-                                        <option value="">اختر المورد</option>
+                                        <option value="">{t('buying.debit_notes.choose_supplier')}</option>
                                         {suppliers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="form-label">فاتورة الشراء المرتبطة</label>
+                                    <label className="form-label">{t('buying.debit_notes.related_purchase_invoice')}</label>
                                     <select className="form-input" value={form.related_invoice_id} onChange={e => setForm(f => ({ ...f, related_invoice_id: e.target.value }))}>
-                                        <option value="">بدون ربط</option>
+                                        <option value="">{t('buying.debit_notes.no_link')}</option>
                                         {purchaseInvoices.map(inv => <option key={inv.id} value={inv.id}>{inv.invoice_number} - {formatNumber(inv.total)} {currency}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="form-label">التاريخ</label>
+                                    <label className="form-label">{t('common.date')}</label>
                                     <DateInput className="form-input" value={form.invoice_date}
                                         onChange={e => setForm(f => ({ ...f, invoice_date: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">ملاحظات</label>
+                                    <label className="form-label">{t('common.notes')}</label>
                                     <input className="form-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                                 </div>
                             </div>
 
-                            <h3 style={{ marginBottom: 12 }}>البنود</h3>
+                            <h3 style={{ marginBottom: 12 }}>{t('buying.debit_notes.items')}</h3>
                             <div className="invoice-items-container" style={{ margin: '12px 0', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                                 <table className="data-table">
                                     <thead style={{ background: 'var(--bg-secondary)' }}>
                                         <tr>
-                                            <th style={{ width: '25%' }}>المنتج</th>
-                                            <th style={{ width: '20%' }}>الوصف</th>
-                                            <th style={{ width: '10%' }}>الكمية</th>
-                                            <th style={{ width: '12%' }}>السعر</th>
-                                            <th style={{ width: '10%' }}>الضريبة %</th>
-                                            <th style={{ width: '10%' }}>الخصم</th>
-                                            <th style={{ width: '10%' }}>الإجمالي</th>
+                                            <th style={{ width: '25%' }}>{t('common.product')}</th>
+                                            <th style={{ width: '20%' }}>{t('common.description')}</th>
+                                            <th style={{ width: '10%' }}>{t('common.quantity')}</th>
+                                            <th style={{ width: '12%' }}>{t('common.price')}</th>
+                                            <th style={{ width: '10%' }}>{t('buying.debit_notes.tax_percent')}</th>
+                                            <th style={{ width: '10%' }}>{t('common.discount')}</th>
+                                            <th style={{ width: '10%' }}>{t('common.total')}</th>
                                             <th style={{ width: '3%' }}></th>
                                         </tr>
                                     </thead>
@@ -247,7 +247,7 @@ function PurchaseDebitNotes() {
                                             <tr key={i}>
                                                 <td>
                                                     <select className="form-input" value={line.product_id || ''} onChange={e => updateLine(i, 'product_id', e.target.value)}>
-                                                        <option value="">-- اختر منتج --</option>
+                                                        <option value="">{t('buying.debit_notes.select_product')}</option>
                                                         {products.map(p => <option key={p.id} value={p.id}>{p.item_name || p.name}</option>)}
                                                     </select>
                                                 </td>
@@ -263,21 +263,21 @@ function PurchaseDebitNotes() {
                                     </tbody>
                                 </table>
                             </div>
-                            <button className="btn btn-secondary" style={{ marginTop: 8 }} onClick={addLine}>+ إضافة بند</button>
+                            <button className="btn btn-secondary" style={{ marginTop: 8 }} onClick={addLine}>+ {t('buying.debit_notes.add_line')}</button>
 
                             <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
                                 <div style={{ minWidth: 250, background: 'var(--card-bg)', padding: 16, borderRadius: 8 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>المبلغ:</span><strong>{formatNumber(calcSubtotal())} {currency}</strong></div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>الضريبة:</span><strong>{formatNumber(calcTax())} {currency}</strong></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>{t('common.amount')}:</span><strong>{formatNumber(calcSubtotal())} {currency}</strong></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span>{t('buying.debit_notes.tax')}:</span><strong>{formatNumber(calcTax())} {currency}</strong></div>
                                     <hr />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 'bold' }}><span>الإجمالي:</span><span>{formatNumber(calcTotal())} {currency}</span></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 'bold' }}><span>{t('common.total')}:</span><span>{formatNumber(calcTotal())} {currency}</span></div>
                                 </div>
                             </div>
 
                             <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>{t('common.cancel')}</button>
                                 <button className="btn btn-primary" onClick={handleCreate} disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'إنشاء إشعار مدين'}
+                                    {saving ? t('buying.debit_notes.saving') : t('buying.debit_notes.create_debit_note')}
                                 </button>
                             </div>
                         </div>
@@ -290,20 +290,20 @@ function PurchaseDebitNotes() {
                 <div className="modal-overlay" onClick={() => setShowDetail(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>إشعار مدين مشتريات: {detailItem.invoice_number}</h2>
+                            <h2>{t('buying.debit_notes.detail_title')}: {detailItem.invoice_number}</h2>
                             <button className="modal-close" onClick={() => setShowDetail(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: 20 }}>
-                                <div className="metric-card"><div className="metric-label">المورد</div><div className="metric-value" style={{ fontSize: 16 }}>{detailItem.party_name}</div></div>
-                                <div className="metric-card"><div className="metric-label">التاريخ</div><div className="metric-value" style={{ fontSize: 16 }}>{formatShortDate(detailItem.invoice_date)}</div></div>
-                                <div className="metric-card"><div className="metric-label">الإجمالي</div><div className="metric-value text-primary" style={{ fontSize: 18 }}>{formatNumber(detailItem.total)} {currency}</div></div>
-                                <div className="metric-card"><div className="metric-label">الحالة</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('common.supplier')}</div><div className="metric-value" style={{ fontSize: 16 }}>{detailItem.party_name}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('common.date')}</div><div className="metric-value" style={{ fontSize: 16 }}>{formatShortDate(detailItem.invoice_date)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('common.total')}</div><div className="metric-value text-primary" style={{ fontSize: 18 }}>{formatNumber(detailItem.total)} {currency}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('common.status')}</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
                             </div>
-                            {detailItem.related_invoice_number && <p style={{ marginBottom: 12 }}>🔗 مرتبط بالفاتورة: <strong>{detailItem.related_invoice_number}</strong></p>}
+                            {detailItem.related_invoice_number && <p style={{ marginBottom: 12 }}>🔗 {t('buying.debit_notes.linked_to_invoice')}: <strong>{detailItem.related_invoice_number}</strong></p>}
                             {detailItem.notes && <p style={{ marginBottom: 16, color: '#666' }}>📝 {detailItem.notes}</p>}
                             <table className="data-table">
-                                <thead><tr><th>الوصف</th><th>الكمية</th><th>السعر</th><th>الضريبة %</th><th>الخصم</th><th>الإجمالي</th></tr></thead>
+                                <thead><tr><th>{t('common.description')}</th><th>{t('common.quantity')}</th><th>{t('common.price')}</th><th>{t('buying.debit_notes.tax_percent')}</th><th>{t('common.discount')}</th><th>{t('common.total')}</th></tr></thead>
                                 <tbody>
                                     {(detailItem.lines || []).map((l, i) => (
                                         <tr key={i}>
@@ -319,10 +319,10 @@ function PurchaseDebitNotes() {
                             </table>
                             <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
                                 <div style={{ minWidth: 200 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>المبلغ:</span><span>{formatNumber(detailItem.subtotal)}</span></div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>الضريبة:</span><span>{formatNumber(detailItem.tax_amount)}</span></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('common.amount')}:</span><span>{formatNumber(detailItem.subtotal)}</span></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('buying.debit_notes.tax')}:</span><span>{formatNumber(detailItem.tax_amount)}</span></div>
                                     <hr />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16 }}><span>الإجمالي:</span><span>{formatNumber(detailItem.total)} {currency}</span></div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 16 }}><span>{t('common.total')}:</span><span>{formatNumber(detailItem.total)} {currency}</span></div>
                                 </div>
                             </div>
                         </div>

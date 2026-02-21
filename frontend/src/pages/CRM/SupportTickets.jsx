@@ -1,22 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { crmAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils';
 
-
-const statusOptions = [
-    { value: 'open', label: 'مفتوحة' },
-    { value: 'in_progress', label: 'قيد المعالجة' },
-    { value: 'resolved', label: 'تم الحل' },
-    { value: 'closed', label: 'مغلقة' }
-]
-
-const priorityOptions = [
-    { value: 'critical', label: 'حرجة' },
-    { value: 'high', label: 'عالية' },
-    { value: 'medium', label: 'متوسطة' },
-    { value: 'low', label: 'منخفضة' }
-]
 
 const statusBadgeStyles = {
     open: { background: '#3b82f6', color: '#fff' },
@@ -33,6 +20,22 @@ const priorityBadgeStyles = {
 }
 
 function SupportTickets() {
+    const { t } = useTranslation()
+
+    const statusOptions = [
+        { value: 'open', label: t('crm.status_open') },
+        { value: 'in_progress', label: t('crm.status_in_progress') },
+        { value: 'resolved', label: t('crm.status_resolved') },
+        { value: 'closed', label: t('crm.status_closed') }
+    ]
+
+    const priorityOptions = [
+        { value: 'critical', label: t('crm.priority_critical') },
+        { value: 'high', label: t('crm.priority_high') },
+        { value: 'medium', label: t('crm.priority_medium') },
+        { value: 'low', label: t('crm.priority_low') }
+    ]
+
     const [tickets, setTickets] = useState([])
     const [customers, setCustomers] = useState([])
     const [loading, setLoading] = useState(true)
@@ -111,7 +114,7 @@ function SupportTickets() {
             fetchTickets()
         } catch (err) {
             console.error('Failed to create ticket', err)
-            alert(err.response?.data?.detail || 'حدث خطأ أثناء الإنشاء')
+            alert(err.response?.data?.detail || t('crm.create_error'))
         }
     }
 
@@ -162,7 +165,7 @@ function SupportTickets() {
             setIsInternal(false)
         } catch (err) {
             console.error('Failed to add comment', err)
-            alert(err.response?.data?.detail || 'حدث خطأ أثناء إضافة التعليق')
+            alert(err.response?.data?.detail || t('crm.comment_error'))
         }
     }
 
@@ -188,20 +191,20 @@ function SupportTickets() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
-                <h1 className="workspace-title">تذاكر الدعم</h1>
-                <p className="workspace-subtitle">إدارة ومتابعة تذاكر الدعم الفني وخدمة العملاء</p>
+                <h1 className="workspace-title">{t('crm.tickets_title')}</h1>
+                <p className="workspace-subtitle">{t('crm.tickets_desc')}</p>
             </div>
 
             {/* Toolbar */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" onClick={openCreate}>+ تذكرة جديدة</button>
+                <button className="btn btn-primary" onClick={openCreate}>+ {t('crm.new_ticket')}</button>
                 <select
                     className="search-bar"
                     style={{ maxWidth: 180 }}
                     value={filterStatus}
                     onChange={e => setFilterStatus(e.target.value)}
                 >
-                    <option value="">جميع الحالات</option>
+                    <option value="">{t('common.all_statuses')}</option>
                     {statusOptions.map(s => (
                         <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
@@ -212,7 +215,7 @@ function SupportTickets() {
                     value={filterPriority}
                     onChange={e => setFilterPriority(e.target.value)}
                 >
-                    <option value="">جميع الأولويات</option>
+                    <option value="">{t('crm.all_priorities')}</option>
                     {priorityOptions.map(p => (
                         <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
@@ -221,20 +224,20 @@ function SupportTickets() {
 
             {/* Table */}
             {loading ? (
-                <div className="empty-state">جاري التحميل...</div>
+                <div className="empty-state">{t('common.loading')}</div>
             ) : tickets.length === 0 ? (
-                <div className="empty-state">لا توجد تذاكر</div>
+                <div className="empty-state">{t('crm.no_tickets')}</div>
             ) : (
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم التذكرة</th>
-                            <th>الموضوع</th>
-                            <th>العميل</th>
-                            <th>الحالة</th>
-                            <th>الأولوية</th>
-                            <th>المسؤول</th>
-                            <th>تاريخ الإنشاء</th>
+                            <th>{t('crm.ticket_number')}</th>
+                            <th>{t('crm.subject')}</th>
+                            <th>{t('common.customer')}</th>
+                            <th>{t('common.status')}</th>
+                            <th>{t('crm.priority')}</th>
+                            <th>{t('crm.responsible')}</th>
+                            <th>{t('crm.created_date')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -268,17 +271,17 @@ function SupportTickets() {
                                         <td colSpan={7} style={{ padding: 0 }}>
                                             <div style={detailPanelStyle}>
                                                 {detailLoading ? (
-                                                    <div style={{ padding: 20, textAlign: 'center' }}>جاري التحميل...</div>
+                                                    <div style={{ padding: 20, textAlign: 'center' }}>{t('common.loading')}</div>
                                                 ) : ticketDetail ? (
                                                     <>
                                                         {/* Ticket Info */}
                                                         <div style={{ marginBottom: 16 }}>
-                                                            <h4 style={{ marginBottom: 8 }}>تفاصيل التذكرة</h4>
-                                                            <p><strong>الوصف:</strong> {ticketDetail.description || 'لا يوجد وصف'}</p>
-                                                            <p><strong>الفئة:</strong> {ticketDetail.category || '-'}</p>
-                                                            <p><strong>SLA (ساعات):</strong> {ticketDetail.sla_hours || '-'}</p>
+                                                            <h4 style={{ marginBottom: 8 }}>{t('crm.ticket_details')}</h4>
+                                                            <p><strong>{t('common.description')}:</strong> {ticketDetail.description || t('crm.no_description')}</p>
+                                                            <p><strong>{t('crm.category')}:</strong> {ticketDetail.category || '-'}</p>
+                                                            <p><strong>{t('crm.sla_hours')}:</strong> {ticketDetail.sla_hours || '-'}</p>
                                                             <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                                <span>تغيير الحالة:</span>
+                                                                <span>{t('crm.change_status')}:</span>
                                                                 {statusOptions.map(s => (
                                                                     <button
                                                                         key={s.value}
@@ -297,19 +300,19 @@ function SupportTickets() {
 
                                                         {/* Comments */}
                                                         <div style={{ borderTop: '1px solid var(--border-color, #e5e7eb)', paddingTop: 12 }}>
-                                                            <h4 style={{ marginBottom: 8 }}>التعليقات ({(ticketDetail.comments || []).length})</h4>
+                                                            <h4 style={{ marginBottom: 8 }}>{t('crm.comments')} ({(ticketDetail.comments || []).length})</h4>
                                                             {(ticketDetail.comments || []).length === 0 ? (
-                                                                <p style={{ color: '#9ca3af' }}>لا توجد تعليقات بعد</p>
+                                                                <p style={{ color: '#9ca3af' }}>{t('crm.no_comments')}</p>
                                                             ) : (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                                                                     {ticketDetail.comments.map((comment, idx) => (
                                                                         <div key={idx} style={commentStyle(comment.is_internal)}>
                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                                                <strong>{comment.user_name || 'مستخدم'}</strong>
+                                                                                <strong>{comment.user_name || t('crm.user')}</strong>
                                                                                 <span style={{ fontSize: 12, color: '#9ca3af' }}>
                                                                                     {formatDate(comment.created_at)}
                                                                                     {comment.is_internal && (
-                                                                                        <span className="badge badge-warning" style={{ marginRight: 6, fontSize: 10 }}>داخلي</span>
+                                                                                        <span className="badge badge-warning" style={{ marginRight: 6, fontSize: 10 }}>{t('crm.internal')}</span>
                                                                                     )}
                                                                                 </span>
                                                                             </div>
@@ -324,7 +327,7 @@ function SupportTickets() {
                                                                 <div className="form-group">
                                                                     <textarea
                                                                         rows={3}
-                                                                        placeholder="أضف تعليقاً..."
+                                                                        placeholder={t('crm.add_comment_placeholder')}
                                                                         value={commentText}
                                                                         onChange={e => setCommentText(e.target.value)}
                                                                         required
@@ -338,10 +341,10 @@ function SupportTickets() {
                                                                             checked={isInternal}
                                                                             onChange={e => setIsInternal(e.target.checked)}
                                                                         />
-                                                                        تعليق داخلي
+                                                                        {t('crm.internal_comment')}
                                                                     </label>
                                                                     <button type="submit" className="btn btn-primary" style={{ fontSize: 13, padding: '6px 16px' }}>
-                                                                        إرسال
+                                                                        {t('common.submit')}
                                                                     </button>
                                                                 </div>
                                                             </form>
@@ -362,12 +365,12 @@ function SupportTickets() {
             {showModal && (
                 <div style={overlayStyle}>
                     <div className="card" style={modalBoxStyle}>
-                        <h3 style={{ marginBottom: 16 }}>تذكرة جديدة</h3>
+                        <h3 style={{ marginBottom: 16 }}>{t('crm.new_ticket')}</h3>
                         <form onSubmit={handleSubmit}>
                             <div className="form-section">
                                 <div className="form-grid">
                                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>الموضوع</label>
+                                        <label>{t('crm.subject')}</label>
                                         <input
                                             type="text"
                                             name="subject"
@@ -377,7 +380,7 @@ function SupportTickets() {
                                         />
                                     </div>
                                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>الوصف</label>
+                                        <label>{t('common.description')}</label>
                                         <textarea
                                             name="description"
                                             rows={4}
@@ -386,16 +389,16 @@ function SupportTickets() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>العميل</label>
+                                        <label>{t('common.customer')}</label>
                                         <select name="customer_id" value={formData.customer_id} onChange={handleChange}>
-                                            <option value="">-- اختر العميل --</option>
+                                            <option value="">{t('crm.select_customer')}</option>
                                             {customers.map(c => (
                                                 <option key={c.id} value={c.id}>{c.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>الأولوية</label>
+                                        <label>{t('crm.priority')}</label>
                                         <select name="priority" value={formData.priority} onChange={handleChange} required>
                                             {priorityOptions.map(p => (
                                                 <option key={p.value} value={p.value}>{p.label}</option>
@@ -403,7 +406,7 @@ function SupportTickets() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label>الفئة</label>
+                                        <label>{t('crm.category')}</label>
                                         <input
                                             type="text"
                                             name="category"
@@ -412,7 +415,7 @@ function SupportTickets() {
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>SLA (ساعات)</label>
+                                        <label>{t('crm.sla_hours')}</label>
                                         <input
                                             type="number"
                                             name="sla_hours"
@@ -424,8 +427,8 @@ function SupportTickets() {
                                 </div>
                             </div>
                             <div className="form-actions" style={{ marginTop: 16 }}>
-                                <button type="submit" className="btn btn-primary">إنشاء</button>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>إلغاء</button>
+                                <button type="submit" className="btn btn-primary">{t('common.create')}</button>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
                             </div>
                         </form>
                     </div>

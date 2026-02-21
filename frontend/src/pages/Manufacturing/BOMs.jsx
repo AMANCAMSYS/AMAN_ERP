@@ -176,10 +176,10 @@ const BOMs = () => {
                 // I should probably double check backend if I want to be 100% sure, but user asked for frontend now.
                 // Assuming backend works or will be fixed.
                 await manufacturingAPI.updateBOM(editId, payload);
-                toastEmitter.emit(t('Updated Successfully'), 'success');
+                toastEmitter.emit(t('common.updated_successfully'), 'success');
             } else {
                 await manufacturingAPI.createBOM(payload);
-                toastEmitter.emit(t('Created Successfully'), 'success');
+                toastEmitter.emit(t('common.created_successfully'), 'success');
             }
             setShowModal(false);
             fetchData();
@@ -248,7 +248,7 @@ const BOMs = () => {
                         {bom.outputs && bom.outputs.length > 0 && (
                             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '10px' }}>
                                 <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <FaPlus /> {t('manufacturing.by_products', 'المنتجات الفرعية')} ({bom.outputs.length})
+                                    <FaPlus /> {t('manufacturing.by_products')} ({bom.outputs.length})
                                 </p>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
                                     {bom.outputs.map((out, idx) => (
@@ -425,7 +425,7 @@ const BOMs = () => {
                                     {/* Outputs Section (By-products) */}
                                     <div style={{ border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', padding: '12px', background: 'rgba(16,185,129,0.05)', marginTop: '12px' }}>
                                         <h3 style={{ fontWeight: 700, fontSize: '13px', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                                            <FaPlus /> {t('manufacturing.by_products', 'المنتجات الفرعية / الثانوية')}
+                                            <FaPlus /> {t('manufacturing.by_products')}
                                         </h3>
 
                                         <div className="space-y-2 mb-4">

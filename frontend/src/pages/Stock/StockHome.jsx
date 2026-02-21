@@ -143,26 +143,26 @@ function StockHome() {
 
                 {/* Advanced Inventory Section */}
                 <div className="card section-card">
-                    <h3 className="section-title">{t('stock.home.sections.advanced', 'المخزون المتقدم')}</h3>
+                    <h3 className="section-title">{t('stock.home.sections.advanced')}</h3>
                     <div className="links-list">
                         <div className="link-item" onClick={() => navigate('/stock/batches')}>
                             <span className="link-icon">📦</span>
-                            {t('stock.home.links.batches', 'الدفعات وأرقام اللوت')}
+                            {t('stock.home.links.batches')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/serials')}>
                             <span className="link-icon">🏷️</span>
-                            {t('stock.home.links.serials', 'الأرقام التسلسلية')}
+                            {t('stock.home.links.serials')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/quality')}>
                             <span className="link-icon">🔬</span>
-                            {t('stock.home.links.quality', 'فحوصات الجودة')}
+                            {t('stock.home.links.quality')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/cycle-counts')}>
                             <span className="link-icon">📋</span>
-                            {t('stock.home.links.cycle_counts', 'الجرد الدوري')}
+                            {t('stock.home.links.cycle_counts')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>

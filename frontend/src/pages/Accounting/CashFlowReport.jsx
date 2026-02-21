@@ -43,8 +43,8 @@ function CashFlowReport() {
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
                 <div>
-                    <h1 className="workspace-title">{t('reports.cash_flow.title') || 'قائمة التدفقات النقدية'}</h1>
-                    <p className="workspace-subtitle">{t('reports.cash_flow.subtitle') || 'تحليل المقبوضات والمدفوعات النقدية'}</p>
+                    <h1 className="workspace-title">{t('reports.cash_flow.title')}</h1>
+                    <p className="workspace-subtitle">{t('reports.cash_flow.subtitle')}</p>
                 </div>
                 <div className="display-flex gap-2">
                     <button className="btn btn-secondary" onClick={() => window.print()}>
@@ -91,15 +91,15 @@ function CashFlowReport() {
                     {/* Summary Cards */}
                     <div className="metrics-grid">
                         <div className="metric-card">
-                            <div className="metric-label">{t('reports.cash_flow.total_inflow') || 'إجمالي التدفقات للداخل'}</div>
+                            <div className="metric-label">{t('reports.cash_flow.total_inflow')}</div>
                             <div className="metric-value text-success">{formatNumber(data.total_inflow)} <small>{currency}</small></div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('reports.cash_flow.total_outflow') || 'إجمالي التدفقات للخارج'}</div>
+                            <div className="metric-label">{t('reports.cash_flow.total_outflow')}</div>
                             <div className="metric-value text-danger">{formatNumber(data.total_outflow)} <small>{currency}</small></div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('reports.cash_flow.net_cash_flow') || 'صافي التدفق النقدي'}</div>
+                            <div className="metric-label">{t('reports.cash_flow.net_cash_flow')}</div>
                             <div className={`metric-value ${data.net_cash_flow >= 0 ? 'text-primary' : 'text-danger'}`}>
                                 {formatNumber(data.net_cash_flow)} <small>{currency}</small>
                             </div>
@@ -110,15 +110,15 @@ function CashFlowReport() {
                         {/* Inflows Table */}
                         <div className="card">
                             <div className="card-header">
-                                <h3 className="card-title">{t('reports.cash_flow.inflow_details') || 'تفاصيل المقبوضات'}</h3>
+                                <h3 className="card-title">{t('reports.cash_flow.inflow_details')}</h3>
                             </div>
                             <div className="data-table-container">
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('reports.cash_flow.category') || 'الفئة'}</th>
-                                            <th>{t('reports.cash_flow.type') || 'النوع'}</th>
-                                            <th className="text-end">{t('reports.cash_flow.amount') || 'المبلغ'}</th>
+                                            <th>{t('reports.cash_flow.category')}</th>
+                                            <th>{t('reports.cash_flow.type')}</th>
+                                            <th className="text-end">{t('reports.cash_flow.amount')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -150,15 +150,15 @@ function CashFlowReport() {
                         {/* Outflows Table */}
                         <div className="card">
                             <div className="card-header">
-                                <h3 className="card-title">{t('reports.cash_flow.outflow_details') || 'تفاصيل المدفوعات'}</h3>
+                                <h3 className="card-title">{t('reports.cash_flow.outflow_details')}</h3>
                             </div>
                             <div className="table-responsive">
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>{t('reports.cash_flow.category') || 'الفئة'}</th>
-                                            <th>{t('reports.cash_flow.type') || 'النوع'}</th>
-                                            <th className="text-end">{t('reports.cash_flow.amount') || 'المبلغ'}</th>
+                                            <th>{t('reports.cash_flow.category')}</th>
+                                            <th>{t('reports.cash_flow.type')}</th>
+                                            <th className="text-end">{t('reports.cash_flow.amount')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

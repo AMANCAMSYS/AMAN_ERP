@@ -29,7 +29,7 @@ function CustomerGroups() {
             setGroups(response.data)
             setError(null)
         } catch (err) {
-            setError(t('sales.groups.form.errors.fetch_failed') || 'فشل في تحميل مجموعات العملاء')
+            setError(t('sales.groups.form.errors.fetch_failed'))
             console.error(err)
         } finally {
             setLoading(false)
@@ -88,7 +88,7 @@ function CustomerGroups() {
             const detail = err.response?.data?.detail
             if (typeof detail === 'string') setError(detail)
             else if (Array.isArray(detail)) setError(detail.map(e => e.msg).join(', '))
-            else setError(t('common.error_occurred') || 'حدث خطأ أثناء الحفظ')
+            else setError(t('common.error_occurred'))
         }
     }
 

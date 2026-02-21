@@ -252,7 +252,7 @@ export default function TreasuryAccountList() {
                         </select>
                     </div>
                     <div className="form-group">
-                        <label className="form-label">{t('common.currency') || 'العملة'}</label>
+                        <label className="form-label">{t('common.currency')}</label>
                         <select
                             className="form-input"
                             value={accountForm.currency}
@@ -274,7 +274,7 @@ export default function TreasuryAccountList() {
 
                     {accountForm.currency && accountForm.currency !== baseCurrency && (
                         <div className="form-group">
-                            <label className="form-label">{t('common.exchange_rate') || 'سعر الصرف'}</label>
+                            <label className="form-label">{t('common.exchange_rate')}</label>
                             <input
                                 type="number"
                                 className="form-input"
@@ -302,7 +302,7 @@ export default function TreasuryAccountList() {
                         />
                         {accountForm.currency && accountForm.currency !== baseCurrency && (
                             <div className="form-text text-sm text-gray-500 mt-1">
-                                {t('common.equivalent') || 'المقابل'}: {(accountForm.opening_balance * (accountForm.exchange_rate || 1)).toLocaleString()} {baseCurrency}
+                                {t('common.equivalent')}: {(accountForm.opening_balance * (accountForm.exchange_rate || 1)).toLocaleString()} {baseCurrency}
                             </div>
                         )}
                     </div>

@@ -47,31 +47,31 @@ const RFQList = () => {
 
     const handleCreate = async (e) => {
         e.preventDefault();
-        if (form.supplier_ids.length === 0) { showToast('يرجى اختيار مورد واحد على الأقل', 'error'); return; }
+        if (form.supplier_ids.length === 0) { showToast(t('buying.rfq.select_supplier_required'), 'error'); return; }
         try {
             await purchasesAPI.createRFQ({ title: form.title, supplier_ids: form.supplier_ids, deadline: form.deadline || null, notes: form.notes || null });
             showToast(t('buying.rfq_created'), 'success');
             setShowModal(false); setForm({ title: '', supplier_ids: [], deadline: '', notes: '' }); fetchRFQs();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleSend = async (id) => {
         try { await purchasesAPI.sendRFQ(id); showToast(t('buying.rfq_sent'), 'success'); fetchRFQs(); }
-        catch (err) { showToast('Error', 'error'); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleCompare = async (id) => {
         try {
             const res = await purchasesAPI.compareRFQ(id);
             showToast(t('buying.rfq_compared_best') + (res.data?.best_supplier || '—'), 'success');
-        } catch (err) { showToast('Error', 'error'); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleConvert = async (id) => {
         try {
             await purchasesAPI.convertRFQtoPO(id, {});
             showToast(t('buying.rfq_converted_to_po'), 'success'); fetchRFQs();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const statusBadge = (s) => {
@@ -136,7 +136,7 @@ const RFQList = () => {
                             <div className="form-group"><label className="form-label">{t('buying.rfq_col_title')}</label>
                                 <input className="form-input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
                             <div className="form-group" style={{ position: 'relative' }} ref={supplierDropRef}>
-                                <label className="form-label">الموردين</label>
+                                <label className="form-label">{t('buying.rfq.suppliers')}</label>
                                 {/* chips */}
                                 {form.supplier_ids.length > 0 && (
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
@@ -159,7 +159,7 @@ const RFQList = () => {
                                     onClick={() => { setSupplierDropOpen(o => !o); setSupplierSearch(''); }}
                                 >
                                     <span style={{ color: form.supplier_ids.length ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                                        {form.supplier_ids.length ? `${form.supplier_ids.length} مورد محدد` : '-- اختر الموردين --'}
+                                        {form.supplier_ids.length ? `${form.supplier_ids.length} ${t('buying.rfq.supplier_selected')}` : t('buying.rfq.choose_suppliers')}
                                     </span>
                                     <ChevronDown size={16} style={{ color: 'var(--text-muted)', transition: 'transform .2s', transform: supplierDropOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                                 </div>
@@ -171,7 +171,7 @@ const RFQList = () => {
                                                 autoFocus
                                                 className="form-input"
                                                 style={{ padding: '6px 10px', fontSize: 13 }}
-                                                placeholder="بحث عن مورد..."
+                                                placeholder={t('buying.rfq.search_supplier')}
                                                 value={supplierSearch}
                                                 onChange={e => setSupplierSearch(e.target.value)}
                                                 onClick={e => e.stopPropagation()}
@@ -207,14 +207,14 @@ const RFQList = () => {
                                                 })
                                             }
                                             {suppliers.filter(s => (s.name || s.supplier_name || '').toLowerCase().includes(supplierSearch.toLowerCase())).length === 0 &&
-                                                <div style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>لا توجد نتائج</div>}
+                                                <div style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: 13, textAlign: 'center' }}>{t('buying.rfq.no_results')}</div>}
                                         </div>
                                         <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
-                                            <button type="button" className="btn btn-sm btn-primary" onClick={() => setSupplierDropOpen(false)}>تأكيد</button>
+                                            <button type="button" className="btn btn-sm btn-primary" onClick={() => setSupplierDropOpen(false)}>{t('common.confirm')}</button>
                                         </div>
                                     </div>
                                 )}
-                                {form.supplier_ids.length === 0 && <small style={{ color: 'var(--danger)' }}>يرجى اختيار مورد واحد على الأقل</small>}
+                                {form.supplier_ids.length === 0 && <small style={{ color: 'var(--danger)' }}>{t('buying.rfq.select_supplier_required')}</small>}
                             </div>
                             <div className="form-group"><label className="form-label">{t('buying.rfq_col_deadline')}</label>
                                 <DateInput className="form-input" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} /></div>

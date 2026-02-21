@@ -21,7 +21,7 @@ function ContractList() {
                 const response = await contractsAPI.listContracts({ branch_id: currentBranch?.id })
                 setContracts(response.data)
             } catch (err) {
-                setError(t('common.error_loading') || 'فشل في تحميل العقود')
+                setError(t('common.error_loading'))
                 console.error(err)
             } finally {
                 setLoading(false)
@@ -46,11 +46,11 @@ function ContractList() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h1 className="workspace-title">{t('sales.contracts.title') || 'العقود والاشتراكات'}</h1>
-                        <p className="workspace-subtitle">{t('sales.contracts.subtitle') || 'إدارة عقود العملاء والاشتراكات المتكررة'}</p>
+                        <h1 className="workspace-title">{t('sales.contracts.title')}</h1>
+                        <p className="workspace-subtitle">{t('sales.contracts.subtitle')}</p>
                     </div>
                     <button className="btn btn-primary" onClick={() => navigate('/sales/contracts/new')}>
-                        + {t('sales.contracts.create_new') || 'عقد جديد'}
+                        + {t('sales.contracts.create_new')}
                     </button>
                 </div>
             </div>
@@ -61,12 +61,12 @@ function ContractList() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>{t('sales.contracts.table.number') || 'رقم العقد'}</th>
-                            <th>{t('sales.contracts.table.customer') || 'العميل'}</th>
-                            <th>{t('sales.contracts.table.type') || 'النوع'}</th>
-                            <th>{t('sales.contracts.table.start_date') || 'تاريخ البدء'}</th>
-                            <th>{t('sales.contracts.table.total') || 'الإجمالي'}</th>
-                            <th>{t('sales.contracts.table.status') || 'الحالة'}</th>
+                            <th>{t('sales.contracts.table.number')}</th>
+                            <th>{t('sales.contracts.table.customer')}</th>
+                            <th>{t('sales.contracts.table.type')}</th>
+                            <th>{t('sales.contracts.table.start_date')}</th>
+                            <th>{t('sales.contracts.table.total')}</th>
+                            <th>{t('sales.contracts.table.status')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -74,10 +74,10 @@ function ContractList() {
                             <tr>
                                 <td colSpan="6" className="start-guide">
                                     <div style={{ padding: '40px', textAlign: 'center' }}>
-                                        <h3>{t('sales.contracts.no_contracts') || 'لا يوجد عقود'}</h3>
-                                        <p>{t('sales.contracts.empty_desc') || 'أضف عقوداً أو اشتراكات لعملائك لمتابعة الفواتير الدورية'}</p>
+                                        <h3>{t('sales.contracts.no_contracts')}</h3>
+                                        <p>{t('sales.contracts.empty_desc')}</p>
                                         <button className="btn btn-primary mt-4" onClick={() => navigate('/sales/contracts/new')}>
-                                            {t('sales.contracts.create_btn') || 'إنشاء أول عقد'}
+                                            {t('sales.contracts.create_btn')}
                                         </button>
                                     </div>
                                 </td>

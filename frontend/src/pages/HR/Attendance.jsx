@@ -153,7 +153,7 @@ const Attendance = () => {
                         style={{ minWidth: '220px' }}
                     >
                         {actionLoading ? (
-                            <span>{t('common.processing', 'جاري التنفيذ...')}</span>
+                            <span>{t('common.processing')}</span>
                         ) : status === 'checked_in' ? (
                             <>
                                 <Square size={20} className="me-2 fill-current" />

@@ -56,7 +56,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
             showToast(t('settings.security.session_terminated') || 'Session terminated', 'success');
             fetchSessions();
         } catch (error) {
-            showToast(t('common.error') || 'Error', 'error');
+            showToast(t('common.error') || t('common.error'), 'error');
         }
     };
 
@@ -67,7 +67,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
             showToast(t('settings.security.all_sessions_terminated') || 'All sessions terminated', 'success');
             fetchSessions();
         } catch (error) {
-            showToast(t('common.error') || 'Error', 'error');
+            showToast(t('common.error') || t('common.error'), 'error');
         }
     };
 

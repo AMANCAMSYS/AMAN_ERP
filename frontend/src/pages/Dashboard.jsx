@@ -74,9 +74,9 @@ const Dashboard = () => {
 
     const greeting = () => {
         const h = new Date().getHours();
-        if (h < 12) return t('common.good_morning') || (isRTL ? 'صباح الخير' : 'Good morning');
-        if (h < 18) return t('common.good_afternoon') || (isRTL ? 'مساء الخير' : 'Good afternoon');
-        return t('common.good_evening') || (isRTL ? 'مساء النور' : 'Good evening');
+        if (h < 12) return t('common.good_morning') || (t('.dashboard.good_morning'));
+        if (h < 18) return t('common.good_afternoon') || (t('.dashboard.good_afternoon'));
+        return t('common.good_evening') || (t('.dashboard.good_evening'));
     };
 
     /* ── System-Admin ───────────────────────────────── */
@@ -122,7 +122,7 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div>
                         <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {t('nav.dashboard') || (isRTL ? 'لوحة التحكم' : 'Dashboard')}
+                            {t('nav.dashboard') || (t('.dashboard.dashboard'))}
                             {currentBranch && (
                                 <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '2px 8px' }}>
                                     {currentBranch.branch_name}
@@ -139,7 +139,7 @@ const Dashboard = () => {
                         <button onClick={fetchAll} disabled={loading}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.6rem', fontSize: '0.8rem', cursor: 'pointer', color: '#475569' }}>
                             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                            {t('common.refresh') || (isRTL ? 'تحديث' : 'Refresh')}
+                            {t('common.refresh') || (t('.dashboard.refresh'))}
                         </button>
                     </div>
                 </div>
@@ -152,47 +152,47 @@ const Dashboard = () => {
 
             {/* Row 2 — Sales summary × 3 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.today') || (isRTL ? 'اليوم' : 'Today')} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.today') || (t('.dashboard.today'))} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'today' }} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.this_week') || (isRTL ? 'هذا الأسبوع' : 'This Week')} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.this_week') || (t('.dashboard.this_week'))} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'week' }} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.this_month') || (isRTL ? 'هذا الشهر' : 'This Month')} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.this_month') || (t('.dashboard.this_month'))} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'month' }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 3 — Financial chart + Quick actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.financial_overview') || (isRTL ? 'المبيعات والمصروفات' : 'Revenue & Expenses')} style={{ minHeight: 320 }}>
+                <Card title={t('dashboard.financial_overview') || (t('.dashboard.revenue_expenses'))} style={{ minHeight: 320 }}>
                     <FinancialChart data={finData} loading={loading} currency={currency} />
                 </Card>
-                <Card title={isRTL ? 'الإجراءات السريعة' : 'Quick Actions'} style={{ minHeight: 320 }}>
+                <Card title={t('.dashboard.quick_actions')} style={{ minHeight: 320 }}>
                     <QuickActions t={t} isRTL={isRTL} />
                 </Card>
             </div>
 
             {/* Row 4 — Top products + Low stock */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.top_products') || (isRTL ? 'أفضل المنتجات' : 'Top Products')} style={{ minHeight: 280 }}>
+                <Card title={t('dashboard.top_products') || (t('.dashboard.top_products'))} style={{ minHeight: 280 }}>
                     <TopProductsChart data={prodData} loading={loading} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.low_stock') || (isRTL ? 'المخزون المنخفض' : 'Low Stock')} style={{ minHeight: 280 }}>
+                <Card title={t('dashboard.low_stock') || (t('.dashboard.low_stock'))} style={{ minHeight: 280 }}>
                     <LowStockWidget config={{ limit: 8 }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 5 — Cash flow */}
             <div style={{ marginBottom: gap }}>
-                <Card title={isRTL ? 'التدفق النقدي (آخر 30 يوم)' : 'Cash Flow (Last 30 days)'} style={{ minHeight: 280 }}>
+                <Card title={t('.dashboard.cash_flow_last_30_days')} style={{ minHeight: 280 }}>
                     <CashFlowWidget config={{ days: 30 }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 6 — Pending tasks */}
             <div style={{ marginBottom: gap }}>
-                <Card title={isRTL ? 'المهام المعلقة' : 'Pending Tasks'}>
+                <Card title={t('.dashboard.pending_tasks')}>
                     <PendingTasksWidget config={{ limit: 10 }} currency={currency} />
                 </Card>
             </div>

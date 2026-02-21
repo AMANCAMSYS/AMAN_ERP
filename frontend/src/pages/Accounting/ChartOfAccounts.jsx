@@ -47,7 +47,7 @@ function ChartOfAccounts() {
                 setCurrency(companyRes.data.currency)
             }
         } catch (err) {
-            setError(t('accounting.coa.errors.fetch_failed') || 'فشل في تحميل شجرة الحسابات')
+            setError(t('accounting.coa.errors.fetch_failed'))
         } finally {
             setLoading(false)
         }
@@ -124,7 +124,7 @@ function ChartOfAccounts() {
             setModal({ open: false, type: 'create', node: null })
             fetchAccounts()
         } catch (err) {
-            toastEmitter.emit(err.response?.data?.detail || 'فشل في الحفظ', 'error')
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -134,7 +134,7 @@ function ChartOfAccounts() {
             setModal({ ...modal, open: false })
             fetchAccounts()
         } catch (err) {
-            toastEmitter.emit(err.response?.data?.detail || 'فشل في الحذف', 'error')
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -356,7 +356,7 @@ function ChartOfAccounts() {
                                     </div>
                                     <div className="form-group">
                                         <CurrencySelector
-                                            label={t('common.currency') || 'العملة'}
+                                            label={t('common.currency')}
                                             value={form.currency}
                                             onChange={(code) => setForm({ ...form, currency: code })}
                                         />

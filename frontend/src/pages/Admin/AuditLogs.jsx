@@ -123,23 +123,23 @@ const AuditLogs = () => {
     return (
         <div className="audit-logs-container">
             <div className="audit-header">
-                <h1>📋 {t('audit.title') || 'سجلات المراقبة'}</h1>
-                <p className="subtitle">{t('audit.subtitle') || 'متابعة جميع الأنشطة والعمليات في النظام'}</p>
+                <h1>📋 {t('audit.title')}</h1>
+                <p className="subtitle">{t('audit.subtitle')}</p>
             </div>
 
             {/* Stats Cards */}
             {stats && (
                 <div className="metrics-grid">
                     <div className="metric-card">
-                        <div className="metric-label">{t('audit.totalLogs') || 'إجمالي السجلات'}</div>
+                        <div className="metric-label">{t('audit.totalLogs')}</div>
                         <div className="metric-value text-primary">{stats.total_logs}</div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('audit.todayLogs') || 'سجلات اليوم'}</div>
+                        <div className="metric-label">{t('audit.todayLogs')}</div>
                         <div className="metric-value text-success">{stats.today_logs}</div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('audit.activeUsers') || 'مستخدمين نشطين'}</div>
+                        <div className="metric-label">{t('audit.activeUsers')}</div>
                         <div className="metric-value text-secondary">{stats.top_users?.length || 0}</div>
                     </div>
                 </div>
@@ -148,14 +148,14 @@ const AuditLogs = () => {
             {/* Filters */}
             <div className="filters-panel">
                 <div className="filter-group">
-                    <label htmlFor="actionFilter">{t('audit.filterAction') || 'نوع العملية'}</label>
+                    <label htmlFor="actionFilter">{t('audit.filterAction')}</label>
                     <select
                         name="action"
                         id="actionFilter"
                         value={filters.action}
                         onChange={handleFilterChange}
                     >
-                        <option value="">{t('common.all') || 'الكل'}</option>
+                        <option value="">{t('common.all')}</option>
                         {actions.map(action => (
                             <option key={action} value={action}>{t(`audit.actions.${action}`) || action}</option>
                         ))}
@@ -163,14 +163,14 @@ const AuditLogs = () => {
                 </div>
                 {user?.role === 'system_admin' && (
                     <div className="filter-group">
-                        <label htmlFor="companyFilter">{t('companies.title') || 'الشركة'}</label>
+                        <label htmlFor="companyFilter">{t('companies.title')}</label>
                         <select
                             name="company_id"
                             id="companyFilter"
                             value={filters.company_id}
                             onChange={handleFilterChange}
                         >
-                            <option value="">{t('audit.system_logs') || 'سجلات النظام'}</option>
+                            <option value="">{t('audit.system_logs')}</option>
                             {Array.isArray(companies) && companies.map(c => (
                                 <option key={c.id} value={c.id}>{c.company_name} ({c.id})</option>
                             ))}
@@ -178,37 +178,37 @@ const AuditLogs = () => {
                     </div>
                 )}
                 <div className="filter-group">
-                    <label htmlFor="userFilter">{t('audit.filterUser') || 'المستخدم'}</label>
+                    <label htmlFor="userFilter">{t('audit.filterUser')}</label>
                     <input
                         type="text"
                         name="username"
                         id="userFilter"
                         value={filters.username}
                         onChange={handleFilterChange}
-                        placeholder={t('audit.searchUser') || 'بحث...'}
+                        placeholder={t('audit.searchUser')}
                         autoComplete="off"
                     />
                 </div>
                 <div className="filter-group">
                     <CustomDatePicker
-                        label={t('audit.filterStartDate') || 'من تاريخ'}
+                        label={t('audit.filterStartDate')}
                         selected={filters.start_date}
                         onChange={(dateStr) => handleDateChange('start_date', dateStr)}
                     />
                 </div>
                 <div className="filter-group">
                     <CustomDatePicker
-                        label={t('audit.filterEndDate') || 'إلى تاريخ'}
+                        label={t('audit.filterEndDate')}
                         selected={filters.end_date}
                         onChange={(dateStr) => handleDateChange('end_date', dateStr)}
                     />
                 </div>
                 <div className="filter-actions">
                     <button className="btn-apply" onClick={applyFilters}>
-                        🔍 {t('common.filter') || 'تصفية'}
+                        🔍 {t('common.filter')}
                     </button>
                     <button className="btn-reset" onClick={resetFilters}>
-                        ↺ {t('common.reset') || 'إعادة تعيين'}
+                        ↺ {t('common.reset')}
                     </button>
                 </div>
             </div>
@@ -216,20 +216,20 @@ const AuditLogs = () => {
             {/* Logs Table */}
             <div className="logs-table-container">
                 {loading ? (
-                    <div className="loading-spinner">⏳ {t('common.loading') || 'جاري التحميل...'}</div>
+                    <div className="loading-spinner">⏳ {t('common.loading')}</div>
                 ) : logs.length === 0 ? (
-                    <div className="no-data">📭 {t('audit.noLogs') || 'لا توجد سجلات'}</div>
+                    <div className="no-data">📭 {t('audit.noLogs')}</div>
                 ) : (
                     <table className="logs-table">
                         <thead>
                             <tr>
-                                <th>{t('audit.action') || 'العملية'}</th>
-                                <th>{t('audit.user') || 'المستخدم'}</th>
-                                <th>{t('audit.resource') || 'المورد'}</th>
-                                <th>{t('audit.details') || 'التفاصيل'}</th>
+                                <th>{t('audit.action')}</th>
+                                <th>{t('audit.user')}</th>
+                                <th>{t('audit.resource')}</th>
+                                <th>{t('audit.details')}</th>
                                 <th>{t('audit.ip') || 'IP'}</th>
-                                <th>{filters.company_id || !user?.company_id ? t('common.branch_or_company') || 'الفرع/الشركة' : t('common.branch')}</th>
-                                <th>{t('audit.time') || 'الوقت'}</th>
+                                <th>{filters.company_id || !user?.company_id ? t('common.branch_or_company') : t('common.branch')}</th>
+                                <th>{t('audit.time')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -357,7 +357,7 @@ const DetailsViewer = ({ details, t }) => {
                 <button
                     className="btn-show-more-icon"
                     onClick={() => setExpanded(!expanded)}
-                    title={expanded ? (t('common.show_less') || 'عرض أقل') : (t('common.show_more') || 'عرض المزيد')}
+                    title={expanded ? (t('common.show_less')) : (t('common.show_more'))}
                 >
                     {toggleIcon}
                 </button>

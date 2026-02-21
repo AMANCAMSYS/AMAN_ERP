@@ -22,11 +22,11 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
                             value={settings.audit_retention_days || '365'}
                             onChange={(e) => handleSettingChange('audit_retention_days', e.target.value)}
                         >
-                            <option value="90">90 {t('common.days') || 'يوم'}</option>
-                            <option value="180">180 {t('common.days') || 'يوم'}</option>
-                            <option value="365">1 {t('common.year') || 'سنة'}</option>
-                            <option value="1095">3 {t('common.years') || 'سنوات'}</option>
-                            <option value="forest">10 {t('common.years') || 'سنوات'}</option>
+                            <option value="90">90 {t('common.days')}</option>
+                            <option value="180">180 {t('common.days')}</option>
+                            <option value="365">1 {t('common.year')}</option>
+                            <option value="1095">3 {t('common.years')}</option>
+                            <option value="forest">10 {t('common.years')}</option>
                         </select>
                     </div>
 
@@ -37,9 +37,9 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
                             value={settings.audit_login_retention || '90'}
                             onChange={(e) => handleSettingChange('audit_login_retention', e.target.value)}
                         >
-                            <option value="30">30 {t('common.days') || 'يوم'}</option>
-                            <option value="90">90 {t('common.days') || 'يوم'}</option>
-                            <option value="180">6 {t('common.months') || 'أشهر'}</option>
+                            <option value="30">30 {t('common.days')}</option>
+                            <option value="90">90 {t('common.days')}</option>
+                            <option value="180">6 {t('common.months')}</option>
                         </select>
                     </div>
                 </div>

@@ -41,7 +41,7 @@ function FiscalYears() {
             const res = await accountingAPI.listFiscalYears()
             setFiscalYears(res.data)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ في جلب السنوات المالية', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -57,7 +57,7 @@ function FiscalYears() {
             setShowCreateModal(false)
             fetchFiscalYears()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ في الإنشاء', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -71,7 +71,7 @@ function FiscalYears() {
             setPreview(res.data)
             setShowPreviewModal(true)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ في المعاينة', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setPreviewLoading(false)
         }
@@ -85,7 +85,7 @@ function FiscalYears() {
             setShowPreviewModal(false)
             fetchFiscalYears()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ في الإقفال', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -100,7 +100,7 @@ function FiscalYears() {
             setReopenReason('')
             fetchFiscalYears()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ في إعادة الفتح', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setActionLoading(false)
         }
@@ -113,7 +113,7 @@ function FiscalYears() {
             setPeriods(res.data)
             setShowPeriodsModal(true)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -126,7 +126,7 @@ function FiscalYears() {
             setPeriods(updated.data)
             fetchFiscalYears()
         } catch (err) {
-            showToast(err.response?.data?.detail || 'خطأ', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -135,14 +135,14 @@ function FiscalYears() {
             <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 className="workspace-title">
-                        {isRTL ? 'السنوات المالية' : 'Fiscal Years'}
+                        {t('accounting.fiscal_years.fiscal_years')}
                     </h1>
                     <p className="workspace-subtitle">
-                        {isRTL ? 'إدارة السنوات المالية وإقفال نهاية السنة' : 'Manage fiscal years and year-end closing'}
+                        {t('accounting.fiscal_years.manage_fiscal_years_and_yearend_closing')}
                     </p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                    {isRTL ? '+ سنة مالية جديدة' : '+ New Fiscal Year'}
+                    {t('accounting.fiscal_years.new_fiscal_year')}
                 </button>
             </div>
 
@@ -152,24 +152,24 @@ function FiscalYears() {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>{isRTL ? 'السنة' : 'Year'}</th>
-                                <th>{isRTL ? 'تاريخ البداية' : 'Start Date'}</th>
-                                <th>{isRTL ? 'تاريخ النهاية' : 'End Date'}</th>
-                                <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                                <th>{isRTL ? 'الفترات' : 'Periods'}</th>
-                                <th>{isRTL ? 'حساب الأرباح المبقاة' : 'Retained Earnings'}</th>
-                                <th>{isRTL ? 'تاريخ الإقفال' : 'Closed At'}</th>
-                                <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                                <th>{t('accounting.fiscal_years.year')}</th>
+                                <th>{t('accounting.fiscal_years.start_date')}</th>
+                                <th>{t('accounting.fiscal_years.end_date')}</th>
+                                <th>{t('accounting.fiscal_years.status')}</th>
+                                <th>{t('accounting.fiscal_years.periods')}</th>
+                                <th>{t('accounting.fiscal_years.retained_earnings')}</th>
+                                <th>{t('accounting.fiscal_years.closed_at')}</th>
+                                <th>{t('accounting.fiscal_years.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {isRTL ? 'جاري التحميل...' : 'Loading...'}
+                                    {t('accounting.fiscal_years.loading')}
                                 </td></tr>
                             ) : fiscalYears.length === 0 ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {isRTL ? 'لا توجد سنوات مالية. قم بإنشاء واحدة.' : 'No fiscal years. Create one.'}
+                                    {t('accounting.fiscal_years.no_fiscal_years_create_one')}
                                 </td></tr>
                             ) : fiscalYears.map(fy => (
                                 <tr key={fy.id}>
@@ -179,8 +179,8 @@ function FiscalYears() {
                                     <td>
                                         <span className={`badge ${fy.status === 'open' ? 'badge-success' : 'badge-secondary'}`}>
                                             {fy.status === 'open'
-                                                ? (isRTL ? 'مفتوحة' : 'Open')
-                                                : (isRTL ? 'مقفلة' : 'Closed')}
+                                                ? (t('accounting.fiscal_years.open'))
+                                                : (t('accounting.fiscal_years.closed'))}
                                         </span>
                                     </td>
                                     <td>
@@ -194,7 +194,7 @@ function FiscalYears() {
                                     <td>
                                         {fy.retained_earnings_account_number
                                             ? `${fy.retained_earnings_account_number} - ${fy.retained_earnings_account_name}`
-                                            : (isRTL ? 'غير محدد' : 'Not set')}
+                                            : (t('accounting.fiscal_years.not_set'))}
                                     </td>
                                     <td>{fy.closed_at ? formatShortDate(fy.closed_at) : '—'}</td>
                                     <td>
@@ -205,7 +205,7 @@ function FiscalYears() {
                                                     onClick={() => handlePreviewClose(fy.year)}
                                                     disabled={previewLoading}
                                                 >
-                                                    🔒 {isRTL ? 'إقفال' : 'Close'}
+                                                    🔒 {t('accounting.fiscal_years.close')}
                                                 </button>
                                             ) : (
                                                 <button
@@ -215,7 +215,7 @@ function FiscalYears() {
                                                         setShowReopenModal(true)
                                                     }}
                                                 >
-                                                    🔓 {isRTL ? 'إعادة فتح' : 'Reopen'}
+                                                    🔓 {t('accounting.fiscal_years.reopen')}
                                                 </button>
                                             )}
                                         </div>
@@ -232,12 +232,12 @@ function FiscalYears() {
                 <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h3>{isRTL ? 'إنشاء سنة مالية' : 'Create Fiscal Year'}</h3>
+                            <h3>{t('accounting.fiscal_years.create_fiscal_year')}</h3>
                             <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
                         </div>
                         <div className="modal-body">
                             <div className="form-group mb-3">
-                                <label className="form-label">{isRTL ? 'السنة' : 'Year'}</label>
+                                <label className="form-label">{t('accounting.fiscal_years.year')}</label>
                                 <input type="number" className="form-control"
                                     value={newYear.year}
                                     onChange={e => {
@@ -251,14 +251,14 @@ function FiscalYears() {
                                 />
                             </div>
                             <div className="form-group mb-3">
-                                <label className="form-label">{isRTL ? 'تاريخ البداية' : 'Start Date'}</label>
+                                <label className="form-label">{t('accounting.fiscal_years.start_date')}</label>
                                 <DateInput className="form-control"
                                     value={newYear.start_date}
                                     onChange={e => setNewYear({ ...newYear, start_date: e.target.value })}
                                 />
                             </div>
                             <div className="form-group mb-3">
-                                <label className="form-label">{isRTL ? 'تاريخ النهاية' : 'End Date'}</label>
+                                <label className="form-label">{t('accounting.fiscal_years.end_date')}</label>
                                 <DateInput className="form-control"
                                     value={newYear.end_date}
                                     onChange={e => setNewYear({ ...newYear, end_date: e.target.value })}
@@ -267,10 +267,10 @@ function FiscalYears() {
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-                                {isRTL ? 'إلغاء' : 'Cancel'}
+                                {t('accounting.fiscal_years.cancel')}
                             </button>
                             <button className="btn btn-primary" onClick={handleCreate} disabled={actionLoading}>
-                                {actionLoading ? '...' : (isRTL ? 'إنشاء' : 'Create')}
+                                {actionLoading ? '...' : (t('accounting.fiscal_years.create'))}
                             </button>
                         </div>
                     </div>
@@ -294,7 +294,7 @@ function FiscalYears() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'var(--success-bg, #d4edda)' }}>
                                     <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                                        {isRTL ? 'إجمالي الإيرادات' : 'Total Revenue'}
+                                        {t('accounting.fiscal_years.total_revenue')}
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--success, #28a745)' }}>
                                         {formatNumber(preview.total_revenue)} {currency}
@@ -302,7 +302,7 @@ function FiscalYears() {
                                 </div>
                                 <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'var(--danger-bg, #f8d7da)' }}>
                                     <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                                        {isRTL ? 'إجمالي المصاريف' : 'Total Expenses'}
+                                        {t('accounting.fiscal_years.total_expenses')}
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: 'var(--danger, #dc3545)' }}>
                                         {formatNumber(preview.total_expenses)} {currency}
@@ -329,7 +329,7 @@ function FiscalYears() {
                             {/* Retained Earnings Account */}
                             {preview.retained_earnings_account && (
                                 <div className="alert alert-info mb-3" style={{ padding: '0.75rem' }}>
-                                    {isRTL ? 'سيتم ترحيل النتيجة إلى: ' : 'Result will be posted to: '}
+                                    {t('accounting.fiscal_years.result_will_be_posted_to')}
                                     <strong>
                                         {preview.retained_earnings_account.account_number} - {preview.retained_earnings_account.name}
                                     </strong>
@@ -340,14 +340,14 @@ function FiscalYears() {
                             {preview.revenue_accounts.length > 0 && (
                                 <>
                                     <h4 style={{ margin: '1rem 0 0.5rem' }}>
-                                        {isRTL ? '📈 حسابات الإيرادات' : '📈 Revenue Accounts'}
+                                        {t('accounting.fiscal_years.revenue_accounts')}
                                     </h4>
                                     <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                         <thead>
                                             <tr>
-                                                <th>{isRTL ? 'رقم الحساب' : 'Account #'}</th>
-                                                <th>{isRTL ? 'اسم الحساب' : 'Account Name'}</th>
-                                                <th>{isRTL ? 'الرصيد' : 'Balance'}</th>
+                                                <th>{t('accounting.fiscal_years.account')}</th>
+                                                <th>{t('accounting.fiscal_years.account_name')}</th>
+                                                <th>{t('accounting.fiscal_years.balance')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -369,14 +369,14 @@ function FiscalYears() {
                             {preview.expense_accounts.length > 0 && (
                                 <>
                                     <h4 style={{ margin: '1rem 0 0.5rem' }}>
-                                        {isRTL ? '📉 حسابات المصاريف' : '📉 Expense Accounts'}
+                                        {t('accounting.fiscal_years.expense_accounts')}
                                     </h4>
                                     <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                         <thead>
                                             <tr>
-                                                <th>{isRTL ? 'رقم الحساب' : 'Account #'}</th>
-                                                <th>{isRTL ? 'اسم الحساب' : 'Account Name'}</th>
-                                                <th>{isRTL ? 'الرصيد' : 'Balance'}</th>
+                                                <th>{t('accounting.fiscal_years.account')}</th>
+                                                <th>{t('accounting.fiscal_years.account_name')}</th>
+                                                <th>{t('accounting.fiscal_years.balance')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -396,17 +396,15 @@ function FiscalYears() {
 
                             {/* Warning */}
                             <div className="alert alert-warning mt-3" style={{ padding: '0.75rem' }}>
-                                ⚠️ {isRTL
-                                    ? 'سيتم إنشاء قيد إقفال يصفّر حسابات الإيرادات والمصاريف ويرحّل النتيجة إلى الأرباح المبقاة. سيتم أيضاً إغلاق جميع الفترات المحاسبية لهذه السنة.'
-                                    : 'A closing entry will be created that zeros revenue and expense accounts and transfers the result to retained earnings. All fiscal periods for this year will also be closed.'}
+                                ⚠️ {t('accounting.fiscal_years.a_closing_entry_will_be_created_that_zeros_revenue')}
                             </div>
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowPreviewModal(false)}>
-                                {isRTL ? 'إلغاء' : 'Cancel'}
+                                {t('accounting.fiscal_years.cancel')}
                             </button>
                             <button className="btn btn-danger" onClick={handleClose} disabled={actionLoading}>
-                                {actionLoading ? '...' : (isRTL ? '🔒 تأكيد الإقفال' : '🔒 Confirm Close')}
+                                {actionLoading ? '...' : (t('accounting.fiscal_years.confirm_close'))}
                             </button>
                         </div>
                     </div>
@@ -429,12 +427,12 @@ function FiscalYears() {
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>{isRTL ? 'الفترة' : 'Period'}</th>
-                                        <th>{isRTL ? 'من' : 'From'}</th>
-                                        <th>{isRTL ? 'إلى' : 'To'}</th>
-                                        <th>{isRTL ? 'القيود' : 'Entries'}</th>
-                                        <th>{isRTL ? 'الحالة' : 'Status'}</th>
-                                        <th>{isRTL ? 'إجراء' : 'Action'}</th>
+                                        <th>{t('accounting.fiscal_years.period')}</th>
+                                        <th>{t('accounting.fiscal_years.from')}</th>
+                                        <th>{t('accounting.fiscal_years.to')}</th>
+                                        <th>{t('accounting.fiscal_years.entries')}</th>
+                                        <th>{t('accounting.fiscal_years.status')}</th>
+                                        <th>{t('accounting.fiscal_years.action')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -447,8 +445,8 @@ function FiscalYears() {
                                             <td>
                                                 <span className={`badge ${p.is_closed ? 'badge-secondary' : 'badge-success'}`}>
                                                     {p.is_closed
-                                                        ? (isRTL ? 'مغلقة' : 'Closed')
-                                                        : (isRTL ? 'مفتوحة' : 'Open')}
+                                                        ? (t('accounting.fiscal_years.closed_2'))
+                                                        : (t('accounting.fiscal_years.open'))}
                                                 </span>
                                             </td>
                                             <td>
@@ -457,8 +455,8 @@ function FiscalYears() {
                                                     onClick={() => handleTogglePeriod(p.id)}
                                                 >
                                                     {p.is_closed
-                                                        ? (isRTL ? 'فتح' : 'Open')
-                                                        : (isRTL ? 'إغلاق' : 'Close')}
+                                                        ? (t('accounting.fiscal_years.open_2'))
+                                                        : (t('accounting.fiscal_years.close_2'))}
                                                 </button>
                                             </td>
                                         </tr>
@@ -468,7 +466,7 @@ function FiscalYears() {
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowPeriodsModal(false)}>
-                                {isRTL ? 'إغلاق' : 'Close'}
+                                {t('accounting.fiscal_years.close_2')}
                             </button>
                         </div>
                     </div>
@@ -489,29 +487,27 @@ function FiscalYears() {
                         </div>
                         <div className="modal-body">
                             <div className="alert alert-warning" style={{ padding: '0.75rem', marginBottom: '1rem' }}>
-                                ⚠️ {isRTL
-                                    ? 'سيتم عكس قيد الإقفال وإعادة فتح جميع الفترات المحاسبية. هذا الإجراء يؤثر على الأرصدة.'
-                                    : 'The closing entry will be reversed and all fiscal periods will be reopened. This affects account balances.'}
+                                ⚠️ {t('accounting.fiscal_years.the_closing_entry_will_be_reversed_and_all_fiscal_')}
                             </div>
                             <div className="form-group">
                                 <label className="form-label">
-                                    {isRTL ? 'سبب إعادة الفتح (اختياري)' : 'Reason for reopening (optional)'}
+                                    {t('accounting.fiscal_years.reason_for_reopening_optional')}
                                 </label>
                                 <textarea
                                     className="form-control"
                                     rows={3}
                                     value={reopenReason}
                                     onChange={e => setReopenReason(e.target.value)}
-                                    placeholder={isRTL ? 'أدخل السبب...' : 'Enter reason...'}
+                                    placeholder={t('accounting.fiscal_years.enter_reason')}
                                 />
                             </div>
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowReopenModal(false)}>
-                                {isRTL ? 'إلغاء' : 'Cancel'}
+                                {t('accounting.fiscal_years.cancel')}
                             </button>
                             <button className="btn btn-warning" onClick={handleReopen} disabled={actionLoading}>
-                                {actionLoading ? '...' : (isRTL ? '🔓 تأكيد إعادة الفتح' : '🔓 Confirm Reopen')}
+                                {actionLoading ? '...' : (t('accounting.fiscal_years.confirm_reopen'))}
                             </button>
                         </div>
                     </div>

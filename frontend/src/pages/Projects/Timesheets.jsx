@@ -113,11 +113,11 @@ export default function Timesheets({ projectId, tasks = [] }) {
             }
 
             await Promise.all(promises);
-            toastEmitter.emit(t('common.save_success', 'تم الحفظ بنجاح'), 'success');
+            toastEmitter.emit(t('common.save_success'), 'success');
             setGridData({}); // Clear local changes
             fetchTimesheets(); // Reload
         } catch (err) {
-            toastEmitter.emit(t('common.save_error', 'حدث خطأ أثناء الحفظ'), 'error');
+            toastEmitter.emit(t('common.save_error'), 'error');
         } finally {
             setSubmitting(false);
         }
@@ -128,7 +128,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
         setApproving(true);
         try {
             await projectsAPI.approveTimesheets(projectId, { timesheet_ids: selectedIds });
-            toastEmitter.emit(t('projects.approve_success', 'تم اعتماد السجلات بنجاح'), 'success');
+            toastEmitter.emit(t('projects.approve_success'), 'success');
             fetchTimesheets();
         } catch (err) {
             console.error(err);
@@ -151,7 +151,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
                             <ChevronRight size={16} />
                         </button>
                         <button className="btn btn-outline-secondary btn-sm" onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 6 }))}>
-                            {t('common.today', 'اليوم')}
+                            {t('common.today')}
                         </button>
                         <button className="btn btn-outline-secondary btn-sm" onClick={() => changeWeek(1)}>
                             <ChevronLeft size={16} /> {/* RTL logic: Left is Next in styling usually, but let's assume standard icon direction needs fix if RTL */}
@@ -164,11 +164,11 @@ export default function Timesheets({ projectId, tasks = [] }) {
                 <div className="d-flex gap-2">
                     {selectedIds.length > 0 && (
                         <button className="btn btn-success" onClick={handleApprove} disabled={approving}>
-                            <CheckCircle2 size={16} /> {approving ? t('common.loading') : `${t('common.approve', 'اعتماد')} (${selectedIds.length})`}
+                            <CheckCircle2 size={16} /> {approving ? t('common.loading') : `${t('common.approve')} (${selectedIds.length})`}
                         </button>
                     )}
                     <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
-                        <Save size={16} /> {submitting ? t('common.saving') : t('common.save_changes', 'حفظ التغييرات')}
+                        <Save size={16} /> {submitting ? t('common.saving') : t('common.save_changes')}
                     </button>
                 </div>
             </div>
@@ -178,14 +178,14 @@ export default function Timesheets({ projectId, tasks = [] }) {
                 <table className="table table-bordered timesheet-table">
                     <thead className="table-light">
                         <tr>
-                            <th style={{ width: '25%' }}>{t('projects.task', 'المهمة')}</th>
+                            <th style={{ width: '25%' }}>{t('projects.task')}</th>
                             {weekDays.map(day => (
                                 <th key={day.toISOString()} className="text-center" style={{ width: '10%' }}>
                                     <div className="small text-muted">{format(day, 'EEE', { locale })}</div>
                                     <div>{format(day, 'd')}</div>
                                 </th>
                             ))}
-                            <th className="text-center" style={{ width: '5%' }}>{t('projects.total', 'المجموع')}</th>
+                            <th className="text-center" style={{ width: '5%' }}>{t('projects.total')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -235,7 +235,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
 
             {tasks.length === 0 && (
                 <div className="text-center py-4 text-muted">
-                    {t('projects.no_tasks_timesheet', 'يرجى إضافة مهام للمشروع أولاً لتسجيل الوقت.')}
+                    {t('projects.no_tasks_timesheet')}
                 </div>
             )}
         </div>

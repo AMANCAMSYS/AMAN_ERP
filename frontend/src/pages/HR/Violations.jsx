@@ -72,11 +72,11 @@ const Violations = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">{isRTL ? 'المخالفات والجزاءات' : 'Violations & Penalties'}</h1>
-                    <p className="workspace-subtitle">{isRTL ? 'إدارة مخالفات وجزاءات الموظفين' : 'Manage employee violations and penalties'}</p>
+                    <h1 className="workspace-title">{t('hr.violations.violations_penalties')}</h1>
+                    <p className="workspace-subtitle">{t('hr.violations.manage_employee_violations_and_penalties')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setEditItem(null); setForm({ employee_id: '', violation_type: '', violation_date: '', description: '', action_taken: 'warning', deduction_amount: 0 }); setShowModal(true); }}>
-                    <Plus size={16} /> {isRTL ? 'مخالفة جديدة' : 'New Violation'}
+                    <Plus size={16} /> {t('hr.violations.new_violation')}
                 </button>
             </div>
 
@@ -85,25 +85,25 @@ const Violations = () => {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
-                            <th>{isRTL ? 'نوع المخالفة' : 'Type'}</th>
-                            <th>{isRTL ? 'التاريخ' : 'Date'}</th>
-                            <th>{isRTL ? 'الوصف' : 'Description'}</th>
-                            <th>{isRTL ? 'الإجراء' : 'Action'}</th>
-                            <th>{isRTL ? 'مبلغ الخصم' : 'Deduction'}</th>
-                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                            <th>{t('hr.violations.employee')}</th>
+                            <th>{t('hr.violations.type')}</th>
+                            <th>{t('hr.violations.date')}</th>
+                            <th>{t('hr.violations.description')}</th>
+                            <th>{t('hr.violations.action')}</th>
+                            <th>{t('hr.violations.deduction')}</th>
+                            <th>{t('hr.violations.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{t('hr.violations.loading')}</td></tr>
                         ) : violations.length === 0 ? (
-                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد مخالفات' : 'No violations'}</td></tr>
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{t('hr.violations.no_violations')}</td></tr>
                         ) : violations.map((v, i) => (
                             <tr key={v.id}>
                                 <td>{i + 1}</td>
                                 <td style={{ fontWeight: 600 }}>{v.employee_name || `#${v.employee_id}`}</td>
-                                <td>{violationTypes.find(vt => vt.value === v.violation_type)?.[isRTL ? 'ar' : 'en'] || v.violation_type}</td>
+                                <td>{violationTypes.find(vt => vt.value === v.violation_type)?.[t('hr.violations.en')] || v.violation_type}</td>
                                 <td>{v.violation_date}</td>
                                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.description || '-'}</td>
                                 <td>{getActionBadge(v.action_taken)}</td>
@@ -120,46 +120,46 @@ const Violations = () => {
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{editItem ? (isRTL ? 'تعديل مخالفة' : 'Edit Violation') : (isRTL ? 'مخالفة جديدة' : 'New Violation')}</h2>
+                        <h2 className="modal-title">{editItem ? (t('hr.violations.edit_violation')) : (t('hr.violations.new_violation'))}</h2>
                         <div className="form-group">
-                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <label>{t('hr.violations.employee')}</label>
                             <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
-                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                <option value="">{t('hr.violations.select')}</option>
                                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
                             </select>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'نوع المخالفة' : 'Violation Type'}</label>
+                                <label>{t('hr.violations.violation_type')}</label>
                                 <select className="form-input" value={form.violation_type} onChange={e => setForm({ ...form, violation_type: e.target.value })}>
-                                    <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                    <option value="">{t('hr.violations.select')}</option>
                                     {violationTypes.map(vt => <option key={vt.value} value={vt.value}>{isRTL ? vt.ar : vt.en}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'التاريخ' : 'Date'}</label>
+                                <label>{t('hr.violations.date')}</label>
                                 <DateInput className="form-input" value={form.violation_date} onChange={e => setForm({ ...form, violation_date: e.target.value })} />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>{isRTL ? 'الوصف' : 'Description'}</label>
+                            <label>{t('hr.violations.description')}</label>
                             <textarea className="form-input" rows="2" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
-                                <label>{isRTL ? 'الإجراء المتخذ' : 'Action Taken'}</label>
+                                <label>{t('hr.violations.action_taken')}</label>
                                 <select className="form-input" value={form.action_taken} onChange={e => setForm({ ...form, action_taken: e.target.value })}>
                                     {actions.map(a => <option key={a.value} value={a.value}>{isRTL ? a.ar : a.en}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>{isRTL ? 'مبلغ الخصم' : 'Deduction Amount'}</label>
+                                <label>{t('hr.violations.deduction_amount')}</label>
                                 <input type="number" className="form-input" value={form.deduction_amount} onChange={e => setForm({ ...form, deduction_amount: e.target.value })} disabled={form.action_taken !== 'deduction'} />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
-                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'حفظ' : 'Save'}</button>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('hr.violations.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{t('hr.violations.save')}</button>
                         </div>
                     </div>
                 </div>

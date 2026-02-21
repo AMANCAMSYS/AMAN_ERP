@@ -228,7 +228,7 @@ function InvoiceForm() {
             return
         }
         if (!formData.payment_method) {
-            setError(t('sales.invoices.form.error_payment_method') || 'يرجى اختيار طريقة الدفع')
+            setError(t('sales.invoices.form.error_payment_method'))
             window.scrollTo(0, 0)
             return
         }
@@ -239,12 +239,12 @@ function InvoiceForm() {
         }
         // Validate items
         if (items.length === 0 || items.every(i => !i.product_id)) {
-            setError(t('sales.invoices.form.error_items') || 'يجب إضافة بند واحد على الأقل')
+            setError(t('sales.invoices.form.error_items'))
             window.scrollTo(0, 0)
             return
         }
         if (items.some(i => i.product_id && (!i.quantity || parseFloat(i.quantity) <= 0))) {
-            setError(t('sales.invoices.form.error_quantity') || 'كمية البند يجب أن تكون أكبر من صفر')
+            setError(t('sales.invoices.form.error_quantity'))
             window.scrollTo(0, 0)
             return
         }
@@ -447,7 +447,7 @@ function InvoiceForm() {
                         {/* Currency Selection */}
                         <div className="form-row mb-3">
                             <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">{t('common.currency') || 'العملة'}</label>
+                                <label className="form-label">{t('common.currency')}</label>
                                 <select
                                     className="form-input form-input-sm"
                                     value={formData.currency}
@@ -468,7 +468,7 @@ function InvoiceForm() {
                             </div>
                             {formData.currency !== currency && (
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('accounting.currencies.table.rate') || 'سعر الصرف'}</label>
+                                    <label className="form-label">{t('accounting.currencies.table.rate')}</label>
                                     <input
                                         type="number"
                                         step="0.000001"
@@ -513,7 +513,7 @@ function InvoiceForm() {
                         {formData.payment_method && formData.payment_method !== 'credit' && (
                             <div className="form-group animate-fade-in">
                                 <label className="form-label">
-                                    {formData.payment_method === 'bank' ? (t('treasury.accounts.bank') || 'حساب البنك') : (t('treasury.accounts.cash') || 'حساب الصندوق')}
+                                    {formData.payment_method === 'bank' ? (t('treasury.accounts.bank')) : (t('treasury.accounts.cash'))}
                                 </label>
                                 <select
                                     className="form-input"
@@ -532,7 +532,7 @@ function InvoiceForm() {
                                 </select>
                                 {formData.treasury_id && (
                                     <div className="account-balance-hint mt-1" style={{ fontSize: '0.85rem' }}>
-                                        <span className="text-muted">{t('treasury.available_balance') || 'الرصيد المتاح'}: </span>
+                                        <span className="text-muted">{t('treasury.available_balance')}: </span>
                                         <span className="fw-bold" style={{ color: 'var(--primary-color)' }}>
                                             {formatNumber(treasuryAccounts.find(a => a.id.toString() === formData.treasury_id.toString())?.current_balance)} {currency}
                                         </span>
@@ -579,7 +579,7 @@ function InvoiceForm() {
                                                     checked={formData.down_payment_method === 'check'}
                                                     onChange={e => setFormData({ ...formData, down_payment_method: e.target.value })}
                                                 />
-                                                {t('sales.invoices.form.payment.check') || 'شيك'}
+                                                {t('sales.invoices.form.payment.check')}
                                             </label>
                                         </div>
 
@@ -591,7 +591,7 @@ function InvoiceForm() {
                                                     onChange={e => setFormData({ ...formData, treasury_id: e.target.value })}
                                                     required
                                                 >
-                                                    <option value="">{t('treasury.accounts.select_account') || 'اختر الحساب'}</option>
+                                                    <option value="">{t('treasury.accounts.select_account')}</option>
                                                     {treasuryAccounts
                                                         .filter(acc => acc.account_type === (formData.down_payment_method === 'bank' ? 'bank' : 'cash'))
                                                         .map(acc => (

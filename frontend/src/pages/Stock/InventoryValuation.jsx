@@ -38,8 +38,8 @@ function InventoryValuation() {
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
                 <div>
-                    <h1 className="workspace-title">{t('reports.inventory_valuation.title') || 'تقرير تقييم المخزون'}</h1>
-                    <p className="workspace-subtitle">{t('reports.inventory_valuation.subtitle') || 'قيمة المخزون الحالي بناءً على التكلفة المتوسطة'}</p>
+                    <h1 className="workspace-title">{t('reports.inventory_valuation.title')}</h1>
+                    <p className="workspace-subtitle">{t('reports.inventory_valuation.subtitle')}</p>
                 </div>
                 <div className="display-flex gap-2">
                     <button className="btn btn-secondary" onClick={() => window.print()}>
@@ -53,11 +53,11 @@ function InventoryValuation() {
 
             <div className="metrics-grid mb-6 mt-4">
                 <div className="metric-card">
-                    <div className="metric-label">{t('reports.inventory_valuation.total_value') || 'إجمالي قيمة المخزون'}</div>
+                    <div className="metric-label">{t('reports.inventory_valuation.total_value')}</div>
                     <div className="metric-value">{formatNumber(totalValuation)} <small>{currency}</small></div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('reports.inventory_valuation.item_count') || 'عدد الأصناف المخزنة'}</div>
+                    <div className="metric-label">{t('reports.inventory_valuation.item_count')}</div>
                     <div className="metric-value">{totalItems}</div>
                 </div>
             </div>
@@ -83,7 +83,7 @@ function InventoryValuation() {
                                     {hasPermission('stock.view_cost') && (
                                         <>
                                             <th className="text-end">{t('inventory.cost_price')}</th>
-                                            <th className="text-end">{t('reports.inventory_valuation.valuation') || 'القيمة الإجمالية'}</th>
+                                            <th className="text-end">{t('reports.inventory_valuation.valuation')}</th>
                                         </>
                                     )}
                                 </tr>
@@ -115,7 +115,7 @@ function InventoryValuation() {
                             {data.length > 0 && hasPermission('stock.view_cost') && (
                                 <tfoot>
                                     <tr className="fw-bold bg-light">
-                                        <td colSpan="6" className="text-end">{t('reports.inventory_valuation.grand_total') || 'الإجمالي الكلي'}</td>
+                                        <td colSpan="6" className="text-end">{t('reports.inventory_valuation.grand_total')}</td>
                                         <td className="text-end">{formatNumber(totalValuation)} {currency}</td>
                                     </tr>
                                 </tfoot>

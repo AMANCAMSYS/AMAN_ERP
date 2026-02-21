@@ -49,10 +49,10 @@ const AssetDetails = () => {
     };
 
     const handleDispose = async () => {
-        if (!window.confirm(t('assets.confirm_dispose', 'هل أنت متأكد من استبعاد هذا الأصل؟ لا يمكن التراجع عن هذا الإجراء.'))) return;
+        if (!window.confirm(t('assets.confirm_dispose'))) return;
         try {
             await assetsAPI.dispose(id, { disposal_date: new Date().toISOString().split('T')[0] });
-            toastEmitter.emit(t('assets.disposed_msg', 'تم استبعاد الأصل بنجاح'), 'success');
+            toastEmitter.emit(t('assets.disposed_msg'), 'success');
             fetchData();
         } catch (error) {
             console.error("Failed to dispose asset", error);
@@ -83,7 +83,7 @@ const AssetDetails = () => {
                         {asset.status === 'active' && (
                             <button className="btn btn-sm btn-outline-danger me-2" onClick={handleDispose}>
                                 <Trash2 size={16} className="me-1" />
-                                {t('assets.dispose', 'استبعاد الأصل')}
+                                {t('assets.dispose')}
                             </button>
                         )}
                         <span className={`badge ${asset.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} border px-3 py-2 fs-6`}>

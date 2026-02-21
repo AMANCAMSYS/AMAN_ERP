@@ -36,7 +36,7 @@ const Recruitment = () => {
             await hrImprovementsAPI.createJobOpening({ ...openingForm, positions: parseInt(openingForm.positions) });
             showToast(t('hr.job_opening_created'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleCreateApplication = async (e) => {
@@ -45,7 +45,7 @@ const Recruitment = () => {
             await hrImprovementsAPI.createApplication({ ...appForm, job_opening_id: parseInt(appForm.job_opening_id) });
             showToast(t('hr.application_submitted'), 'success');
             setShowModal(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleUpdateStage = async (appId, stage) => {
@@ -53,7 +53,7 @@ const Recruitment = () => {
             await hrImprovementsAPI.updateApplicationStage(appId, stage);
             showToast(t('hr.stage_updated'), 'success');
             fetchData();
-        } catch (err) { showToast('Error', 'error'); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const statusBadge = (status) => {

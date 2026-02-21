@@ -37,7 +37,7 @@ function JournalEntryList() {
             setEntries(res.data.items || [])
             setTotal(res.data.total || 0)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -46,26 +46,26 @@ function JournalEntryList() {
     useEffect(() => { fetchEntries() }, [fetchEntries])
 
     const handlePost = async (entryId) => {
-        if (!confirm(isRTL ? 'هل تريد ترحيل هذا القيد؟' : 'Post this journal entry?')) return
+        if (!confirm(t('accounting.journal_entries.post_this_journal_entry'))) return
         try {
             const res = await accountingAPI.postJournalEntry(entryId)
             showToast(res.data.message, 'success')
             fetchEntries()
             setSelectedEntry(null)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
     const handleVoid = async (entryId) => {
-        if (!confirm(isRTL ? 'هل تريد إلغاء هذا القيد؟ سيتم إنشاء قيد عكسي.' : 'Void this entry? A reversal entry will be created.')) return
+        if (!confirm(t('accounting.journal_entries.void_this_entry_a_reversal_entry_will_be_created'))) return
         try {
             const res = await accountingAPI.voidJournalEntry(entryId)
             showToast(res.data.message, 'success')
             fetchEntries()
             setSelectedEntry(null)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -75,7 +75,7 @@ function JournalEntryList() {
             const res = await accountingAPI.getJournalEntry(entryId)
             setSelectedEntry(res.data)
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error')
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally {
             setDetailLoading(false)
         }
@@ -83,9 +83,9 @@ function JournalEntryList() {
 
     const statusBadge = (status) => {
         const map = {
-            draft: { class: 'badge-warning', label: t('common.status_draft') || (isRTL ? 'مسودة' : 'Draft') },
-            posted: { class: 'badge-success', label: t('common.status_posted') || (isRTL ? 'مرحّل' : 'Posted') },
-            voided: { class: 'badge-secondary', label: t('common.status_voided') || (isRTL ? 'ملغى' : 'Voided') },
+            draft: { class: 'badge-warning', label: t('common.status_draft') || (t('accounting.journal_entries.draft')) },
+            posted: { class: 'badge-success', label: t('common.status_posted') || (t('accounting.journal_entries.posted')) },
+            voided: { class: 'badge-secondary', label: t('common.status_voided') || (t('accounting.journal_entries.voided')) },
         }
         const s = map[status] || { class: '', label: status }
         return <span className={`badge ${s.class}`}>{s.label}</span>
@@ -120,9 +120,9 @@ function JournalEntryList() {
                     onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
                 >
                     <option value="">{t('common.all_status')}</option>
-                    <option value="draft">{t('common.status_draft') || (isRTL ? 'مسودة' : 'Draft')}</option>
-                    <option value="posted">{t('common.status_posted') || (isRTL ? 'مرحّل' : 'Posted')}</option>
-                    <option value="voided">{t('common.status_voided') || (isRTL ? 'ملغى' : 'Voided')}</option>
+                    <option value="draft">{t('common.status_draft') || (t('accounting.journal_entries.draft'))}</option>
+                    <option value="posted">{t('common.status_posted') || (t('accounting.journal_entries.posted'))}</option>
+                    <option value="voided">{t('common.status_voided') || (t('accounting.journal_entries.voided'))}</option>
                 </select>
                 <input
                     type="text"
@@ -153,11 +153,11 @@ function JournalEntryList() {
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {isRTL ? 'جاري التحميل...' : 'Loading...'}
+                                    {t('accounting.journal_entries.loading')}
                                 </td></tr>
                             ) : entries.length === 0 ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {isRTL ? 'لا توجد قيود' : 'No entries found'}
+                                    {t('accounting.journal_entries.no_entries_found')}
                                 </td></tr>
                             ) : entries.map(e => (
                                 <tr key={e.id} style={{ cursor: 'pointer' }}
@@ -222,14 +222,14 @@ function JournalEntryList() {
                                 <div><strong>{t('common.date')}:</strong> {formatDate(selectedEntry.entry_date)}</div>
                                 <div><strong>{t('common.reference')}:</strong> {selectedEntry.reference || '—'}</div>
                                 <div style={{ gridColumn: '1 / -1' }}><strong>{t('common.description')}:</strong> {selectedEntry.description}</div>
-                                <div><strong>{t('common.currency') || (isRTL ? 'العملة:' : 'Currency:')}:</strong> {selectedEntry.currency}</div>
+                                <div><strong>{t('common.currency') || (t('accounting.journal_entries.currency'))}:</strong> {selectedEntry.currency}</div>
                                 <div><strong>{t('common.created_by')}:</strong> {selectedEntry.created_by_name}</div>
                             </div>
 
                             <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                 <thead>
                                     <tr>
-                                        <th>{t('common.account') || (isRTL ? 'الحساب' : 'Account')}</th>
+                                        <th>{t('common.account') || (t('accounting.journal_entries.account'))}</th>
                                         <th>{t('common.description')}</th>
                                         <th>{t('accounting.journal_entries.table.debit')}</th>
                                         <th>{t('accounting.journal_entries.table.credit')}</th>
@@ -264,7 +264,7 @@ function JournalEntryList() {
                                 </button>
                             )}
                             <button className="btn btn-secondary" onClick={() => setSelectedEntry(null)}>
-                                {isRTL ? 'إغلاق' : 'Close'}
+                                {t('accounting.journal_entries.close')}
                             </button>
                         </div>
                     </div>

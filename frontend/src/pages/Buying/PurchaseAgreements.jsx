@@ -38,12 +38,12 @@ const PurchaseAgreements = () => {
             await purchasesAPI.createAgreement({ ...form, supplier_id: parseInt(form.supplier_id) });
             showToast(t('buying.agreement_created'), 'success');
             setShowModal(false); fetchAgreements();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleActivate = async (id) => {
         try { await purchasesAPI.activateAgreement(id); showToast(t('buying.activated'), 'success'); fetchAgreements(); }
-        catch (err) { showToast('Error', 'error'); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const handleCallOff = async (id) => {
@@ -52,7 +52,7 @@ const PurchaseAgreements = () => {
         try {
             await purchasesAPI.callOffAgreement(id, { quantity: parseFloat(qty) });
             showToast(t('buying.calloff_created'), 'success'); fetchAgreements();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const statusBadge = (s) => {

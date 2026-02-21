@@ -14,7 +14,7 @@ const ComingSoon = ({ title }) => {
                 {title}
             </h2>
             <p className="text-base-content/60 max-w-md">
-                {t('settings.coming_soon_desc') || 'هذه الصفحة قيد التطوير حالياً وستتوفر في التحديثات القادمة لتوفير تحكم كامل في النظام.'}
+                {t('settings.coming_soon_desc')}
             </p>
 
             <div className="mt-8 flex gap-2">

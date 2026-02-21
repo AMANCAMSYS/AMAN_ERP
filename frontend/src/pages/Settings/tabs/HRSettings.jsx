@@ -11,11 +11,11 @@ const HRSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Clock size={20} className="text-primary" />
-                    {t('settings.hr.hours_title') || 'ساعات العمل الرسمية'}
+                    {t('settings.hr.hours_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.hr.work_start') || 'وقت بدء العمل'}</label>
+                        <label className="form-label">{t('settings.hr.work_start')}</label>
                         <input
                             type="time"
                             className="form-input"
@@ -24,7 +24,7 @@ const HRSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.hr.work_end') || 'وقت انتهاء العمل'}</label>
+                        <label className="form-label">{t('settings.hr.work_end')}</label>
                         <input
                             type="time"
                             className="form-input"
@@ -39,10 +39,10 @@ const HRSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Calendar size={20} className="text-primary" />
-                    {t('settings.hr.days_title') || 'أيام العمل والعطلات'}
+                    {t('settings.hr.days_title')}
                 </h3>
                 <div className="form-group">
-                    <label className="form-label mb-3">{t('settings.hr.weekends') || 'أيام العطلة الأسبوعية'}</label>
+                    <label className="form-label mb-3">{t('settings.hr.weekends')}</label>
                     <div className="flex flex-wrap gap-4">
                         {['friday', 'saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday'].map((day) => {
                             const isWeekend = (settings.hr_weekends || '').includes(day);

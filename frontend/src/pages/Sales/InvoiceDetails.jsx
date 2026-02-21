@@ -74,10 +74,10 @@ function InvoiceDetails() {
                         <button
                             className="btn btn-outline-danger"
                             onClick={async () => {
-                                if (!window.confirm(t('sales.invoices.details.confirm_cancel') || 'هل أنت متأكد من إلغاء هذه الفاتورة؟')) return;
+                                if (!window.confirm(t('sales.invoices.details.confirm_cancel'))) return;
                                 try {
                                     await salesAPI.cancelInvoice(id);
-                                    toastEmitter.emit(t('sales.invoices.details.cancelled_success') || 'تم إلغاء الفاتورة بنجاح', 'success');
+                                    toastEmitter.emit(t('sales.invoices.details.cancelled_success'), 'success');
                                     const response = await salesAPI.getInvoice(id);
                                     setInvoice(response.data);
                                 } catch (err) {
@@ -86,7 +86,7 @@ function InvoiceDetails() {
                             }}
                         >
                             <XCircle size={18} style={{ marginLeft: '8px' }} />
-                            {t('sales.invoices.details.cancel_invoice') || 'إلغاء الفاتورة'}
+                            {t('sales.invoices.details.cancel_invoice')}
                         </button>
                     )}
                     {(invoice.status === 'unpaid' || invoice.status === 'partial') && (
@@ -179,7 +179,7 @@ function InvoiceDetails() {
                     <div style={{ width: '320px', padding: '24px', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                         {invoice.currency && invoice.currency !== currency && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed var(--border-color)' }}>
-                                <span className="text-secondary" style={{ fontSize: '13px' }}>{t('accounting.currencies.table.rate', 'سعر الصرف')}</span>
+                                <span className="text-secondary" style={{ fontSize: '13px' }}>{t('accounting.currencies.table.rate')}</span>
                                 <span className="font-mono" style={{ fontSize: '13px' }}>
                                     1 {invoice.currency} = {formatNumber(invoice.exchange_rate, 6)} {currency}
                                 </span>

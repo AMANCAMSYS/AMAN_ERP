@@ -59,33 +59,33 @@ function TaxReturnForm() {
     }
 
     const months = [
-        { value: 1, label: t('months.jan') || 'يناير' },
-        { value: 2, label: t('months.feb') || 'فبراير' },
-        { value: 3, label: t('months.mar') || 'مارس' },
-        { value: 4, label: t('months.apr') || 'أبريل' },
-        { value: 5, label: t('months.may') || 'مايو' },
-        { value: 6, label: t('months.jun') || 'يونيو' },
-        { value: 7, label: t('months.jul') || 'يوليو' },
-        { value: 8, label: t('months.aug') || 'أغسطس' },
-        { value: 9, label: t('months.sep') || 'سبتمبر' },
-        { value: 10, label: t('months.oct') || 'أكتوبر' },
-        { value: 11, label: t('months.nov') || 'نوفمبر' },
-        { value: 12, label: t('months.dec') || 'ديسمبر' }
+        { value: 1, label: t('months.jan') },
+        { value: 2, label: t('months.feb') },
+        { value: 3, label: t('months.mar') },
+        { value: 4, label: t('months.apr') },
+        { value: 5, label: t('months.may') },
+        { value: 6, label: t('months.jun') },
+        { value: 7, label: t('months.jul') },
+        { value: 8, label: t('months.aug') },
+        { value: 9, label: t('months.sep') },
+        { value: 10, label: t('months.oct') },
+        { value: 11, label: t('months.nov') },
+        { value: 12, label: t('months.dec') }
     ]
 
     const quarters = [
-        { value: 1, label: t('taxes.q1') || 'الربع الأول (يناير - مارس)' },
-        { value: 2, label: t('taxes.q2') || 'الربع الثاني (أبريل - يونيو)' },
-        { value: 3, label: t('taxes.q3') || 'الربع الثالث (يوليو - سبتمبر)' },
-        { value: 4, label: t('taxes.q4') || 'الربع الرابع (أكتوبر - ديسمبر)' }
+        { value: 1, label: t('taxes.q1') },
+        { value: 2, label: t('taxes.q2') },
+        { value: 3, label: t('taxes.q3') },
+        { value: 4, label: t('taxes.q4') }
     ]
 
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div>
-                    <h1 className="workspace-title">📝 {t('taxes.new_return_title') || 'إنشاء إقرار ضريبي'}</h1>
-                    <p className="workspace-subtitle">{t('taxes.new_return_subtitle') || 'سيتم حساب مبالغ الضريبة تلقائياً من فواتير المبيعات والمشتريات'}</p>
+                    <h1 className="workspace-title">📝 {t('taxes.new_return_title')}</h1>
+                    <p className="workspace-subtitle">{t('taxes.new_return_subtitle')}</p>
                 </div>
             </div>
 
@@ -95,26 +95,26 @@ function TaxReturnForm() {
                 <div className="card mt-4">
                     <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
-                        <h2 style={{ color: 'var(--success)' }}>{t('taxes.return_created') || 'تم إنشاء الإقرار الضريبي بنجاح'}</h2>
+                        <h2 style={{ color: 'var(--success)' }}>{t('taxes.return_created')}</h2>
                         <p style={{ fontFamily: 'monospace', fontSize: '18px', margin: '8px 0' }}>{success.return_number}</p>
 
                         {success.summary && (
                             <div className="metrics-grid mt-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', maxWidth: '800px', margin: '24px auto' }}>
                                 <div className="metric-card">
-                                    <div className="metric-label">{t('taxes.output_vat') || 'ضريبة المخرجات'}</div>
+                                    <div className="metric-label">{t('taxes.output_vat')}</div>
                                     <div className="metric-value text-secondary">{(success.summary.output_vat || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</div>
                                 </div>
                                 <div className="metric-card">
-                                    <div className="metric-label">{t('taxes.input_vat') || 'ضريبة المدخلات'}</div>
+                                    <div className="metric-label">{t('taxes.input_vat')}</div>
                                     <div className="metric-value text-primary">{(success.summary.input_vat || 0).toLocaleString('en', { minimumFractionDigits: 2 })}</div>
                                 </div>
                                 <div className="metric-card">
-                                    <div className="metric-label">{t('taxes.net_payable') || 'صافي المستحق'}</div>
+                                    <div className="metric-label">{t('taxes.net_payable')}</div>
                                     <div className={`metric-value ${success.summary.net_payable >= 0 ? 'text-error' : 'text-success'}`}>
                                         {Math.abs(success.summary.net_payable || 0).toLocaleString('en', { minimumFractionDigits: 2 })} {currency}
                                     </div>
                                     <div className="metric-change">
-                                        {success.summary.net_payable >= 0 ? (t('taxes.payable') || 'مستحق للدفع') : (t('taxes.refundable') || 'مستحق للاسترداد')}
+                                        {success.summary.net_payable >= 0 ? (t('taxes.payable')) : (t('taxes.refundable'))}
                                     </div>
                                 </div>
                             </div>
@@ -122,10 +122,10 @@ function TaxReturnForm() {
 
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
                             <button className="btn btn-primary" onClick={() => navigate(`/taxes/returns/${success.id}`)}>
-                                👁️ {t('taxes.view_return') || 'عرض الإقرار'}
+                                👁️ {t('taxes.view_return')}
                             </button>
                             <button className="btn btn-secondary" onClick={() => navigate('/taxes')}>
-                                🏠 {t('taxes.back_to_taxes') || 'العودة للضرائب'}
+                                🏠 {t('taxes.back_to_taxes')}
                             </button>
                         </div>
                     </div>
@@ -139,21 +139,21 @@ function TaxReturnForm() {
                                 <div style={{ background: '#eff6ff', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <span style={{ fontSize: '18px' }}>📅</span>
                                 </div>
-                                <h5 className="mb-0 fw-semibold">{t('taxes.period_settings') || 'إعدادات الفترة'}</h5>
+                                <h5 className="mb-0 fw-semibold">{t('taxes.period_settings')}</h5>
                             </div>
 
                             <div className="form-row">
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.period_type') || 'نوع الفترة'} *</label>
+                                    <label className="form-label">{t('taxes.period_type')} *</label>
                                     <select className="form-input" value={form.period_type}
                                         onChange={e => setForm({...form, period_type: e.target.value})}>
-                                        <option value="monthly">{t('taxes.monthly') || 'شهري'}</option>
-                                        <option value="quarterly">{t('taxes.quarterly') || 'ربع سنوي'}</option>
+                                        <option value="monthly">{t('taxes.monthly')}</option>
+                                        <option value="quarterly">{t('taxes.quarterly')}</option>
                                     </select>
                                 </div>
 
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.year') || 'السنة'} *</label>
+                                    <label className="form-label">{t('taxes.year')} *</label>
                                     <select className="form-input" value={form.year}
                                         onChange={e => setForm({...form, year: parseInt(e.target.value)})}>
                                         {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(y => (
@@ -166,7 +166,7 @@ function TaxReturnForm() {
                             <div className="form-row">
                                 {form.period_type === 'monthly' ? (
                                     <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">{t('taxes.month') || 'الشهر'} *</label>
+                                        <label className="form-label">{t('taxes.month')} *</label>
                                         <select className="form-input" value={form.month}
                                             onChange={e => setForm({...form, month: parseInt(e.target.value)})}>
                                             {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
@@ -174,7 +174,7 @@ function TaxReturnForm() {
                                     </div>
                                 ) : (
                                     <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">{t('taxes.quarter') || 'الربع'} *</label>
+                                        <label className="form-label">{t('taxes.quarter')} *</label>
                                         <select className="form-input" value={form.quarter}
                                             onChange={e => setForm({...form, quarter: parseInt(e.target.value)})}>
                                             {quarters.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
@@ -183,12 +183,12 @@ function TaxReturnForm() {
                                 )}
 
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.tax_type') || 'نوع الضريبة'}</label>
+                                    <label className="form-label">{t('taxes.tax_type')}</label>
                                     <select className="form-input" value={form.tax_type}
                                         onChange={e => setForm({...form, tax_type: e.target.value})}>
-                                        <option value="vat">{t('taxes.vat') || 'ضريبة القيمة المضافة'}</option>
-                                        <option value="income">{t('taxes.income_tax') || 'ضريبة الدخل'}</option>
-                                        <option value="withholding">{t('taxes.withholding') || 'ضريبة الاستقطاع'}</option>
+                                        <option value="vat">{t('taxes.vat')}</option>
+                                        <option value="income">{t('taxes.income_tax')}</option>
+                                        <option value="withholding">{t('taxes.withholding')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -196,36 +196,36 @@ function TaxReturnForm() {
                             <div className="form-row">
                                 <div className="form-group" style={{ flex: 1 }}>
                                     <CustomDatePicker
-                                        label={t('taxes.due_date') || 'تاريخ الاستحقاق'}
+                                        label={t('taxes.due_date')}
                                         selected={form.due_date}
                                         onChange={(val) => setForm({...form, due_date: val})}
                                         placeholder="YYYY/MM/DD"
                                     />
                                 </div>
                                 <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.selected_period') || 'الفترة المختارة'}</label>
+                                    <label className="form-label">{t('taxes.selected_period')}</label>
                                     <input className="form-input" value={getPeriodString()} readOnly
                                         style={{ fontFamily: 'monospace', fontWeight: 'bold', background: 'var(--bg-secondary)' }} />
                                 </div>
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">{t('taxes.notes') || 'ملاحظات'}</label>
+                                <label className="form-label">{t('taxes.notes')}</label>
                                 <textarea className="form-input" rows="3" value={form.notes}
                                     onChange={e => setForm({...form, notes: e.target.value})}
-                                    placeholder={t('taxes.notes_placeholder') || 'ملاحظات إضافية...'} />
+                                    placeholder={t('taxes.notes_placeholder')} />
                             </div>
 
                             <div className="alert alert-info mt-3">
-                                ℹ️ {t('taxes.auto_calc_note') || 'سيتم حساب مبالغ الضريبة تلقائياً من فواتير المبيعات والمشتريات المسجلة في النظام خلال الفترة المحددة.'}
+                                ℹ️ {t('taxes.auto_calc_note')}
                             </div>
 
                             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '16px' }}>
                                 <button type="button" className="btn btn-outline-secondary" onClick={() => navigate('/taxes')}>
-                                    {t('common.cancel') || 'إلغاء'}
+                                    {t('common.cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                                    {loading ? (t('common.creating') || 'جاري الإنشاء...') : (t('taxes.create_return') || 'إنشاء الإقرار')}
+                                    {loading ? (t('common.creating')) : (t('taxes.create_return'))}
                                 </button>
                             </div>
                         </div>

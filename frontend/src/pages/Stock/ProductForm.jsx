@@ -221,7 +221,7 @@ function ProductForm() {
                     {/* Tracking Section - only for products */}
                     {formData.item_type === 'product' && (
                         <div className="form-section">
-                            <h3 className="section-title">{t('stock.products.form.tracking', 'التتبع المتقدم')}</h3>
+                            <h3 className="section-title">{t('stock.products.form.tracking')}</h3>
                             <div className="form-row">
                                 <div className="form-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '10px', background: formData.has_batch_tracking ? 'var(--primary-light, #e8f0fe)' : 'var(--bg-secondary)', borderRadius: '8px', border: formData.has_batch_tracking ? '2px solid var(--primary)' : '2px solid transparent' }}>
@@ -229,9 +229,9 @@ function ProductForm() {
                                             checked={formData.has_batch_tracking}
                                             onChange={(e) => setFormData({ ...formData, has_batch_tracking: e.target.checked })} />
                                         <div>
-                                            <strong>📦 {t('stock.products.form.batch_tracking', 'تتبع الدفعات')}</strong>
+                                            <strong>📦 {t('stock.products.form.batch_tracking')}</strong>
                                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                {t('stock.products.form.batch_tracking_desc', 'تتبع المنتج بأرقام اللوت والدفعات')}
+                                                {t('stock.products.form.batch_tracking_desc')}
                                             </div>
                                         </div>
                                     </label>
@@ -242,9 +242,9 @@ function ProductForm() {
                                             checked={formData.has_serial_tracking}
                                             onChange={(e) => setFormData({ ...formData, has_serial_tracking: e.target.checked })} />
                                         <div>
-                                            <strong>🏷️ {t('stock.products.form.serial_tracking', 'تتبع الأرقام التسلسلية')}</strong>
+                                            <strong>🏷️ {t('stock.products.form.serial_tracking')}</strong>
                                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                {t('stock.products.form.serial_tracking_desc', 'كل وحدة لها رقم تسلسلي فريد')}
+                                                {t('stock.products.form.serial_tracking_desc')}
                                             </div>
                                         </div>
                                     </label>
@@ -257,9 +257,9 @@ function ProductForm() {
                                             checked={formData.has_expiry_tracking}
                                             onChange={(e) => setFormData({ ...formData, has_expiry_tracking: e.target.checked })} />
                                         <div>
-                                            <strong>📅 {t('stock.products.form.expiry_tracking', 'تتبع الصلاحية')}</strong>
+                                            <strong>📅 {t('stock.products.form.expiry_tracking')}</strong>
                                             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                {t('stock.products.form.expiry_tracking_desc', 'تتبع تواريخ انتهاء الصلاحية للدفعات')}
+                                                {t('stock.products.form.expiry_tracking_desc')}
                                             </div>
                                         </div>
                                     </label>
@@ -267,12 +267,12 @@ function ProductForm() {
                                 {formData.has_expiry_tracking && (
                                     <div className="form-group" style={{ display: 'flex', gap: '12px' }}>
                                         <div style={{ flex: 1 }}>
-                                            <label className="form-label">{t('stock.products.form.shelf_life', 'مدة الصلاحية (أيام)')}</label>
+                                            <label className="form-label">{t('stock.products.form.shelf_life')}</label>
                                             <input type="number" name="shelf_life_days" className="form-input" min="0"
                                                 value={formData.shelf_life_days} onChange={handleChange} placeholder="365" />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <label className="form-label">{t('stock.products.form.expiry_alert', 'تنبيه قبل (أيام)')}</label>
+                                            <label className="form-label">{t('stock.products.form.expiry_alert')}</label>
                                             <input type="number" name="expiry_alert_days" className="form-input" min="0"
                                                 value={formData.expiry_alert_days} onChange={handleChange} placeholder="30" />
                                         </div>

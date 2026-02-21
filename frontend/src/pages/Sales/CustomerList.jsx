@@ -25,7 +25,7 @@ function CustomerList() {
                 const response = await salesAPI.listCustomers({ branch_id: currentBranch?.id })
                 setCustomers(response.data)
             } catch (err) {
-                setError(t('common.error_loading') || 'فشل تحميل البيانات')
+                setError(t('common.error_loading'))
                 console.error(err)
             } finally {
                 setLoading(false)
@@ -59,7 +59,7 @@ function CustomerList() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th style={{ width: '12%' }}>{t('sales.customers.table.code') || 'رقم العميل'}</th>
+                            <th style={{ width: '12%' }}>{t('sales.customers.table.code')}</th>
                             <th style={{ width: '28%' }}>{t('sales.customers.table.name')}</th>
                             <th style={{ width: '20%' }}>{t('sales.customers.table.contact')}</th>
                             <th style={{ width: '20%' }}>{t('sales.customers.table.balance')}</th>

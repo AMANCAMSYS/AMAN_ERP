@@ -59,7 +59,7 @@ export default function SupplierDetails() {
                                 style={{ padding: '4px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
                             >
                                 <Edit2 size={14} />
-                                {t('common.edit', 'تعديل')}
+                                {t('common.edit')}
                             </button>
                         </div>
                     </div>
@@ -105,7 +105,7 @@ export default function SupplierDetails() {
                                         padding: '2px 8px', fontSize: '10px', cursor: 'pointer',
                                         color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px'
                                     }}
-                                    title={t('common.switch_currency', 'تبديل العملة')}
+                                    title={t('common.switch_currency')}
                                 >
                                     <Clock size={10} />
                                     {balanceView === 'supplier' ? data.supplier.currency : currency}

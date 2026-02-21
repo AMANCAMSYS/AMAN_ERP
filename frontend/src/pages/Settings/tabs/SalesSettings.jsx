@@ -36,7 +36,7 @@ const SalesSettings = ({ settings, handleSettingChange, currency }) => {
                             value={settings.sales_default_customer || ''}
                             onChange={(e) => handleSettingChange('sales_default_customer', e.target.value)}
                         >
-                            <option value="">{t('common.select') || 'اختر...'}</option>
+                            <option value="">{t('common.select')}</option>
                             {customers.map(c => (
                                 <option key={c.id} value={c.id.toString()}>{c.name}</option>
                             ))}
@@ -80,7 +80,7 @@ const SalesSettings = ({ settings, handleSettingChange, currency }) => {
                                 onChange={(e) => handleSettingChange('sales_quotation_expiry', e.target.value)}
                             />
                             <div className="absolute left-0 top-0 bottom-0 px-4 bg-base-200 flex items-center border-r border-base-300 rounded-l-lg text-sm text-base-content/60">
-                                {t('common.days') || 'أيام'}
+                                {t('common.days')}
                             </div>
                         </div>
                     </div>

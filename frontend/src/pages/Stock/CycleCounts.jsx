@@ -80,7 +80,7 @@ function CycleCounts() {
             setForm({ warehouse_id: '', count_type: 'full', product_ids: [], notes: '' })
             fetchCycleCounts()
         } catch (err) {
-            setError(err.response?.data?.detail || 'حدث خطأ')
+            setError(err.response?.data?.detail || t('common.error_occurred'))
         } finally {
             setSaving(false)
         }
@@ -91,7 +91,7 @@ function CycleCounts() {
             await inventoryAPI.startCycleCount(id)
             fetchCycleCounts()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            alert(err.response?.data?.detail || t('common.error_occurred'))
         }
     }
 
@@ -108,7 +108,7 @@ function CycleCounts() {
             setItemUpdates(items)
             setShowDetailModal(true)
         } catch (err) {
-            alert('حدث خطأ في تحميل التفاصيل')
+            alert(t('stock.cycle.error_loading'))
         }
     }
 
@@ -133,7 +133,7 @@ function CycleCounts() {
             setCountDetail(null)
             fetchCycleCounts()
         } catch (err) {
-            setError(err.response?.data?.detail || 'حدث خطأ')
+            setError(err.response?.data?.detail || t('common.error_occurred'))
         } finally {
             setSaving(false)
         }
@@ -141,17 +141,17 @@ function CycleCounts() {
 
     const getStatusBadge = (status) => {
         const map = {
-            draft: { label: 'مسودة', cls: 'badge-secondary' },
-            in_progress: { label: 'جاري العد', cls: 'badge-warning' },
-            completed: { label: 'مكتمل', cls: 'badge-success' },
-            cancelled: { label: 'ملغي', cls: 'badge-danger' }
+            draft: { label: t('stock.cycle.draft'), cls: 'badge-secondary' },
+            in_progress: { label: t('stock.cycle.in_progress'), cls: 'badge-warning' },
+            completed: { label: t('stock.cycle.completed'), cls: 'badge-success' },
+            cancelled: { label: t('stock.cycle.cancelled'), cls: 'badge-danger' }
         }
         const s = map[status] || { label: status, cls: 'badge-secondary' }
         return <span className={`badge ${s.cls}`}>{s.label}</span>
     }
 
     const getCountTypeName = (type) => {
-        const map = { full: 'جرد شامل', partial: 'جرد جزئي', random: 'جرد عشوائي' }
+        const map = { full: t('stock.cycle.full_count'), partial: t('stock.cycle.partial_count'), random: t('stock.cycle.random_count') }
         return map[type] || type
     }
 
@@ -169,11 +169,11 @@ function CycleCounts() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div>
-                    <h1 className="workspace-title">📋 {t('stock.cycleCounts.title', 'الجرد الدوري')}</h1>
-                    <p className="workspace-subtitle">{t('stock.cycleCounts.subtitle', 'جرد المخزون ومطابقة الكميات الفعلية مع النظام')}</p>
+                    <h1 className="workspace-title">📋 {t('stock.cycleCounts.title')}</h1>
+                    <p className="workspace-subtitle">{t('stock.cycleCounts.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                    + إنشاء عملية جرد
+                    + {t('stock.cycle.create_new')}
                 </button>
             </div>
 
@@ -184,7 +184,7 @@ function CycleCounts() {
                         <path d="M3 3v18h18"/>
                         <path d="m19 9-5 5-4-4-3 3"/>
                     </svg>
-                    <div className="small text-muted">إجمالي عمليات الجرد</div>
+                    <div className="small text-muted">{t('stock.cycle.total_counts')}</div>
                     <div className="fw-bold fs-4">{total}</div>
                 </div>
                 <div className="card p-3 text-center">
@@ -194,7 +194,7 @@ function CycleCounts() {
                         <path d="m19 15 3-3-3-3"/>
                         <circle cx="12" cy="12" r="3"/>
                     </svg>
-                    <div className="small text-muted">جاري العد</div>
+                    <div className="small text-muted">{t('stock.cycle.in_progress')}</div>
                     <div className="fw-bold fs-4 text-warning">
                         {cycleCounts.filter(c => c.status === 'in_progress').length}
                     </div>
@@ -204,7 +204,7 @@ function CycleCounts() {
                         <path d="M21.801 10A10 10 0 1 1 17 3.335"/>
                         <path d="m9 11 3 3L22 4"/>
                     </svg>
-                    <div className="small text-muted">مكتمل</div>
+                    <div className="small text-muted">{t('stock.cycle.completed')}</div>
                     <div className="fw-bold fs-4 text-success">
                         {cycleCounts.filter(c => c.status === 'completed').length}
                     </div>
@@ -214,7 +214,7 @@ function CycleCounts() {
                         <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
                         <polyline points="14 2 14 8 20 8"/>
                     </svg>
-                    <div className="small text-muted">مسودات</div>
+                    <div className="small text-muted">{t('stock.cycle.drafts')}</div>
                     <div className="fw-bold fs-4 text-primary">
                         {cycleCounts.filter(c => c.status === 'draft').length}
                     </div>
@@ -226,10 +226,10 @@ function CycleCounts() {
                 <div className="form-row" style={{ gap: '12px', flexWrap: 'wrap' }}>
                     <select className="form-input" style={{ maxWidth: '180px' }}
                         value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">كل الحالات</option>
-                        <option value="draft">مسودة</option>
-                        <option value="in_progress">جاري العد</option>
-                        <option value="completed">مكتمل</option>
+                        <option value="">{t('common.all_statuses')}</option>
+                        <option value="draft">{t('stock.cycle.draft')}</option>
+                        <option value="in_progress">{t('stock.cycle.in_progress')}</option>
+                        <option value="completed">{t('stock.cycle.completed')}</option>
                     </select>
                 </div>
             </div>
@@ -240,22 +240,22 @@ function CycleCounts() {
                     <table className="data-table">
                         <thead>
                             <tr style={{ background: 'var(--bg-secondary)' }}>
-                                <th style={{ width: '12%' }}>رقم الجرد</th>
-                                <th style={{ width: '15%' }}>المستودع</th>
-                                <th style={{ width: '12%' }}>النوع</th>
-                                <th style={{ width: '10%' }}>عدد الأصناف</th>
-                                <th style={{ width: '10%' }}>الفروقات</th>
-                                <th style={{ width: '10%' }}>الحالة</th>
-                                <th style={{ width: '15%' }}>التاريخ</th>
-                                <th style={{ width: '16%' }}>إجراءات</th>
+                                <th style={{ width: '12%' }}>{t('stock.cycle.count_number')}</th>
+                                <th style={{ width: '15%' }}>{t('stock.cycle.warehouse')}</th>
+                                <th style={{ width: '12%' }}>{t('stock.cycle.type')}</th>
+                                <th style={{ width: '10%' }}>{t('stock.cycle.items_count')}</th>
+                                <th style={{ width: '10%' }}>{t('stock.cycle.variances')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '15%' }}>{t('stock.cycle.date')}</th>
+                                <th style={{ width: '16%' }}>{t('common.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>جاري التحميل...</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</td></tr>
                             ) : cycleCounts.length === 0 ? (
                                 <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                                    لا توجد عمليات جرد
+                                    {t('stock.cycle.no_counts')}
                                 </td></tr>
                             ) : cycleCounts.map(cc => (
                                 <tr key={cc.id}>
@@ -276,17 +276,17 @@ function CycleCounts() {
                                         <div style={{ display: 'flex', gap: '6px' }}>
                                             {cc.status === 'draft' && (
                                                 <button className="btn btn-sm btn-primary" onClick={() => handleStart(cc.id)}>
-                                                    ▶ بدء العد
+                                                    ▶ {t('stock.cycle.start_count')}
                                                 </button>
                                             )}
                                             {cc.status === 'in_progress' && (
                                                 <button className="btn btn-sm btn-success" onClick={() => openDetail(cc)}>
-                                                    📝 تسجيل العد
+                                                    📝 {t('stock.cycle.record_count')}
                                                 </button>
                                             )}
                                             {cc.status === 'completed' && (
                                                 <button className="btn btn-sm btn-secondary" onClick={() => openDetail(cc)}>
-                                                    👁 عرض
+                                                    👁 {t('stock.cycle.view')}
                                                 </button>
                                             )}
                                         </div>
@@ -304,36 +304,36 @@ function CycleCounts() {
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}
                         style={{ maxWidth: '700px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
-                            <h2>إنشاء عملية جرد جديدة</h2>
+                            <h2>{t('stock.cycle.create_count')}</h2>
                             <button className="modal-close" onClick={() => setShowCreateModal(false)}>✕</button>
                         </div>
                         <form onSubmit={handleCreate}>
                             {error && <div className="alert alert-error mb-4">{error}</div>}
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">المستودع *</label>
+                                    <label className="form-label">{t('stock.cycle.warehouse')} *</label>
                                     <select className="form-input" required value={form.warehouse_id}
                                         onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}>
-                                        <option value="">-- اختر المستودع --</option>
+                                        <option value="">{t('stock.cycle.select_warehouse')}</option>
                                         {warehouses.map(w => (
                                             <option key={w.id} value={w.id}>{w.warehouse_name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">نوع الجرد</label>
+                                    <label className="form-label">{t('stock.cycle.count_type')}</label>
                                     <select className="form-input" value={form.count_type}
                                         onChange={(e) => setForm({ ...form, count_type: e.target.value })}>
-                                        <option value="full">جرد شامل</option>
-                                        <option value="partial">جرد جزئي</option>
-                                        <option value="random">جرد عشوائي</option>
+                                        <option value="full">{t('stock.cycle.full_count')}</option>
+                                        <option value="partial">{t('stock.cycle.partial_count')}</option>
+                                        <option value="random">{t('stock.cycle.random_count')}</option>
                                     </select>
                                 </div>
                             </div>
 
                             {form.count_type === 'partial' && (
                                 <div className="form-group">
-                                    <label className="form-label">اختر المنتجات للجرد</label>
+                                    <label className="form-label">{t('stock.cycle.select_products')}</label>
                                     <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px' }}>
                                         {products.filter(p => p.item_type === 'product').map(p => (
                                             <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', cursor: 'pointer' }}>
@@ -343,22 +343,22 @@ function CycleCounts() {
                                             </label>
                                         ))}
                                     </div>
-                                    <small style={{ color: 'var(--text-secondary)' }}>تم اختيار {form.product_ids.length} منتج</small>
+                                    <small style={{ color: 'var(--text-secondary)' }}>{t('stock.cycle.selected_products', { count: form.product_ids.length })}</small>
                                 </div>
                             )}
 
                             <div className="form-group">
-                                <label className="form-label">ملاحظات</label>
+                                <label className="form-label">{t('common.notes')}</label>
                                 <textarea className="form-input" rows="2" value={form.notes}
                                     onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                             </div>
 
                             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'جاري الإنشاء...' : 'إنشاء الجرد'}
+                                    {saving ? t('common.creating') : t('stock.cycle.create_count_btn')}
                                 </button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         </form>
@@ -373,15 +373,15 @@ function CycleCounts() {
                         style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
                             <h2>
-                                {selectedCount?.status === 'in_progress' ? '📝 تسجيل العد' : '👁 تفاصيل الجرد'} - {countDetail.count_number}
+                                {selectedCount?.status === 'in_progress' ? `📝 ${t('stock.cycle.record_count')}` : `👁 ${t('stock.cycle.detail_view')}`} - {countDetail.count_number}
                             </h2>
                             <button className="modal-close" onClick={() => setShowDetailModal(false)}>✕</button>
                         </div>
 
                         <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-                            <div><strong>المستودع:</strong> {countDetail.warehouse_name}</div>
-                            <div><strong>النوع:</strong> {getCountTypeName(countDetail.count_type)}</div>
-                            <div><strong>الحالة:</strong> {getStatusBadge(countDetail.status)}</div>
+                            <div><strong>{t('stock.cycle.warehouse')}:</strong> {countDetail.warehouse_name}</div>
+                            <div><strong>{t('stock.cycle.type')}:</strong> {getCountTypeName(countDetail.count_type)}</div>
+                            <div><strong>{t('common.status')}:</strong> {getStatusBadge(countDetail.status)}</div>
                         </div>
 
                         {error && <div className="alert alert-error mb-4">{error}</div>}
@@ -390,11 +390,11 @@ function CycleCounts() {
                             <table className="data-table">
                                 <thead>
                                     <tr style={{ background: 'var(--bg-secondary)' }}>
-                                        <th>المنتج</th>
-                                        <th>كمية النظام</th>
-                                        <th>الكمية الفعلية</th>
-                                        <th>الفرق</th>
-                                        <th>ملاحظات</th>
+                                        <th>{t('common.product')}</th>
+                                        <th>{t('stock.cycle.system_quantity')}</th>
+                                        <th>{t('stock.cycle.actual_quantity')}</th>
+                                        <th>{t('stock.cycle.variance')}</th>
+                                        <th>{t('common.notes')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -426,7 +426,7 @@ function CycleCounts() {
                                                             style={{ width: '150px' }}
                                                             value={update?.notes ?? ''}
                                                             onChange={(e) => updateItemCount(item.id, 'notes', e.target.value)}
-                                                            placeholder="سبب الفرق..." />
+                                                            placeholder={t('stock.cycle.variance_reason')} />
                                                     ) : (
                                                         item.notes || '-'
                                                     )}
@@ -441,10 +441,10 @@ function CycleCounts() {
                         {selectedCount?.status === 'in_progress' && (
                             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
                                 <button className="btn btn-success" onClick={handleComplete} disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : '✓ إتمام الجرد وتعديل المخزون'}
+                                    {saving ? t('common.saving') : `✓ ${t('stock.cycle.complete_count')}`}
                                 </button>
                                 <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                             </div>
                         )}

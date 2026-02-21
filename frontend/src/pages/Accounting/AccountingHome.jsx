@@ -71,12 +71,12 @@ function AccountingHome() {
             items: [
                 { label: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', icon: '📚', permission: 'accounting.view' },
                 { label: t('accounting.home.links.trial_balance'), path: '/accounting/trial-balance', icon: '⚖️', permission: 'accounting.view' },
-                { label: t('accounting.home.links.vat_report') || 'إقرار ضريبة القيمة المضافة', path: '/accounting/vat-report', icon: '🧾', permission: 'accounting.view' },
+                { label: t('accounting.home.links.vat_report'), path: '/accounting/vat-report', icon: '🧾', permission: 'accounting.view' },
                 { label: t('accounting.home.links.income_statement'), path: '/accounting/income-statement', icon: '📈', permission: 'accounting.view' },
                 { label: t('accounting.home.links.balance_sheet'), path: '/accounting/balance-sheet', icon: '🏦', permission: 'accounting.view' },
-                { label: t('accounting.home.links.tax_audit') || 'سجل التدقيق الضريبي', path: '/accounting/tax-audit', icon: '🔍', permission: 'accounting.view' },
-                { label: t('accounting.home.links.cashflow_report') || 'قائمة التدفقات النقدية', path: '/accounting/cashflow', icon: '🌊', permission: 'accounting.view' },
-                { label: t('accounting.home.links.inventory_valuation') || 'تقييم المخزون', path: '/stock/valuation-report', icon: '📦', permission: 'reports.view' },
+                { label: t('accounting.home.links.tax_audit'), path: '/accounting/tax-audit', icon: '🔍', permission: 'accounting.view' },
+                { label: t('accounting.home.links.cashflow_report'), path: '/accounting/cashflow', icon: '🌊', permission: 'accounting.view' },
+                { label: t('accounting.home.links.inventory_valuation'), path: '/stock/valuation-report', icon: '📦', permission: 'reports.view' },
                 { label: i18n.language === 'ar' ? 'مقارنة الفترات' : 'Period Comparison', path: '/accounting/period-comparison', icon: '📊', permission: 'accounting.view' }
             ]
         }
