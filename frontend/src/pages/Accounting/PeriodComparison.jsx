@@ -6,18 +6,9 @@ import { useToast } from '../../context/ToastContext'
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 
-const REPORT_TYPES = {
-    'profit-loss': { ar: 'قائمة الدخل', en: 'Income Statement' },
-    'balance-sheet': { ar: 'الميزانية العمومية', en: 'Balance Sheet' },
-    'trial-balance': { ar: 'ميزان المراجعة', en: 'Trial Balance' },
-}
+// Report types use t() keys
 
-const PRESET_PERIODS = {
-    'yoy': { ar: 'سنة بسنة', en: 'Year over Year' },
-    'qoq': { ar: 'ربع بربع', en: 'Quarter over Quarter' },
-    'mom': { ar: 'شهر بشهر', en: 'Month over Month' },
-    'custom': { ar: 'مخصص', en: 'Custom' },
-}
+// Preset periods use t() keys
 
 function getPresetPeriods(preset) {
     const now = new Date()
@@ -79,7 +70,6 @@ function getPresetPeriods(preset) {
 export default function PeriodComparison() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
-    const isAr = i18n.language === 'ar'
 
     const [reportType, setReportType] = useState('profit-loss')
     const [preset, setPreset] = useState('yoy')
@@ -156,17 +146,17 @@ export default function PeriodComparison() {
     }) || []
 
     const TYPE_LABELS = {
-        asset: isAr ? 'أصول' : 'Assets',
-        liability: isAr ? 'خصوم' : 'Liabilities',
-        equity: isAr ? 'حقوق ملكية' : 'Equity',
-        revenue: isAr ? 'إيرادات' : 'Revenue',
-        expense: isAr ? 'مصروفات' : 'Expenses',
+        asset: t('comparison.type_asset'),
+        liability: t('comparison.type_liability'),
+        equity: t('comparison.type_equity'),
+        revenue: t('comparison.type_revenue'),
+        expense: t('comparison.type_expense'),
     }
 
     return (
-        <div className="module-container" dir={isAr ? 'rtl' : 'ltr'}>
+        <div className="module-container" dir={i18n.dir()}>
             <div className="module-header">
-                <h2>📊 {isAr ? 'تقارير مقارنة الفترات' : 'Period Comparison Reports'}</h2>
+                <h2>📊 {t('comparison.title')}</h2>
             </div>
 
             {/* Controls */}
@@ -174,29 +164,29 @@ export default function PeriodComparison() {
                 <div className="card-body">
                     <div className="row g-3 align-items-end">
                         <div className="col-md-3">
-                            <label className="form-label">{isAr ? 'نوع التقرير' : 'Report Type'}</label>
+                            <label className="form-label">{t('comparison.report_type')}</label>
                             <select className="form-input" value={reportType} onChange={e => setReportType(e.target.value)}>
-                                {Object.entries(REPORT_TYPES).map(([k, v]) => (
-                                    <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                                {[['profit-loss','comparison.report_profit_loss'],['balance-sheet','comparison.report_balance_sheet'],['trial-balance','comparison.report_trial_balance']].map(([k, tk]) => (
+                                    <option key={k} value={k}>{t(tk)}</option>
                                 ))}
                             </select>
                         </div>
                         <div className="col-md-3">
-                            <label className="form-label">{isAr ? 'الفترة' : 'Period Preset'}</label>
+                            <label className="form-label">{t('comparison.period_preset')}</label>
                             <select className="form-input" value={preset} onChange={e => handlePresetChange(e.target.value)}>
-                                {Object.entries(PRESET_PERIODS).map(([k, v]) => (
-                                    <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                                {[['yoy','comparison.preset_yoy'],['qoq','comparison.preset_qoq'],['mom','comparison.preset_mom'],['custom','comparison.preset_custom']].map(([k, tk]) => (
+                                    <option key={k} value={k}>{t(tk)}</option>
                                 ))}
                             </select>
                         </div>
                         <div className="col-md-3">
                             <button className="btn btn-primary" onClick={fetchComparison} disabled={loading}>
-                                {loading ? '⏳' : '🔍'} {isAr ? 'عرض المقارنة' : 'Compare'}
+                                {loading ? '⏳' : '🔍'} {t('comparison.compare')}
                             </button>
                         </div>
                         <div className="col-md-3 text-end">
                             <button className="btn btn-outline-secondary btn-sm" onClick={addPeriod}>
-                                + {isAr ? 'فترة إضافية' : 'Add Period'}
+                                + {t('comparison.add_period')}
                             </button>
                         </div>
                     </div>
@@ -206,19 +196,19 @@ export default function PeriodComparison() {
                         {customPeriods.map((p, idx) => (
                             <div key={idx} className="row g-2 mb-2 align-items-center">
                                 <div className="col-auto">
-                                    <span className="badge bg-primary">{isAr ? `فترة ${idx + 1}` : `Period ${idx + 1}`}</span>
+                                    <span className="badge bg-primary">{`${t('comparison.period_n')} ${idx + 1}`}</span>
                                 </div>
                                 <div className="col">
                                     <DateInput className="form-input form-input-sm" value={p.start}
                                         onChange={e => { updatePeriod(idx, 'start', e.target.value); setPreset('custom') }} />
                                 </div>
-                                <div className="col-auto">{isAr ? 'إلى' : 'to'}</div>
+                                <div className="col-auto">{t('comparison.to')}</div>
                                 <div className="col">
                                     <DateInput className="form-input form-input-sm" value={p.end}
                                         onChange={e => { updatePeriod(idx, 'end', e.target.value); setPreset('custom') }} />
                                 </div>
                                 <div className="col">
-                                    <input className="form-input form-input-sm" placeholder={isAr ? 'تسمية' : 'Label'}
+                                    <input className="form-input form-input-sm" placeholder={t('comparison.label')}
                                         value={p.label || ''} onChange={e => updatePeriod(idx, 'label', e.target.value)} />
                                 </div>
                                 <div className="col-auto">
@@ -249,15 +239,15 @@ export default function PeriodComparison() {
                                         {reportType === 'profit-loss' && (
                                             <div className="row text-center">
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'الإيرادات' : 'Revenue'}</div>
+                                                    <div className="small text-muted">{t('comparison.revenue')}</div>
                                                     <div className="fw-bold text-success">{formatNum(s.total_revenue)}</div>
                                                 </div>
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'المصروفات' : 'Expenses'}</div>
+                                                    <div className="small text-muted">{t('comparison.expenses')}</div>
                                                     <div className="fw-bold text-danger">{formatNum(s.total_expense)}</div>
                                                 </div>
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'صافي الدخل' : 'Net Income'}</div>
+                                                    <div className="small text-muted">{t('comparison.net_income')}</div>
                                                     <div className={`fw-bold ${s.net_income >= 0 ? 'text-success' : 'text-danger'}`}>
                                                         {formatNum(s.net_income)}
                                                     </div>
@@ -267,15 +257,15 @@ export default function PeriodComparison() {
                                         {reportType === 'balance-sheet' && (
                                             <div className="row text-center">
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'الأصول' : 'Assets'}</div>
+                                                    <div className="small text-muted">{t('comparison.assets')}</div>
                                                     <div className="fw-bold">{formatNum(s.total_assets)}</div>
                                                 </div>
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'الخصوم' : 'Liabilities'}</div>
+                                                    <div className="small text-muted">{t('comparison.liabilities')}</div>
                                                     <div className="fw-bold">{formatNum(s.total_liabilities)}</div>
                                                 </div>
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'حقوق الملكية' : 'Equity'}</div>
+                                                    <div className="small text-muted">{t('comparison.equity')}</div>
                                                     <div className="fw-bold">{formatNum(s.total_equity)}</div>
                                                 </div>
                                             </div>
@@ -283,11 +273,11 @@ export default function PeriodComparison() {
                                         {reportType === 'trial-balance' && (
                                             <div className="row text-center">
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'مدين' : 'Debit'}</div>
+                                                    <div className="small text-muted">{t('comparison.debit')}</div>
                                                     <div className="fw-bold">{formatNum(s.total_debit)}</div>
                                                 </div>
                                                 <div className="col">
-                                                    <div className="small text-muted">{isAr ? 'دائن' : 'Credit'}</div>
+                                                    <div className="small text-muted">{t('comparison.credit')}</div>
                                                     <div className="fw-bold">{formatNum(s.total_credit)}</div>
                                                 </div>
                                             </div>
@@ -305,14 +295,14 @@ export default function PeriodComparison() {
                                 <table className="data-table table-hover mb-0">
                                     <thead className="table-light">
                                         <tr>
-                                            <th>{isAr ? 'رقم الحساب' : 'Code'}</th>
-                                            <th>{isAr ? 'اسم الحساب' : 'Account'}</th>
-                                            <th>{isAr ? 'النوع' : 'Type'}</th>
+                                            <th>{t('comparison.code')}</th>
+                                            <th>{t('comparison.account')}</th>
+                                            <th>{t('comparison.type')}</th>
                                             {reportType === 'trial-balance' ? (
                                                 periodLabels.map((label, idx) => (
                                                     <React.Fragment key={idx}>
-                                                        <th className="text-end">{label} ({isAr ? 'مدين' : 'Dr'})</th>
-                                                        <th className="text-end">{label} ({isAr ? 'دائن' : 'Cr'})</th>
+                                                        <th className="text-end">{label} ({t('comparison.dr')})</th>
+                                                        <th className="text-end">{label} ({t('comparison.cr')})</th>
                                                     </React.Fragment>
                                                 ))
                                             ) : (
@@ -320,7 +310,7 @@ export default function PeriodComparison() {
                                                     {periodLabels.map((label, idx) => (
                                                         <th key={idx} className="text-end">{label}</th>
                                                     ))}
-                                                    <th className="text-end">{isAr ? 'التغيير' : 'Change'}</th>
+                                                    <th className="text-end">{t('comparison.change')}</th>
                                                     <th className="text-end">%</th>
                                                 </>
                                             )}
@@ -330,7 +320,7 @@ export default function PeriodComparison() {
                                         {result.comparison.map((row, idx) => (
                                             <tr key={idx}>
                                                 <td className="text-muted small">{row.account_number}</td>
-                                                <td>{isAr ? row.name : (row.name_en || row.name)}</td>
+                                                <td>{i18n.language === 'ar' ? row.name : (row.name_en || row.name)}</td>
                                                 <td><span className="badge bg-secondary">{TYPE_LABELS[row.account_type] || row.account_type}</span></td>
                                                 {reportType === 'trial-balance' ? (
                                                     row.periods.map((p, pi) => (

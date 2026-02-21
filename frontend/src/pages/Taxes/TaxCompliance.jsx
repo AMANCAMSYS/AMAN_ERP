@@ -17,7 +17,6 @@ function TaxCompliance() {
     const { t, i18n } = useTranslation()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
-    const isAr = i18n.language === 'ar'
 
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('overview')
@@ -187,7 +186,7 @@ function TaxCompliance() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                         <span style={{ fontSize: '24px' }}>{COUNTRY_FLAGS[j.country_code] || '🏳️'}</span>
                                         <div>
-                                            <strong>{isAr ? j.name_ar : j.name_en}</strong>
+                                            <strong>{i18n.language === 'ar' ? j.name_ar : j.name_en}</strong>
                                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{j.country_code}</div>
                                         </div>
                                     </div>
@@ -251,7 +250,7 @@ function TaxCompliance() {
                                 <option value="">{t('tax_compliance.select_country')}</option>
                                 {(countries || []).map(c => (
                                     <option key={c.code || c.country_code} value={c.code || c.country_code}>
-                                        {COUNTRY_FLAGS[c.code || c.country_code]} {isAr ? c.name_ar : c.name_en}
+                                        {COUNTRY_FLAGS[c.code || c.country_code]} {i18n.language === 'ar' ? c.name_ar : c.name_en}
                                     </option>
                                 ))}
                             </select>
@@ -263,7 +262,7 @@ function TaxCompliance() {
                                     <thead>
                                         <tr>
                                             <th>{t('tax_compliance.tax_type')}</th>
-                                            <th>{isAr ? t('tax_compliance.name_ar') : t('tax_compliance.name_en')}</th>
+                                            <th>{t(i18n.language === 'ar' ? 'tax_compliance.name_ar' : 'tax_compliance.name_en')}</th>
                                             <th>{t('tax_compliance.default_rate')}</th>
                                             <th>{t('tax_compliance.required')}</th>
                                             <th>{t('tax_compliance.applies_to')}</th>
@@ -274,7 +273,7 @@ function TaxCompliance() {
                                         {regimes.map(r => (
                                             <tr key={r.id}>
                                                 <td><code style={{ padding: '2px 6px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '12px' }}>{r.tax_type}</code></td>
-                                                <td>{isAr ? r.name_ar : r.name_en}</td>
+                                                <td>{i18n.language === 'ar' ? r.name_ar : r.name_en}</td>
                                                 <td style={{ fontWeight: 600 }}>{r.default_rate}%</td>
                                                 <td>{r.is_required ?
                                                     <span style={{ color: 'var(--error)', fontWeight: 600 }}>✓ {t('tax_compliance.mandatory')}</span> :
@@ -368,7 +367,7 @@ function TaxCompliance() {
                                             {reportData.boxes.map((box, i) => (
                                                 <tr key={i} style={box.is_total ? { fontWeight: 700, background: 'var(--bg-secondary)' } : {}}>
                                                     <td>{box.box_number || box.number || (i + 1)}</td>
-                                                    <td>{isAr ? (box.description_ar || box.description) : (box.description_en || box.description)}</td>
+                                                    <td>{i18n.language === 'ar' ? (box.description_ar || box.description) : (box.description_en || box.description)}</td>
                                                     <td style={{ textAlign: 'end' }}>{box.taxable_amount != null ? formatNumber(box.taxable_amount) : '—'}</td>
                                                     <td style={{ textAlign: 'end' }}>{box.tax_amount != null ? formatNumber(box.tax_amount) : (box.amount != null ? formatNumber(box.amount) : '—')}</td>
                                                 </tr>
@@ -457,7 +456,7 @@ function TaxCompliance() {
                                         <tbody>
                                             {(branchSettings.settings || branchSettings.regimes || []).map((s, i) => (
                                                 <tr key={i}>
-                                                    <td>{isAr ? s.name_ar : s.name_en}</td>
+                                                    <td>{i18n.language === 'ar' ? s.name_ar : s.name_en}</td>
                                                     <td style={{ fontWeight: 600 }}>{s.effective_rate ?? s.override_rate ?? s.default_rate}%</td>
                                                     <td>{s.is_active ? <CheckCircle size={16} style={{ color: 'var(--success)' }} /> : '—'}</td>
                                                     <td>{s.registration_number || '—'}</td>

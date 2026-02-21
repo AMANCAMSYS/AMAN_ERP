@@ -8,7 +8,6 @@ from utils.permissions import require_permission
 from database import get_db_connection
 from utils.accounting import update_account_balance, get_base_currency
 from utils.exports import generate_excel, generate_pdf, create_export_response
-from utils.exports import generate_excel, generate_pdf, create_export_response
 from schemas import UserResponse
 from schemas.manufacturing_advanced import (
     WorkCenterCreate, WorkCenterResponse,

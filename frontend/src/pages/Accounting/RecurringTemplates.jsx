@@ -6,18 +6,11 @@ import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
-const FREQ_LABELS = {
-    daily: { ar: 'يومي', en: 'Daily' },
-    weekly: { ar: 'أسبوعي', en: 'Weekly' },
-    monthly: { ar: 'شهري', en: 'Monthly' },
-    quarterly: { ar: 'ربع سنوي', en: 'Quarterly' },
-    yearly: { ar: 'سنوي', en: 'Yearly' },
-}
+
 
 export default function RecurringTemplates() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
-    const isAr = i18n.language === 'ar'
 
     const [templates, setTemplates] = useState([])
     const [loading, setLoading] = useState(true)
@@ -48,7 +41,7 @@ export default function RecurringTemplates() {
             const res = await accountingAPI.listRecurringTemplates(params)
             setTemplates(res.data)
         } catch {
-            showToast(isAr ? 'خطأ في جلب القوالب' : 'Error loading templates', 'error')
+            showToast(t('recurring.error_loading'), 'error')
         } finally {
             setLoading(false)
         }
@@ -104,7 +97,7 @@ export default function RecurringTemplates() {
             setEditId(id)
             setShowModal(true)
         } catch {
-            showToast(isAr ? 'خطأ في جلب التفاصيل' : 'Error loading details', 'error')
+            showToast(t('recurring.error_details'), 'error')
         }
     }
 
@@ -114,7 +107,7 @@ export default function RecurringTemplates() {
             setDetailData(res.data)
             setShowDetailModal(true)
         } catch {
-            showToast(isAr ? 'خطأ' : 'Error', 'error')
+            showToast(t('recurring.error'), 'error')
         }
     }
 
@@ -137,10 +130,10 @@ export default function RecurringTemplates() {
         try {
             if (editId) {
                 await accountingAPI.updateRecurringTemplate(editId, payload)
-                showToast(isAr ? 'تم تعديل القالب' : 'Template updated', 'success')
+                showToast(t('recurring.template_updated'), 'success')
             } else {
                 await accountingAPI.createRecurringTemplate(payload)
-                showToast(isAr ? 'تم إنشاء القالب' : 'Template created', 'success')
+                showToast(t('recurring.template_created'), 'success')
             }
             setShowModal(false)
             resetForm()
@@ -151,10 +144,10 @@ export default function RecurringTemplates() {
     }
 
     const handleDelete = async (id, name) => {
-        if (!confirm(isAr ? `حذف القالب "${name}"؟` : `Delete template "${name}"?`)) return
+        if (!confirm(`${t('recurring.delete_confirm')} "${name}"?`)) return
         try {
             await accountingAPI.deleteRecurringTemplate(id)
-            showToast(isAr ? 'تم الحذف' : 'Deleted', 'success')
+            showToast(t('recurring.deleted'), 'success')
             fetchTemplates()
         } catch (err) {
             showToast(err.response?.data?.detail || 'Error', 'error')
@@ -166,7 +159,7 @@ export default function RecurringTemplates() {
         try {
             const res = await accountingAPI.generateFromTemplate(id)
             showToast(
-                isAr ? `تم توليد القيد #${res.data.entry_id}` : `Generated entry #${res.data.entry_id}`,
+                `${t('recurring.generated_entry')} #${res.data.entry_id}`,
                 'success'
             )
             fetchTemplates()
@@ -182,9 +175,7 @@ export default function RecurringTemplates() {
             const res = await accountingAPI.generateDueTemplates()
             const d = res.data
             showToast(
-                isAr
-                    ? `تم توليد ${d.generated_count} قيد${d.error_count ? ` (${d.error_count} أخطاء)` : ''}`
-                    : `Generated ${d.generated_count} entries${d.error_count ? ` (${d.error_count} errors)` : ''}`,
+                `${t('recurring.generated_count')}: ${d.generated_count}${d.error_count ? ` (${d.error_count} ${t('recurring.errors_count')})` : ''}`,
                 d.error_count ? 'warning' : 'success'
             )
             fetchTemplates()
@@ -217,25 +208,25 @@ export default function RecurringTemplates() {
     const totalCredit = form.lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0)
     const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01
 
-    const freqLabel = (f) => FREQ_LABELS[f]?.[isAr ? 'ar' : 'en'] || f
+    const freqLabel = (f) => t(`recurring.freq_${f}`) || f
 
     return (
-        <div className="module-container" dir={isAr ? 'rtl' : 'ltr'}>
+        <div className="module-container" dir={i18n.dir()}>
             <div className="module-header">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h2>🔄 {isAr ? 'القيود المتكررة' : 'Recurring Journal Entries'}</h2>
+                    <h2>🔄 {t('recurring.title')}</h2>
                     <div className="d-flex gap-2">
                         <select className="form-input" style={{ width: 'auto' }}
                             value={filterActive} onChange={e => setFilterActive(e.target.value)}>
-                            <option value="">{isAr ? 'الكل' : 'All'}</option>
-                            <option value="true">{isAr ? 'نشط' : 'Active'}</option>
-                            <option value="false">{isAr ? 'متوقف' : 'Inactive'}</option>
+                            <option value="">{t('recurring.filter_all')}</option>
+                            <option value="true">{t('recurring.filter_active')}</option>
+                            <option value="false">{t('recurring.filter_inactive')}</option>
                         </select>
                         <button className="btn btn-outline-primary btn-sm" onClick={handleGenerateAll}>
-                            ⚡ {isAr ? 'توليد المستحقة' : 'Generate Due'}
+                            ⚡ {t('recurring.generate_due')}
                         </button>
                         <button className="btn btn-primary btn-sm" onClick={openCreate}>
-                            + {isAr ? 'قالب جديد' : 'New Template'}
+                            + {t('recurring.new_template')}
                         </button>
                     </div>
                 </div>
@@ -245,7 +236,7 @@ export default function RecurringTemplates() {
                 <div className="text-center p-5"><div className="spinner-border" /></div>
             ) : templates.length === 0 ? (
                 <div className="text-center text-muted p-5">
-                    {isAr ? 'لا توجد قوالب متكررة' : 'No recurring templates'}
+                    {t('recurring.no_templates')}
                 </div>
             ) : (
                 <div className="data-table-container">
@@ -253,14 +244,14 @@ export default function RecurringTemplates() {
                         <thead>
                             <tr>
                                 <th>#</th>
-                                <th>{isAr ? 'الاسم' : 'Name'}</th>
-                                <th>{isAr ? 'التكرار' : 'Frequency'}</th>
-                                <th>{isAr ? 'التنفيذ التالي' : 'Next Run'}</th>
-                                <th>{isAr ? 'آخر تنفيذ' : 'Last Run'}</th>
-                                <th>{isAr ? 'التنفيذ' : 'Runs'}</th>
-                                <th>{isAr ? 'ترحيل تلقائي' : 'Auto Post'}</th>
-                                <th>{isAr ? 'الحالة' : 'Status'}</th>
-                                <th>{isAr ? 'إجراءات' : 'Actions'}</th>
+                                <th>{t('recurring.name')}</th>
+                                <th>{t('recurring.frequency')}</th>
+                                <th>{t('recurring.next_run')}</th>
+                                <th>{t('recurring.last_run')}</th>
+                                <th>{t('recurring.runs')}</th>
+                                <th>{t('recurring.auto_post')}</th>
+                                <th>{t('recurring.status')}</th>
+                                <th>{t('recurring.actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -284,12 +275,12 @@ export default function RecurringTemplates() {
                                     <td>{t.auto_post ? '✅' : '❌'}</td>
                                     <td>
                                         <span className={`badge ${t.is_active ? 'bg-success' : 'bg-secondary'}`}>
-                                            {t.is_active ? (isAr ? 'نشط' : 'Active') : (isAr ? 'متوقف' : 'Inactive')}
+                                            {t.is_active ? (t('recurring.filter_active')) : (t('recurring.filter_inactive'))}
                                         </span>
                                     </td>
                                     <td>
                                         <div className="btn-group btn-group-sm">
-                                            <button className="btn btn-outline-success" title={isAr ? 'توليد الآن' : 'Generate Now'}
+                                            <button className="btn btn-outline-success" title={t('recurring.generate_now')}
                                                 disabled={generating === t.id} onClick={() => handleGenerate(t.id)}>
                                                 {generating === t.id ? '⏳' : '⚡'}
                                             </button>
@@ -312,36 +303,36 @@ export default function RecurringTemplates() {
                             <div className="modal-header">
                                 <h5 className="modal-title">
                                     {editId
-                                        ? (isAr ? 'تعديل قالب متكرر' : 'Edit Recurring Template')
-                                        : (isAr ? 'قالب متكرر جديد' : 'New Recurring Template')}
+                                        ? (t('recurring.edit_template'))
+                                        : (t('recurring.new_template_title'))}
                                 </h5>
                                 <button type="button" className="btn-close" onClick={() => setShowModal(false)} />
                             </div>
                             <div className="modal-body">
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-4">
-                                        <label className="form-label">{isAr ? 'اسم القالب *' : 'Template Name *'}</label>
+                                        <label className="form-label">{t('recurring.template_name') + ' *'}</label>
                                         <input className="form-control" required value={form.name}
                                             onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                                     </div>
                                     <div className="col-md-4">
-                                        <label className="form-label">{isAr ? 'المرجع' : 'Reference'}</label>
+                                        <label className="form-label">{t('recurring.reference')}</label>
                                         <input className="form-control" value={form.reference}
                                             onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
                                     </div>
                                     <div className="col-md-4">
-                                        <label className="form-label">{isAr ? 'التكرار *' : 'Frequency *'}</label>
+                                        <label className="form-label">{t('recurring.frequency_label') + ' *'}</label>
                                         <select className="form-input" required value={form.frequency}
                                             onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))}>
-                                            {Object.entries(FREQ_LABELS).map(([k, v]) => (
-                                                <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                                            {['daily','weekly','monthly','quarterly','yearly'].map(k => (
+                                                <option key={k} value={k}>{t(`recurring.freq_${k}`)}</option>
                                             ))}
                                         </select>
                                     </div>
                                 </div>
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-3">
-                                        <label className="form-label">{isAr ? 'تاريخ البداية *' : 'Start Date *'}</label>
+                                        <label className="form-label">{t('recurring.start_date') + ' *'}</label>
                                         <DateInput className="form-control" required value={formatDate(form.start_date)}
                                             onChange={e => setForm(f => ({
                                                 ...f, start_date: e.target.value,
@@ -349,25 +340,25 @@ export default function RecurringTemplates() {
                                             }))} />
                                     </div>
                                     <div className="col-md-3">
-                                        <label className="form-label">{isAr ? 'تاريخ النهاية' : 'End Date'}</label>
+                                        <label className="form-label">{t('recurring.end_date')}</label>
                                         <DateInput className="form-control" value={formatDate(form.end_date)}
                                             onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">
-                                        <label className="form-label">{isAr ? 'التنفيذ التالي' : 'Next Run Date'}</label>
+                                        <label className="form-label">{t('recurring.next_run_date')}</label>
                                         <DateInput className="form-control" value={form.next_run_date}
                                             onChange={e => setForm(f => ({ ...f, next_run_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">
-                                        <label className="form-label">{isAr ? 'الحد الأقصى للتنفيذ' : 'Max Runs'}</label>
+                                        <label className="form-label">{t('recurring.max_runs')}</label>
                                         <input type="number" className="form-control" min="1" value={form.max_runs}
-                                            placeholder={isAr ? 'بلا حد' : 'Unlimited'}
+                                            placeholder={t('recurring.unlimited')}
                                             onChange={e => setForm(f => ({ ...f, max_runs: e.target.value }))} />
                                     </div>
                                 </div>
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-8">
-                                        <label className="form-label">{isAr ? 'الوصف' : 'Description'}</label>
+                                        <label className="form-label">{t('recurring.description')}</label>
                                         <input className="form-control" value={form.description}
                                             onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
                                     </div>
@@ -378,7 +369,7 @@ export default function RecurringTemplates() {
                                                 checked={form.is_active}
                                                 onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
                                             <label className="form-check-label" htmlFor="is_active">
-                                                {isAr ? 'نشط' : 'Active'}
+                                                {t('recurring.filter_active')}
                                             </label>
                                         </div>
                                     </div>
@@ -389,22 +380,22 @@ export default function RecurringTemplates() {
                                                 checked={form.auto_post}
                                                 onChange={e => setForm(f => ({ ...f, auto_post: e.target.checked }))} />
                                             <label className="form-check-label" htmlFor="auto_post">
-                                                {isAr ? 'ترحيل تلقائي' : 'Auto Post'}
+                                                {t('recurring.auto_post')}
                                             </label>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Lines */}
-                                <h6 className="mt-3 mb-2">{isAr ? 'بنود القيد' : 'Journal Lines'}</h6>
+                                <h6 className="mt-3 mb-2">{t('recurring.journal_lines')}</h6>
                                 <div className="data-table-container">
                                     <table className="data-table table-bordered">
                                         <thead className="table-light">
                                             <tr>
-                                                <th style={{ width: '35%' }}>{isAr ? 'الحساب' : 'Account'}</th>
-                                                <th style={{ width: '15%' }}>{isAr ? 'مدين' : 'Debit'}</th>
-                                                <th style={{ width: '15%' }}>{isAr ? 'دائن' : 'Credit'}</th>
-                                                <th style={{ width: '25%' }}>{isAr ? 'البيان' : 'Description'}</th>
+                                                <th style={{ width: '35%' }}>{t('recurring.account')}</th>
+                                                <th style={{ width: '15%' }}>{t('recurring.debit')}</th>
+                                                <th style={{ width: '15%' }}>{t('recurring.credit')}</th>
+                                                <th style={{ width: '25%' }}>{t('recurring.line_desc')}</th>
                                                 <th style={{ width: '10%' }}></th>
                                             </tr>
                                         </thead>
@@ -415,7 +406,7 @@ export default function RecurringTemplates() {
                                                         <select className="form-input" required
                                                             value={line.account_id}
                                                             onChange={e => updateLine(idx, 'account_id', e.target.value)}>
-                                                            <option value="">{isAr ? '-- اختر --' : '-- Select --'}</option>
+                                                            <option value="">{t('recurring.select_account')}</option>
                                                             {accounts.map(a => (
                                                                 <option key={a.id} value={a.id}>{a.account_number} - {a.name}</option>
                                                             ))}
@@ -445,12 +436,12 @@ export default function RecurringTemplates() {
                                         </tbody>
                                         <tfoot>
                                             <tr className="fw-bold">
-                                                <td className="text-end">{isAr ? 'الإجمالي' : 'Total'}</td>
+                                                <td className="text-end">{t('recurring.total')}</td>
                                                 <td className={!isBalanced ? 'text-danger' : ''}>{totalDebit.toFixed(2)}</td>
                                                 <td className={!isBalanced ? 'text-danger' : ''}>{totalCredit.toFixed(2)}</td>
                                                 <td colSpan="2">
                                                     <button type="button" className="btn btn-sm btn-outline-primary" onClick={addLine}>
-                                                        + {isAr ? 'سطر' : 'Line'}
+                                                        + {t('recurring.add_line')}
                                                     </button>
                                                 </td>
                                             </tr>
@@ -459,17 +450,17 @@ export default function RecurringTemplates() {
                                 </div>
                                 {!isBalanced && (
                                     <div className="alert alert-warning py-1 small">
-                                        ⚠️ {isAr ? 'القيد غير متوازن' : 'Entry is not balanced'} —
-                                        {isAr ? ' الفرق: ' : ' Difference: '}{Math.abs(totalDebit - totalCredit).toFixed(2)}
+                                        ⚠️ {t('recurring.not_balanced')} —
+                                        {` ${t('recurring.difference')}: `}{Math.abs(totalDebit - totalCredit).toFixed(2)}
                                     </div>
                                 )}
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                    {isAr ? 'إلغاء' : 'Cancel'}
+                                    {t('recurring.cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={!isBalanced || totalDebit === 0}>
-                                    {editId ? (isAr ? 'تحديث' : 'Update') : (isAr ? 'إنشاء' : 'Create')}
+                                    {editId ? (t('recurring.update')) : (t('recurring.create'))}
                                 </button>
                             </div>
                         </form>
@@ -489,47 +480,47 @@ export default function RecurringTemplates() {
                             <div className="modal-body">
                                 <div className="row mb-3">
                                     <div className="col-md-4">
-                                        <strong>{isAr ? 'التكرار:' : 'Frequency:'}</strong>{' '}
+                                        <strong>{t('recurring.detail_frequency')}</strong>{' '}
                                         <span className="badge bg-info">{freqLabel(detailData.frequency)}</span>
                                     </div>
                                     <div className="col-md-4">
-                                        <strong>{isAr ? 'الحالة:' : 'Status:'}</strong>{' '}
+                                        <strong>{t('recurring.detail_status')}</strong>{' '}
                                         <span className={`badge ${detailData.is_active ? 'bg-success' : 'bg-secondary'}`}>
-                                            {detailData.is_active ? (isAr ? 'نشط' : 'Active') : (isAr ? 'متوقف' : 'Inactive')}
+                                            {detailData.is_active ? (t('recurring.filter_active')) : (t('recurring.filter_inactive'))}
                                         </span>
                                     </div>
                                     <div className="col-md-4">
-                                        <strong>{isAr ? 'ترحيل تلقائي:' : 'Auto Post:'}</strong>{' '}
+                                        <strong>{t('recurring.detail_auto_post')}</strong>{' '}
                                         {detailData.auto_post ? '✅' : '❌'}
                                     </div>
                                 </div>
                                 <div className="row mb-3">
-                                    <div className="col-md-3"><strong>{isAr ? 'البداية:' : 'Start:'}</strong> {formatDate(detailData.start_date)}</div>
-                                    <div className="col-md-3"><strong>{isAr ? 'النهاية:' : 'End:'}</strong> {formatDate(detailData.end_date)}</div>
-                                    <div className="col-md-3"><strong>{isAr ? 'التالي:' : 'Next:'}</strong> {detailData.next_run_date}</div>
-                                    <div className="col-md-3"><strong>{isAr ? 'آخر تنفيذ:' : 'Last:'}</strong> {detailData.last_run_date || '-'}</div>
+                                    <div className="col-md-3"><strong>{t('recurring.detail_start')}</strong> {formatDate(detailData.start_date)}</div>
+                                    <div className="col-md-3"><strong>{t('recurring.detail_end')}</strong> {formatDate(detailData.end_date)}</div>
+                                    <div className="col-md-3"><strong>{t('recurring.detail_next')}</strong> {detailData.next_run_date}</div>
+                                    <div className="col-md-3"><strong>{t('recurring.detail_last')}</strong> {detailData.last_run_date || '-'}</div>
                                 </div>
                                 <div className="row mb-3">
                                     <div className="col-md-4">
-                                        <strong>{isAr ? 'التنفيذ:' : 'Runs:'}</strong>{' '}
+                                        <strong>{t('recurring.detail_runs')}</strong>{' '}
                                         {detailData.run_count || 0}{detailData.max_runs ? `/${detailData.max_runs}` : ''}
                                     </div>
                                     {detailData.reference && (
-                                        <div className="col-md-4"><strong>{isAr ? 'المرجع:' : 'Ref:'}</strong> {detailData.reference}</div>
+                                        <div className="col-md-4"><strong>{t('recurring.detail_ref')}</strong> {detailData.reference}</div>
                                     )}
                                     {detailData.description && (
-                                        <div className="col-md-4"><strong>{isAr ? 'الوصف:' : 'Desc:'}</strong> {detailData.description}</div>
+                                        <div className="col-md-4"><strong>{t('recurring.detail_desc')}</strong> {detailData.description}</div>
                                     )}
                                 </div>
 
-                                <h6>{isAr ? 'البنود' : 'Lines'}</h6>
+                                <h6>{t('recurring.lines')}</h6>
                                 <table className="data-table table-bordered">
                                     <thead className="table-light">
                                         <tr>
-                                            <th>{isAr ? 'الحساب' : 'Account'}</th>
-                                            <th>{isAr ? 'مدين' : 'Debit'}</th>
-                                            <th>{isAr ? 'دائن' : 'Credit'}</th>
-                                            <th>{isAr ? 'البيان' : 'Description'}</th>
+                                            <th>{t('recurring.account')}</th>
+                                            <th>{t('recurring.debit')}</th>
+                                            <th>{t('recurring.credit')}</th>
+                                            <th>{t('recurring.line_desc')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -544,7 +535,7 @@ export default function RecurringTemplates() {
                                     </tbody>
                                     <tfoot>
                                         <tr className="fw-bold">
-                                            <td>{isAr ? 'الإجمالي' : 'Total'}</td>
+                                            <td>{t('recurring.total')}</td>
                                             <td>{detailData.lines.reduce((s, l) => s + parseFloat(l.debit || 0), 0).toFixed(2)}</td>
                                             <td>{detailData.lines.reduce((s, l) => s + parseFloat(l.credit || 0), 0).toFixed(2)}</td>
                                             <td></td>
@@ -554,13 +545,13 @@ export default function RecurringTemplates() {
                             </div>
                             <div className="modal-footer">
                                 <button className="btn btn-outline-success btn-sm" onClick={() => { setShowDetailModal(false); handleGenerate(detailData.id) }}>
-                                    ⚡ {isAr ? 'توليد الآن' : 'Generate Now'}
+                                    ⚡ {t('recurring.generate_now')}
                                 </button>
                                 <button className="btn btn-outline-primary btn-sm" onClick={() => { setShowDetailModal(false); openEdit(detailData.id) }}>
-                                    ✏️ {isAr ? 'تعديل' : 'Edit'}
+                                    ✏️ {t('recurring.edit')}
                                 </button>
                                 <button className="btn btn-secondary btn-sm" onClick={() => setShowDetailModal(false)}>
-                                    {isAr ? 'إغلاق' : 'Close'}
+                                    {t('recurring.close')}
                                 </button>
                             </div>
                         </div>

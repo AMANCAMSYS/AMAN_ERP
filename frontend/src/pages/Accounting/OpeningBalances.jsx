@@ -8,7 +8,6 @@ import { formatDate, formatDateTime } from '../../utils/dateUtils';
 export default function OpeningBalances() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
-    const isAr = i18n.language === 'ar'
 
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -34,7 +33,7 @@ export default function OpeningBalances() {
                 setEntryDate(res.data.entry.entry_date.slice(0, 10))
             }
         } catch {
-            showToast(isAr ? 'خطأ في جلب البيانات' : 'Error loading data', 'error')
+            showToast(t('opening.error_loading'), 'error')
         } finally {
             setLoading(false)
         }
@@ -59,7 +58,7 @@ export default function OpeningBalances() {
                 }))
 
             const res = await accountingAPI.saveOpeningBalances({ lines, date: entryDate })
-            showToast(res.data.message || (isAr ? 'تم الحفظ' : 'Saved'), 'success')
+            showToast(res.data.message || (t('opening.saved')), 'success')
             fetchData()
         } catch (err) {
             showToast(err.response?.data?.detail || 'Error', 'error')
@@ -87,27 +86,27 @@ export default function OpeningBalances() {
     const formatNum = (n) => n ? parseFloat(n).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'
 
     const TYPE_LABELS = {
-        asset: { ar: 'أصول', en: 'Assets', color: 'primary' },
-        liability: { ar: 'خصوم', en: 'Liabilities', color: 'warning' },
-        equity: { ar: 'حقوق ملكية', en: 'Equity', color: 'success' },
-        revenue: { ar: 'إيرادات', en: 'Revenue', color: 'info' },
-        expense: { ar: 'مصروفات', en: 'Expenses', color: 'danger' },
+        asset: { label: t('comparison.type_asset'), color: 'primary' },
+        liability: { label: t('comparison.type_liability'), color: 'warning' },
+        equity: { label: t('comparison.type_equity'), color: 'success' },
+        revenue: { label: t('comparison.type_revenue'), color: 'info' },
+        expense: { label: t('comparison.type_expense'), color: 'danger' },
     }
 
     return (
-        <div className="module-container" dir={isAr ? 'rtl' : 'ltr'}>
+        <div className="module-container" dir={i18n.dir()}>
             <div className="module-header">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <h2>📋 {isAr ? 'الأرصدة الافتتاحية' : 'Opening Balances'}</h2>
+                        <h2>📋 {t('opening.title')}</h2>
                         {entryInfo && (
                             <small className="text-muted">
-                                {isAr ? 'قيد رقم: ' : 'Entry #'}{entryInfo.entry_number} — {formatDate(entryInfo.entry_date)}
+                                {t('opening.entry_number')}{entryInfo.entry_number} — {formatDate(entryInfo.entry_date)}
                             </small>
                         )}
                     </div>
                     <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving ? '⏳' : '💾'} {isAr ? 'حفظ الأرصدة' : 'Save Balances'}
+                        {saving ? '⏳' : '💾'} {t('opening.save')}
                     </button>
                 </div>
             </div>
@@ -115,20 +114,20 @@ export default function OpeningBalances() {
             {/* Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                 <div className="card p-3 text-center">
-                    <div className="small text-muted">{isAr ? 'تاريخ القيد' : 'Entry Date'}</div>
+                    <div className="small text-muted">{t('opening.entry_date')}</div>
                     <DateInput className="form-control form-control-sm mt-1"
                         value={entryDate} onChange={e => setEntryDate(e.target.value)} />
                 </div>
                 <div className="card p-3 text-center">
-                    <div className="small text-muted">{isAr ? 'إجمالي المدين' : 'Total Debit'}</div>
+                    <div className="small text-muted">{t('opening.total_debit')}</div>
                     <div className="fw-bold text-primary">{formatNum(totalDebit)}</div>
                 </div>
                 <div className="card p-3 text-center">
-                    <div className="small text-muted">{isAr ? 'إجمالي الدائن' : 'Total Credit'}</div>
+                    <div className="small text-muted">{t('opening.total_credit')}</div>
                     <div className="fw-bold text-success">{formatNum(totalCredit)}</div>
                 </div>
                 <div className={`card p-3 text-center ${!isBalanced ? 'border-danger' : 'border-success'}`}>
-                    <div className="small text-muted">{isAr ? 'الفرق' : 'Difference'}</div>
+                    <div className="small text-muted">{t('opening.difference')}</div>
                     <div className={`fw-bold ${isBalanced ? 'text-success' : 'text-danger'}`}>
                         {isBalanced ? '✅ 0.00' : formatNum(Math.abs(difference))}
                     </div>
@@ -137,29 +136,27 @@ export default function OpeningBalances() {
 
             {!isBalanced && (
                 <div className="alert alert-info py-2 small">
-                    ℹ️ {isAr
-                        ? 'سيتم إضافة الفرق تلقائياً إلى حساب حقوق الملكية عند الحفظ'
-                        : 'The difference will be automatically posted to an equity account on save'}
+                    ℹ️ {t('opening.auto_equity')}
                 </div>
             )}
 
             {/* Filters */}
             <div className="row g-2 mb-3">
                 <div className="col-md-6">
-                    <input className="form-control form-control-sm" placeholder={isAr ? '🔍 بحث بالرقم أو الاسم...' : '🔍 Search by code or name...'}
+                    <input className="form-control form-control-sm" placeholder={t('opening.search')}
                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="col-md-3">
                     <select className="form-input" value={filterType} onChange={e => setFilterType(e.target.value)}>
-                        <option value="">{isAr ? 'كل الأنواع' : 'All Types'}</option>
+                        <option value="">{t('opening.all_types')}</option>
                         {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                            <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                            <option key={k} value={k}>{v.label}</option>
                         ))}
                     </select>
                 </div>
                 <div className="col-md-3 text-end">
                     <span className="badge bg-secondary">
-                        {filteredAccounts.filter(a => a.debit > 0 || a.credit > 0).length} / {filteredAccounts.length} {isAr ? 'حساب' : 'accounts'}
+                        {filteredAccounts.filter(a => a.debit > 0 || a.credit > 0).length} / {filteredAccounts.length} {t('opening.accounts')}
                     </span>
                 </div>
             </div>
@@ -171,11 +168,11 @@ export default function OpeningBalances() {
                     <table className="data-table table-hover">
                         <thead className="table-light">
                             <tr>
-                                <th style={{ width: '10%' }}>{isAr ? 'رقم الحساب' : 'Code'}</th>
-                                <th style={{ width: '35%' }}>{isAr ? 'اسم الحساب' : 'Account Name'}</th>
-                                <th style={{ width: '12%' }}>{isAr ? 'النوع' : 'Type'}</th>
-                                <th style={{ width: '20%' }}>{isAr ? 'مدين' : 'Debit'}</th>
-                                <th style={{ width: '20%' }}>{isAr ? 'دائن' : 'Credit'}</th>
+                                <th style={{ width: '10%' }}>{t('opening.account_code')}</th>
+                                <th style={{ width: '35%' }}>{t('opening.account_name')}</th>
+                                <th style={{ width: '12%' }}>{t('opening.type')}</th>
+                                <th style={{ width: '20%' }}>{t('opening.debit')}</th>
+                                <th style={{ width: '20%' }}>{t('opening.credit')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -184,8 +181,8 @@ export default function OpeningBalances() {
                                 return (
                                     <tr key={a.id} className={(a.debit > 0 || a.credit > 0) ? 'table-light' : ''}>
                                         <td className="text-muted small">{a.account_number}</td>
-                                        <td>{isAr ? a.name : (a.name_en || a.name)}</td>
-                                        <td><span className={`badge bg-${tl.color || 'secondary'}`}>{tl[isAr ? 'ar' : 'en'] || a.account_type}</span></td>
+                                        <td>{i18n.language === 'ar' ? a.name : (a.name_en || a.name)}</td>
+                                        <td><span className={`badge bg-${tl.color || 'secondary'}`}>{tl.label || a.account_type}</span></td>
                                         <td>
                                             <input type="number" className="form-control form-control-sm"
                                                 step="0.01" min="0" value={a.debit || ''}
@@ -204,7 +201,7 @@ export default function OpeningBalances() {
                         </tbody>
                         <tfoot className="table-dark">
                             <tr className="fw-bold">
-                                <td colSpan="3" className="text-end">{isAr ? 'الإجمالي' : 'Total'}</td>
+                                <td colSpan="3" className="text-end">{t('opening.total')}</td>
                                 <td>{formatNum(totalDebit)}</td>
                                 <td>{formatNum(totalCredit)}</td>
                             </tr>
