@@ -1,0 +1,671 @@
+"""
+AMAN ERP - Authentication Router
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from sqlalchemy import text, create_engine
+from jose import jwt, JWTError
+from datetime import datetime, timedelta
+from typing import Optional
+import logging
+
+from database import get_system_db, verify_password, get_db_connection
+from config import settings
+from schemas import Token, UserResponse
+from utils.audit import log_activity, log_system_activity
+
+router = APIRouter(prefix="/auth", tags=["المصادقة"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+logger = logging.getLogger(__name__)
+
+# Login rate limiting - track failed attempts per IP AND per username
+_login_attempts = {}  # {ip: {"count": int, "last_attempt": datetime}}
+_username_attempts = {}  # {username: {"count": int, "last_attempt": datetime}}
+MAX_LOGIN_ATTEMPTS = 5
+MAX_USERNAME_ATTEMPTS = 10  # More lenient per-username (shared IPs)
+LOCKOUT_DURATION = timedelta(minutes=15)
+
+
+def check_rate_limit(request: Request, username: str = None):
+    """Check if IP or username has exceeded login attempt limit"""
+    client_ip = request.client.host if request.client else "unknown"
+    now = datetime.utcnow()
+    
+    # Check IP-based limit
+    if client_ip in _login_attempts:
+        info = _login_attempts[client_ip]
+        if now - info["last_attempt"] > LOCKOUT_DURATION:
+            del _login_attempts[client_ip]
+        elif info["count"] >= MAX_LOGIN_ATTEMPTS:
+            remaining = LOCKOUT_DURATION - (now - info["last_attempt"])
+            minutes = int(remaining.total_seconds() / 60) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"تم تجاوز عدد المحاولات المسموح. يرجى الانتظار {minutes} دقيقة"
+            )
+    
+    # Check username-based limit (prevents brute-force across IPs)
+    if username and username in _username_attempts:
+        info = _username_attempts[username]
+        if now - info["last_attempt"] > LOCKOUT_DURATION:
+            del _username_attempts[username]
+        elif info["count"] >= MAX_USERNAME_ATTEMPTS:
+            remaining = LOCKOUT_DURATION - (now - info["last_attempt"])
+            minutes = int(remaining.total_seconds() / 60) + 1
+            logger.warning(f"🔒 Username '{username}' locked out - too many attempts from multiple IPs")
+            raise HTTPException(
+                status_code=429,
+                detail=f"تم تجاوز عدد المحاولات لهذا المستخدم. يرجى الانتظار {minutes} دقيقة"
+            )
+
+
+def record_failed_attempt(request: Request, username: str = None):
+    """Record a failed login attempt for both IP and username"""
+    client_ip = request.client.host if request.client else "unknown"
+    now = datetime.utcnow()
+    if client_ip in _login_attempts:
+        _login_attempts[client_ip]["count"] += 1
+        _login_attempts[client_ip]["last_attempt"] = now
+    else:
+        _login_attempts[client_ip] = {"count": 1, "last_attempt": now}
+    
+    if username:
+        if username in _username_attempts:
+            _username_attempts[username]["count"] += 1
+            _username_attempts[username]["last_attempt"] = now
+        else:
+            _username_attempts[username] = {"count": 1, "last_attempt": now}
+
+
+def clear_failed_attempts(request: Request, username: str = None):
+    """Clear failed attempts on successful login"""
+    client_ip = request.client.host if request.client else "unknown"
+    if client_ip in _login_attempts:
+        del _login_attempts[client_ip]
+    if username and username in _username_attempts:
+        del _username_attempts[username]
+
+
+# ============ SEC-201: Persistent Token Blacklist ============
+# In-memory cache + DB persistence for token blacklist
+_token_blacklist_cache = set()  # Local cache for fast lookup
+_blacklist_initialized = False
+
+
+def _ensure_blacklist_table():
+    """Create token_blacklist table in system DB if not exists"""
+    global _blacklist_initialized
+    if _blacklist_initialized:
+        return
+    try:
+        from database import engine as sys_engine
+        with sys_engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS token_blacklist (
+                    id SERIAL PRIMARY KEY,
+                    token_hash VARCHAR(64) NOT NULL UNIQUE,
+                    expires_at TIMESTAMP NOT NULL,
+                    blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    username VARCHAR(100),
+                    reason VARCHAR(50) DEFAULT 'logout'
+                );
+                CREATE INDEX IF NOT EXISTS idx_token_blacklist_hash ON token_blacklist(token_hash);
+                CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+            """))
+            conn.commit()
+        _blacklist_initialized = True
+    except Exception as e:
+        logger.warning(f"Token blacklist table init failed: {e}")
+
+
+def _hash_token(token: str) -> str:
+    """Hash token for storage (don't store raw tokens)"""
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def add_token_to_blacklist(token: str, username: str = None, reason: str = "logout"):
+    """Add token to blacklist (DB + cache)"""
+    _ensure_blacklist_table()
+    token_hash = _hash_token(token)
+    _token_blacklist_cache.add(token_hash)
+
+    try:
+        # Extract expiry from token
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"verify_exp": False})
+        exp = payload.get("exp")
+        if exp:
+            expires_at = datetime.utcfromtimestamp(exp)
+        else:
+            expires_at = datetime.utcnow() + timedelta(hours=24)
+
+        from database import engine as sys_engine
+        with sys_engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO token_blacklist (token_hash, expires_at, username, reason)
+                VALUES (:hash, :exp, :user, :reason)
+                ON CONFLICT (token_hash) DO NOTHING
+            """), {"hash": token_hash, "exp": expires_at, "user": username, "reason": reason})
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"Failed to persist token blacklist: {e}")
+
+
+def is_token_blacklisted(token: str) -> bool:
+    """Check if token is blacklisted (cache first, then DB)"""
+    token_hash = _hash_token(token)
+
+    # Fast cache check
+    if token_hash in _token_blacklist_cache:
+        return True
+
+    # DB fallback (after restart, cache is empty)
+    try:
+        _ensure_blacklist_table()
+        from database import engine as sys_engine
+        with sys_engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT 1 FROM token_blacklist WHERE token_hash = :hash AND expires_at > CURRENT_TIMESTAMP"
+            ), {"hash": token_hash}).fetchone()
+            if row:
+                _token_blacklist_cache.add(token_hash)  # Populate cache
+                return True
+    except Exception:
+        pass
+
+    return False
+
+
+def cleanup_expired_blacklist():
+    """Remove expired tokens from blacklist (called periodically)"""
+    try:
+        _ensure_blacklist_table()
+        from database import engine as sys_engine
+        with sys_engine.connect() as conn:
+            deleted = conn.execute(text(
+                "DELETE FROM token_blacklist WHERE expires_at < CURRENT_TIMESTAMP"
+            )).rowcount
+            conn.commit()
+            if deleted:
+                logger.info(f"🧹 Cleaned {deleted} expired tokens from blacklist")
+    except Exception as e:
+        logger.warning(f"Blacklist cleanup failed: {e}")
+
+
+# Legacy compatibility alias
+token_blacklist = _token_blacklist_cache
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "iat": datetime.utcnow()})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        return None
+
+
+@router.post("/login", response_model=Token)
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    """تسجيل الدخول - يبحث تلقائياً في جميع الشركات"""
+    # Rate limit check (IP + username)
+    check_rate_limit(request, form_data.username)
+    
+    db = get_system_db()
+    
+    try:
+        # Check if system admin
+        result = db.execute(
+            text("SELECT rolname FROM pg_roles WHERE rolname = :username"),
+            {"username": form_data.username}
+        ).fetchone()
+        
+        if result and form_data.username == "admin":
+            # System admin login - verify password using bcrypt
+            from database import verify_password as verify_pwd, hash_password
+            
+            admin_hash = getattr(settings, 'ADMIN_PASSWORD_HASH', None)
+            if not admin_hash:
+                import os
+                admin_hash = os.environ.get('ADMIN_PASSWORD_HASH', None)
+            
+            if not admin_hash:
+                # SECURITY: No hash configured — reject login entirely
+                logger.critical("⚠️ ADMIN_PASSWORD_HASH not configured! Admin login DISABLED.")
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Admin password not configured. Set ADMIN_PASSWORD_HASH in .env"
+                )
+            
+            if not verify_pwd(form_data.password, admin_hash):
+                record_failed_attempt(request, form_data.username)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="كلمة المرور غير صحيحة",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            clear_failed_attempts(request, form_data.username)
+            access_token = create_access_token({
+                "sub": form_data.username,
+                "role": "system_admin",
+                "type": "system_admin",
+                "company_id": None,
+                "permissions": ["*"]
+            })
+            # LOG SYSTEM ADMIN LOGIN
+            log_system_activity(
+                action="auth.login",
+                performed_by=form_data.username,
+                description="System administrator logged in",
+                request=request
+            )
+            
+            return Token(
+                access_token=access_token,
+                token_type="bearer",
+                user={"username": form_data.username, "role": "system_admin", "company_id": None, "permissions": ["*"]}
+            )
+        
+        # DB-015: Fast lookup using central user index
+        indexed_companies = db.execute(
+            text("SELECT DISTINCT company_id FROM system_user_index WHERE username = :username AND is_active = true"),
+            {"username": form_data.username}
+        ).fetchall()
+
+        # If found in index, only check those companies
+        if indexed_companies:
+            companies = []
+            for ic in indexed_companies:
+                comp = db.execute(
+                    text("SELECT id, database_name, status FROM system_companies WHERE id = :id AND status = 'active'"),
+                    {"id": ic[0]}
+                ).fetchone()
+                if comp:
+                    companies.append(comp)
+        else:
+            # Fallback: search all companies (first login or missing index)
+            companies = db.execute(
+                text("SELECT id, database_name, status FROM system_companies WHERE status = 'active'")
+            ).fetchall()
+        
+        for company in companies:
+            company_id, db_name, company_status = company
+            conn_url = settings.get_company_database_url(company_id)
+            
+            try:
+                # Debug logging
+                # print(f"DEBUG: Checking company {company_id} ({db_name}) for user {form_data.username}")
+                
+                # Check for existing connection errors first
+                if not conn_url:
+                    print(f"ERROR: No connection URL for company {company_id}")
+                    continue
+
+                company_engine = create_engine(conn_url, pool_pre_ping=True)
+                with company_engine.connect() as company_conn:
+                    result = company_conn.execute(
+                        text("""
+                            SELECT id, username, password, email, full_name, role, permissions, is_active
+                            FROM company_users WHERE username = :username AND is_active = true
+                        """),
+                        {"username": form_data.username}
+                    ).fetchone()
+                    
+                    if result:
+                        # print(f"DEBUG: Found user {form_data.username} in company {company_id}")
+                        if verify_password(form_data.password, result[2]):
+                            # Update last login
+                            company_conn.execute(
+                                text("UPDATE company_users SET last_login = :now WHERE id = :user_id"),
+                                {"now": datetime.utcnow(), "user_id": result[0]}
+                            )
+                            
+                            # Fetch Allowed Branches
+                            allowed_branches_rows = company_conn.execute(
+                                text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
+                                {"uid": result[0]}
+                            ).fetchall() # Use fetchall then process
+                            allowed_branches = [r[0] for r in allowed_branches_rows] if allowed_branches_rows else []
+                            
+                            # LOG LOGIN ACTIVITY
+                            # Determine a representative branch for the log (Primary or first allowed)
+                            login_branch_id = allowed_branches[0] if allowed_branches else None
+                            if not login_branch_id:
+                                # Fallback to company default branch if no specific branch assigned
+                                default_branch = company_conn.execute(text("SELECT id FROM branches WHERE is_default = true LIMIT 1")).fetchone()
+                                login_branch_id = default_branch[0] if default_branch else None
+
+                            try:
+                                log_activity(
+                                    company_conn,
+                                    user_id=result[0],
+                                    username=result[1],
+                                    action="auth.login",
+                                    resource_type="user",
+                                    resource_id=str(result[0]),
+                                    details={"method": "password", "name": result[1]},
+                                    request=request,
+                                    branch_id=login_branch_id
+                                )
+
+                                # LOG TO SYSTEM LOG AS WELL
+                                log_system_activity(
+                                    action="auth.login",
+                                    company_id=company_id,
+                                    performed_by=result[1],
+                                    description=f"User logged in to company {company_id}",
+                                    request=request
+                                )
+                            except Exception as log_err:
+                                print(f"WARNING: Logging failed: {log_err}")
+                            
+                            company_conn.commit()
+
+                            # DB-015: Update central user index for fast future lookups
+                            try:
+                                db.execute(
+                                    text("""
+                                        INSERT INTO system_user_index (username, company_id, is_active)
+                                        VALUES (:username, :company_id, true)
+                                        ON CONFLICT (username, company_id) DO UPDATE SET is_active = true, updated_at = CURRENT_TIMESTAMP
+                                    """),
+                                    {"username": form_data.username, "company_id": company_id}
+                                )
+                                db.commit()
+                            except Exception:
+                                pass  # Non-critical, don't block login
+                            
+                            # Fetch Role Permissions
+                            role_permissions = []
+                            if result[5]: # role
+                                try:
+                                    role_res = company_conn.execute(
+                                        text("SELECT permissions FROM roles WHERE role_name = :r"),
+                                        {"r": result[5]}
+                                    ).scalar()
+                                    if role_res:
+                                        role_permissions = role_res
+                                except Exception as e:
+                                    logger.warning(f"Could not fetch roles for user {result[1]}: {e}")
+
+                            # Merge Permissions (User overrides Role)
+                            user_permissions = result[6]
+                            
+                            # Handle Legacy Format {'all': True}
+                            if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
+                                user_permissions = ["*"]
+                            elif not isinstance(user_permissions, list):
+                                user_permissions = []
+
+                            final_permissions = list(set((role_permissions or []) + user_permissions))
+
+                            # CRITICAL: Force Admin Access
+                            if result[5] in ['admin', 'system_admin', 'superuser'] or result[1] == 'admin':
+                                final_permissions = ["*"]
+                            elif "*" in final_permissions:
+                                 final_permissions = ["*"]
+                            
+                            access_token = create_access_token({
+                                "sub": result[1],
+                                "user_id": result[0],
+                                "company_id": company_id,
+                                "role": result[5],
+                                "permissions": final_permissions,
+                                "allowed_branches": allowed_branches,
+                                "type": "company_user"
+                            })
+                            
+                            # Get company settings
+                            currency = db.execute(
+                                text("SELECT currency FROM system_companies WHERE id = :id"),
+                                {"id": company_id}
+                            ).scalar()
+
+                            decimal_places = 2
+                            try:
+                                dp_res = company_conn.execute(
+                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
+                                ).scalar()
+                                if dp_res:
+                                    decimal_places = int(dp_res)
+                            except Exception as e:
+                                logger.warning(f"Failed to fetch decimal_places setting: {e}")
+
+                            company_engine.dispose()
+                            logger.info(f"✅ Login: {result[1]} -> {company_id}")
+                            
+                            clear_failed_attempts(request, form_data.username)
+                            return Token(
+                                access_token=access_token,
+                                token_type="bearer",
+                                user={
+                                    "id": result[0],
+                                    "username": result[1],
+                                    "email": result[3],
+                                    "full_name": result[4],
+                                    "role": result[5],
+                                    "permissions": final_permissions,
+                                    "currency": currency,
+                                    "decimal_places": decimal_places,
+                                    "allowed_branches": allowed_branches
+                                },
+                                company_id=company_id
+                            )
+                
+                company_engine.dispose()
+            except Exception as e:
+                logger.error(f"Error searching company {company_id}: {str(e)}")
+                # print(f"CRITICAL ERROR in company {company_id}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        record_failed_attempt(request, form_data.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="اسم المستخدم أو كلمة المرور غير صحيحة",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    finally:
+        db.close()
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    """الحصول على معلومات المستخدم الحالي"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    if is_token_blacklisted(token):
+        raise credentials_exception
+        
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str = payload.get("sub")
+        company_id: str = payload.get("company_id")
+        permissions: list = payload.get("permissions")
+        
+        if username is None:
+            raise credentials_exception
+            
+        # For system_admin, company_id is not required
+        is_system_admin = payload.get("type") == "system_admin"
+        if not is_system_admin and company_id is None:
+            raise credentials_exception
+            
+    except JWTError as e:
+        logger.warning(f"Token decode failed: {e}")
+        raise credentials_exception
+    
+    if payload.get("type") == "system_admin":
+        return UserResponse(
+            id=0,
+            username=payload.get("sub"),
+            email="admin@aman-erp.com",
+            full_name="المدير العام للنظام",
+            role="system_admin",
+            is_active=True,
+            company_id=None,
+            currency=payload.get("currency", None),
+            permissions=["*"]
+        )
+    
+    company_id = payload.get("company_id")
+    user_id = payload.get("user_id")
+    
+    if not company_id or not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="بيانات غير كاملة")
+    
+    db = get_system_db()
+    try:
+        company = db.execute(
+            text("SELECT database_name, currency FROM system_companies WHERE id = :id"),
+            {"id": company_id}
+        ).fetchone()
+        
+        if not company:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="الشركة غير موجودة")
+        
+        currency = company[1]
+        
+        with get_db_connection(company_id) as company_conn:
+            result = company_conn.execute(
+                text("SELECT id, username, email, full_name, role, is_active, permissions FROM company_users WHERE id = :user_id"),
+                {"user_id": user_id}
+            ).fetchone()
+            
+            if result:
+                # Process permissions (same logic as login)
+                user_permissions = result[6]
+                
+                # Handle Legacy Format {'all': True}
+                if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
+                    user_permissions = ["*"]
+                elif not isinstance(user_permissions, list):
+                    user_permissions = []
+
+                # Fetch Role Permissions
+                role_permissions = []
+                if result[4]:  # role
+                    try:
+                        role_res = company_conn.execute(
+                            text("SELECT permissions FROM roles WHERE role_name = :r"),
+                            {"r": result[4]}
+                        ).scalar()
+                        if role_res:
+                            role_permissions = role_res if isinstance(role_res, list) else []
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch role permissions for '{result[4]}': {e}")
+
+                final_permissions = list(set((role_permissions or []) + user_permissions))
+
+                # Fetch Allowed Branches
+                allowed_branches_rows = company_conn.execute(
+                    text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
+                    {"uid": user_id}
+                ).fetchall()
+                allowed_branches = [r[0] for r in allowed_branches_rows]
+
+                # Force Admin Access
+                if result[4] in ['admin', 'system_admin', 'superuser']:
+                    final_permissions = ["*"]
+                elif "*" in final_permissions:
+                    final_permissions = ["*"]
+
+                # Fetch Decimal Places Setting
+                decimal_places = 2
+                try:
+                    dp_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
+                    ).scalar()
+                    if dp_res:
+                        decimal_places = int(dp_res)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch decimal_places setting in /me: {e}")
+
+                return UserResponse(
+                    id=result[0],
+                    username=result[1],
+                    email=result[2],
+                    full_name=result[3],
+                    role=result[4],
+                    is_active=result[5],
+                    company_id=company_id,
+                    currency=currency,
+                    decimal_places=decimal_places,
+                    permissions=final_permissions,
+                    allowed_branches=allowed_branches
+                )
+    finally:
+        db.close()
+    
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="المستخدم غير موجود")
+
+
+@router.post("/logout")
+async def logout(token: str = Depends(oauth2_scheme)):
+    """تسجيل الخروج - يتم إضافة التوكن إلى القائمة السوداء"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"verify_exp": False})
+        username = payload.get("sub")
+    except JWTError:
+        username = None
+    add_token_to_blacklist(token, username=username, reason="logout")
+    return {"message": "تم تسجيل الخروج بنجاح"}
+
+
+@router.post("/refresh")
+async def refresh_token(token: str = Depends(oauth2_scheme)):
+    """تجديد التوكن — يُنشئ توكن جديد من توكن صالح"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="التوكن منتهي أو غير صالح",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    if is_token_blacklisted(token):
+        raise credentials_exception
+        
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        
+        # Create new token with same claims but fresh expiry
+        new_payload = {
+            "sub": payload.get("sub"),
+            "type": payload.get("type"),
+            "company_id": payload.get("company_id"),
+            "role": payload.get("role"),
+            "permissions": payload.get("permissions"),
+        }
+        # Include optional fields
+        if payload.get("user_id"):
+            new_payload["user_id"] = payload["user_id"]
+        if payload.get("allowed_branches"):
+            new_payload["allowed_branches"] = payload["allowed_branches"]
+        
+        new_token = create_access_token(new_payload)
+        
+        return {
+            "access_token": new_token,
+            "token_type": "bearer"
+        }
+    except JWTError:
+        raise credentials_exception

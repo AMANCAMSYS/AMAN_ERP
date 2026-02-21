@@ -1,0 +1,136 @@
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { inventoryAPI } from '../../utils/api';
+import { useBranch } from '../../context/BranchContext';
+import { formatNumber } from '../../utils/format';
+
+const StockReports = () => {
+    const { t } = useTranslation();
+    const { currentBranch } = useBranch();
+    const [loading, setLoading] = useState(true);
+    const [warehouseStock, setWarehouseStock] = useState([]);
+    const [filter, setFilter] = useState('');
+
+    useEffect(() => {
+        fetchData();
+    }, [currentBranch]);
+
+    const fetchData = async () => {
+        try {
+            const res = await inventoryAPI.getInventoryBalance({ branch_id: currentBranch?.id });
+            setWarehouseStock(res.data);
+        } catch (err) {
+            console.error("Failed to load reports", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Group by Warehouse
+    const groupedStock = warehouseStock.reduce((acc, item) => {
+        const wh = item.warehouse || t('stock.reports.balance.unassigned');
+        if (!acc[wh]) acc[wh] = [];
+        acc[wh].push(item);
+        return acc;
+    }, {});
+
+    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+
+    const filteredWarehouses = Object.keys(groupedStock).filter(wh =>
+        wh.includes(filter) ||
+        groupedStock[wh].some(item =>
+            item.item_name.includes(filter) || item.item_code.includes(filter)
+        )
+    );
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div>
+                    <h1 className="workspace-title">{t('stock.reports.balance.title')}</h1>
+                    <p className="workspace-subtitle">{t('stock.reports.balance.subtitle')}</p>
+                </div>
+            </div>
+
+            {/* Filter */}
+            <div className="section-card mb-6" style={{ marginBottom: '24px' }}>
+                <input
+                    type="text"
+                    placeholder={t('stock.reports.balance.search_placeholder')}
+                    className="form-input"
+                    value={filter}
+                    onChange={e => setFilter(e.target.value)}
+                />
+            </div>
+
+            {/* Warehouse Tables */}
+            <div style={{ display: 'grid', gap: '24px' }}>
+                {filteredWarehouses.map(wh => (
+                    <div key={wh} className="section-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                            <h3 className="section-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '1.2em' }}>📍</span> {wh}
+                            </h3>
+                            <span className="badge badge-secondary">
+                                {groupedStock[wh].filter(item =>
+                                    item.item_name.includes(filter) || item.item_code.includes(filter)
+                                ).length} {t('stock.reports.balance.items_count')}
+                            </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>{t('stock.reports.balance.table.code')}</th>
+                                        <th>{t('stock.reports.balance.table.name')}</th>
+                                        <th>{t('stock.reports.balance.table.unit')}</th>
+                                        <th>{t('stock.reports.balance.table.quantity')}</th>
+                                        <th>{t('stock.reports.balance.table.status')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {groupedStock[wh]
+                                        .filter(item =>
+                                            item.item_name.includes(filter) || item.item_code.includes(filter)
+                                        )
+                                        .map((item, idx) => (
+                                            <tr key={idx} style={{
+                                                background: item.quantity <= 0 ? '#FEF2F2' : 'transparent'
+                                            }}>
+                                                <td className="font-mono text-sm text-muted">{item.item_code}</td>
+                                                <td className="font-medium">{item.item_name}</td>
+                                                <td className="text-sm">{item.unit}</td>
+                                                <td className="font-bold" style={{
+                                                    color: item.quantity < 0 ? '#DC2626' : 'inherit'
+                                                }}>
+                                                    {formatNumber(item.quantity)}
+                                                </td>
+                                                <td>
+                                                    {item.quantity <= 0 ? (
+                                                        <span className="badge badge-danger">{t('stock.reports.balance.stock_status.out_of_stock')}</span>
+                                                    ) : item.quantity < 10 ? (
+                                                        <span className="badge badge-warning">{t('stock.reports.balance.stock_status.low')}</span>
+                                                    ) : (
+                                                        <span className="badge badge-success">{t('stock.reports.balance.stock_status.good')}</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
+
+                {filteredWarehouses.length === 0 && (
+                    <div className="text-center py-12 text-muted">
+                        {t('stock.reports.balance.no_results')}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default StockReports;

@@ -1,0 +1,123 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import api from '../../utils/api';
+import { Boxes, Package, ArrowRight, AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { formatNumber } from '../../utils/format';
+import '../../components/ModuleStyles.css';
+
+export default function MRPPlanning() {
+    const { t, i18n } = useTranslation();
+    const navigate = useNavigate();
+    const isRTL = i18n.language === 'ar';
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        fetchOrders();
+    }, []);
+
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            const res = await api.get('/manufacturing/orders');
+            // Filter only non-completed and non-cancelled orders for planning
+            const activeOrders = res.data.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+            setOrders(activeOrders);
+        } catch (err) {
+            console.error('Failed to fetch orders for MRP', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredOrders = orders.filter(o =>
+        o.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        o.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (loading) {
+        return (
+            <div className="workspace flex items-center justify-center pt-5">
+                <span className="loading"></span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div>
+                    <h1 className="workspace-title flex items-center gap-2">
+                        <Boxes size={24} className="text-primary" />
+                        {t('manufacturing.mrp.title', 'تخطيط متطلبات المواد (MRP)')}
+                    </h1>
+                    <p className="workspace-subtitle">
+                        {t('manufacturing.mrp.planning_desc', 'تحليل توفر المواد الخام المطلوبة لأوامر الإنتاج الجارية')}
+                    </p>
+                </div>
+            </div>
+
+            <div style={{ maxWidth: '480px', marginBottom: '24px' }}>
+                <div className="search-box" style={{ width: '100%' }}>
+                    <Search size={16} />
+                    <input
+                        type="text"
+                        placeholder={t('common.search', 'بحث...')}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div className="data-table-container">
+                <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>{t('common.id', 'الرقم')}</th>
+                                <th>{t('products.product', 'المنتج')}</th>
+                                <th>{t('manufacturing.bom', 'قائمة المواد')}</th>
+                                <th className="text-center">{t('common.quantity', 'الكمية')}</th>
+                                <th className="text-center">{t('common.status', 'الحالة')}</th>
+                                <th className="text-center">{t('common.actions', 'الإجراءات')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredOrders.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="text-center py-5 text-muted">
+                                        <Package size={48} className="mb-3 opacity-20" />
+                                        <p>{t('manufacturing.mrp.no_active_orders', 'لا توجد أوامر إنتاج نشطة بحاجة لتخطيط')}</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredOrders.map(order => (
+                                    <tr key={order.id}>
+                                        <td className="font-mono fw-bold text-primary">{order.order_number}</td>
+                                        <td>{order.product_name}</td>
+                                        <td>{order.bom_name}</td>
+                                        <td className="text-center fw-bold">{order.quantity}</td>
+                                        <td className="text-center">
+                                            <span className={`badge ${order.status === 'in_progress' ? 'badge-warning' : 'badge-info'}`}>
+                                                {t(`manufacturing.status.${order.status}`, order.status)}
+                                            </span>
+                                        </td>
+                                        <td className="text-center">
+                                            <button
+                                                className="btn btn-primary btn-sm d-inline-flex align-items-center gap-1"
+                                                onClick={() => navigate(`/manufacturing/mrp/${order.id}`)}
+                                            >
+                                                {t('manufacturing.check_availability', 'تحقق من توفر المواد')}
+                                                {isRTL ? <ArrowRight size={14} /> : <ArrowRight size={14} />}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+            </div>
+        </div>
+    );
+}

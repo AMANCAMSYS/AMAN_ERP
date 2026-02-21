@@ -1,0 +1,955 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
+import logging
+from datetime import date, timedelta, datetime
+import json
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.permissions import require_permission, validate_branch_access
+import time
+
+router = APIRouter(prefix="/dashboard", tags=["لوحة التحكم"])
+logger = logging.getLogger(__name__)
+
+# Cache for system stats to avoid slowness
+_system_stats_cache = {
+    "data": None,
+    "last_updated": 0
+}
+CACHE_DURATION = 600 # 10 minutes for system-wide stats
+
+
+def get_user_company_id(user):
+    cid = getattr(user, "company_id", None)
+    if cid is None and isinstance(user, dict):
+        cid = user.get("company_id")
+    if not cid:
+         raise HTTPException(status_code=400, detail="Company ID missing")
+    return cid
+
+@router.get("/stats", response_model=Dict[str, Any], dependencies=[Depends(require_permission("dashboard.view"))])
+def get_dashboard_stats(
+    branch_id: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """احصائيات رئيسية للوحة التحكم مع مقارنة بالفترة السابقة"""
+    # Enforce branch restriction
+    branch_id = validate_branch_access(current_user, branch_id)
+    
+    db = get_db_connection(get_user_company_id(current_user))
+    try:
+        # Dates
+        today = date.today()
+        this_month_start = today.replace(day=1)
+        prev_month_end = this_month_start - timedelta(days=1)
+        prev_month_start = prev_month_end.replace(day=1)
+        
+        # Shared filters
+        branch_filter_cash = ""
+        params_cash = {}
+        if branch_id:
+            branch_filter_cash = "AND branch_id = :branch_id"
+            params_cash["branch_id"] = branch_id
+
+        def calculate_period_stats(start_dt, end_dt=None):
+            """Calculate stats from GL account balances for consistency with Accounting page."""
+            # For GL-based reporting, we use cumulative account balances
+            # Period filtering would require summing journal_lines within the period
+            # For simplicity, this returns current balances (month-to-date can be added later)
+            
+            branch_filter_je = ""
+            date_filter_je = ""
+            params_gl = {}
+            if branch_id:
+                branch_filter_je = "AND je.branch_id = :branch_id"
+                params_gl["branch_id"] = branch_id
+            if start_dt:
+                date_filter_je += " AND je.entry_date >= :start_dt"
+                params_gl["start_dt"] = start_dt
+            if end_dt:
+                date_filter_je += " AND je.entry_date <= :end_dt"
+                params_gl["end_dt"] = end_dt
+            
+            if branch_id or start_dt or end_dt:
+                # Branch/period-specific: sum journal lines
+                total_income = db.execute(text(f"""
+                    SELECT COALESCE(SUM(jl.credit - jl.debit), 0)
+                    FROM journal_lines jl
+                    JOIN journal_entries je ON jl.journal_entry_id = je.id
+                    JOIN accounts a ON jl.account_id = a.id
+                    WHERE a.account_type = 'revenue' {branch_filter_je} {date_filter_je}
+                """), params_gl).scalar() or 0
+                
+                total_expenses = db.execute(text(f"""
+                    SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+                    FROM journal_lines jl
+                    JOIN journal_entries je ON jl.journal_entry_id = je.id
+                    JOIN accounts a ON jl.account_id = a.id
+                    WHERE a.account_type = 'expense' {branch_filter_je} {date_filter_je}
+                """), params_gl).scalar() or 0
+                
+                # Cash balance for branch
+                treasury_ids = [row[0] for row in db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE is_active = true")).fetchall() if row[0]]
+                legacy_ids = [row[0] for row in db.execute(text("SELECT id FROM accounts WHERE account_code LIKE 'BOX%' OR account_code LIKE 'BNK%'")).fetchall()]
+                all_cash_ids = list(set(treasury_ids + legacy_ids))
+                
+                cash_balance = 0
+                if all_cash_ids:
+                    cash_balance = db.execute(text(f"""
+                        SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+                        FROM journal_lines jl
+                        JOIN journal_entries je ON jl.journal_entry_id = je.id
+                        JOIN accounts a ON jl.account_id = a.id
+                        WHERE a.id IN ({','.join(map(str, all_cash_ids))})
+                        {branch_filter_je} {date_filter_je}
+                    """), params_gl).scalar() or 0
+            else:
+                # Company-wide: if date filters exist, sum journal lines instead of using cumulative balances
+                if start_dt or end_dt:
+                    total_income = db.execute(text(f"""
+                        SELECT COALESCE(SUM(jl.credit - jl.debit), 0)
+                        FROM journal_lines jl
+                        JOIN journal_entries je ON jl.journal_entry_id = je.id
+                        JOIN accounts a ON jl.account_id = a.id
+                        WHERE a.account_type = 'revenue' {date_filter_je}
+                    """), params_gl).scalar() or 0
+                    
+                    total_expenses = db.execute(text(f"""
+                        SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+                        FROM journal_lines jl
+                        JOIN journal_entries je ON jl.journal_entry_id = je.id
+                        JOIN accounts a ON jl.account_id = a.id
+                        WHERE a.account_type = 'expense' {date_filter_je}
+                    """), params_gl).scalar() or 0
+                else:
+                    # No date filter: use account balances directly (fastest)
+                    total_income = db.execute(text("""
+                        SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'revenue'
+                    """)).scalar() or 0
+                    
+                    total_expenses = db.execute(text("""
+                        SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'expense'
+                    """)).scalar() or 0
+                
+                # Cash balance
+                treasury_ids = [row[0] for row in db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE is_active = true")).fetchall() if row[0]]
+                legacy_ids = [row[0] for row in db.execute(text("SELECT id FROM accounts WHERE account_code LIKE 'BOX%' OR account_code LIKE 'BNK%'")).fetchall()]
+                all_cash_ids = list(set(treasury_ids + legacy_ids))
+                
+                cash_balance = 0
+                if all_cash_ids:
+                    cash_balance = db.execute(text(f"""
+                        SELECT COALESCE(SUM(balance), 0) FROM accounts 
+                        WHERE id IN ({','.join(map(str, all_cash_ids))})
+                    """)).scalar() or 0
+            
+            return {
+                "sales": float(total_income),
+                "expenses": float(total_expenses),
+                "profit": float(total_income - total_expenses),
+                "cash": float(cash_balance)
+            }
+
+        # Calculate current and previous
+        current = calculate_period_stats(this_month_start)
+        previous = calculate_period_stats(prev_month_start, prev_month_end)
+        
+        # Trends
+        def calc_change(curr, prev):
+            if prev == 0:
+                return 0 if curr == 0 else 100
+            return round(((curr - prev) / prev) * 100, 1)
+
+        # Cash on Hand (GL-linked snapshot)
+        cash_sql = f"""
+            SELECT COALESCE(SUM(a.balance), 0) 
+            FROM treasury_accounts ta
+            JOIN accounts a ON ta.gl_account_id = a.id
+            WHERE ta.is_active = TRUE {branch_filter_cash.replace('branch_id =', 'ta.branch_id =')}
+        """
+        cash = db.execute(text(cash_sql), params_cash).scalar() or 0
+
+        # Low Stock
+        low_stock_query = f"""
+            SELECT COUNT(*) FROM (
+                SELECT p.id
+                FROM products p
+                LEFT JOIN (
+                    SELECT product_id, SUM(quantity) as total_qty 
+                    FROM inventory inv
+                    {"JOIN warehouses w ON inv.warehouse_id = w.id" if branch_id else ""}
+                    {"WHERE w.branch_id = :branch_id" if branch_id else ""}
+                    GROUP BY product_id
+                ) inv_sum ON p.id = inv_sum.product_id
+                WHERE (COALESCE(inv_sum.total_qty, 0) <= p.reorder_level)
+                OR (p.reorder_level = 0 AND COALESCE(inv_sum.total_qty, 0) <= 5)
+            ) as low_stock_items
+        """
+        low_stock = db.execute(text(low_stock_query), params_cash).scalar() or 0
+
+        # Reserved Stock
+        reserved_stock_query = f"""
+            SELECT p.product_name, SUM(inv.reserved_quantity) as reserved_qty
+            FROM inventory inv
+            JOIN products p ON inv.product_id = p.id
+            {"JOIN warehouses w ON inv.warehouse_id = w.id" if branch_id else ""}
+            WHERE inv.reserved_quantity > 0
+            {"AND w.branch_id = :branch_id" if branch_id else ""}
+            GROUP BY p.product_name
+        """
+        reserved_stock_data = db.execute(text(reserved_stock_query), params_cash).fetchall()
+        reserved_stock_list = [{"product": row.product_name, "quantity": int(row.reserved_qty)} for row in reserved_stock_data]
+
+        return {
+            "sales": current["sales"],
+            "sales_change": calc_change(current["sales"], previous["sales"]),
+            "expenses": current["expenses"],
+            "expenses_change": calc_change(current["expenses"], previous["expenses"]),
+            "profit": current["profit"],
+            "profit_change": calc_change(current["profit"], previous["profit"]),
+            "cash": current["cash"],
+            "cash_change": calc_change(current["cash"], previous["cash"]),
+            "cash_status": "Stable" if current["cash"] > 0 else "Low",
+            "low_stock": int(low_stock),
+            "reserved_stock": reserved_stock_list
+        }
+    except Exception as e:
+        import traceback
+        print(f"DASHBOARD ERROR: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Dashboard calculation error: {str(e)}")
+    finally:
+        db.close()
+
+@router.get("/charts/financial", response_model=List[Dict[str, Any]], dependencies=[Depends(require_permission("dashboard.view"))])
+def get_financial_chart(
+    days: int = 30,
+    branch_id: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """الرسم البياني المالي (مبيعات vs مصروفات)"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(get_user_company_id(current_user))
+    try:
+        start_date = date.today() - timedelta(days=days)
+        params = {"start": start_date}
+        if branch_id:
+            params["branch_id"] = branch_id
+        
+        branch_cond_inv = "AND branch_id = :branch_id" if branch_id else ""
+        branch_cond_exp = "AND ta.branch_id = :branch_id" if branch_id else ""
+
+        # Fetch Sales by Date
+        sales_data = db.execute(text(f"""
+            WITH all_sales AS (
+                SELECT invoice_date as sale_date, COALESCE(total * exchange_rate, 0) as total, branch_id
+                FROM invoices
+                WHERE invoice_type = 'sales' AND invoice_date >= :start AND status != 'cancelled'
+                
+                UNION ALL
+                
+                SELECT CAST(order_date AS DATE) as sale_date, COALESCE(total_amount, 0) as total, branch_id
+                FROM pos_orders
+                WHERE order_date >= :start AND status = 'paid'
+            )
+            SELECT sale_date, SUM(total) as total
+            FROM all_sales
+            WHERE 1=1
+            {branch_cond_inv.replace('branch_id =', 'branch_id =')}
+            GROUP BY sale_date
+        """), params).fetchall()
+        sales_map = {}
+        for row in sales_data:
+            d = row.sale_date
+            if isinstance(d, datetime): d = d.date()
+            key = d.isoformat() if hasattr(d, "isoformat") else str(d)
+            sales_map[key] = float(row.total)
+
+        # Fetch Expenses by Date
+        expenses_data = db.execute(text(f"""
+            SELECT t.transaction_date, COALESCE(SUM(t.amount), 0) as total
+            FROM treasury_transactions t
+            JOIN treasury_accounts ta ON t.treasury_id = ta.id
+            WHERE t.transaction_type = 'expense' AND t.transaction_date >= :start
+            {branch_cond_exp}
+            GROUP BY t.transaction_date
+        """), params).fetchall()
+        expenses_map = {}
+        for row in expenses_data:
+            d = row.transaction_date
+            if isinstance(d, datetime): d = d.date()
+            key = d.isoformat() if hasattr(d, "isoformat") else str(d)
+            expenses_map[key] = float(row.total)
+
+        # Merge
+        result = []
+        for i in range(days + 1):
+            day = start_date + timedelta(days=i)
+            day_key = day.isoformat()
+            s = sales_map.get(day_key, 0)
+            e = expenses_map.get(day_key, 0)
+            result.append({
+                "date": day.isoformat(),
+                "sales": s,
+                "expenses": e,
+                "profit": s - e # Simplified (Revenue - Expense), neglecting COGS daily calc complexity for speed
+            })
+            
+        return result
+    finally:
+        db.close()
+
+@router.get("/charts/products", response_model=List[Dict[str, Any]], dependencies=[Depends(require_permission("dashboard.view"))])
+def get_top_products(
+    limit: int = 5,
+    branch_id: int = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """أكثر المنتجات مبيعاً"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(get_user_company_id(current_user))
+    try:
+        params = {"limit": limit}
+        branch_filter = ""
+        if branch_id:
+            params["branch_id"] = branch_id
+            branch_filter = "AND i.branch_id = :branch_id"
+
+        result = db.execute(text(f"""
+            WITH all_items AS (
+                SELECT 
+                    il.product_id,
+                    il.total * i.exchange_rate as value,
+                    i.branch_id
+                FROM invoice_lines il
+                JOIN invoices i ON il.invoice_id = i.id
+                WHERE i.invoice_type = 'sales' AND i.status != 'cancelled'
+                
+                UNION ALL
+                
+                SELECT 
+                    pi.product_id,
+                    pi.total as value,
+                    po.branch_id
+                FROM pos_order_lines pi
+                JOIN pos_orders po ON pi.order_id = po.id
+                WHERE po.status = 'paid'
+            )
+            SELECT 
+                p.product_name as name,
+                COALESCE(SUM(val.value), 0) as value
+            FROM all_items val
+            JOIN products p ON val.product_id = p.id
+            WHERE 1=1
+            {branch_filter.replace('i.branch_id', 'val.branch_id')}
+            GROUP BY p.id, p.product_name
+            ORDER BY value DESC
+            LIMIT :limit
+        """), params).fetchall()
+
+
+        return [{"name": row.name, "value": float(row.value)} for row in result]
+    finally:
+        db.close()
+@router.get("/system-stats", response_model=Dict[str, Any])
+def get_system_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """احصائيات النظام (للمدير العام فقط)"""
+    # Verify System Admin Role
+    if current_user.role != 'system_admin':
+         raise HTTPException(status_code=403, detail="Access denied. System Admin only.")
+    
+    # Return immediately from cache
+    if _system_stats_cache["data"]:
+        return _system_stats_cache["data"]
+    
+    # If cache empty (initial boot), return zeroed status instead of hanging
+    return {
+        "total_companies": 0,
+        "total_users": 0,
+        "active_users": 0,
+        "system_status": "Starting..."
+    }
+
+async def update_system_stats_task():
+    """المهمة الخلفية لتحديث إحصائيات النظام بشكل دوري"""
+    from database import engine
+    from config import settings
+    from sqlalchemy import create_engine
+    import asyncio
+    
+    logger.info("📡 System Stats Worker Started")
+    
+    while True:
+        try:
+            # 1. Total Companies
+            with engine.connect() as db:
+                companies_res = db.execute(text("SELECT id FROM system_companies WHERE status = 'active'")).fetchall()
+                total_companies = len(companies_res)
+                
+                # Active Users (last 24 hours from GLOBAL activity log)
+                active_users_res = db.execute(text("""
+                    SELECT COUNT(DISTINCT performed_by) 
+                    FROM system_activity_log 
+                    WHERE created_at >= (CURRENT_TIMESTAMP - INTERVAL '24 hours')
+                """)).scalar() or 0
+
+            # 2. Total Registered Users (Aggregated across all company DBs)
+            total_users = 0
+            # Use small batch sizes to be nice to the DB and prevent connection saturation
+            for (cid,) in companies_res:
+                 company_engine = None
+                 try:
+                     db_url = settings.get_company_database_url(cid)
+                     company_engine = create_engine(db_url, pool_pre_ping=True)
+                     with company_engine.connect() as company_conn:
+                          count = company_conn.execute(text("SELECT COUNT(*) FROM company_users")).scalar() or 0
+                          total_users += count
+                 except Exception:
+                      pass
+                 finally:
+                      if company_engine:
+                          company_engine.dispose()
+                 
+                 # Micro-sleep between companies to prevent CPU/Connection spikes
+                 await asyncio.sleep(0.01)
+
+            stats = {
+                "total_companies": total_companies,
+                "total_users": total_users,
+                "active_users": active_users_res,
+                "system_status": "Healthy"
+            }
+            
+            # Update cache
+            _system_stats_cache["data"] = stats
+            _system_stats_cache["last_updated"] = time.time()
+            
+            logger.info(f"📊 System Stats UPDATED: Companies={total_companies}, Users={total_users}")
+            
+        except Exception as e:
+            logger.error(f"❌ System stats worker error: {str(e)}")
+        
+        # Wait 15 minutes before next update
+        await asyncio.sleep(900) 
+
+
+# ===================== DASH-001: Customizable Dashboard Layouts =====================
+
+class WidgetConfig(BaseModel):
+    id: str  # Unique widget ID (e.g., "sales_today", "low_stock")
+    type: str  # Widget type: "stat", "chart", "list", "table"
+    title: str  # Display title
+    x: int = 0  # Grid column position
+    y: int = 0  # Grid row position
+    w: int = 1  # Width (grid cols)
+    h: int = 1  # Height (grid rows)
+    config: Optional[Dict[str, Any]] = {}  # Widget-specific config (period, limit, etc.)
+
+class LayoutCreate(BaseModel):
+    layout_name: str = "default"
+    widgets: List[WidgetConfig] = []
+
+class LayoutUpdate(BaseModel):
+    widgets: List[WidgetConfig]
+
+
+# Default widgets for new users
+DEFAULT_WIDGETS = [
+    {"id": "sales_today", "type": "stat", "title": "مبيعات اليوم", "x": 0, "y": 0, "w": 1, "h": 1, "config": {"period": "today"}},
+    {"id": "sales_month", "type": "stat", "title": "مبيعات الشهر", "x": 1, "y": 0, "w": 1, "h": 1, "config": {"period": "month"}},
+    {"id": "expenses_month", "type": "stat", "title": "مصروفات الشهر", "x": 2, "y": 0, "w": 1, "h": 1, "config": {"period": "month"}},
+    {"id": "cash_balance", "type": "stat", "title": "الرصيد النقدي", "x": 3, "y": 0, "w": 1, "h": 1, "config": {}},
+    {"id": "financial_chart", "type": "chart", "title": "المبيعات والمصروفات", "x": 0, "y": 1, "w": 2, "h": 2, "config": {"days": 30}},
+    {"id": "top_products", "type": "chart", "title": "أفضل المنتجات", "x": 2, "y": 1, "w": 2, "h": 2, "config": {"limit": 5}},
+    {"id": "low_stock", "type": "list", "title": "المخزون المنخفض", "x": 0, "y": 3, "w": 2, "h": 1, "config": {"limit": 10}},
+    {"id": "pending_tasks", "type": "list", "title": "المهام المعلقة", "x": 2, "y": 3, "w": 2, "h": 1, "config": {"limit": 10}},
+]
+
+
+@router.get("/layouts", dependencies=[Depends(require_permission("dashboard.view"))])
+def get_dashboard_layouts(current_user=Depends(get_current_user)):
+    """جلب تخطيطات لوحة التحكم للمستخدم"""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT id, layout_name, is_active, widgets, created_at, updated_at
+            FROM dashboard_layouts WHERE user_id = :uid ORDER BY updated_at DESC
+        """), {"uid": current_user.id}).fetchall()
+
+        if not rows:
+            # Return default layout
+            return {"layouts": [{"id": 0, "layout_name": "default", "is_active": True,
+                                 "widgets": DEFAULT_WIDGETS}]}
+
+        return {"layouts": [
+            {
+                "id": r.id,
+                "layout_name": r.layout_name,
+                "is_active": r.is_active,
+                "widgets": r.widgets if isinstance(r.widgets, list) else json.loads(r.widgets) if r.widgets else DEFAULT_WIDGETS,
+                "created_at": str(r.created_at) if r.created_at else None,
+                "updated_at": str(r.updated_at) if r.updated_at else None
+            } for r in rows
+        ]}
+    except Exception as e:
+        logger.warning(f"Dashboard layouts fetch: {e}")
+        return {"layouts": [{"id": 0, "layout_name": "default", "is_active": True,
+                             "widgets": DEFAULT_WIDGETS}]}
+    finally:
+        db.close()
+
+
+@router.post("/layouts", dependencies=[Depends(require_permission("dashboard.view"))])
+def save_dashboard_layout(data: LayoutCreate, current_user=Depends(get_current_user)):
+    """حفظ تخطيط لوحة التحكم"""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        widgets_json = json.dumps([w.dict() for w in data.widgets]) if data.widgets else json.dumps(DEFAULT_WIDGETS)
+
+        result = db.execute(text("""
+            INSERT INTO dashboard_layouts (user_id, layout_name, widgets, is_active)
+            VALUES (:uid, :name, :widgets::jsonb, TRUE)
+            ON CONFLICT (user_id, layout_name) DO UPDATE
+            SET widgets = :widgets::jsonb, updated_at = CURRENT_TIMESTAMP
+            RETURNING id
+        """), {"uid": current_user.id, "name": data.layout_name, "widgets": widgets_json})
+
+        layout_id = result.fetchone()[0]
+        db.commit()
+        return {"id": layout_id, "message": "تم حفظ التخطيط بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"فشل في حفظ التخطيط: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.put("/layouts/{layout_id}", dependencies=[Depends(require_permission("dashboard.view"))])
+def update_dashboard_layout(layout_id: int, data: LayoutUpdate, current_user=Depends(get_current_user)):
+    """تحديث تخطيط لوحة التحكم (تغيير ترتيب/حجم الـ widgets)"""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        widgets_json = json.dumps([w.dict() for w in data.widgets])
+
+        db.execute(text("""
+            UPDATE dashboard_layouts SET widgets = :widgets::jsonb, updated_at = CURRENT_TIMESTAMP
+            WHERE id = :lid AND user_id = :uid
+        """), {"lid": layout_id, "uid": current_user.id, "widgets": widgets_json})
+        db.commit()
+        return {"message": "تم تحديث التخطيط بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/layouts/{layout_id}", dependencies=[Depends(require_permission("dashboard.view"))])
+def delete_dashboard_layout(layout_id: int, current_user=Depends(get_current_user)):
+    """حذف تخطيط لوحة التحكم"""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        db.execute(text("""
+            DELETE FROM dashboard_layouts WHERE id = :lid AND user_id = :uid
+        """), {"lid": layout_id, "uid": current_user.id})
+        db.commit()
+        return {"message": "تم حذف التخطيط"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+# ===================== DASH-002: Additional Widgets Data =====================
+
+@router.get("/widgets/sales-summary", dependencies=[Depends(require_permission("dashboard.view"))])
+def widget_sales_summary(
+    period: str = "today",
+    branch_id: int = None,
+    current_user=Depends(get_current_user)
+):
+    """
+    Widget المبيعات (اليوم / الأسبوع / الشهر)
+    period: today, week, month, quarter, year
+    """
+    branch_id = validate_branch_access(current_user, branch_id)
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        today = date.today()
+        if period == "today":
+            start_date = today
+        elif period == "week":
+            start_date = today - timedelta(days=today.weekday())
+        elif period == "month":
+            start_date = today.replace(day=1)
+        elif period == "quarter":
+            quarter_month = ((today.month - 1) // 3) * 3 + 1
+            start_date = today.replace(month=quarter_month, day=1)
+        elif period == "year":
+            start_date = today.replace(month=1, day=1)
+        else:
+            start_date = today
+
+        params = {"start": start_date, "end": today}
+        branch_filter = ""
+        if branch_id:
+            branch_filter = "AND branch_id = :bid"
+            params["bid"] = branch_id
+
+        # Total Sales
+        sales = db.execute(text(f"""
+            SELECT COALESCE(SUM(total * COALESCE(exchange_rate, 1)), 0) as total,
+                   COUNT(*) as count
+            FROM invoices
+            WHERE invoice_type = 'sales' AND status != 'cancelled'
+            AND invoice_date >= :start AND invoice_date <= :end {branch_filter}
+        """), params).fetchone()
+
+        # POS Sales
+        pos = db.execute(text(f"""
+            SELECT COALESCE(SUM(total_amount), 0) as total,
+                   COUNT(*) as count
+            FROM pos_orders
+            WHERE status = 'paid'
+            AND CAST(order_date AS DATE) >= :start AND CAST(order_date AS DATE) <= :end
+            {branch_filter}
+        """), params).fetchone()
+
+        total_sales = float(sales.total or 0) + float(pos.total or 0)
+        total_count = int(sales.count or 0) + int(pos.count or 0)
+
+        # Previous period comparison
+        period_days = (today - start_date).days + 1
+        prev_start = start_date - timedelta(days=period_days)
+        prev_end = start_date - timedelta(days=1)
+        params_prev = {"start": prev_start, "end": prev_end}
+        if branch_id:
+            params_prev["bid"] = branch_id
+
+        prev_sales = db.execute(text(f"""
+            SELECT COALESCE(SUM(total * COALESCE(exchange_rate, 1)), 0) as total
+            FROM invoices
+            WHERE invoice_type = 'sales' AND status != 'cancelled'
+            AND invoice_date >= :start AND invoice_date <= :end {branch_filter}
+        """), params_prev).scalar() or 0
+
+        prev_pos = db.execute(text(f"""
+            SELECT COALESCE(SUM(total_amount), 0) as total
+            FROM pos_orders
+            WHERE status = 'paid'
+            AND CAST(order_date AS DATE) >= :start AND CAST(order_date AS DATE) <= :end
+            {branch_filter}
+        """), params_prev).scalar() or 0
+
+        prev_total = float(prev_sales) + float(prev_pos)
+        change = round(((total_sales - prev_total) / prev_total * 100), 1) if prev_total > 0 else (100 if total_sales > 0 else 0)
+
+        return {
+            "period": period,
+            "total": total_sales,
+            "count": total_count,
+            "change_percent": change,
+            "previous_total": prev_total
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/widgets/top-products", dependencies=[Depends(require_permission("dashboard.view"))])
+def widget_top_products(
+    limit: int = 10,
+    period: str = "month",
+    branch_id: int = None,
+    current_user=Depends(get_current_user)
+):
+    """Widget أفضل المنتجات مبيعاً"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        today = date.today()
+        if period == "week":
+            start_date = today - timedelta(days=7)
+        elif period == "month":
+            start_date = today.replace(day=1)
+        elif period == "year":
+            start_date = today.replace(month=1, day=1)
+        else:
+            start_date = today.replace(day=1)
+
+        params = {"start": start_date, "limit": limit}
+        branch_filter = ""
+        if branch_id:
+            branch_filter = "AND i.branch_id = :bid"
+            params["bid"] = branch_id
+
+        result = db.execute(text(f"""
+            SELECT p.product_name as name,
+                   SUM(il.quantity) as qty,
+                   SUM(il.total * COALESCE(i.exchange_rate, 1)) as value
+            FROM invoice_lines il
+            JOIN invoices i ON il.invoice_id = i.id
+            JOIN products p ON il.product_id = p.id
+            WHERE i.invoice_type = 'sales' AND i.status != 'cancelled'
+            AND i.invoice_date >= :start {branch_filter}
+            GROUP BY p.id, p.product_name
+            ORDER BY value DESC LIMIT :limit
+        """), params).fetchall()
+
+        return {"products": [
+            {"name": r.name, "quantity": float(r.qty or 0), "value": float(r.value or 0)}
+            for r in result
+        ]}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/widgets/low-stock", dependencies=[Depends(require_permission("dashboard.view"))])
+def widget_low_stock(
+    limit: int = 10,
+    branch_id: int = None,
+    current_user=Depends(get_current_user)
+):
+    """Widget المخزون المنخفض"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        params = {"limit": limit}
+        branch_join = ""
+        branch_filter = ""
+        if branch_id:
+            branch_join = "JOIN warehouses w ON inv.warehouse_id = w.id"
+            branch_filter = "AND w.branch_id = :bid"
+            params["bid"] = branch_id
+
+        result = db.execute(text(f"""
+            SELECT p.id, p.product_name, p.sku, p.reorder_level,
+                   COALESCE(inv_sum.total_qty, 0) as current_stock
+            FROM products p
+            LEFT JOIN (
+                SELECT inv.product_id, SUM(inv.quantity) as total_qty
+                FROM inventory inv
+                {branch_join}
+                WHERE 1=1 {branch_filter}
+                GROUP BY inv.product_id
+            ) inv_sum ON p.id = inv_sum.product_id
+            WHERE p.is_active = TRUE
+            AND (COALESCE(inv_sum.total_qty, 0) <= GREATEST(p.reorder_level, 5))
+            ORDER BY COALESCE(inv_sum.total_qty, 0) ASC
+            LIMIT :limit
+        """), params).fetchall()
+
+        return {"items": [
+            {
+                "id": r.id,
+                "product_name": r.product_name,
+                "sku": r.sku,
+                "current_stock": float(r.current_stock),
+                "reorder_level": float(r.reorder_level or 5)
+            }
+            for r in result
+        ]}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/widgets/pending-tasks", dependencies=[Depends(require_permission("dashboard.view"))])
+def widget_pending_tasks(
+    limit: int = 10,
+    current_user=Depends(get_current_user)
+):
+    """Widget المهام المعلقة (فواتير غير مدفوعة، طلبات معلقة، إلخ)"""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        tasks = []
+
+        # Unpaid invoices
+        try:
+            unpaid = db.execute(text("""
+                SELECT COUNT(*) as cnt, COALESCE(SUM(total * COALESCE(exchange_rate, 1)), 0) as total
+                FROM invoices WHERE status IN ('pending', 'partially_paid') AND invoice_type = 'sales'
+            """)).fetchone()
+            if unpaid and unpaid.cnt > 0:
+                tasks.append({
+                    "type": "unpaid_invoices",
+                    "label": f"{unpaid.cnt} فاتورة غير مدفوعة",
+                    "value": float(unpaid.total),
+                    "link": "/accounting/invoices?status=pending"
+                })
+        except Exception:
+            pass
+
+        # Pending purchase orders
+        try:
+            pending_po = db.execute(text("""
+                SELECT COUNT(*) as cnt FROM purchase_orders WHERE status = 'pending'
+            """)).scalar() or 0
+            if pending_po > 0:
+                tasks.append({
+                    "type": "pending_purchases",
+                    "label": f"{pending_po} أمر شراء معلق",
+                    "link": "/purchases/orders?status=pending"
+                })
+        except Exception:
+            pass
+
+        # Pending approvals
+        try:
+            pending_approvals = db.execute(text("""
+                SELECT COUNT(*) FROM approval_requests WHERE status = 'pending'
+            """)).scalar() or 0
+            if pending_approvals > 0:
+                tasks.append({
+                    "type": "pending_approvals",
+                    "label": f"{pending_approvals} طلب اعتماد معلق",
+                    "link": "/approvals"
+                })
+        except Exception:
+            pass
+
+        # Leave requests pending
+        try:
+            pending_leaves = db.execute(text("""
+                SELECT COUNT(*) FROM leave_requests WHERE status = 'pending'
+            """)).scalar() or 0
+            if pending_leaves > 0:
+                tasks.append({
+                    "type": "pending_leaves",
+                    "label": f"{pending_leaves} طلب إجازة معلق",
+                    "link": "/hr/leaves"
+                })
+        except Exception:
+            pass
+
+        # Overdue invoices
+        try:
+            overdue = db.execute(text("""
+                SELECT COUNT(*) as cnt FROM invoices
+                WHERE status IN ('pending', 'partially_paid')
+                AND due_date < CURRENT_DATE AND invoice_type = 'sales'
+            """)).scalar() or 0
+            if overdue > 0:
+                tasks.append({
+                    "type": "overdue_invoices",
+                    "label": f"{overdue} فاتورة متأخرة عن السداد",
+                    "link": "/accounting/invoices?overdue=true"
+                })
+        except Exception:
+            pass
+
+        return {"tasks": tasks[:limit]}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/widgets/cash-flow", dependencies=[Depends(require_permission("dashboard.view"))])
+def widget_cash_flow(
+    days: int = 30,
+    branch_id: int = None,
+    current_user=Depends(get_current_user)
+):
+    """Widget التدفق النقدي"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        start_date = date.today() - timedelta(days=days)
+        params = {"start": start_date}
+        branch_filter = ""
+        if branch_id:
+            branch_filter = "AND ta.branch_id = :bid"
+            params["bid"] = branch_id
+
+        # Cash inflows (receipts) by day
+        inflows = db.execute(text(f"""
+            SELECT t.transaction_date as dt,
+                   COALESCE(SUM(t.amount), 0) as total
+            FROM treasury_transactions t
+            JOIN treasury_accounts ta ON t.treasury_id = ta.id
+            WHERE t.transaction_type IN ('receipt', 'deposit', 'income')
+            AND t.transaction_date >= :start {branch_filter}
+            GROUP BY t.transaction_date
+        """), params).fetchall()
+        inflow_map = {}
+        for r in inflows:
+            d = r.dt
+            if isinstance(d, datetime): d = d.date()
+            inflow_map[d.isoformat()] = float(r.total)
+
+        # Cash outflows (payments) by day
+        outflows = db.execute(text(f"""
+            SELECT t.transaction_date as dt,
+                   COALESCE(SUM(t.amount), 0) as total
+            FROM treasury_transactions t
+            JOIN treasury_accounts ta ON t.treasury_id = ta.id
+            WHERE t.transaction_type IN ('payment', 'expense', 'withdrawal')
+            AND t.transaction_date >= :start {branch_filter}
+            GROUP BY t.transaction_date
+        """), params).fetchall()
+        outflow_map = {}
+        for r in outflows:
+            d = r.dt
+            if isinstance(d, datetime): d = d.date()
+            outflow_map[d.isoformat()] = float(r.total)
+
+        # Build daily series
+        result = []
+        running_net = 0
+        for i in range(days + 1):
+            day = start_date + timedelta(days=i)
+            day_key = day.isoformat()
+            inflow = inflow_map.get(day_key, 0)
+            outflow = outflow_map.get(day_key, 0)
+            running_net += inflow - outflow
+            result.append({
+                "date": day_key,
+                "inflow": inflow,
+                "outflow": outflow,
+                "net": running_net
+            })
+
+        return {"data": result}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/widgets/available", dependencies=[Depends(require_permission("dashboard.view"))])
+def get_available_widgets(current_user=Depends(get_current_user)):
+    """قائمة الـ widgets المتاحة للإضافة"""
+    return {"widgets": [
+        {"id": "sales_today", "type": "stat", "title": "مبيعات اليوم", "default_w": 1, "default_h": 1},
+        {"id": "sales_week", "type": "stat", "title": "مبيعات الأسبوع", "default_w": 1, "default_h": 1},
+        {"id": "sales_month", "type": "stat", "title": "مبيعات الشهر", "default_w": 1, "default_h": 1},
+        {"id": "expenses_month", "type": "stat", "title": "مصروفات الشهر", "default_w": 1, "default_h": 1},
+        {"id": "cash_balance", "type": "stat", "title": "الرصيد النقدي", "default_w": 1, "default_h": 1},
+        {"id": "profit_month", "type": "stat", "title": "صافي الربح", "default_w": 1, "default_h": 1},
+        {"id": "financial_chart", "type": "chart", "title": "المبيعات والمصروفات", "default_w": 2, "default_h": 2},
+        {"id": "top_products", "type": "chart", "title": "أفضل المنتجات", "default_w": 2, "default_h": 2},
+        {"id": "cash_flow", "type": "chart", "title": "التدفق النقدي", "default_w": 2, "default_h": 2},
+        {"id": "low_stock", "type": "list", "title": "المخزون المنخفض", "default_w": 2, "default_h": 1},
+        {"id": "pending_tasks", "type": "list", "title": "المهام المعلقة", "default_w": 2, "default_h": 1},
+        {"id": "recent_invoices", "type": "table", "title": "آخر الفواتير", "default_w": 2, "default_h": 2},
+        {"id": "receivables_aging", "type": "chart", "title": "أعمار الذمم المدينة", "default_w": 2, "default_h": 1},
+    ]}

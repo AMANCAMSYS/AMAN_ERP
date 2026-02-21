@@ -1,0 +1,22 @@
+.allocation-cell {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.allocation-cell:hover {
+    transform: scale(1.05);
+    z-index: 1;
+}
+
+.bg-success-subtle {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.avatar {
+    flex-shrink: 0;
+}

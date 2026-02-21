@@ -1,0 +1,50 @@
+.timesheet-table th,
+.timesheet-table td {
+    vertical-align: middle;
+}
+
+.timesheet-table input:focus {
+    background-color: #fff3cd;
+    box-shadow: none;
+}
+
+.timesheet-container {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.bg-light-success {
+    background-color: #f0fff4 !important;
+}
+
+.selection-overlay {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    cursor: pointer;
+    z-index: 5;
+}
+
+.selection-overlay input {
+    cursor: pointer;
+}
+
+.approved-indicator {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    color: #28a745;
+}
+
+.timesheet-table td:hover .selection-overlay {
+    display: block;
+}
+
+/* RTL Adjustments */
+[dir="rtl"] .selection-overlay,
+[dir="rtl"] .approved-indicator {
+    right: auto;
+    left: 2px;
+}

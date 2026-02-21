@@ -1,0 +1,175 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { inventoryAPI } from '../../utils/api'
+import { getCurrency, hasPermission } from '../../utils/auth'
+import { useBranch } from '../../context/BranchContext'
+import { useTranslation } from 'react-i18next'
+import '../../components/ModuleStyles.css'
+import { formatNumber } from '../../utils/format'
+
+function StockHome() {
+    const { t, i18n } = useTranslation()
+    const navigate = useNavigate()
+    const [stats, setStats] = useState({ product_count: 0, inventory_value: 0, low_stock_count: 0 })
+    const [loading, setLoading] = useState(true)
+    const currency = getCurrency()
+    const { currentBranch } = useBranch()
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!hasPermission('stock.reports')) {
+                setLoading(false);
+                return;
+            }
+            try {
+                setLoading(true)
+                const params = {}
+                if (currentBranch?.id) params.branch_id = currentBranch.id
+
+                const response = await inventoryAPI.getSummary(params)
+                setStats(response.data)
+            } catch (err) {
+                console.error("Failed to fetch stock stats", err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchStats()
+    }, [currentBranch])
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <h1 className="workspace-title">{t('stock.home.title')}</h1>
+                <p className="workspace-subtitle">{t('stock.home.subtitle')}</p>
+            </div>
+
+            {/* Metrics Section */}
+            <div className="metrics-grid">
+                <div className="metric-card">
+                    <div className="metric-label">{t('stock.home.metrics.total_products')}</div>
+                    <div className="metric-value text-primary">
+                        {!hasPermission('stock.reports') ? '***' : (loading ? '...' : stats.product_count)}
+                    </div>
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('stock.home.metrics.inventory_value')}</div>
+                    <div className="metric-value text-success">
+                        {!hasPermission('stock.reports') ? '***' : (loading ? '...' : formatNumber(stats.inventory_value))} {hasPermission('stock.reports') && <small>{currency}</small>}
+                    </div>
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('stock.home.metrics.low_stock')}</div>
+                    <div className="metric-value text-warning">
+                        {!hasPermission('stock.reports') ? '***' : (loading ? '...' : stats.low_stock_count)}
+                    </div>
+                </div>
+            </div>
+
+            {/* Module Sections */}
+            <div className="modules-grid">
+                {/* Masters Section */}
+                <div className="card section-card">
+                    <h3 className="section-title">{t('stock.home.sections.masters')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/stock/products')}>
+                            <span className="link-icon">📦</span>
+                            {t('stock.home.links.products')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/price-lists')}>
+                            <span className="link-icon">🏷️</span>
+                            {t('stock.home.links.price_lists')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/categories')}>
+                            <span className="link-icon">📁</span>
+                            {t('stock.home.links.categories')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/warehouses')}>
+                            <span className="link-icon">🏭</span>
+                            {t('stock.home.links.warehouses')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Transactions Section */}
+                <div className="card section-card">
+                    <h3 className="section-title">{t('stock.home.sections.transactions')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/stock/transfer')}>
+                            <span className="link-icon">🔄</span>
+                            {t('stock.home.links.transfer')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/shipments')}>
+                            <span className="link-icon">🚚</span>
+                            {t('stock.home.links.shipments')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/shipments/incoming')}>
+                            <span className="link-icon">📥</span>
+                            {t('stock.home.links.incoming_shipments')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/adjustments')}>
+                            <span className="link-icon">⚖️</span>
+                            {t('stock.adjustments.title')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Reports Section */}
+                {hasPermission('stock.reports') && (
+                    <div className="card section-card">
+                        <h3 className="section-title">{t('stock.home.sections.reports')}</h3>
+                        <div className="links-list">
+                            <div className="link-item" onClick={() => navigate('/stock/reports/balance')}>
+                                <span className="link-icon">📊</span>
+                                {t('stock.home.links.balance_report')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/stock/reports/movements')}>
+                                <span className="link-icon">📈</span>
+                                {t('stock.home.links.movements_report')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Advanced Inventory Section */}
+                <div className="card section-card">
+                    <h3 className="section-title">{t('stock.home.sections.advanced', 'المخزون المتقدم')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/stock/batches')}>
+                            <span className="link-icon">📦</span>
+                            {t('stock.home.links.batches', 'الدفعات وأرقام اللوت')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/serials')}>
+                            <span className="link-icon">🏷️</span>
+                            {t('stock.home.links.serials', 'الأرقام التسلسلية')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/quality')}>
+                            <span className="link-icon">🔬</span>
+                            {t('stock.home.links.quality', 'فحوصات الجودة')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/cycle-counts')}>
+                            <span className="link-icon">📋</span>
+                            {t('stock.home.links.cycle_counts', 'الجرد الدوري')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default StockHome

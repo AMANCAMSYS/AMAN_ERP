@@ -1,0 +1,116 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { ArrowLeft, ArrowRight, ClipboardList, AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
+import api from '../../utils/api'
+import { formatNumber } from '../../utils/format'
+import { useToast } from '../../context/ToastContext'
+import '../../components/ModuleStyles.css'
+
+export default function MRPView() {
+    const { t, i18n } = useTranslation()
+    const { id } = useParams()
+    const navigate = useNavigate()
+    const { showToast } = useToast()
+    const isRTL = i18n.language === 'ar'
+
+    const [mrp, setMrp] = useState(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (id) fetchMRP()
+    }, [id])
+
+    const fetchMRP = async () => {
+        try {
+            setLoading(true)
+            const res = await api.get(`/manufacturing/mrp/calculate/${id}`)
+            setMrp(res.data)
+        } catch (err) {
+            console.error('Failed to fetch MRP', err)
+            showToast(t('manufacturing.mrp.load_error', 'فشل في حساب متطلبات المواد'), 'error')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading) return <div className="page-center"><span className="loading"></span></div>
+
+    if (!mrp) return <div className="workspace p-5 text-center"><h3>MRP Not Found</h3></div>
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div className="d-flex align-items-center gap-3">
+                    <button onClick={() => navigate(-1)} className="btn btn-sm btn-light">
+                        {isRTL ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
+                    </button>
+                    <div>
+                        <h1 className="workspace-title">{t('manufacturing.mrp.title', 'تخطيط متطلبات المواد')}</h1>
+                        <p className="text-muted small">{mrp.plan_name}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+                <div className="table-responsive">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>{t('manufacturing.material_name', 'اسم المادة')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.required', 'المطلوب')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.on_hand', 'المتوفر')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.shortage', 'العجز')}</th>
+                                <th className="text-center">{t('manufacturing.mrp.action', 'الإجراء المقترح')}</th>
+                                <th className="text-center">{t('common.status', 'الحالة')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mrp.items.map((item, idx) => (
+                                <tr key={idx}>
+                                    <td className="fw-bold">{item.product_name}</td>
+                                    <td className="text-center">{formatNumber(item.required_quantity)}</td>
+                                    <td className="text-center">{formatNumber(item.on_hand_quantity)}</td>
+                                    <td className="text-center">
+                                        <span className={item.shortage_quantity > 0 ? 'text-danger fw-bold' : 'text-success'}>
+                                            {formatNumber(item.shortage_quantity)}
+                                        </span>
+                                    </td>
+                                    <td className="text-center">
+                                        {item.suggested_action === 'purchase_order' ? (
+                                            <span className="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1">
+                                                <ShoppingCart size={12} /> {t('manufacturing.mrp.create_po', 'طلب شراء')}
+                                            </span>
+                                        ) : (
+                                            <span className="badge bg-success-subtle text-success">
+                                                {t('manufacturing.mrp.stock_available', 'مخزون متاح')}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="text-center">
+                                        {item.shortage_quantity > 0 ? (
+                                            <AlertCircle size={18} className="text-danger" />
+                                        ) : (
+                                            <CheckCircle size={18} className="text-success" />
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="mt-4 d-flex justify-content-end gap-2">
+                <button className="btn btn-outline-primary" onClick={() => window.print()}>
+                    {t('common.print', 'طباعة التقرير')}
+                </button>
+                {mrp.items.some(i => i.shortage_quantity > 0) && (
+                    <button className="btn btn-primary">
+                        {t('manufacturing.mrp.generate_all_pos', 'توليد طلبات الشراء لجميع المواد')}
+                    </button>
+                )}
+            </div>
+        </div>
+    )
+}

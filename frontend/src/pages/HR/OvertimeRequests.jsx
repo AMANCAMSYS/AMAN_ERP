@@ -1,0 +1,156 @@
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { Plus, Check, X, Clock } from 'lucide-react';
+import '../../index.css';
+import '../../components/ModuleStyles.css';
+
+import DateInput from '../../components/common/DateInput';
+const OvertimeRequests = () => {
+    const { t, i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar';
+    const [items, setItems] = useState([]);
+    const [employees, setEmployees] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [form, setForm] = useState({ employee_id: '', date: '', hours: '', rate_multiplier: 1.5, reason: '' });
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [res, empRes] = await Promise.all([
+                hrAdvancedAPI.listOvertime(),
+                hrAPI.listEmployees({ limit: 200 })
+            ]);
+            setItems(res.data || []);
+            setEmployees(empRes.data?.items || empRes.data || []);
+        } catch (e) { console.error(e); }
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+
+    const handleSave = async () => {
+        try {
+            await hrAdvancedAPI.createOvertime({ ...form, hours: parseFloat(form.hours), rate_multiplier: parseFloat(form.rate_multiplier), employee_id: parseInt(form.employee_id) });
+            setShowModal(false);
+            setForm({ employee_id: '', date: '', hours: '', rate_multiplier: 1.5, reason: '' });
+            fetchData();
+        } catch (e) { console.error(e); }
+    };
+
+    const handleApprove = async (id, status) => {
+        try {
+            await hrAdvancedAPI.approveOvertime(id, { status });
+            fetchData();
+        } catch (e) { console.error(e); }
+    };
+
+    const getStatusBadge = (status) => {
+        const map = {
+            pending: { cls: 'badge-warning', ar: 'معلق', en: 'Pending' },
+            approved: { cls: 'badge-success', ar: 'موافق', en: 'Approved' },
+            rejected: { cls: 'badge-danger', ar: 'مرفوض', en: 'Rejected' }
+        };
+        const s = map[status] || map.pending;
+        return <span className={`badge ${s.cls}`}>{isRTL ? s.ar : s.en}</span>;
+    };
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div className="header-title">
+                    <h1 className="workspace-title">{isRTL ? 'طلبات العمل الإضافي' : 'Overtime Requests'}</h1>
+                    <p className="workspace-subtitle">{isRTL ? 'إدارة ساعات العمل الإضافي' : 'Manage overtime hours'}</p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={16} /> {isRTL ? 'طلب جديد' : 'New Request'}
+                </button>
+            </div>
+
+            <div className="card">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>{isRTL ? 'الموظف' : 'Employee'}</th>
+                            <th>{isRTL ? 'التاريخ' : 'Date'}</th>
+                            <th>{isRTL ? 'الساعات' : 'Hours'}</th>
+                            <th>{isRTL ? 'المضاعف' : 'Rate'}</th>
+                            <th>{isRTL ? 'السبب' : 'Reason'}</th>
+                            <th>{isRTL ? 'الحالة' : 'Status'}</th>
+                            <th>{isRTL ? 'إجراءات' : 'Actions'}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</td></tr>
+                        ) : items.length === 0 ? (
+                            <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>{isRTL ? 'لا توجد طلبات' : 'No requests'}</td></tr>
+                        ) : items.map((item, i) => (
+                            <tr key={item.id}>
+                                <td>{i + 1}</td>
+                                <td style={{ fontWeight: 600 }}>{item.employee_name || `#${item.employee_id}`}</td>
+                                <td>{item.date}</td>
+                                <td>{item.hours}</td>
+                                <td>×{item.rate_multiplier}</td>
+                                <td>{item.reason || '-'}</td>
+                                <td>{getStatusBadge(item.status)}</td>
+                                <td>
+                                    {item.status === 'pending' && (
+                                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                            <button className="btn btn-sm btn-success" onClick={() => handleApprove(item.id, 'approved')} title={isRTL ? 'موافقة' : 'Approve'}><Check size={14} /></button>
+                                            <button className="btn btn-sm btn-danger" onClick={() => handleApprove(item.id, 'rejected')} title={isRTL ? 'رفض' : 'Reject'}><X size={14} /></button>
+                                        </div>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {showModal && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+                        <h2 className="modal-title">{isRTL ? 'طلب عمل إضافي' : 'Overtime Request'}</h2>
+                        <div className="form-group">
+                            <label>{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <select className="form-input" value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })}>
+                                <option value="">{isRTL ? '-- اختر --' : '-- Select --'}</option>
+                                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name || emp.full_name}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div className="form-group">
+                                <label>{isRTL ? 'التاريخ' : 'Date'}</label>
+                                <DateInput className="form-input" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>{isRTL ? 'الساعات' : 'Hours'}</label>
+                                <input type="number" step="0.5" className="form-input" value={form.hours} onChange={e => setForm({ ...form, hours: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>{isRTL ? 'معدل المضاعفة' : 'Rate Multiplier'}</label>
+                            <select className="form-input" value={form.rate_multiplier} onChange={e => setForm({ ...form, rate_multiplier: e.target.value })}>
+                                <option value="1.5">1.5× ({isRTL ? 'عادي' : 'Regular'})</option>
+                                <option value="2">2× ({isRTL ? 'عطلة' : 'Holiday'})</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>{isRTL ? 'السبب' : 'Reason'}</label>
+                            <textarea className="form-input" rows="2" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                            <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{isRTL ? 'إلغاء' : 'Cancel'}</button>
+                            <button className="btn btn-primary" onClick={handleSave}>{isRTL ? 'إرسال' : 'Submit'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default OvertimeRequests;

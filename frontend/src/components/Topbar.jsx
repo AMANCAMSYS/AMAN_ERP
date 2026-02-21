@@ -1,0 +1,394 @@
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { getUser, getCompanyId, logout, hasPermission } from '../utils/auth'
+import { inventoryAPI } from '../utils/api'
+import { notificationsAPI } from '../utils/api' // New generic API
+import { useTranslation } from 'react-i18next'
+import { useBranch } from '../context/BranchContext'
+
+function Topbar() {
+    const { t, i18n } = useTranslation()
+    const user = getUser()
+    const companyId = getCompanyId()
+    const navigate = useNavigate()
+    const [showMenu, setShowMenu] = useState(false)
+    const [showNotifications, setShowNotifications] = useState(false)
+    const [notifications, setNotifications] = useState([])
+    const [unreadCount, setUnreadCount] = useState(0)
+    const menuRef = useRef(null)
+    const notifRef = useRef(null)
+    const branchRef = useRef(null)
+    const [showBranchMenu, setShowBranchMenu] = useState(false)
+    const { branches, currentBranch, setBranch } = useBranch()
+
+    // Fetch notifications
+    useEffect(() => {
+        if (!user || user.role === 'system_admin') return;
+
+        const fetchNotifications = async () => {
+            try {
+                // Use new generic API
+                const [notifRes, countRes] = await Promise.all([
+                    notificationsAPI.getAll(),
+                    notificationsAPI.getUnreadCount()
+                ]);
+                setNotifications(notifRes.data);
+                setUnreadCount(countRes.data.count);
+            } catch (err) {
+                console.error("Failed to fetch notifications", err);
+            }
+        };
+        fetchNotifications();
+
+        // Poll every 30 seconds
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, [user?.username]);
+
+    // Close menus when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowMenu(false)
+            }
+            if (notifRef.current && !notifRef.current.contains(event.target)) {
+                setShowNotifications(false)
+            }
+            if (branchRef.current && !branchRef.current.contains(event.target)) {
+                setShowBranchMenu(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [menuRef, notifRef, branchRef])
+
+    const handleLogout = () => {
+        logout()
+    }
+
+    const handleNotificationClick = async (notif) => {
+        try {
+            if (!notif.is_read) {
+                await notificationsAPI.markRead(notif.id);
+                setUnreadCount(prev => Math.max(0, prev - 1));
+                setNotifications(prev => prev.map(n =>
+                    n.id === notif.id ? { ...n, is_read: true } : n
+                ));
+            }
+            // Navigate based on type
+            // e.g. project_task -> /projects/:id
+            if (notif.resource_type === 'project' || notif.resource_type === 'task') {
+                navigate(`/projects`); // Ideally to specific project if resource_id is project_id
+            } else if (notif.resource_type === 'invoice') {
+                navigate(`/sales/invoices/${notif.resource_id}`);
+            }
+            setShowNotifications(false);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleMarkAllRead = async () => {
+        try {
+            await inventoryAPI.markAllNotificationsRead();
+            setUnreadCount(0);
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        } catch (err) {
+            console.error("Failed to mark all as read", err);
+        }
+    };
+
+    return (
+        <header className="topbar">
+            <div className="topbar-search">
+                <input type="text" name="search" id="search" className="search-input" placeholder={t('common.search')} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Language Switcher */}
+                <button
+                    onClick={() => {
+                        const newLang = i18n.language === 'ar' ? 'en' : 'ar';
+                        i18n.changeLanguage(newLang);
+                        window.location.reload(); // To force direction change properly if not reactive
+                    }}
+                    style={{
+                        background: 'none',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                    }}
+                >
+                    {i18n.language === 'ar' ? 'English' : 'العربية'}
+                </button>
+
+                {/* Branch Selector */}
+                {branches.length > 0 && (
+                    <div ref={branchRef} style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setShowBranchMenu(!showBranchMenu)}
+                            style={{
+                                background: 'white',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                padding: '4px 12px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                minWidth: '140px',
+                                justifyContent: 'space-between'
+                            }}
+                        >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🏢 {currentBranch ? currentBranch.branch_name : t('branches.all_branches') || 'كل الفروع'}
+                            </span>
+                            <span style={{ fontSize: '10px' }}>▼</span>
+                        </button>
+
+                        {showBranchMenu && (
+                            <div className="dropdown-menu fade-in" style={{
+                                position: 'absolute',
+                                top: '35px',
+                                left: '0',
+                                width: '220px',
+                                background: 'white',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                border: '1px solid var(--border-color)',
+                                zIndex: 100,
+                                padding: '4px 0',
+                                maxHeight: '300px',
+                                overflowY: 'auto'
+                            }}>
+                                <div
+                                    className="dropdown-item"
+                                    onClick={() => { setBranch(null); setShowBranchMenu(false); }}
+                                    style={{
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        background: !currentBranch ? '#f0f9ff' : 'transparent',
+                                        color: !currentBranch ? 'var(--primary)' : 'inherit'
+                                    }}
+                                >
+                                    🌐 {t('branches.all_branches') || 'كل الفروع'}
+                                </div>
+                                <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }}></div>
+                                {branches.map(branch => (
+                                    <div
+                                        key={branch.id}
+                                        className="dropdown-item"
+                                        onClick={() => { setBranch(branch); setShowBranchMenu(false); }}
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            background: currentBranch?.id === branch.id ? '#f0f9ff' : 'transparent',
+                                            color: currentBranch?.id === branch.id ? 'var(--primary)' : 'inherit',
+                                            display: 'flex',
+                                            justifyContent: 'space-between'
+                                        }}
+                                    >
+                                        <span>{branch.branch_name}</span>
+                                        {branch.is_default && <span style={{ fontSize: '10px', background: '#e0e7ff', padding: '2px 4px', borderRadius: '4px' }}>Default</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Notifications Bell */}
+                <div ref={notifRef} style={{ position: 'relative' }}>
+                    <button
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '20px',
+                            position: 'relative',
+                            padding: '8px'
+                        }}
+                    >
+                        🔔
+                        {unreadCount > 0 && (
+                            <span style={{
+                                position: 'absolute',
+                                top: '2px',
+                                right: '2px',
+                                background: '#EF4444',
+                                color: 'white',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        )}
+                    </button>
+
+                    {showNotifications && (
+                        <div className="dropdown-menu fade-in" style={{
+                            position: 'absolute',
+                            top: '45px',
+                            left: '0',
+                            width: '320px',
+                            maxHeight: '400px',
+                            overflowY: 'auto',
+                            background: 'white',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                            border: '1px solid var(--border-color)',
+                            zIndex: 200,
+                        }}>
+                            <div style={{
+                                padding: '12px 16px',
+                                borderBottom: '1px solid var(--border-color)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span style={{ fontWeight: '700', fontSize: '15px' }}>🔔 {t('common.notifications_panel.title')}</span>
+                                {unreadCount > 0 && (
+                                    <button
+                                        onClick={handleMarkAllRead}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--primary)',
+                                            fontSize: '12px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {t('common.notifications_panel.mark_read')}
+                                    </button>
+                                )}
+                            </div>
+
+                            {notifications.length === 0 ? (
+                                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <div style={{ fontSize: '32px', marginBottom: '8px', opacity: 0.5 }}>📭</div>
+                                    {t('common.notifications_panel.empty')}
+                                </div>
+                            ) : (
+                                notifications.map(notif => (
+                                    <div
+                                        key={notif.id}
+                                        onClick={() => handleNotificationClick(notif)}
+                                        style={{
+                                            padding: '12px 16px',
+                                            borderBottom: '1px solid var(--border-color)',
+                                            cursor: 'pointer',
+                                            background: notif.is_read ? 'white' : '#F0F9FF',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = '#f1f5f9'}
+                                        onMouseLeave={e => e.target.style.background = notif.is_read ? 'white' : '#F0F9FF'}
+                                    >
+                                        <div style={{ fontWeight: notif.is_read ? '400' : '600', fontSize: '13px', marginBottom: '4px' }}>
+                                            {notif.title}
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                            {notif.message}
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                            {new Date(notif.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US')}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+
+                            <Link
+                                to="/stock/shipments/incoming"
+                                style={{
+                                    display: 'block',
+                                    padding: '12px 16px',
+                                    textAlign: 'center',
+                                    color: 'var(--primary)',
+                                    fontSize: '13px',
+                                    textDecoration: 'none'
+                                }}
+                                onClick={() => setShowNotifications(false)}
+                            >
+                                {t('common.notifications_panel.view_incoming')}
+                            </Link>
+                        </div>
+                    )}
+                </div>
+
+                {/* User Menu */}
+                <div className="topbar-actions" ref={menuRef}>
+                    <div
+                        className="user-menu-trigger"
+                        onClick={() => setShowMenu(!showMenu)}
+                        style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '12px' }}
+                    >
+                        <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '14px', fontWeight: '600' }}>{user?.full_name}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {companyId}</div>
+                        </div>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--primary)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            fontSize: '14px'
+                        }}>
+                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                    </div>
+
+                    {showMenu && (
+                        <div className="dropdown-menu fade-in" style={{
+                            position: 'absolute',
+                            top: '60px',
+                            left: '24px',
+                            width: '200px',
+                            background: 'white',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                            border: '1px solid var(--border-color)',
+                            zIndex: 100,
+                            padding: '8px 0'
+                        }}>
+                            <div
+                                className="dropdown-item"
+                                onClick={() => { setShowMenu(false); navigate('/profile') }}
+                                style={{ padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', hover: { background: '#f1f5f9' } }}
+                            >
+                                <span>👤</span> {t('common.user_menu.profile')}
+                            </div>
+                            <div style={{ height: '1px', background: 'var(--border-color)', margin: '8px 0' }}></div>
+                            <div
+                                className="dropdown-item text-danger"
+                                onClick={handleLogout}
+                                style={{ padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                <span>🚪</span> {t('common.user_menu.logout')}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </header>
+    )
+}
+
+export default Topbar

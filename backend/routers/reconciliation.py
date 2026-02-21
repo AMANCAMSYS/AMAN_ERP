@@ -1,0 +1,803 @@
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import date, datetime
+from pydantic import BaseModel
+import csv
+import io
+import re
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.permissions import require_permission
+from schemas.reconciliation import ReconciliationCreate, StatementLineCreate, MatchRequest, UnmatchRequest
+
+router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"])
+
+# --- Endpoints ---
+
+@router.get("", dependencies=[Depends(require_permission("reconciliation.view"))])
+def list_reconciliations(
+    account_id: Optional[int] = None, 
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض قائمة التسويات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT r.*, t.name as account_name, t.currency,
+                   u.username as created_by_name,
+                   (SELECT COUNT(*) FROM bank_statement_lines bsl 
+                    WHERE bsl.reconciliation_id = r.id AND bsl.is_reconciled = FALSE) as unmatched_count,
+                   (SELECT COUNT(*) FROM bank_statement_lines bsl 
+                    WHERE bsl.reconciliation_id = r.id AND bsl.is_reconciled = TRUE) as matched_count,
+                   (SELECT COUNT(*) FROM bank_statement_lines bsl 
+                    WHERE bsl.reconciliation_id = r.id) as total_lines
+            FROM bank_reconciliations r
+            JOIN treasury_accounts t ON r.treasury_account_id = t.id
+            LEFT JOIN company_users u ON r.created_by = u.id
+            WHERE 1=1
+        """
+        params = {}
+        if account_id:
+            query += " AND r.treasury_account_id = :aid"
+            params["aid"] = account_id
+            
+        if branch_id:
+             query += " AND r.branch_id = :bid"
+             params["bid"] = branch_id
+             
+        query += " ORDER BY r.statement_date DESC"
+        
+        result = db.execute(text(query), params).fetchall()
+        return [dict(row._mapping) for row in result]
+    finally:
+        db.close()
+
+@router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("reconciliation.create"))])
+def create_reconciliation(data: ReconciliationCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء مسودة تسوية جديدة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check if draft already exists for this account
+        existing = db.execute(text("""
+            SELECT id FROM bank_reconciliations 
+            WHERE treasury_account_id = :tid 
+            AND status = 'draft'
+        """), {"tid": data.treasury_account_id}).fetchone()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="يوجد بالفعل تسوية مسودة لهذا الحساب. يرجى إكمالها أو حذفها.")
+
+        rec_id = db.execute(text("""
+            INSERT INTO bank_reconciliations (
+                treasury_account_id, statement_date, start_balance, end_balance, 
+                status, notes, created_by, branch_id
+            ) VALUES (
+                :tid, :date, :start, :end, 
+                'draft', :notes, :uid, :bid
+            ) RETURNING id
+        """), {
+            "tid": data.treasury_account_id, "date": data.statement_date,
+            "start": data.start_balance, "end": data.end_balance,
+            "notes": data.notes, "uid": current_user.id, "bid": data.branch_id
+        }).scalar()
+        
+        db.commit()
+        return {"id": rec_id, "message": "تم إنشاء التسوية بنجاح"}
+    finally:
+        db.close()
+
+@router.get("/{id}", dependencies=[Depends(require_permission("reconciliation.view"))])
+def get_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
+    """جلب تفاصيل التسوية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("""
+            SELECT r.*, t.name as account_name, t.currency, t.current_balance as book_balance
+            FROM bank_reconciliations r
+            JOIN treasury_accounts t ON r.treasury_account_id = t.id
+            WHERE r.id = :id
+        """), {"id": id}).fetchone()
+        
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            
+        statement_lines = db.execute(text("""
+            SELECT sl.*, 
+                   CASE WHEN sl.is_reconciled = TRUE THEN 'matched' ELSE 'unmatched' END as match_status,
+                   jl_ref.entry_number as matched_entry_number
+            FROM bank_statement_lines sl
+            LEFT JOIN (
+                SELECT jl.id as jl_id, je.entry_number 
+                FROM journal_lines jl 
+                JOIN journal_entries je ON jl.journal_entry_id = je.id
+            ) jl_ref ON sl.matched_journal_line_id = jl_ref.jl_id
+            WHERE sl.reconciliation_id = :id
+            ORDER BY sl.transaction_date, sl.id
+        """), {"id": id}).fetchall()
+
+        all_lines = [dict(r._mapping) for r in statement_lines]
+        matched_lines = [l for l in all_lines if l.get('is_reconciled')]
+        unmatched_lines = [l for l in all_lines if not l.get('is_reconciled')]
+
+        matched_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in matched_lines)
+        unmatched_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in unmatched_lines)
+        total_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in all_lines)
+        
+        calculated_end = float(rec.start_balance) + total_net
+        difference = calculated_end - float(rec.end_balance)
+
+        return {
+            "header": dict(rec._mapping),
+            "lines": all_lines,
+            "summary": {
+                "total_lines": len(all_lines),
+                "matched_count": len(matched_lines),
+                "unmatched_count": len(unmatched_lines),
+                "matched_net": round(matched_net, 2),
+                "unmatched_net": round(unmatched_net, 2),
+                "total_net": round(total_net, 2),
+                "calculated_end_balance": round(calculated_end, 2),
+                "target_end_balance": float(rec.end_balance),
+                "difference": round(difference, 2),
+            }
+        }
+    finally:
+        db.close()
+
+@router.post("/{id}/lines", dependencies=[Depends(require_permission("reconciliation.create"))])
+def add_statement_lines(id: int, lines: List[StatementLineCreate], current_user: dict = Depends(get_current_user)):
+    """إضافة أسطر كشف الحساب يدوياً"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("SELECT status, start_balance FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن إضافة أسطر إلى تسوية معتمدة")
+
+        last_balance = db.execute(text("""
+            SELECT balance FROM bank_statement_lines 
+            WHERE reconciliation_id = :id ORDER BY id DESC LIMIT 1
+        """), {"id": id}).scalar()
+        
+        running_balance = float(last_balance) if last_balance is not None else float(rec.start_balance)
+
+        added = []
+        for line in lines:
+            running_balance = running_balance + float(line.credit) - float(line.debit)
+            
+            result = db.execute(text("""
+                INSERT INTO bank_statement_lines (
+                    reconciliation_id, transaction_date, description, reference, 
+                    debit, credit, balance, is_reconciled
+                ) VALUES (:rid, :date, :desc, :ref, :deb, :cred, :bal, FALSE)
+                RETURNING id
+            """), {
+                "rid": id, "date": line.transaction_date, "desc": line.description,
+                "ref": line.reference, "deb": line.debit, "cred": line.credit, "bal": running_balance
+            })
+            added.append(result.scalar())
+            
+        db.commit()
+        return {"message": f"تم إضافة {len(added)} أسطر بنجاح", "line_ids": added}
+    finally:
+        db.close()
+
+
+# ──────── BANK STATEMENT FILE IMPORT ────────
+
+def _parse_date(val: str) -> Optional[str]:
+    """Try multiple date formats common in Saudi bank exports."""
+    val = val.strip()
+    for fmt_str in ('%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d', '%d-%m-%Y', '%d.%m.%Y'):
+        try:
+            return datetime.strptime(val, fmt_str).strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    return None
+
+
+def _detect_csv_columns(headers: List[str]) -> dict:
+    """Auto-detect column mapping from CSV headers (Arabic + English)."""
+    mapping = {}
+    date_keywords = ['date', 'تاريخ', 'transaction_date', 'value_date', 'posting_date', 'تاريخ العملية', 'تاريخ القيد']
+    desc_keywords = ['description', 'الوصف', 'details', 'البيان', 'التفاصيل', 'narrative', 'particulars', 'بيان']
+    ref_keywords  = ['reference', 'المرجع', 'ref', 'رقم المرجع', 'cheque', 'رقم الشيك', 'transaction_id']
+    deb_keywords  = ['debit', 'مدين', 'withdrawal', 'سحب', 'مسحوب', 'مبلغ مدين', 'withdrawals']
+    cred_keywords = ['credit', 'دائن', 'deposit', 'إيداع', 'مبلغ دائن', 'deposits']
+    bal_keywords  = ['balance', 'الرصيد', 'رصيد', 'running_balance']
+    amount_keywords = ['amount', 'المبلغ', 'مبلغ']
+
+    normalized = [h.strip().lower().replace('\ufeff', '') for h in headers]
+
+    for i, h in enumerate(normalized):
+        if not mapping.get('date') and any(k in h for k in date_keywords):
+            mapping['date'] = i
+        elif not mapping.get('description') and any(k in h for k in desc_keywords):
+            mapping['description'] = i
+        elif not mapping.get('reference') and any(k in h for k in ref_keywords):
+            mapping['reference'] = i
+        elif not mapping.get('debit') and any(k in h for k in deb_keywords):
+            mapping['debit'] = i
+        elif not mapping.get('credit') and any(k in h for k in cred_keywords):
+            mapping['credit'] = i
+        elif not mapping.get('balance') and any(k in h for k in bal_keywords):
+            mapping['balance'] = i
+        elif not mapping.get('amount') and any(k in h for k in amount_keywords):
+            mapping['amount'] = i
+
+    return mapping
+
+
+def _parse_amount(val) -> float:
+    """Parse amount string handling commas, parentheses (negative), Arabic digits."""
+    if val is None:
+        return 0.0
+    s = str(val).strip()
+    if not s or s in ('-', '—', '–', ''):
+        return 0.0
+    # Arabic digits
+    arabic_digits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}
+    for ar, en in arabic_digits.items():
+        s = s.replace(ar, en)
+    negative = False
+    if s.startswith('(') and s.endswith(')'):
+        negative = True
+        s = s[1:-1]
+    s = s.replace(',', '').replace(' ', '')
+    s = re.sub(r'[^\d.\-]', '', s)
+    try:
+        v = float(s)
+        return -v if negative else v
+    except ValueError:
+        return 0.0
+
+
+@router.post("/{id}/import-preview", dependencies=[Depends(require_permission("reconciliation.create"))])
+async def preview_import(
+    id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """معاينة ملف كشف الحساب قبل الاستيراد (CSV / Excel)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن الاستيراد في تسوية معتمدة")
+
+        content = await file.read()
+        filename = file.filename.lower() if file.filename else ""
+
+        rows = []
+        headers = []
+
+        if filename.endswith(('.xlsx', '.xls')):
+            try:
+                import openpyxl
+            except ImportError:
+                raise HTTPException(status_code=400, detail="يرجى تثبيت مكتبة openpyxl لدعم ملفات Excel")
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            ws = wb.active
+            all_rows = list(ws.iter_rows(values_only=True))
+            if not all_rows:
+                raise HTTPException(status_code=400, detail="الملف فارغ")
+            # Skip empty leading rows
+            start_idx = 0
+            for i, row in enumerate(all_rows):
+                if any(cell is not None and str(cell).strip() for cell in row):
+                    start_idx = i
+                    break
+            headers = [str(cell or '').strip() for cell in all_rows[start_idx]]
+            for row in all_rows[start_idx + 1:]:
+                rows.append([str(cell or '').strip() for cell in row])
+        else:
+            # Treat as CSV
+            try:
+                text_content = content.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                try:
+                    text_content = content.decode('cp1256')  # Arabic Windows encoding
+                except UnicodeDecodeError:
+                    text_content = content.decode('latin-1')
+
+            # Detect delimiter
+            sample = text_content[:2000]
+            if sample.count('\t') > sample.count(',') and sample.count('\t') > sample.count(';'):
+                delimiter = '\t'
+            elif sample.count(';') > sample.count(','):
+                delimiter = ';'
+            else:
+                delimiter = ','
+
+            reader = csv.reader(io.StringIO(text_content), delimiter=delimiter)
+            all_rows = list(reader)
+            if not all_rows:
+                raise HTTPException(status_code=400, detail="الملف فارغ")
+            # Skip empty leading rows
+            start_idx = 0
+            for i, row in enumerate(all_rows):
+                if any(cell.strip() for cell in row):
+                    start_idx = i
+                    break
+            headers = [h.strip() for h in all_rows[start_idx]]
+            rows = all_rows[start_idx + 1:]
+
+        # Auto-detect columns
+        col_mapping = _detect_csv_columns(headers)
+
+        # Parse rows into preview lines
+        preview_lines = []
+        skipped = 0
+        for row in rows:
+            if not any(str(cell).strip() for cell in row):
+                continue  # skip empty rows
+
+            # Extract date
+            raw_date = row[col_mapping['date']] if 'date' in col_mapping and col_mapping['date'] < len(row) else ''
+            parsed_date = _parse_date(raw_date)
+            if not parsed_date:
+                skipped += 1
+                continue
+
+            desc = row[col_mapping['description']] if 'description' in col_mapping and col_mapping['description'] < len(row) else ''
+            ref = row[col_mapping['reference']] if 'reference' in col_mapping and col_mapping['reference'] < len(row) else ''
+
+            debit_val = 0.0
+            credit_val = 0.0
+
+            if 'debit' in col_mapping and 'credit' in col_mapping:
+                debit_val = _parse_amount(row[col_mapping['debit']] if col_mapping['debit'] < len(row) else '')
+                credit_val = _parse_amount(row[col_mapping['credit']] if col_mapping['credit'] < len(row) else '')
+            elif 'amount' in col_mapping:
+                amt = _parse_amount(row[col_mapping['amount']] if col_mapping['amount'] < len(row) else '')
+                if amt < 0:
+                    debit_val = abs(amt)
+                else:
+                    credit_val = amt
+
+            # Ensure positive values
+            debit_val = abs(debit_val)
+            credit_val = abs(credit_val)
+
+            if debit_val == 0 and credit_val == 0:
+                skipped += 1
+                continue
+
+            preview_lines.append({
+                "transaction_date": parsed_date,
+                "description": desc.strip(),
+                "reference": ref.strip(),
+                "debit": round(debit_val, 2),
+                "credit": round(credit_val, 2),
+            })
+
+        return {
+            "filename": file.filename,
+            "headers": headers,
+            "column_mapping": col_mapping,
+            "total_rows": len(rows),
+            "parsed_lines": len(preview_lines),
+            "skipped_rows": skipped,
+            "preview": preview_lines[:200],  # Max 200 for preview
+            "all_lines": preview_lines,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"خطأ في تحليل الملف: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.post("/{id}/import-confirm", dependencies=[Depends(require_permission("reconciliation.create"))])
+def confirm_import(id: int, lines: List[StatementLineCreate], current_user: dict = Depends(get_current_user)):
+    """تأكيد استيراد أسطر كشف الحساب بعد المعاينة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("SELECT status, start_balance FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن الاستيراد في تسوية معتمدة")
+
+        if not lines:
+            raise HTTPException(status_code=400, detail="لا توجد أسطر للاستيراد")
+
+        last_balance = db.execute(text("""
+            SELECT balance FROM bank_statement_lines 
+            WHERE reconciliation_id = :id ORDER BY id DESC LIMIT 1
+        """), {"id": id}).scalar()
+
+        running_balance = float(last_balance) if last_balance is not None else float(rec.start_balance)
+
+        added = []
+        for line in lines:
+            running_balance = running_balance + float(line.credit) - float(line.debit)
+            result = db.execute(text("""
+                INSERT INTO bank_statement_lines (
+                    reconciliation_id, transaction_date, description, reference, 
+                    debit, credit, balance, is_reconciled
+                ) VALUES (:rid, :date, :desc, :ref, :deb, :cred, :bal, FALSE)
+                RETURNING id
+            """), {
+                "rid": id, "date": line.transaction_date, "desc": line.description,
+                "ref": line.reference, "deb": line.debit, "cred": line.credit, "bal": running_balance
+            })
+            added.append(result.scalar())
+
+        db.commit()
+        return {"message": f"تم استيراد {len(added)} سطر بنجاح", "line_ids": added, "imported_count": len(added)}
+    finally:
+        db.close()
+
+
+# ──────── AUTO RECONCILIATION ────────
+
+@router.post("/{id}/auto-match", dependencies=[Depends(require_permission("reconciliation.create"))])
+def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(get_current_user)):
+    """مطابقة تلقائية بناءً على المبلغ والتاريخ"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec_info = db.execute(text("""
+            SELECT r.status, t.gl_account_id, r.statement_date
+            FROM bank_reconciliations r
+            JOIN treasury_accounts t ON r.treasury_account_id = t.id
+            WHERE r.id = :id
+        """), {"id": id}).fetchone()
+
+        if not rec_info:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec_info.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن المطابقة في تسوية معتمدة")
+
+        # Get unmatched statement lines
+        stmt_lines = db.execute(text("""
+            SELECT id, transaction_date, debit, credit 
+            FROM bank_statement_lines 
+            WHERE reconciliation_id = :id AND is_reconciled = FALSE
+            ORDER BY transaction_date
+        """), {"id": id}).fetchall()
+
+        # Get unmatched ledger entries
+        ledger = db.execute(text("""
+            SELECT jl.id, je.entry_date, jl.debit, jl.credit
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE jl.account_id = :gl_id
+            AND (jl.is_reconciled = FALSE OR jl.is_reconciled IS NULL)
+            AND je.status = 'posted'
+            AND je.entry_date <= :stmt_date
+            ORDER BY je.entry_date
+        """), {"gl_id": rec_info.gl_account_id, "stmt_date": rec_info.statement_date}).fetchall()
+
+        matched_stmt_ids = set()
+        matched_jl_ids = set()
+        matches = []
+
+        for sl in stmt_lines:
+            if sl.id in matched_stmt_ids:
+                continue
+
+            sl_debit = float(sl.debit or 0)
+            sl_credit = float(sl.credit or 0)
+            sl_date = sl.transaction_date
+
+            for jl in ledger:
+                if jl.id in matched_jl_ids:
+                    continue
+
+                jl_debit = float(jl.debit or 0)
+                jl_credit = float(jl.credit or 0)
+                jl_date = jl.entry_date
+
+                # Check date tolerance
+                if sl_date and jl_date:
+                    day_diff = abs((sl_date - jl_date).days) if hasattr(sl_date, 'days') or isinstance(sl_date, date) else 999
+                    if isinstance(sl_date, str):
+                        try:
+                            day_diff = abs((datetime.strptime(str(sl_date), '%Y-%m-%d').date() - datetime.strptime(str(jl_date), '%Y-%m-%d').date()).days)
+                        except Exception:
+                            day_diff = 999
+                    if day_diff > tolerance_days:
+                        continue
+
+                # Amount matching: bank debit=withdrawal matches GL credit, bank credit=deposit matches GL debit
+                amount_match = False
+                if sl_debit > 0 and jl_credit > 0 and abs(sl_debit - jl_credit) < 0.01:
+                    amount_match = True
+                elif sl_credit > 0 and jl_debit > 0 and abs(sl_credit - jl_debit) < 0.01:
+                    amount_match = True
+
+                if amount_match:
+                    # Mark as matched
+                    db.execute(text("""
+                        UPDATE bank_statement_lines 
+                        SET is_reconciled = TRUE, matched_journal_line_id = :jid 
+                        WHERE id = :sid
+                    """), {"jid": jl.id, "sid": sl.id})
+
+                    db.execute(text("""
+                        UPDATE journal_lines 
+                        SET is_reconciled = TRUE, reconciliation_id = :rid 
+                        WHERE id = :jid
+                    """), {"rid": id, "jid": jl.id})
+
+                    matched_stmt_ids.add(sl.id)
+                    matched_jl_ids.add(jl.id)
+                    matches.append({
+                        "statement_line_id": sl.id,
+                        "journal_line_id": jl.id,
+                        "amount": sl_debit if sl_debit > 0 else sl_credit,
+                    })
+                    break  # Move to next statement line
+
+        db.commit()
+        return {
+            "matched_count": len(matches),
+            "matches": matches,
+            "remaining_unmatched": len(stmt_lines) - len(matches),
+            "message": f"تم مطابقة {len(matches)} حركة تلقائياً"
+        }
+    finally:
+        db.close()
+
+@router.delete("/{id}/lines/{line_id}", dependencies=[Depends(require_permission("reconciliation.create"))])
+def delete_statement_line(id: int, line_id: int, current_user: dict = Depends(get_current_user)):
+    """حذف سطر من كشف الحساب البنكي"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن حذف أسطر من تسوية معتمدة")
+
+        line = db.execute(text("""
+            SELECT is_reconciled, matched_journal_line_id 
+            FROM bank_statement_lines WHERE id = :lid AND reconciliation_id = :rid
+        """), {"lid": line_id, "rid": id}).fetchone()
+        
+        if not line:
+            raise HTTPException(status_code=404, detail="السطر غير موجود")
+            
+        if line.is_reconciled and line.matched_journal_line_id:
+            db.execute(text("""
+                UPDATE journal_lines SET is_reconciled = FALSE, reconciliation_id = NULL
+                WHERE id = :jid
+            """), {"jid": line.matched_journal_line_id})
+        
+        db.execute(text("DELETE FROM bank_statement_lines WHERE id = :lid"), {"lid": line_id})
+        db.commit()
+        return {"message": "تم حذف السطر بنجاح"}
+    finally:
+        db.close()
+
+@router.get("/{id}/ledger", dependencies=[Depends(require_permission("reconciliation.view"))])
+def get_ledger_entries(id: int, current_user: dict = Depends(get_current_user)):
+    """جلب قيود النظام غير المطابقة لهذا الحساب"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec_info = db.execute(text("""
+            SELECT t.gl_account_id, r.statement_date
+            FROM bank_reconciliations r
+            JOIN treasury_accounts t ON r.treasury_account_id = t.id
+            WHERE r.id = :id
+        """), {"id": id}).fetchone()
+        
+        if not rec_info:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+
+        gl_id = rec_info.gl_account_id
+        stmt_date = rec_info.statement_date
+        
+        ledger = db.execute(text("""
+            SELECT jl.id, je.entry_date, je.entry_number, je.description as header_desc, 
+                   jl.description as line_desc, jl.debit, jl.credit,
+                   jl.currency, jl.amount_currency
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE jl.account_id = :gl_id
+            AND (jl.is_reconciled = FALSE OR jl.is_reconciled IS NULL)
+            AND je.status = 'posted'
+            AND je.entry_date <= :stmt_date
+            ORDER BY je.entry_date, je.id
+        """), {"gl_id": gl_id, "stmt_date": stmt_date}).fetchall()
+        
+        return [dict(r._mapping) for r in ledger]
+    finally:
+        db.close()
+
+@router.post("/{id}/match", dependencies=[Depends(require_permission("reconciliation.create"))])
+def match_transaction(id: int, match: MatchRequest, current_user: dict = Depends(get_current_user)):
+    """مطابقة سطر بنكي مع قيد محاسبي"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec_status = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec_status:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec_status.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن المطابقة في تسوية معتمدة")
+
+        sl = db.execute(text("""
+            SELECT debit, credit, is_reconciled 
+            FROM bank_statement_lines WHERE id = :id AND reconciliation_id = :rid
+        """), {"id": match.statement_line_id, "rid": id}).fetchone()
+        
+        jl = db.execute(text("""
+            SELECT debit, credit, is_reconciled 
+            FROM journal_lines WHERE id = :id
+        """), {"id": match.journal_line_id}).fetchone()
+        
+        if not sl or not jl:
+             raise HTTPException(status_code=404, detail="الأسطر غير موجودة")
+        
+        if sl.is_reconciled:
+            raise HTTPException(status_code=400, detail="سطر الكشف البنكي مطابق بالفعل")
+        if jl.is_reconciled:
+            raise HTTPException(status_code=400, detail="القيد المحاسبي مطابق بالفعل في تسوية أخرى")
+             
+        sl_debit = float(sl.debit or 0)
+        sl_credit = float(sl.credit or 0)
+        jl_debit = float(jl.debit or 0)
+        jl_credit = float(jl.credit or 0)
+        
+        # Bank withdrawal (debit) matches GL credit (asset decrease)
+        # Bank deposit (credit) matches GL debit (asset increase)
+        if sl_debit > 0:
+            if abs(sl_debit - jl_credit) > 0.01:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"المبالغ غير متطابقة. سحب بنكي: {sl_debit:,.2f} ≠ قيد دائن: {jl_credit:,.2f}"
+                )
+        elif sl_credit > 0:
+            if abs(sl_credit - jl_debit) > 0.01:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"المبالغ غير متطابقة. إيداع بنكي: {sl_credit:,.2f} ≠ قيد مدين: {jl_debit:,.2f}"
+                )
+        else:
+            raise HTTPException(status_code=400, detail="سطر الكشف البنكي لا يحتوي على مبلغ")
+
+        db.execute(text("""
+            UPDATE bank_statement_lines 
+            SET is_reconciled = TRUE, matched_journal_line_id = :jid 
+            WHERE id = :sid
+        """), {"jid": match.journal_line_id, "sid": match.statement_line_id})
+        
+        db.execute(text("""
+            UPDATE journal_lines 
+            SET is_reconciled = TRUE, reconciliation_id = :rid 
+            WHERE id = :jid
+        """), {"rid": id, "jid": match.journal_line_id})
+        
+        db.commit()
+        return {"success": True, "message": "تمت المطابقة بنجاح"}
+    finally:
+        db.close()
+
+@router.post("/{id}/unmatch", dependencies=[Depends(require_permission("reconciliation.create"))])
+def unmatch_transaction(id: int, data: UnmatchRequest, current_user: dict = Depends(get_current_user)):
+    """إلغاء مطابقة سطر بنكي"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec_status = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec_status:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        if rec_status.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن إلغاء المطابقة في تسوية معتمدة")
+
+        sl = db.execute(text("""
+            SELECT matched_journal_line_id, is_reconciled 
+            FROM bank_statement_lines WHERE id = :sid AND reconciliation_id = :rid
+        """), {"sid": data.statement_line_id, "rid": id}).fetchone()
+        
+        if not sl:
+            raise HTTPException(status_code=404, detail="السطر غير موجود")
+        if not sl.is_reconciled:
+            raise HTTPException(status_code=400, detail="السطر غير مطابق أصلاً")
+
+        if sl.matched_journal_line_id:
+            db.execute(text("""
+                UPDATE journal_lines SET is_reconciled = FALSE, reconciliation_id = NULL
+                WHERE id = :jid
+            """), {"jid": sl.matched_journal_line_id})
+
+        db.execute(text("""
+            UPDATE bank_statement_lines 
+            SET is_reconciled = FALSE, matched_journal_line_id = NULL
+            WHERE id = :sid
+        """), {"sid": data.statement_line_id})
+        
+        db.commit()
+        return {"success": True, "message": "تم إلغاء المطابقة بنجاح"}
+    finally:
+        db.close()
+
+@router.delete("/{id}", dependencies=[Depends(require_permission("reconciliation.create"))])
+def delete_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
+    """حذف تسوية بنكية (مسودة فقط)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        
+        if rec.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن حذف تسوية معتمدة. يمكن حذف التسويات في حالة المسودة فقط")
+        
+        # Un-reconcile any matched journal lines first
+        db.execute(text("""
+            UPDATE journal_lines SET is_reconciled = FALSE, reconciliation_id = NULL
+            WHERE reconciliation_id = :id
+        """), {"id": id})
+        
+        db.execute(text("DELETE FROM bank_statement_lines WHERE reconciliation_id = :id"), {"id": id})
+        db.execute(text("DELETE FROM bank_reconciliations WHERE id = :id"), {"id": id})
+        db.commit()
+        return {"message": "تم حذف التسوية بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="حدث خطأ أثناء حذف التسوية")
+    finally:
+        db.close()
+
+
+@router.post("/{id}/finalize", dependencies=[Depends(require_permission("reconciliation.approve"))])
+def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
+    """اعتماد التسوية وإغلاقها"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rec = db.execute(text("""
+            SELECT start_balance, end_balance, status 
+            FROM bank_reconciliations WHERE id = :id
+        """), {"id": id}).fetchone()
+        
+        if not rec:
+            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+        
+        if rec.status == 'posted':
+            raise HTTPException(status_code=400, detail="التسوية معتمدة بالفعل")
+        
+        unmatched_count = db.execute(text("""
+            SELECT COUNT(*) FROM bank_statement_lines 
+            WHERE reconciliation_id = :id AND (is_reconciled = FALSE OR is_reconciled IS NULL)
+        """), {"id": id}).scalar() or 0
+        
+        if unmatched_count > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"يوجد {unmatched_count} سطر غير مطابق. يجب مطابقة جميع الأسطر قبل الاعتماد"
+            )
+        
+        # Net = credits (in) - debits (out)
+        calc = db.execute(text("""
+            SELECT COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0)
+            FROM bank_statement_lines 
+            WHERE reconciliation_id = :id AND is_reconciled = TRUE
+        """), {"id": id}).scalar() or 0
+        
+        calculated_end = float(rec.start_balance) + float(calc)
+        
+        if abs(calculated_end - float(rec.end_balance)) > 0.01:
+             raise HTTPException(
+                status_code=400, 
+                detail=f"خطأ في توازن التسوية. الرصيد المحسوب: {calculated_end:,.2f}, الرصيد المدخل: {float(rec.end_balance):,.2f}"
+            )
+             
+        db.execute(text("""
+            UPDATE bank_reconciliations SET status = 'posted', updated_at = NOW() 
+            WHERE id = :id
+        """), {"id": id})
+        db.commit()
+        return {"success": True, "message": "تم اعتماد التسوية"}
+    finally:
+        db.close()

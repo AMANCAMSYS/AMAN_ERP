@@ -1,0 +1,662 @@
+"""
+INV-001: إشعار دائن - Sales Credit Note
+INV-002: إشعار مدين - Sales Debit Note
+
+Credit Note (إشعار دائن): Reduces customer balance (e.g., returns, price correction down)
+  GL: Debit Sales Revenue + VAT Output, Credit AR/Cash
+
+Debit Note (إشعار مدين): Increases customer balance (e.g., undercharge correction, additional charges)
+  GL: Debit AR, Credit Sales Revenue + VAT Output
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from sqlalchemy import text
+from typing import Optional, List
+from datetime import date
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.permissions import require_permission, validate_branch_access
+from utils.audit import log_activity
+from utils.accounting import (
+    get_mapped_account_id,
+    generate_sequential_number,
+    update_account_balance,
+    get_base_currency,
+)
+import logging
+
+logger = logging.getLogger(__name__)
+
+credit_notes_router = APIRouter()
+
+
+# ==================== CREDIT NOTES (إشعار دائن) ====================
+
+@credit_notes_router.get("/credit-notes", dependencies=[Depends(require_permission("sales.view"))])
+def list_sales_credit_notes(
+    party_id: Optional[int] = None,
+    status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """قائمة إشعارات دائنة (مبيعات)"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["i.invoice_type = 'sales_credit_note'"]
+        params = {}
+
+        if party_id:
+            conditions.append("i.party_id = :party_id")
+            params["party_id"] = party_id
+        if status_filter:
+            conditions.append("i.status = :status")
+            params["status"] = status_filter
+        if date_from:
+            conditions.append("i.invoice_date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            conditions.append("i.invoice_date <= :date_to")
+            params["date_to"] = date_to
+        if search:
+            conditions.append("(i.invoice_number ILIKE :search OR i.notes ILIKE :search)")
+            params["search"] = f"%{search}%"
+        if branch_id:
+            conditions.append("i.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+
+        where = " AND ".join(conditions)
+        total = db.execute(text(f"SELECT COUNT(*) FROM invoices i WHERE {where}"), params).scalar()
+
+        offset = (page - 1) * limit
+        params["limit"] = limit
+        params["offset"] = offset
+
+        rows = db.execute(text(f"""
+            SELECT i.*,
+                   p.name AS party_name,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE {where}
+            ORDER BY i.invoice_date DESC, i.id DESC
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit,
+        }
+    finally:
+        db.close()
+
+
+@credit_notes_router.get("/credit-notes/{note_id}", dependencies=[Depends(require_permission("sales.view"))])
+def get_sales_credit_note(note_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل إشعار دائن"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        note = db.execute(text("""
+            SELECT i.*,
+                   p.name AS party_name, p.phone AS party_phone, p.tax_number AS party_tax,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE i.id = :id AND i.invoice_type = 'sales_credit_note'
+        """), {"id": note_id}).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
+
+        lines = db.execute(text("""
+            SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
+            FROM invoice_lines il
+            LEFT JOIN products pr ON il.product_id = pr.id
+            WHERE il.invoice_id = :id
+            ORDER BY il.id
+        """), {"id": note_id}).fetchall()
+
+        result = dict(note._mapping)
+        result["lines"] = [dict(l._mapping) for l in lines]
+        return result
+    finally:
+        db.close()
+
+
+@credit_notes_router.post("/credit-notes", status_code=status.HTTP_201_CREATED,
+                          dependencies=[Depends(require_permission("sales.create"))])
+def create_sales_credit_note(
+    request: Request,
+    data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    إنشاء إشعار دائن (مبيعات)
+    يُخفض رصيد العميل ويعكس جزء من فاتورة المبيعات.
+    
+    GL:
+      Debit: Sales Revenue (صافي), VAT Output (ضريبة)
+      Credit: AR (إجمالي)
+    
+    data: {
+        party_id, related_invoice_id, invoice_date, lines: [{product_id, description, quantity, unit_price, tax_rate, discount}],
+        notes, branch_id, currency, exchange_rate, reason
+    }
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        party_id = data.get("party_id")
+        related_invoice_id = data.get("related_invoice_id")
+        lines = data.get("lines", [])
+        if not lines:
+            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+        if not party_id:
+            raise HTTPException(status_code=400, detail="يجب تحديد العميل")
+
+        # Validate related invoice exists and belongs to this customer
+        if related_invoice_id:
+            orig = db.execute(text(
+                "SELECT id, party_id, total, invoice_type FROM invoices WHERE id = :id"
+            ), {"id": related_invoice_id}).fetchone()
+            if not orig:
+                raise HTTPException(status_code=400, detail="الفاتورة المرتبطة غير موجودة")
+            if orig.party_id != party_id:
+                raise HTTPException(status_code=400, detail="الفاتورة لا تخص هذا العميل")
+            if orig.invoice_type not in ('sales',):
+                raise HTTPException(status_code=400, detail="يجب ربط الإشعار بفاتورة مبيعات")
+
+        # Calculate totals
+        inv_date = data.get("invoice_date", str(date.today()))
+        base_currency = get_base_currency(db)
+        currency = data.get("currency", base_currency)
+        exchange_rate = float(data.get("exchange_rate", 1.0))
+        branch_id = validate_branch_access(current_user, data.get("branch_id"))
+
+        subtotal = 0
+        tax_total = 0
+        discount_total = 0
+        computed_lines = []
+
+        for line in lines:
+            qty = float(line.get("quantity", 1))
+            price = float(line.get("unit_price", 0))
+            tax_rate = float(line.get("tax_rate", 0))
+            disc = float(line.get("discount", 0))
+            line_gross = qty * price
+            line_net = line_gross - disc
+            line_tax = round(line_net * tax_rate / 100, 4)
+            line_total = round(line_net + line_tax, 4)
+
+            subtotal += line_net
+            tax_total += line_tax
+            discount_total += disc
+            computed_lines.append({
+                "product_id": line.get("product_id"),
+                "description": line.get("description", ""),
+                "quantity": qty,
+                "unit_price": price,
+                "tax_rate": tax_rate,
+                "discount": disc,
+                "total": line_total,
+            })
+
+        total = round(subtotal + tax_total, 4)
+
+        # Generate number & insert
+        inv_num = generate_sequential_number(db, "SCN", "invoices", "invoice_number")
+        result = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, invoice_type, party_id, invoice_date, 
+                subtotal, tax_amount, discount, total, paid_amount, status,
+                notes, branch_id, related_invoice_id,
+                currency, exchange_rate, created_by
+            ) VALUES (
+                :num, 'sales_credit_note', :party, :date,
+                :sub, :tax, :disc, :total, 0, 'posted',
+                :notes, :branch, :rel,
+                :curr, :rate, :user
+            ) RETURNING id
+        """), {
+            "num": inv_num, "party": party_id, "date": inv_date,
+            "sub": subtotal, "tax": tax_total, "disc": discount_total,
+            "total": total, "notes": data.get("notes", ""),
+            "branch": branch_id or current_user.branch_id,
+            "rel": related_invoice_id, "curr": currency,
+            "rate": exchange_rate, "user": current_user.id,
+        })
+        note_id = result.fetchone()[0]
+
+        # Insert lines
+        for cl in computed_lines:
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv, :prod, :desc, :qty, :price, :tax, :disc, :total)
+            """), {
+                "inv": note_id, "prod": cl["product_id"],
+                "desc": cl["description"], "qty": cl["quantity"],
+                "price": cl["unit_price"], "tax": cl["tax_rate"],
+                "disc": cl["discount"], "total": cl["total"],
+            })
+
+        # === GL Journal Entry ===
+        # Credit Note reverses invoice: Debit Revenue+VAT, Credit AR
+        acc_ar = get_mapped_account_id(db, "acc_map_ar")
+        acc_sales = get_mapped_account_id(db, "acc_map_sales_rev")
+        acc_vat = get_mapped_account_id(db, "acc_map_vat_out")
+
+        if not acc_ar or not acc_sales:
+            raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AR / Sales Revenue)")
+
+        gl_sub = round(subtotal * exchange_rate, 4)
+        gl_tax = round(tax_total * exchange_rate, 4)
+        gl_total = round(total * exchange_rate, 4)
+
+        je_lines = []
+        # Debit: Sales Revenue
+        if gl_sub > 0:
+            je_lines.append({
+                "account_id": acc_sales, "debit": gl_sub, "credit": 0,
+                "description": f"إشعار دائن - مرتجع إيرادات {inv_num}",
+                "amount_currency": subtotal, "currency": currency,
+            })
+        # Debit: VAT Output
+        if gl_tax > 0 and acc_vat:
+            je_lines.append({
+                "account_id": acc_vat, "debit": gl_tax, "credit": 0,
+                "description": f"إشعار دائن - عكس ضريبة {inv_num}",
+                "amount_currency": tax_total, "currency": currency,
+            })
+        # Credit: Accounts Receivable
+        je_lines.append({
+            "account_id": acc_ar, "debit": 0, "credit": gl_total,
+            "description": f"إشعار دائن للعميل - {inv_num}",
+            "amount_currency": total, "currency": currency,
+        })
+
+        je_num = f"JE-SCN-{inv_num}"
+        je_id = db.execute(text("""
+            INSERT INTO journal_entries (
+                entry_number, entry_date, description, reference, status,
+                created_by, branch_id, currency, exchange_rate, posted_at
+            ) VALUES (
+                :num, :date, :desc, :ref, 'posted',
+                :user, :branch, :curr, :rate, NOW()
+            ) RETURNING id
+        """), {
+            "num": je_num, "date": inv_date,
+            "desc": f"إشعار دائن مبيعات {inv_num}" + (f" - مقابل فاتورة {related_invoice_id}" if related_invoice_id else ""),
+            "ref": inv_num, "user": current_user.id,
+            "branch": branch_id or current_user.branch_id,
+            "curr": currency, "rate": exchange_rate,
+        }).scalar()
+
+        for jl in je_lines:
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
+                ) VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
+            """), {
+                "jid": je_id, "aid": jl["account_id"],
+                "deb": jl["debit"], "cred": jl["credit"],
+                "desc": jl["description"],
+                "amt": jl["amount_currency"], "curr": jl["currency"],
+            })
+            update_account_balance(
+                db, account_id=jl["account_id"],
+                debit_base=jl["debit"], credit_base=jl["credit"],
+                debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
+                credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
+                currency=jl["currency"],
+            )
+
+        # Update related invoice paid_amount (credit note reduces what's owed)
+        if related_invoice_id:
+            db.execute(text("""
+                UPDATE invoices SET paid_amount = paid_amount + :amt,
+                    status = CASE
+                        WHEN paid_amount + :amt >= total THEN 'paid'
+                        WHEN paid_amount + :amt > 0 THEN 'partial'
+                        ELSE status
+                    END
+                WHERE id = :id
+            """), {"amt": total, "id": related_invoice_id})
+
+        db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="sales.credit_note.create",
+            resource_type="sales_credit_note", resource_id=inv_num,
+            details={"party_id": party_id, "total": float(total), "related_invoice": related_invoice_id},
+            request=request, branch_id=branch_id,
+        )
+
+        return {
+            "success": True, "id": note_id, "invoice_number": inv_num,
+            "journal_entry_id": je_id, "journal_entry_number": je_num,
+            "message": f"تم إنشاء الإشعار الدائن {inv_num} بنجاح",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating sales credit note: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ==================== DEBIT NOTES (إشعار مدين) ====================
+
+@credit_notes_router.get("/debit-notes", dependencies=[Depends(require_permission("sales.view"))])
+def list_sales_debit_notes(
+    party_id: Optional[int] = None,
+    status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """قائمة إشعارات مدينة (مبيعات)"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["i.invoice_type = 'sales_debit_note'"]
+        params = {}
+
+        if party_id:
+            conditions.append("i.party_id = :party_id")
+            params["party_id"] = party_id
+        if status_filter:
+            conditions.append("i.status = :status")
+            params["status"] = status_filter
+        if date_from:
+            conditions.append("i.invoice_date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            conditions.append("i.invoice_date <= :date_to")
+            params["date_to"] = date_to
+        if search:
+            conditions.append("(i.invoice_number ILIKE :search OR i.notes ILIKE :search)")
+            params["search"] = f"%{search}%"
+        if branch_id:
+            conditions.append("i.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+
+        where = " AND ".join(conditions)
+        total = db.execute(text(f"SELECT COUNT(*) FROM invoices i WHERE {where}"), params).scalar()
+
+        offset = (page - 1) * limit
+        params["limit"] = limit
+        params["offset"] = offset
+
+        rows = db.execute(text(f"""
+            SELECT i.*,
+                   p.name AS party_name,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE {where}
+            ORDER BY i.invoice_date DESC, i.id DESC
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit,
+        }
+    finally:
+        db.close()
+
+
+@credit_notes_router.get("/debit-notes/{note_id}", dependencies=[Depends(require_permission("sales.view"))])
+def get_sales_debit_note(note_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل إشعار مدين"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        note = db.execute(text("""
+            SELECT i.*,
+                   p.name AS party_name, p.phone AS party_phone, p.tax_number AS party_tax,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE i.id = :id AND i.invoice_type = 'sales_debit_note'
+        """), {"id": note_id}).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
+
+        lines = db.execute(text("""
+            SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
+            FROM invoice_lines il
+            LEFT JOIN products pr ON il.product_id = pr.id
+            WHERE il.invoice_id = :id
+            ORDER BY il.id
+        """), {"id": note_id}).fetchall()
+
+        result = dict(note._mapping)
+        result["lines"] = [dict(l._mapping) for l in lines]
+        return result
+    finally:
+        db.close()
+
+
+@credit_notes_router.post("/debit-notes", status_code=status.HTTP_201_CREATED,
+                          dependencies=[Depends(require_permission("sales.create"))])
+def create_sales_debit_note(
+    request: Request,
+    data: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    إنشاء إشعار مدين (مبيعات)
+    يزيد رصيد العميل (تصحيح نقص في الفوترة أو رسوم إضافية).
+    
+    GL:
+      Debit: AR (إجمالي)
+      Credit: Sales Revenue (صافي), VAT Output (ضريبة)
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        party_id = data.get("party_id")
+        related_invoice_id = data.get("related_invoice_id")
+        lines = data.get("lines", [])
+        if not lines:
+            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+        if not party_id:
+            raise HTTPException(status_code=400, detail="يجب تحديد العميل")
+
+        # Validate related invoice if provided
+        if related_invoice_id:
+            orig = db.execute(text(
+                "SELECT id, party_id, invoice_type FROM invoices WHERE id = :id"
+            ), {"id": related_invoice_id}).fetchone()
+            if not orig:
+                raise HTTPException(status_code=400, detail="الفاتورة المرتبطة غير موجودة")
+            if orig.party_id != party_id:
+                raise HTTPException(status_code=400, detail="الفاتورة لا تخص هذا العميل")
+
+        inv_date = data.get("invoice_date", str(date.today()))
+        base_currency = get_base_currency(db)
+        currency = data.get("currency", base_currency)
+        exchange_rate = float(data.get("exchange_rate", 1.0))
+        branch_id = validate_branch_access(current_user, data.get("branch_id"))
+
+        subtotal = 0
+        tax_total = 0
+        discount_total = 0
+        computed_lines = []
+
+        for line in lines:
+            qty = float(line.get("quantity", 1))
+            price = float(line.get("unit_price", 0))
+            tax_rate = float(line.get("tax_rate", 0))
+            disc = float(line.get("discount", 0))
+            line_gross = qty * price
+            line_net = line_gross - disc
+            line_tax = round(line_net * tax_rate / 100, 4)
+            line_total = round(line_net + line_tax, 4)
+
+            subtotal += line_net
+            tax_total += line_tax
+            discount_total += disc
+            computed_lines.append({
+                "product_id": line.get("product_id"),
+                "description": line.get("description", ""),
+                "quantity": qty, "unit_price": price,
+                "tax_rate": tax_rate, "discount": disc,
+                "total": line_total,
+            })
+
+        total = round(subtotal + tax_total, 4)
+
+        inv_num = generate_sequential_number(db, "SDN", "invoices", "invoice_number")
+        result = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, invoice_type, party_id, invoice_date,
+                subtotal, tax_amount, discount, total, paid_amount, status,
+                notes, branch_id, related_invoice_id,
+                currency, exchange_rate, created_by
+            ) VALUES (
+                :num, 'sales_debit_note', :party, :date,
+                :sub, :tax, :disc, :total, 0, 'unpaid',
+                :notes, :branch, :rel,
+                :curr, :rate, :user
+            ) RETURNING id
+        """), {
+            "num": inv_num, "party": party_id, "date": inv_date,
+            "sub": subtotal, "tax": tax_total, "disc": discount_total,
+            "total": total, "notes": data.get("notes", ""),
+            "branch": branch_id or current_user.branch_id,
+            "rel": related_invoice_id, "curr": currency,
+            "rate": exchange_rate, "user": current_user.id,
+        })
+        note_id = result.fetchone()[0]
+
+        for cl in computed_lines:
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv, :prod, :desc, :qty, :price, :tax, :disc, :total)
+            """), {
+                "inv": note_id, "prod": cl["product_id"],
+                "desc": cl["description"], "qty": cl["quantity"],
+                "price": cl["unit_price"], "tax": cl["tax_rate"],
+                "disc": cl["discount"], "total": cl["total"],
+            })
+
+        # === GL: Debit AR, Credit Revenue + VAT ===
+        acc_ar = get_mapped_account_id(db, "acc_map_ar")
+        acc_sales = get_mapped_account_id(db, "acc_map_sales_rev")
+        acc_vat = get_mapped_account_id(db, "acc_map_vat_out")
+
+        if not acc_ar or not acc_sales:
+            raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AR / Sales Revenue)")
+
+        gl_sub = round(subtotal * exchange_rate, 4)
+        gl_tax = round(tax_total * exchange_rate, 4)
+        gl_total = round(total * exchange_rate, 4)
+
+        je_lines = []
+        # Debit: AR
+        je_lines.append({
+            "account_id": acc_ar, "debit": gl_total, "credit": 0,
+            "description": f"إشعار مدين - زيادة ذمم {inv_num}",
+            "amount_currency": total, "currency": currency,
+        })
+        # Credit: Sales Revenue
+        if gl_sub > 0:
+            je_lines.append({
+                "account_id": acc_sales, "debit": 0, "credit": gl_sub,
+                "description": f"إشعار مدين - إيرادات إضافية {inv_num}",
+                "amount_currency": subtotal, "currency": currency,
+            })
+        # Credit: VAT
+        if gl_tax > 0 and acc_vat:
+            je_lines.append({
+                "account_id": acc_vat, "debit": 0, "credit": gl_tax,
+                "description": f"إشعار مدين - ضريبة إضافية {inv_num}",
+                "amount_currency": tax_total, "currency": currency,
+            })
+
+        je_num = f"JE-SDN-{inv_num}"
+        je_id = db.execute(text("""
+            INSERT INTO journal_entries (
+                entry_number, entry_date, description, reference, status,
+                created_by, branch_id, currency, exchange_rate, posted_at
+            ) VALUES (
+                :num, :date, :desc, :ref, 'posted',
+                :user, :branch, :curr, :rate, NOW()
+            ) RETURNING id
+        """), {
+            "num": je_num, "date": inv_date,
+            "desc": f"إشعار مدين مبيعات {inv_num}",
+            "ref": inv_num, "user": current_user.id,
+            "branch": branch_id or current_user.branch_id,
+            "curr": currency, "rate": exchange_rate,
+        }).scalar()
+
+        for jl in je_lines:
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
+                ) VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
+            """), {
+                "jid": je_id, "aid": jl["account_id"],
+                "deb": jl["debit"], "cred": jl["credit"],
+                "desc": jl["description"],
+                "amt": jl["amount_currency"], "curr": jl["currency"],
+            })
+            update_account_balance(
+                db, account_id=jl["account_id"],
+                debit_base=jl["debit"], credit_base=jl["credit"],
+                debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
+                credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
+                currency=jl["currency"],
+            )
+
+        db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="sales.debit_note.create",
+            resource_type="sales_debit_note", resource_id=inv_num,
+            details={"party_id": party_id, "total": float(total)},
+            request=request, branch_id=branch_id,
+        )
+
+        return {
+            "success": True, "id": note_id, "invoice_number": inv_num,
+            "journal_entry_id": je_id, "journal_entry_number": je_num,
+            "message": f"تم إنشاء الإشعار المدين {inv_num} بنجاح",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating sales debit note: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

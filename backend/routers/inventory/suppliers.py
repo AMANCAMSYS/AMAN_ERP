@@ -1,0 +1,285 @@
+"""
+Inventory Module - Suppliers CRUD
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import datetime
+import logging
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.audit import log_activity
+from utils.permissions import require_permission
+from .schemas import SupplierCreate, SupplierResponse
+
+suppliers_router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+@suppliers_router.get("/suppliers", response_model=List[SupplierResponse], dependencies=[Depends(require_permission("buying.view"))])
+def list_suppliers(
+    skip: int = 0,
+    limit: int = 100,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض قائمة الموردين"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT
+                id,
+                name,
+                name_en,
+                phone,
+                email,
+                address,
+                tax_number,
+                commercial_register,
+                currency,
+                status = 'active' as is_active,
+                created_at,
+                COALESCE(current_balance, 0) as current_balance
+            FROM parties p
+            WHERE p.is_supplier = TRUE
+        """
+        params = {"limit": limit, "skip": skip}
+
+        query += " ORDER BY p.created_at DESC LIMIT :limit OFFSET :skip"
+        result = db.execute(text(query), params).fetchall()
+
+        suppliers = []
+        for row in result:
+            suppliers.append({
+                "id": row.id,
+                "name": row.name,
+                "name_en": row.name_en,
+                "phone": row.phone,
+                "email": row.email,
+                "address": row.address,
+                "tax_number": row.tax_number,
+                "commercial_register": row.commercial_register,
+                "currency": row.currency,
+                "current_balance": float(row.current_balance or 0),
+                "is_active": row.is_active,
+                "created_at": row.created_at
+            })
+        return suppliers
+    finally:
+        db.close()
+
+
+@suppliers_router.get("/suppliers/{id}", response_model=SupplierResponse, dependencies=[Depends(require_permission("buying.view"))])
+def get_supplier(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض تفاصيل مورد محدد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        supplier = db.execute(text("""
+            SELECT
+                id, name, name_en, phone, email, address, tax_number,
+                commercial_register, currency, branch_id,
+                status = 'active' as is_active, created_at,
+                COALESCE(current_balance, 0) as current_balance
+            FROM parties
+            WHERE id = :id AND is_supplier = TRUE
+        """), {"id": id}).fetchone()
+
+        if not supplier:
+            raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        return {
+            "id": supplier.id,
+            "name": supplier.name,
+            "name_en": supplier.name_en,
+            "phone": supplier.phone,
+            "email": supplier.email,
+            "address": supplier.address,
+            "tax_number": supplier.tax_number,
+            "commercial_register": supplier.commercial_register,
+            "currency": supplier.currency,
+            "branch_id": supplier.branch_id,
+            "current_balance": float(supplier.current_balance or 0),
+            "is_active": supplier.is_active,
+            "created_at": supplier.created_at
+        }
+    finally:
+        db.close()
+
+
+@suppliers_router.post("/suppliers", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_supplier(
+    supplier: SupplierCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء مورد جديد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        import random
+        code = f"SUP-{random.randint(1000, 9999)}"
+
+        # Merge if tax number exists
+        existing_id = None
+        if supplier.tax_number:
+            existing_id = db.execute(text("SELECT id FROM parties WHERE tax_number = :tax LIMIT 1"), {"tax": supplier.tax_number}).scalar()
+
+        if existing_id:
+            db.execute(text("UPDATE parties SET is_supplier = TRUE WHERE id = :id"), {"id": existing_id})
+            pid = existing_id
+            result = db.execute(text("SELECT current_balance, created_at FROM parties WHERE id = :id"), {"id": pid}).fetchone()
+        else:
+            result = db.execute(text("""
+                INSERT INTO parties (
+                    party_code, name, name_en, 
+                    phone, email, address, tax_number, branch_id, is_supplier, status, currency
+                ) VALUES (
+                    :code, :name, :name_en, :phone, :email, :address, :tax, :branch_id, TRUE, 'active', :currency
+                ) RETURNING id, current_balance, created_at
+            """), {
+                "code": code,
+                "name": supplier.name,
+                "name_en": supplier.name_en,
+                "phone": supplier.phone,
+                "email": supplier.email,
+                "address": supplier.address,
+                "tax": supplier.tax_number,
+                "branch_id": supplier.branch_id,
+                "currency": supplier.currency
+            }).fetchone()
+            pid = result[0]
+
+        db.commit()
+
+        return {
+            **supplier.model_dump(),
+            "id": pid,
+            "current_balance": float(result.current_balance or 0),
+            "is_active": True,
+            "created_at": result.created_at
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating supplier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@suppliers_router.put("/suppliers/{id}", response_model=SupplierResponse, dependencies=[Depends(require_permission("buying.edit"))])
+def update_supplier(
+    id: int,
+    supplier: SupplierCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث بيانات مورد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check existence
+        existing = db.execute(text("SELECT id, created_at, current_balance FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        db.execute(text("""
+            UPDATE parties SET
+                name = :name,
+                name_en = :name_en,
+                phone = :phone,
+                email = :email,
+                address = :address,
+                tax_number = :tax,
+                branch_id = :branch_id,
+                currency = :currency,
+                updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "id": id,
+            "name": supplier.name,
+            "name_en": supplier.name_en,
+            "phone": supplier.phone,
+            "email": supplier.email,
+            "address": supplier.address,
+            "tax": supplier.tax_number,
+            "branch_id": supplier.branch_id,
+            "currency": supplier.currency
+        })
+
+        db.commit()
+
+        return {
+            **supplier.model_dump(),
+            "id": id,
+            "current_balance": float(existing.current_balance or 0),
+            "is_active": True,
+            "created_at": existing.created_at
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating supplier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@suppliers_router.delete("/suppliers/{id}", dependencies=[Depends(require_permission("buying.delete"))])
+def delete_supplier(
+    id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """حذف مورد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check existence
+        supplier = db.execute(text("SELECT id, name FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        # Check if supplier has balance
+        balance = db.execute(text("SELECT COALESCE(current_balance, 0) FROM parties WHERE id = :id"), {"id": id}).scalar()
+        if balance and abs(balance) > 0.01:
+            raise HTTPException(status_code=400, detail="لا يمكن حذف مورد له رصيد مستحق")
+
+        # Check if supplier has transactions
+        usage = db.execute(text("""
+            SELECT COUNT(*) FROM (
+                SELECT 1 FROM purchase_invoices WHERE supplier_id = :id
+                UNION ALL
+                SELECT 1 FROM purchase_orders WHERE supplier_id = :id
+            ) AS usage
+        """), {"id": id}).scalar()
+
+        if usage and usage > 0:
+            raise HTTPException(status_code=400, detail="لا يمكن حذف مورد له معاملات سابقة")
+
+        # Delete supplier (set is_supplier to FALSE instead of actual delete to preserve data integrity)
+        db.execute(text("UPDATE parties SET is_supplier = FALSE, status = 'inactive' WHERE id = :id"), {"id": id})
+        db.commit()
+
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="supplier.delete",
+            resource_type="supplier",
+            resource_id=str(id),
+            details={"name": supplier.name},
+            request=request,
+            branch_id=None
+        )
+
+        return {"message": "تم حذف المورد بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting supplier: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

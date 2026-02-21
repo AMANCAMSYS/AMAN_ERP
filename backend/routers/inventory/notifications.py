@@ -1,0 +1,115 @@
+"""
+Inventory Module - Notifications
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
+import logging
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.permissions import require_permission
+
+notifications_router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+@notifications_router.get("/notifications", dependencies=[Depends(require_permission("notifications.view"))])
+def get_notifications(
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض إشعارات المستخدم"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    if not company_id:
+        return []
+    db = get_db_connection(company_id)
+    try:
+        result = db.execute(text("""
+            SELECT * FROM notifications
+            WHERE user_id = :user OR user_id IS NULL
+            ORDER BY created_at DESC
+            LIMIT 50
+        """), {"user": user_id}).fetchall()
+
+        # Convert rows to dicts safely
+        notifications = []
+        for r in result:
+            if hasattr(r, '_mapping'):
+                n_dict = dict(r._mapping)
+            else:
+                n_dict = dict(r)
+            notifications.append(n_dict)
+
+        return notifications
+    except Exception as e:
+        import traceback
+        print(f"NOTIFICATION ERROR: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch notifications: {str(e)}")
+    finally:
+        db.close()
+
+
+@notifications_router.get("/notifications/unread-count", dependencies=[Depends(require_permission("notifications.view"))])
+def get_unread_count(
+    current_user: dict = Depends(get_current_user)
+):
+    """عدد الإشعارات غير المقروءة"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    if not company_id:
+        return {"count": 0}
+    db = get_db_connection(company_id)
+    try:
+        count = db.execute(text("""
+            SELECT COUNT(*) FROM notifications
+            WHERE (user_id = :user OR user_id IS NULL) AND is_read = FALSE
+        """), {"user": user_id}).scalar()
+        return {"count": count}
+    except Exception as e:
+        import traceback
+        print(f"UNREAD COUNT ERROR: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch unread count: {str(e)}")
+    finally:
+        db.close()
+
+
+@notifications_router.post("/notifications/{id}/read", dependencies=[Depends(require_permission("notifications.view"))])
+def mark_notification_read(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديد الإشعار كمقروء"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else getattr(current_user, "company_id", None)
+    if not company_id:
+        return {"success": False}
+    db = get_db_connection(company_id)
+    try:
+        db.execute(text("""
+            UPDATE notifications SET is_read = TRUE, read_at = NOW() WHERE id = :id
+        """), {"id": id})
+        db.commit()
+        return {"message": "تم تحديد الإشعار كمقروء"}
+    finally:
+        db.close()
+
+
+@notifications_router.post("/notifications/read-all", dependencies=[Depends(require_permission("notifications.view"))])
+def mark_all_notifications_read(
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديد جميع الإشعارات كمقروءة"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    db = get_db_connection(company_id)
+    try:
+        db.execute(text("""
+            UPDATE notifications SET is_read = TRUE, read_at = NOW()
+            WHERE (user_id = :user OR user_id IS NULL) AND is_read = FALSE
+        """), {"user": user_id})
+        db.commit()
+        return {"message": "تم تحديد جميع الإشعارات كمقروءة"}
+    finally:
+        db.close()

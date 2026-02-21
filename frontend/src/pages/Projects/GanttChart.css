@@ -1,0 +1,105 @@
+.gantt-container {
+    overflow-x: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    position: relative;
+    max-height: 500px;
+    /* Optional constraint */
+}
+
+.gantt-scroll-container {
+    position: relative;
+    min-width: 100%;
+}
+
+.gantt-header {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    z-index: 10;
+    white-space: nowrap;
+}
+
+.gantt-header-cell {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.gantt-header-cell.weekend {
+    background-color: #f1f3f5;
+}
+
+.day-number {
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: #343a40;
+}
+
+.gantt-body {
+    position: relative;
+    background: white;
+}
+
+.gantt-grid-column {
+    position: absolute;
+    top: 0;
+    border-right: 1px solid #f1f3f5;
+    z-index: 1;
+}
+
+.gantt-task-row {
+    position: absolute;
+    width: 100%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+}
+
+.gantt-task-bar {
+    position: absolute;
+    height: 24px;
+    border-radius: 12px;
+    overflow: hidden;
+    color: white;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.gantt-task-bar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+    /* Bring to front on hover */
+}
+
+.gantt-task-label {
+    z-index: 2;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gantt-task-progress {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.3);
+    z-index: 1;
+}

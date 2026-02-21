@@ -1,0 +1,116 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { purchasesAPI } from '../../utils/api';
+import { getCurrency } from '../../utils/auth';
+import { useBranch } from '../../context/BranchContext';
+import { toastEmitter } from '../../utils/toastEmitter';
+
+function SupplierPayments() {
+    const { t } = useTranslation();
+    const navigate = useNavigate();
+    const { currentBranch } = useBranch();
+    const currency = getCurrency();
+    const [payments, setPayments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        fetchPayments();
+    }, [currentBranch]);
+
+    const fetchPayments = async () => {
+        try {
+            const res = await purchasesAPI.listPayments({ branch_id: currentBranch?.id });
+            setPayments(res.data);
+        } catch (error) {
+            console.error('Error fetching payments:', error);
+            toastEmitter.emit(t('buying.payments.error_loading') || 'فشل تحميل سندات الصرف', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredPayments = payments.filter(p =>
+        p.voucher_number.toLowerCase().includes(search.toLowerCase()) ||
+        (p.supplier_name && p.supplier_name.toLowerCase().includes(search.toLowerCase()))
+    );
+
+    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title">{t('buying.payments.title')}</h1>
+                        <p className="workspace-subtitle">{t('buying.payments.subtitle')}</p>
+                    </div>
+                    <button className="btn btn-primary bg-purple-600 hover:bg-purple-700" onClick={() => navigate('/buying/payments/new')}>
+                        + {t('buying.payments.create_new')}
+                    </button>
+                </div>
+            </div>
+
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder={t('buying.payments.search_placeholder')}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="form-input w-full max-w-md"
+                />
+            </div>
+
+            <div className="data-table-container">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>{t('buying.payments.table.voucher_number')}</th>
+                            <th>{t('buying.payments.table.date')}</th>
+                            <th>{t('buying.payments.table.supplier')}</th>
+                            <th>{t('buying.payments.table.amount')}</th>
+                            <th>{t('buying.payments.table.payment_method')}</th>
+                            <th>{t('buying.payments.table.status')}</th>
+                            <th>{t('buying.payments.table.actions')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredPayments.length === 0 ? (
+                            <tr>
+                                <td colSpan="7" className="px-6 py-8 text-center text-muted">
+                                    {t('buying.payments.no_payments')}
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredPayments.map((payment) => (
+                                <tr key={payment.id} onClick={() => navigate(`/buying/payments/${payment.id}`)} style={{ cursor: 'pointer' }}>
+                                    <td className="font-medium text-purple-700">{payment.voucher_number}</td>
+                                    <td>{new Date(payment.voucher_date).toLocaleDateString('ar-EG')}</td>
+                                    <td>{payment.supplier_name}</td>
+                                    <td className="font-bold">{Number(payment.amount).toLocaleString()} {currency}</td>
+                                    <td>
+                                        {payment.payment_method === 'cash' ? t('buying.payments.form.payment_methods.cash') || 'نقداً' : payment.payment_method === 'bank' ? t('buying.payments.form.payment_methods.bank') || 'بنك' : t('buying.payments.form.payment_methods.check') || 'شيك'}
+                                    </td>
+                                    <td>
+                                        <span className={`badge ${payment.status === 'posted' ? 'badge-success' : 'badge-secondary'}`}>
+                                            {payment.status === 'posted' ? t('buying.payments.status.posted') : t('buying.payments.status.draft')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button className="btn btn-secondary btn-sm" onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/buying/payments/${payment.id}`);
+                                        }}>{t('common.actions') || 'عرض'}</button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+export default SupplierPayments;

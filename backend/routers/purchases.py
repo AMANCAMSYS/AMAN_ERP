@@ -1,0 +1,3277 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import datetime, date
+import logging
+from pydantic import BaseModel
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from fastapi import Request
+from utils.audit import log_activity
+from utils.permissions import require_permission
+from utils.accounting import get_mapped_account_id, generate_sequential_number, update_account_balance, get_base_currency
+from schemas.purchases import PurchaseLineItem, PurchaseCreate, SupplierGroupCreate, POCreate, ReceiveItem, POReceiveRequest, SupplierCreate, PaymentAllocationSchema, SupplierPaymentCreate
+
+router = APIRouter(prefix="/buying", tags=["المشتريات"])
+logger = logging.getLogger(__name__)
+
+
+
+# --- Endpoints ---
+
+# === Supplier Groups ===
+
+@router.get("/supplier-groups", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
+def list_supplier_groups(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض مجموعات الموردين"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        query = "SELECT * FROM supplier_groups WHERE 1=1"
+        params = {}
+        if branch_id:
+            query += " AND (branch_id = :bid OR branch_id IS NULL)"
+            params["bid"] = branch_id
+        
+        query += " ORDER BY id"
+        result = db.execute(text(query), params).fetchall()
+        
+        return [{
+            "id": row.id,
+            "group_name": row.group_name,
+            "group_name_en": row.group_name_en,
+            "description": row.description,
+            "discount_percentage": row.discount_percentage,
+            "payment_days": row.payment_days,
+            "status": row.status
+        } for row in result]
+    finally:
+        db.close()
+
+@router.post("/supplier-groups", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_supplier_group(
+    group: SupplierGroupCreate, 
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء مجموعة موردين جديدة"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # Generate sequential group code
+        from utils.accounting import generate_sequential_number
+        group_code = generate_sequential_number(db, "SG", "supplier_groups", "group_code")
+        
+        db.execute(text("""
+            INSERT INTO supplier_groups (
+                group_code, group_name, group_name_en, description, 
+                discount_percentage, payment_days, branch_id, status
+            ) VALUES (
+                :code, :name, :name_en, :desc, :disc, :days, :branch_id, :status
+            )
+        """), {
+            "code": group_code,
+            "name": group.group_name,
+            "name_en": group.group_name_en,
+            "desc": group.description,
+            "disc": group.discount_percentage,
+            "days": group.payment_days,
+            "branch_id": group.branch_id,
+            "status": group.status
+        })
+        db.commit()
+
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="buying.supplier_group.create",
+            resource_type="supplier_group",
+            details={"group_name": group.group_name},
+            request=None
+        )
+        return {"message": "تم إنشاء المجموعة بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.put("/supplier-groups/{id}", dependencies=[Depends(require_permission("buying.edit"))])
+def update_supplier_group(
+    id: int,
+    group: SupplierGroupCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث مجموعة موردين"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        result = db.execute(text("""
+            UPDATE supplier_groups 
+            SET group_name = :name,
+                group_name_en = :name_en,
+                description = :desc,
+                discount_percentage = :disc,
+                payment_days = :days,
+                status = :status
+            WHERE id = :id
+        """), {
+            "name": group.group_name,
+            "name_en": group.group_name_en,
+            "desc": group.description,
+            "disc": group.discount_percentage,
+            "days": group.payment_days,
+            "status": group.status,
+            "id": id
+        })
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+            
+        db.commit()
+
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="buying.supplier_group.update",
+            resource_type="supplier_group",
+            resource_id=str(id),
+            details={"group_name": group.group_name},
+            request=None
+        )
+        return {"message": "تم تحديث المجموعة بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.delete("/supplier-groups/{id}", dependencies=[Depends(require_permission("buying.delete"))])
+def delete_supplier_group(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """حذف مجموعة موردين"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # Check usage first
+        usage = db.execute(text("SELECT COUNT(*) FROM parties WHERE party_group_id = :id"), {"id": id}).scalar()
+        if usage > 0:
+            raise HTTPException(status_code=400, detail="لا يمكن حذف المجموعة لأنها مرتبطة بموردين")
+            
+        result = db.execute(text("DELETE FROM supplier_groups WHERE id = :id"), {"id": id})
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+            
+        db.commit()
+
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="buying.supplier_group.delete",
+            resource_type="supplier_group",
+            resource_id=str(id),
+            details=None,
+            request=None
+        )
+        return {"message": "تم حذف المجموعة بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# === Purchase Orders ===
+
+@router.get("/orders", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
+def list_purchase_orders(
+    branch_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض أوامر الشراء"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+    
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        query_str = """
+            SELECT po.id, po.po_number, p.name as supplier_name, po.order_date, 
+                   po.expected_date, po.total, po.status
+            FROM purchase_orders po
+            LEFT JOIN parties p ON po.party_id = p.id
+            WHERE 1=1
+        """
+        params = {"limit": limit, "skip": skip}
+        
+        if branch_id:
+            query_str += " AND po.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+        
+        query_str += " ORDER BY po.created_at DESC LIMIT :limit OFFSET :skip"
+        
+        result = db.execute(text(query_str), params).fetchall()
+        
+        return [{
+            "id": row.id,
+            "po_number": row.po_number,
+            "supplier_name": row.supplier_name,
+            "order_date": row.order_date,
+            "expected_date": row.expected_date,
+            "total": row.total,
+            "status": row.status
+        } for row in result]
+    finally:
+        db.close()
+
+@router.get("/orders/{id}", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
+def get_purchase_order(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب تفاصيل أمر الشراء"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        po = db.execute(text("""
+            SELECT po.*, p.name as supplier_name, p.party_code as supplier_code 
+            FROM purchase_orders po
+            LEFT JOIN parties p ON po.party_id = p.id
+            WHERE po.id = :id
+        """), {"id": id}).fetchone()
+        
+        if not po:
+            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
+        
+        if not po:
+            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            
+        lines = db.execute(text("""
+            SELECT l.*, p.product_name, p.product_code 
+            FROM purchase_order_lines l
+            LEFT JOIN products p ON l.product_id = p.id
+            WHERE l.po_id = :id
+        """), {"id": id}).fetchall()
+        
+        # Fetch Related Documents
+        # 1. Journal Entries (Linked by Reference)
+        jes = db.execute(text("""
+            SELECT je.id, je.entry_number, je.entry_date, je.description,
+                   COALESCE((SELECT SUM(jl.debit) FROM journal_lines jl WHERE jl.journal_entry_id = je.id), 0) as total_debit
+            FROM journal_entries je
+            WHERE je.reference = :ref OR je.description LIKE :desc_ref
+            ORDER BY je.entry_date DESC
+        """), {"ref": po.po_number, "desc_ref": f"%{po.po_number}%"}).fetchall()
+        
+        po_data = {
+            "id": po.id,
+            "po_number": po.po_number,
+            "supplier_id": po.party_id,
+            "supplier_name": po.supplier_name,
+            "supplier_code": po.supplier_code,
+            "order_date": po.order_date,
+            "expected_date": po.expected_date,
+            "status": po.status,
+            "subtotal": po.subtotal,
+            "tax_amount": po.tax_amount,
+            "discount": po.discount,
+            "total": po.total,
+            "branch_id": po.branch_id,
+            "notes": po.notes,
+            "currency": po.currency,
+            "exchange_rate": po.exchange_rate,
+            "items": [{
+                "id": l.id,
+                "product_id": l.product_id,
+                "product_name": l.product_name or l.description,
+                "product_code": l.product_code,
+                "description": l.description,
+                "quantity": l.quantity,
+                "unit_price": l.unit_price,
+                "tax_rate": l.tax_rate,
+                "discount": l.discount,
+                "total": l.total,
+                "received_quantity": l.received_quantity
+            } for l in lines],
+            "related_documents": {
+                "journal_entries": [{
+                    "id": j.id,
+                    "entry_number": j.entry_number,
+                    "date": j.entry_date,
+                    "description": j.description,
+                    "amount": j.total_debit
+                } for j in jes],
+                # 3. Inventory Transactions
+                "inventory_transactions": [{
+                    "id": t.id,
+                    "date": t.created_at,
+                    "type": t.transaction_type,
+                    "quantity": t.quantity,
+                    "product_name": t.product_name
+                } for t in db.execute(text("""
+                    SELECT t.id, t.created_at, t.transaction_type, t.quantity, p.product_name
+                    FROM inventory_transactions t
+                    JOIN products p ON t.product_id = p.id
+                    WHERE t.reference_document = :ref
+                    ORDER BY t.created_at DESC
+                """), {"ref": po.po_number}).fetchall()]
+            }
+        }
+        
+        return po_data
+    finally:
+        db.close()
+
+@router.get("/suppliers/{id}/transactions", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
+def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
+    """جلب سجل حركات المورد (فواتير ودفعات)"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # 1. Fetch Invoices
+        inv_query = """
+            SELECT id, invoice_number, invoice_date, total, paid_amount, status, currency, exchange_rate
+            FROM invoices
+            WHERE party_id = :id AND invoice_type = 'purchase'
+        """
+        inv_params = {"id": id}
+        
+        from utils.accounting import get_base_currency
+        base_currency = get_base_currency(db)
+        branch_id = validate_branch_access(current_user, branch_id)
+        
+        if branch_id:
+            inv_query += " AND branch_id = :branch_id"
+            inv_params["branch_id"] = branch_id
+        
+        inv_query += " ORDER BY invoice_date DESC"
+        invoices_res = db.execute(text(inv_query), inv_params).fetchall()
+        
+        invoices = [{
+            "id": r.id, 
+            "invoice_number": r.invoice_number,
+            "date": r.invoice_date,
+            "total": float(r.total), 
+            "paid": float(r.paid_amount or 0),
+            "status": r.status,
+            "currency": r.currency or base_currency,
+            "exchange_rate": float(r.exchange_rate or 1.0)
+        } for r in invoices_res]
+        
+        # Calculate total purchases in Base Currency
+        total_purchases = sum(float(r.total) * float(r.exchange_rate or 1.0) for r in invoices_res)
+        
+        # 2. Fetch Payments (Vouchers)
+        # Note: payment_vouchers table has currency field
+        pay_query = """
+            SELECT id, voucher_number, voucher_date, amount, payment_method, status, currency
+            FROM payment_vouchers
+            WHERE party_id = :id AND party_type = 'supplier' AND voucher_type = 'payment'
+        """
+        pay_params = {"id": id}
+        if branch_id:
+            pay_query += " AND branch_id = :branch_id"
+            pay_params["branch_id"] = branch_id
+            
+        pay_query += " ORDER BY voucher_date DESC"
+        payments_res = db.execute(text(pay_query), pay_params).fetchall()
+        
+        payments = [{
+            "id": r.id,
+            "voucher_number": r.voucher_number,
+            "date": r.voucher_date,
+            "amount": float(r.amount),
+            "method": r.payment_method,
+            "status": r.status,
+            "currency": r.currency or base_currency
+        } for r in payments_res]
+
+        # 3. Fetch Receipts (Refund Vouchers)
+        receipts_res = db.execute(text("""
+            SELECT id, voucher_number, voucher_date, amount, payment_method, status, currency
+            FROM payment_vouchers
+            WHERE party_id = :id AND party_type = 'supplier' AND voucher_type = 'refund'
+            ORDER BY voucher_date DESC
+        """), {"id": id}).fetchall()
+        
+        receipts = [{
+            "id": r.id,
+            "voucher_number": r.voucher_number,
+            "date": r.voucher_date,
+            "amount": float(r.amount),
+            "method": r.payment_method,
+            "status": r.status,
+            "currency": r.currency or base_currency
+        } for r in receipts_res]
+
+        # 4. Get basic info for header
+        supplier = db.execute(text("SELECT name as supplier_name, current_balance, currency FROM parties WHERE id = :id"), {"id": id}).fetchone()
+        
+        supplier_currency = supplier.currency if supplier and supplier.currency else "SYP"
+        balance = float(supplier.current_balance or 0) if supplier else 0
+        exchange_rate = 1.0
+        
+        if supplier_currency != "SYP":
+             # Fetch current exchange rate
+             rate_row = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": supplier_currency}).scalar()
+             if rate_row:
+                  exchange_rate = float(rate_row)
+        
+        balance_bc = balance * exchange_rate
+
+        return {
+            "supplier": {
+                "name": supplier.supplier_name if supplier else "Unknown",
+                "balance": balance,
+                "balance_bc": balance_bc,
+                "currency": supplier_currency,
+                "exchange_rate": exchange_rate,
+                "total_purchases": total_purchases
+            },
+            "invoices": invoices,
+            "payments": payments,
+            "receipts": receipts
+        }
+    finally:
+        db.close()
+
+@router.post("/orders", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_purchase_order(
+    po: POCreate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء أمر شراء جديد"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # Generate Sequential PO Number
+        from utils.accounting import generate_sequential_number
+        po_num = generate_sequential_number(db, f"PO-{datetime.now().year}", "purchase_orders", "po_number")
+        
+        # Calculate Totals
+        subtotal = 0
+        total_tax = 0
+        total_discount = 0
+        
+        lines_data = []
+        for item in po.items:
+            # Validate quantities and prices
+            if float(item.quantity) <= 0:
+                raise HTTPException(status_code=400, detail=f"الكمية يجب أن تكون أكبر من صفر: {item.description}")
+            if float(item.unit_price) < 0:
+                raise HTTPException(status_code=400, detail=f"سعر الوحدة لا يمكن أن يكون سالباً: {item.description}")
+            
+            line_total = float(item.quantity) * float(item.unit_price)
+            line_discount = float(item.discount)
+            
+            if line_discount < 0:
+                raise HTTPException(status_code=400, detail=f"الخصم لا يمكن أن يكون سالباً: {item.description}")
+            if line_discount > line_total:
+                raise HTTPException(status_code=400, detail=f"الخصم ({line_discount}) يتجاوز إجمالي السطر ({line_total}): {item.description}")
+            
+            taxable = line_total - line_discount
+            line_tax = taxable * (float(item.tax_rate) / 100)
+            final_total = taxable + line_tax
+            
+            subtotal += line_total
+            total_discount += line_discount
+            total_tax += line_tax
+            
+            lines_data.append({
+                "product_id": item.product_id,
+                "description": item.description,
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": item.tax_rate,
+                "discount": item.discount,
+                "total": final_total
+            })
+
+        grand_total = subtotal - total_discount + total_tax
+        
+        # Insert PO Header
+        result = db.execute(text("""
+            INSERT INTO purchase_orders (
+                po_number, party_id, branch_id, order_date, expected_date,
+                subtotal, tax_amount, discount, total, status, notes, created_by,
+                currency, exchange_rate
+            ) VALUES (
+                :num, :supp, :bid, :date, :exp,
+                :sub, :tax, :disc, :total, 'draft', :notes, :user,
+                :currency, :exchange_rate
+            ) RETURNING id
+        """), {
+            "num": po_num,
+            "supp": po.supplier_id,
+            "bid": po.branch_id,
+            "date": po.order_date,
+            "exp": po.expected_date,
+            "sub": subtotal,
+            "tax": total_tax,
+            "disc": total_discount,
+            "total": grand_total,
+            "notes": po.notes,
+            "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            "currency": po.currency,
+            "exchange_rate": po.exchange_rate
+        }).fetchone()
+        
+        po_id = result[0]
+        
+        # Insert Lines
+        for line in lines_data:
+            db.execute(text("""
+                INSERT INTO purchase_order_lines (
+                    po_id, product_id, description, quantity, unit_price, 
+                    tax_rate, discount, total
+                ) VALUES (
+                    :po_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                )
+            """), {
+                "po_id": po_id,
+                "pid": line["product_id"],
+                "desc": line["description"],
+                "qty": line["quantity"],
+                "price": line["unit_price"],
+                "tax_rate": line["tax_rate"],
+                "disc": line["discount"],
+                "total": line["total"]
+            })
+            
+        db.commit()
+
+        supp_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": po.supplier_id}).scalar()
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="purchase_order.create",
+            resource_type="purchase_order",
+            resource_id=str(po_id),
+            details={"po_number": po_num, "total": grand_total, "supplier_name": supp_name},
+            request=request,
+            branch_id=po.branch_id
+        )
+
+        # Submit for approval if workflow exists
+        approval_result = None
+        try:
+            from utils.approval_utils import try_submit_for_approval
+            user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+            approval_result = try_submit_for_approval(
+                db,
+                document_type="purchase_order",
+                document_id=po_id,
+                document_number=po_num,
+                amount=grand_total,
+                submitted_by=user_id,
+                description=f"أمر شراء {po_num} - {supp_name} - {grand_total:,.2f}",
+                link=f"/purchases/orders/{po_id}"
+            )
+            if approval_result:
+                db.commit()
+        except Exception:
+            pass  # Non-blocking
+
+        response = {"message": "تم إنشاء أمر الشراء بنجاح", "id": po_id}
+        if approval_result:
+            response["approval"] = approval_result
+        return response
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# === Purchase Order Approval & Receipt ===
+
+@router.put("/orders/{id}/approve", dependencies=[Depends(require_permission("buying.approve"))])
+def approve_purchase_order(
+    id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """اعتماد أمر الشراء"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check current status
+        po = db.execute(text("""
+            SELECT id, status, po_number, party_id as supplier_id FROM purchase_orders WHERE id = :id
+        """), {"id": id}).fetchone()
+        
+        if not po:
+            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+        
+        if po.status != 'draft':
+            raise HTTPException(status_code=400, detail="يمكن اعتماد أوامر الشراء في حالة 'مسودة' فقط")
+        
+        # Update status to approved
+        db.execute(text("""
+            UPDATE purchase_orders 
+            SET status = 'approved', updated_at = NOW()
+            WHERE id = :id
+        """), {"id": id})
+        
+        db.commit()
+        
+        # Get supplier info for notification
+        supplier = db.execute(text("""
+            SELECT name, email, phone FROM parties WHERE id = :id
+        """), {"id": po.supplier_id}).fetchone()
+        
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="purchase_order.approve",
+            resource_type="purchase_order",
+            resource_id=str(id),
+            details={"po_number": po.po_number, "supplier_name": supplier.name if supplier else None},
+            request=request,
+            branch_id=None
+        )
+        
+        return {
+            "message": "تم اعتماد أمر الشراء بنجاح",
+            "id": id,
+            "status": "approved",
+            "supplier_notified": bool(supplier and (supplier.email or supplier.phone))
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.post("/orders/{id}/receive", dependencies=[Depends(require_permission("buying.receive"))])
+def receive_purchase_order(
+    id: int,
+    receive_data: POReceiveRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """استلام أمر الشراء (جزئي أو كامل)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check PO exists and is approved
+        po = db.execute(text("""
+            SELECT id, status, po_number, party_id as supplier_id, branch_id, exchange_rate 
+            FROM purchase_orders WHERE id = :id
+        """), {"id": id}).fetchone()
+        
+        if not po:
+            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+        
+        if po.status not in ('approved', 'partial'):
+            raise HTTPException(status_code=400, detail="يجب اعتماد أمر الشراء أولاً قبل الاستلام")
+        
+        # Get all lines with their current received quantities
+        lines = db.execute(text("""
+            SELECT l.id, l.product_id, l.quantity, l.unit_price, COALESCE(l.received_quantity, 0) as received_quantity,
+                   p.product_name
+            FROM purchase_order_lines l
+            LEFT JOIN products p ON l.product_id = p.id
+            WHERE l.po_id = :po_id
+        """), {"po_id": id}).fetchall()
+        
+        lines_map = {line.id: line for line in lines}
+        
+        # Process received items
+        total_received = 0
+        total_expected = 0
+        receipt_details = []
+        receipt_value_base = 0
+        exchange_rate = float(po.exchange_rate or 1.0)
+        
+        for item in receive_data.items:
+            line = lines_map.get(item.line_id)
+            if not line:
+                raise HTTPException(status_code=400, detail=f"البند {item.line_id} غير موجود في أمر الشراء")
+            
+            # Defensive quantity casting
+            line_qty = float(line.quantity or 0)
+            line_received = float(line.received_quantity or 0)
+            item_qty = float(item.received_quantity or 0)
+            
+            remaining = line_qty - line_received
+            if item_qty > remaining:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"الكمية المستلمة ({item_qty}) أكبر من المتبقية ({remaining}) للمنتج {line.product_name}"
+                )
+            
+            if item_qty > 0:
+                # Update received quantity on line
+                new_received = line_received + item_qty
+                db.execute(text("""
+                    UPDATE purchase_order_lines 
+                    SET received_quantity = :received
+                    WHERE id = :line_id
+                """), {"received": new_received, "line_id": item.line_id})
+                
+                # Add to inventory
+                if line.product_id:
+                    # Check if inventory record exists
+                    existing = db.execute(text("""
+                        SELECT id, quantity FROM inventory 
+                        WHERE product_id = :pid AND warehouse_id = :wid
+                    """), {"pid": line.product_id, "wid": receive_data.warehouse_id}).fetchone()
+                    
+                    if existing:
+                        db.execute(text("""
+                            UPDATE inventory SET quantity = quantity + :qty, updated_at = NOW()
+                            WHERE id = :id
+                        """), {"qty": item_qty, "id": existing.id})
+                    else:
+                        db.execute(text("""
+                            INSERT INTO inventory (product_id, warehouse_id, quantity, reserved_quantity)
+                            VALUES (:pid, :wid, :qty, 0)
+                        """), {"pid": line.product_id, "wid": receive_data.warehouse_id, "qty": item_qty})
+                    
+                    # Create inventory transaction (replacing non-existent stock_movements)
+                    unit_price = float(line.unit_price or 0)
+                    db.execute(text("""
+                        INSERT INTO inventory_transactions (
+                            product_id, warehouse_id, transaction_type, 
+                            reference_type, reference_id, reference_document,
+                            quantity, unit_cost, total_cost, created_by
+                        ) VALUES (
+                            :pid, :wid, 'purchase_in', 
+                            'purchase_order', :po_id, :po_num,
+                            :qty, :cost, :total_cost, :uid
+                        )
+                    """), {
+                        "pid": line.product_id, 
+                        "wid": receive_data.warehouse_id, 
+                        "qty": item_qty,
+                        "po_id": id,
+                        "po_num": po.po_number,
+                        "cost": unit_price,
+                        "total_cost": item_qty * unit_price,
+                        "uid": int(current_user.get("id") if isinstance(current_user, dict) else current_user.id)
+                    })
+                
+                receipt_details.append({
+                    "product": line.product_name,
+                    "received": item_qty
+                })
+                
+                # Calculate accrual value
+                unit_price_base = float(line.unit_price or 0) * exchange_rate
+                receipt_value_base += item_qty * unit_price_base
+        
+        # Calculate new total received vs expected
+        updated_lines = db.execute(text("""
+            SELECT SUM(quantity) as total_qty, SUM(COALESCE(received_quantity, 0)) as total_received
+            FROM purchase_order_lines WHERE po_id = :po_id
+        """), {"po_id": id}).fetchone()
+        
+        total_expected = float(updated_lines.total_qty or 0)
+        total_received = float(updated_lines.total_received or 0)
+        
+        # Determine new status
+        if total_received >= total_expected:
+            new_status = 'received'
+        elif total_received > 0:
+            new_status = 'partial'
+        else:
+            new_status = po.status
+        
+        # Update PO status
+        db.execute(text("""
+            UPDATE purchase_orders SET status = :status WHERE id = :id
+        """), {"status": new_status, "id": id})
+        
+        # --- ACCOUNTING ENTRY (ACCRUAL) ---
+        if receipt_value_base > 0.01:
+            acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
+            acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
+            
+            if acc_inventory and acc_unbilled:
+                je_num = f"JE-RECV-{po.po_number}-{datetime.now().strftime('%M%S')}"
+                je_id = db.execute(text("""
+                    INSERT INTO journal_entries (entry_number, entry_date, description, reference, status, created_by, branch_id)
+                    VALUES (:num, NOW(), :desc, :ref, 'posted', :user, :branch) RETURNING id
+                """), {
+                    "num": je_num, 
+                    "desc": f"استحقاق توريد بضاعة - {po.po_number}", 
+                    "ref": po.po_number, 
+                    "user": int(current_user.get("id") if isinstance(current_user, dict) else current_user.id),
+                    "branch": po.branch_id
+                }).scalar()
+                
+                # Debit Inventory
+                db.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                    VALUES (:jid, :aid, :deb, 0, :desc)
+                """), {"jid": je_id, "aid": acc_inventory, "deb": receipt_value_base, "desc": f"Inventory Receipt - {po.po_number}"})
+                
+                # Credit Unbilled Purchases
+                db.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                    VALUES (:jid, :aid, 0, :cred, :desc)
+                """), {"jid": je_id, "aid": acc_unbilled, "cred": receipt_value_base, "desc": f"Unbilled Accrual - {po.po_number}"})
+                
+                # Update Account Balances
+                from utils.accounting import update_account_balance
+                receipt_value_fc = receipt_value_base / exchange_rate if exchange_rate else receipt_value_base
+                update_account_balance(db, account_id=acc_inventory, debit_base=receipt_value_base, credit_base=0, debit_curr=receipt_value_fc, credit_curr=0, currency=po.currency)
+                update_account_balance(db, account_id=acc_unbilled, debit_base=0, credit_base=receipt_value_base, debit_curr=0, credit_curr=receipt_value_fc, currency=po.currency)
+        
+        db.commit()
+        
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=int(current_user.get("id") if isinstance(current_user, dict) else current_user.id),
+            username=str(current_user.get("username") if isinstance(current_user, dict) else current_user.username),
+            action="purchase_order.receive",
+            resource_type="purchase_order",
+            resource_id=str(id),
+            details={
+                "po_number": str(po.po_number), 
+                "status": str(new_status),
+                "items_received": receipt_details
+            },
+            request=request,
+            branch_id=int(po.branch_id) if po.branch_id else None
+        )
+        
+        return {
+            "message": "تم استلام البضاعة بنجاح",
+            "id": int(id),
+            "status": str(new_status),
+            "total_expected": float(total_expected),
+            "total_received": float(total_received),
+            "remaining": float(total_expected) - float(total_received)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# === Purchases Summary ===
+
+
+@router.get("/summary", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
+def get_purchases_summary(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب ملخص إحصائيات المشتريات"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        if branch_id:
+            supplier_count = db.execute(text("""
+                SELECT COUNT(DISTINCT party_id) FROM invoices 
+                WHERE invoice_type = 'purchase' AND branch_id = :bid
+            """), {"bid": branch_id}).scalar() or 0
+            
+            total_payables = db.execute(text("""
+                SELECT COALESCE(SUM((total - paid_amount) * exchange_rate), 0) FROM invoices 
+                WHERE invoice_type = 'purchase' AND branch_id = :bid AND status != 'paid'
+            """), {"bid": branch_id}).scalar() or 0
+        else:
+            supplier_count = db.execute(text("SELECT COUNT(*) FROM parties WHERE is_supplier = TRUE")).scalar() or 0
+            total_balance = db.execute(text("SELECT COALESCE(SUM(current_balance), 0) FROM parties WHERE is_supplier = TRUE AND current_balance < 0")).scalar() or 0
+            total_payables = abs(total_balance)
+        
+        # 3. Monthly Purchases (Total of invoices - returns in current month)
+        first_day = date.today().replace(day=1)
+        # Note: invoices now use party_id. We might need to join parties to ensure it's a supplier invoice? 
+        # But invoice_type='purchase' is sufficient context usually.
+        mp_query = """
+            SELECT (
+                (SELECT COALESCE(SUM(total * exchange_rate), 0) FROM invoices WHERE (invoice_type = 'purchase') AND status != 'cancelled' AND invoice_date >= :first_day {branch_filter}) -
+                (SELECT COALESCE(SUM(total * exchange_rate), 0) FROM invoices WHERE (invoice_type = 'purchase_return') AND status != 'cancelled' AND invoice_date >= :first_day {branch_filter})
+            )
+        """
+        mp_params = {"first_day": first_day}
+        
+        if branch_id:
+             mp_params["bid"] = branch_id
+             mp_query = mp_query.format(branch_filter="AND branch_id = :bid")
+        else:
+             mp_query = mp_query.format(branch_filter="")
+
+        monthly_purchases = db.execute(text(mp_query), mp_params).scalar() or 0
+        
+        return {
+            "supplier_count": supplier_count,
+            "total_payables": total_payables,
+            "monthly_purchases": monthly_purchases
+        }
+    finally:
+        db.close()
+
+@router.get("/invoices", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
+def list_purchase_invoices(
+    supplier_id: Optional[int] = None,
+    branch_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض فواتير المشتريات"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        query = """
+            SELECT i.id, i.invoice_number, p.name as supplier_name, 
+                   i.invoice_date, i.total, i.status
+            FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE i.invoice_type = 'purchase'
+        """
+        params = {"limit": limit, "skip": skip}
+        
+        if supplier_id:
+            # Here 'supplier_id' parameter implies party_id of the supplier
+            query += " AND i.party_id = :sid"
+            params["sid"] = supplier_id
+            
+        if branch_id:
+            query += " AND i.branch_id = :bid"
+            params["bid"] = branch_id
+
+        query += " ORDER BY i.created_at DESC LIMIT :limit OFFSET :skip"
+        
+        result = db.execute(text(query), params).fetchall()
+        
+        invoices = []
+        for row in result:
+            invoices.append({
+                "id": row.id,
+                "invoice_number": row.invoice_number,
+                "supplier_name": row.supplier_name,
+                "invoice_date": row.invoice_date,
+                "total": row.total,
+                "status": row.status
+            })
+        return invoices
+    finally:
+        db.close()
+@router.get("/suppliers", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
+def list_suppliers(
+    skip: int = 0,
+    limit: int = 100,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض قائمة الموردين (من جدول Parties)"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        query = """
+            SELECT
+                id,
+                name as supplier_name,
+                name_en as supplier_name_en,
+                party_code as supplier_code,
+                phone,
+                email,
+                address,
+                tax_number,
+                COALESCE(current_balance, 0) as current_balance,
+                currency,
+                status, created_at
+            FROM parties
+            WHERE is_supplier = TRUE
+        """
+        params = {"limit": limit, "skip": skip}
+
+        query += " ORDER BY created_at DESC LIMIT :limit OFFSET :skip"
+        result = db.execute(text(query), params).fetchall()
+
+        suppliers = []
+        for row in result:
+            suppliers.append({
+                "id": row.id,
+                "name": row.supplier_name,
+                "name_en": row.supplier_name_en,
+                "supplier_code": row.supplier_code,
+                "phone": row.phone,
+                "email": row.email,
+                "address": row.address,
+                "tax_number": row.tax_number,
+                "current_balance": float(row.current_balance or 0),
+                "currency": row.currency,
+                "status": row.status,
+                "created_at": row.created_at
+            })
+        return suppliers
+    finally:
+        db.close()
+
+@router.post("/suppliers", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_supplier(
+    supplier: SupplierCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء مورد جديد (في جدول Parties)"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        from utils.accounting import generate_sequential_number
+        code = generate_sequential_number(db, "SUP", "parties", "party_code")
+        
+        existing_id = None
+        if supplier.tax_number:
+            existing_id = db.execute(text("SELECT id FROM parties WHERE tax_number = :tax LIMIT 1"), {"tax": supplier.tax_number}).scalar()
+        
+        if existing_id:
+            db.execute(text("UPDATE parties SET is_supplier = TRUE WHERE id = :id"), {"id": existing_id})
+            pid = existing_id
+        else:
+            pid = db.execute(text("""
+                INSERT INTO parties (
+                    party_code, name, name_en, 
+                    phone, email, address, tax_number, branch_id, 
+                    party_group_id, is_supplier, is_customer, status
+                ) VALUES (
+                    :code, :name, :name_en, :phone, :email, :address, :tax, :branch_id, 
+                    :pg, TRUE, FALSE, 'active'
+                ) RETURNING id
+            """), {
+                "code": code,
+                "name": supplier.supplier_name,
+                "name_en": supplier.supplier_name_en,
+                "phone": supplier.phone,
+                "email": supplier.email,
+                "address": supplier.address,
+                "tax": supplier.tax_number,
+                "branch_id": supplier.branch_id,
+                "pg": supplier.supplier_group_id
+            }).scalar()
+        
+        db.commit()
+        return {"id": pid, "message": "تم إضافة المورد بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.get("/invoices/{id}", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
+def get_purchase_invoice(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب تفاصيل فاتورة مشتريات مع المنتجات"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # 1. Fetch Invoice Header
+        invoice = db.execute(text("""
+            SELECT i.*, p.name as supplier_name, p.party_code as supplier_code
+            FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE i.id = :id AND i.invoice_type = 'purchase'
+        """), {"id": id}).fetchone()
+        
+        if not invoice:
+            raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+            
+        # 2. Fetch Invoice Lines
+        lines = db.execute(text("""
+            SELECT il.*, p.product_name, p.product_code 
+            FROM invoice_lines il
+            LEFT JOIN products p ON il.product_id = p.id
+            WHERE il.invoice_id = :id
+        """), {"id": id}).fetchall()
+
+        # 2.5 Calculate Returned Quantities
+        # Fetch sum of quantities from all Return Invoices linked to this Reference Invoice
+        returned_stats = db.execute(text("""
+            SELECT il.product_id, SUM(il.quantity) as returned_qty
+            FROM invoice_lines il
+            JOIN invoices i ON il.invoice_id = i.id
+            WHERE i.related_invoice_id = :id 
+              AND i.invoice_type = 'purchase_return' 
+              AND i.status != 'void'
+            GROUP BY il.product_id
+        """), {"id": id}).fetchall()
+        
+        returned_map = {row.product_id: float(row.returned_qty or 0) for row in returned_stats}
+        
+        # 3. Construct Response
+        return {
+            "id": invoice.id,
+            "invoice_number": invoice.invoice_number,
+            "invoice_date": invoice.invoice_date,
+            "due_date": invoice.due_date,
+            "supplier_id": invoice.party_id,
+            "supplier_name": invoice.supplier_name,
+            "status": invoice.status,
+            "subtotal": invoice.subtotal,
+            "tax_amount": invoice.tax_amount,
+            "discount": invoice.discount,
+            "total": invoice.total,
+            "paid_amount": float(invoice.paid_amount or 0),
+            "currency": invoice.currency or base_currency,
+            "exchange_rate": float(invoice.exchange_rate or 1.0),
+            "notes": invoice.notes,
+            "items": [{
+                "id": l.id,
+                "product_id": l.product_id,
+                "product_name": l.product_name or l.description,
+                "description": l.description,
+                "quantity": l.quantity,
+                "unit_price": l.unit_price,
+                "tax_rate": l.tax_rate,
+                "discount": l.discount,
+                "total": l.total,
+                "returned_quantity": returned_map.get(l.product_id, 0),
+                "remaining_quantity": max(0, float(l.quantity) - returned_map.get(l.product_id, 0))
+            } for l in lines]
+        }
+    finally:
+        db.close()
+
+@router.post("/invoices", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+async def create_purchase_invoice(
+    invoice: PurchaseCreate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء فاتورة مشتريات (إضافة للمخزون + قيد محاسبي)"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # --- 0. Currency & Exchange Rate Logic ---
+        # Get Company Base Currency
+        base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
+        if not base_currency_row:
+             base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
+        
+        base_currency = base_currency_row[0] if base_currency_row else "SAR"
+
+        inv_currency = invoice.currency or base_currency
+        exchange_rate = float(invoice.exchange_rate or 1.0)
+
+        def conversion_rate_needed(rate_val):
+            return rate_val is None or rate_val == 0 or rate_val == 1.0
+
+        # If currency is different from base and no rate provided, fetch latest rate
+        if inv_currency != base_currency and conversion_rate_needed(invoice.exchange_rate):
+             rate_row = db.execute(text("""
+                SELECT rate FROM exchange_rates 
+                WHERE currency_id = (SELECT id FROM currencies WHERE code = :code) 
+                AND rate_date <= :date 
+                ORDER BY rate_date DESC LIMIT 1
+             """), {"code": inv_currency, "date": invoice.invoice_date}).fetchone()
+             
+             if not rate_row:
+                 raise HTTPException(status_code=400, detail=f"No exchange rate found for {inv_currency}")
+             exchange_rate = float(rate_row.rate)
+             
+        def to_base(amount):
+            return round(float(amount) * exchange_rate, 2)
+        # 1. Generate Sequential Invoice Number
+        from utils.accounting import generate_sequential_number
+        inv_num = generate_sequential_number(db, f"PINV-{datetime.now().year}", "invoices", "invoice_number")
+        
+        # 2. Preparation (Warehouse)
+        wh_id = invoice.warehouse_id
+        if not wh_id:
+             wh_id = db.execute(text("SELECT id FROM warehouses WHERE is_default = TRUE")).scalar() or 1
+
+        # 2.5 Validate Warehouse-Branch Association
+        if wh_id and invoice.branch_id:
+            wh_check = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": wh_id}).fetchone()
+            if wh_check and wh_check[0] and wh_check[0] != invoice.branch_id:
+                raise HTTPException(status_code=400, detail="المستودع المختار لا يتبع للفرع الحالي")
+
+        # 2.6 Check for linked PO and fetch received quantities
+        po_received_map = {} # product_id -> received_qty
+        if invoice.original_invoice_id:
+            po_lines = db.execute(text("""
+                SELECT product_id, received_quantity 
+                FROM purchase_order_lines 
+                WHERE po_id = :po_id
+            """), {"po_id": invoice.original_invoice_id}).fetchall()
+            for pol in po_lines:
+                po_received_map[pol.product_id] = float(pol.received_quantity or 0)
+
+        # 3. Calculate Totals
+        subtotal = 0
+        total_tax = 0
+        total_discount = 0
+        
+        lines_data = []
+        for item in invoice.items:
+            line_total = float(item.quantity) * float(item.unit_price)
+            line_discount = float(item.discount)
+            taxable = line_total - line_discount
+            line_tax = taxable * (float(item.tax_rate) / 100)
+            final_total = taxable + line_tax
+            
+            subtotal += line_total
+            total_discount += line_discount
+            total_tax += line_tax
+            
+            lines_data.append({
+                "product_id": item.product_id,
+                "description": item.description,
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": item.tax_rate,
+                "discount": item.discount,
+                "total": final_total
+            })
+
+        grand_total = subtotal - total_discount + total_tax
+        
+        # 3. Handle Payment & Debt
+        paid_amount = invoice.paid_amount
+        if invoice.payment_method in ["cash", "bank"] and paid_amount == 0:
+             paid_amount = grand_total
+             
+        remaining_balance = grand_total - paid_amount
+        
+        # Determine Status
+        inv_status = "paid"
+        if remaining_balance > 0.01:
+            inv_status = "partial" if paid_amount > 0 else "unpaid"
+
+        # 4. Insert Invoice Header
+        result = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, invoice_type, party_id, invoice_date, due_date,
+                subtotal, tax_amount, discount, total, paid_amount, status, notes, 
+                down_payment_method, created_by, branch_id, warehouse_id,
+                currency, exchange_rate
+            ) VALUES (
+                :num, 'purchase', :party_id, :date, :due,
+                :sub, :tax, :disc, :total, :paid, :status, :notes, 
+                :dp_method, :user, :branch, :wh,
+                :currency, :exchange_rate
+            ) RETURNING id
+        """), {
+            "num": inv_num,
+            "party_id": invoice.supplier_id,
+            "date": invoice.invoice_date,
+            "due": invoice.due_date,
+            "sub": subtotal,
+            "tax": total_tax,
+            "disc": total_discount,
+            "total": grand_total,
+            "paid": paid_amount,
+            "status": inv_status,
+            "notes": invoice.notes,
+            "dp_method": invoice.down_payment_method,
+            "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            "branch": invoice.branch_id,
+            "wh": wh_id,
+            "currency": inv_currency,
+            "exchange_rate": exchange_rate
+        }).fetchone()
+        
+        invoice_id = result[0]
+        
+        # 5. Insert Invoice Lines & Update Stock
+        receipt_accrual_reversal_base = 0.0
+
+        for line in lines_data:
+            db.execute(text("""
+                INSERT INTO invoice_lines (
+                    invoice_id, product_id, description, quantity, unit_price, 
+                    tax_rate, discount, total
+                ) VALUES (
+                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                )
+            """), {
+                "inv_id": invoice_id,
+                "pid": line["product_id"],
+                "desc": line["description"],
+                "qty": line["quantity"],
+                "price": line["unit_price"],
+                "tax_rate": line["tax_rate"],
+                "disc": line["discount"],
+                "total": line["total"]
+            })
+            
+            # Stock Update & WAC Calculation
+            if line["product_id"] and not invoice.is_prepayment:
+                # 1. Update Cost using Strategy Pattern (Global, Warehouse, etc.)
+                from services.costing_service import CostingService
+                
+                # We need to pass the base currency price
+                new_price_fc = float(line["unit_price"])
+                new_price_bc = to_base(new_price_fc)
+                
+                CostingService.update_cost(
+                    db, 
+                    product_id=line["product_id"], 
+                    warehouse_id=wh_id, 
+                    new_qty=float(line["quantity"]), 
+                    new_price=new_price_bc
+                )
+
+                # 2. Update Inventory Quantity (Avoid double counting if already received via PO)
+                received_qty = po_received_map.get(line["product_id"], 0)
+                invoice_qty = float(line["quantity"])
+                
+                # The quantity to actually ADD to inventory now
+                qty_to_add = invoice_qty
+                qty_already_received = 0
+                
+                if invoice.original_invoice_id:
+                    # If we already received some, only add the difference
+                    qty_already_received = min(invoice_qty, received_qty)
+                    qty_to_add = max(0, invoice_qty - received_qty)
+                    
+                    # Accumulate value to reverse from "Unbilled Purchases" instead of Dr Inventory
+                    receipt_accrual_reversal_base += qty_already_received * new_price_bc
+                
+                if qty_to_add > 0:
+                    inv_exists = db.execute(text("""
+                        SELECT 1 FROM inventory WHERE product_id = :pid AND warehouse_id = :wh
+                    """), {"pid": line["product_id"], "wh": wh_id}).fetchone()
+                    
+                    if inv_exists:
+                        db.execute(text("""
+                            UPDATE inventory SET quantity = quantity + :qty 
+                            WHERE product_id = :pid AND warehouse_id = :wh
+                        """), {"qty": qty_to_add, "pid": line["product_id"], "wh": wh_id})
+                    else:
+                        db.execute(text("""
+                            INSERT INTO inventory (product_id, warehouse_id, quantity, average_cost)
+                            VALUES (:pid, :wh, :qty, :cost)
+                        """), {"pid": line["product_id"], "wh": wh_id, "qty": qty_to_add, "cost": new_price_bc})
+                    
+                # 4. Log Inventory Transaction (Only if not prepayment)
+                db.execute(text("""
+                    INSERT INTO inventory_transactions (
+                        product_id, warehouse_id, transaction_type, 
+                        reference_type, reference_id, reference_document,
+                        quantity, unit_cost, total_cost, created_by
+                    ) VALUES (
+                        :pid, :wh, 'purchase', 'invoice', :inv_id, :inv_num,
+                        :qty, :cost, :total_cost, :user
+                    )
+                """), {
+                    "pid": line["product_id"],
+                    "wh": wh_id,
+                    "inv_id": invoice_id,
+                    "inv_num": inv_num,
+                    "qty": line["quantity"],
+                    "cost": new_price_bc,
+                    "total_cost": to_base(line["total"]),
+                    "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id
+                })
+
+        # 6. Update Supplier Balance (base + currency)
+        if remaining_balance > 0.01:
+            gl_remaining = to_base(remaining_balance)
+            db.execute(text("""
+                UPDATE parties 
+                SET current_balance = current_balance - :amount 
+                WHERE id = :id
+            """), {"amount": gl_remaining, "id": invoice.supplier_id})
+            
+            # Update balance_currency for FC invoices
+            inv_currency = invoice.currency or base_currency
+            if inv_currency != base_currency:
+                db.execute(text("""
+                    UPDATE parties
+                    SET balance_currency = COALESCE(balance_currency, 0) - :amount
+                    WHERE id = :id
+                """), {"amount": remaining_balance, "id": invoice.supplier_id})
+            
+        # 7. Record Payment Transaction
+        if paid_amount and paid_amount > 0:
+            from utils.accounting import generate_sequential_number
+            v_num = generate_sequential_number(db, f"PAY-{datetime.now().year}", "payment_vouchers", "voucher_number")
+            # Determine actual payment method for the voucher
+            # If main method is 'credit', check down_payment_method
+            actual_method = invoice.payment_method
+            if invoice.payment_method == 'credit':
+                actual_method = invoice.down_payment_method or 'cash'
+            
+            pay_id = db.execute(text("""
+                INSERT INTO payment_vouchers (
+                    voucher_number, voucher_type, voucher_date, 
+                    party_type, party_id, amount, payment_method, 
+                    reference, status, created_by,
+                    currency, exchange_rate, treasury_account_id
+                ) VALUES (
+                    :num, 'payment', :date, 
+                    'supplier', :pid, :amt, :method, 
+                    :ref, 'posted', :user,
+                    :currency, :exchange_rate, :treasury_id
+                ) RETURNING id
+            """), {
+                "num": v_num,
+                "date": invoice.invoice_date,
+                "pid": invoice.supplier_id,
+                "amt": paid_amount,
+                "method": actual_method,
+                "ref": f"Payment for {inv_num}",
+                "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                "currency": inv_currency,
+                "exchange_rate": exchange_rate,
+                "treasury_id": invoice.treasury_id
+            }).scalar()
+
+            # Create Allocation
+            db.execute(text("""
+                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                VALUES (:pid, :iid, :amt)
+            """), {
+                "pid": pay_id,
+                "iid": invoice_id,
+                "amt": paid_amount
+            })
+
+        # 8. GL Entry (Automated using Dynamic Mappings)
+        acc_inventory = get_mapped_account_id(db, "acc_map_prepayment_supplier") if invoice.is_prepayment else get_mapped_account_id(db, "acc_map_inventory")
+        acc_vat_in = get_mapped_account_id(db, "acc_map_vat_in")
+        acc_ap = get_mapped_account_id(db, "acc_map_ap")
+        acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
+        acc_bank = get_mapped_account_id(db, "acc_map_bank")
+        
+        je_lines = []
+        
+        # Calculate Base Currency Amounts for GL
+        gl_total = to_base(grand_total)
+        gl_subtotal = to_base(subtotal)
+        gl_tax = to_base(total_tax)
+        gl_paid = to_base(paid_amount)
+        gl_net_purchases = gl_subtotal - to_base(total_discount)
+
+        # A. Inventory (Debit) - Net of Discount (Base Currency)
+        # Handle Accrual Reversal if created from PO
+        gl_inventory_debit = gl_net_purchases - receipt_accrual_reversal_base
+        
+        # FC equivalents for amount_currency
+        fc_net_purchases = subtotal - total_discount
+        fc_accrual_reversal = round(receipt_accrual_reversal_base / exchange_rate, 2) if exchange_rate != 0 else 0
+        fc_inventory_debit = fc_net_purchases - fc_accrual_reversal
+        
+        if gl_inventory_debit > 0.01:
+            je_lines.append({
+                "account_id": acc_inventory, "debit": gl_inventory_debit, "credit": 0, 
+                "description": f"Purchase Stock - {inv_num}",
+                "amount_currency": fc_inventory_debit if inv_currency != base_currency else gl_inventory_debit,
+                "currency": inv_currency
+            })
+        
+        if receipt_accrual_reversal_base > 0.01:
+            acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
+            if acc_unbilled:
+                je_lines.append({
+                    "account_id": acc_unbilled, "debit": receipt_accrual_reversal_base, "credit": 0, 
+                    "description": f"Reverse Unbilled Accrual - {inv_num}",
+                    "amount_currency": fc_accrual_reversal if inv_currency != base_currency else receipt_accrual_reversal_base,
+                    "currency": inv_currency
+                })
+                # Balance update handled by the JE lines loop below
+            else:
+                 # Fallback if mapping missing but we have reversal value (should not happen if system setup right)
+                 je_lines.append({
+                     "account_id": acc_inventory, "debit": receipt_accrual_reversal_base, "credit": 0, 
+                     "description": f"Purchase Stock (No Accrual Map) - {inv_num}",
+                     "amount_currency": fc_accrual_reversal if inv_currency != base_currency else receipt_accrual_reversal_base,
+                     "currency": inv_currency
+                 })
+            
+        # B. VAT Input (Debit) (Base Currency)
+        if gl_tax > 0:
+            je_lines.append({
+                "account_id": acc_vat_in, "debit": gl_tax, "credit": 0, 
+                "description": f"VAT Input - {inv_num}",
+                "amount_currency": total_tax, "currency": inv_currency
+            })
+            
+        # C. Credit Side (Cash/Bank/AP)
+        actual_pay_method = invoice.payment_method
+        if invoice.payment_method == 'credit':
+             actual_pay_method = invoice.down_payment_method or 'cash'
+             
+        if gl_paid > 0:
+             if actual_pay_method == "cash" or actual_pay_method == "check": 
+                  # Use selected treasury account if provided, else fallback to default cash map
+                  cash_acc_id = acc_cash
+                  if actual_pay_method == "check":
+                      cash_acc_id = acc_bank # Default for checks
+                  
+                  if invoice.treasury_id:
+                       t_acc = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": invoice.treasury_id}).fetchone()
+                       if t_acc:
+                            cash_acc_id = t_acc[0]
+
+                  je_lines.append({
+                      "account_id": cash_acc_id, "debit": 0, "credit": gl_paid, 
+                      "description": f"Purchase {actual_pay_method.capitalize()} - {inv_num}",
+                      "amount_currency": paid_amount, "currency": inv_currency
+                  })
+             elif actual_pay_method == "bank":
+                  # Use selected treasury account if provided, else fallback to default bank map
+                  bank_acc_id = acc_bank
+                  if invoice.treasury_id:
+                       t_acc = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": invoice.treasury_id}).fetchone()
+                       if t_acc:
+                            bank_acc_id = t_acc[0]
+                  je_lines.append({
+                      "account_id": bank_acc_id, "debit": 0, "credit": gl_paid, 
+                      "description": f"Purchase Bank - {inv_num}",
+                      "amount_currency": paid_amount, "currency": inv_currency
+                  })
+        
+        remaining_gl = gl_total - gl_paid     
+        if remaining_gl > 0.01:
+             je_lines.append({
+                 "account_id": acc_ap, "debit": 0, "credit": remaining_gl, 
+                 "description": f"Purchase Credit - {inv_num}",
+                 "amount_currency": remaining_balance, "currency": inv_currency
+             })
+        
+        # Insert Journal Entry
+        if je_lines:
+            # Filter out None accounts
+            valid_lines = [l for l in je_lines if l["account_id"] is not None]
+            
+            if valid_lines:
+                import uuid
+                je_num = f"JE-PURCH-{inv_num}"
+                je_id = db.execute(text("""
+                    INSERT INTO journal_entries (
+                        entry_number, entry_date, description, reference, status, 
+                        created_by, branch_id, currency, exchange_rate
+                    )
+                    VALUES (
+                        :num, :date, :desc, :ref, 'posted', 
+                        :user, :branch, :currency, :rate
+                    ) RETURNING id
+                """), {
+                    "num": je_num, "date": invoice.invoice_date, 
+                    "desc": f"Purchase Invoice {inv_num} ({inv_currency})", 
+                    "ref": inv_num, "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                    "branch": invoice.branch_id,
+                    "currency": inv_currency, "rate": exchange_rate
+                }).scalar()
+                
+                for line in valid_lines:
+                    db.execute(text("""
+                        INSERT INTO journal_lines (
+                            journal_entry_id, account_id, debit, credit, description,
+                            amount_currency, currency
+                        )
+                        VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
+                    """), {
+                        "jid": je_id, 
+                        "aid": line["account_id"], 
+                        "deb": line["debit"], 
+                        "cred": line["credit"], 
+                        "desc": line["description"],
+                        "amt_curr": line.get("amount_currency", 0),
+                        "curr": line.get("currency", base_currency)
+                    })
+                    
+                    # Update Account Balance
+                    from utils.accounting import update_account_balance
+                    update_account_balance(
+                        db,
+                        account_id=line["account_id"],
+                        debit_base=line["debit"],
+                        credit_base=line["credit"],
+                        debit_curr=line.get("amount_currency", 0) if line["debit"] > 0 else 0,
+                        credit_curr=line.get("amount_currency", 0) if line["credit"] > 0 else 0,
+                        currency=line.get("currency", base_currency)
+                    )
+
+        # --- 8. Insert Currency Transaction (if Foreign Currency) ---
+        if inv_currency != base_currency:
+             db.execute(text("""
+                 INSERT INTO currency_transactions (
+                     transaction_type, transaction_id, account_id, 
+                     currency_code, exchange_rate, amount_fc, amount_bc, description
+                 ) VALUES (
+                     'purchase', :tid, :aid, :curr, :rate, :fc, :bc, :desc
+                 )
+             """), {
+                 "tid": invoice_id,
+                 "aid": acc_ap, # Tracking AP in foreign currency
+                 "curr": inv_currency,
+                 "rate": exchange_rate,
+                 "fc": grand_total,
+                 "bc": to_base(grand_total),
+                 "desc": f"Purchase Invoice {inv_num}"
+             })
+
+        db.commit()
+
+
+
+        supp_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": invoice.supplier_id}).scalar()
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="purchase_invoice.create",
+            resource_type="invoice",
+            resource_id=str(invoice_id),
+            details={"invoice_number": inv_num, "total": grand_total, "supplier_id": invoice.supplier_id, "supplier_name": supp_name},
+            request=request,
+            branch_id=invoice.branch_id
+        )
+
+        return {"success": True, "message": "تم إنشاء فاتورة المشتريات بنجاح", "invoice_id": invoice_id}
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating purchase invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+# === Purchase Returns ===
+
+@router.get("/returns", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
+def list_purchase_returns(
+    branch_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض مردودات المشتريات"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        query_str = """
+            SELECT i.id, i.invoice_number, p.name as supplier_name, 
+                   i.invoice_date, i.total, i.status
+            FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE i.invoice_type = 'purchase_return'
+        """
+        params = {"limit": limit, "skip": skip}
+        
+        if branch_id:
+            query_str += " AND i.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+            
+        query_str += " ORDER BY i.created_at DESC LIMIT :limit OFFSET :skip"
+        
+        result = db.execute(text(query_str), params).fetchall()
+        
+        returns = []
+        for row in result:
+            returns.append({
+                "id": row.id,
+                "invoice_number": row.invoice_number,
+                "supplier_name": row.supplier_name,
+                "invoice_date": row.invoice_date,
+                "total": row.total,
+                "status": row.status
+            })
+        return returns
+    finally:
+        db.close()
+
+@router.get("/returns/{id}", dependencies=[Depends(require_permission("buying.view"))])
+def get_purchase_return(
+    id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب تفاصيل مردود مشتريات"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # Get Invoice
+        query = """
+            SELECT i.*, p.name as supplier_name, p.party_code as supplier_code
+            FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE i.id = :id AND i.invoice_type = 'purchase_return'
+        """
+        invoice = db.execute(text(query), {"id": id}).fetchone()
+        
+        if not invoice:
+            raise HTTPException(status_code=404, detail="مردود المشتريات غير موجود")
+            
+        # Get Items
+        items_query = """
+            SELECT ii.*, p.product_name, p.product_code
+            FROM invoice_lines ii
+            JOIN products p ON ii.product_id = p.id
+            WHERE ii.invoice_id = :id
+        """
+        items = db.execute(text(items_query), {"id": id}).fetchall()
+        
+        return {
+            "invoice": dict(invoice._mapping),
+            "items": [dict(item._mapping) for item in items]
+        }
+    finally:
+        db.close()
+
+@router.post("/returns", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_purchase_return(
+    request: Request,
+    invoice: PurchaseCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء مردود مشتريات (خصم من المخزون + قيد دائن للمورد + سند قبض اختياري)"""
+    # Get company_id and user_id robustly
+    if isinstance(current_user, dict):
+        company_id = current_user.get("company_id")
+        user_id = current_user.get("id")
+    else:
+        company_id = getattr(current_user, "company_id", None)
+        user_id = getattr(current_user, "id", None)
+
+    db = get_db_connection(company_id)
+    try:
+        # Resolve base currency
+        from utils.accounting import get_base_currency
+        base_currency = get_base_currency(db)
+        
+        # 1. Validate Supplier
+        supplier = db.execute(text("SELECT * FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": invoice.supplier_id}).fetchone()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        # 2. Generate Return Number (PR-YYYY-XXXX)
+        year = date.today().year
+        count = db.execute(text("SELECT count(*) FROM invoices WHERE invoice_type='purchase_return'")).scalar() or 0
+        return_number = f"PR-{year}-{str(count + 1).zfill(4)}"
+
+        # 3. Create Invoice Record (Type: purchase_return)
+        # Calculate totals
+        subtotal = sum(float(item.quantity) * float(item.unit_price) for item in invoice.items)
+        tax_total = sum(float(item.quantity) * float(item.unit_price) * (float(item.tax_rate) / 100) for item in invoice.items)
+        total = subtotal + tax_total
+
+        # Determine warehouse: Use original invoice's warehouse if possible
+        wh_id = invoice.warehouse_id
+        if not wh_id and invoice.original_invoice_id:
+            # Try to fetch warehouse from original invoice (if stored in a column or logically linked)
+            # Check if original invoice has a warehouse_id stored in its records
+            orig_wh = db.execute(text("""
+                SELECT warehouse_id FROM inventory_transactions 
+                WHERE reference_id = :id AND reference_type = 'invoice' 
+                LIMIT 1
+            """), {"id": invoice.original_invoice_id}).scalar()
+            if orig_wh:
+                wh_id = orig_wh
+
+        if not wh_id:
+            wh_id = db.execute(text("SELECT id FROM warehouses WHERE is_active=TRUE ORDER BY is_default DESC LIMIT 1")).scalar()
+            if not wh_id:
+                wh_id = db.execute(text("SELECT id FROM warehouses LIMIT 1")).scalar()
+        
+        if not wh_id:
+             raise HTTPException(status_code=400, detail="يجب تعريف مستودع واحد على الأقل")
+
+        # 3.5 Validate Warehouse-Branch Association (for Return)
+        if wh_id and invoice.branch_id:
+            wh_check = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": wh_id}).fetchone()
+            if wh_check and wh_check[0] and wh_check[0] != invoice.branch_id:
+                raise HTTPException(status_code=400, detail="المستودع المختار لا يتبع للفرع الحالي")
+
+        # Determine Branch
+        branch_id = invoice.branch_id
+        if not branch_id and invoice.original_invoice_id:
+            branch_id = db.execute(text("SELECT branch_id FROM invoices WHERE id = :id"), {"id": invoice.original_invoice_id}).scalar()
+
+        for item in invoice.items:
+            current_stock = db.execute(text("SELECT quantity FROM inventory WHERE product_id = :pid AND warehouse_id = :wh"), 
+                                     {"pid": item.product_id, "wh": wh_id}).scalar() or 0
+            # For returns, we check if we have the items? 
+            # Actually, standard logic: You can't return what you don't have? 
+            # Yes, we check stock availability to remove it.
+            # Wait, if I bought 10, current stock 10. Return 5. Valid.
+            # If I bought 10, sold 10. Current stock 0. Return 5?
+            # You physically have the item to return? If stock is 0, implies you don't have it.
+            # Unless you allow negative stock. 
+            # We will enforce logic: Must have stock to return it.
+            qty_to_check = abs(item.quantity)
+            if qty_to_check > current_stock:
+                product_name = db.execute(text("SELECT product_name FROM products WHERE id=:id"), {"id": item.product_id}).scalar()
+                raise ValueError(f"الكمية المراد إرجاعها '{product_name}' ({qty_to_check}) غير متوفرة في المخزون الحالي ({current_stock})")
+
+        # Create Invoice
+        # Note: If paid_amount > 0, we mark as 'paid' or 'partial'.
+        # For returns, 'paid' means the refund was processed.
+        return_status = 'posted' # Default
+        if invoice.paid_amount and invoice.paid_amount >= total - 0.01:
+            return_status = 'paid'
+        elif invoice.paid_amount and invoice.paid_amount > 0:
+            return_status = 'partial'
+
+        new_invoice_id = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, party_id, invoice_date, due_date,
+                subtotal, tax_amount, total, paid_amount,
+                status, invoice_type, notes, created_by, related_invoice_id, branch_id,
+                currency, exchange_rate
+            ) VALUES (
+                :num, :pid, :date, :due,
+                :sub, :tax, :total, :paid,
+                :status, 'purchase_return', :notes, :uid, :rel_id, :bid,
+                :currency, :exchange_rate
+            ) RETURNING id
+        """), {
+            "num": return_number, "pid": invoice.supplier_id, "date": invoice.invoice_date,
+            "due": invoice.due_date, "sub": subtotal, "tax": tax_total, "total": total,
+            "paid": invoice.paid_amount or 0,
+            "status": return_status, "notes": invoice.notes, "uid": user_id,
+            "rel_id": invoice.original_invoice_id, "bid": branch_id,
+            "currency": invoice.currency or base_currency, "exchange_rate": invoice.exchange_rate or 1.0
+        }).fetchone()[0]
+
+        # 4. Add Items & Update Stock (DEDUCT)
+        for item in invoice.items:
+            item_total = float(item.quantity) * float(item.unit_price) * (1 + float(item.tax_rate) / 100)
+            db.execute(text("""
+                INSERT INTO invoice_lines (
+                    invoice_id, product_id, description, quantity, unit_price,
+                    tax_rate, discount, total
+                ) VALUES (
+                    :iid, :pid, :desc, :qty, :price,
+                    :tax, :disc, :total
+                )
+            """), {
+                "iid": new_invoice_id, "pid": item.product_id, "desc": item.description,
+                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate,
+                "disc": item.discount, "total": item_total
+            })
+
+            # Update Inventory (DECREASE QUANTITY)
+            db.execute(text("""
+                UPDATE inventory 
+                SET quantity = quantity - :qty, last_movement_date = NOW()
+                WHERE product_id = :pid AND warehouse_id = :wh
+            """), {"qty": abs(item.quantity), "pid": item.product_id, "wh": wh_id})
+            
+            # Log Transaction
+            db.execute(text("""
+                INSERT INTO inventory_transactions (
+                    product_id, warehouse_id, transaction_type, 
+                    reference_type, reference_id,
+                    quantity, notes, created_by
+                ) VALUES (
+                    :pid, :wh, 'purchase_return',
+                    'invoice', :ref_id,
+                    :qty, 'مردود مشتريات', :uid
+                )
+            """), {
+                "pid": item.product_id, "wh": wh_id, "ref_id": new_invoice_id,
+                "qty": -abs(item.quantity), "uid": user_id
+            })
+
+        # 5. Update Supplier Balance (Logic: Return reduces balance)
+        exchange_rate = float(invoice.exchange_rate or 1.0)
+        def to_base(amount):
+            return round(float(amount) * exchange_rate, 2)
+
+        gl_total = to_base(total)
+        gl_subtotal = to_base(subtotal)
+        gl_tax = to_base(tax_total)
+
+        db.execute(text("""
+            UPDATE parties 
+            SET current_balance = COALESCE(current_balance, 0) + :amount 
+            WHERE id = :id
+        """), {"amount": gl_total, "id": invoice.supplier_id})
+
+        # 6. Accounting Entries (Return Itself)
+        # Credit: Inventory | Debit: Accounts Payable
+        inventory_acc = get_mapped_account_id(db, "acc_map_inventory")
+        ap_acc = get_mapped_account_id(db, "acc_map_ap")
+        vat_acc = get_mapped_account_id(db, "acc_map_vat_in")
+
+        if inventory_acc and ap_acc:
+            entry_id = db.execute(text("""
+                INSERT INTO journal_entries (
+                    entry_date, reference, description, status, created_by, branch_id,
+                    currency, exchange_rate
+                ) 
+                VALUES (:date, :ref, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
+            """), {
+                "date": invoice.invoice_date, "ref": return_number, 
+                "desc": f"مردود مشتريات {return_number} ({invoice.currency})", 
+                "uid": user_id, "bid": invoice.branch_id,
+                "curr": invoice.currency or base_currency, "rate": exchange_rate
+            }).fetchone()[0]
+
+            # Debit AP (Decrease Liability)
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
+                ) VALUES (:eid, :acc, :amount, 0, 'مردود مشتريات', :amt_curr, :curr)
+            """), {"eid": entry_id, "acc": ap_acc, "amount": gl_total, "amt_curr": total, "curr": invoice.currency or base_currency})
+
+            # Credit Inventory
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
+                ) VALUES (:eid, :acc, 0, :amount, 'تكلفة البضاعة', :amt_curr, :curr)
+            """), {"eid": entry_id, "acc": inventory_acc, "amount": gl_subtotal, "amt_curr": subtotal, "curr": invoice.currency or base_currency})
+            
+            # Credit VAT
+            if gl_tax > 0 and vat_acc:
+                 db.execute(text("""
+                     INSERT INTO journal_lines (
+                         journal_entry_id, account_id, debit, credit, description,
+                         amount_currency, currency
+                     ) VALUES (:eid, :acc, 0, :amount, 'استرداد ضريبة', :amt_curr, :curr)
+                 """), {"eid": entry_id, "acc": vat_acc, "amount": gl_tax, "amt_curr": tax_total, "curr": invoice.currency or base_currency})
+
+            # Update Account Balances
+            from utils.accounting import update_account_balance
+            update_account_balance(db, account_id=ap_acc, debit_base=gl_total, credit_base=0)
+            update_account_balance(db, account_id=inventory_acc, debit_base=0, credit_base=gl_subtotal)
+            if gl_tax > 0 and vat_acc:
+                update_account_balance(db, account_id=vat_acc, debit_base=0, credit_base=gl_tax)
+
+        # 7. INTEGRATED REFUND (If paid_amount > 0)
+        if invoice.paid_amount and invoice.paid_amount > 0:
+            from utils.accounting import generate_sequential_number
+            voucher_num = generate_sequential_number(db, f"RCT-{datetime.now().year}", "payment_vouchers", "voucher_number")
+            
+            gl_paid = to_base(invoice.paid_amount)
+
+            # Create Voucher (Type: refund)
+            vid = db.execute(text("""
+                INSERT INTO payment_vouchers (
+                    voucher_number, voucher_type, voucher_date, party_type, party_id,
+                    amount, payment_method, notes, status, created_by,
+                    currency, exchange_rate
+                ) VALUES (
+                    :vnum, 'refund', :vdate, 'supplier', :supp,
+                    :amt, :method, :notes, 'posted', :user,
+                    :currency, :exchange_rate
+                ) RETURNING id
+            """), {
+                "vnum": voucher_num, "vdate": invoice.invoice_date, "supp": invoice.supplier_id,
+                "amt": invoice.paid_amount, "method": invoice.payment_method or 'cash',
+                "notes": f"استرداد نقدي عن مردود {return_number}", "user": user_id,
+                "currency": invoice.currency or base_currency, "exchange_rate": exchange_rate
+            }).fetchone()[0]
+
+            # Allocation
+            db.execute(text("""
+                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                VALUES (:vid, :iid, :amt)
+            """), {"vid": vid, "iid": new_invoice_id, "amt": invoice.paid_amount})
+
+            # Update Supplier Balance (Refund INCREASES balance: Debit Cash, Credit AP)
+            db.execute(text("""
+                UPDATE parties
+                SET current_balance = COALESCE(current_balance, 0) - :amt
+                WHERE id = :sid
+            """), {"amt": gl_paid, "sid": invoice.supplier_id})
+
+            # GL for Refund
+            cash_acc = get_mapped_account_id(db, "acc_map_cash_main")
+            if invoice.payment_method == 'bank': 
+                cash_acc = get_mapped_account_id(db, "acc_map_bank")
+
+            if cash_acc and ap_acc:
+                ref_entry_id = db.execute(text("""
+                    INSERT INTO journal_entries (
+                        entry_date, reference, description, status, created_by, branch_id,
+                        currency, exchange_rate
+                    ) 
+                    VALUES (:date, :ref, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
+                """), {
+                    "date": invoice.invoice_date, "ref": voucher_num, 
+                    "desc": f"سند قبض مورد {voucher_num} ({invoice.currency})", 
+                    "uid": user_id, "bid": invoice.branch_id,
+                    "curr": invoice.currency or base_currency, "rate": exchange_rate
+                }).fetchone()[0]
+
+                # Debit Cash (We received money)
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, :amount, 0, 'قبض', :amt_curr, :curr)
+                """), {"eid": ref_entry_id, "acc": cash_acc, "amount": gl_paid, "amt_curr": invoice.paid_amount, "curr": invoice.currency or base_currency})
+
+                # Credit AP (We owe them again / Clear the Debit note)
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, 0, :amount, 'تسوية مردود', :amt_curr, :curr)
+                """), {"eid": ref_entry_id, "acc": ap_acc, "amount": gl_paid, "amt_curr": invoice.paid_amount, "curr": invoice.currency or base_currency})
+
+                # Update account balances for refund
+                update_account_balance(db, account_id=cash_acc, debit_base=gl_paid, credit_base=0)
+                update_account_balance(db, account_id=ap_acc, debit_base=0, credit_base=gl_paid)
+
+        db.commit()
+
+        log_activity(
+            db,
+            user_id=user_id,
+            username=getattr(current_user, "username", "unknown") if not isinstance(current_user, dict) else current_user.get("username", "unknown"),
+            action="purchase_return.create",
+            resource_type="invoice",
+            resource_id=str(new_invoice_id),
+            details={"return_number": return_number, "total": total, "supplier_id": invoice.supplier_id},
+            request=request,
+            branch_id=invoice.branch_id
+        )
+
+        return {"id": new_invoice_id, "message": "تم إنشاء مردود المشتريات بنجاح"}
+
+    except ValueError as ve:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating return: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ أثناء إنشاء مردود المشتريات")
+    finally:
+        db.close()
+
+@router.post("/payments", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+def create_supplier_payment(request: Request, data: SupplierPaymentCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء سند صرف/قبض لمورد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        from utils.accounting import generate_sequential_number, get_base_currency
+        base_currency = get_base_currency(db)
+        # Validate amount
+        if data.amount is None or data.amount <= 0:
+            raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون أكبر من صفر")
+        
+        # Check supplier balance (total owed)
+        supplier_balance = db.execute(text("""
+            SELECT COALESCE(current_balance, 0) as balance FROM parties WHERE id = :sid
+        """), {"sid": data.supplier_id}).fetchone()
+        if not supplier_balance:
+            raise HTTPException(status_code=404, detail="المورد غير موجود")
+        
+        # For payments (not refunds), warn if paying more than owed
+        amount_base = round(data.amount * float(data.exchange_rate or 1.0), 2)
+        if data.voucher_type != 'refund' and amount_base > float(supplier_balance.balance) + 0.01:
+            # Allow overpayment but log warning (some businesses prepay)
+            logger.warning(f"Supplier payment {data.amount} exceeds balance {supplier_balance.balance} for supplier {data.supplier_id}")
+        
+        # Prefix based on type
+        prefix = "PAY" if data.voucher_type != 'refund' else "RCT"
+        voucher_num = generate_sequential_number(db, f"{prefix}-{date.today().year}", "payment_vouchers", "voucher_number")
+        
+        # 1. Insert Voucher Header
+        result = db.execute(text("""
+            INSERT INTO payment_vouchers (
+                voucher_number, voucher_type, voucher_date, party_type, party_id, 
+                amount, payment_method, bank_account_id, treasury_account_id, check_number, check_date,
+                reference, notes, status, created_by, branch_id, currency, exchange_rate
+            ) VALUES (
+                :vnum, :type, :vdate, 'supplier', :supp,
+                :amt, :method, :bank, :treasury, :check_num, :check_date,
+                :ref, :notes, 'posted', :user, :bid, :curr, :rate
+            ) RETURNING id
+        """), {
+            "vnum": voucher_num, "type": data.voucher_type or 'payment', "vdate": data.voucher_date, "supp": data.supplier_id,
+            "amt": data.amount, "method": data.payment_method, 
+            "bank": data.bank_account_id if data.payment_method != 'cash' else None,
+            "treasury": data.treasury_account_id or (data.bank_account_id if data.payment_method == 'cash' else None), 
+            "check_num": data.check_number, "check_date": data.check_date,
+            "ref": data.reference, "notes": data.notes, "user": current_user.id, "bid": data.branch_id,
+            "curr": data.currency, "rate": data.exchange_rate or 1.0
+        }).fetchone()
+        
+        voucher_id = result[0]
+        
+        # 2. Process Allocations
+        voucher_rate = float(data.exchange_rate or 1.0)
+        for alloc in data.allocations:
+            db.execute(text("""
+                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                VALUES (:vid, :iid, :amt)
+            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc.allocated_amount})
+            
+            # Fetch invoice details for currency conversion
+            invoice = db.execute(text("SELECT currency, exchange_rate FROM invoices WHERE id = :id"), {"id": alloc.invoice_id}).fetchone()
+            if invoice:
+                inv_curr = invoice.currency or base_currency
+                inv_rate = float(invoice.exchange_rate or 1.0)
+                
+                # Conversion logic:
+                # if voucher is SYP (rate 1) and invoice is USD (rate 3.75)
+                # allocated 375 SYP -> debt reduction = 375 / 3.75 = 100 USD
+                # reduction = allocated * (voucher_rate / inv_rate)
+                reduction = round(alloc.allocated_amount * (voucher_rate / inv_rate), 4)
+
+                # Update invoice paid_amount
+                db.execute(text("""
+                    UPDATE invoices
+                    SET paid_amount = COALESCE(paid_amount, 0) + :amt,
+                        status = CASE
+                            WHEN (COALESCE(paid_amount, 0) + :amt) >= total - 0.01 THEN 'paid'
+                            WHEN (COALESCE(paid_amount, 0) + :amt) > 0.1 THEN 'partial'
+                            ELSE status
+                        END
+                    WHERE id = :iid
+                """), {"amt": reduction, "iid": alloc.invoice_id})
+        
+        # 3. Update Supplier Balance (Base + Currency)
+        amount_base = round(data.amount * (data.exchange_rate or 1.0), 2)
+        balance_change = amount_base if data.voucher_type != 'refund' else -amount_base
+        
+        # Update base currency balance
+        db.execute(text("""
+            UPDATE parties
+            SET current_balance = COALESCE(current_balance, 0) + :change
+            WHERE id = :sid
+        """), {"change": balance_change, "sid": data.supplier_id})
+        
+        # Update foreign currency balance if applicable
+        balance_change_fc = data.amount if data.voucher_type != 'refund' else -data.amount
+        if data.currency and data.currency != base_currency:
+            db.execute(text("""
+                UPDATE parties
+                SET balance_currency = COALESCE(balance_currency, 0) + :change
+                WHERE id = :sid
+            """), {"change": balance_change_fc, "sid": data.supplier_id})
+        
+        # 4. Create GL Entry
+        # Dynamic Treasury Lookup
+        treasury_id = data.treasury_account_id or data.bank_account_id
+        cash_acc = None
+        treasury_curr = data.currency
+        treasury_rate = float(data.exchange_rate or 1.0)
+        amount_treasury_curr = data.amount
+        
+        if treasury_id:
+            # Fetch treasury account details
+            treasury = db.execute(text("SELECT gl_account_id, currency FROM treasury_accounts WHERE id = :id"), {"id": treasury_id}).fetchone()
+            if treasury:
+                cash_acc = treasury.gl_account_id
+                treasury_curr = treasury.currency or data.currency
+                
+                # Fetch current rate for treasury currency
+                treasury_rate = 1.0
+                if treasury_curr != (current_user.company_currency or base_currency):
+                     # Try to get rate from currencies table
+                     curr_data = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": treasury_curr}).fetchone()
+                     if curr_data:
+                         treasury_rate = float(curr_data.current_rate or 1.0)
+                
+                # Calculate amount in treasury's currency
+                if data.transaction_rate and data.transaction_rate > 0:
+                    amount_treasury_curr = round(data.amount * data.transaction_rate, 4)
+                else:
+                    amount_treasury_curr = round(data.amount * (voucher_rate / treasury_rate), 4)
+                
+                amount_base_cash = round(amount_treasury_curr * treasury_rate, 2)
+                
+                # Update Treasury account specific balance
+                # Payment decreases balance (Credit Asset), Refund increases balance (Debit Asset)
+                if data.voucher_type == 'refund':
+                    balance_change_treasury = abs(amount_treasury_curr)
+                else:
+                    balance_change_treasury = -abs(amount_treasury_curr)
+
+                db.execute(text("""
+                    UPDATE treasury_accounts
+                    SET current_balance = COALESCE(current_balance, 0) + :change
+                    WHERE id = :id
+                """), {"change": balance_change_treasury, "id": treasury_id})
+        
+        # Fallback to legacy mappings if no treasury linked
+        if not cash_acc:
+            cash_acc = get_mapped_account_id(db, "acc_map_cash_main")
+            if data.payment_method in ['bank', 'check']: 
+                cash_acc = get_mapped_account_id(db, "acc_map_bank")
+
+        ap_acc = get_mapped_account_id(db, "acc_map_ap")
+        # Ensure we have a base amount for the cash side (defaulting to voucher's base if not set)
+        amount_base_cash = locals().get('amount_base_cash', amount_base)
+
+        if ap_acc and cash_acc:
+            je_num = f"JE-{voucher_num}"
+            entry_id = db.execute(text("""
+                INSERT INTO journal_entries (
+                    entry_number, entry_date, reference, description, status, 
+                    created_by, branch_id, currency, exchange_rate
+                ) VALUES (
+                    :num, :date, :ref, :desc, 'posted', 
+                    :uid, :bid, :curr, :rate
+                ) RETURNING id
+            """), {
+                "num": je_num, "date": data.voucher_date, "ref": voucher_num, 
+                "desc": f"{'سند قبض من' if data.voucher_type=='refund' else 'سند صرف لـ'} مورد {voucher_num} ({data.currency})", 
+                "uid": current_user.id, "bid": data.branch_id,
+                "curr": data.currency, "rate": data.exchange_rate or 1.0
+            }).scalar()
+
+            if data.voucher_type == 'refund':
+                # Receipt: Debit Cash, Credit AP
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, :amt, 0, 'قبض', :amt_curr, :curr)
+                """), {"eid": entry_id, "acc": cash_acc, "amt": amount_base_cash, "amt_curr": amount_treasury_curr, "curr": treasury_curr})
+                
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, 0, :amt, 'من مورد', :amt_curr, :curr)
+                """), {"eid": entry_id, "acc": ap_acc, "amt": amount_base, "amt_curr": data.amount, "curr": data.currency})
+            else:
+                # Payment: Debit AP, Credit Cash
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, :amt, 0, 'صرف', :amt_curr, :curr)
+                """), {"eid": entry_id, "acc": ap_acc, "amt": amount_base, "amt_curr": data.amount, "curr": data.currency})
+                
+                db.execute(text("""
+                    INSERT INTO journal_lines (
+                        journal_entry_id, account_id, debit, credit, description,
+                        amount_currency, currency
+                    ) VALUES (:eid, :acc, 0, :amt, 'من خزينة', :amt_curr, :curr)
+                """), {"eid": entry_id, "acc": cash_acc, "amt": amount_base_cash, "amt_curr": amount_treasury_curr, "curr": treasury_curr})
+            
+            # 5. Handle Exchange Difference to Balance the JE
+            diff = round(amount_base - amount_base_cash, 2)
+            if abs(diff) > 0.01:
+                fx_acc = get_mapped_account_id(db, "acc_map_fx_difference") or get_mapped_account_id(db, "acc_map_expense_other")
+                if fx_acc:
+                    # Logic: If diff (AP-Cash) is +ve, we need More Credit (if Payment) or More Debit (if Refund)
+                    je_diff = -diff if data.voucher_type != 'refund' else diff # Adjustment to Debit
+                    if je_diff > 0:
+                        db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:eid, :acc, :amt, 0, 'فرق سعر صرف')"), {"eid": entry_id, "acc": fx_acc, "amt": abs(je_diff)})
+                    else:
+                        db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:eid, :acc, 0, :amt, 'فرق سعر صرف')"), {"eid": entry_id, "acc": fx_acc, "amt": abs(je_diff)})
+
+            # 6. Update account balances
+            from utils.accounting import update_account_balance
+            # AP side
+            update_account_balance(
+                db,
+                account_id=ap_acc,
+                debit_base=amount_base if data.voucher_type != 'refund' else 0,
+                credit_base=amount_base if data.voucher_type == 'refund' else 0,
+                debit_curr=data.amount if data.voucher_type != 'refund' else 0,
+                credit_curr=data.amount if data.voucher_type == 'refund' else 0,
+                currency=data.currency
+            )
+            # Cash side
+            update_account_balance(
+                db,
+                account_id=cash_acc,
+                debit_base=amount_base_cash if data.voucher_type == 'refund' else 0,
+                credit_base=amount_base_cash if data.voucher_type != 'refund' else 0,
+                debit_curr=amount_treasury_curr if data.voucher_type == 'refund' else 0,
+                credit_curr=amount_treasury_curr if data.voucher_type != 'refund' else 0,
+                currency=treasury_curr
+            )
+
+        db.commit()
+
+        supp_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": data.supplier_id}).scalar()
+        log_activity(
+            db_conn=db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="buying.supplier_payment.create",
+            resource_type="payment_voucher",
+            resource_id=str(voucher_id),
+            details={"voucher_number": voucher_num, "amount": data.amount, "supplier_name": supp_name},
+            request=request,
+            branch_id=data.branch_id
+        )
+
+        return {"id": voucher_id, "message": "تم حفظ السند بنجاح"}
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating payment: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ أثناء إنشاء سند الصرف")
+    finally:
+        db.close()
+        
+
+
+@router.get("/payments", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
+def list_supplier_payments(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
+    """قائمة سندات الصرف"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query_str = """
+            SELECT pv.id, pv.voucher_number, pv.voucher_date, pv.amount, pv.currency,
+                   pv.payment_method, pv.status, p.name as supplier_name
+            FROM payment_vouchers pv
+            JOIN parties p ON pv.party_id = p.id
+            WHERE pv.voucher_type = 'payment' AND pv.party_type = 'supplier'
+        """
+        params = {}
+        if branch_id:
+            query_str += " AND (pv.branch_id = :branch_id OR pv.branch_id IS NULL)"
+            params["branch_id"] = branch_id
+        
+        query_str += " ORDER BY pv.created_at DESC"
+        
+        result = db.execute(text(query_str), params).fetchall()
+        return [dict(row._mapping) for row in result]
+    except Exception as e:
+        logger.error(f"Error listing payments: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.get("/payments/{voucher_id}", response_model=dict, dependencies=[Depends(require_permission("buying.view"))])
+def get_payment_details(voucher_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل سند صرف"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        header = db.execute(text("""
+            SELECT pv.*, p.name as party_name, p.party_code
+            FROM payment_vouchers pv
+            JOIN parties p ON pv.party_id = p.id
+            WHERE pv.id = :id AND pv.party_type = 'supplier' AND pv.voucher_type = 'payment'
+        """), {"id": voucher_id}).fetchone()
+        
+        if not header:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        
+        allocations = db.execute(text("""
+            SELECT pa.*, i.invoice_number
+            FROM payment_allocations pa
+            JOIN invoices i ON pa.invoice_id = i.id
+            WHERE pa.voucher_id = :id
+        """), {"id": voucher_id}).fetchall()
+        
+        return {
+            **dict(header._mapping),
+            "allocations": [dict(a._mapping) for a in allocations]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting payment: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.get("/suppliers/{supplier_id}/outstanding-invoices", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
+def get_supplier_outstanding_invoices(
+    supplier_id: int, 
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Fetch unpaid/partial purchase invoices for a supplier"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT id, invoice_number, invoice_date, total, paid_amount, status, invoice_type,
+                   currency, exchange_rate,
+                   (total - COALESCE(paid_amount, 0)) as remaining_balance
+            FROM invoices
+            WHERE party_id = :sid
+              AND invoice_type IN ('purchase', 'purchase_return')
+              AND status IN ('unpaid', 'partial', 'posted')
+        """
+        params = {"sid": supplier_id}
+        if branch_id:
+            query += " AND branch_id = :bid"
+            params["bid"] = branch_id
+        
+        query += " ORDER BY invoice_date ASC"
+        
+        result = db.execute(text(query), params).fetchall()
+        return [dict(row._mapping) for row in result]
+    except Exception as e:
+        logger.error(f"Error fetching outstanding invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+@router.get("/invoices/{invoice_id}/payment-history", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
+def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(get_current_user)):
+    """سجل الدفعات لفاتورة شراء معينة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            SELECT 
+                pv.id as voucher_id,
+                pv.voucher_number,
+                pv.voucher_date,
+                pv.payment_method,
+                pa.allocated_amount
+            FROM payment_allocations pa
+            JOIN payment_vouchers pv ON pa.voucher_id = pv.id
+            WHERE pa.invoice_id = :invoice_id
+              AND pv.voucher_type = 'payment'
+            ORDER BY pv.voucher_date DESC
+        """), {"invoice_id": invoice_id}).fetchall()
+        
+        return [dict(row._mapping) for row in result]
+    except Exception as e:
+        logger.error(f"Error getting payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ==================== INV-003: Purchase Credit Notes (إشعار دائن مشتريات) ====================
+# Credit Note from Supplier: Reduces what we owe (e.g., supplier overcharged us, returns to supplier)
+# GL: Debit AP (reduce payable), Credit Inventory/Expense + VAT Input
+
+@router.get("/credit-notes", dependencies=[Depends(require_permission("buying.view"))])
+def list_purchase_credit_notes(
+    party_id: Optional[int] = None,
+    status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """قائمة إشعارات دائنة (مشتريات)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["i.invoice_type = 'purchase_credit_note'"]
+        params = {}
+        if party_id:
+            conditions.append("i.party_id = :party_id")
+            params["party_id"] = party_id
+        if status_filter:
+            conditions.append("i.status = :status")
+            params["status"] = status_filter
+        if date_from:
+            conditions.append("i.invoice_date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            conditions.append("i.invoice_date <= :date_to")
+            params["date_to"] = date_to
+        if search:
+            conditions.append("(i.invoice_number ILIKE :search OR i.notes ILIKE :search)")
+            params["search"] = f"%{search}%"
+        if branch_id:
+            conditions.append("i.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+
+        where = " AND ".join(conditions)
+        total = db.execute(text(f"SELECT COUNT(*) FROM invoices i WHERE {where}"), params).scalar()
+
+        offset = (page - 1) * limit
+        params["limit"] = limit
+        params["offset"] = offset
+
+        rows = db.execute(text(f"""
+            SELECT i.*, p.name AS party_name,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE {where}
+            ORDER BY i.invoice_date DESC, i.id DESC
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total, "page": page,
+            "pages": (total + limit - 1) // limit,
+        }
+    finally:
+        db.close()
+
+
+@router.get("/credit-notes/{note_id}", dependencies=[Depends(require_permission("buying.view"))])
+def get_purchase_credit_note(note_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل إشعار دائن مشتريات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        note = db.execute(text("""
+            SELECT i.*, p.name AS party_name, p.phone AS party_phone, p.tax_number AS party_tax,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE i.id = :id AND i.invoice_type = 'purchase_credit_note'
+        """), {"id": note_id}).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
+
+        lines = db.execute(text("""
+            SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
+            FROM invoice_lines il LEFT JOIN products pr ON il.product_id = pr.id
+            WHERE il.invoice_id = :id ORDER BY il.id
+        """), {"id": note_id}).fetchall()
+
+        result = dict(note._mapping)
+        result["lines"] = [dict(l._mapping) for l in lines]
+        return result
+    finally:
+        db.close()
+
+
+@router.post("/credit-notes", status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_permission("buying.create"))])
+def create_purchase_credit_note(
+    request: Request,
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    إنشاء إشعار دائن مشتريات
+    GL: Debit AP, Credit Purchases/Inventory + VAT Input
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        party_id = data.get("party_id")
+        related_invoice_id = data.get("related_invoice_id")
+        lines = data.get("lines", [])
+        if not lines:
+            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+        if not party_id:
+            raise HTTPException(status_code=400, detail="يجب تحديد المورد")
+
+        if related_invoice_id:
+            orig = db.execute(text(
+                "SELECT id, party_id, invoice_type FROM invoices WHERE id = :id"
+            ), {"id": related_invoice_id}).fetchone()
+            if not orig or orig.party_id != party_id:
+                raise HTTPException(status_code=400, detail="الفاتورة المرتبطة غير موجودة أو لا تخص هذا المورد")
+
+        inv_date = data.get("invoice_date", str(date.today()))
+        base_currency = get_base_currency(db)
+        currency = data.get("currency", base_currency)
+        exchange_rate = float(data.get("exchange_rate", 1.0))
+        branch_id = data.get("branch_id") or current_user.branch_id
+
+        subtotal = 0
+        tax_total = 0
+        discount_total = 0
+        computed_lines = []
+
+        for line in lines:
+            qty = float(line.get("quantity", 1))
+            price = float(line.get("unit_price", 0))
+            tax_rate = float(line.get("tax_rate", 0))
+            disc = float(line.get("discount", 0))
+            line_net = qty * price - disc
+            line_tax = round(line_net * tax_rate / 100, 4)
+            line_total = round(line_net + line_tax, 4)
+            subtotal += line_net
+            tax_total += line_tax
+            discount_total += disc
+            computed_lines.append({
+                "product_id": line.get("product_id"),
+                "description": line.get("description", ""),
+                "quantity": qty, "unit_price": price,
+                "tax_rate": tax_rate, "discount": disc, "total": line_total,
+            })
+
+        total = round(subtotal + tax_total, 4)
+
+        inv_num = generate_sequential_number(db, "PCN", "invoices", "invoice_number")
+        result = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, invoice_type, party_id, invoice_date,
+                subtotal, tax_amount, discount, total, paid_amount, status,
+                notes, branch_id, related_invoice_id, currency, exchange_rate, created_by
+            ) VALUES (
+                :num, 'purchase_credit_note', :party, :date,
+                :sub, :tax, :disc, :total, 0, 'posted',
+                :notes, :branch, :rel, :curr, :rate, :user
+            ) RETURNING id
+        """), {
+            "num": inv_num, "party": party_id, "date": inv_date,
+            "sub": subtotal, "tax": tax_total, "disc": discount_total,
+            "total": total, "notes": data.get("notes", ""),
+            "branch": branch_id, "rel": related_invoice_id,
+            "curr": currency, "rate": exchange_rate, "user": current_user.id,
+        })
+        note_id = result.fetchone()[0]
+
+        for cl in computed_lines:
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv, :prod, :desc, :qty, :price, :tax, :disc, :total)
+            """), {"inv": note_id, "prod": cl["product_id"], "desc": cl["description"],
+                   "qty": cl["quantity"], "price": cl["unit_price"], "tax": cl["tax_rate"],
+                   "disc": cl["discount"], "total": cl["total"]})
+
+        # GL: Debit AP, Credit Inventory + VAT
+        acc_ap = get_mapped_account_id(db, "acc_map_ap")
+        acc_inv = get_mapped_account_id(db, "acc_map_inventory")
+        acc_vat = get_mapped_account_id(db, "acc_map_vat_in")
+
+        if not acc_ap or not acc_inv:
+            raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
+
+        gl_sub = round(subtotal * exchange_rate, 4)
+        gl_tax = round(tax_total * exchange_rate, 4)
+        gl_total = round(total * exchange_rate, 4)
+
+        je_lines = []
+        # Debit: AP (reduces payable)
+        je_lines.append({"account_id": acc_ap, "debit": gl_total, "credit": 0,
+                         "description": f"إشعار دائن مشتريات - تخفيض ذمم {inv_num}",
+                         "amount_currency": total, "currency": currency})
+        # Credit: Inventory/Purchases
+        if gl_sub > 0:
+            je_lines.append({"account_id": acc_inv, "debit": 0, "credit": gl_sub,
+                             "description": f"إشعار دائن مشتريات - تخفيض مخزون {inv_num}",
+                             "amount_currency": subtotal, "currency": currency})
+        # Credit: VAT Input
+        if gl_tax > 0 and acc_vat:
+            je_lines.append({"account_id": acc_vat, "debit": 0, "credit": gl_tax,
+                             "description": f"إشعار دائن مشتريات - عكس ضريبة {inv_num}",
+                             "amount_currency": tax_total, "currency": currency})
+
+        je_num = f"JE-PCN-{inv_num}"
+        je_id = db.execute(text("""
+            INSERT INTO journal_entries (
+                entry_number, entry_date, description, reference, status,
+                created_by, branch_id, currency, exchange_rate, posted_at
+            ) VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :curr, :rate, NOW())
+            RETURNING id
+        """), {
+            "num": je_num, "date": inv_date,
+            "desc": f"إشعار دائن مشتريات {inv_num}",
+            "ref": inv_num, "user": current_user.id,
+            "branch": branch_id, "curr": currency, "rate": exchange_rate,
+        }).scalar()
+
+        for jl in je_lines:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
+                VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
+            """), {"jid": je_id, "aid": jl["account_id"], "deb": jl["debit"], "cred": jl["credit"],
+                   "desc": jl["description"], "amt": jl["amount_currency"], "curr": jl["currency"]})
+            update_account_balance(db, account_id=jl["account_id"],
+                                   debit_base=jl["debit"], credit_base=jl["credit"],
+                                   debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
+                                   credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
+                                   currency=jl["currency"])
+
+        # Reduce related invoice balance
+        if related_invoice_id:
+            db.execute(text("""
+                UPDATE invoices SET paid_amount = paid_amount + :amt,
+                    status = CASE WHEN paid_amount + :amt >= total THEN 'paid' WHEN paid_amount + :amt > 0 THEN 'partial' ELSE status END
+                WHERE id = :id
+            """), {"amt": total, "id": related_invoice_id})
+
+        db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="buying.credit_note.create", resource_type="purchase_credit_note",
+                     resource_id=inv_num, details={"party_id": party_id, "total": float(total)},
+                     request=request, branch_id=branch_id)
+
+        return {"success": True, "id": note_id, "invoice_number": inv_num,
+                "journal_entry_id": je_id, "message": f"تم إنشاء الإشعار الدائن {inv_num} بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating purchase credit note: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ==================== INV-004: Purchase Debit Notes (إشعار مدين مشتريات) ====================
+# Debit Note to Supplier: Increases what we owe (e.g., undercharged, additional services)
+# GL: Debit Inventory/Expense + VAT Input, Credit AP
+
+@router.get("/debit-notes", dependencies=[Depends(require_permission("buying.view"))])
+def list_purchase_debit_notes(
+    party_id: Optional[int] = None,
+    status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """قائمة إشعارات مدينة (مشتريات)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["i.invoice_type = 'purchase_debit_note'"]
+        params = {}
+        if party_id:
+            conditions.append("i.party_id = :party_id")
+            params["party_id"] = party_id
+        if status_filter:
+            conditions.append("i.status = :status")
+            params["status"] = status_filter
+        if date_from:
+            conditions.append("i.invoice_date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            conditions.append("i.invoice_date <= :date_to")
+            params["date_to"] = date_to
+        if search:
+            conditions.append("(i.invoice_number ILIKE :search OR i.notes ILIKE :search)")
+            params["search"] = f"%{search}%"
+        if branch_id:
+            conditions.append("i.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+
+        where = " AND ".join(conditions)
+        total = db.execute(text(f"SELECT COUNT(*) FROM invoices i WHERE {where}"), params).scalar()
+        offset = (page - 1) * limit
+        params["limit"] = limit
+        params["offset"] = offset
+
+        rows = db.execute(text(f"""
+            SELECT i.*, p.name AS party_name,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE {where}
+            ORDER BY i.invoice_date DESC, i.id DESC
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total, "page": page,
+            "pages": (total + limit - 1) // limit,
+        }
+    finally:
+        db.close()
+
+
+@router.get("/debit-notes/{note_id}", dependencies=[Depends(require_permission("buying.view"))])
+def get_purchase_debit_note(note_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل إشعار مدين مشتريات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        note = db.execute(text("""
+            SELECT i.*, p.name AS party_name, p.phone AS party_phone, p.tax_number AS party_tax,
+                   ri.invoice_number AS related_invoice_number,
+                   cu.username AS created_by_name
+            FROM invoices i
+            LEFT JOIN parties p ON i.party_id = p.id
+            LEFT JOIN invoices ri ON i.related_invoice_id = ri.id
+            LEFT JOIN company_users cu ON i.created_by = cu.id
+            WHERE i.id = :id AND i.invoice_type = 'purchase_debit_note'
+        """), {"id": note_id}).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
+
+        lines = db.execute(text("""
+            SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
+            FROM invoice_lines il LEFT JOIN products pr ON il.product_id = pr.id
+            WHERE il.invoice_id = :id ORDER BY il.id
+        """), {"id": note_id}).fetchall()
+
+        result = dict(note._mapping)
+        result["lines"] = [dict(l._mapping) for l in lines]
+        return result
+    finally:
+        db.close()
+
+
+@router.post("/debit-notes", status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_permission("buying.create"))])
+def create_purchase_debit_note(
+    request: Request,
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    إنشاء إشعار مدين مشتريات
+    GL: Debit Inventory/Expense + VAT Input, Credit AP
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        party_id = data.get("party_id")
+        related_invoice_id = data.get("related_invoice_id")
+        lines = data.get("lines", [])
+        if not lines:
+            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+        if not party_id:
+            raise HTTPException(status_code=400, detail="يجب تحديد المورد")
+
+        inv_date = data.get("invoice_date", str(date.today()))
+        base_currency = get_base_currency(db)
+        currency = data.get("currency", base_currency)
+        exchange_rate = float(data.get("exchange_rate", 1.0))
+        branch_id = data.get("branch_id") or current_user.branch_id
+
+        subtotal = 0
+        tax_total = 0
+        discount_total = 0
+        computed_lines = []
+
+        for line in lines:
+            qty = float(line.get("quantity", 1))
+            price = float(line.get("unit_price", 0))
+            tax_rate = float(line.get("tax_rate", 0))
+            disc = float(line.get("discount", 0))
+            line_net = qty * price - disc
+            line_tax = round(line_net * tax_rate / 100, 4)
+            line_total = round(line_net + line_tax, 4)
+            subtotal += line_net
+            tax_total += line_tax
+            discount_total += disc
+            computed_lines.append({
+                "product_id": line.get("product_id"),
+                "description": line.get("description", ""),
+                "quantity": qty, "unit_price": price,
+                "tax_rate": tax_rate, "discount": disc, "total": line_total,
+            })
+
+        total = round(subtotal + tax_total, 4)
+
+        inv_num = generate_sequential_number(db, "PDN", "invoices", "invoice_number")
+        result = db.execute(text("""
+            INSERT INTO invoices (
+                invoice_number, invoice_type, party_id, invoice_date,
+                subtotal, tax_amount, discount, total, paid_amount, status,
+                notes, branch_id, related_invoice_id, currency, exchange_rate, created_by
+            ) VALUES (
+                :num, 'purchase_debit_note', :party, :date,
+                :sub, :tax, :disc, :total, 0, 'unpaid',
+                :notes, :branch, :rel, :curr, :rate, :user
+            ) RETURNING id
+        """), {
+            "num": inv_num, "party": party_id, "date": inv_date,
+            "sub": subtotal, "tax": tax_total, "disc": discount_total,
+            "total": total, "notes": data.get("notes", ""),
+            "branch": branch_id, "rel": related_invoice_id,
+            "curr": currency, "rate": exchange_rate, "user": current_user.id,
+        })
+        note_id = result.fetchone()[0]
+
+        for cl in computed_lines:
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv, :prod, :desc, :qty, :price, :tax, :disc, :total)
+            """), {"inv": note_id, "prod": cl["product_id"], "desc": cl["description"],
+                   "qty": cl["quantity"], "price": cl["unit_price"], "tax": cl["tax_rate"],
+                   "disc": cl["discount"], "total": cl["total"]})
+
+        # GL: Debit Inventory + VAT, Credit AP
+        acc_ap = get_mapped_account_id(db, "acc_map_ap")
+        acc_inv = get_mapped_account_id(db, "acc_map_inventory")
+        acc_vat = get_mapped_account_id(db, "acc_map_vat_in")
+
+        if not acc_ap or not acc_inv:
+            raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
+
+        gl_sub = round(subtotal * exchange_rate, 4)
+        gl_tax = round(tax_total * exchange_rate, 4)
+        gl_total = round(total * exchange_rate, 4)
+
+        je_lines = []
+        # Debit: Inventory/Expense
+        if gl_sub > 0:
+            je_lines.append({"account_id": acc_inv, "debit": gl_sub, "credit": 0,
+                             "description": f"إشعار مدين مشتريات - زيادة مخزون {inv_num}",
+                             "amount_currency": subtotal, "currency": currency})
+        # Debit: VAT Input
+        if gl_tax > 0 and acc_vat:
+            je_lines.append({"account_id": acc_vat, "debit": gl_tax, "credit": 0,
+                             "description": f"إشعار مدين مشتريات - ضريبة إضافية {inv_num}",
+                             "amount_currency": tax_total, "currency": currency})
+        # Credit: AP
+        je_lines.append({"account_id": acc_ap, "debit": 0, "credit": gl_total,
+                         "description": f"إشعار مدين مشتريات - زيادة ذمم {inv_num}",
+                         "amount_currency": total, "currency": currency})
+
+        je_num = f"JE-PDN-{inv_num}"
+        je_id = db.execute(text("""
+            INSERT INTO journal_entries (
+                entry_number, entry_date, description, reference, status,
+                created_by, branch_id, currency, exchange_rate, posted_at
+            ) VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :curr, :rate, NOW())
+            RETURNING id
+        """), {
+            "num": je_num, "date": inv_date,
+            "desc": f"إشعار مدين مشتريات {inv_num}",
+            "ref": inv_num, "user": current_user.id,
+            "branch": branch_id, "curr": currency, "rate": exchange_rate,
+        }).scalar()
+
+        for jl in je_lines:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
+                VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
+            """), {"jid": je_id, "aid": jl["account_id"], "deb": jl["debit"], "cred": jl["credit"],
+                   "desc": jl["description"], "amt": jl["amount_currency"], "curr": jl["currency"]})
+            update_account_balance(db, account_id=jl["account_id"],
+                                   debit_base=jl["debit"], credit_base=jl["credit"],
+                                   debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
+                                   credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
+                                   currency=jl["currency"])
+
+        db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="buying.debit_note.create", resource_type="purchase_debit_note",
+                     resource_id=inv_num, details={"party_id": party_id, "total": float(total)},
+                     request=request, branch_id=branch_id)
+
+        return {"success": True, "id": note_id, "invoice_number": inv_num,
+                "journal_entry_id": je_id, "message": f"تم إنشاء الإشعار المدين {inv_num} بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating purchase debit note: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# =====================================================
+# 8.11 PURCHASES IMPROVEMENTS
+# =====================================================
+
+# ---------- PUR-001: Request for Quotations ----------
+
+@router.get("/rfq", dependencies=[Depends(require_permission("buying.view"))])
+def list_rfqs(status: Optional[str] = None, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM request_for_quotations WHERE 1=1"
+        params = {}
+        if status:
+            q += " AND status = :status"
+            params["status"] = status
+        q += " ORDER BY created_at DESC"
+        rows = db.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.get("/rfq/{rfq_id}", dependencies=[Depends(require_permission("buying.view"))])
+def get_rfq(rfq_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        rfq = db.execute(text("SELECT * FROM request_for_quotations WHERE id = :id"), {"id": rfq_id}).fetchone()
+        if not rfq:
+            raise HTTPException(status_code=404, detail="RFQ not found")
+        lines = db.execute(text("SELECT * FROM rfq_lines WHERE rfq_id = :id"), {"id": rfq_id}).fetchall()
+        responses = db.execute(text("SELECT * FROM rfq_responses WHERE rfq_id = :id ORDER BY total_price ASC"), {"id": rfq_id}).fetchall()
+        return {
+            "rfq": dict(rfq._mapping),
+            "lines": [dict(r._mapping) for r in lines],
+            "responses": [dict(r._mapping) for r in responses],
+        }
+    finally:
+        db.close()
+
+
+@router.post("/rfq", dependencies=[Depends(require_permission("buying.create"))])
+def create_rfq(data: dict, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import uuid
+        rfq_num = f"RFQ-{uuid.uuid4().hex[:8].upper()}"
+        rfq = db.execute(text("""
+            INSERT INTO request_for_quotations (rfq_number, title, description, status, deadline, branch_id, created_by)
+            VALUES (:num, :title, :desc, 'draft', :deadline, :branch, :uid)
+            RETURNING *
+        """), {
+            "num": rfq_num, "title": data["title"], "desc": data.get("description"),
+            "deadline": data.get("deadline"), "branch": data.get("branch_id"), "uid": current_user.id,
+        }).fetchone()
+        for line in data.get("lines", []):
+            db.execute(text("""
+                INSERT INTO rfq_lines (rfq_id, product_id, product_name, quantity, unit, specifications)
+                VALUES (:rid, :pid, :pname, :qty, :unit, :specs)
+            """), {"rid": rfq.id, "pid": line.get("product_id"), "pname": line.get("product_name"),
+                   "qty": line["quantity"], "unit": line.get("unit"), "specs": line.get("specifications")})
+        db.commit()
+        return dict(rfq._mapping)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.put("/rfq/{rfq_id}/send", dependencies=[Depends(require_permission("buying.create"))])
+def send_rfq(rfq_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("UPDATE request_for_quotations SET status = 'sent', updated_at = NOW() WHERE id = :id"), {"id": rfq_id})
+        db.commit()
+        return {"message": "RFQ sent to suppliers"}
+    finally:
+        db.close()
+
+
+@router.post("/rfq/{rfq_id}/responses", dependencies=[Depends(require_permission("buying.create"))])
+def add_rfq_response(rfq_id: int, data: dict, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            INSERT INTO rfq_responses (rfq_id, supplier_id, supplier_name, unit_price, total_price, delivery_days, notes)
+            VALUES (:rid, :sid, :sname, :uprice, :total, :days, :notes)
+            RETURNING *
+        """), {
+            "rid": rfq_id, "sid": data["supplier_id"], "sname": data.get("supplier_name"),
+            "uprice": data.get("unit_price", 0), "total": data.get("total_price", 0),
+            "days": data.get("delivery_days"), "notes": data.get("notes"),
+        }).fetchone()
+        db.commit()
+        return dict(result._mapping)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/rfq/{rfq_id}/compare", dependencies=[Depends(require_permission("buying.view"))])
+def compare_rfq_responses(rfq_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        responses = db.execute(text("""
+            SELECT * FROM rfq_responses WHERE rfq_id = :rid ORDER BY total_price ASC
+        """), {"rid": rfq_id}).fetchall()
+        data = [dict(r._mapping) for r in responses]
+        best = data[0] if data else None
+        return {"responses": data, "recommended": best}
+    finally:
+        db.close()
+
+
+@router.post("/rfq/{rfq_id}/convert", dependencies=[Depends(require_permission("buying.create"))])
+def convert_rfq_to_po(rfq_id: int, data: dict, current_user=Depends(get_current_user)):
+    """Convert selected RFQ response to Purchase Order."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        response_id = data.get("response_id")
+        resp = db.execute(text("SELECT * FROM rfq_responses WHERE id = :id AND rfq_id = :rid"),
+                          {"id": response_id, "rid": rfq_id}).fetchone()
+        if not resp:
+            raise HTTPException(status_code=404, detail="Response not found")
+        db.execute(text("UPDATE rfq_responses SET is_selected = true WHERE id = :id"), {"id": response_id})
+        db.execute(text("UPDATE request_for_quotations SET status = 'converted', updated_at = NOW() WHERE id = :id"), {"id": rfq_id})
+        db.commit()
+        return {"message": "RFQ converted. Create PO from supplier.", "supplier_id": resp.supplier_id, "total_price": float(resp.total_price)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ---------- PUR-002: Supplier Ratings ----------
+
+@router.get("/supplier-ratings", dependencies=[Depends(require_permission("buying.view"))])
+def list_supplier_ratings(supplier_id: Optional[int] = None, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM supplier_ratings WHERE 1=1"
+        params = {}
+        if supplier_id:
+            q += " AND supplier_id = :sid"
+            params["sid"] = supplier_id
+        q += " ORDER BY rated_at DESC"
+        rows = db.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.get("/supplier-ratings/summary/{supplier_id}", dependencies=[Depends(require_permission("buying.view"))])
+def supplier_rating_summary(supplier_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text("""
+            SELECT supplier_id,
+                   COUNT(*) as total_ratings,
+                   ROUND(AVG(quality_score),1) as avg_quality,
+                   ROUND(AVG(delivery_score),1) as avg_delivery,
+                   ROUND(AVG(price_score),1) as avg_price,
+                   ROUND(AVG(service_score),1) as avg_service,
+                   ROUND(AVG(overall_score),1) as avg_overall
+            FROM supplier_ratings WHERE supplier_id = :sid
+            GROUP BY supplier_id
+        """), {"sid": supplier_id}).fetchone()
+        if not row:
+            return {"supplier_id": supplier_id, "total_ratings": 0, "avg_overall": 0}
+        return dict(row._mapping)
+    finally:
+        db.close()
+
+
+@router.post("/supplier-ratings", dependencies=[Depends(require_permission("buying.create"))])
+def rate_supplier(data: dict, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        q = float(data.get("quality_score", 0))
+        d = float(data.get("delivery_score", 0))
+        p = float(data.get("price_score", 0))
+        s = float(data.get("service_score", 0))
+        overall = round((q + d + p + s) / 4, 1)
+        result = db.execute(text("""
+            INSERT INTO supplier_ratings (supplier_id, po_id, quality_score, delivery_score,
+                price_score, service_score, overall_score, comments, rated_by)
+            VALUES (:sid, :po, :q, :d, :p, :s, :o, :comments, :uid)
+            RETURNING *
+        """), {
+            "sid": data["supplier_id"], "po": data.get("po_id"),
+            "q": q, "d": d, "p": p, "s": s, "o": overall,
+            "comments": data.get("comments"), "uid": current_user.id,
+        }).fetchone()
+        db.commit()
+        return dict(result._mapping)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ---------- PUR-003: Purchase Agreements (Blanket PO) ----------
+
+@router.get("/agreements", dependencies=[Depends(require_permission("buying.view"))])
+def list_agreements(status: Optional[str] = None, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM purchase_agreements WHERE 1=1"
+        params = {}
+        if status:
+            q += " AND status = :status"
+            params["status"] = status
+        q += " ORDER BY created_at DESC"
+        rows = db.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.get("/agreements/{agr_id}", dependencies=[Depends(require_permission("buying.view"))])
+def get_agreement(agr_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        agr = db.execute(text("SELECT * FROM purchase_agreements WHERE id = :id"), {"id": agr_id}).fetchone()
+        if not agr:
+            raise HTTPException(status_code=404, detail="Agreement not found")
+        lines = db.execute(text("SELECT * FROM purchase_agreement_lines WHERE agreement_id = :id"), {"id": agr_id}).fetchall()
+        return {"agreement": dict(agr._mapping), "lines": [dict(r._mapping) for r in lines]}
+    finally:
+        db.close()
+
+
+@router.post("/agreements", dependencies=[Depends(require_permission("buying.create"))])
+def create_agreement(data: dict, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import uuid
+        agr_num = f"PA-{uuid.uuid4().hex[:8].upper()}"
+        total = sum(float(l.get("unit_price", 0)) * float(l.get("quantity", 0)) for l in data.get("lines", []))
+        agr = db.execute(text("""
+            INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title,
+                start_date, end_date, total_amount, status, branch_id, created_by)
+            VALUES (:num, :sid, :type, :title, :start, :end, :total, 'draft', :branch, :uid)
+            RETURNING *
+        """), {
+            "num": agr_num, "sid": data["supplier_id"],
+            "type": data.get("agreement_type", "blanket"), "title": data.get("title"),
+            "start": data.get("start_date"), "end": data.get("end_date"),
+            "total": total, "branch": data.get("branch_id"), "uid": current_user.id,
+        }).fetchone()
+        for line in data.get("lines", []):
+            db.execute(text("""
+                INSERT INTO purchase_agreement_lines (agreement_id, product_id, product_name, quantity, unit_price)
+                VALUES (:aid, :pid, :pname, :qty, :price)
+            """), {"aid": agr.id, "pid": line.get("product_id"), "pname": line.get("product_name"),
+                   "qty": line.get("quantity", 0), "price": line.get("unit_price", 0)})
+        db.commit()
+        return dict(agr._mapping)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.put("/agreements/{agr_id}/activate", dependencies=[Depends(require_permission("buying.approve"))])
+def activate_agreement(agr_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("UPDATE purchase_agreements SET status = 'active' WHERE id = :id"), {"id": agr_id})
+        db.commit()
+        return {"message": "Agreement activated"}
+    finally:
+        db.close()
+
+
+@router.post("/agreements/{agr_id}/call-off", dependencies=[Depends(require_permission("buying.create"))])
+def create_call_off(agr_id: int, data: dict, current_user=Depends(get_current_user)):
+    """Create a call-off (partial order) against a blanket agreement."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        agr = db.execute(text("SELECT * FROM purchase_agreements WHERE id = :id AND status = 'active'"), {"id": agr_id}).fetchone()
+        if not agr:
+            raise HTTPException(status_code=404, detail="Active agreement not found")
+        amount = float(data.get("amount", 0))
+        if float(agr.consumed_amount) + amount > float(agr.total_amount):
+            raise HTTPException(status_code=400, detail="Call-off exceeds agreement total")
+        db.execute(text("UPDATE purchase_agreements SET consumed_amount = consumed_amount + :amt WHERE id = :id"),
+                   {"amt": amount, "id": agr_id})
+        db.commit()
+        return {"message": f"Call-off of {amount} created", "remaining": float(agr.total_amount) - float(agr.consumed_amount) - amount}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

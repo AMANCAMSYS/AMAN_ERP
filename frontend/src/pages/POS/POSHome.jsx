@@ -1,0 +1,259 @@
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../../utils/api';
+import { useTranslation } from 'react-i18next';
+import { useToast } from '../../context/ToastContext';
+import { Layout, Store, Calculator, Info, ArrowLeft, Play, Wallet } from 'lucide-react';
+
+const POSHome = () => {
+    const { t, i18n } = useTranslation();
+    const { showToast } = useToast();
+    const navigate = useNavigate();
+    const isRTL = i18n.dir() === 'rtl';
+
+    const [loading, setLoading] = useState(true);
+    const [openingBalance, setOpeningBalance] = useState('');
+    const [warehouses, setWarehouses] = useState([]);
+    const [selectedWarehouse, setSelectedWarehouse] = useState('');
+    const [treasuryAccounts, setTreasuryAccounts] = useState([]);
+    const [selectedTreasury, setSelectedTreasury] = useState('');
+    const [notes, setNotes] = useState('');
+
+    useEffect(() => {
+        const init = async () => {
+            await checkActiveSession();
+            await fetchWarehouses();
+            await fetchTreasuryAccounts();
+        };
+        init();
+    }, []);
+
+    const checkActiveSession = async () => {
+        try {
+            const response = await api.get('/pos/sessions/active');
+            if (response.data) {
+                navigate('/pos/interface');
+            } else {
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error("Error checking session:", error);
+            setLoading(false);
+        }
+    };
+
+    const fetchWarehouses = async () => {
+        try {
+            // Use POS-specific endpoint that doesn't require stock.view permission
+            const response = await api.get('/pos/warehouses');
+            setWarehouses(response.data);
+            if (response.data.length > 0) setSelectedWarehouse(response.data[0].id);
+        } catch (error) {
+            console.error("Error fetching warehouses", error);
+        }
+    }
+
+    const fetchTreasuryAccounts = async () => {
+        try {
+            const response = await api.get('/treasury/accounts');
+            // Filter only Cash/Bank accounts if needed, but for now show all active
+            const activeAccounts = response.data.filter(acc => acc.is_active);
+            setTreasuryAccounts(activeAccounts);
+            if (activeAccounts.length > 0) setSelectedTreasury(activeAccounts[0].id);
+        } catch (error) {
+            console.error("Error fetching treasury accounts", error);
+        }
+    }
+
+    const handleOpenSession = async (e) => {
+        e.preventDefault();
+        if (!openingBalance || !selectedWarehouse || !selectedTreasury) {
+            showToast(t('pos.fill_required'), 'error');
+            return;
+        }
+
+        try {
+            await api.post('/pos/sessions/open', {
+                opening_balance: parseFloat(openingBalance),
+                warehouse_id: parseInt(selectedWarehouse),
+                treasury_account_id: parseInt(selectedTreasury),
+                notes: notes
+            });
+
+            showToast(t('pos.session_opened'), 'success');
+            navigate('/pos/interface');
+        } catch (error) {
+            showToast(error.response?.data?.detail || t('common.error_occurred'), 'error');
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="workspace flex items-center justify-center fade-in">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-slate-500">{t('common.loading')}...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title flex items-center gap-2">
+                            <span className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                                <Layout size={24} />
+                            </span>
+                            {t('pos.title')}
+                        </h1>
+                        <p className="workspace-subtitle">
+                            {t('pos.open_new_session')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex justify-center mt-10">
+                <div className="card shadow-lg max-w-2xl w-full p-10" style={{ borderRadius: '2rem' }}>
+                    <div className="flex items-center gap-4 mb-8">
+                        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl">
+                            <Store />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-slate-800">{t('pos.open_session')}</h2>
+                            <p className="text-slate-500">{t('pos.open_new_session')}</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleOpenSession} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="form-group">
+                                <label className="form-label flex items-center gap-2">
+                                    <Store size={16} className="text-slate-400" />
+                                    {t('pos.warehouse')}
+                                </label>
+                                <select
+                                    value={selectedWarehouse}
+                                    onChange={(e) => setSelectedWarehouse(e.target.value)}
+                                    className="form-input"
+                                    required
+                                >
+                                    <option value="">{t('common.select')}</option>
+                                    {warehouses.map(wh => (
+                                        <option key={wh.id} value={wh.id}>{wh.name || wh.warehouse_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label flex items-center gap-2">
+                                    <Calculator size={16} className="text-slate-400" />
+                                    {t('pos.opening_balance')}
+                                </label>
+                                <input
+                                    type="number"
+                                    value={openingBalance}
+                                    onChange={(e) => setOpeningBalance(e.target.value)}
+                                    className="form-input text-lg font-bold"
+                                    placeholder="0.00"
+                                    min="0"
+                                    step="0.01"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label flex items-center gap-2">
+                                <Wallet size={16} className="text-slate-400" />
+                                {t('pos.treasury_account') || "حساب الخزينة"}
+                            </label>
+                            <select
+                                value={selectedTreasury}
+                                onChange={(e) => setSelectedTreasury(e.target.value)}
+                                className="form-input"
+                                required
+                            >
+                                <option value="">{t('common.select')}</option>
+                                {treasuryAccounts.map(acc => (
+                                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label flex items-center gap-2">
+                                <Info size={16} className="text-slate-400" />
+                                {t('common.notes')}
+                            </label>
+                            <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                className="form-input no-padding"
+                                style={{ paddingTop: '12px' }}
+                                rows="3"
+                                placeholder={t('common.notes_placeholder') || "..."}
+                            />
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                            <button
+                                type="submit"
+                                className="btn btn-primary flex-1 py-4 text-lg"
+                                style={{ borderRadius: '1rem' }}
+                            >
+                                <Play size={20} fill="currentColor" />
+                                {t('pos.open_session')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/dashboard')}
+                                className="btn btn-secondary py-4 px-8 text-lg"
+                                style={{ borderRadius: '1rem' }}
+                            >
+                                <ArrowLeft size={20} className={isRTL ? "rotate-180" : ""} />
+                                {t('common.back')}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {/* POS Features */}
+            <div className="modules-grid" style={{ maxWidth: '800px', margin: '2rem auto' }}>
+                <div className="card section-card">
+                    <h3 className="section-title">{isRTL ? 'ميزات نقاط البيع' : 'POS Features'}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/pos/promotions')}>
+                            <span className="link-icon">🎁</span>
+                            {isRTL ? 'العروض والخصومات' : 'Promotions & Discounts'}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/pos/loyalty')}>
+                            <span className="link-icon">⭐</span>
+                            {isRTL ? 'برامج الولاء' : 'Loyalty Programs'}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/pos/tables')}>
+                            <span className="link-icon">🪑</span>
+                            {isRTL ? 'إدارة الطاولات' : 'Table Management'}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/pos/kitchen')}>
+                            <span className="link-icon">👨‍🍳</span>
+                            {isRTL ? 'شاشة المطبخ' : 'Kitchen Display'}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default POSHome;
+

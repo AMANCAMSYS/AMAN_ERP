@@ -1,0 +1,284 @@
+import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { salesAPI, inventoryAPI, contractsAPI } from '../../utils/api'
+import { getCurrency } from '../../utils/auth'
+import { formatNumber, getStep } from '../../utils/format'
+import { useTranslation } from 'react-i18next'
+import CustomDatePicker from '../../components/common/CustomDatePicker'
+import { useBranch } from '../../context/BranchContext'
+
+function ContractForm() {
+    const { t } = useTranslation()
+    const navigate = useNavigate()
+    const { id } = useParams()
+    const currency = getCurrency()
+    const [loading, setLoading] = useState(false)
+    const [customers, setCustomers] = useState([])
+    const [products, setProducts] = useState([])
+    const { currentBranch } = useBranch()
+    const [error, setError] = useState(null)
+
+    const [formData, setFormData] = useState({
+        contract_number: `CON-${Date.now().toString().slice(-6)}`,
+        party_id: '',
+        contract_type: 'subscription',
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: '',
+        billing_interval: 'monthly',
+        total_amount: 0,
+        currency: currency || '',
+        notes: ''
+    })
+
+    const [items, setItems] = useState([
+        { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15 }
+    ])
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [custRes, prodRes] = await Promise.all([
+                    salesAPI.listCustomers({ branch_id: currentBranch?.id }),
+                    inventoryAPI.listProducts({ branch_id: currentBranch?.id })
+                ])
+                setCustomers(custRes.data)
+                setProducts(prodRes.data)
+
+                if (id) {
+                    setLoading(true)
+                    const res = await contractsAPI.getContract(id)
+                    const c = res.data
+                    setFormData({
+                        ...c,
+                        party_id: c.party_id.toString()
+                    })
+                    setItems(c.items.map(item => ({
+                        ...item,
+                        product_id: item.product_id.toString()
+                    })))
+                    setLoading(false)
+                }
+            } catch (err) {
+                console.error("Failed to load data", err)
+            }
+        }
+        fetchData()
+    }, [id, currentBranch])
+
+    const handleItemChange = (index, field, value) => {
+        const newItems = items.map((item, i) => {
+            if (i === index) {
+                const updatedItem = { ...item, [field]: value }
+                if (field === 'product_id') {
+                    const product = products.find(p => p.id === parseInt(value))
+                    if (product) {
+                        updatedItem.description = product.item_name
+                        updatedItem.unit_price = product.selling_price
+                        updatedItem.tax_rate = product.tax_rate || 15
+                    }
+                }
+                return updatedItem
+            }
+            return item
+        })
+        setItems(newItems)
+    }
+
+    const addItem = () => setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15 }])
+    const removeItem = (index) => setItems(items.filter((_, i) => i !== index))
+
+    const getTotals = () => {
+        let subtotal = 0
+        let tax = 0
+        items.forEach(item => {
+            const lineSub = item.quantity * item.unit_price
+            subtotal += lineSub
+            tax += lineSub * (item.tax_rate / 100)
+        })
+        return { subtotal, tax, total: subtotal + tax }
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        if (!formData.party_id) return setError(t("sales.contracts.form.select_customer_error"))
+        setLoading(true)
+        try {
+            const totals = getTotals()
+            const payload = {
+                ...formData,
+                party_id: parseInt(formData.party_id),
+                total_amount: totals.total,
+                items: items.map(item => ({
+                    ...item,
+                    product_id: parseInt(item.product_id),
+                    quantity: parseFloat(item.quantity),
+                    unit_price: parseFloat(item.unit_price),
+                    tax_rate: parseFloat(item.tax_rate)
+                }))
+            }
+            if (id) {
+                await contractsAPI.updateContract(id, payload)
+            } else {
+                await contractsAPI.createContract(payload)
+            }
+            navigate('/sales/contracts')
+        } catch (err) {
+            setError(err.response?.data?.detail || t("sales.contracts.form.save_error"))
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading && id) return <div className="page-center"><span className="loading"></span></div>
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <h1 className="workspace-title">{id ? t("sales.contracts.form.edit") : t("sales.contracts.form.create")}</h1>
+            </div>
+
+            {error && <div className="alert alert-error mb-4">{error}</div>}
+
+            <form onSubmit={handleSubmit}>
+                <div className="card mb-4">
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label className="form-label">{t("sales.contracts.form.contract_number")}</label>
+                            <input type="text" className="form-input" value={formData.contract_number} readOnly />
+                        </div>
+                        <div className="form-group" style={{ flex: 2 }}>
+                            <label className="form-label">{t("sales.contracts.form.customer")} *</label>
+                            <select
+                                className="form-input"
+                                value={formData.party_id}
+                                onChange={e => setFormData({ ...formData, party_id: e.target.value })}
+                                required
+                            >
+                                <option value="">{t("sales.contracts.form.select_customer")}</option>
+                                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t("sales.contracts.form.contract_type")}</label>
+                            <select
+                                className="form-input"
+                                value={formData.contract_type}
+                                onChange={e => setFormData({ ...formData, contract_type: e.target.value })}
+                            >
+                                <option value="subscription">{t("sales.contracts.type_subscription")}</option>
+                                <option value="fixed">{t("sales.contracts.type_fixed")}</option>
+                                <option value="recurring">{t("sales.contracts.type_recurring")}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="form-row mt-3">
+                        <div className="form-group">
+                            <CustomDatePicker
+                                label={t("sales.contracts.form.start_date")}
+                                selected={formData.start_date}
+                                onChange={d => setFormData({ ...formData, start_date: d })}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <CustomDatePicker
+                                label={t("sales.contracts.form.end_date")}
+                                selected={formData.end_date}
+                                onChange={d => setFormData({ ...formData, end_date: d })}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t("sales.contracts.form.billing_interval")}</label>
+                            <select
+                                className="form-input"
+                                value={formData.billing_interval}
+                                onChange={e => setFormData({ ...formData, billing_interval: e.target.value })}
+                            >
+                                <option value="monthly">{t("sales.contracts.form.monthly")}</option>
+                                <option value="quarterly">{t("sales.contracts.form.quarterly")}</option>
+                                <option value="yearly">{t("sales.contracts.form.yearly")}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="card mb-4">
+                    <h3 className="section-title">{t("sales.contracts.form.items")}</h3>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '40%' }}>{t("sales.contracts.form.product_service")}</th>
+                                <th>{t("sales.contracts.form.quantity")}</th>
+                                <th>{t("sales.contracts.form.price")}</th>
+                                <th>{t("sales.contracts.form.tax_percent")}</th>
+                                <th>{t("sales.contracts.form.total")}</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {items.map((item, index) => {
+                                const lineTotal = item.quantity * item.unit_price * (1 + item.tax_rate / 100)
+                                return (
+                                    <tr key={index}>
+                                        <td>
+                                            <select
+                                                className="form-input"
+                                                value={item.product_id}
+                                                onChange={e => handleItemChange(index, 'product_id', e.target.value)}
+                                            >
+                                                <option value="">{t("sales.contracts.form.select_product")}</option>
+                                                {products.map(p => <option key={p.id} value={p.id}>{p.item_name}</option>)}
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" className="form-input" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)} />
+                                        </td>
+                                        <td>
+                                            <input type="number" className="form-input" value={item.unit_price} onChange={e => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)} />
+                                        </td>
+                                        <td>
+                                            <input type="number" className="form-input" value={item.tax_rate} onChange={e => handleItemChange(index, 'tax_rate', parseFloat(e.target.value) || 0)} />
+                                        </td>
+                                        <td style={{ fontWeight: 'bold' }}>{formatNumber(lineTotal)}</td>
+                                        <td>
+                                            <button type="button" className="btn-icon text-danger" onClick={() => removeItem(index)}>🗑️</button>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                    <button type="button" className="btn btn-secondary mt-3" onClick={addItem}>{t("sales.contracts.form.add_item")}</button>
+                </div>
+
+                <div className="card mb-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                            <label className="form-label">{t("sales.contracts.form.notes")}</label>
+                            <textarea className="form-input" rows="3" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })}></textarea>
+                        </div>
+                        <div style={{ width: '300px', marginLeft: '32px', textAlign: 'left' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span>{t("sales.contracts.form.subtotal")}:</span>
+                                <span>{formatNumber(getTotals().subtotal)} {formData.currency}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span>{t("sales.contracts.form.tax")}:</span>
+                                <span>{formatNumber(getTotals().tax)} {formData.currency}</span>
+                            </div>
+                            <div style={{ borderTop: '1px solid #ddd', margin: '8px 0' }}></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                                <span>{t("sales.contracts.form.grand_total")}:</span>
+                                <span>{formatNumber(getTotals().total)} {formData.currency}</span>
+                            </div>
+                            <button type="submit" className="btn btn-primary mt-4 w-full" disabled={loading}>
+                                {loading ? t("common.saving") : t("sales.contracts.form.save")}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    )
+}
+
+export default ContractForm

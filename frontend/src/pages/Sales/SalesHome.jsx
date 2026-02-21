@@ -1,0 +1,179 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { salesAPI } from '../../utils/api'
+import { getCurrency, hasPermission } from '../../utils/auth'
+import { useBranch } from '../../context/BranchContext'
+import { useTranslation } from 'react-i18next'
+import '../../components/ModuleStyles.css'
+import { formatNumber } from '../../utils/format'
+
+function SalesHome() {
+    const { t, i18n } = useTranslation()
+    const navigate = useNavigate()
+    const [stats, setStats] = useState({ customer_count: 0, total_receivables: 0, monthly_sales: 0, unpaid_count: 0 })
+    const [loading, setLoading] = useState(true)
+    const currency = getCurrency()
+    const { currentBranch } = useBranch()
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!hasPermission('sales.reports')) {
+                setLoading(false);
+                return;
+            }
+            try {
+                setLoading(true)
+                const params = {}
+                if (currentBranch?.id) params.branch_id = currentBranch.id
+
+                const response = await salesAPI.getSummary(params)
+                setStats(response.data)
+            } catch (err) {
+                console.error("Failed to fetch sales stats", err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchStats()
+    }, [currentBranch])
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <h1 className="workspace-title">{t('sales.title')}</h1>
+                <p className="workspace-subtitle">{t('sales.subtitle')}</p>
+            </div>
+
+            {/* Metrics Section */}
+            <div className="metrics-grid">
+                <div className="metric-card">
+                    <div className="metric-label">{t('sales.metrics.monthly_sales')}</div>
+                    <div className="metric-value text-primary">
+                        {!hasPermission('sales.reports') ? '***' : (loading ? '...' : formatNumber(stats.monthly_sales))} {hasPermission('sales.reports') && <small>{currency}</small>}
+                    </div>
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('sales.metrics.receivables')}</div>
+                    <div className="metric-value text-warning">
+                        {!hasPermission('sales.reports') ? '***' : (loading ? '...' : formatNumber(stats.total_receivables))} {hasPermission('sales.reports') && <small>{currency}</small>}
+                    </div>
+                    {hasPermission('sales.reports') && (
+                        <div className="metric-change">
+                            {loading ? '' : `${stats.unpaid_count} ${t('sales.metrics.invoices_count')}`}
+                        </div>
+                    )}
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('sales.metrics.total_customers')}</div>
+                    <div className="metric-value text-secondary">
+                        {!hasPermission('sales.reports') ? '***' : (loading ? '...' : stats.customer_count)}
+                    </div>
+                </div>
+            </div>
+
+            {/* Module Sections */}
+            <div className="modules-grid">
+                {/* Masters Section */}
+                <div className="card section-card">
+                    <h3 className="section-title">{t('sales.sections.masters')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/sales/customers')}>
+                            <span className="link-icon">👥</span>
+                            {t('sales.menu.customers')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/customer-groups')}>
+                            <span className="link-icon">📁</span>
+                            {t('sales.menu.customer_groups')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/price-lists')}>
+                            <span className="link-icon">🏷️</span>
+                            {t('sales.menu.price_lists')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Transactions Section */}
+                <div className="card section-card">
+                    <h3 className="section-title">{t('sales.sections.transactions')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/sales/invoices')}>
+                            <span className="link-icon">🧾</span>
+                            {t('sales.menu.invoices')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/orders')}>
+                            <span className="link-icon">📦</span>
+                            {t('sales.menu.orders')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/quotations')}>
+                            <span className="link-icon">💬</span>
+                            {t('sales.menu.quotations')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/returns')}>
+                            <span className="link-icon">🔄</span>
+                            {t('sales.menu.returns')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/receipts')}>
+                            <span className="link-icon">💰</span>
+                            {t('sales.menu.vouchers')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/contracts')}>
+                            <span className="link-icon">📄</span>
+                            {t('sales.menu.contracts') || 'العقود والاشتراكات'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/credit-notes')}>
+                            <span className="link-icon">📋</span>
+                            {t('sales.menu.credit_notes') || 'إشعارات دائنة'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/debit-notes')}>
+                            <span className="link-icon">📝</span>
+                            {t('sales.menu.debit_notes') || 'إشعارات مدينة'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/sales/commissions')}>
+                            <span className="link-icon">💵</span>
+                            {i18n.language === 'ar' ? 'العمولات' : 'Commissions'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Reports Section */}
+                {/* Reports Section */}
+                {hasPermission('sales.reports') && (
+                    <div className="card section-card">
+                        <h3 className="section-title">{t('sales.sections.reports')}</h3>
+                        <div className="links-list">
+                            <div className="link-item" onClick={() => navigate('/sales/reports/analytics')}>
+                                <span className="link-icon">📊</span>
+                                {t('sales.menu.analytics_report')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/sales/reports/customer-statement')}>
+                                <span className="link-icon">📜</span>
+                                {t('sales.menu.statement_report')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/sales/reports/aging')}>
+                                <span className="link-icon">⏳</span>
+                                {t('sales.menu.aging_report')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+export default SalesHome

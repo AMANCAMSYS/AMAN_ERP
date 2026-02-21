@@ -1,0 +1,227 @@
+"""Sales orders endpoints."""
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import datetime
+import logging
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.audit import log_activity
+from utils.permissions import require_permission
+from .schemas import SOCreate
+
+orders_router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+@orders_router.get("/orders", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
+def list_sales_orders(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
+    """عرض قائمة أوامر البيع"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query_str = """
+            SELECT so.*, p.name as customer_name 
+            FROM sales_orders so
+            JOIN parties p ON so.party_id = p.id
+            WHERE 1=1
+        """
+        params = {}
+        if branch_id:
+            query_str += " AND so.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+
+        query_str += " ORDER BY so.created_at DESC"
+
+        result = db.execute(text(query_str), params).fetchall()
+        return [dict(row._mapping) for row in result]
+    finally:
+        db.close()
+
+
+@orders_router.get("/orders/{order_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
+def get_sales_order(order_id: int, current_user: dict = Depends(get_current_user)):
+    """جلب تفاصيل أمر البيع"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Header
+        query = """
+            SELECT so.*, so.party_id as customer_id, p.name as customer_name, p.party_code as customer_code
+            FROM sales_orders so
+            JOIN parties p ON so.party_id = p.id
+            WHERE so.id = :id
+        """
+        header_row = db.execute(text(query), {"id": order_id}).fetchone()
+        if not header_row:
+            raise HTTPException(status_code=404, detail="أمر البيع غير موجود")
+
+        # Lines
+        lines_query = """
+            SELECT sol.*, p.product_name, u.unit_name as unit
+            FROM sales_order_lines sol
+            LEFT JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_units u ON p.unit_id = u.id
+            WHERE sol.so_id = :id
+        """
+        lines_result = db.execute(text(lines_query), {"id": order_id}).fetchall()
+
+        return {
+            **dict(header_row._mapping),
+            "items": [dict(r._mapping) for r in lines_result]
+        }
+    finally:
+        db.close()
+
+
+@orders_router.post("/orders", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
+def create_sales_order(request: Request, data: SOCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء أمر بيع جديد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # 0. Validate quotation if provided
+        if data.quotation_id:
+            quot = db.execute(text("SELECT id, status FROM quotations WHERE id = :qid"), {"qid": data.quotation_id}).fetchone()
+            if not quot:
+                raise HTTPException(status_code=404, detail="عرض السعر غير موجود")
+            if quot.status in ('expired', 'converted', 'cancelled'):
+                raise HTTPException(status_code=400, detail=f"عرض السعر لا يمكن تحويله (الحالة: {quot.status})")
+
+        # 1. Generate Sequential SO Number
+        from utils.accounting import generate_sequential_number
+        so_num = generate_sequential_number(db, f"SO-{datetime.now().year}", "sales_orders", "so_number")
+
+        # 2. Calculate Totals
+        subtotal = 0
+        total_tax = 0
+        total_discount = 0
+        items_to_save = []
+
+        for item in data.items:
+            line_subtotal = float(item.quantity) * float(item.unit_price)
+            taxable = line_subtotal - float(item.discount)
+            line_tax = taxable * (float(item.tax_rate) / 100)
+            line_total = taxable + line_tax
+
+            subtotal += line_subtotal
+            total_tax += line_tax
+            total_discount += item.discount
+
+            items_to_save.append({
+                **item.model_dump(),
+                "total": line_total
+            })
+
+        grand_total = subtotal - total_discount + total_tax
+
+        # 3. Save Header
+        res = db.execute(text("""
+            INSERT INTO sales_orders (
+                so_number, party_id, order_date, expected_delivery_date,
+                subtotal, tax_amount, discount, total, status, notes, created_by, branch_id,
+                warehouse_id, quotation_id,
+                currency, exchange_rate
+            ) VALUES (
+                :num, :cust, :odate, :edate,
+                :sub, :tax, :disc, :total, 'draft', :notes, :user, :bid,
+                :whid, :qid,
+                :currency, :exchange_rate
+            ) RETURNING id
+        """), {
+            "num": so_num, "cust": data.customer_id, "odate": data.order_date,
+            "edate": data.expected_delivery_date, "sub": subtotal, "tax": total_tax,
+            "disc": total_discount, "total": grand_total, "notes": data.notes, "user": current_user.id,
+            "bid": data.branch_id, "whid": data.warehouse_id, "qid": data.quotation_id,
+            "currency": data.currency, "exchange_rate": data.exchange_rate
+        }).fetchone()
+
+        so_id = res[0]
+
+        # 4. Save Lines
+        for line in items_to_save:
+            db.execute(text("""
+                INSERT INTO sales_order_lines (
+                    so_id, product_id, description, quantity, unit_price, tax_rate, discount, total
+                ) VALUES (
+                    :so_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                )
+            """), {
+                "so_id": so_id, "pid": line["product_id"], "desc": line["description"],
+                "qty": line["quantity"], "price": line["unit_price"], "tax_rate": line["tax_rate"],
+                "disc": line["discount"], "total": line["total"]
+            })
+
+            # 5. Inventory Reservation
+            if data.warehouse_id:
+                # Check/Create inventory record
+                inv = db.execute(text("""
+                    SELECT id, quantity, reserved_quantity FROM inventory 
+                    WHERE product_id = :pid AND warehouse_id = :wid
+                """), {"pid": line["product_id"], "wid": data.warehouse_id}).fetchone()
+
+                if not inv:
+                    # Create new inventory record if not exists
+                    inv_id = db.execute(text("""
+                        INSERT INTO inventory (product_id, warehouse_id, quantity, reserved_quantity, available_quantity)
+                        VALUES (:pid, :wid, 0, 0, 0) RETURNING id
+                    """), {"pid": line["product_id"], "wid": data.warehouse_id}).scalar()
+                    current_qty = 0
+                    current_reserved = 0
+                else:
+                    inv_id = inv.id
+                    current_qty = float(inv.quantity)
+                    current_reserved = float(inv.reserved_quantity)
+
+                new_reserved = current_reserved + float(line["quantity"])
+                new_available = current_qty - new_reserved
+
+                db.execute(text("""
+                    UPDATE inventory 
+                    SET reserved_quantity = :reserved, available_quantity = :available, last_costing_update = NOW()
+                    WHERE id = :id
+                """), {"reserved": new_reserved, "available": new_available, "id": inv_id})
+
+                # Log Transaction
+                db.execute(text("""
+                    INSERT INTO inventory_transactions (
+                        product_id, warehouse_id, transaction_type, reference_type, 
+                        reference_id, reference_document, quantity, notes, created_by
+                    ) VALUES (
+                        :pid, :wid, 'reservation', 'sales_order', 
+                        :ref_id, :ref_doc, :qty, :notes, :user
+                    )
+                """), {
+                    "pid": line["product_id"],
+                    "wid": data.warehouse_id,
+                    "ref_id": so_id,
+                    "ref_doc": so_num,
+                    "qty": float(line["quantity"]),
+                    "notes": "Reservation for Sales Order",
+                    "user": current_user.id
+                })
+
+        # Update quotation status to 'converted' if applicable
+        if data.quotation_id:
+            db.execute(text("UPDATE quotations SET status = 'converted' WHERE id = :qid"), {"qid": data.quotation_id})
+
+        db.commit()
+
+        cust_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": data.customer_id}).scalar()
+        # AUDIT LOG
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="sales.order.create",
+            resource_type="sales_order",
+            resource_id=str(so_id),
+            details={"so_number": so_num, "total": grand_total, "customer_id": data.customer_id, "customer_name": cust_name},
+            request=request,
+            branch_id=data.branch_id
+        )
+        return {"id": so_id, "so_number": so_num}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating Sales Order: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

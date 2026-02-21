@@ -1,0 +1,133 @@
+"""
+Inventory Module - Shared Pydantic Schemas
+"""
+
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+
+
+# --- Product Schemas ---
+class ProductCreate(BaseModel):
+    item_code: str
+    item_name: str
+    item_name_en: Optional[str] = None
+    item_type: str = 'product'  # product, service, consumable
+    unit: str = 'قطعة'
+    selling_price: float = 0.0
+    buying_price: float = 0.0  # Represents WAC (Weighted Average Cost)
+    last_buying_price: float = 0.0  # Represents Last Purchase Price
+    tax_rate: float = 15.0
+    description: Optional[str] = None
+    category_id: Optional[int] = None
+    is_active: bool = True
+    has_batch_tracking: bool = False
+    has_serial_tracking: bool = False
+    has_expiry_tracking: bool = False
+    shelf_life_days: int = 0
+    expiry_alert_days: int = 30
+
+
+class ProductResponse(ProductCreate):
+    id: int
+    category_name: Optional[str] = None
+    current_stock: float
+    reserved_quantity: float = 0
+    has_batch_tracking: bool = False
+    has_serial_tracking: bool = False
+    has_expiry_tracking: bool = False
+    shelf_life_days: int = 0
+    expiry_alert_days: int = 30
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Supplier Schemas ---
+class SupplierCreate(BaseModel):
+    name: str
+    name_en: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    tax_number: Optional[str] = None
+    branch_id: Optional[int] = None
+    currency: Optional[str] = "SYP"
+
+
+class SupplierResponse(SupplierCreate):
+    id: int
+    current_balance: float
+    is_active: bool
+    currency: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Stock Transfer Schemas ---
+class StockTransferSingleCreate(BaseModel):
+    """Single-item transfer (with GL + WAC costing)"""
+    product_id: int
+    source_warehouse_id: int
+    destination_warehouse_id: int
+    quantity: float
+    notes: Optional[str] = None
+
+
+class StockTransferItem(BaseModel):
+    product_id: int
+    quantity: float
+
+
+class StockTransferCreate(BaseModel):
+    """Multi-item transfer"""
+    source_warehouse_id: int
+    destination_warehouse_id: int
+    items: List[StockTransferItem]
+    notes: Optional[str] = None
+
+
+class StockMovementCreate(BaseModel):
+    warehouse_id: int
+    items: List[StockTransferItem]
+    notes: Optional[str] = None
+    date: Optional[str] = None
+    reference: Optional[str] = None
+
+
+# --- Price List Schemas ---
+class PriceListCreate(BaseModel):
+    name: str
+    currency: str
+    is_active: bool = True
+    is_default: bool = False
+
+
+class PriceListItemUpdate(BaseModel):
+    product_id: int
+    price: float
+
+
+# --- Shipment Schemas ---
+class ShipmentItemCreate(BaseModel):
+    product_id: int
+    quantity: float
+
+
+class ShipmentCreate(BaseModel):
+    source_warehouse_id: int
+    destination_warehouse_id: int
+    items: List[ShipmentItemCreate]
+    notes: Optional[str] = None
+
+
+# --- Stock Adjustment Schemas ---
+class StockAdjustmentCreate(BaseModel):
+    warehouse_id: int
+    product_id: int
+    new_quantity: float
+    reason: Optional[str] = "Physical Count"
+    notes: Optional[str] = None

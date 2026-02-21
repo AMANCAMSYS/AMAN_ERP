@@ -1,0 +1,249 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { purchasesAPI, inventoryAPI } from '../../utils/api';
+import { getCurrency } from '../../utils/auth';
+import { useBranch } from '../../context/BranchContext';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '../../utils/format';
+import '../../components/ModuleStyles.css';
+import { toastEmitter } from '../../utils/toastEmitter';
+
+function PurchaseOrderReceive() {
+    const { t } = useTranslation();
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const { currentBranch } = useBranch();
+    const [order, setOrder] = useState(null);
+    const [warehouses, setWarehouses] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [selectedWarehouse, setSelectedWarehouse] = useState('');
+    const [receiveQtys, setReceiveQtys] = useState({});
+    const currency = getCurrency();
+
+    useEffect(() => {
+        fetchData();
+    }, [id]);
+
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const orderRes = await purchasesAPI.getOrder(id);
+            setOrder(orderRes.data);
+
+            // Use the PO branch, or fallback to the current context branch
+            const branchId = orderRes.data.branch_id || currentBranch?.id;
+            console.log("Filtering warehouses for branch:", branchId);
+
+            const warehousesRes = await inventoryAPI.listWarehouses({ branch_id: branchId });
+            setWarehouses(warehousesRes.data || []);
+
+            // Initialize receive quantities
+            const initialQtys = {};
+            orderRes.data.items?.forEach(item => {
+                const remaining = item.quantity - (item.received_quantity || 0);
+                initialQtys[item.id] = remaining > 0 ? remaining : 0;
+            });
+            setReceiveQtys(initialQtys);
+        } catch (err) {
+            console.error("Failed to fetch data", err);
+            toastEmitter.emit(t('common.error_occurred'), 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleQtyChange = (itemId, value) => {
+        // Allow empty string for easier typing
+        if (value === '') {
+            setReceiveQtys(prev => ({ ...prev, [itemId]: '' }));
+            return;
+        }
+
+        const val = parseFloat(value);
+        if (!isNaN(val)) {
+            setReceiveQtys(prev => ({
+                ...prev,
+                [itemId]: val
+            }));
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!selectedWarehouse) {
+            toastEmitter.emit(t('buying.receive.select_warehouse'), 'error');
+            return;
+        }
+
+        const itemsToReceive = [];
+        for (const [lineId, qty] of Object.entries(receiveQtys)) {
+            const numericQty = parseFloat(qty);
+            if (!isNaN(numericQty) && numericQty > 0) {
+                const item = order.items?.find(i => i.id === parseInt(lineId));
+                const remaining = item ? (item.quantity - (item.received_quantity || 0)) : 0;
+
+                if (numericQty > remaining + 0.0001) { // small epsilon for floats
+                    toastEmitter.emit(`${t('common.error')}: ${t('buying.receive.qty_to_receive')} (${numericQty}) > ${t('buying.orders.item.qty_remaining')} (${remaining}) - ${item?.product_name}`, 'error');
+                    return;
+                }
+
+                itemsToReceive.push({
+                    line_id: parseInt(lineId),
+                    received_quantity: numericQty
+                });
+            }
+        }
+
+        if (itemsToReceive.length === 0) {
+            toastEmitter.emit(t('buying.receive.no_items'), 'error');
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+            await purchasesAPI.receiveOrder(id, {
+                items: itemsToReceive,
+                warehouse_id: parseInt(selectedWarehouse)
+            });
+            navigate(`/buying/orders/${id}`);
+        } catch (err) {
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleReceiveAll = () => {
+        const allQtys = {};
+        order.items?.forEach(item => {
+            const remaining = item.quantity - (item.received_quantity || 0);
+            allQtys[item.id] = remaining > 0 ? remaining : 0;
+        });
+        setReceiveQtys(allQtys);
+    };
+
+    if (loading) {
+        return <div className="workspace fade-in p-8 text-center">{t('common.loading')}...</div>;
+    }
+
+    if (!order) {
+        return <div className="workspace fade-in p-8 text-center">{t('buying.orders.not_found')}</div>;
+    }
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div>
+                    <h1 className="workspace-title">📥 {t('buying.receive.title')}</h1>
+                    <p className="workspace-subtitle">{order.po_number} - {order.supplier_name}</p>
+                </div>
+                <div className="header-actions">
+                    <button className="btn btn-secondary" onClick={() => navigate(`/buying/orders/${id}`)}>
+                        {t('common.cancel')}
+                    </button>
+                </div>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+                {/* Warehouse Selection */}
+                <div className="card mb-4">
+                    <div className="form-group">
+                        <label className="form-label">{t('buying.receive.warehouse')} *</label>
+                        <select
+                            className="form-select"
+                            value={selectedWarehouse}
+                            onChange={(e) => setSelectedWarehouse(e.target.value)}
+                            required
+                            style={{ color: '#1e293b', backgroundColor: '#ffffff' }}
+                        >
+                            <option value="" style={{ color: '#1e293b' }}>{t('buying.receive.select_warehouse')}</option>
+                            {warehouses.map(wh => (
+                                <option key={wh.id} value={wh.id} style={{ color: '#1e293b' }}>
+                                    {wh.name || wh.warehouse_name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {/* Items to Receive */}
+                <div className="card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3>{t('buying.receive.items')}</h3>
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={handleReceiveAll}>
+                            {t('buying.receive.receive_all')}
+                        </button>
+                    </div>
+
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>{t('buying.orders.item.product')}</th>
+                                <th style={{ textAlign: 'center' }}>{t('buying.orders.item.qty_ordered')}</th>
+                                <th style={{ textAlign: 'center' }}>{t('buying.orders.item.qty_received')}</th>
+                                <th style={{ textAlign: 'center' }}>{t('buying.orders.item.qty_remaining')}</th>
+                                <th style={{ textAlign: 'center', width: '150px' }}>{t('buying.receive.qty_to_receive')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {order.items?.map((item) => {
+                                const received = item.received_quantity || 0;
+                                const remaining = item.quantity - received;
+                                const receiveQty = receiveQtys[item.id] || 0;
+
+                                return (
+                                    <tr key={item.id}>
+                                        <td>
+                                            <div style={{ fontWeight: '500' }}>{item.product_name || item.description}</div>
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>{item.quantity}</td>
+                                        <td style={{ textAlign: 'center', color: received > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                                            {received}
+                                        </td>
+                                        <td style={{ textAlign: 'center', color: remaining > 0 ? 'var(--warning)' : 'var(--success)' }}>
+                                            {remaining}
+                                        </td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                className="form-input"
+                                                style={{ textAlign: 'center', width: '100%', backgroundColor: remaining <= 0 ? '#f3f4f6' : '#fff' }}
+                                                min="0"
+                                                value={receiveQty}
+                                                onChange={(e) => handleQtyChange(item.id, e.target.value)}
+                                                disabled={remaining <= 0}
+                                                placeholder="0"
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Submit Button */}
+                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => navigate(`/buying/orders/${id}`)}
+                    >
+                        {t('common.cancel')}
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={submitting}
+                    >
+                        {submitting ? t('common.saving') : t('buying.receive.confirm')}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
+
+export default PurchaseOrderReceive;

@@ -1,0 +1,161 @@
+import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { format, startOfWeek, endOfWeek, addDays, eachDayOfInterval, isSameDay } from 'date-fns';
+import { arSA, enUS } from 'date-fns/locale';
+import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, User, AlertCircle } from 'lucide-react';
+import { projectsAPI } from '../../utils/api';
+import './ResourceManagement.css';
+
+const ResourceManagement = () => {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language === 'ar' ? arSA : enUS;
+
+    // State
+    const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 6 }));
+    const [loading, setLoading] = useState(false);
+    const [resources, setResources] = useState([]);
+
+    useEffect(() => {
+        fetchAllocation();
+    }, [currentWeekStart]);
+
+    const fetchAllocation = async () => {
+        setLoading(true);
+        try {
+            const start = format(currentWeekStart, 'yyyy-MM-dd');
+            const end = format(addDays(currentWeekStart, 6), 'yyyy-MM-dd');
+            const res = await projectsAPI.getResourceAllocation({ start_date: start, end_date: end });
+            setResources(res.data || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const changeWeek = (direction) => {
+        setCurrentWeekStart(prev => addDays(prev, direction * 7));
+    };
+
+    const weekDays = eachDayOfInterval({
+        start: currentWeekStart,
+        end: addDays(currentWeekStart, 6)
+    });
+
+    const getDailyLoad = (resource, date) => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        return resource.daily_load.find(d => d.date === dateStr)?.hours || 0;
+    };
+
+    const getCellColor = (hours) => {
+        if (hours === 0) return '';
+        if (hours <= 6) return 'bg-success-subtle'; // Light load
+        if (hours <= 8) return 'bg-success text-white'; // Optimal
+        if (hours <= 10) return 'bg-warning text-dark'; // Heavy
+        return 'bg-danger text-white'; // Overload
+    };
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div>
+                    <h1 className="workspace-title">{t('projects.resource_allocation', 'تخصيص الموارد')}</h1>
+                    <p className="workspace-subtitle">{t('projects.resource_subtitle', 'متابعة ضغط العمل وتوزيع المهام على الموظفين')}</p>
+                </div>
+
+                {/* Date Navigation */}
+                <div className="d-flex align-items-center bg-white p-2 rounded shadow-sm border">
+                    <button className="btn btn-icon btn-sm" onClick={() => changeWeek(-1)}>
+                        {i18n.dir() === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                    </button>
+                    <div className="mx-3 d-flex align-items-center fw-bold text-primary">
+                        <CalendarIcon size={18} className="me-2" />
+                        {format(currentWeekStart, 'd MMM', { locale })} - {format(addDays(currentWeekStart, 6), 'd MMM yyyy', { locale })}
+                    </div>
+                    <button className="btn btn-icon btn-sm" onClick={() => changeWeek(1)}>
+                        {i18n.dir() === 'rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+                    </button>
+                    <button
+                        className="btn btn-outline-secondary btn-sm ms-2"
+                        onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 6 }))}
+                    >
+                        {t('common.current_week', 'الأسبوع الحالي')}
+                    </button>
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="d-flex gap-3 mb-3 text-small">
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-success-subtle text-dark border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_light', '< 6 ساعات')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-success border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_optimal', '6-8 ساعات')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-warning border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_heavy', '8-10 ساعات')}</div>
+                <div className="d-flex align-items-center gap-1"><span className="badge bg-danger border p-1 rounded-circle" style={{ width: 12, height: 12 }}></span> {t('projects.load_overload', '> 10 ساعات')}</div>
+            </div>
+
+            {/* Allocation Matrix */}
+            <div className="card shadow-sm border-0">
+                <div className="card-body p-0">
+                    <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0 resource-matrix">
+                            <thead className="bg-light">
+                                <tr>
+                                    <th style={{ width: '250px' }} className="ps-4 py-3">{t('common.employee', 'الموظف')}</th>
+                                    {weekDays.map(day => (
+                                        <th key={day.toISOString()} className="text-center py-3" style={{ minWidth: '100px' }}>
+                                            <div className="small text-muted text-uppercase">{format(day, 'EEE', { locale })}</div>
+                                            <div className="fw-bold">{format(day, 'd', { locale })}</div>
+                                        </th>
+                                    ))}
+                                    <th className="text-center py-3">{t('common.total', 'الإجمالي')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (
+                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.loading', 'جاري التحميل...')}</td></tr>
+                                ) : resources.length === 0 ? (
+                                    <tr><td colSpan={9} className="text-center py-5 text-muted">{t('common.no_data', 'لا توجد بيانات')}</td></tr>
+                                ) : (
+                                    resources.map(res => {
+                                        const totalWeekly = weekDays.reduce((acc, day) => acc + getDailyLoad(res, day), 0);
+                                        return (
+                                            <tr key={res.id}>
+                                                <td className="ps-4 py-3">
+                                                    <div className="d-flex align-items-center gap-3">
+                                                        <div className="avatar bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: 36, height: 36 }}>
+                                                            <User size={18} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="fw-bold text-dark">{res.name}</div>
+                                                            <div className="small text-muted text-truncate" style={{ maxWidth: '180px' }}>
+                                                                {res.projects.join(', ')}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                {weekDays.map(day => {
+                                                    const hours = getDailyLoad(res, day);
+                                                    return (
+                                                        <td key={day.toISOString()} className="text-center p-1">
+                                                            <div className={`allocation-cell rounded py-2 fw-bold ${getCellColor(hours)}`}>
+                                                                {hours > 0 ? hours : '-'}
+                                                            </div>
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="text-center fw-bold text-primary">
+                                                    {totalWeekly.toFixed(1)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ResourceManagement;

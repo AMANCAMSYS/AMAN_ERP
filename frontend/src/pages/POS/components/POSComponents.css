@@ -1,0 +1,410 @@
+/* Held Orders Modal */
+.held-orders-modal,
+.returns-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.held-orders-content,
+.returns-content {
+    background: var(--base-100, #fff);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.held-orders-header,
+.returns-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--base-300, #e5e7eb);
+    background: var(--base-200, #f9fafb);
+}
+
+.held-orders-header h3,
+.returns-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--base-content, #333);
+    transition: background 0.2s;
+}
+
+.close-btn:hover {
+    background: var(--base-300, #e5e7eb);
+}
+
+/* Held Orders List */
+.held-orders-list {
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.held-order-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--base-200, #f9fafb);
+    border-radius: 12px;
+    border: 1px solid var(--base-300, #e5e7eb);
+    transition: all 0.2s;
+}
+
+.held-order-card:hover {
+    border-color: var(--primary, #3b82f6);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.order-info {
+    flex: 1;
+}
+
+.order-number {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--primary, #3b82f6);
+}
+
+.order-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: var(--base-content-secondary, #6b7280);
+}
+
+.order-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.order-total {
+    margin-top: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--success, #22c55e);
+}
+
+.order-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: var(--base-content-secondary, #9ca3af);
+}
+
+.empty-state svg {
+    opacity: 0.5;
+    margin-bottom: 12px;
+}
+
+.loading-state {
+    display: flex;
+    justify-content: center;
+    padding: 48px;
+}
+
+/* Returns Modal */
+.search-step {
+    padding: 24px;
+}
+
+.step-desc {
+    text-align: center;
+    margin-bottom: 16px;
+    color: var(--base-content-secondary, #6b7280);
+}
+
+.search-box {
+    display: flex;
+    gap: 8px;
+}
+
+.search-box input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid var(--base-300, #e5e7eb);
+    border-radius: 10px;
+    font-size: 1rem;
+    direction: ltr;
+    text-align: center;
+}
+
+.search-box input:focus {
+    border-color: var(--primary, #3b82f6);
+    outline: none;
+}
+
+/* Select Items Step */
+.select-items-step {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.order-summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--base-200, #f3f4f6);
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+.items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.return-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--base-100, #fff);
+    border: 1px solid var(--base-300, #e5e7eb);
+    border-radius: 10px;
+}
+
+.item-info {
+    flex: 1;
+}
+
+.item-name {
+    font-weight: 500;
+    display: block;
+}
+
+.item-price {
+    font-size: 0.85rem;
+    color: var(--base-content-secondary, #6b7280);
+}
+
+.item-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.item-qty-controls button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: var(--base-200, #e5e7eb);
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.item-qty-controls button:hover {
+    background: var(--primary, #3b82f6);
+    color: white;
+}
+
+.item-qty-controls span {
+    min-width: 32px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.item-qty-controls span.has-qty {
+    color: var(--error, #ef4444);
+}
+
+/* Refund Options */
+.refund-options {
+    padding: 12px 0;
+}
+
+.refund-options label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.method-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.method-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid var(--base-300, #e5e7eb);
+    border-radius: 8px;
+    background: var(--base-100, #fff);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.method-btn.active {
+    border-color: var(--primary, #3b82f6);
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary, #3b82f6);
+}
+
+/* Return Summary */
+.return-summary {
+    padding: 16px;
+    background: var(--error, #fef2f2);
+    border-radius: 10px;
+    border: 1px solid #fecaca;
+}
+
+.total-refund {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.total-refund .amount {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--error, #dc2626);
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 8px;
+}
+
+.select-items-step textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--base-300, #e5e7eb);
+    border-radius: 10px;
+    resize: none;
+    font-family: inherit;
+}
+
+/* Button Styles */
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: var(--primary, #3b82f6);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: var(--primary-dark, #2563eb);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid var(--base-300, #e5e7eb);
+    color: var(--base-content, #333);
+}
+
+.btn-ghost:hover {
+    background: var(--base-200, #f3f4f6);
+}
+
+.btn-success {
+    background: var(--success, #22c55e);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #16a34a;
+}
+
+.btn-error {
+    background: var(--error, #ef4444);
+    color: white;
+}
+
+.btn-error:hover {
+    background: #dc2626;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.loading {
+    display: inline-block;
+}
+
+.loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.loading-sm {
+    width: 14px;
+    height: 14px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

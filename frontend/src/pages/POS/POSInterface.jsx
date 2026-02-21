@@ -1,0 +1,838 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import './POSInterface.css';
+import './components/POSComponents.css';
+import { useNavigate } from 'react-router-dom';
+import api from '../../utils/api';
+import { useTranslation } from 'react-i18next';
+import { useToast } from '../../context/ToastContext';
+import { getCurrency, logout } from '../../utils/auth';
+import HeldOrders from './components/HeldOrders';
+import POSReturns from './components/POSReturns';
+import LazyImage from '../../components/common/LazyImage';
+import {
+    Search, RefreshCcw, Home, LogOut,
+    ShoppingCart, Plus, Minus,
+    Store, X,
+    Banknote, CreditCard as CardIcon, Split,
+    UserCircle, Printer, Save,
+    Clock, LayoutGrid, ArrowRightLeft, Smartphone, Package, RotateCcw
+} from 'lucide-react';
+
+const POSInterface = () => {
+    const { t, i18n } = useTranslation();
+    const { showToast } = useToast();
+    const navigate = useNavigate();
+    const isRTL = i18n.dir() === 'rtl';
+
+    // --- State ---
+    const [session, setSession] = useState(null);
+    const [products, setProducts] = useState([]);
+    const [filteredProducts, setFilteredProducts] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(true);
+    const currency = getCurrency(); // Use the same method as other pages
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Modal states
+    const [showHeldOrders, setShowHeldOrders] = useState(false);
+    const [showReturns, setShowReturns] = useState(false);
+    const [showCloseSession, setShowCloseSession] = useState(false);
+    const [closingData, setClosingData] = useState({ cashCount: '', notes: '' });
+
+    const [cart, setCart] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [globalDiscount, setGlobalDiscount] = useState(0);
+
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentAmounts, setPaymentAmounts] = useState({ cash: 0, bank: 0 });
+    const [submitting, setSubmitting] = useState(false);
+
+    // --- Effects ---
+    useEffect(() => {
+        initPOS();
+        fetchCustomers();
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    useEffect(() => {
+        const productsArray = Array.isArray(products) ? products : [];
+        if (!searchQuery) {
+            setFilteredProducts(productsArray);
+        } else {
+            const lower = searchQuery.toLowerCase();
+            const filtered = productsArray.filter(p =>
+                (p.name || '').toLowerCase().includes(lower) ||
+                (p.barcode && p.barcode.includes(lower)) ||
+                (p.code && (p.code || '').toLowerCase().includes(lower))
+            );
+            setFilteredProducts(filtered);
+        }
+    }, [searchQuery, products]);
+
+    // --- Actions ---
+    const refreshSession = async () => {
+        try {
+            const sessionRes = await api.get('/pos/sessions/active');
+            if (sessionRes.data) {
+                setSession(sessionRes.data);
+            }
+        } catch (e) {
+            console.error("Refresh Session Error:", e);
+        }
+    };
+
+    const initPOS = async () => {
+        try {
+            const sessionRes = await api.get('/pos/sessions/active');
+            if (!sessionRes.data) {
+                navigate('/pos');
+                return;
+            }
+            setSession(sessionRes.data);
+
+            const productsRes = await api.get('/pos/products', {
+                params: { warehouse_id: sessionRes.data.warehouse_id }
+            });
+
+            const fetchedProducts = Array.isArray(productsRes.data) ? productsRes.data : [];
+            setProducts(fetchedProducts);
+            setFilteredProducts(fetchedProducts);
+            setLoading(false);
+        } catch (error) {
+            console.error("Init POS Error:", error);
+            showToast(t('common.error_occurred'), "error");
+            navigate('/dashboard');
+        }
+    };
+
+    const fetchCustomers = async () => {
+        try {
+            const res = await api.get('/sales/customers');
+            setCustomers(res.data);
+        } catch (e) { console.error(e); }
+    }
+
+    // --- Cart Logic ---
+    const addToCart = (product) => {
+        setCart(prev => {
+            const existing = prev.find(item => item.id === product.id);
+            if (existing) {
+                return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+            } else {
+                return [...prev, { ...product, quantity: 1, discount: 0, tax_rate: (product.tax_rate !== undefined && product.tax_rate !== null) ? product.tax_rate : 15 }];
+            }
+        });
+    };
+
+    const removeFromCart = (productId) => {
+        setCart(prev => prev.filter(item => item.id !== productId));
+    };
+
+    const updateQuantity = (productId, delta) => {
+        setCart(prev => prev.map(item => {
+            if (item.id === productId) {
+                const newQty = Math.max(1, item.quantity + delta);
+                return { ...item, quantity: newQty };
+            }
+            return item;
+        }));
+    };
+
+    const cartTotals = useMemo(() => {
+        let subtotal = 0;
+        let totalTax = 0;
+
+        cart.forEach(item => {
+            const itemTotal = item.price * item.quantity;
+            subtotal += itemTotal;
+            const itemTax = itemTotal * (item.tax_rate / 100);
+            totalTax += itemTax;
+        });
+
+        const total = Math.max(0, subtotal + totalTax - globalDiscount);
+        return { subtotal, discount: globalDiscount, tax: totalTax, total };
+    }, [cart, globalDiscount]);
+
+    // --- Checkout Logic ---
+    const openSplitPayment = () => {
+        setPaymentAmounts({ cash: 0, bank: 0 });
+        setShowPaymentModal(true);
+    }
+
+    const quickPay = async (method) => {
+        const finalMethod = method === 'cash' ? 'cash' : 'bank';
+        try {
+            await processOrder([{ method: finalMethod, amount: cartTotals.total, reference: method }]);
+        } catch (e) { }
+    }
+
+    const processOrder = async (payments, status = "paid") => {
+        if (cart.length === 0) return;
+        if (submitting) return; // Prevent double-submit
+        setSubmitting(true);
+
+        try {
+            const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+            if (status === 'paid' && totalPaid < cartTotals.total - 0.01) {
+                showToast(t('pos.paid_amount_less'), "warning");
+                return;
+            }
+
+            const orderData = {
+                session_id: session?.id,
+                warehouse_id: session?.warehouse_id,
+                customer_id: selectedCustomer?.id,
+                items: cart.map(item => ({
+                    product_id: item.id,
+                    quantity: item.quantity,
+                    unit_price: item.price,
+                    tax_rate: (item.tax_rate !== undefined && item.tax_rate !== null) ? item.tax_rate : 15
+                })),
+                discount_amount: globalDiscount,
+                paid_amount: status === 'paid' ? totalPaid : 0,
+                payments: status === 'paid' ? payments : [],
+                status: status
+            };
+
+            await api.post('/pos/orders', orderData);
+            showToast(status === 'paid' ? t('pos.order_completed') : t('common.saved'), "success");
+
+            setCart([]);
+            setGlobalDiscount(0);
+            setShowPaymentModal(false);
+            setSelectedCustomer(null);
+
+            // Refresh session totals and product stock
+            refreshSession();
+            return true;
+        } catch (error) {
+            console.error("Order error", error);
+            showToast(t('common.error_save'), "error");
+            throw error;
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    const handleSplitCheckout = async () => {
+        const totalPaid = Number(paymentAmounts.cash) + Number(paymentAmounts.bank);
+        if (totalPaid < cartTotals.total) {
+            showToast(t('pos.paid_amount_less'), "warning");
+            return;
+        }
+        const payments = [];
+        if (paymentAmounts.cash > 0) payments.push({ method: "cash", amount: paymentAmounts.cash });
+        if (paymentAmounts.bank > 0) payments.push({ method: "bank", amount: paymentAmounts.bank });
+        await processOrder(payments);
+    };
+
+    const handleHold = async () => {
+        await processOrder([], 'hold');
+    }
+
+    const handleCloseSession = async () => {
+        if (!closingData.cashCount) {
+            showToast(t('pos.enter_cash_count'), 'error');
+            return;
+        }
+
+        try {
+            await api.post(`/pos/sessions/${session.id}/close`, {
+                cash_register_balance: parseFloat(closingData.cashCount),
+                closing_balance: parseFloat(closingData.cashCount),
+                notes: closingData.notes
+            });
+
+            showToast(t('pos.session_closed'), 'success');
+            setTimeout(() => {
+                navigate('/pos');
+            }, 1500);
+        } catch (error) {
+            showToast(error.response?.data?.detail || t('common.error'), 'error');
+        }
+    }
+
+    // --- Loading State ---
+    if (loading) {
+        return (
+            <div className="pos-loading">
+                <RefreshCcw className="pos-loading-spinner" size={40} />
+            </div>
+        );
+    }
+
+    return (
+        <div className="pos-container" dir={isRTL ? 'rtl' : 'ltr'}>
+
+            {/* ========== HEADER ========== */}
+            <header className="pos-header">
+
+                {/* Brand */}
+                <div className="pos-header-brand">
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="brand-icon"
+                    >
+                        <Home size={18} />
+                    </button>
+                    <div className="brand-text">
+                        <h1>{t('pos.title')}</h1>
+                        <span>{t('pos.new_order')}</span>
+                    </div>
+                </div>
+
+                <div className="pos-header-divider" />
+
+                {/* Info Items */}
+                <div className="pos-header-info">
+                    {/* Invoice No */}
+                    <div className="pos-info-item">
+                        <div className="info-icon">
+                            <LayoutGrid size={16} />
+                        </div>
+                        <div className="info-content">
+                            <span className="info-label">{t('pos.invoice_no')}</span>
+                            <span className="info-value">
+                                {session?.session_code ? `${session.session_code}-${(session.order_count || 0) + 1}` : `NEW-${(session?.order_count || 0) + 1}`}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Date/Time */}
+                    <div className="pos-info-item">
+                        <div className="info-icon">
+                            <Clock size={16} />
+                        </div>
+                        <div className="info-content">
+                            <span className="info-label">{t('pos.invoice_date')}</span>
+                            <span className="info-value">
+                                {currentTime.toLocaleDateString()} {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Warehouse */}
+                    <div className="pos-info-item">
+                        <div className="info-icon">
+                            <Store size={16} />
+                        </div>
+                        <div className="info-content">
+                            <span className="info-label">{t('pos.branch')}</span>
+                            <span className="info-value">{session?.warehouse_name}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Search - Center */}
+                <div className="pos-header-search">
+                    <div className="pos-search-input">
+                        <Search className="search-icon" size={18} />
+                        <input
+                            type="text"
+                            placeholder={t('pos.scan_hint')}
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            autoFocus
+                        />
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pos-header-actions">
+                    {/* Customer Select */}
+                    <div className="pos-customer-select">
+                        <UserCircle className="select-icon" size={18} />
+                        <select
+                            onChange={(e) => setSelectedCustomer(customers.find(c => c.id === parseInt(e.target.value)) || null)}
+                            value={selectedCustomer?.id || ""}
+                        >
+                            <option value="">{t('pos.walk_in_customer')}</option>
+                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Hold Orders Button */}
+                    <button
+                        className="pos-action-btn"
+                        onClick={() => setShowHeldOrders(true)}
+                        title={t('pos.held_orders')}
+                    >
+                        <Clock size={18} />
+                        <span>{t('pos.held_orders')}</span>
+                    </button>
+
+                    {/* Returns Button */}
+                    <button
+                        className="pos-action-btn"
+                        onClick={() => setShowReturns(true)}
+                        title={t('pos.returns')}
+                    >
+                        <RotateCcw size={18} />
+                        <span>{t('pos.returns')}</span>
+                    </button>
+
+                    <button
+                        onClick={initPOS}
+                        className="pos-action-btn"
+                        title={t('common.refresh')}
+                    >
+                        <RefreshCcw size={18} />
+                    </button>
+
+                    <button
+                        onClick={() => setShowCloseSession(true)}
+                        className="pos-action-btn warning"
+                        title={t('pos.close_session')}
+                    >
+                        <Store size={18} />
+                        <span>{t('pos.close_session')}</span>
+                    </button>
+
+                    <button
+                        onClick={logout}
+                        className="pos-action-btn danger"
+                        title={t('common.logout')}
+                    >
+                        <LogOut size={18} />
+                        <span>{t('common.logout')}</span>
+                    </button>
+                </div>
+            </header>
+
+            {/* ========== MAIN CONTENT ========== */}
+            <div className="pos-main">
+
+                {/* ===== PRODUCTS AREA ===== */}
+                <main className="pos-products">
+                    <div className="pos-products-grid">
+                        {filteredProducts.length === 0 ? (
+                            <div className="pos-empty-state">
+                                <div className="empty-icon">
+                                    <Package size={40} />
+                                </div>
+                                <p>{t('pos.no_products_found')}</p>
+                            </div>
+                        ) : (
+                            <div className="products-grid">
+                                {filteredProducts.map(product => (
+                                    <div
+                                        key={product.id}
+                                        onClick={() => addToCart(product)}
+                                        className="product-card"
+                                    >
+                                        <div className="product-card-image">
+                                            {product.image_url ? (
+                                                <LazyImage
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                />
+                                            ) : (
+                                                <span className="placeholder-text">{product.name.charAt(0)}</span>
+                                            )}
+                                            <div className="product-stock-badge">
+                                                {product.stock_quantity || 0}
+                                            </div>
+                                            <div className="product-add-overlay">
+                                                <div className="add-icon">
+                                                    <Plus size={24} strokeWidth={3} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="product-card-content">
+                                            <h3 className="product-card-name" title={product.name}>{product.name}</h3>
+                                            <div className="product-card-price">
+                                                <span className="price">{product.price.toLocaleString()}</span>
+                                                <span className="currency">{currency}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </main>
+
+                {/* ===== CART SIDEBAR ===== */}
+                <aside className="pos-cart">
+
+                    {/* Cart Header */}
+                    <div className="pos-cart-header">
+                        <div className="pos-cart-header-info">
+                            <div className="cart-icon">
+                                <ShoppingCart size={22} />
+                            </div>
+                            <div className="cart-text">
+                                <h2>{t('pos.cart')}</h2>
+                                <p>{cart.reduce((a, c) => a + c.quantity, 0)} {t('pos.items')}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setCart([])}
+                            disabled={!cart.length}
+                            className="pos-cart-clear-btn"
+                        >
+                            {t('pos.clear_all')}
+                        </button>
+                    </div>
+
+                    {/* Cart Items */}
+                    <div className="pos-cart-items">
+                        {cart.length === 0 ? (
+                            <div className="cart-empty">
+                                <div className="empty-icon">
+                                    <ShoppingCart size={28} />
+                                </div>
+                                <p>{t('pos.cart_empty')}</p>
+                            </div>
+                        ) : cart.map(item => (
+                            <div key={item.id} className="cart-item">
+                                <div className="cart-item-info">
+                                    <h4 className="cart-item-name">{item.name}</h4>
+                                    <p className="cart-item-price">{item.price.toLocaleString()} {currency}</p>
+                                </div>
+
+                                <div className="cart-item-qty">
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}><Minus size={14} /></button>
+                                    <span>{item.quantity}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}><Plus size={14} /></button>
+                                </div>
+
+                                <div className="cart-item-total">
+                                    <p className="total-amount">{(item.price * item.quantity).toLocaleString()}</p>
+                                    <p className="total-currency">{currency}</p>
+                                </div>
+
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                                    className="cart-item-remove"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Cart Footer */}
+                    <div className="pos-cart-footer">
+                        <div className="cart-totals">
+                            <div className="cart-totals-row">
+                                <span className="label">{t('pos.subtotal')}</span>
+                                <span className="value">{cartTotals.subtotal.toLocaleString()} {currency}</span>
+                            </div>
+                            <div className="cart-totals-row discount">
+                                <span className="label">{t('pos.discount')}</span>
+                                <div className="discount-actions">
+                                    {globalDiscount > 0 ? (
+                                        <>
+                                            <span className="value">-{globalDiscount.toLocaleString()} {currency}</span>
+                                            <button onClick={() => setGlobalDiscount(0)} className="discount-btn remove">إلغاء</button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                const d = prompt('أدخل قيمة الخصم');
+                                                if (d && !isNaN(d)) {
+                                                    const val = Number(d);
+                                                    if (val < 0) {
+                                                        showToast('الخصم لا يمكن أن يكون سالباً', 'warning');
+                                                    } else if (val > cartTotals.subtotal) {
+                                                        showToast('الخصم لا يمكن أن يتجاوز إجمالي المبيعات', 'warning');
+                                                    } else {
+                                                        setGlobalDiscount(val);
+                                                    }
+                                                }
+                                            }}
+                                            className="discount-btn add"
+                                        >
+                                            + {t('common.add')}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="cart-totals-row">
+                                <span className="label">{t('pos.tax')}</span>
+                                <span className="value">{cartTotals.tax.toLocaleString()} {currency}</span>
+                            </div>
+                        </div>
+
+                        <div className="cart-grand-total">
+                            <span className="label">{t('pos.total')}</span>
+                            <div className="value">
+                                <p className="amount">{cartTotals.total.toLocaleString()}</p>
+                                <p className="currency">{currency}</p>
+                            </div>
+                        </div>
+
+                        <div className="cart-payment-grid">
+                            <button
+                                onClick={() => quickPay('cash')}
+                                disabled={!cart.length || submitting}
+                                className="payment-btn cash"
+                            >
+                                <Banknote size={18} /> {submitting ? '...' : t('pos.cash')}
+                            </button>
+                            <button
+                                onClick={() => quickPay('card')}
+                                disabled={!cart.length || submitting}
+                                className="payment-btn card"
+                            >
+                                <CardIcon size={18} /> {t('pos.payment_credit_card')}
+                            </button>
+                            <button
+                                onClick={() => quickPay('mada')}
+                                disabled={!cart.length || submitting}
+                                className="payment-btn mada"
+                            >
+                                <Smartphone size={16} /> {t('pos.payment_mada')}
+                            </button>
+                            <button
+                                onClick={openSplitPayment}
+                                disabled={!cart.length || submitting}
+                                className="payment-btn split"
+                            >
+                                <Split size={16} /> {t('pos.split_payment')}
+                            </button>
+                        </div>
+
+                        <div className="cart-secondary-actions">
+                            <button
+                                onClick={handleHold}
+                                disabled={!cart.length}
+                                className="secondary-btn hold"
+                            >
+                                <Clock size={18} />
+                                <span>{t('pos.hold_invoice')}</span>
+                            </button>
+                            <button
+                                disabled={!cart.length}
+                                className="secondary-btn print"
+                            >
+                                <Printer size={18} />
+                                <span>{t('pos.print')}</span>
+                            </button>
+                            <button
+                                onClick={initPOS}
+                                className="secondary-btn new"
+                            >
+                                <Plus size={18} />
+                                <span>{t('pos.new_invoice')}</span>
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            {/* ========== SPLIT PAYMENT MODAL ========== */}
+            {showPaymentModal && (
+                <div className="pos-modal-overlay" onClick={() => setShowPaymentModal(false)}>
+                    <div className="pos-modal" onClick={e => e.stopPropagation()}>
+                        <div className="pos-modal-header">
+                            <div>
+                                <h3>{t('pos.split_payment')}</h3>
+                                <p>{t("pos.multi_payment")}</p>
+                            </div>
+                            <button onClick={() => setShowPaymentModal(false)} className="pos-modal-close">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="pos-modal-body">
+                            <div className="modal-remaining">
+                                <p className="label">{t('pos.remaining_amount')}</p>
+                                <p className="amount">
+                                    <span className="currency">{currency}</span>
+                                    {(cartTotals.total - paymentAmounts.cash - paymentAmounts.bank).toLocaleString()}
+                                </p>
+                            </div>
+
+                            <div className="modal-input-group">
+                                <label>{t('pos.cash')}</label>
+                                <div className="modal-input-row">
+                                    <div className="modal-input-icon cash">
+                                        <Banknote size={24} />
+                                    </div>
+                                    <input
+                                        type="number"
+                                        value={paymentAmounts.cash}
+                                        onChange={e => setPaymentAmounts({ ...paymentAmounts, cash: e.target.value })}
+                                        onFocus={e => e.target.select()}
+                                    />
+                                    <button
+                                        onClick={() => setPaymentAmounts(p => ({ ...p, cash: cartTotals.total - p.bank }))}
+                                        className="modal-full-btn"
+                                    >
+                                        {t('pos.full')}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="modal-input-group">
+                                <label>{t('pos.bank')}</label>
+                                <div className="modal-input-row">
+                                    <div className="modal-input-icon bank">
+                                        <CardIcon size={24} />
+                                    </div>
+                                    <input
+                                        type="number"
+                                        value={paymentAmounts.bank}
+                                        onChange={e => setPaymentAmounts({ ...paymentAmounts, bank: e.target.value })}
+                                        onFocus={e => e.target.select()}
+                                    />
+                                    <button
+                                        onClick={() => setPaymentAmounts(p => ({ ...p, bank: cartTotals.total - p.cash }))}
+                                        className="modal-full-btn"
+                                    >
+                                        {t('pos.full')}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onClick={handleSplitCheckout} className="modal-confirm-btn">
+                                <span>{t('pos.confirm_payment')}</span>
+                                <ArrowRightLeft size={20} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Held Orders Modal */}
+            {showHeldOrders && (
+                <HeldOrders
+                    onResume={(orderData) => {
+                        // Resume order - load items into cart
+                        setCart(orderData.items.map(item => ({
+                            id: item.product_id,
+                            name: item.name,
+                            price: item.unit_price,
+                            quantity: item.quantity,
+                            code: item.code,
+                            barcode: item.barcode,
+                            tax_rate: item.tax_percent
+                        })));
+                        setShowHeldOrders(false);
+                    }}
+                    onClose={() => setShowHeldOrders(false)}
+                />
+            )}
+
+            {/* Returns Modal */}
+            {showReturns && (
+                <POSReturns
+                    onClose={() => setShowReturns(false)}
+                    onComplete={(returnData) => {
+                        showToast(t('pos.return_success'), 'success');
+                        setShowReturns(false);
+                    }}
+                />
+            )}
+
+            {/* Close Session Modal */}
+            {showCloseSession && (
+                <div className="held-orders-modal">
+                    <div className="held-orders-content">
+                        <div className="held-orders-header">
+                            <h3><Store size={20} /> {t('pos.close_session')}</h3>
+                            <button className="close-btn" onClick={() => setShowCloseSession(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div style={{ padding: '20px' }}>
+                            <div style={{ marginBottom: '20px', padding: '16px', background: 'var(--base-200)', borderRadius: '12px' }}>
+                                <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>{t('pos.session_summary')}</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>{t('pos.opening_balance')}:</span>
+                                        <strong>{session?.opening_balance?.toLocaleString()} {currency}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--base-200)', paddingTop: '4px' }}>
+                                        <span>{t('pos.total_actual_sales') || 'إجمالي المبيعات (كل الُطرق)'}:</span>
+                                        <strong style={{ fontWeight: '500' }}>{session?.total_sales?.toLocaleString() || 0} {currency}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>{t('pos.total_cash_sales') || 'المبيعات النقدية'}:</span>
+                                        <strong style={{ color: '#059669' }}>+{session?.total_cash?.toLocaleString() || 0} {currency}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>{t('pos.total_bank_sales') || 'مبيعات الشبكة/البنك'}:</span>
+                                        <strong style={{ color: '#2563eb' }}>{session?.total_bank?.toLocaleString() || 0} {currency}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: session?.total_returns_cash > 0 ? 'var(--pos-danger)' : 'inherit' }}>
+                                        <span>{t('pos.total_returns_cash') || 'مرتجعات نقدية (-)'}:</span>
+                                        <strong>-{session?.total_returns_cash?.toLocaleString() || 0} {currency}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '2px solid var(--base-300)' }}>
+                                        <span style={{ fontWeight: '700', fontSize: '14px' }}>{t('pos.expected_cash')}:</span>
+                                        <strong style={{ color: 'var(--primary)', fontSize: '17px' }}>
+                                            {((session?.opening_balance || 0) + (session?.total_cash || 0) - (session?.total_returns_cash || 0)).toLocaleString()} {currency}
+                                        </strong>
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--base-content-secondary)', marginTop: '4px', textAlign: 'center' }}>
+                                        * {t('pos.expected_cash_note') || 'النقد المتوقع = رصيد الافتتاح + المبيعات النقدية - المرتجعات النقدية'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
+                                    {t('pos.actual_cash_count')} *
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={closingData.cashCount}
+                                    onChange={(e) => setClosingData({ ...closingData, cashCount: e.target.value })}
+                                    placeholder="0.00"
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        border: '2px solid var(--base-300)',
+                                        borderRadius: '10px',
+                                        fontSize: '16px',
+                                        textAlign: 'center',
+                                        fontWeight: '600'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
+                                    {t('common.notes')}
+                                </label>
+                                <textarea
+                                    value={closingData.notes}
+                                    onChange={(e) => setClosingData({ ...closingData, notes: e.target.value })}
+                                    placeholder={t('pos.closing_notes_placeholder')}
+                                    rows="3"
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        border: '2px solid var(--base-300)',
+                                        borderRadius: '10px',
+                                        fontSize: '14px',
+                                        resize: 'vertical'
+                                    }}
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleCloseSession}
+                                className="btn btn-primary"
+                                style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600' }}
+                            >
+                                {t('pos.confirm_close_session')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default POSInterface;

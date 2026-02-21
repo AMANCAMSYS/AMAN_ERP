@@ -1,0 +1,1383 @@
+"""
+Inventory Module - Batch & Serial Number Management
+INV-101: Batch Numbers
+INV-102: Serial Numbers  
+INV-103: Expiry Date tracking
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import datetime, date, timedelta
+from pydantic import BaseModel
+import logging
+import random
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.audit import log_activity
+from utils.permissions import require_permission
+
+batches_router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+# ============ SCHEMAS ============
+
+class BatchCreate(BaseModel):
+    product_id: int
+    warehouse_id: int
+    batch_number: str
+    manufacturing_date: Optional[str] = None
+    expiry_date: Optional[str] = None
+    quantity: float = 0
+    unit_cost: float = 0
+    supplier_id: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class BatchUpdate(BaseModel):
+    manufacturing_date: Optional[str] = None
+    expiry_date: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = None
+
+
+class SerialCreate(BaseModel):
+    product_id: int
+    warehouse_id: int
+    serial_number: str
+    batch_id: Optional[int] = None
+    purchase_price: float = 0
+    warranty_start: Optional[str] = None
+    warranty_end: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SerialBulkCreate(BaseModel):
+    product_id: int
+    warehouse_id: int
+    batch_id: Optional[int] = None
+    prefix: str = ""
+    start_number: int = 1
+    count: int = 1
+    purchase_price: float = 0
+    notes: Optional[str] = None
+
+
+class SerialUpdate(BaseModel):
+    status: Optional[str] = None
+    warranty_start: Optional[str] = None
+    warranty_end: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ============ BATCH ENDPOINTS ============
+
+@batches_router.get("/batches", dependencies=[Depends(require_permission("stock.view"))])
+def list_batches(
+    product_id: Optional[int] = None,
+    warehouse_id: Optional[int] = None,
+    status: Optional[str] = None,
+    expiring_within_days: Optional[int] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """قائمة الدفعات مع إمكانية الفلترة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT b.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   s.name as supplier_name
+            FROM product_batches b
+            JOIN products p ON b.product_id = p.id
+            JOIN warehouses w ON b.warehouse_id = w.id
+            LEFT JOIN parties s ON b.supplier_id = s.id
+            WHERE 1=1
+        """
+        params = {"limit": limit, "skip": skip}
+
+        if product_id:
+            query += " AND b.product_id = :pid"
+            params["pid"] = product_id
+        if warehouse_id:
+            query += " AND b.warehouse_id = :wid"
+            params["wid"] = warehouse_id
+        if status:
+            query += " AND b.status = :status"
+            params["status"] = status
+        if expiring_within_days:
+            query += " AND b.expiry_date IS NOT NULL AND b.expiry_date <= CURRENT_DATE + :days * INTERVAL '1 day' AND b.expiry_date >= CURRENT_DATE"
+            params["days"] = expiring_within_days
+        if search:
+            query += " AND (b.batch_number ILIKE :search OR p.product_name ILIKE :search)"
+            params["search"] = f"%{search}%"
+
+        query += " ORDER BY b.created_at DESC LIMIT :limit OFFSET :skip"
+
+        rows = db.execute(text(query), params).fetchall()
+        
+        # Count
+        count_query = """
+            SELECT COUNT(*) FROM product_batches b
+            JOIN products p ON b.product_id = p.id
+            WHERE 1=1
+        """
+        count_params = {}
+        if product_id:
+            count_query += " AND b.product_id = :pid"
+            count_params["pid"] = product_id
+        if warehouse_id:
+            count_query += " AND b.warehouse_id = :wid"
+            count_params["wid"] = warehouse_id
+        if status:
+            count_query += " AND b.status = :status"
+            count_params["status"] = status
+
+        total = db.execute(text(count_query), count_params).scalar() or 0
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total
+        }
+    finally:
+        db.close()
+
+
+@batches_router.get("/batches/expiry-alerts", dependencies=[Depends(require_permission("stock.view"))])
+def get_expiry_alerts(
+    days: int = Query(default=30, description="عدد الأيام للتنبيه"),
+    warehouse_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تنبيهات المنتجات قريبة الانتهاء والمنتهية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT b.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   CASE 
+                       WHEN b.expiry_date < CURRENT_DATE THEN 'expired'
+                       WHEN b.expiry_date <= CURRENT_DATE + :days * INTERVAL '1 day' THEN 'expiring_soon'
+                       ELSE 'ok'
+                   END as alert_status,
+                   b.expiry_date - CURRENT_DATE as days_remaining
+            FROM product_batches b
+            JOIN products p ON b.product_id = p.id
+            JOIN warehouses w ON b.warehouse_id = w.id
+            WHERE b.expiry_date IS NOT NULL 
+              AND b.status = 'active'
+              AND b.quantity > 0
+              AND b.expiry_date <= CURRENT_DATE + :days * INTERVAL '1 day'
+        """
+        params = {"days": days}
+
+        if warehouse_id:
+            query += " AND b.warehouse_id = :wid"
+            params["wid"] = warehouse_id
+
+        query += " ORDER BY b.expiry_date ASC"
+
+        rows = db.execute(text(query), params).fetchall()
+
+        expired = []
+        expiring_soon = []
+        for r in rows:
+            item = dict(r._mapping)
+            if item.get("days_remaining") is not None:
+                item["days_remaining"] = int(item["days_remaining"].days) if hasattr(item["days_remaining"], 'days') else int(item["days_remaining"])
+            if item["alert_status"] == "expired":
+                expired.append(item)
+            else:
+                expiring_soon.append(item)
+
+        return {
+            "expired": expired,
+            "expired_count": len(expired),
+            "expiring_soon": expiring_soon,
+            "expiring_soon_count": len(expiring_soon),
+            "total_alerts": len(expired) + len(expiring_soon)
+        }
+    finally:
+        db.close()
+
+
+@batches_router.get("/batches/{batch_id}", dependencies=[Depends(require_permission("stock.view"))])
+def get_batch(batch_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل دفعة محددة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        batch = db.execute(text("""
+            SELECT b.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   s.name as supplier_name
+            FROM product_batches b
+            JOIN products p ON b.product_id = p.id
+            JOIN warehouses w ON b.warehouse_id = w.id
+            LEFT JOIN parties s ON b.supplier_id = s.id
+            WHERE b.id = :id
+        """), {"id": batch_id}).fetchone()
+
+        if not batch:
+            raise HTTPException(status_code=404, detail="الدفعة غير موجودة")
+
+        result = dict(batch._mapping)
+
+        # Get movements for this batch
+        movements = db.execute(text("""
+            SELECT bsm.*, cu.full_name as user_name
+            FROM batch_serial_movements bsm
+            LEFT JOIN company_users cu ON bsm.created_by = cu.id
+            WHERE bsm.batch_id = :bid
+            ORDER BY bsm.created_at DESC
+        """), {"bid": batch_id}).fetchall()
+
+        result["movements"] = [dict(m._mapping) for m in movements]
+
+        # Get serials in this batch
+        serials = db.execute(text("""
+            SELECT id, serial_number, status, created_at
+            FROM product_serials
+            WHERE batch_id = :bid
+            ORDER BY serial_number
+        """), {"bid": batch_id}).fetchall()
+
+        result["serials"] = [dict(s._mapping) for s in serials]
+
+        return result
+    finally:
+        db.close()
+
+
+@batches_router.post("/batches", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
+def create_batch(
+    batch: BatchCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء دفعة جديدة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check product exists and has batch tracking
+        product = db.execute(text("""
+            SELECT id, product_name, has_batch_tracking FROM products WHERE id = :id
+        """), {"id": batch.product_id}).fetchone()
+
+        if not product:
+            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+        # Check duplicate batch number
+        exists = db.execute(text("""
+            SELECT 1 FROM product_batches 
+            WHERE product_id = :pid AND warehouse_id = :wid AND batch_number = :bn
+        """), {"pid": batch.product_id, "wid": batch.warehouse_id, "bn": batch.batch_number}).fetchone()
+
+        if exists:
+            raise HTTPException(status_code=400, detail="رقم الدفعة موجود بالفعل لهذا المنتج في هذا المستودع")
+
+        result = db.execute(text("""
+            INSERT INTO product_batches (
+                product_id, warehouse_id, batch_number, manufacturing_date, expiry_date,
+                quantity, available_quantity, unit_cost, supplier_id, notes, 
+                created_by, status
+            ) VALUES (
+                :pid, :wid, :bn, :mdate, :edate,
+                :qty, :qty, :cost, :sid, :notes,
+                :uid, 'active'
+            ) RETURNING id, created_at
+        """), {
+            "pid": batch.product_id,
+            "wid": batch.warehouse_id,
+            "bn": batch.batch_number,
+            "mdate": batch.manufacturing_date,
+            "edate": batch.expiry_date,
+            "qty": batch.quantity,
+            "cost": batch.unit_cost,
+            "sid": batch.supplier_id,
+            "notes": batch.notes,
+            "uid": current_user.id
+        }).fetchone()
+
+        # If quantity > 0, update inventory and log movement
+        if batch.quantity > 0:
+            # Upsert inventory
+            inv = db.execute(text("""
+                SELECT id FROM inventory WHERE product_id = :pid AND warehouse_id = :wid
+            """), {"pid": batch.product_id, "wid": batch.warehouse_id}).fetchone()
+
+            if inv:
+                db.execute(text("""
+                    UPDATE inventory SET quantity = quantity + :qty, updated_at = NOW()
+                    WHERE product_id = :pid AND warehouse_id = :wid
+                """), {"qty": batch.quantity, "pid": batch.product_id, "wid": batch.warehouse_id})
+            else:
+                db.execute(text("""
+                    INSERT INTO inventory (product_id, warehouse_id, quantity)
+                    VALUES (:pid, :wid, :qty)
+                """), {"pid": batch.product_id, "wid": batch.warehouse_id, "qty": batch.quantity})
+
+            # Log inventory transaction
+            db.execute(text("""
+                INSERT INTO inventory_transactions (
+                    product_id, warehouse_id, transaction_type, reference_type,
+                    reference_id, quantity, unit_cost, total_cost, notes, created_by
+                ) VALUES (
+                    :pid, :wid, 'batch_in', 'batch',
+                    :bid, :qty, :cost, :total, :notes, :uid
+                )
+            """), {
+                "pid": batch.product_id,
+                "wid": batch.warehouse_id,
+                "bid": result.id,
+                "qty": batch.quantity,
+                "cost": batch.unit_cost,
+                "total": batch.quantity * batch.unit_cost,
+                "notes": f"إضافة دفعة {batch.batch_number}",
+                "uid": current_user.id
+            })
+
+            # Log batch movement
+            db.execute(text("""
+                INSERT INTO batch_serial_movements (
+                    product_id, batch_id, warehouse_id, movement_type,
+                    reference_type, quantity, notes, created_by
+                ) VALUES (
+                    :pid, :bid, :wid, 'batch_create',
+                    'batch', :qty, :notes, :uid
+                )
+            """), {
+                "pid": batch.product_id,
+                "bid": result.id,
+                "wid": batch.warehouse_id,
+                "qty": batch.quantity,
+                "notes": f"إنشاء دفعة {batch.batch_number}",
+                "uid": current_user.id
+            })
+
+        # Enable batch tracking on product if not already
+        db.execute(text("""
+            UPDATE products SET has_batch_tracking = TRUE WHERE id = :pid AND has_batch_tracking = FALSE
+        """), {"pid": batch.product_id})
+
+        db.commit()
+
+        return {
+            "id": result.id,
+            "batch_number": batch.batch_number,
+            "message": "تم إنشاء الدفعة بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating batch: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.put("/batches/{batch_id}", dependencies=[Depends(require_permission("stock.manage"))])
+def update_batch(
+    batch_id: int,
+    data: BatchUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث بيانات دفعة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        batch = db.execute(text("SELECT id FROM product_batches WHERE id = :id"), {"id": batch_id}).fetchone()
+        if not batch:
+            raise HTTPException(status_code=404, detail="الدفعة غير موجودة")
+
+        updates = []
+        params = {"id": batch_id}
+
+        if data.manufacturing_date is not None:
+            updates.append("manufacturing_date = :mdate")
+            params["mdate"] = data.manufacturing_date
+        if data.expiry_date is not None:
+            updates.append("expiry_date = :edate")
+            params["edate"] = data.expiry_date
+        if data.notes is not None:
+            updates.append("notes = :notes")
+            params["notes"] = data.notes
+        if data.status is not None:
+            updates.append("status = :status")
+            params["status"] = data.status
+
+        if updates:
+            updates.append("updated_at = NOW()")
+            db.execute(text(f"UPDATE product_batches SET {', '.join(updates)} WHERE id = :id"), params)
+            db.commit()
+
+        return {"message": "تم تحديث الدفعة بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.get("/batches/product/{product_id}", dependencies=[Depends(require_permission("stock.view"))])
+def get_product_batches(
+    product_id: int,
+    warehouse_id: Optional[int] = None,
+    active_only: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب دفعات منتج محدد (FEFO: الأقرب انتهاءً أولاً)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT b.*, w.warehouse_name
+            FROM product_batches b
+            JOIN warehouses w ON b.warehouse_id = w.id
+            WHERE b.product_id = :pid
+        """
+        params = {"pid": product_id}
+
+        if warehouse_id:
+            query += " AND b.warehouse_id = :wid"
+            params["wid"] = warehouse_id
+        if active_only:
+            query += " AND b.status = 'active' AND b.quantity > 0"
+
+        # FEFO: First Expired First Out
+        query += " ORDER BY COALESCE(b.expiry_date, '9999-12-31') ASC, b.created_at ASC"
+
+        rows = db.execute(text(query), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+# ============ SERIAL NUMBER ENDPOINTS ============
+
+@batches_router.get("/serials", dependencies=[Depends(require_permission("stock.view"))])
+def list_serials(
+    product_id: Optional[int] = None,
+    warehouse_id: Optional[int] = None,
+    batch_id: Optional[int] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """قائمة الأرقام التسلسلية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT s.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   b.batch_number
+            FROM product_serials s
+            JOIN products p ON s.product_id = p.id
+            LEFT JOIN warehouses w ON s.warehouse_id = w.id
+            LEFT JOIN product_batches b ON s.batch_id = b.id
+            WHERE 1=1
+        """
+        params = {"limit": limit, "skip": skip}
+
+        if product_id:
+            query += " AND s.product_id = :pid"
+            params["pid"] = product_id
+        if warehouse_id:
+            query += " AND s.warehouse_id = :wid"
+            params["wid"] = warehouse_id
+        if batch_id:
+            query += " AND s.batch_id = :bid"
+            params["bid"] = batch_id
+        if status:
+            query += " AND s.status = :status"
+            params["status"] = status
+        if search:
+            query += " AND (s.serial_number ILIKE :search OR p.product_name ILIKE :search)"
+            params["search"] = f"%{search}%"
+
+        query += " ORDER BY s.created_at DESC LIMIT :limit OFFSET :skip"
+        rows = db.execute(text(query), params).fetchall()
+
+        # Count
+        count_query = "SELECT COUNT(*) FROM product_serials s WHERE 1=1"
+        count_params = {}
+        if product_id:
+            count_query += " AND s.product_id = :pid"
+            count_params["pid"] = product_id
+        if status:
+            count_query += " AND s.status = :status"
+            count_params["status"] = status
+
+        total = db.execute(text(count_query), count_params).scalar() or 0
+
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total
+        }
+    finally:
+        db.close()
+
+
+@batches_router.get("/serials/{serial_id}", dependencies=[Depends(require_permission("stock.view"))])
+def get_serial(serial_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل رقم تسلسلي محدد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        serial = db.execute(text("""
+            SELECT s.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   b.batch_number,
+                   c.name as customer_name
+            FROM product_serials s
+            JOIN products p ON s.product_id = p.id
+            LEFT JOIN warehouses w ON s.warehouse_id = w.id
+            LEFT JOIN product_batches b ON s.batch_id = b.id
+            LEFT JOIN parties c ON s.customer_id = c.id
+            WHERE s.id = :id
+        """), {"id": serial_id}).fetchone()
+
+        if not serial:
+            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+
+        result = dict(serial._mapping)
+
+        # Get movement history
+        movements = db.execute(text("""
+            SELECT bsm.*, cu.full_name as user_name
+            FROM batch_serial_movements bsm
+            LEFT JOIN company_users cu ON bsm.created_by = cu.id
+            WHERE bsm.serial_id = :sid
+            ORDER BY bsm.created_at DESC
+        """), {"sid": serial_id}).fetchall()
+
+        result["movements"] = [dict(m._mapping) for m in movements]
+
+        return result
+    finally:
+        db.close()
+
+
+@batches_router.get("/serials/lookup/{serial_number}", dependencies=[Depends(require_permission("stock.view"))])
+def lookup_serial(serial_number: str, current_user: dict = Depends(get_current_user)):
+    """البحث عن رقم تسلسلي بالرقم"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        serial = db.execute(text("""
+            SELECT s.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   b.batch_number,
+                   c.name as customer_name
+            FROM product_serials s
+            JOIN products p ON s.product_id = p.id
+            LEFT JOIN warehouses w ON s.warehouse_id = w.id
+            LEFT JOIN product_batches b ON s.batch_id = b.id
+            LEFT JOIN parties c ON s.customer_id = c.id
+            WHERE s.serial_number = :sn
+        """), {"sn": serial_number}).fetchone()
+
+        if not serial:
+            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+
+        result = dict(serial._mapping)
+
+        # Get movement history
+        movements = db.execute(text("""
+            SELECT bsm.*, cu.full_name as user_name
+            FROM batch_serial_movements bsm
+            LEFT JOIN company_users cu ON bsm.created_by = cu.id
+            WHERE bsm.serial_id = :sid
+            ORDER BY bsm.created_at DESC
+        """), {"sid": serial.id}).fetchall()
+
+        result["movements"] = [dict(m._mapping) for m in movements]
+
+        return result
+    finally:
+        db.close()
+
+
+@batches_router.post("/serials", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
+def create_serial(
+    serial: SerialCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء رقم تسلسلي واحد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Validate product
+        product = db.execute(text("SELECT id, product_name FROM products WHERE id = :id"), {"id": serial.product_id}).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+        # Check duplicate
+        exists = db.execute(text("""
+            SELECT 1 FROM product_serials WHERE product_id = :pid AND serial_number = :sn
+        """), {"pid": serial.product_id, "sn": serial.serial_number}).fetchone()
+
+        if exists:
+            raise HTTPException(status_code=400, detail="الرقم التسلسلي موجود بالفعل لهذا المنتج")
+
+        result = db.execute(text("""
+            INSERT INTO product_serials (
+                product_id, warehouse_id, serial_number, batch_id,
+                purchase_price, warranty_start, warranty_end,
+                status, notes, created_by
+            ) VALUES (
+                :pid, :wid, :sn, :bid,
+                :price, :ws, :we,
+                'available', :notes, :uid
+            ) RETURNING id, created_at
+        """), {
+            "pid": serial.product_id,
+            "wid": serial.warehouse_id,
+            "sn": serial.serial_number,
+            "bid": serial.batch_id,
+            "price": serial.purchase_price,
+            "ws": serial.warranty_start,
+            "we": serial.warranty_end,
+            "notes": serial.notes,
+            "uid": current_user.id
+        }).fetchone()
+
+        # Log movement
+        db.execute(text("""
+            INSERT INTO batch_serial_movements (
+                product_id, serial_id, warehouse_id, movement_type,
+                reference_type, quantity, notes, created_by
+            ) VALUES (
+                :pid, :sid, :wid, 'serial_create',
+                'serial', 1, :notes, :uid
+            )
+        """), {
+            "pid": serial.product_id,
+            "sid": result.id,
+            "wid": serial.warehouse_id,
+            "notes": f"إنشاء رقم تسلسلي {serial.serial_number}",
+            "uid": current_user.id
+        })
+
+        # Enable serial tracking
+        db.execute(text("UPDATE products SET has_serial_tracking = TRUE WHERE id = :pid"), {"pid": serial.product_id})
+
+        db.commit()
+        return {"id": result.id, "serial_number": serial.serial_number, "message": "تم إنشاء الرقم التسلسلي بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating serial: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.post("/serials/bulk", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
+def create_serials_bulk(
+    data: SerialBulkCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء أرقام تسلسلية دفعة واحدة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        if data.count > 1000:
+            raise HTTPException(status_code=400, detail="الحد الأقصى 1000 رقم تسلسلي في المرة الواحدة")
+
+        product = db.execute(text("SELECT id FROM products WHERE id = :id"), {"id": data.product_id}).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+        created = []
+        failed = []
+
+        for i in range(data.count):
+            num = data.start_number + i
+            serial_number = f"{data.prefix}{str(num).zfill(len(str(data.start_number + data.count)))}"
+
+            try:
+                result = db.execute(text("""
+                    INSERT INTO product_serials (
+                        product_id, warehouse_id, serial_number, batch_id,
+                        purchase_price, status, notes, created_by
+                    ) VALUES (
+                        :pid, :wid, :sn, :bid,
+                        :price, 'available', :notes, :uid
+                    ) RETURNING id
+                """), {
+                    "pid": data.product_id,
+                    "wid": data.warehouse_id,
+                    "sn": serial_number,
+                    "bid": data.batch_id,
+                    "price": data.purchase_price,
+                    "notes": data.notes,
+                    "uid": current_user.id
+                }).fetchone()
+
+                # Log movement
+                db.execute(text("""
+                    INSERT INTO batch_serial_movements (
+                        product_id, serial_id, warehouse_id, movement_type,
+                        reference_type, quantity, notes, created_by
+                    ) VALUES (:pid, :sid, :wid, 'serial_create', 'serial', 1, :notes, :uid)
+                """), {
+                    "pid": data.product_id, "sid": result.id, "wid": data.warehouse_id,
+                    "notes": f"إنشاء رقم تسلسلي {serial_number}", "uid": current_user.id
+                })
+
+                created.append(serial_number)
+            except Exception as e:
+                failed.append({"serial": serial_number, "error": str(e)})
+                db.rollback()
+                continue
+
+        # Enable serial tracking
+        db.execute(text("UPDATE products SET has_serial_tracking = TRUE WHERE id = :pid"), {"pid": data.product_id})
+
+        db.commit()
+        return {
+            "message": f"تم إنشاء {len(created)} رقم تسلسلي",
+            "created_count": len(created),
+            "failed_count": len(failed),
+            "created": created[:20],  # Return first 20 only
+            "failed": failed
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.put("/serials/{serial_id}", dependencies=[Depends(require_permission("stock.manage"))])
+def update_serial(
+    serial_id: int,
+    data: SerialUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث بيانات رقم تسلسلي"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        serial = db.execute(text("SELECT id, serial_number FROM product_serials WHERE id = :id"), {"id": serial_id}).fetchone()
+        if not serial:
+            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+
+        updates = []
+        params = {"id": serial_id}
+
+        if data.status is not None:
+            updates.append("status = :status")
+            params["status"] = data.status
+        if data.warranty_start is not None:
+            updates.append("warranty_start = :ws")
+            params["ws"] = data.warranty_start
+        if data.warranty_end is not None:
+            updates.append("warranty_end = :we")
+            params["we"] = data.warranty_end
+        if data.notes is not None:
+            updates.append("notes = :notes")
+            params["notes"] = data.notes
+
+        if updates:
+            updates.append("updated_at = NOW()")
+            db.execute(text(f"UPDATE product_serials SET {', '.join(updates)} WHERE id = :id"), params)
+            db.commit()
+
+        return {"message": "تم تحديث الرقم التسلسلي بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ============ PRODUCT TRACKING CONFIG ============
+
+@batches_router.put("/products/{product_id}/tracking", dependencies=[Depends(require_permission("products.edit"))])
+def update_product_tracking(
+    product_id: int,
+    has_batch_tracking: Optional[bool] = None,
+    has_serial_tracking: Optional[bool] = None,
+    has_expiry_tracking: Optional[bool] = None,
+    shelf_life_days: Optional[int] = None,
+    expiry_alert_days: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث إعدادات تتبع المنتج"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        product = db.execute(text("SELECT id FROM products WHERE id = :id"), {"id": product_id}).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+
+        updates = []
+        params = {"id": product_id}
+
+        if has_batch_tracking is not None:
+            updates.append("has_batch_tracking = :hbt")
+            params["hbt"] = has_batch_tracking
+        if has_serial_tracking is not None:
+            updates.append("has_serial_tracking = :hst")
+            params["hst"] = has_serial_tracking
+        if has_expiry_tracking is not None:
+            updates.append("has_expiry_tracking = :het")
+            params["het"] = has_expiry_tracking
+        if shelf_life_days is not None:
+            updates.append("shelf_life_days = :sld")
+            params["sld"] = shelf_life_days
+        if expiry_alert_days is not None:
+            updates.append("expiry_alert_days = :ead")
+            params["ead"] = expiry_alert_days
+
+        if updates:
+            db.execute(text(f"UPDATE products SET {', '.join(updates)}, updated_at = NOW() WHERE id = :id"), params)
+            db.commit()
+
+        return {"message": "تم تحديث إعدادات التتبع بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ============ QUALITY CONTROL ============
+
+@batches_router.get("/quality-inspections", dependencies=[Depends(require_permission("stock.view"))])
+def list_quality_inspections(
+    product_id: Optional[int] = None,
+    status: Optional[str] = None,
+    inspection_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """قائمة فحوصات الجودة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT qi.*, 
+                   p.product_name, p.product_code,
+                   w.warehouse_name,
+                   b.batch_number,
+                   ins.full_name as inspector_name
+            FROM quality_inspections qi
+            JOIN products p ON qi.product_id = p.id
+            LEFT JOIN warehouses w ON qi.warehouse_id = w.id
+            LEFT JOIN product_batches b ON qi.batch_id = b.id
+            LEFT JOIN company_users ins ON qi.inspector_id = ins.id
+            WHERE 1=1
+        """
+        params = {"limit": limit, "skip": skip}
+
+        if product_id:
+            query += " AND qi.product_id = :pid"
+            params["pid"] = product_id
+        if status:
+            query += " AND qi.status = :status"
+            params["status"] = status
+        if inspection_type:
+            query += " AND qi.inspection_type = :itype"
+            params["itype"] = inspection_type
+
+        query += " ORDER BY qi.created_at DESC LIMIT :limit OFFSET :skip"
+        rows = db.execute(text(query), params).fetchall()
+
+        total = db.execute(text("SELECT COUNT(*) FROM quality_inspections"), {}).scalar() or 0
+
+        return {"items": [dict(r._mapping) for r in rows], "total": total}
+    finally:
+        db.close()
+
+
+@batches_router.get("/quality-inspections/{inspection_id}", dependencies=[Depends(require_permission("stock.view"))])
+def get_quality_inspection(inspection_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل فحص جودة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        qi = db.execute(text("""
+            SELECT qi.*, p.product_name, p.product_code, w.warehouse_name,
+                   b.batch_number, ins.full_name as inspector_name
+            FROM quality_inspections qi
+            JOIN products p ON qi.product_id = p.id
+            LEFT JOIN warehouses w ON qi.warehouse_id = w.id
+            LEFT JOIN product_batches b ON qi.batch_id = b.id
+            LEFT JOIN company_users ins ON qi.inspector_id = ins.id
+            WHERE qi.id = :id
+        """), {"id": inspection_id}).fetchone()
+
+        if not qi:
+            raise HTTPException(status_code=404, detail="فحص الجودة غير موجود")
+
+        result = dict(qi._mapping)
+
+        # Get criteria
+        criteria = db.execute(text("""
+            SELECT * FROM quality_inspection_criteria WHERE inspection_id = :iid ORDER BY id
+        """), {"iid": inspection_id}).fetchall()
+
+        result["criteria"] = [dict(c._mapping) for c in criteria]
+        return result
+    finally:
+        db.close()
+
+
+class QualityInspectionCreate(BaseModel):
+    inspection_type: str  # incoming, outgoing, in_process, periodic
+    product_id: int
+    warehouse_id: Optional[int] = None
+    batch_id: Optional[int] = None
+    reference_type: Optional[str] = None
+    reference_id: Optional[int] = None
+    inspected_quantity: float = 0
+    criteria: Optional[list] = []
+    notes: Optional[str] = None
+
+
+class QualityInspectionComplete(BaseModel):
+    accepted_quantity: float = 0
+    rejected_quantity: float = 0
+    status: str  # passed, failed, partial
+    result_notes: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    criteria: Optional[list] = []
+
+
+@batches_router.post("/quality-inspections", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
+def create_quality_inspection(
+    data: QualityInspectionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء فحص جودة جديد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Generate inspection number
+        count = db.execute(text("SELECT COUNT(*) FROM quality_inspections")).scalar() or 0
+        inspection_number = f"QI-{datetime.now().year}-{str(count + 1).zfill(5)}"
+
+        result = db.execute(text("""
+            INSERT INTO quality_inspections (
+                inspection_number, inspection_type, product_id, warehouse_id,
+                batch_id, reference_type, reference_id, inspected_quantity,
+                status, created_by
+            ) VALUES (
+                :num, :type, :pid, :wid, :bid, :rtype, :rid, :qty,
+                'pending', :uid
+            ) RETURNING id
+        """), {
+            "num": inspection_number,
+            "type": data.inspection_type,
+            "pid": data.product_id,
+            "wid": data.warehouse_id,
+            "bid": data.batch_id,
+            "rtype": data.reference_type,
+            "rid": data.reference_id,
+            "qty": data.inspected_quantity,
+            "uid": current_user.id
+        }).fetchone()
+
+        # Add criteria
+        for criterion in (data.criteria or []):
+            db.execute(text("""
+                INSERT INTO quality_inspection_criteria (
+                    inspection_id, criteria_name, expected_value
+                ) VALUES (:iid, :name, :expected)
+            """), {
+                "iid": result.id,
+                "name": criterion.get("name", ""),
+                "expected": criterion.get("expected_value", "")
+            })
+
+        db.commit()
+        return {"id": result.id, "inspection_number": inspection_number, "message": "تم إنشاء فحص الجودة بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating QI: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.put("/quality-inspections/{inspection_id}/complete", dependencies=[Depends(require_permission("stock.manage"))])
+def complete_quality_inspection(
+    inspection_id: int,
+    data: QualityInspectionComplete,
+    current_user: dict = Depends(get_current_user)
+):
+    """إكمال فحص الجودة وتسجيل النتيجة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        qi = db.execute(text("SELECT * FROM quality_inspections WHERE id = :id"), {"id": inspection_id}).fetchone()
+        if not qi:
+            raise HTTPException(status_code=404, detail="فحص الجودة غير موجود")
+
+        db.execute(text("""
+            UPDATE quality_inspections SET
+                accepted_quantity = :accepted,
+                rejected_quantity = :rejected,
+                status = :status,
+                result_notes = :notes,
+                rejection_reason = :reason,
+                inspector_id = :uid,
+                completed_date = NOW(),
+                updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "accepted": data.accepted_quantity,
+            "rejected": data.rejected_quantity,
+            "status": data.status,
+            "notes": data.result_notes,
+            "reason": data.rejection_reason,
+            "uid": current_user.id,
+            "id": inspection_id
+        })
+
+        # Update criteria
+        for criterion in (data.criteria or []):
+            if criterion.get("id"):
+                db.execute(text("""
+                    UPDATE quality_inspection_criteria SET
+                        actual_value = :actual,
+                        is_passed = :passed,
+                        notes = :notes
+                    WHERE id = :id
+                """), {
+                    "actual": criterion.get("actual_value", ""),
+                    "passed": criterion.get("is_passed", False),
+                    "notes": criterion.get("notes", ""),
+                    "id": criterion["id"]
+                })
+
+        db.commit()
+        return {"message": "تم إكمال فحص الجودة بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ============ CYCLE COUNTS ============
+
+class CycleCountCreate(BaseModel):
+    warehouse_id: int
+    count_type: str = "full"  # full, partial, category
+    scheduled_date: Optional[str] = None
+    product_ids: Optional[list] = None  # For partial count
+    notes: Optional[str] = None
+
+
+class CycleCountItemUpdate(BaseModel):
+    id: int
+    counted_quantity: float
+    notes: Optional[str] = None
+
+
+class CycleCountComplete(BaseModel):
+    items: List[CycleCountItemUpdate]
+    auto_adjust: bool = False
+
+
+@batches_router.get("/cycle-counts", dependencies=[Depends(require_permission("stock.view"))])
+def list_cycle_counts(
+    warehouse_id: Optional[int] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """قائمة الجرد الدوري"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT cc.*, w.warehouse_name, cu.full_name as created_by_name
+            FROM cycle_counts cc
+            JOIN warehouses w ON cc.warehouse_id = w.id
+            LEFT JOIN company_users cu ON cc.created_by = cu.id
+            WHERE 1=1
+        """
+        params = {"limit": limit, "skip": skip}
+
+        if warehouse_id:
+            query += " AND cc.warehouse_id = :wid"
+            params["wid"] = warehouse_id
+        if status:
+            query += " AND cc.status = :status"
+            params["status"] = status
+
+        query += " ORDER BY cc.created_at DESC LIMIT :limit OFFSET :skip"
+        rows = db.execute(text(query), params).fetchall()
+
+        total = db.execute(text("SELECT COUNT(*) FROM cycle_counts"), {}).scalar() or 0
+
+        return {"items": [dict(r._mapping) for r in rows], "total": total}
+    finally:
+        db.close()
+
+
+@batches_router.get("/cycle-counts/{count_id}", dependencies=[Depends(require_permission("stock.view"))])
+def get_cycle_count(count_id: int, current_user: dict = Depends(get_current_user)):
+    """تفاصيل الجرد الدوري"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        cc = db.execute(text("""
+            SELECT cc.*, w.warehouse_name, cu.full_name as created_by_name
+            FROM cycle_counts cc
+            JOIN warehouses w ON cc.warehouse_id = w.id
+            LEFT JOIN company_users cu ON cc.created_by = cu.id
+            WHERE cc.id = :id
+        """), {"id": count_id}).fetchone()
+
+        if not cc:
+            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+
+        result = dict(cc._mapping)
+
+        # Get items
+        items = db.execute(text("""
+            SELECT cci.*, p.product_name, p.product_code,
+                   cu.full_name as counted_by_name
+            FROM cycle_count_items cci
+            JOIN products p ON cci.product_id = p.id
+            LEFT JOIN company_users cu ON cci.counted_by = cu.id
+            WHERE cci.cycle_count_id = :ccid
+            ORDER BY p.product_name
+        """), {"ccid": count_id}).fetchall()
+
+        result["items"] = [dict(i._mapping) for i in items]
+        return result
+    finally:
+        db.close()
+
+
+@batches_router.post("/cycle-counts", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
+def create_cycle_count(
+    data: CycleCountCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """إنشاء جرد دوري جديد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Generate count number
+        count = db.execute(text("SELECT COUNT(*) FROM cycle_counts")).scalar() or 0
+        count_number = f"CC-{datetime.now().year}-{str(count + 1).zfill(5)}"
+
+        # Get products to count
+        if data.count_type == "full":
+            # All products in warehouse
+            products = db.execute(text("""
+                SELECT i.product_id, i.quantity, COALESCE(p.cost_price, 0) as cost
+                FROM inventory i
+                JOIN products p ON i.product_id = p.id
+                WHERE i.warehouse_id = :wid AND p.product_type = 'product'
+            """), {"wid": data.warehouse_id}).fetchall()
+        elif data.product_ids:
+            products = db.execute(text("""
+                SELECT i.product_id, i.quantity, COALESCE(p.cost_price, 0) as cost
+                FROM inventory i
+                JOIN products p ON i.product_id = p.id
+                WHERE i.warehouse_id = :wid AND i.product_id = ANY(:pids)
+            """), {"wid": data.warehouse_id, "pids": data.product_ids}).fetchall()
+        else:
+            products = []
+
+        result = db.execute(text("""
+            INSERT INTO cycle_counts (
+                count_number, warehouse_id, count_type, status,
+                scheduled_date, total_items, notes, created_by
+            ) VALUES (
+                :num, :wid, :type, 'draft',
+                :sdate, :total, :notes, :uid
+            ) RETURNING id
+        """), {
+            "num": count_number,
+            "wid": data.warehouse_id,
+            "type": data.count_type,
+            "sdate": data.scheduled_date,
+            "total": len(products),
+            "notes": data.notes,
+            "uid": current_user.id
+        }).fetchone()
+
+        # Create count items
+        for prod in products:
+            db.execute(text("""
+                INSERT INTO cycle_count_items (
+                    cycle_count_id, product_id, system_quantity, unit_cost, status
+                ) VALUES (:ccid, :pid, :qty, :cost, 'pending')
+            """), {
+                "ccid": result.id,
+                "pid": prod.product_id,
+                "qty": float(prod.quantity),
+                "cost": float(prod.cost)
+            })
+
+        db.commit()
+        return {
+            "id": result.id,
+            "count_number": count_number,
+            "total_items": len(products),
+            "message": "تم إنشاء الجرد الدوري بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating cycle count: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.put("/cycle-counts/{count_id}/start", dependencies=[Depends(require_permission("stock.manage"))])
+def start_cycle_count(count_id: int, current_user: dict = Depends(get_current_user)):
+    """بدء الجرد الدوري"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        cc = db.execute(text("SELECT status FROM cycle_counts WHERE id = :id"), {"id": count_id}).fetchone()
+        if not cc:
+            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+        if cc.status != 'draft':
+            raise HTTPException(status_code=400, detail="لا يمكن بدء جرد ليس في حالة مسودة")
+
+        db.execute(text("""
+            UPDATE cycle_counts SET status = 'in_progress', start_date = NOW(), updated_at = NOW()
+            WHERE id = :id
+        """), {"id": count_id})
+        db.commit()
+        return {"message": "تم بدء الجرد الدوري"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@batches_router.put("/cycle-counts/{count_id}/complete", dependencies=[Depends(require_permission("stock.manage"))])
+def complete_cycle_count(
+    count_id: int,
+    data: CycleCountComplete,
+    current_user: dict = Depends(get_current_user)
+):
+    """إكمال الجرد الدوري وحساب الفروقات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        cc = db.execute(text("SELECT * FROM cycle_counts WHERE id = :id"), {"id": count_id}).fetchone()
+        if not cc:
+            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+
+        variance_count = 0
+        counted_count = 0
+
+        for item in data.items:
+            # Get count item
+            cci = db.execute(text("""
+                SELECT * FROM cycle_count_items WHERE id = :id AND cycle_count_id = :ccid
+            """), {"id": item.id, "ccid": count_id}).fetchone()
+
+            if not cci:
+                continue
+
+            variance = item.counted_quantity - float(cci.system_quantity)
+            variance_value = variance * float(cci.unit_cost)
+
+            db.execute(text("""
+                UPDATE cycle_count_items SET
+                    counted_quantity = :qty,
+                    variance = :var,
+                    variance_value = :vval,
+                    status = 'counted',
+                    counted_by = :uid,
+                    counted_at = NOW(),
+                    notes = :notes
+                WHERE id = :id
+            """), {
+                "qty": item.counted_quantity,
+                "var": variance,
+                "vval": variance_value,
+                "uid": current_user.id,
+                "notes": item.notes,
+                "id": item.id
+            })
+
+            counted_count += 1
+            if variance != 0:
+                variance_count += 1
+
+                # Auto adjust inventory if requested
+                if data.auto_adjust:
+                    db.execute(text("""
+                        UPDATE inventory SET quantity = :qty, updated_at = NOW()
+                        WHERE product_id = :pid AND warehouse_id = :wid
+                    """), {
+                        "qty": item.counted_quantity,
+                        "pid": cci.product_id,
+                        "wid": cc.warehouse_id
+                    })
+
+                    # Log adjustment
+                    adj_type = 'adjustment_in' if variance > 0 else 'adjustment_out'
+                    db.execute(text("""
+                        INSERT INTO inventory_transactions (
+                            product_id, warehouse_id, transaction_type, reference_type,
+                            reference_id, quantity, notes, created_by
+                        ) VALUES (
+                            :pid, :wid, :type, 'cycle_count', :ccid, :qty,
+                            :notes, :uid
+                        )
+                    """), {
+                        "pid": cci.product_id,
+                        "wid": cc.warehouse_id,
+                        "type": adj_type,
+                        "ccid": count_id,
+                        "qty": variance,
+                        "notes": f"تسوية جرد دوري {cc.count_number}",
+                        "uid": current_user.id
+                    })
+
+        # Update cycle count
+        db.execute(text("""
+            UPDATE cycle_counts SET
+                status = 'completed',
+                end_date = NOW(),
+                counted_items = :counted,
+                variance_items = :variance,
+                updated_at = NOW()
+            WHERE id = :id
+        """), {"counted": counted_count, "variance": variance_count, "id": count_id})
+
+        db.commit()
+        return {
+            "message": "تم إكمال الجرد الدوري بنجاح",
+            "counted_items": counted_count,
+            "variance_items": variance_count,
+            "auto_adjusted": data.auto_adjust
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error completing cycle count: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

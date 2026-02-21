@@ -1,0 +1,364 @@
+import React, { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import { reportsAPI } from '../../utils/api'
+import { useToast } from '../../context/ToastContext'
+
+import DateInput from '../../components/common/DateInput';
+const REPORT_TYPES = {
+    'profit-loss': { ar: 'قائمة الدخل', en: 'Income Statement' },
+    'balance-sheet': { ar: 'الميزانية العمومية', en: 'Balance Sheet' },
+    'trial-balance': { ar: 'ميزان المراجعة', en: 'Trial Balance' },
+}
+
+const PRESET_PERIODS = {
+    'yoy': { ar: 'سنة بسنة', en: 'Year over Year' },
+    'qoq': { ar: 'ربع بربع', en: 'Quarter over Quarter' },
+    'mom': { ar: 'شهر بشهر', en: 'Month over Month' },
+    'custom': { ar: 'مخصص', en: 'Custom' },
+}
+
+function getPresetPeriods(preset) {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth()
+    const q = Math.floor(m / 3)
+
+    switch (preset) {
+        case 'yoy':
+            return [
+                { start: `${y}-01-01`, end: `${y}-12-31`, label: `${y}` },
+                { start: `${y - 1}-01-01`, end: `${y - 1}-12-31`, label: `${y - 1}` },
+            ]
+        case 'qoq': {
+            const qStart = (qi) => {
+                const yr = qi < 0 ? y - 1 : y
+                const qq = qi < 0 ? qi + 4 : qi
+                const sm = qq * 3 + 1
+                return `${yr}-${String(sm).padStart(2, '0')}-01`
+            }
+            const qEnd = (qi) => {
+                const yr = qi < 0 ? y - 1 : y
+                const qq = qi < 0 ? qi + 4 : qi
+                const em = (qq + 1) * 3
+                const lastDay = new Date(yr, em, 0).getDate()
+                return `${yr}-${String(em).padStart(2, '0')}-${lastDay}`
+            }
+            return [
+                { start: qStart(q), end: qEnd(q), label: `Q${q + 1} ${y}` },
+                { start: qStart(q - 1), end: qEnd(q - 1), label: `Q${q > 0 ? q : 4} ${q > 0 ? y : y - 1}` },
+            ]
+        }
+        case 'mom': {
+            const mStart = (offset) => {
+                const d = new Date(y, m + offset, 1)
+                return d.toISOString().slice(0, 10)
+            }
+            const mEnd = (offset) => {
+                const d = new Date(y, m + offset + 1, 0)
+                return d.toISOString().slice(0, 10)
+            }
+            const mLabel = (offset) => {
+                const d = new Date(y, m + offset, 1)
+                return d.toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
+            }
+            return [
+                { start: mStart(0), end: mEnd(0), label: mLabel(0) },
+                { start: mStart(-1), end: mEnd(-1), label: mLabel(-1) },
+            ]
+        }
+        default:
+            return [
+                { start: `${y}-01-01`, end: `${y}-12-31`, label: `${y}` },
+                { start: `${y - 1}-01-01`, end: `${y - 1}-12-31`, label: `${y - 1}` },
+            ]
+    }
+}
+
+export default function PeriodComparison() {
+    const { t, i18n } = useTranslation()
+    const { showToast } = useToast()
+    const isAr = i18n.language === 'ar'
+
+    const [reportType, setReportType] = useState('profit-loss')
+    const [preset, setPreset] = useState('yoy')
+    const [customPeriods, setCustomPeriods] = useState(getPresetPeriods('yoy'))
+    const [loading, setLoading] = useState(false)
+    const [result, setResult] = useState(null)
+
+    const handlePresetChange = (p) => {
+        setPreset(p)
+        if (p !== 'custom') {
+            setCustomPeriods(getPresetPeriods(p))
+        }
+    }
+
+    const updatePeriod = (idx, field, val) => {
+        setCustomPeriods(ps => {
+            const copy = [...ps]
+            copy[idx] = { ...copy[idx], [field]: val }
+            return copy
+        })
+    }
+
+    const addPeriod = () => {
+        setPreset('custom')
+        setCustomPeriods(ps => [...ps, { start: '', end: '', label: '' }])
+    }
+
+    const removePeriod = (idx) => {
+        if (customPeriods.length <= 2) return
+        setCustomPeriods(ps => ps.filter((_, i) => i !== idx))
+    }
+
+    const fetchComparison = useCallback(async () => {
+        setLoading(true)
+        try {
+            let periodsStr
+            if (reportType === 'balance-sheet') {
+                periodsStr = customPeriods.map(p => p.end).join(',')
+            } else {
+                periodsStr = customPeriods.map(p => `${p.start}:${p.end}`).join(',')
+            }
+
+            let res
+            if (reportType === 'profit-loss') {
+                res = await reportsAPI.compareProfitLoss({ periods: periodsStr })
+            } else if (reportType === 'balance-sheet') {
+                res = await reportsAPI.compareBalanceSheet({ periods: periodsStr })
+            } else {
+                res = await reportsAPI.compareTrialBalance({ periods: periodsStr })
+            }
+            setResult(res.data)
+        } catch (err) {
+            showToast(err.response?.data?.detail || 'Error', 'error')
+        } finally {
+            setLoading(false)
+        }
+    }, [reportType, customPeriods])
+
+    const formatNum = (n) => {
+        if (n === 0 || n === undefined) return '-'
+        return parseFloat(n).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+
+    const changeColor = (val) => {
+        if (val > 0) return 'text-success'
+        if (val < 0) return 'text-danger'
+        return ''
+    }
+
+    const periodLabels = result?.periods?.map((p, i) => {
+        if (p.label) return p.label
+        if (p.date) return p.date
+        return `${p.start} → ${p.end}`
+    }) || []
+
+    const TYPE_LABELS = {
+        asset: isAr ? 'أصول' : 'Assets',
+        liability: isAr ? 'خصوم' : 'Liabilities',
+        equity: isAr ? 'حقوق ملكية' : 'Equity',
+        revenue: isAr ? 'إيرادات' : 'Revenue',
+        expense: isAr ? 'مصروفات' : 'Expenses',
+    }
+
+    return (
+        <div className="module-container" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="module-header">
+                <h2>📊 {isAr ? 'تقارير مقارنة الفترات' : 'Period Comparison Reports'}</h2>
+            </div>
+
+            {/* Controls */}
+            <div className="card mb-3">
+                <div className="card-body">
+                    <div className="row g-3 align-items-end">
+                        <div className="col-md-3">
+                            <label className="form-label">{isAr ? 'نوع التقرير' : 'Report Type'}</label>
+                            <select className="form-input" value={reportType} onChange={e => setReportType(e.target.value)}>
+                                {Object.entries(REPORT_TYPES).map(([k, v]) => (
+                                    <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="col-md-3">
+                            <label className="form-label">{isAr ? 'الفترة' : 'Period Preset'}</label>
+                            <select className="form-input" value={preset} onChange={e => handlePresetChange(e.target.value)}>
+                                {Object.entries(PRESET_PERIODS).map(([k, v]) => (
+                                    <option key={k} value={k}>{v[isAr ? 'ar' : 'en']}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="col-md-3">
+                            <button className="btn btn-primary" onClick={fetchComparison} disabled={loading}>
+                                {loading ? '⏳' : '🔍'} {isAr ? 'عرض المقارنة' : 'Compare'}
+                            </button>
+                        </div>
+                        <div className="col-md-3 text-end">
+                            <button className="btn btn-outline-secondary btn-sm" onClick={addPeriod}>
+                                + {isAr ? 'فترة إضافية' : 'Add Period'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Period inputs */}
+                    <div className="mt-3">
+                        {customPeriods.map((p, idx) => (
+                            <div key={idx} className="row g-2 mb-2 align-items-center">
+                                <div className="col-auto">
+                                    <span className="badge bg-primary">{isAr ? `فترة ${idx + 1}` : `Period ${idx + 1}`}</span>
+                                </div>
+                                <div className="col">
+                                    <DateInput className="form-input form-input-sm" value={p.start}
+                                        onChange={e => { updatePeriod(idx, 'start', e.target.value); setPreset('custom') }} />
+                                </div>
+                                <div className="col-auto">{isAr ? 'إلى' : 'to'}</div>
+                                <div className="col">
+                                    <DateInput className="form-input form-input-sm" value={p.end}
+                                        onChange={e => { updatePeriod(idx, 'end', e.target.value); setPreset('custom') }} />
+                                </div>
+                                <div className="col">
+                                    <input className="form-input form-input-sm" placeholder={isAr ? 'تسمية' : 'Label'}
+                                        value={p.label || ''} onChange={e => updatePeriod(idx, 'label', e.target.value)} />
+                                </div>
+                                <div className="col-auto">
+                                    {customPeriods.length > 2 && (
+                                        <button className="btn btn-sm btn-outline-danger" onClick={() => removePeriod(idx)}>✕</button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Results */}
+            {loading && <div className="text-center p-5"><div className="spinner-border" /></div>}
+
+            {!loading && result && (
+                <>
+                    {/* Summary Cards */}
+                    <div className="row g-3 mb-3">
+                        {result.summary.map((s, idx) => (
+                            <div key={idx} className="col-md">
+                                <div className="card">
+                                    <div className="card-header bg-light">
+                                        <strong>{periodLabels[idx]}</strong>
+                                    </div>
+                                    <div className="card-body p-2">
+                                        {reportType === 'profit-loss' && (
+                                            <div className="row text-center">
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'الإيرادات' : 'Revenue'}</div>
+                                                    <div className="fw-bold text-success">{formatNum(s.total_revenue)}</div>
+                                                </div>
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'المصروفات' : 'Expenses'}</div>
+                                                    <div className="fw-bold text-danger">{formatNum(s.total_expense)}</div>
+                                                </div>
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'صافي الدخل' : 'Net Income'}</div>
+                                                    <div className={`fw-bold ${s.net_income >= 0 ? 'text-success' : 'text-danger'}`}>
+                                                        {formatNum(s.net_income)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {reportType === 'balance-sheet' && (
+                                            <div className="row text-center">
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'الأصول' : 'Assets'}</div>
+                                                    <div className="fw-bold">{formatNum(s.total_assets)}</div>
+                                                </div>
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'الخصوم' : 'Liabilities'}</div>
+                                                    <div className="fw-bold">{formatNum(s.total_liabilities)}</div>
+                                                </div>
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'حقوق الملكية' : 'Equity'}</div>
+                                                    <div className="fw-bold">{formatNum(s.total_equity)}</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {reportType === 'trial-balance' && (
+                                            <div className="row text-center">
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'مدين' : 'Debit'}</div>
+                                                    <div className="fw-bold">{formatNum(s.total_debit)}</div>
+                                                </div>
+                                                <div className="col">
+                                                    <div className="small text-muted">{isAr ? 'دائن' : 'Credit'}</div>
+                                                    <div className="fw-bold">{formatNum(s.total_credit)}</div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Comparison Table */}
+                    <div className="card">
+                        <div className="card-body p-0">
+                            <div className="data-table-container">
+                                <table className="data-table table-hover mb-0">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>{isAr ? 'رقم الحساب' : 'Code'}</th>
+                                            <th>{isAr ? 'اسم الحساب' : 'Account'}</th>
+                                            <th>{isAr ? 'النوع' : 'Type'}</th>
+                                            {reportType === 'trial-balance' ? (
+                                                periodLabels.map((label, idx) => (
+                                                    <React.Fragment key={idx}>
+                                                        <th className="text-end">{label} ({isAr ? 'مدين' : 'Dr'})</th>
+                                                        <th className="text-end">{label} ({isAr ? 'دائن' : 'Cr'})</th>
+                                                    </React.Fragment>
+                                                ))
+                                            ) : (
+                                                <>
+                                                    {periodLabels.map((label, idx) => (
+                                                        <th key={idx} className="text-end">{label}</th>
+                                                    ))}
+                                                    <th className="text-end">{isAr ? 'التغيير' : 'Change'}</th>
+                                                    <th className="text-end">%</th>
+                                                </>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.comparison.map((row, idx) => (
+                                            <tr key={idx}>
+                                                <td className="text-muted small">{row.account_number}</td>
+                                                <td>{isAr ? row.name : (row.name_en || row.name)}</td>
+                                                <td><span className="badge bg-secondary">{TYPE_LABELS[row.account_type] || row.account_type}</span></td>
+                                                {reportType === 'trial-balance' ? (
+                                                    row.periods.map((p, pi) => (
+                                                        <React.Fragment key={pi}>
+                                                            <td className="text-end">{formatNum(p.debit)}</td>
+                                                            <td className="text-end">{formatNum(p.credit)}</td>
+                                                        </React.Fragment>
+                                                    ))
+                                                ) : (
+                                                    <>
+                                                        {row.periods.map((val, pi) => (
+                                                            <td key={pi} className="text-end">{formatNum(val)}</td>
+                                                        ))}
+                                                        <td className={`text-end fw-bold ${changeColor(row.change)}`}>
+                                                            {row.change > 0 ? '+' : ''}{formatNum(row.change)}
+                                                        </td>
+                                                        <td className={`text-end ${changeColor(row.change_pct)}`}>
+                                                            {row.change_pct > 0 ? '+' : ''}{row.change_pct}%
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    )
+}
