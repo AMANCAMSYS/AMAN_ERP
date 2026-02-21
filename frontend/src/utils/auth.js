@@ -35,6 +35,11 @@ export function getCurrency() {
     return user?.currency || ''
 }
 
+export function getCountry() {
+    const user = getUser()
+    return user?.country || ''
+}
+
 export function hasPermission(permission) {
     const user = getUser()
     if (!user || !user.permissions || !Array.isArray(user.permissions)) {

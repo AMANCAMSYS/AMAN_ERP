@@ -10,7 +10,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 
@@ -470,7 +470,7 @@ def check_password_expiry(current_user=Depends(get_current_user)):
         if not last_change:
             return {"expired": False, "days_remaining": max_age_days, "warning": False}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if hasattr(last_change, 'replace'):
             # Ensure timezone-naive comparison
             last_change = last_change.replace(tzinfo=None) if hasattr(last_change, 'tzinfo') and last_change.tzinfo else last_change
@@ -527,7 +527,7 @@ def check_password_expiry_on_login(company_conn, user_id: int, policy: dict = No
         if not last_change:
             return {}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if hasattr(last_change, 'replace') and hasattr(last_change, 'tzinfo') and last_change.tzinfo:
             last_change = last_change.replace(tzinfo=None)
 

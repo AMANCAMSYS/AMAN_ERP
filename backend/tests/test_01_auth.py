@@ -75,6 +75,30 @@ class TestAuth:
         assert "role" in data
         assert "permissions" in data
 
+    def test_user_has_currency_and_country(self, client, admin_headers):
+        """✅ بيانات المستخدم تحتوي على العملة والدولة"""
+        response = client.get("/api/auth/me", headers=admin_headers)
+        if response.status_code != 200:
+            pytest.skip("لا يمكن جلب بيانات المستخدم")
+        data = response.json()
+        if data.get("role") == "system_admin":
+            pytest.skip("مدير النظام ليس لديه شركة")
+        assert "currency" in data, "حقل العملة مفقود من بيانات المستخدم"
+        assert "country" in data, "حقل الدولة مفقود من بيانات المستخدم"
+        assert data["currency"] is not None, "العملة فارغة"
+        assert data["country"] is not None, "الدولة فارغة"
+        assert len(data["country"]) == 2, f"كود الدولة يجب أن يكون حرفين: {data['country']}"
+
+    def test_user_has_allowed_branches(self, client, admin_headers):
+        """✅ بيانات المستخدم تحتوي على الفروع المسموحة"""
+        response = client.get("/api/auth/me", headers=admin_headers)
+        if response.status_code != 200:
+            pytest.skip("لا يمكن جلب بيانات المستخدم")
+        data = response.json()
+        if data.get("role") == "system_admin":
+            pytest.skip("مدير النظام ليس لديه فروع")
+        assert "allowed_branches" in data, "حقل الفروع المسموحة مفقود"
+
     def test_token_has_required_fields(self, client):
         """✅ التوكن يحتوي على جميع الحقول المطلوبة"""
         import os

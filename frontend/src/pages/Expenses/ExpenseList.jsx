@@ -9,6 +9,8 @@ import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import Pagination, { usePagination } from '../../components/common/Pagination';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 export default function ExpenseList() {
   const { t, i18n } = useTranslation();
@@ -262,7 +264,7 @@ export default function ExpenseList() {
                       <span className="fw-bold" style={{ color: 'var(--primary)' }}>{expense.expense_number}</span>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      {new Date(expense.expense_date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US')}
+                      {formatShortDate(expense.expense_date)}
                     </td>
                     <td>{getTypeBadge(expense.expense_type)}</td>
                     <td>{expense.vendor_name || <span className="text-muted">—</span>}</td>

@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useBranch } from '../context/BranchContext';
 import { getUser } from '../utils/auth';
+import { formatShortDate } from '../utils/dateUtils';
+
 
 /* ── Card wrapper ────────────────────────────────────── */
 const Card = ({ title, children, style = {} }) => (
@@ -132,7 +134,7 @@ const Dashboard = () => {
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.6rem', fontSize: '0.8rem', color: '#64748b' }}>
                             <Calendar size={14} />
-                            {new Date().toLocaleDateString(i18n.language, { day: 'numeric', month: 'long', year: 'numeric' })}
+                            {formatShortDate(new Date())}
                         </span>
                         <button onClick={fetchAll} disabled={loading}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.6rem', fontSize: '0.8rem', cursor: 'pointer', color: '#475569' }}>

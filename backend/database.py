@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from typing import Generator, Tuple
+from contextlib import contextmanager
 from passlib.context import CryptContext
 import uuid
 
@@ -50,8 +51,28 @@ def _get_engine(company_id: str):
     return _engines[company_id]
 
 def get_db_connection(company_id: str):
-    """Returns a connection to the company specific database with engine caching"""
+    """Returns a connection to the company specific database with engine caching
+    
+    Note: Caller is responsible for closing the connection with db.close()
+    For safer usage, use db_connection() context manager instead.
+    """
     return _get_engine(company_id).connect()
+
+@contextmanager
+def db_connection(company_id: str):
+    """Context manager for safe database connection handling
+    
+    Usage:
+        with db_connection(company_id) as db:
+            result = db.execute(...)
+            # connection automatically closed
+    """
+    conn = _get_engine(company_id).connect()
+    try:
+        yield conn
+    finally:
+        if not conn.closed:
+            conn.close()
 
 def get_company_db(company_id: str) -> Generator[Session, None, None]:
     """Returns a session to the company specific database using cached engine"""
@@ -126,9 +147,9 @@ def get_all_table_sql() -> str:
         role VARCHAR(50) DEFAULT 'user',
         permissions JSONB DEFAULT '{}',
         is_active BOOLEAN DEFAULT TRUE,
-        last_login TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        last_login TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS branches (
@@ -140,19 +161,21 @@ def get_all_table_sql() -> str:
         address TEXT,
         city VARCHAR(100),
         country VARCHAR(100),
+        country_code VARCHAR(5) DEFAULT NULL,
+        default_currency VARCHAR(3) DEFAULT NULL,
         phone VARCHAR(50),
         email VARCHAR(255),
         manager_id INTEGER,
         is_default BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS user_branches (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES company_users(id) ON DELETE CASCADE,
         branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, branch_id)
     );
 
@@ -167,7 +190,7 @@ def get_all_table_sql() -> str:
         payment_days INTEGER DEFAULT 30,
         description TEXT,
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS parties (
@@ -212,8 +235,8 @@ def get_all_table_sql() -> str:
         
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS party_transactions (
@@ -229,7 +252,7 @@ def get_all_table_sql() -> str:
         payment_id INTEGER, -- Link to payment_vouchers if needed
         invoice_id INTEGER, -- Link to invoices if needed
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     
@@ -245,8 +268,8 @@ def get_all_table_sql() -> str:
         balance_currency DECIMAL(18, 4) DEFAULT 0,
         currency VARCHAR(3) DEFAULT NULL,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS treasury_accounts (
@@ -262,8 +285,8 @@ def get_all_table_sql() -> str:
         account_number VARCHAR(100),
         iban VARCHAR(100),
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- bank_accounts table removed (ARCH-006): merged into treasury_accounts
@@ -281,9 +304,9 @@ def get_all_table_sql() -> str:
         source VARCHAR(100),
         source_id INTEGER,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        posted_at TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        posted_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS journal_lines (
@@ -298,7 +321,7 @@ def get_all_table_sql() -> str:
         description TEXT,
         is_reconciled BOOLEAN DEFAULT FALSE,
         reconciliation_id INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS invoices (
@@ -324,8 +347,8 @@ def get_all_table_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS invoice_lines (
@@ -338,15 +361,15 @@ def get_all_table_sql() -> str:
         tax_rate DECIMAL(5, 2) DEFAULT 0,
         discount DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS company_settings (
         id SERIAL PRIMARY KEY,
         setting_key VARCHAR(100) UNIQUE NOT NULL,
         setting_value TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
 -- ===== SUPPLIERS TABLES (Legacy/Deprecated) =====
@@ -361,7 +384,7 @@ def get_all_table_sql() -> str:
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS suppliers (
@@ -389,8 +412,8 @@ def get_all_table_sql() -> str:
         tax_exempt BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS supplier_contacts (
@@ -405,7 +428,7 @@ def get_all_table_sql() -> str:
         mobile VARCHAR(50),
         is_primary BOOLEAN DEFAULT FALSE,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS supplier_bank_accounts (
@@ -421,7 +444,7 @@ def get_all_table_sql() -> str:
         account_holder VARCHAR(255),
         is_default BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS supplier_transactions (
@@ -437,7 +460,7 @@ def get_all_table_sql() -> str:
         payment_id INTEGER,
         invoice_id INTEGER,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS supplier_payments (
@@ -454,7 +477,7 @@ def get_all_table_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
 
@@ -475,7 +498,7 @@ def get_additional_tables_sql() -> str:
         price_list_id INTEGER,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customers (
@@ -505,8 +528,8 @@ def get_additional_tables_sql() -> str:
         tax_exempt BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customer_contacts (
@@ -521,7 +544,7 @@ def get_additional_tables_sql() -> str:
         mobile VARCHAR(50),
         is_primary BOOLEAN DEFAULT FALSE,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customer_bank_accounts (
@@ -536,7 +559,7 @@ def get_additional_tables_sql() -> str:
         account_holder VARCHAR(255),
         is_default BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customer_transactions (
@@ -552,7 +575,7 @@ def get_additional_tables_sql() -> str:
         receipt_id INTEGER,
         invoice_id INTEGER,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customer_receipts (
@@ -569,7 +592,7 @@ def get_additional_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS customer_price_lists (
@@ -585,7 +608,7 @@ def get_additional_tables_sql() -> str:
         valid_to DATE,
         status VARCHAR(20) DEFAULT 'active',
         is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     -- ===== PRODUCTS & INVENTORY TABLES (7) =====
@@ -600,7 +623,7 @@ def get_additional_tables_sql() -> str:
         image_url TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         sort_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS product_units (
@@ -612,7 +635,7 @@ def get_additional_tables_sql() -> str:
         base_unit_id INTEGER REFERENCES product_units(id),
         conversion_factor DECIMAL(10, 6) DEFAULT 1,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS products (
@@ -646,8 +669,16 @@ def get_additional_tables_sql() -> str:
         reorder_level DECIMAL(18, 4) DEFAULT 0,
         reorder_quantity DECIMAL(18, 4) DEFAULT 0,
         image_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS customer_price_list_items (
+        id SERIAL PRIMARY KEY,
+        price_list_id INTEGER NOT NULL,
+        product_id INTEGER REFERENCES products(id),
+        price DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS warehouses (
@@ -663,7 +694,7 @@ def get_additional_tables_sql() -> str:
         manager_id INTEGER REFERENCES company_users(id),
         is_default BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS inventory (
@@ -675,10 +706,10 @@ def get_additional_tables_sql() -> str:
         available_quantity DECIMAL(18, 4) DEFAULT 0,
         average_cost DECIMAL(18, 4) DEFAULT 0, -- Total company-wide or per-wh cost
         policy_version INTEGER DEFAULT 1,
-        last_costing_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_movement_date TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_costing_update TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        last_movement_date TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(product_id, warehouse_id)
     );
     
@@ -697,7 +728,7 @@ def get_additional_tables_sql() -> str:
         total_cost DECIMAL(18, 4) DEFAULT 0,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS stock_adjustments (
@@ -713,7 +744,7 @@ def get_additional_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== STOCK SHIPMENTS (2) =====
@@ -725,38 +756,10 @@ def get_additional_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'pending', -- pending, shipped, received, cancelled
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        shipped_at TIMESTAMP,
-        received_at TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        shipped_at TIMESTAMPTZ,
+        received_at TIMESTAMPTZ,
         received_by INTEGER REFERENCES company_users(id)
-    );
-
-    -- ===== MANUFACTURING TABLES (3) =====
-    CREATE TABLE IF NOT EXISTS manufacturing_boms (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        product_id INTEGER REFERENCES products(id),
-        quantity DECIMAL(18, 4) DEFAULT 1, -- Quantity produced
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS manufacturing_bom_items (
-        id SERIAL PRIMARY KEY,
-        bom_id INTEGER REFERENCES manufacturing_boms(id) ON DELETE CASCADE,
-        item_id INTEGER REFERENCES products(id), -- Raw Material
-        quantity DECIMAL(18, 4) NOT NULL, -- Qty needed per BOM unit
-        waste_percentage DECIMAL(5, 2) DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS manufacturing_orders (
-        id SERIAL PRIMARY KEY,
-        bom_id INTEGER REFERENCES manufacturing_boms(id),
-        quantity DECIMAL(18, 4) NOT NULL, -- Cycles to run
-        status VARCHAR(20) DEFAULT 'draft', -- draft, in_progress, completed, cancelled
-        start_date TIMESTAMP,
-        end_date TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS stock_shipment_items (
@@ -764,6 +767,20 @@ def get_additional_tables_sql() -> str:
         shipment_id INTEGER REFERENCES stock_shipments(id) ON DELETE CASCADE,
         product_id INTEGER REFERENCES products(id),
         quantity DECIMAL(18, 4) NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS stock_transfer_log (
+        id SERIAL PRIMARY KEY,
+        shipment_id INTEGER,
+        product_id INTEGER REFERENCES products(id),
+        from_warehouse_id INTEGER REFERENCES warehouses(id),
+        to_warehouse_id INTEGER REFERENCES warehouses(id),
+        quantity DECIMAL(18, 4) DEFAULT 0,
+        transfer_cost DECIMAL(18, 4) DEFAULT 0,
+        from_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
+        to_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
+        to_avg_cost_after DECIMAL(18, 4) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -783,8 +800,8 @@ def get_additional_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS purchase_order_lines (
@@ -798,7 +815,7 @@ def get_additional_tables_sql() -> str:
         discount DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
         received_quantity DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
 
@@ -810,7 +827,7 @@ def get_additional_tables_sql() -> str:
         link VARCHAR(255),
         is_read BOOLEAN DEFAULT FALSE,
         type VARCHAR(20) DEFAULT 'info',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS custom_reports (
@@ -819,8 +836,8 @@ def get_additional_tables_sql() -> str:
         description TEXT,
         config JSONB DEFAULT '{}',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS scheduled_reports (
@@ -830,12 +847,12 @@ def get_additional_tables_sql() -> str:
         recipients TEXT NOT NULL,
         format VARCHAR(10) DEFAULT 'pdf',
         branch_id INTEGER REFERENCES branches(id),
-        next_run_at TIMESTAMP,
-        last_run_at TIMESTAMP,
+        next_run_at TIMESTAMPTZ,
+        last_run_at TIMESTAMPTZ,
         is_active BOOLEAN DEFAULT TRUE,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS sales_quotations (
@@ -856,7 +873,7 @@ def get_additional_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS sales_quotation_lines (
@@ -890,7 +907,7 @@ def get_additional_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS sales_order_lines (
@@ -929,7 +946,7 @@ def get_additional_tables_sql() -> str:
         check_date DATE,
         exchange_rate DECIMAL(10, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS sales_return_lines (
@@ -964,7 +981,7 @@ def get_additional_tables_sql() -> str:
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         status VARCHAR(20) DEFAULT 'posted',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS payment_allocations (
@@ -972,8 +989,124 @@ def get_additional_tables_sql() -> str:
         voucher_id INTEGER REFERENCES payment_vouchers(id) ON DELETE CASCADE,
         invoice_id INTEGER REFERENCES invoices(id),
         allocated_amount DECIMAL(18, 4) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- ===== SALES COMMISSIONS =====
+    CREATE TABLE IF NOT EXISTS commission_rules (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        salesperson_id INTEGER,
+        product_id INTEGER,
+        category_id INTEGER,
+        rate_type VARCHAR(20) DEFAULT 'percentage',
+        rate DECIMAL(10, 4) DEFAULT 0,
+        min_amount DECIMAL(18, 4) DEFAULT 0,
+        max_amount DECIMAL(18, 4),
+        is_active BOOLEAN DEFAULT TRUE,
+        branch_id INTEGER REFERENCES branches(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sales_commissions (
+        id SERIAL PRIMARY KEY,
+        salesperson_id INTEGER,
+        salesperson_name VARCHAR(255),
+        invoice_id INTEGER,
+        invoice_number VARCHAR(50),
+        invoice_date DATE,
+        invoice_total DECIMAL(18, 4) DEFAULT 0,
+        commission_rate DECIMAL(10, 4) DEFAULT 0,
+        commission_amount DECIMAL(18, 4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'pending',
+        paid_date DATE,
+        branch_id INTEGER REFERENCES branches(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(invoice_id, salesperson_id)
+    );
+
+    -- ===== REQUEST FOR QUOTATIONS =====
+    CREATE TABLE IF NOT EXISTS request_for_quotations (
+        id SERIAL PRIMARY KEY,
+        rfq_number VARCHAR(50) UNIQUE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        status VARCHAR(30) DEFAULT 'draft',
+        deadline TIMESTAMPTZ,
+        branch_id INTEGER REFERENCES branches(id),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS rfq_lines (
+        id SERIAL PRIMARY KEY,
+        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        product_name VARCHAR(255),
+        quantity NUMERIC(12, 3) NOT NULL,
+        unit VARCHAR(50),
+        specifications TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS rfq_responses (
+        id SERIAL PRIMARY KEY,
+        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+        supplier_id INTEGER,
+        supplier_name VARCHAR(255),
+        unit_price NUMERIC(15, 2),
+        total_price NUMERIC(15, 2),
+        delivery_days INTEGER,
+        notes TEXT,
+        is_selected BOOLEAN DEFAULT FALSE,
+        submitted_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ===== SUPPLIER RATINGS =====
+    CREATE TABLE IF NOT EXISTS supplier_ratings (
+        id SERIAL PRIMARY KEY,
+        supplier_id INTEGER NOT NULL,
+        po_id INTEGER,
+        quality_score NUMERIC(3, 1) DEFAULT 0,
+        delivery_score NUMERIC(3, 1) DEFAULT 0,
+        price_score NUMERIC(3, 1) DEFAULT 0,
+        service_score NUMERIC(3, 1) DEFAULT 0,
+        overall_score NUMERIC(3, 1) DEFAULT 0,
+        comments TEXT,
+        rated_by INTEGER REFERENCES company_users(id),
+        rated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ===== PURCHASE AGREEMENTS =====
+    CREATE TABLE IF NOT EXISTS purchase_agreements (
+        id SERIAL PRIMARY KEY,
+        agreement_number VARCHAR(50) UNIQUE,
+        supplier_id INTEGER NOT NULL,
+        agreement_type VARCHAR(30) DEFAULT 'blanket',
+        title VARCHAR(255),
+        start_date DATE,
+        end_date DATE,
+        total_amount NUMERIC(15, 2) DEFAULT 0,
+        consumed_amount NUMERIC(15, 2) DEFAULT 0,
+        status VARCHAR(30) DEFAULT 'draft',
+        branch_id INTEGER REFERENCES branches(id),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS purchase_agreement_lines (
+        id SERIAL PRIMARY KEY,
+        agreement_id INTEGER REFERENCES purchase_agreements(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        product_name VARCHAR(255),
+        quantity NUMERIC(12, 3),
+        unit_price NUMERIC(15, 2),
+        delivered_qty NUMERIC(12, 3) DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_rfq_status ON request_for_quotations(status);
+    CREATE INDEX IF NOT EXISTS idx_supplier_ratings_supplier ON supplier_ratings(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_agreements_status ON purchase_agreements(status);
     """
 
 
@@ -990,7 +1123,7 @@ def get_organization_tables_sql() -> str:
         end_date DATE NOT NULL,
         payment_date DATE,
         status VARCHAR(20) DEFAULT 'draft',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS departments (
@@ -1003,7 +1136,7 @@ def get_organization_tables_sql() -> str:
         manager_id INTEGER,
         description TEXT,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS employee_positions (
@@ -1015,7 +1148,7 @@ def get_organization_tables_sql() -> str:
         description TEXT,
         level INTEGER DEFAULT 1,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS roles (
@@ -1025,7 +1158,7 @@ def get_organization_tables_sql() -> str:
         description TEXT,
         permissions JSONB DEFAULT '[]',
         is_system_role BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -1038,7 +1171,7 @@ def get_organization_tables_sql() -> str:
         details JSONB,
         ip_address VARCHAR(50),
         branch_id INTEGER REFERENCES branches(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
         
     CREATE TABLE IF NOT EXISTS employees (
@@ -1075,8 +1208,8 @@ def get_organization_tables_sql() -> str:
         address TEXT,
         emergency_contact TEXT,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS cost_centers (
@@ -1089,18 +1222,18 @@ def get_organization_tables_sql() -> str:
         budget DECIMAL(18, 4) DEFAULT 0,
         currency VARCHAR(3) DEFAULT NULL,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS attendance (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER REFERENCES employees(id),
         date DATE NOT NULL,
-        check_in TIMESTAMP,
-        check_out TIMESTAMP,
+        check_in TIMESTAMPTZ,
+        check_out TIMESTAMPTZ,
         status VARCHAR(20) DEFAULT 'present',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS employee_loans (
@@ -1115,8 +1248,8 @@ def get_organization_tables_sql() -> str:
         reason TEXT,
         approved_by INTEGER REFERENCES company_users(id),
         branch_id INTEGER REFERENCES branches(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS leave_requests (
@@ -1129,8 +1262,8 @@ def get_organization_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'pending',
         approved_by INTEGER REFERENCES company_users(id),
         attachment_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== ADVANCED HR TABLES (Phase 4) =====
@@ -1142,8 +1275,8 @@ def get_organization_tables_sql() -> str:
         description TEXT,
         base_type VARCHAR(50) DEFAULT 'monthly',
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS salary_components (
@@ -1160,7 +1293,7 @@ def get_organization_tables_sql() -> str:
         is_active BOOLEAN DEFAULT TRUE,
         sort_order INTEGER DEFAULT 0,
         structure_id INTEGER REFERENCES salary_structures(id) ON DELETE SET NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS employee_salary_components (
@@ -1170,7 +1303,7 @@ def get_organization_tables_sql() -> str:
         amount DECIMAL(18, 4) DEFAULT 0,
         is_active BOOLEAN DEFAULT TRUE,
         effective_date DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(employee_id, component_id)
     );
 
@@ -1186,10 +1319,10 @@ def get_organization_tables_sql() -> str:
         reason TEXT,
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'processed')),
         approved_by INTEGER REFERENCES company_users(id),
-        approved_at TIMESTAMP,
+        approved_at TIMESTAMPTZ,
         branch_id INTEGER REFERENCES branches(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS gosi_settings (
@@ -1200,8 +1333,8 @@ def get_organization_tables_sql() -> str:
         max_contributable_salary DECIMAL(18, 4) DEFAULT 45000,
         is_active BOOLEAN DEFAULT TRUE,
         effective_date DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS employee_documents (
@@ -1216,8 +1349,8 @@ def get_organization_tables_sql() -> str:
         notes TEXT,
         alert_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'valid' CHECK (status IN ('valid', 'expired', 'expiring_soon')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS performance_reviews (
@@ -1235,8 +1368,8 @@ def get_organization_tables_sql() -> str:
         self_comments TEXT,
         manager_comments TEXT,
         status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'self_review', 'manager_review', 'completed')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS training_programs (
@@ -1251,7 +1384,7 @@ def get_organization_tables_sql() -> str:
         max_participants INTEGER,
         cost DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'completed', 'cancelled')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS training_participants (
@@ -1262,7 +1395,7 @@ def get_organization_tables_sql() -> str:
         certificate_issued BOOLEAN DEFAULT FALSE,
         score DECIMAL(5, 2),
         feedback TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(training_id, employee_id)
     );
 
@@ -1279,8 +1412,8 @@ def get_organization_tables_sql() -> str:
         payroll_period_id INTEGER REFERENCES payroll_periods(id),
         reported_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'appealed', 'dismissed')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS employee_custody (
@@ -1296,8 +1429,8 @@ def get_organization_tables_sql() -> str:
         value DECIMAL(18, 4) DEFAULT 0,
         notes TEXT,
         status VARCHAR(20) DEFAULT 'assigned' CHECK (status IN ('assigned', 'returned', 'lost', 'damaged')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
 
@@ -1319,8 +1452,63 @@ def get_organization_tables_sql() -> str:
         deductions DECIMAL(18, 4) DEFAULT 0,
         net_salary DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'draft',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- ===== JOB OPENINGS & APPLICATIONS (HR Recruitment) =====
+    CREATE TABLE IF NOT EXISTS job_openings (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        department_id INTEGER REFERENCES departments(id),
+        position_id INTEGER,
+        description TEXT,
+        requirements TEXT,
+        employment_type VARCHAR(50) DEFAULT 'full_time',
+        vacancies INTEGER DEFAULT 1,
+        status VARCHAR(30) DEFAULT 'open',
+        branch_id INTEGER REFERENCES branches(id),
+        published_at TIMESTAMPTZ,
+        closing_date DATE,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS job_applications (
+        id SERIAL PRIMARY KEY,
+        opening_id INTEGER REFERENCES job_openings(id),
+        applicant_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        resume_url TEXT,
+        cover_letter TEXT,
+        stage VARCHAR(50) DEFAULT 'applied',
+        rating INTEGER DEFAULT 0,
+        interview_date TIMESTAMPTZ,
+        interviewer_id INTEGER REFERENCES company_users(id),
+        notes TEXT,
+        status VARCHAR(30) DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ===== LEAVE CARRYOVER =====
+    CREATE TABLE IF NOT EXISTS leave_carryover (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id),
+        leave_type VARCHAR(50) NOT NULL,
+        year INTEGER NOT NULL,
+        entitled_days NUMERIC(6, 1) DEFAULT 0,
+        used_days NUMERIC(6, 1) DEFAULT 0,
+        carried_days NUMERIC(6, 1) DEFAULT 0,
+        expired_days NUMERIC(6, 1) DEFAULT 0,
+        max_carryover NUMERIC(6, 1) DEFAULT 5,
+        calculated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, leave_type, year)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_job_openings_status ON job_openings(status);
+    CREATE INDEX IF NOT EXISTS idx_job_applications_opening ON job_applications(opening_id);
+    CREATE INDEX IF NOT EXISTS idx_leave_carryover_emp ON leave_carryover(employee_id, year);
     """
 
 
@@ -1343,7 +1531,7 @@ def get_financial_tables_sql() -> str:
         aging_120_plus DECIMAL(18, 4) DEFAULT 0,
         last_payment_date DATE,
         last_invoice_date DATE,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS supplier_balances (
@@ -1361,7 +1549,7 @@ def get_financial_tables_sql() -> str:
         aging_120_plus DECIMAL(18, 4) DEFAULT 0,
         last_payment_date DATE,
         last_invoice_date DATE,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS receipts (
@@ -1382,7 +1570,7 @@ def get_financial_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS payments (
@@ -1403,7 +1591,7 @@ def get_financial_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS pending_receivables (
@@ -1417,7 +1605,7 @@ def get_financial_tables_sql() -> str:
         outstanding_amount DECIMAL(18, 4) DEFAULT 0,
         days_overdue INTEGER DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS pending_payables (
@@ -1431,7 +1619,7 @@ def get_financial_tables_sql() -> str:
         outstanding_amount DECIMAL(18, 4) DEFAULT 0,
         days_overdue INTEGER DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== FISCAL YEARS =====
@@ -1444,10 +1632,10 @@ def get_financial_tables_sql() -> str:
         retained_earnings_account_id INTEGER REFERENCES accounts(id),
         closing_entry_id INTEGER,  -- references journal_entries(id) after closing
         closed_by INTEGER REFERENCES company_users(id),
-        closed_at TIMESTAMP,
+        closed_at TIMESTAMPTZ,
         reopened_by INTEGER REFERENCES company_users(id),
-        reopened_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        reopened_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== RECURRING JOURNAL TEMPLATES (ACC-003) =====
@@ -1469,8 +1657,8 @@ def get_financial_tables_sql() -> str:
         run_count INTEGER DEFAULT 0,
         max_runs INTEGER,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS recurring_journal_lines (
@@ -1492,8 +1680,8 @@ def get_financial_tables_sql() -> str:
         fiscal_year INTEGER,
         is_closed BOOLEAN DEFAULT FALSE,
         closed_by INTEGER REFERENCES company_users(id),
-        closed_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        closed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
 
@@ -1501,12 +1689,16 @@ def get_financial_tables_sql() -> str:
     -- ===== BUDGETS & REPORTS (5) =====
     CREATE TABLE IF NOT EXISTS budgets (
         id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
         budget_code VARCHAR(50) UNIQUE,
-        budget_name VARCHAR(255) NOT NULL,
+        budget_name VARCHAR(255),
         budget_name_en VARCHAR(255),
+        description TEXT,
         fiscal_year INTEGER,
         branch_id INTEGER REFERENCES branches(id),
         department_id INTEGER REFERENCES departments(id),
+        cost_center_id INTEGER REFERENCES cost_centers(id),
+        budget_type VARCHAR(30) DEFAULT 'annual',
         status VARCHAR(20) DEFAULT 'draft',
         total_budget DECIMAL(18, 4) DEFAULT 0,
         used_budget DECIMAL(18, 4) DEFAULT 0,
@@ -1514,8 +1706,18 @@ def get_financial_tables_sql() -> str:
         start_date DATE,
         end_date DATE,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS budget_items (
+        id SERIAL PRIMARY KEY,
+        budget_id INTEGER REFERENCES budgets(id) ON DELETE CASCADE,
+        account_id INTEGER REFERENCES accounts(id),
+        planned_amount DECIMAL(18, 4) DEFAULT 0,
+        actual_amount DECIMAL(18, 4) DEFAULT 0,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS budget_lines (
@@ -1526,7 +1728,7 @@ def get_financial_tables_sql() -> str:
         used_amount DECIMAL(18, 4) DEFAULT 0,
         remaining_amount DECIMAL(18, 4) DEFAULT 0,
         percentage DECIMAL(5, 2) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS cost_centers_budgets (
@@ -1536,7 +1738,7 @@ def get_financial_tables_sql() -> str:
         allocated_amount DECIMAL(18, 4) DEFAULT 0,
         used_amount DECIMAL(18, 4) DEFAULT 0,
         fiscal_year INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS financial_reports (
@@ -1544,11 +1746,11 @@ def get_financial_tables_sql() -> str:
         report_name VARCHAR(255) NOT NULL,
         report_type VARCHAR(50) NOT NULL,
         report_period VARCHAR(50),
-        generated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        generated_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         parameters JSONB DEFAULT '{}',
         data JSONB DEFAULT '{}',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS report_templates (
@@ -1559,7 +1761,7 @@ def get_financial_tables_sql() -> str:
         parameters JSONB DEFAULT '{}',
         template_content TEXT,
         is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     -- ===== FIXED ASSETS (5) =====
@@ -1572,7 +1774,7 @@ def get_financial_tables_sql() -> str:
         depreciation_rate DECIMAL(5, 2) DEFAULT 0,
         useful_life INTEGER DEFAULT 0,
         parent_id INTEGER REFERENCES asset_categories(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS assets (
@@ -1589,8 +1791,8 @@ def get_financial_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT NULL,
         depreciation_method VARCHAR(50) DEFAULT 'straight_line',
         status VARCHAR(20) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS asset_depreciation_schedule (
@@ -1603,7 +1805,7 @@ def get_financial_tables_sql() -> str:
         book_value DECIMAL(18, 4) DEFAULT 0,
         posted BOOLEAN DEFAULT FALSE,
         journal_entry_id INTEGER, -- REFERENCES journal_entries(id)
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS asset_transfers (
@@ -1617,7 +1819,7 @@ def get_financial_tables_sql() -> str:
         approved_by INTEGER,
         status VARCHAR(20) DEFAULT 'pending',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS asset_disposals (
@@ -1632,9 +1834,57 @@ def get_financial_tables_sql() -> str:
         notes TEXT,
         approved_by INTEGER,
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
+    -- ===== ASSET ADVANCED (Revaluations, Insurance, Maintenance) =====
+    CREATE TABLE IF NOT EXISTS asset_revaluations (
+        id SERIAL PRIMARY KEY,
+        asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+        revaluation_date DATE NOT NULL,
+        old_value NUMERIC(15, 2) NOT NULL,
+        new_value NUMERIC(15, 2) NOT NULL,
+        difference NUMERIC(15, 2) NOT NULL,
+        reason TEXT,
+        journal_entry_id INTEGER,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS asset_insurance (
+        id SERIAL PRIMARY KEY,
+        asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+        policy_number VARCHAR(100),
+        insurer VARCHAR(255),
+        coverage_type VARCHAR(100),
+        premium_amount NUMERIC(15, 2) DEFAULT 0,
+        coverage_amount NUMERIC(15, 2) DEFAULT 0,
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR(30) DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS asset_maintenance (
+        id SERIAL PRIMARY KEY,
+        asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+        maintenance_type VARCHAR(50) DEFAULT 'preventive',
+        description TEXT,
+        scheduled_date DATE,
+        completed_date DATE,
+        cost NUMERIC(15, 2) DEFAULT 0,
+        vendor VARCHAR(255),
+        status VARCHAR(30) DEFAULT 'scheduled',
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_asset_revaluations_asset ON asset_revaluations(asset_id);
+    CREATE INDEX IF NOT EXISTS idx_asset_insurance_asset ON asset_insurance(asset_id);
+    CREATE INDEX IF NOT EXISTS idx_asset_maintenance_asset ON asset_maintenance(asset_id);
+
     -- ===== TAX TABLES (4) =====
     CREATE TABLE IF NOT EXISTS tax_rates (
         id SERIAL PRIMARY KEY,
@@ -1643,11 +1893,12 @@ def get_financial_tables_sql() -> str:
         tax_name_en VARCHAR(255),
         rate_type VARCHAR(20) DEFAULT 'percentage',
         rate_value DECIMAL(10, 4) DEFAULT 0,
+        country_code VARCHAR(5) DEFAULT NULL,
         description TEXT,
         effective_from DATE,
         effective_to DATE,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS tax_groups (
@@ -1658,7 +1909,7 @@ def get_financial_tables_sql() -> str:
         description TEXT,
         tax_ids JSONB DEFAULT '[]',
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS tax_returns (
@@ -1676,7 +1927,7 @@ def get_financial_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'draft',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS tax_payments (
@@ -1690,7 +1941,7 @@ def get_financial_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'pending',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     -- ===== PROJECTS (5) =====
@@ -1712,8 +1963,8 @@ def get_financial_tables_sql() -> str:
         branch_id INTEGER,
         contract_type VARCHAR(30) DEFAULT 'fixed_price',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS project_tasks (
@@ -1730,7 +1981,7 @@ def get_financial_tables_sql() -> str:
         progress DECIMAL(5, 2) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
         assigned_to INTEGER REFERENCES employees(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS project_budgets (
@@ -1742,7 +1993,7 @@ def get_financial_tables_sql() -> str:
         variance DECIMAL(18, 4) DEFAULT 0,
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS project_expenses (
@@ -1756,7 +2007,7 @@ def get_financial_tables_sql() -> str:
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS project_revenues (
@@ -1770,7 +2021,7 @@ def get_financial_tables_sql() -> str:
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS project_documents (
@@ -1780,7 +2031,7 @@ def get_financial_tables_sql() -> str:
         file_url TEXT NOT NULL,
         file_type VARCHAR(50),
         uploaded_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS project_change_orders (
@@ -1795,9 +2046,9 @@ def get_financial_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'pending',
         requested_by INTEGER REFERENCES company_users(id),
         approved_by INTEGER REFERENCES company_users(id),
-        approved_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        approved_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     -- ===== ATTACHMENTS (3) =====
@@ -1810,7 +2061,7 @@ def get_financial_tables_sql() -> str:
         allowed_extensions VARCHAR(255) DEFAULT 'pdf,jpg,png,doc,docx,xls,xlsx',
         max_size INTEGER DEFAULT 10485760,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS attachments (
@@ -1824,7 +2075,7 @@ def get_financial_tables_sql() -> str:
         mime_type VARCHAR(100),
         description TEXT,
         uploaded_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS document_templates (
@@ -1835,7 +2086,7 @@ def get_financial_tables_sql() -> str:
         template_content TEXT,
         variables JSONB DEFAULT '{}',
         is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     -- (Duplicate notifications table removed)
@@ -1848,8 +2099,8 @@ def get_financial_tables_sql() -> str:
         body TEXT,
         message_type VARCHAR(50) DEFAULT 'internal',
         is_read BOOLEAN DEFAULT FALSE,
-        read_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS email_templates (
@@ -1859,9 +2110,38 @@ def get_financial_tables_sql() -> str:
         body TEXT,
         variables JSONB DEFAULT '{}',
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
+    -- ===== DASHBOARD LAYOUTS =====
+    CREATE TABLE IF NOT EXISTS dashboard_layouts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES company_users(id),
+        layout_name VARCHAR(255) DEFAULT 'default',
+        widgets JSONB DEFAULT '[]'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== SALES TARGETS =====
+    CREATE TABLE IF NOT EXISTS sales_targets (
+        id SERIAL PRIMARY KEY,
+        year INTEGER NOT NULL,
+        month_number INTEGER NOT NULL,
+        target_amount DECIMAL(18, 4) DEFAULT 0,
+        branch_id INTEGER REFERENCES branches(id),
+        salesperson_id INTEGER,
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_targets_unique ON sales_targets(year, month_number, COALESCE(branch_id, 0), COALESCE(salesperson_id, 0));
+
+    CREATE INDEX IF NOT EXISTS idx_dashboard_layouts_user ON dashboard_layouts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_targets_year ON sales_targets(year);
     """
 
 
@@ -1885,7 +2165,7 @@ def get_treasury_tables_sql() -> str:
         reference_number VARCHAR(100),
         status VARCHAR(20) DEFAULT 'posted',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS bank_reconciliations (
@@ -1898,8 +2178,8 @@ def get_treasury_tables_sql() -> str:
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
         branch_id INTEGER REFERENCES branches(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS bank_statement_lines (
@@ -1913,7 +2193,7 @@ def get_treasury_tables_sql() -> str:
         balance DECIMAL(18, 4) DEFAULT 0,
         is_reconciled BOOLEAN DEFAULT FALSE,
         matched_journal_line_id INTEGER REFERENCES journal_lines(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== CHECKS MANAGEMENT =====
@@ -1940,8 +2220,8 @@ def get_treasury_tables_sql() -> str:
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS checks_payable (
@@ -1967,8 +2247,8 @@ def get_treasury_tables_sql() -> str:
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== NOTES RECEIVABLE / PAYABLE =====
@@ -1994,8 +2274,8 @@ def get_treasury_tables_sql() -> str:
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS notes_payable (
@@ -2020,8 +2300,8 @@ def get_treasury_tables_sql() -> str:
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== EXPENSES TABLE (1) =====
@@ -2042,13 +2322,13 @@ def get_treasury_tables_sql() -> str:
         branch_id INTEGER REFERENCES branches(id),
         approval_status VARCHAR(20) DEFAULT 'pending',
         approved_by INTEGER REFERENCES company_users(id),
-        approved_at TIMESTAMP,
+        approved_at TIMESTAMPTZ,
         approval_notes TEXT,
         receipt_number VARCHAR(100),
         vendor_name VARCHAR(255),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
 
@@ -2066,8 +2346,8 @@ def get_currency_tables_sql() -> str:
         is_base BOOLEAN DEFAULT FALSE,
         current_rate DECIMAL(18, 6) DEFAULT 1, -- Relative to base currency
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS exchange_rates (
@@ -2077,7 +2357,7 @@ def get_currency_tables_sql() -> str:
         rate DECIMAL(18, 6) NOT NULL,
         source VARCHAR(50) DEFAULT 'manual', -- manual, api
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(currency_id, rate_date)
     );
 
@@ -2091,7 +2371,7 @@ def get_currency_tables_sql() -> str:
         amount_fc DECIMAL(18, 4) NOT NULL, -- Amount in Foreign Currency
         amount_bc DECIMAL(18, 4) NOT NULL, -- Amount in Base Currency
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
     
@@ -2113,8 +2393,8 @@ def get_contract_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS contract_items (
@@ -2126,7 +2406,7 @@ def get_contract_tables_sql() -> str:
         unit_price DECIMAL(18, 4) DEFAULT 0,
         tax_rate DECIMAL(5, 2) DEFAULT 15,
         total DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
 
@@ -2141,8 +2421,8 @@ def get_costing_policy_tables_sql() -> str:
         policy_type VARCHAR(50) NOT NULL, -- global_wac, per_warehouse_wac, hybrid, smart
         description TEXT,
         is_active BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         created_by INTEGER,
         updated_by INTEGER
     );
@@ -2158,7 +2438,7 @@ def get_costing_policy_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         old_policy_type VARCHAR(50),
         new_policy_type VARCHAR(50),
-        change_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        change_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         changed_by INTEGER,
         reason TEXT,
         affected_products_count INTEGER,
@@ -2173,7 +2453,7 @@ def get_costing_policy_tables_sql() -> str:
         average_cost DECIMAL(18, 4),
         quantity DECIMAL(18, 4),
         policy_type VARCHAR(50),
-        snapshot_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        snapshot_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
 
@@ -2204,8 +2484,8 @@ def get_advanced_inventory_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(product_id, warehouse_id, batch_number)
     );
 
@@ -2228,8 +2508,8 @@ def get_advanced_inventory_tables_sql() -> str:
         warranty_end DATE,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(product_id, serial_number)
     );
 
@@ -2246,7 +2526,7 @@ def get_advanced_inventory_tables_sql() -> str:
         quantity DECIMAL(18, 4) DEFAULT 1,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== QUALITY CONTROL (INV-104) =====
@@ -2266,11 +2546,11 @@ def get_advanced_inventory_tables_sql() -> str:
         result_notes TEXT,
         rejection_reason TEXT,
         inspector_id INTEGER REFERENCES company_users(id),
-        inspection_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        completed_date TIMESTAMP,
+        inspection_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        completed_date TIMESTAMPTZ,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS quality_inspection_criteria (
@@ -2291,15 +2571,15 @@ def get_advanced_inventory_tables_sql() -> str:
         count_type VARCHAR(50) DEFAULT 'full',
         status VARCHAR(20) DEFAULT 'draft',
         scheduled_date DATE,
-        start_date TIMESTAMP,
-        end_date TIMESTAMP,
+        start_date TIMESTAMPTZ,
+        end_date TIMESTAMPTZ,
         total_items INTEGER DEFAULT 0,
         counted_items INTEGER DEFAULT 0,
         variance_items INTEGER DEFAULT 0,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS cycle_count_items (
@@ -2314,7 +2594,7 @@ def get_advanced_inventory_tables_sql() -> str:
         unit_cost DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
         counted_by INTEGER REFERENCES company_users(id),
-        counted_at TIMESTAMP,
+        counted_at TIMESTAMPTZ,
         notes TEXT
     );
     """
@@ -2331,7 +2611,7 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         attribute_type VARCHAR(50) DEFAULT 'select',
         sort_order INTEGER DEFAULT 0,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS product_attribute_values (
@@ -2342,7 +2622,7 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         color_code VARCHAR(20),
         sort_order INTEGER DEFAULT 0,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS product_variants (
@@ -2356,8 +2636,8 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         selling_price DECIMAL(15,2) DEFAULT 0,
         weight DECIMAL(10,3),
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS product_variant_attributes (
@@ -2383,7 +2663,7 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         max_weight DECIMAL(10,2),
         max_volume DECIMAL(10,2),
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(warehouse_id, bin_code)
     );
 
@@ -2393,7 +2673,7 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         product_id INTEGER NOT NULL REFERENCES products(id),
         batch_id INTEGER REFERENCES product_batches(id),
         quantity DECIMAL(15,4) DEFAULT 0,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(bin_id, product_id, batch_id)
     );
 
@@ -2404,8 +2684,8 @@ def get_advanced_inventory_phase2_tables_sql() -> str:
         kit_name VARCHAR(200),
         kit_type VARCHAR(30) DEFAULT 'fixed',
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS product_kit_items (
@@ -2437,8 +2717,8 @@ def get_manufacturing_tables_sql() -> str:
         cost_center_id INTEGER REFERENCES cost_centers(id), -- For linking to Cost Accounting
         default_expense_account_id INTEGER REFERENCES accounts(id), -- For Overhead Absorption
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'maintenance')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== ROUTING (MFG-002) =====
@@ -2448,8 +2728,8 @@ def get_manufacturing_tables_sql() -> str:
         product_id INTEGER REFERENCES products(id), -- Default route for product
         is_active BOOLEAN DEFAULT TRUE,
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS manufacturing_operations (
@@ -2460,7 +2740,7 @@ def get_manufacturing_tables_sql() -> str:
         description VARCHAR(255),
         setup_time DECIMAL(8, 2) DEFAULT 0, -- minutes
         cycle_time DECIMAL(8, 2) DEFAULT 0, -- minutes per unit
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== BILL OF MATERIALS (MFG-003) =====
@@ -2473,8 +2753,8 @@ def get_manufacturing_tables_sql() -> str:
         route_id INTEGER REFERENCES manufacturing_routes(id),
         is_active BOOLEAN DEFAULT TRUE,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS bom_components (
@@ -2486,25 +2766,7 @@ def get_manufacturing_tables_sql() -> str:
         cost_share_percentage DECIMAL(5, 2) DEFAULT 0,
         is_percentage BOOLEAN DEFAULT FALSE, -- Variable BOM: quantity = % of order qty
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- ===== IN-PROCESS QC CHECKS (MFG-108) =====
-    CREATE TABLE IF NOT EXISTS mfg_qc_checks (
-        id SERIAL PRIMARY KEY,
-        production_order_id INTEGER REFERENCES production_orders(id) ON DELETE CASCADE,
-        operation_id INTEGER REFERENCES manufacturing_operations(id),
-        check_name VARCHAR(200) NOT NULL,
-        check_type VARCHAR(30) DEFAULT 'visual' CHECK (check_type IN ('visual','measurement','test','weight','count')),
-        specification TEXT,
-        actual_value VARCHAR(200),
-        result VARCHAR(20) DEFAULT 'pending' CHECK (result IN ('pending','pass','fail','warning')),
-        failure_action VARCHAR(20) DEFAULT 'warn' CHECK (failure_action IN ('stop','warn','continue')),
-        checked_by INTEGER REFERENCES company_users(id),
-        notes TEXT,
-        checked_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== BY-PRODUCTS (MFG-010) =====
@@ -2515,7 +2777,7 @@ def get_manufacturing_tables_sql() -> str:
         quantity DECIMAL(15, 4) NOT NULL,
         cost_allocation_percentage DECIMAL(5, 2) DEFAULT 0,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== PRODUCTION ORDERS (MFG-004) =====
@@ -2535,8 +2797,8 @@ def get_manufacturing_tables_sql() -> str:
         destination_warehouse_id INTEGER REFERENCES warehouses(id),
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS production_order_operations (
@@ -2550,13 +2812,13 @@ def get_manufacturing_tables_sql() -> str:
         actual_run_time DECIMAL(8, 2) DEFAULT 0,
         completed_quantity DECIMAL(15, 4) DEFAULT 0,
         scrapped_quantity DECIMAL(15, 4) DEFAULT 0,
-        planned_start_time TIMESTAMP,
-        planned_end_time TIMESTAMP,
-        start_time TIMESTAMP,
-        end_time TIMESTAMP,
+        planned_start_time TIMESTAMPTZ,
+        planned_end_time TIMESTAMPTZ,
+        start_time TIMESTAMPTZ,
+        end_time TIMESTAMPTZ,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== MRP - Material Requirements Planning (MFG-005) =====
@@ -2565,7 +2827,7 @@ def get_manufacturing_tables_sql() -> str:
         plan_name VARCHAR(255) NOT NULL,
         production_order_id INTEGER REFERENCES production_orders(id) ON DELETE CASCADE,
         status VARCHAR(50) DEFAULT 'draft', -- draft, confirmed, converted
-        calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        calculated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id)
     );
@@ -2584,6 +2846,24 @@ def get_manufacturing_tables_sql() -> str:
         status VARCHAR(50) DEFAULT 'pending'
     );
 
+    -- ===== IN-PROCESS QC CHECKS (MFG-108) =====
+    CREATE TABLE IF NOT EXISTS mfg_qc_checks (
+        id SERIAL PRIMARY KEY,
+        production_order_id INTEGER REFERENCES production_orders(id) ON DELETE CASCADE,
+        operation_id INTEGER REFERENCES manufacturing_operations(id),
+        check_name VARCHAR(200) NOT NULL,
+        check_type VARCHAR(30) DEFAULT 'visual' CHECK (check_type IN ('visual','measurement','test','weight','count')),
+        specification TEXT,
+        actual_value VARCHAR(200),
+        result VARCHAR(20) DEFAULT 'pending' CHECK (result IN ('pending','pass','fail','warning')),
+        failure_action VARCHAR(20) DEFAULT 'warn' CHECK (failure_action IN ('stop','warn','continue')),
+        checked_by INTEGER REFERENCES company_users(id),
+        notes TEXT,
+        checked_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- ===== EQUIPMENT & MAINTENANCE (MFG-011) =====
     CREATE TABLE IF NOT EXISTS manufacturing_equipment (
         id SERIAL PRIMARY KEY,
@@ -2595,8 +2875,8 @@ def get_manufacturing_tables_sql() -> str:
         last_maintenance_date DATE,
         next_maintenance_date DATE,
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS maintenance_logs (
@@ -2611,7 +2891,7 @@ def get_manufacturing_tables_sql() -> str:
         next_due_date DATE,
         status VARCHAR(20) DEFAULT 'completed',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS project_timesheets (
@@ -2623,8 +2903,8 @@ def get_manufacturing_tables_sql() -> str:
         hours DECIMAL(5, 2) NOT NULL,
         description TEXT,
         status VARCHAR(20) DEFAULT 'draft',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     """
 
@@ -2632,16 +2912,23 @@ def get_manufacturing_tables_sql() -> str:
 def sync_essential_columns(conn):
     """Ensure essential columns exist even in older companies"""
     columns_to_add = [
+        # Phase 7 / Legacy
         ("journal_entries", "source", "VARCHAR(100)"),
         ("journal_entries", "source_id", "INTEGER"),
         ("products", "sku", "VARCHAR(100) UNIQUE"),
+        # Budgets improvements (Phase 8.13)
+        ("budgets", "name", "VARCHAR(255)"),
+        ("budgets", "description", "TEXT"),
+        ("budgets", "cost_center_id", "INTEGER"),
+        ("budgets", "budget_type", "VARCHAR(30) DEFAULT 'annual'"),
+        # POS treasury link
+        ("pos_sessions", "treasury_account_id", "INTEGER REFERENCES treasury_accounts(id)"),
     ]
-    
+
     for table, column, col_type in columns_to_add:
         try:
-            # Check if column exists
             query = text(f"""
-                SELECT 1 FROM information_schema.columns 
+                SELECT 1 FROM information_schema.columns
                 WHERE table_name = '{table}' AND column_name = '{column}'
             """)
             if not conn.execute(query).fetchone():
@@ -2649,6 +2936,88 @@ def sync_essential_columns(conn):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
         except Exception as e:
             logger.warning(f"Could not add column {column} to {table}: {e}")
+
+    # Backfill budgets.name from budget_name for existing rows
+    try:
+        conn.execute(text(
+            "UPDATE budgets SET name = budget_name WHERE name IS NULL AND budget_name IS NOT NULL"
+        ))
+    except Exception:
+        pass
+
+    # Ensure Phase 8.13 tables exist in older company DBs
+    missing_tables_sql = [
+        # budget_items
+        """CREATE TABLE IF NOT EXISTS budget_items (
+            id SERIAL PRIMARY KEY,
+            budget_id INTEGER REFERENCES budgets(id) ON DELETE CASCADE,
+            account_id INTEGER REFERENCES accounts(id),
+            planned_amount DECIMAL(18, 4) DEFAULT 0,
+            actual_amount DECIMAL(18, 4) DEFAULT 0,
+            notes TEXT,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )""",
+        # commission_rules
+        """CREATE TABLE IF NOT EXISTS commission_rules (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            salesperson_id INTEGER,
+            product_id INTEGER,
+            category_id INTEGER,
+            rate_type VARCHAR(20) DEFAULT 'percentage',
+            rate DECIMAL(10, 4) DEFAULT 0,
+            min_amount DECIMAL(18, 4) DEFAULT 0,
+            max_amount DECIMAL(18, 4),
+            is_active BOOLEAN DEFAULT TRUE,
+            branch_id INTEGER REFERENCES branches(id),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )""",
+        # sales_commissions
+        """CREATE TABLE IF NOT EXISTS sales_commissions (
+            id SERIAL PRIMARY KEY,
+            salesperson_id INTEGER,
+            salesperson_name VARCHAR(255),
+            invoice_id INTEGER,
+            invoice_number VARCHAR(50),
+            invoice_date DATE,
+            invoice_total DECIMAL(18, 4) DEFAULT 0,
+            commission_rate DECIMAL(10, 4) DEFAULT 0,
+            commission_amount DECIMAL(18, 4) DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'pending',
+            paid_date DATE,
+            branch_id INTEGER REFERENCES branches(id),
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(invoice_id, salesperson_id)
+        )""",
+        # stock_transfer_log
+        """CREATE TABLE IF NOT EXISTS stock_transfer_log (
+            id SERIAL PRIMARY KEY,
+            shipment_id INTEGER,
+            product_id INTEGER REFERENCES products(id),
+            from_warehouse_id INTEGER REFERENCES warehouses(id),
+            to_warehouse_id INTEGER REFERENCES warehouses(id),
+            quantity DECIMAL(18, 4) DEFAULT 0,
+            transfer_cost DECIMAL(18, 4) DEFAULT 0,
+            from_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
+            to_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
+            to_avg_cost_after DECIMAL(18, 4) DEFAULT 0,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )""",
+        # customer_price_list_items
+        """CREATE TABLE IF NOT EXISTS customer_price_list_items (
+            id SERIAL PRIMARY KEY,
+            price_list_id INTEGER NOT NULL,
+            product_id INTEGER REFERENCES products(id),
+            price DECIMAL(18, 4) NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )""",
+    ]
+
+    for sql in missing_tables_sql:
+        try:
+            conn.execute(text(sql))
+        except Exception as e:
+            logger.warning(f"Could not ensure table: {e}")
 
 
 
@@ -2791,10 +3160,26 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
         company_engine.dispose()
 
 
+# Country → official currency mapping
+COUNTRY_CURRENCY_MAP = {
+    "SA": "SAR",
+    "SY": "SYP",
+    "AE": "AED",
+    "EG": "EGP",
+    "KW": "KWD",
+    "TR": "TRY",
+    "JO": "JOD",
+    "IQ": "IQD",
+    "LB": "LBP",
+    "OM": "OMR",
+    "BH": "BHD",
+    "QA": "QAR",
+}
+
 def initialize_company_default_data(company_id: str, admin_username: str, 
                                     admin_email: str, admin_password: str, 
-                                    admin_full_name: str, timezone: str = "Asia/Riyadh",
-                                    currency: str = "SAR") -> Tuple[bool, str]:
+                                    admin_full_name: str, timezone: str = "Asia/Damascus",
+                                    currency: str = "SYP", country: str = "SY") -> Tuple[bool, str]:
     """Initialize default data for company"""
     db_name = f"aman_{company_id}"
     connection_url = settings.get_company_database_url(company_id)
@@ -3097,24 +3482,16 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                 ("acc_map_revaluation_reserve", inserted_ids.get("35")),
             ]
 
-            settings_data = [
-                ("default_currency", default_currency),
-                ("fiscal_year_start", "01-01"),
-                ("invoice_prefix", "INV-"),
-                ("journal_prefix", "JE-"),
-                ("decimal_places", "2"),
-                ("date_format", "YYYY-MM-DD"),
-                ("timezone", timezone),
-            ]
-
             curr_names = {
                 "SAR": ("ريال سعودي", "Saudi Riyal", "ر.س"),
+                "SYP": ("ليرة سورية", "Syrian Pound", "ل.س"),
                 "USD": ("دولار أمريكي", "US Dollar", "$"),
                 "EUR": ("يورو", "Euro", "€"),
                 "GBP": ("جنيه إسترليني", "British Pound", "£"),
                 "AED": ("درهم إماراتي", "UAE Dirham", "د.إ"),
                 "KWD": ("دينار كويتي", "Kuwaiti Dinar", "د.ك"),
-                "EGP": ("جنيه مصري", "Egyptian Pound", "ج.م")
+                "EGP": ("جنيه مصري", "Egyptian Pound", "ج.م"),
+                "TRY": ("ليرة تركية", "Turkish Lira", "₺"),
             }
             c_name, c_name_en, c_symbol = curr_names.get(currency, (currency, currency, currency))
             
@@ -3128,6 +3505,7 @@ def initialize_company_default_data(company_id: str, admin_username: str,
 
             settings_data = [
                 ("default_currency", default_currency),
+                ("company_country", country),
                 ("fiscal_year_start", "01-01"),
                 ("invoice_prefix", "INV-"),
                 ("journal_prefix", "JE-"),
@@ -3150,11 +3528,21 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                     """), {"key": key, "value": str(val_id)})
 
             # Default branch
+            # Map country code to country name and timezone
+            country_names = {
+                "SA": ("المملكة العربية السعودية", "Saudi Arabia"),
+                "SY": ("سوريا", "Syria"),
+                "AE": ("الإمارات", "United Arab Emirates"),
+                "EG": ("مصر", "Egypt"),
+                "KW": ("الكويت", "Kuwait"),
+                "TR": ("تركيا", "Turkey"),
+            }
+            country_ar, country_en = country_names.get(country, (country, country))
             branch_result = conn.execute(text("""
-                INSERT INTO branches (branch_code, branch_name, branch_name_en, is_default, is_active)
-                VALUES ('BR001', 'الفرع الرئيسي', 'Main Branch', TRUE, TRUE)
+                INSERT INTO branches (branch_code, branch_name, branch_name_en, country, country_code, default_currency, is_default, is_active)
+                VALUES ('BR001', 'الفرع الرئيسي', 'Main Branch', :country_name, :country_code, :currency, TRUE, TRUE)
                 RETURNING id
-            """)).fetchone()
+            """), {"country_name": country_ar, "country_code": country, "currency": currency}).fetchone()
             branch_id = branch_result[0]
 
             # Link admin user to branch
@@ -3240,10 +3628,11 @@ def get_pos_tables_sql() -> str:
         cash_register_balance DECIMAL(18, 4) DEFAULT 0,
         difference DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'opened', 
-        opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        closed_at TIMESTAMP,
+        opened_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        closed_at TIMESTAMPTZ,
         notes TEXT,
-        branch_id INTEGER REFERENCES branches(id)
+        branch_id INTEGER REFERENCES branches(id),
+        treasury_account_id INTEGER REFERENCES treasury_accounts(id)
     );
 
     CREATE TABLE IF NOT EXISTS pos_orders (
@@ -3254,7 +3643,7 @@ def get_pos_tables_sql() -> str:
         walk_in_customer_name VARCHAR(255),
         branch_id INTEGER REFERENCES branches(id),
         warehouse_id INTEGER REFERENCES warehouses(id),
-        order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        order_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         status VARCHAR(20) DEFAULT 'draft', 
         
         -- Money Fields
@@ -3268,7 +3657,7 @@ def get_pos_tables_sql() -> str:
         
         note TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS pos_order_lines (
@@ -3297,8 +3686,147 @@ def get_pos_tables_sql() -> str:
         payment_method VARCHAR(50) NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         reference_number VARCHAR(100),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- POS Order Payments (per-order payment method breakdown)
+    CREATE TABLE IF NOT EXISTS pos_order_payments (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER REFERENCES pos_orders(id) ON DELETE CASCADE,
+        method VARCHAR(50) NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        reference VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- POS Returns
+    CREATE TABLE IF NOT EXISTS pos_returns (
+        id SERIAL PRIMARY KEY,
+        original_order_id INTEGER REFERENCES pos_orders(id),
+        user_id INTEGER REFERENCES company_users(id),
+        session_id INTEGER REFERENCES pos_sessions(id),
+        refund_amount DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        refund_method VARCHAR(50) DEFAULT 'cash',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_return_items (
+        id SERIAL PRIMARY KEY,
+        return_id INTEGER REFERENCES pos_returns(id) ON DELETE CASCADE,
+        original_item_id INTEGER,
+        quantity DECIMAL(18, 4) NOT NULL DEFAULT 1,
+        reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- POS Promotions
+    CREATE TABLE IF NOT EXISTS pos_promotions (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        promotion_type VARCHAR(50) NOT NULL DEFAULT 'percentage',
+        value NUMERIC(15, 2) NOT NULL DEFAULT 0,
+        buy_qty INTEGER,
+        get_qty INTEGER,
+        coupon_code VARCHAR(100),
+        applicable_products TEXT,
+        applicable_categories TEXT,
+        min_order_amount NUMERIC(15, 2) DEFAULT 0,
+        start_date TIMESTAMPTZ,
+        end_date TIMESTAMPTZ,
+        is_active BOOLEAN DEFAULT TRUE,
+        branch_id INTEGER,
+        created_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- POS Loyalty Programs
+    CREATE TABLE IF NOT EXISTS pos_loyalty_programs (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        points_per_unit NUMERIC(10, 4) DEFAULT 1,
+        currency_per_point NUMERIC(10, 4) DEFAULT 0.01,
+        min_points_redeem INTEGER DEFAULT 100,
+        tier_rules JSONB DEFAULT '[]'::jsonb,
+        is_active BOOLEAN DEFAULT TRUE,
+        branch_id INTEGER,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_loyalty_points (
+        id SERIAL PRIMARY KEY,
+        program_id INTEGER REFERENCES pos_loyalty_programs(id),
+        party_id INTEGER,
+        points_earned NUMERIC(12, 2) DEFAULT 0,
+        points_redeemed NUMERIC(12, 2) DEFAULT 0,
+        balance NUMERIC(12, 2) DEFAULT 0,
+        tier VARCHAR(50) DEFAULT 'standard',
+        last_activity_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_loyalty_transactions (
+        id SERIAL PRIMARY KEY,
+        loyalty_id INTEGER REFERENCES pos_loyalty_points(id),
+        order_id INTEGER,
+        txn_type VARCHAR(20) NOT NULL,
+        points NUMERIC(12, 2) NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- POS Tables (Restaurant/Dine-in)
+    CREATE TABLE IF NOT EXISTS pos_tables (
+        id SERIAL PRIMARY KEY,
+        table_number VARCHAR(50) NOT NULL,
+        table_name VARCHAR(100),
+        floor VARCHAR(50) DEFAULT 'main',
+        capacity INTEGER DEFAULT 4,
+        status VARCHAR(20) DEFAULT 'available',
+        shape VARCHAR(20) DEFAULT 'square',
+        pos_x NUMERIC(8, 2) DEFAULT 0,
+        pos_y NUMERIC(8, 2) DEFAULT 0,
+        branch_id INTEGER,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_table_orders (
+        id SERIAL PRIMARY KEY,
+        table_id INTEGER REFERENCES pos_tables(id),
+        order_id INTEGER,
+        seated_at TIMESTAMPTZ DEFAULT NOW(),
+        cleared_at TIMESTAMPTZ,
+        guests INTEGER DEFAULT 1,
+        waiter_id INTEGER,
+        status VARCHAR(20) DEFAULT 'seated'
+    );
+
+    -- POS Kitchen Display
+    CREATE TABLE IF NOT EXISTS pos_kitchen_orders (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER,
+        order_line_id INTEGER,
+        product_id INTEGER,
+        product_name VARCHAR(255),
+        quantity NUMERIC(12, 3),
+        notes TEXT,
+        station VARCHAR(100) DEFAULT 'main',
+        status VARCHAR(30) DEFAULT 'pending',
+        priority INTEGER DEFAULT 0,
+        sent_at TIMESTAMPTZ DEFAULT NOW(),
+        accepted_at TIMESTAMPTZ,
+        ready_at TIMESTAMPTZ,
+        served_at TIMESTAMPTZ,
+        branch_id INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pos_returns_session ON pos_returns(session_id);
+    CREATE INDEX IF NOT EXISTS idx_pos_returns_order ON pos_returns(original_order_id);
+    CREATE INDEX IF NOT EXISTS idx_pos_order_payments_order ON pos_order_payments(order_id);
+    CREATE INDEX IF NOT EXISTS idx_pos_promotions_active ON pos_promotions(is_active);
+    CREATE INDEX IF NOT EXISTS idx_pos_kitchen_status ON pos_kitchen_orders(status);
     """
 
 
@@ -3316,8 +3844,8 @@ def get_approval_tables_sql() -> str:
         steps JSONB DEFAULT '[]',
         is_active BOOLEAN DEFAULT TRUE,
         created_by INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS approval_requests (
@@ -3331,9 +3859,9 @@ def get_approval_tables_sql() -> str:
         total_steps INTEGER DEFAULT 1,
         status VARCHAR(20) DEFAULT 'pending',
         requested_by INTEGER,
-        completed_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS approval_actions (
@@ -3343,7 +3871,7 @@ def get_approval_tables_sql() -> str:
         action VARCHAR(20) NOT NULL,
         actioned_by INTEGER,
         notes TEXT,
-        actioned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        actioned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
@@ -3363,15 +3891,15 @@ def get_security_tables_sql() -> str:
         secret_key VARCHAR(100),
         is_enabled BOOLEAN DEFAULT FALSE,
         backup_codes TEXT,
-        verified_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        verified_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS password_history (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS user_sessions (
@@ -3380,13 +3908,190 @@ def get_security_tables_sql() -> str:
         token_hash VARCHAR(255),
         ip_address VARCHAR(50),
         user_agent TEXT,
-        login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        login_time TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        last_activity TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         is_active BOOLEAN DEFAULT TRUE
     );
 
     CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_password_history_user ON password_history(user_id);
+
+    -- ===== PHASE 9: External API + CRM + ZATCA + WHT =====
+
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS zatca_hash TEXT;
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS zatca_signature TEXT;
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS zatca_qr TEXT;
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS zatca_status VARCHAR(20) DEFAULT 'pending';
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS zatca_submission_id TEXT;
+
+    CREATE TABLE IF NOT EXISTS api_keys (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        key_hash VARCHAR(255) NOT NULL UNIQUE,
+        key_prefix VARCHAR(10) NOT NULL,
+        permissions JSONB DEFAULT '[]',
+        rate_limit_per_minute INT DEFAULT 60,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        expires_at TIMESTAMPTZ,
+        last_used_at TIMESTAMPTZ,
+        usage_count INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        url TEXT NOT NULL,
+        secret VARCHAR(255),
+        events JSONB NOT NULL DEFAULT '[]',
+        is_active BOOLEAN DEFAULT TRUE,
+        retry_count INT DEFAULT 3,
+        timeout_seconds INT DEFAULT 10,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        webhook_id INT REFERENCES webhooks(id) ON DELETE CASCADE,
+        event VARCHAR(100),
+        payload JSONB,
+        response_status INT,
+        response_body TEXT,
+        success BOOLEAN DEFAULT FALSE,
+        attempt INT DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS wht_rates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        name_ar VARCHAR(100),
+        rate DECIMAL(5,2) NOT NULL,
+        category VARCHAR(50) DEFAULT 'general',
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    INSERT INTO wht_rates (name, name_ar, rate, category) 
+    SELECT * FROM (VALUES
+        ('Services - Resident', 'خدمات - مقيم', 5.00, 'services'),
+        ('Services - Non-Resident', 'خدمات - غير مقيم', 15.00, 'services'),
+        ('Rent', 'إيجار', 5.00, 'rent'),
+        ('Consulting', 'استشارات', 5.00, 'consulting'),
+        ('Royalties', 'حقوق الملكية', 15.00, 'royalties'),
+        ('Insurance', 'تأمين', 5.00, 'insurance'),
+        ('International Transport', 'نقل دولي', 5.00, 'transport'),
+        ('Dividend', 'أرباح الأسهم', 5.00, 'dividend')
+    ) AS v(name, name_ar, rate, category)
+    WHERE NOT EXISTS (SELECT 1 FROM wht_rates LIMIT 1);
+
+    CREATE TABLE IF NOT EXISTS wht_transactions (
+        id SERIAL PRIMARY KEY,
+        invoice_id INT,
+        payment_id INT,
+        supplier_id INT,
+        wht_rate_id INT REFERENCES wht_rates(id),
+        gross_amount DECIMAL(18,2) NOT NULL,
+        wht_rate DECIMAL(5,2) NOT NULL,
+        wht_amount DECIMAL(18,2) NOT NULL,
+        net_amount DECIMAL(18,2) NOT NULL,
+        certificate_number VARCHAR(50),
+        status VARCHAR(20) DEFAULT 'pending',
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS sales_opportunities (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        customer_id INT REFERENCES parties(id),
+        contact_name VARCHAR(100),
+        contact_email VARCHAR(100),
+        contact_phone VARCHAR(30),
+        stage VARCHAR(30) DEFAULT 'lead',
+        probability INT DEFAULT 10,
+        expected_value DECIMAL(18,2) DEFAULT 0,
+        expected_close_date DATE,
+        currency VARCHAR(10) DEFAULT 'SAR',
+        source VARCHAR(50),
+        assigned_to INT,
+        branch_id INT,
+        notes TEXT,
+        lost_reason TEXT,
+        won_quotation_id INT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS opportunity_activities (
+        id SERIAL PRIMARY KEY,
+        opportunity_id INT REFERENCES sales_opportunities(id) ON DELETE CASCADE,
+        activity_type VARCHAR(30),
+        title VARCHAR(200),
+        description TEXT,
+        due_date DATE,
+        completed BOOLEAN DEFAULT FALSE,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS support_tickets (
+        id SERIAL PRIMARY KEY,
+        ticket_number VARCHAR(30) UNIQUE,
+        subject VARCHAR(200) NOT NULL,
+        description TEXT,
+        customer_id INT REFERENCES parties(id),
+        contact_name VARCHAR(100),
+        contact_email VARCHAR(100),
+        contact_phone VARCHAR(30),
+        status VARCHAR(20) DEFAULT 'open',
+        priority VARCHAR(20) DEFAULT 'medium',
+        category VARCHAR(50),
+        assigned_to INT,
+        branch_id INT,
+        sla_hours INT DEFAULT 24,
+        resolution TEXT,
+        resolved_at TIMESTAMPTZ,
+        closed_at TIMESTAMPTZ,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS ticket_comments (
+        id SERIAL PRIMARY KEY,
+        ticket_id INT REFERENCES support_tickets(id) ON DELETE CASCADE,
+        comment TEXT NOT NULL,
+        is_internal BOOLEAN DEFAULT FALSE,
+        attachment_url TEXT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS tax_calendar (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        tax_type VARCHAR(50),
+        due_date DATE NOT NULL,
+        reminder_days JSONB DEFAULT '[7, 3, 1]',
+        is_recurring BOOLEAN DEFAULT FALSE,
+        recurrence_months INT DEFAULT 3,
+        is_completed BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sales_opp_stage ON sales_opportunities(stage);
+    CREATE INDEX IF NOT EXISTS idx_sales_opp_customer ON sales_opportunities(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_tickets_status ON support_tickets(status, priority);
+    CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON support_tickets(assigned_to);
     """
 
 

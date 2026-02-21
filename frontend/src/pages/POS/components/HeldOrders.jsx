@@ -3,6 +3,8 @@ import { Clock, Package, User, Trash2, Play, X } from 'lucide-react';
 import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
+import { formatShortDate, formatDateTime } from '../../../utils/dateUtils';
+
 
 const HeldOrders = ({ onResume, onClose }) => {
     const { t } = useTranslation();
@@ -62,7 +64,7 @@ const HeldOrders = ({ onResume, onClose }) => {
 
     const formatTime = (dateStr) => {
         const date = new Date(dateStr);
-        return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        return formatDateTime(date);
     };
 
     return (

@@ -5,6 +5,8 @@ import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const IncomingShipments = () => {
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
@@ -92,7 +94,7 @@ const IncomingShipments = () => {
                                         {t('stock.shipments.incoming_page.from_to', { source: s.source_warehouse, dest: s.destination_warehouse })}
                                     </p>
                                     <p className="text-muted" style={{ fontSize: '12px' }}>
-                                        {t('stock.shipments.incoming_page.by_user', { user: s.created_by_name })} • {new Date(s.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US')}
+                                        {t('stock.shipments.incoming_page.by_user', { user: s.created_by_name })} • {formatShortDate(s.created_at)}
                                     </p>
                                 </div>
                                 <span style={{

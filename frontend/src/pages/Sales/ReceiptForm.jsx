@@ -7,6 +7,8 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function ReceiptForm() {
     const { t } = useTranslation();
@@ -411,7 +413,7 @@ function ReceiptForm() {
                                         {outstandingInvoices.filter(inv => formData.voucher_type === 'receipt' ? inv.invoice_type === 'sales' : inv.invoice_type === 'sales_return').map(inv => (
                                             <tr key={inv.id}>
                                                 <td className="font-medium text-primary">{inv.invoice_number}</td>
-                                                <td>{new Date(inv.invoice_date).toLocaleDateString('ar-EG')}</td>
+                                                <td>{formatShortDate(inv.invoice_date)}</td>
                                                 <td>
                                                     {formatNumber(inv.total)}
                                                     <small className="mx-1 text-muted">{inv.currency || currency}</small>

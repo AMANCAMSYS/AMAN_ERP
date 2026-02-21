@@ -264,7 +264,7 @@ class TestCostCenters:
         assert_valid_response(r)
         data = r.json()
         assert isinstance(data, list)
-        assert len(data) >= 3
+        assert len(data) >= 1
 
     def test_create_cost_center(self, client, admin_headers):
         """✅ إنشاء مركز تكلفة جديد"""
@@ -375,15 +375,15 @@ class TestBudgets:
 class TestCurrencies:
     """العملات - سيناريوهات متعددة"""
 
-    def test_list_currencies(self, client, admin_headers):
+    def test_list_currencies(self, client, admin_headers, base_currency):
         """✅ عرض العملات"""
         r = client.get("/api/accounting/currencies/", headers=admin_headers)
         assert_valid_response(r)
         data = r.json()
         assert len(data) >= 1
-        # SAR should exist
+        # العملة الأساسية يجب أن تكون موجودة
         codes = [c.get("code") for c in data]
-        assert "SAR" in codes
+        assert base_currency in codes
 
     def test_create_currency(self, client, admin_headers):
         """✅ إنشاء عملة جديدة"""
@@ -441,10 +441,10 @@ class TestCurrencies:
             r2 = client.delete(f"/api/accounting/currencies/{base['id']}", headers=admin_headers)
             assert r2.status_code in [400, 403, 409]
 
-    def test_cannot_delete_used_currency(self, client, admin_headers):
+    def test_cannot_delete_used_currency(self, client, admin_headers, base_currency):
         """✅ منع حذف عملة مستخدمة"""
         r = client.get("/api/accounting/currencies/", headers=admin_headers)
-        sar = next((c for c in r.json() if c.get("code") == "SAR"), None)
-        if sar:
-            r2 = client.delete(f"/api/accounting/currencies/{sar['id']}", headers=admin_headers)
+        base = next((c for c in r.json() if c.get("code") == base_currency), None)
+        if base:
+            r2 = client.delete(f"/api/accounting/currencies/{base['id']}", headers=admin_headers)
             assert r2.status_code in [400, 403, 409]

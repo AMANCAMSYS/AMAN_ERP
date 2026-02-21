@@ -8,7 +8,7 @@ import hmac
 import json
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
@@ -48,7 +48,7 @@ def _send_single_webhook(webhook_id: int, url: str, secret: Optional[str],
     headers = {
         "Content-Type": "application/json; charset=utf-8",
         "X-Webhook-Event": event,
-        "X-Webhook-Timestamp": datetime.utcnow().isoformat(),
+        "X-Webhook-Timestamp": datetime.now(timezone.utc).isoformat(),
     }
     
     if secret:

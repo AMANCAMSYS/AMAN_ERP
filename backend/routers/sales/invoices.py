@@ -69,7 +69,7 @@ def create_sales_invoice(
         if not base_currency_row:
              base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
 
-        base_currency = base_currency_row[0] if base_currency_row else "SAR"
+        base_currency = base_currency_row[0] if base_currency_row else "SYP"
 
         inv_currency = invoice.currency or base_currency
         exchange_rate = float(invoice.exchange_rate or 1.0)
@@ -178,7 +178,7 @@ def create_sales_invoice(
             wh_id = db.execute(text("SELECT id FROM warehouses WHERE is_default = TRUE LIMIT 1")).scalar() or 1
 
         from services.costing_service import CostingService
-        costing_service = CostingService(db)
+        costing_service = CostingService
 
         for item in items_to_save:
             db.execute(text("""
@@ -548,7 +548,7 @@ def cancel_invoice(
         base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
         if not base_currency_row:
             base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
-        base_currency = base_currency_row[0] if base_currency_row else "SAR"
+        base_currency = base_currency_row[0] if base_currency_row else "SYP"
 
         # 1. Get invoice
         inv = db.execute(text("""

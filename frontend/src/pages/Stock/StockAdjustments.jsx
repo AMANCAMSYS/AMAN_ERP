@@ -6,6 +6,8 @@ import { ArrowLeft, Plus, Search, FileText } from 'lucide-react';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const StockAdjustments = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -103,7 +105,7 @@ const StockAdjustments = () => {
                                 <tr key={adj.id}>
                                     <td className="fw-medium text-primary">#{adj.adjustment_number}</td>
                                     <td className="text-muted small">
-                                        {new Date(adj.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        {formatShortDate(adj.created_at)}
                                     </td>
                                     <td>
                                         <div style={{ fontSize: '14px', fontWeight: '500' }}>{adj.warehouse_name}</div>

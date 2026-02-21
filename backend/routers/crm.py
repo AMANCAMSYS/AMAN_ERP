@@ -7,6 +7,7 @@ CRM-004: Support Tickets with comments and SLA
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
+
 from datetime import datetime
 from pydantic import BaseModel
 import logging
@@ -32,7 +33,7 @@ class OpportunityCreate(BaseModel):
     probability: int = 10
     expected_value: float = 0
     expected_close_date: Optional[str] = None
-    currency: str = "SAR"
+    currency: Optional[str] = None
     source: Optional[str] = None
     assigned_to: Optional[int] = None
     branch_id: Optional[int] = None

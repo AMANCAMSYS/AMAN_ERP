@@ -25,8 +25,8 @@ def create_budget(budget: BudgetCreate, current_user: UserResponse = Depends(get
             raise HTTPException(status_code=400, detail="Budget name already exists")
             
         result = conn.execute(text("""
-            INSERT INTO budgets (name, start_date, end_date, description, status, created_by)
-            VALUES (:name, :start, :end, :desc, 'draft', :uid)
+            INSERT INTO budgets (name, budget_name, start_date, end_date, description, status, created_by)
+            VALUES (:name, :name, :start, :end, :desc, 'draft', :uid)
             RETURNING id, created_at, status
         """), {
             "name": budget.name,
@@ -562,43 +562,31 @@ def get_budget_stats(current_user: UserResponse = Depends(get_current_user)):
         conn.close()
 
 
-@router.get("/{budget_id}", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def get_budget_detail(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
-    """Get budget with summary info"""
-    conn = get_db_connection(current_user.company_id)
-    try:
-        budget = conn.execute(text("SELECT * FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
-        if not budget:
-            raise HTTPException(status_code=404, detail="Budget not found")
-        
-        # Summary: total planned, items count
-        summary = conn.execute(text("""
-            SELECT 
-                COUNT(*) as items_count,
-                COALESCE(SUM(planned_amount), 0) as total_planned
-            FROM budget_items WHERE budget_id = :id
-        """), {"id": budget_id}).fetchone()
-        
-        return {
-            "id": budget.id,
-            "name": budget.name,
-            "start_date": str(budget.start_date),
-            "end_date": str(budget.end_date),
-            "description": budget.description,
-            "status": budget.status,
-            "created_at": str(budget.created_at),
-            "items_count": summary.items_count,
-            "total_planned": float(summary.total_planned)
-        }
-    finally:
-        conn.close()
-
-
 # =====================================================
 # 8.13 BUDGETS IMPROVEMENTS
 # =====================================================
 
 # ---------- BDG-001: Budget by Cost Center ----------
+
+@router.get("/by-cost-center", dependencies=[Depends(require_permission("accounting.budgets.view"))])
+def list_all_cc_budgets(current_user: UserResponse = Depends(get_current_user)):
+    """List all budgets that have a cost center assigned."""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        rows = conn.execute(text("""
+            SELECT b.*, COALESCE(SUM(bi.planned_amount),0) as total_planned
+            FROM budgets b
+            LEFT JOIN budget_items bi ON bi.budget_id = b.id
+            WHERE b.cost_center_id IS NOT NULL
+            GROUP BY b.id ORDER BY b.start_date DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception as e:
+        logger.error(f"Error listing cost center budgets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 
 @router.post("/by-cost-center", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
 def create_budget_by_cost_center(data: dict, current_user: UserResponse = Depends(get_current_user)):
@@ -700,5 +688,38 @@ def compare_budgets(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+# --- IMPORTANT: /{budget_id} must be LAST so it doesn't shadow static routes like /multi-year ---
+@router.get("/{budget_id}", dependencies=[Depends(require_permission("accounting.budgets.view"))])
+def get_budget_detail(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+    """Get budget with summary info"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        budget = conn.execute(text("SELECT * FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
+        if not budget:
+            raise HTTPException(status_code=404, detail="Budget not found")
+        
+        # Summary: total planned, items count
+        summary = conn.execute(text("""
+            SELECT 
+                COUNT(*) as items_count,
+                COALESCE(SUM(planned_amount), 0) as total_planned
+            FROM budget_items WHERE budget_id = :id
+        """), {"id": budget_id}).fetchone()
+        
+        return {
+            "id": budget.id,
+            "name": budget.name,
+            "start_date": str(budget.start_date),
+            "end_date": str(budget.end_date),
+            "description": budget.description,
+            "status": budget.status,
+            "created_at": str(budget.created_at),
+            "items_count": summary.items_count,
+            "total_planned": float(summary.total_planned)
+        }
     finally:
         conn.close()

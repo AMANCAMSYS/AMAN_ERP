@@ -248,9 +248,9 @@ def delete_supplier(
         # Check if supplier has transactions
         usage = db.execute(text("""
             SELECT COUNT(*) FROM (
-                SELECT 1 FROM purchase_invoices WHERE supplier_id = :id
+                SELECT 1 FROM invoices WHERE (party_id = :id OR supplier_id = :id) AND invoice_type IN ('purchase', 'purchase_return')
                 UNION ALL
-                SELECT 1 FROM purchase_orders WHERE supplier_id = :id
+                SELECT 1 FROM purchase_orders WHERE party_id = :id OR supplier_id = :id
             ) AS usage
         """), {"id": id}).scalar()
 

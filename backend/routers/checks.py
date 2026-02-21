@@ -8,7 +8,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission, validate_branch_access
-from utils.accounting import update_account_balance
+from utils.accounting import update_account_balance, get_base_currency
 from datetime import date, datetime
 from typing import Optional
 
@@ -30,10 +30,10 @@ def _ensure_checks_accounts(db):
             ), {"code": parent_prefix + '00'}).fetchone()
             db.execute(text("""
                 INSERT INTO accounts (account_number, account_code, name, name_en, account_type, parent_id, is_active, currency)
-                VALUES (:code, :code, :name, :name_en, :type, :pid, TRUE, 'SAR')
+                VALUES (:code, :code, :name, :name_en, :type, :pid, TRUE, :currency)
                 ON CONFLICT (account_number) DO NOTHING
             """), {"code": code, "name": nm, "name_en": nm_en, "type": acc_type,
-                   "pid": parent.id if parent else None})
+                   "pid": parent.id if parent else None, "currency": get_base_currency(db)})
             db.commit()
 
 
@@ -265,7 +265,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
             "bank_name": data.get("bank_name", ""),
             "branch_name": data.get("branch_name", ""),
             "amount": amount,
-            "currency": data.get("currency", "SAR"),
+            "currency": data.get("currency", get_base_currency(db)),
             "issue_date": data.get("issue_date"),
             "due_date": data["due_date"],
             "party_id": data.get("party_id"),
@@ -737,7 +737,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
             "bank_name": data.get("bank_name", ""),
             "branch_name": data.get("branch_name", ""),
             "amount": amount,
-            "currency": data.get("currency", "SAR"),
+            "currency": data.get("currency", get_base_currency(db)),
             "issue_date": data["issue_date"],
             "due_date": data["due_date"],
             "party_id": data.get("party_id"),

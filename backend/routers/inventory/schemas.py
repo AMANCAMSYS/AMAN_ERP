@@ -2,7 +2,7 @@
 Inventory Module - Shared Pydantic Schemas
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -40,8 +40,7 @@ class ProductResponse(ProductCreate):
     expiry_alert_days: int = 30
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Supplier Schemas ---
@@ -53,7 +52,7 @@ class SupplierCreate(BaseModel):
     address: Optional[str] = None
     tax_number: Optional[str] = None
     branch_id: Optional[int] = None
-    currency: Optional[str] = "SYP"
+    currency: Optional[str] = None
 
 
 class SupplierResponse(SupplierCreate):
@@ -63,8 +62,7 @@ class SupplierResponse(SupplierCreate):
     currency: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Stock Transfer Schemas ---

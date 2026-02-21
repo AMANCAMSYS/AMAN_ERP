@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import Pagination, { usePagination } from '../../components/common/Pagination'
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 function SupplierList() {
     const { t, i18n } = useTranslation()
     const navigate = useNavigate()
@@ -153,7 +155,7 @@ function SupplierList() {
                                         </span>
                                     </td>
                                     <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                        {new Date(supplier.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                                        {formatShortDate(supplier.created_at)}
                                     </td>
                                 </tr>
                             ))

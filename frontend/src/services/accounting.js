@@ -1,0 +1,86 @@
+import api from './apiClient'
+
+export const accountingAPI = {
+    list: (params) => api.get('/accounting/accounts', { params }),
+    create: (data) => api.post('/accounting/accounts', data),
+    update: (id, data) => api.put(`/accounting/accounts/${id}`, data),
+    delete: (id) => api.delete(`/accounting/accounts/${id}`),
+    createJournalEntry: (data) => api.post('/accounting/journal-entries', data),
+    voidJournalEntry: (id) => api.post(`/accounting/journal-entries/${id}/void`),
+    getSummary: (params) => api.get('/accounting/summary', { params }),
+
+    // Fiscal Years (ACC-001)
+    listFiscalYears: () => api.get('/accounting/fiscal-years'),
+    createFiscalYear: (data) => api.post('/accounting/fiscal-years', data),
+    previewClosing: (year) => api.get(`/accounting/fiscal-years/${year}/preview-closing`),
+    closeFiscalYear: (year, data) => api.post(`/accounting/fiscal-years/${year}/close`, data),
+    reopenFiscalYear: (year, data) => api.post(`/accounting/fiscal-years/${year}/reopen`, data),
+    listFiscalPeriods: (year) => api.get(`/accounting/fiscal-years/${year}/periods`),
+    togglePeriod: (periodId) => api.post(`/accounting/fiscal-periods/${periodId}/toggle-close`),
+
+    // Journal Entries (ACC-002)
+    listJournalEntries: (params) => api.get('/accounting/journal-entries', { params }),
+    getJournalEntry: (id) => api.get(`/accounting/journal-entries/${id}`),
+    postJournalEntry: (id) => api.post(`/accounting/journal-entries/${id}/post`),
+
+    // Recurring Templates (ACC-003)
+    listRecurringTemplates: (params) => api.get('/accounting/recurring-templates', { params }),
+    getRecurringTemplate: (id) => api.get(`/accounting/recurring-templates/${id}`),
+    createRecurringTemplate: (data) => api.post('/accounting/recurring-templates', data),
+    updateRecurringTemplate: (id, data) => api.put(`/accounting/recurring-templates/${id}`, data),
+    deleteRecurringTemplate: (id) => api.delete(`/accounting/recurring-templates/${id}`),
+    generateFromTemplate: (id) => api.post(`/accounting/recurring-templates/${id}/generate`),
+    generateDueTemplates: () => api.post('/accounting/recurring-templates/generate-due'),
+
+    // Opening Balances (ACC-005)
+    getOpeningBalances: () => api.get('/accounting/opening-balances'),
+    saveOpeningBalances: (data) => api.post('/accounting/opening-balances', data),
+
+    // Closing Entries (ACC-006)
+    previewClosingEntries: (params) => api.get('/accounting/closing-entries/preview', { params }),
+    generateClosingEntries: (data) => api.post('/accounting/closing-entries/generate', data),
+}
+
+export const costCentersAPI = {
+    list: () => api.get('/cost-centers/'),
+    create: (data) => api.post('/cost-centers/', data),
+    update: (id, data) => api.put(`/cost-centers/${id}`, data),
+    delete: (id) => api.delete(`/cost-centers/${id}`)
+}
+
+export const budgetsAPI = {
+    list: () => api.get('/accounting/budgets/'),
+    create: (data) => api.post('/accounting/budgets/', data),
+    get: (id) => api.get(`/accounting/budgets/${id}`),
+    update: (id, data) => api.put(`/accounting/budgets/${id}`, data),
+    setItems: (id, items) => api.post(`/accounting/budgets/${id}/items`, items),
+    getItems: (id) => api.get(`/accounting/budgets/${id}/items`),
+    getReport: (id, params) => api.get(`/accounting/budgets/${id}/report`, { params }),
+    delete: (id) => api.delete(`/accounting/budgets/${id}`),
+    activate: (id) => api.post(`/accounting/budgets/${id}/activate`),
+    close: (id) => api.post(`/accounting/budgets/${id}/close`),
+    getOverrunAlerts: (threshold) => api.get('/accounting/budgets/alerts/overruns', { params: { threshold } }),
+    getStats: () => api.get('/accounting/budgets/stats/summary')
+}
+
+export const budgetImprovementsAPI = {
+    createByCostCenter: (data) => api.post('/accounting/budgets/by-cost-center', data),
+    getByCostCenter: (ccId) => api.get(`/accounting/budgets/by-cost-center/${ccId}`),
+    getMultiYear: (params) => api.get('/accounting/budgets/multi-year', { params }),
+    getComparison: (params) => api.get('/accounting/budgets/comparison', { params }),
+    listCostCenterBudgets: (params) => api.get('/accounting/budgets/by-cost-center', { params }),
+    listMultiYearBudgets: (params) => api.get('/accounting/budgets/multi-year', { params }),
+    createCostCenterBudget: (data) => api.post('/accounting/budgets/by-cost-center', data),
+    createMultiYearBudget: (data) => api.post('/accounting/budgets/multi-year', data),
+    compareBudgets: (id1, id2) => api.get(`/accounting/budgets/comparison`, { params: { budget_id_1: id1, budget_id_2: id2 } }),
+}
+
+export const currenciesAPI = {
+    list: () => api.get('/accounting/currencies/'),
+    create: (data) => api.post('/accounting/currencies/', data),
+    update: (id, data) => api.put(`/accounting/currencies/${id}`, data),
+    delete: (id) => api.delete(`/accounting/currencies/${id}`),
+    addRate: (data) => api.post('/accounting/currencies/rates', data),
+    getHistory: (id, limit = 30) => api.get(`/accounting/currencies/${id}/rates`, { params: { limit } }),
+    revaluate: (data) => api.post('/accounting/currencies/revaluate', data)
+}

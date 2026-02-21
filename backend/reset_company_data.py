@@ -30,9 +30,6 @@ TABLES_TO_TRUNCATE = [
     # === Manufacturing (children first) ===
     "production_order_operations",
     "production_order_materials",
-    "manufacturing_orders",
-    "manufacturing_bom_items",
-    "manufacturing_boms",
     "manufacturing_work_center_routes",
     "manufacturing_routes",
     "manufacturing_work_centers",

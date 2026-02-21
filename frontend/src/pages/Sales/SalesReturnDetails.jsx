@@ -5,6 +5,8 @@ import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 const SalesReturnDetails = () => {
     const { t } = useTranslation();
@@ -61,7 +63,7 @@ const SalesReturnDetails = () => {
                                     ret.status === 'cancelled' ? t('sales.returns.status.cancelled') : ret.status}
                         </span>
                     </div>
-                    <p className="workspace-subtitle">{t('sales.returns.details.date')}: {new Date(ret.return_date).toLocaleDateString('ar-EG')}</p>
+                    <p className="workspace-subtitle">{t('sales.returns.details.date')}: {formatShortDate(ret.return_date)}</p>
                 </div>
                 <div className="header-actions">
                     <button onClick={() => window.print()} className="btn btn-secondary">

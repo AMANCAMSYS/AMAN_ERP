@@ -2,7 +2,7 @@
 AMAN ERP - Pydantic Schemas
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date
 
@@ -16,6 +16,7 @@ class CompanyCreateRequest(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     email: EmailStr
     address: Optional[str] = None
+    country: str = Field(default="SY", max_length=5, description="Country code: SA, SY, etc.")
     currency: str = Field(default="SYP", max_length=3)
     
     admin_username: str = Field(..., min_length=4, max_length=50)
@@ -23,21 +24,22 @@ class CompanyCreateRequest(BaseModel):
     admin_full_name: str = Field(..., min_length=3, max_length=255)
     admin_password: str = Field(..., min_length=8)
     
-    timezone: str = Field(default="Asia/Riyadh", max_length=100)
+    timezone: str = Field(default="Asia/Damascus", max_length=100)
     plan_type: str = Field(default="basic")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "company_name": "شركة الأمل للتجارة",
-                "email": "info@alamal.com",
-                "admin_username": "admin",
-                "admin_email": "admin@alamal.com",
-                "admin_full_name": "أحمد محمد",
-                "admin_password": "SecurePass123!@#",
-                "timezone": "Asia/Riyadh"
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "company_name": "شركة الأمل للتجارة",
+            "email": "info@alamal.com",
+            "country": "SY",
+            "currency": "SYP",
+            "admin_username": "admin",
+            "admin_email": "admin@alamal.com",
+            "admin_full_name": "أحمد محمد",
+            "admin_password": "SecurePass123!@#",
+            "timezone": "Asia/Damascus"
         }
+    })
 
 
 class CompanyUpdateRequest(BaseModel):
@@ -58,8 +60,7 @@ class Token(BaseModel):
     company_id: Optional[str] = None
     user: Optional[Dict[str, Any]] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserResponse(BaseModel):
@@ -71,12 +72,13 @@ class UserResponse(BaseModel):
     is_active: bool = True
     company_id: Optional[str] = None
     currency: Optional[str] = None
+    country: Optional[str] = None
     decimal_places: int = 2
+    timezone: str = "Asia/Damascus"
     permissions: List[str] = []
     allowed_branches: List[int] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserCreateRequest(BaseModel):
@@ -118,8 +120,7 @@ class PartyResponse(BaseModel):
     is_customer: bool = False
     is_supplier: bool = False
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AccountingEntryLine(BaseModel):
@@ -154,8 +155,7 @@ class CompanyResponse(BaseModel):
     currency: str = "SYP"
     logo_url: Optional[str] = None
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyCreateResponse(BaseModel):
@@ -174,8 +174,7 @@ class CompanyListItem(BaseModel):
     plan_type: str = "basic"
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyListResponse(BaseModel):
@@ -213,8 +212,7 @@ class WarehouseResponse(BaseModel):
     branch_name: Optional[str] = None
     is_default: bool = False
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CurrencyCreate(BaseModel):
@@ -261,6 +259,8 @@ class BranchCreate(BaseModel):
     address: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    country_code: Optional[str] = None
+    default_currency: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     is_active: bool = True
@@ -275,11 +275,12 @@ class BranchResponse(BaseModel):
     address: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+    country_code: Optional[str] = None
+    default_currency: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     is_default: bool = False
     is_active: bool = True
     created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

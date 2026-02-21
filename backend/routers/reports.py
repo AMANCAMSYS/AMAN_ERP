@@ -435,7 +435,7 @@ def get_customer_statement(
                     id, CAST(order_date AS DATE) as date, order_number as ref, 
                     'pos_order' as type, total_amount as debit, 
                     0 as credit,
-                    'SAR' as currency, 1.0 as exchange_rate, branch_id, customer_id as party_id
+                    (SELECT COALESCE((SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1), (SELECT setting_value FROM company_settings WHERE setting_key = 'default_currency'), 'SYP')) as currency, 1.0 as exchange_rate, branch_id, customer_id as party_id
                 FROM pos_orders
                 WHERE status = 'paid'
                 
@@ -1167,10 +1167,20 @@ def _get_balance_sheet_data(db, as_of_date, branch_id=None):
             "level": 0
         })
 
+    # Compute totals
+    total_assets = sum(r["balance"] for r in roots if r.get("account_type") == "asset")
+    total_liabilities = sum(r["balance"] for r in roots if r.get("account_type") == "liability")
+    total_equity = sum(r["balance"] for r in roots if r.get("account_type") == "equity") + retained_earnings
+
     return {
-        "as_of": as_of_date,
+        "period": {"start": as_of_date, "end": as_of_date},
         "data": roots,
-        "net_income": retained_earnings
+        "total": total_assets,
+        "as_of": as_of_date,
+        "net_income": retained_earnings,
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "total_equity": total_equity
     }
 
 @router.get("/accounting/balance-sheet", response_model=FinancialStatementResponse, dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const ShipmentDetails = () => {
     const { t, i18n } = useTranslation();
     const { id } = useParams();
@@ -77,14 +79,14 @@ const ShipmentDetails = () => {
                 <div className="metric-card">
                     <div className="metric-label">{t('stock.shipments.table.date')}</div>
                     <div className="metric-value" style={{ fontSize: '16px' }}>
-                        {new Date(shipment.created_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US')}
+                        {formatShortDate(shipment.created_at)}
                     </div>
                 </div>
                 {shipment.received_at && (
                     <div className="metric-card" style={{ borderRight: '4px solid #059669' }}>
                         <div className="metric-label">{t('stock.shipments.status.received')}</div>
                         <div className="metric-value" style={{ fontSize: '16px', color: '#059669' }}>
-                            {new Date(shipment.received_at).toLocaleDateString(i18n.language === 'ar' ? 'ar-SA' : 'en-US')}
+                            {formatShortDate(shipment.received_at)}
                         </div>
                     </div>
                 )}

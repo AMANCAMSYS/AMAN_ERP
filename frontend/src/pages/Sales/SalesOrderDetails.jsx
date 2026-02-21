@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function SalesOrderDetails() {
     const { t } = useTranslation()
@@ -44,7 +46,7 @@ function SalesOrderDetails() {
                                     order.status === 'delivered' ? t('sales.orders.status.delivered') : order.status}
                         </span>
                     </div>
-                    <p className="workspace-subtitle">{t('sales.orders.details.date')}: {new Date(order.order_date).toLocaleDateString('ar-EG')}</p>
+                    <p className="workspace-subtitle">{t('sales.orders.details.date')}: {formatShortDate(order.order_date)}</p>
                 </div>
                 <div className="header-actions">
                     <button
@@ -71,7 +73,7 @@ function SalesOrderDetails() {
                     </div>
                     <div style={{ textAlign: 'left' }}>
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('sales.orders.details.delivery_details')}:</h4>
-                        <div>{t('sales.orders.details.expected_delivery')}: {order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString('ar-EG') : '-'}</div>
+                        <div>{t('sales.orders.details.expected_delivery')}: {order.expected_delivery_date ? formatShortDate(order.expected_delivery_date) : '-'}</div>
                     </div>
                 </div>
 

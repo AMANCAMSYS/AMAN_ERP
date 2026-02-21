@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function QualityInspections() {
     const { t } = useTranslation()
@@ -282,7 +284,7 @@ function QualityInspections() {
                                     <td>{insp.sample_size || '-'}</td>
                                     <td>{getStatusBadge(insp.status)}</td>
                                     <td>{getResultBadge(insp.result)}</td>
-                                    <td>{insp.created_at ? new Date(insp.created_at).toLocaleDateString('ar-SA') : '-'}</td>
+                                    <td>{insp.created_at ? formatShortDate(insp.created_at) : '-'}</td>
                                     <td>
                                         {insp.status !== 'completed' && (
                                             <button className="btn btn-sm btn-primary"

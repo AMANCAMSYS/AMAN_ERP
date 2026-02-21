@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { getUser, getCompanyId, logout, hasPermission } from '../utils/auth'
 import { inventoryAPI } from '../utils/api'
 import { notificationsAPI } from '../utils/api' // New generic API
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../context/BranchContext'
+import { useNotificationSocket } from '../hooks/useNotificationSocket'
 
 function Topbar() {
     const { t, i18n } = useTranslation()
@@ -21,13 +22,23 @@ function Topbar() {
     const [showBranchMenu, setShowBranchMenu] = useState(false)
     const { branches, currentBranch, setBranch } = useBranch()
 
-    // Fetch notifications
+    // Handle incoming WebSocket notification
+    const handleWsNotification = useCallback((notif) => {
+        setNotifications(prev => [notif, ...prev].slice(0, 50))
+        setUnreadCount(prev => prev + 1)
+    }, [])
+
+    // WebSocket connection for real-time notifications
+    const { connected: wsConnected } = useNotificationSocket(
+        user && user.role !== 'system_admin' ? handleWsNotification : null
+    )
+
+    // Initial fetch + fallback polling (only if WS is not connected)
     useEffect(() => {
         if (!user || user.role === 'system_admin') return;
 
         const fetchNotifications = async () => {
             try {
-                // Use new generic API
                 const [notifRes, countRes] = await Promise.all([
                     notificationsAPI.getAll(),
                     notificationsAPI.getUnreadCount()
@@ -40,10 +51,12 @@ function Topbar() {
         };
         fetchNotifications();
 
-        // Poll every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
-    }, [user?.username]);
+        // Fallback polling only when WebSocket is disconnected (60s interval)
+        if (!wsConnected) {
+            const interval = setInterval(fetchNotifications, 60000);
+            return () => clearInterval(interval);
+        }
+    }, [user?.username, wsConnected]);
 
     // Close menus when clicking outside
     useEffect(() => {
@@ -90,7 +103,7 @@ function Topbar() {
 
     const handleMarkAllRead = async () => {
         try {
-            await inventoryAPI.markAllNotificationsRead();
+            await notificationsAPI.markAllRead();
             setUnreadCount(0);
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         } catch (err) {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
-import { formatShortDate } from '../../utils/dateUtils';
+import { formatShortDate, formatDateTime} from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
 import { Filter, Search, Warehouse, Activity, Calendar } from 'lucide-react';
 import { useBranch } from '../../context/BranchContext';
@@ -200,7 +200,7 @@ const StockMovements = () => {
                                         <td className="text-sm text-secondary font-mono">
                                             {formatShortDate(move.created_at)}
                                             <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                                {new Date(move.created_at).toLocaleTimeString(i18n.language === 'ar' ? 'ar-SA' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                {formatDateTime(move.created_at)}
                                             </div>
                                         </td>
                                         <td>{getTypeBadge(move.transaction_type)}</td>

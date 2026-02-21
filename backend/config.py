@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     
     FRONTEND_URL: str = "http://localhost:5173"
     FRONTEND_URL_PRODUCTION: str = ""
+    # Comma-separated list of allowed origins for production (overrides FRONTEND_URL_PRODUCTION)
+    # e.g. "https://erp.mycompany.com,https://app.mycompany.com"
+    ALLOWED_ORIGINS: str = ""
     
     SYSTEM_EMAIL: str = "admin@aman-erp.com"
     MAX_COMPANIES_PER_INSTANCE: int = 1000

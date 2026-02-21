@@ -83,12 +83,12 @@ function GeneralLedger() {
 
     return (
         <div className="workspace fade-in">
-            <div className="workspace-header display-flex justify-between align-center">
+            <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                     <h1 className="workspace-title">📚 {t('accounting.general_ledger.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.general_ledger.subtitle')}</p>
                 </div>
-                <div className="display-flex gap-2">
+                <div>
                     <button className="btn btn-secondary" onClick={() => window.print()}>
                         {t('common.print')}
                     </button>
@@ -96,11 +96,16 @@ function GeneralLedger() {
             </div>
 
             {/* Filters */}
-            <div className="card mb-4 mt-4">
-                <div className="card-body">
-                    <div className="display-flex gap-4 align-center flex-wrap">
-                        <div style={{ minWidth: '250px', flex: 1 }}>
-                            <label className="form-label">{t('accounting.general_ledger.select_account')}</label>
+            <div className="card mt-3 p-4">
+                <h5 style={{ fontWeight: 600, marginBottom: '1rem' }}>🔍 {t('accounting.general_ledger.select_account')}</h5>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: '280px', flex: 1 }}>
+                        <label className="form-label">{t('accounting.general_ledger.select_account')}</label>
+                        {loadingAccounts ? (
+                            <select className="form-control" disabled>
+                                <option>{t('common.loading')}...</option>
+                            </select>
+                        ) : (
                             <select
                                 className="form-control"
                                 value={selectedAccount}
@@ -113,46 +118,44 @@ function GeneralLedger() {
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                        <div style={{ width: '200px' }}>
-                            <label className="form-label">{t('common.start_date')}</label>
-                            <CustomDatePicker
-                                selected={startDate}
-                                onChange={date => setStartDate(date)}
-                                className="form-control"
-                            />
-                        </div>
-                        <div style={{ width: '200px' }}>
-                            <label className="form-label">{t('common.end_date')}</label>
-                            <CustomDatePicker
-                                selected={endDate}
-                                onChange={date => setEndDate(date)}
-                                className="form-control"
-                            />
-                        </div>
+                        )}
+                    </div>
+                    <div style={{ width: '200px' }}>
+                        <CustomDatePicker
+                            label={t('common.start_date')}
+                            selected={startDate}
+                            onChange={(dateStr) => setStartDate(dateStr ? new Date(dateStr) : new Date(new Date().getFullYear(), 0, 1))}
+                        />
+                    </div>
+                    <div style={{ width: '200px' }}>
+                        <CustomDatePicker
+                            label={t('common.end_date')}
+                            selected={endDate}
+                            onChange={(dateStr) => setEndDate(dateStr ? new Date(dateStr) : new Date())}
+                        />
                     </div>
                 </div>
             </div>
 
             {!selectedAccount ? (
-                <div className="card">
-                    <div className="text-center p-5 text-muted">
+                <div className="card mt-3">
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-secondary)' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📚</div>
-                        <p>{t('accounting.general_ledger.select_account_prompt')}</p>
+                        <p style={{ fontSize: '1.1rem' }}>{t('accounting.general_ledger.select_account_prompt')}</p>
                     </div>
                 </div>
             ) : loading ? (
-                <div className="text-center p-5">
+                <div style={{ textAlign: 'center', padding: '3rem' }}>
                     <div className="spinner"></div>
-                    <p className="mt-2">{t('common.loading')}</p>
+                    <p style={{ marginTop: '0.75rem' }}>{t('common.loading')}</p>
                 </div>
             ) : error ? (
-                <div className="alert alert-danger">{error}</div>
+                <div className="card mt-3 p-3" style={{ background: '#FEF2F2', color: '#DC2626', borderRadius: '12px' }}>{error}</div>
             ) : (
                 <>
                     {/* Account Info & Summary */}
                     {selectedAccountData && (
-                        <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                        <div className="metrics-grid mt-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
                             <div className="metric-card">
                                 <div className="metric-label">{t('accounting.general_ledger.account')}</div>
                                 <div className="metric-value" style={{ fontSize: '1rem' }}>
@@ -180,42 +183,45 @@ function GeneralLedger() {
                     )}
 
                     {/* Entries Table */}
-                    <div className="card">
+                    <div className="card mt-3">
                         <div className="data-table-container">
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>{t('accounting.general_ledger.date')}</th>
-                                        <th>{t('accounting.general_ledger.entry_number')}</th>
+                                        <th style={{ width: '120px' }}>{t('accounting.general_ledger.date')}</th>
+                                        <th style={{ width: '130px' }}>{t('accounting.general_ledger.entry_number')}</th>
                                         <th>{t('accounting.general_ledger.description')}</th>
-                                        <th>{t('accounting.general_ledger.reference')}</th>
-                                        <th style={{ textAlign: 'left' }}>{t('accounting.table.debit')}</th>
-                                        <th style={{ textAlign: 'left' }}>{t('accounting.table.credit')}</th>
-                                        <th style={{ textAlign: 'left' }}>{t('accounting.general_ledger.balance')}</th>
+                                        <th style={{ width: '120px' }}>{t('accounting.general_ledger.reference')}</th>
+                                        <th style={{ textAlign: 'left', width: '140px' }}>{t('accounting.table.debit')}</th>
+                                        <th style={{ textAlign: 'left', width: '140px' }}>{t('accounting.table.credit')}</th>
+                                        <th style={{ textAlign: 'left', width: '150px' }}>{t('accounting.general_ledger.balance')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {entriesWithBalance.length === 0 ? (
                                         <tr>
-                                            <td colSpan="7" className="text-center p-4 text-muted">
+                                            <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                                 {t('accounting.general_ledger.no_entries')}
                                             </td>
                                         </tr>
                                     ) : (
                                         entriesWithBalance.map((entry, idx) => (
                                             <tr key={idx} className="hover-row">
-                                                <td className="font-mono">{entry.entry_date}</td>
-                                                <td className="font-mono">{entry.entry_number}</td>
-                                                <td>{entry.description}</td>
-                                                <td>{entry.reference || '-'}</td>
-                                                <td style={{ textAlign: 'left', color: parseFloat(entry.debit) > 0 ? 'var(--text-primary)' : 'var(--text-light)' }}>
+                                                <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{entry.entry_date}</td>
+                                                <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{entry.entry_number}</td>
+                                                <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.description}</td>
+                                                <td style={{ color: entry.reference ? 'var(--text-primary)' : 'var(--text-light)' }}>{entry.reference || '-'}</td>
+                                                <td style={{ textAlign: 'left', fontWeight: parseFloat(entry.debit) > 0 ? '600' : '400', color: parseFloat(entry.debit) > 0 ? 'var(--text-primary)' : 'var(--text-light)' }}>
                                                     {parseFloat(entry.debit) > 0 ? formatNumber(entry.debit) : '-'}
                                                 </td>
-                                                <td style={{ textAlign: 'left', color: parseFloat(entry.credit) > 0 ? 'var(--text-primary)' : 'var(--text-light)' }}>
+                                                <td style={{ textAlign: 'left', fontWeight: parseFloat(entry.credit) > 0 ? '600' : '400', color: parseFloat(entry.credit) > 0 ? 'var(--text-primary)' : 'var(--text-light)' }}>
                                                     {parseFloat(entry.credit) > 0 ? formatNumber(entry.credit) : '-'}
                                                 </td>
-                                                <td style={{ textAlign: 'left', fontWeight: 'bold' }}>
+                                                <td style={{ textAlign: 'left', fontWeight: 'bold', color: entry.running_balance >= 0 ? 'var(--text-primary)' : '#DC2626' }}>
                                                     {formatNumber(Math.abs(entry.running_balance))}
+                                                    <small style={{ opacity: 0.6, marginInlineStart: '4px' }}>
+                                                        {entry.running_balance >= 0 ? t('accounting.table.debit') : t('accounting.table.credit')}
+                                                    </small>
                                                 </td>
                                             </tr>
                                         ))
@@ -223,11 +229,13 @@ function GeneralLedger() {
                                 </tbody>
                                 {entriesWithBalance.length > 0 && (
                                     <tfoot>
-                                        <tr style={{ background: 'var(--primary)', color: 'white', fontWeight: 'bold' }}>
+                                        <tr style={{ background: 'var(--primary)', color: 'white', fontWeight: 'bold', fontSize: '1.05em' }}>
                                             <td colSpan="4" style={{ textAlign: 'center' }}>{t('accounting.general_ledger.totals')}</td>
-                                            <td style={{ textAlign: 'left' }}>{formatNumber(totalDebit)}</td>
-                                            <td style={{ textAlign: 'left' }}>{formatNumber(totalCredit)}</td>
-                                            <td style={{ textAlign: 'left' }}>{formatNumber(Math.abs(runningBalance))}</td>
+                                            <td style={{ textAlign: 'left' }}>{formatNumber(totalDebit)} <small>{currency}</small></td>
+                                            <td style={{ textAlign: 'left' }}>{formatNumber(totalCredit)} <small>{currency}</small></td>
+                                            <td style={{ textAlign: 'left' }}>
+                                                {formatNumber(Math.abs(runningBalance))} <small>{currency}</small>
+                                            </td>
                                         </tr>
                                     </tfoot>
                                 )}

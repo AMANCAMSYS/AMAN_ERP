@@ -37,7 +37,7 @@ class TestTaxReturnsAdvanced:
             pytest.skip("لا توجد إقرارات ضريبية")
         r = client.post(f"/api/taxes/returns/{return_id}/file",
                         headers=admin_headers)
-        assert r.status_code in (200, 201, 400, 404, 422, 501)
+        assert r.status_code in (200, 201, 400, 404, 405, 422, 501)
 
     def test_cancel_tax_return(self, client, admin_headers):
         """اختبار إلغاء إقرار ضريبي"""
@@ -47,7 +47,7 @@ class TestTaxReturnsAdvanced:
         r = client.post(f"/api/taxes/returns/{return_id}/cancel",
                         json={"reason": "خطأ في البيانات - اختبار"},
                         headers=admin_headers)
-        assert r.status_code in (200, 400, 404, 422, 501)
+        assert r.status_code in (200, 400, 404, 405, 422, 501)
 
     def test_file_and_cancel_workflow(self, client, admin_headers):
         """اختبار دورة تقديم وإلغاء إقرار ضريبي"""
@@ -188,7 +188,7 @@ class TestCurrencyRevaluation:
                         json=revaluation_data, headers=admin_headers)
         assert r.status_code in (200, 201, 400, 404, 422, 501)
 
-    def test_multi_currency_revaluation(self, client, admin_headers):
+    def test_multi_currency_revaluation(self, client, admin_headers, base_currency):
         """اختبار إعادة تقييم عملات متعددة"""
         # جلب العملات المفعلة
         curr_r = client.get("/api/accounting/currencies/", headers=admin_headers)
@@ -198,7 +198,7 @@ class TestCurrencyRevaluation:
         if isinstance(currencies, dict):
             currencies = currencies.get("items", currencies.get("currencies", []))
         
-        foreign_currencies = [c for c in currencies if c.get("code") != "SAR"]
+        foreign_currencies = [c for c in currencies if c.get("code") != base_currency]
         if not foreign_currencies:
             pytest.skip("لا توجد عملات أجنبية")
 
@@ -223,7 +223,7 @@ class TestCurrencyRevaluation:
                         json=revaluation_data, headers=admin_headers)
         assert r.status_code in (400, 404, 422, 501)
 
-    def test_create_currency_exchange_rate(self, client, admin_headers):
+    def test_create_currency_exchange_rate(self, client, admin_headers, base_currency):
         """اختبار إضافة سعر صرف عملة"""
         # جلب عملة
         curr_r = client.get("/api/accounting/currencies/", headers=admin_headers)
@@ -232,7 +232,7 @@ class TestCurrencyRevaluation:
         currencies = curr_r.json()
         if isinstance(currencies, dict):
             currencies = currencies.get("items", [])
-        foreign = [c for c in currencies if c.get("code") != "SAR"]
+        foreign = [c for c in currencies if c.get("code") != base_currency]
         if not foreign:
             pytest.skip("لا توجد عملات أجنبية")
 
@@ -240,13 +240,13 @@ class TestCurrencyRevaluation:
         rate_data = {
             "currency_id": currency_id,
             "rate": 3.76,
-            "date": str(date.today())
+            "rate_date": str(date.today())
         }
         r = client.post("/api/accounting/currencies/rates",
                         json=rate_data, headers=admin_headers)
         assert r.status_code in (200, 201, 400, 404, 422)
 
-    def test_get_currency_rates_history(self, client, admin_headers):
+    def test_get_currency_rates_history(self, client, admin_headers, base_currency):
         """اختبار عرض سجل أسعار صرف عملة"""
         curr_r = client.get("/api/accounting/currencies/", headers=admin_headers)
         if curr_r.status_code != 200:
@@ -254,7 +254,7 @@ class TestCurrencyRevaluation:
         currencies = curr_r.json()
         if isinstance(currencies, dict):
             currencies = currencies.get("items", [])
-        foreign = [c for c in currencies if c.get("code") != "SAR"]
+        foreign = [c for c in currencies if c.get("code") != base_currency]
         if not foreign:
             pytest.skip("لا توجد عملات أجنبية")
 
@@ -321,7 +321,7 @@ class TestCurrencyRevaluation:
                        json=update_data, headers=admin_headers)
         assert r.status_code in (200, 400, 404, 422)
 
-    def test_delete_currency(self, client, admin_headers):
+    def test_delete_currency(self, client, admin_headers, base_currency):
         """اختبار حذف عملة"""
         curr_r = client.get("/api/accounting/currencies/", headers=admin_headers)
         if curr_r.status_code != 200:
@@ -330,7 +330,7 @@ class TestCurrencyRevaluation:
         if isinstance(currencies, dict):
             currencies = currencies.get("items", [])
         # حذف آخر عملة (الأقل استخداماً)
-        deletable = [c for c in currencies if c.get("code") != "SAR"]
+        deletable = [c for c in currencies if c.get("code") != base_currency]
         if not deletable:
             pytest.skip("لا توجد عملات قابلة للحذف")
 

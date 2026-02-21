@@ -9,6 +9,11 @@ import CustomDatePicker from '../../components/common/CustomDatePicker'
 function IncomeStatement() {
     const { t, i18n } = useTranslation()
     const { currentBranch } = useBranch()
+    const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1))
+    const [endDate, setEndDate] = useState(new Date())
+    const [data, setData] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
     const [isCompareMode, setIsCompareMode] = useState(false)
     const [compareStartDate, setCompareStartDate] = useState(new Date(new Date().getFullYear() - 1, 0, 1))
     const [compareEndDate, setCompareEndDate] = useState(new Date(new Date().getFullYear() - 1, 11, 31))
@@ -50,7 +55,35 @@ function IncomeStatement() {
         fetchData()
     }, [currentBranch, startDate, endDate, isCompareMode, compareStartDate, compareEndDate])
 
-    // Flatten tree and other helpers...
+    // Helpers
+    const currency = getCurrency()
+    const isRTL = i18n.language === 'ar'
+    const getName = (acc) => (isRTL ? acc.name : (acc.name_en || acc.name))
+
+    // Flatten account tree to a list with level info
+    const flattenTree = (nodes) => {
+        const result = []
+        const traverse = (items) => {
+            for (const item of items) {
+                result.push(item)
+                if (item.children && item.children.length > 0) {
+                    traverse(item.children)
+                }
+            }
+        }
+        traverse(nodes || [])
+        return result
+    }
+
+    // Derive totals and flat lists from API data
+    const allAccounts = data?.data || []
+    const revenueRoots = allAccounts.filter(a => a.account_type === 'revenue')
+    const expenseRoots = allAccounts.filter(a => a.account_type === 'expense')
+    const flatRevenue = flattenTree(revenueRoots)
+    const flatExpense = flattenTree(expenseRoots)
+    const totalRevenue = revenueRoots.reduce((sum, a) => sum + (parseFloat(a.balance) || 0), 0)
+    const totalExpense = expenseRoots.reduce((sum, a) => sum + (parseFloat(a.balance) || 0), 0)
+    const netIncome = data?.total !== undefined ? parseFloat(data.total) : (totalRevenue - totalExpense)
 
     return (
         <div className="workspace fade-in">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
+import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
 const FREQ_LABELS = {
@@ -31,7 +32,7 @@ export default function RecurringTemplates() {
         name: '', description: '', reference: '',
         frequency: 'monthly', start_date: '', end_date: '',
         next_run_date: '', is_active: true, auto_post: false,
-        currency: 'SAR', exchange_rate: 1, max_runs: '',
+        currency: getCurrency(), exchange_rate: 1, max_runs: '',
         lines: [
             { account_id: '', debit: '', credit: '', description: '', cost_center_id: '' },
             { account_id: '', debit: '', credit: '', description: '', cost_center_id: '' },
@@ -67,7 +68,7 @@ export default function RecurringTemplates() {
             name: '', description: '', reference: '',
             frequency: 'monthly', start_date: '', end_date: '',
             next_run_date: '', is_active: true, auto_post: false,
-            currency: 'SAR', exchange_rate: 1, max_runs: '',
+            currency: getCurrency(), exchange_rate: 1, max_runs: '',
             lines: [
                 { account_id: '', debit: '', credit: '', description: '', cost_center_id: '' },
                 { account_id: '', debit: '', credit: '', description: '', cost_center_id: '' },
@@ -89,7 +90,7 @@ export default function RecurringTemplates() {
                 end_date: d.end_date ? d.end_date.slice(0, 10) : '',
                 next_run_date: d.next_run_date ? d.next_run_date.slice(0, 10) : '',
                 is_active: d.is_active, auto_post: d.auto_post,
-                currency: d.currency || 'SAR', exchange_rate: d.exchange_rate || 1,
+                currency: d.currency || getCurrency(), exchange_rate: d.exchange_rate || 1,
                 max_runs: d.max_runs || '',
                 lines: d.lines.length ? d.lines.map(l => ({
                     account_id: l.account_id, debit: l.debit || '', credit: l.credit || '',

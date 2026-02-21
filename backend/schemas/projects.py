@@ -118,7 +118,7 @@ class ProjectInvoiceCreate(BaseModel):
     items: List[ProjectInvoiceItem]
     notes: Optional[str] = None
     payment_method: Optional[str] = "credit"
-    currency: Optional[str] = "SAR"
+    currency: Optional[str] = None
     exchange_rate: Optional[float] = 1.0
 
 

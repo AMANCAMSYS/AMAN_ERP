@@ -36,11 +36,25 @@ IMPORT_CONFIGS = {
         "optional_columns": ["tax_number", "phone", "email", "address", "city", "credit_limit"],
         "unique_key": "name",
     },
+    "customers": {
+        "label": "العملاء",
+        "table": "customers",
+        "required_columns": ["customer_name"],
+        "optional_columns": ["customer_code", "tax_number", "phone", "email", "address", "city", "credit_limit"],
+        "unique_key": "customer_name",
+    },
+    "suppliers": {
+        "label": "الموردين",
+        "table": "suppliers",
+        "required_columns": ["supplier_name"],
+        "optional_columns": ["supplier_code", "tax_number", "phone", "email", "address", "city", "credit_limit"],
+        "unique_key": "supplier_name",
+    },
     "products": {
         "label": "المنتجات",
         "table": "products",
         "required_columns": ["name", "sku"],
-        "optional_columns": ["description", "category", "unit", "purchase_price", "selling_price", "min_stock", "barcode"],
+        "optional_columns": ["description", "unit_price", "cost_price", "is_active", "barcode"],
         "unique_key": "sku",
     },
     "employees": {
@@ -291,7 +305,19 @@ def export_data(
 
     try:
         all_columns = config["required_columns"] + config["optional_columns"]
-        col_list = ", ".join(all_columns)
+        
+        # Get actual columns in the table to avoid missing column errors
+        actual_cols = db.execute(text("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = :table
+        """), {"table": config["table"]}).fetchall()
+        existing_cols = {r[0] for r in actual_cols}
+        col_list_filtered = [c for c in all_columns if c in existing_cols]
+        
+        if not col_list_filtered:
+            raise HTTPException(500, "لا توجد أعمدة مطابقة في الجدول")
+        
+        col_list = ", ".join(col_list_filtered)
 
         rows = db.execute(text(f"SELECT {col_list} FROM {config['table']}")).fetchall()
         data = [dict(r._mapping) for r in rows]
@@ -301,9 +327,9 @@ def export_data(
             return JSONResponse(content=data)
         else:
             from fastapi.responses import StreamingResponse
-            csv_lines = [",".join(all_columns)]
+            csv_lines = [",".join(col_list_filtered)]
             for row in data:
-                csv_lines.append(",".join([_csv_escape(str(row.get(c, "") or "")) for c in all_columns]))
+                csv_lines.append(",".join([_csv_escape(str(row.get(c, "") or "")) for c in col_list_filtered]))
 
             csv_content = "\n".join(csv_lines)
             return StreamingResponse(

@@ -939,7 +939,7 @@ def create_return(
     # Update session totals (subtract refund)
     db.execute(text("""
         UPDATE pos_sessions 
-        SET total_refunds = COALESCE(total_refunds, 0) + :amount 
+        SET total_returns = COALESCE(total_returns, 0) + :amount 
         WHERE id = :id
     """), {"amount": total_refund, "id": order.session_id})
     

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { companiesAPI } from '../../utils/api'
 import { Search, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function CompanyList() {
     const { t } = useTranslation();
@@ -94,7 +96,7 @@ function CompanyList() {
                                     </td>
                                     <td style={{ padding: '12px' }}>{company.plan_type}</td>
                                     <td style={{ padding: '12px' }}>
-                                        {new Date(company.created_at).toLocaleDateString('ar-SA')}
+                                        {formatShortDate(company.created_at)}
                                     </td>
                                 </tr>
                             ))}

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function SerialList() {
     const { t } = useTranslation()
@@ -294,7 +296,7 @@ function SerialList() {
                                     <td>{serial.batch_number || '-'}</td>
                                     <td>{serial.warranty_expiry || '-'}</td>
                                     <td>{getStatusBadge(serial.status)}</td>
-                                    <td>{serial.created_at ? new Date(serial.created_at).toLocaleDateString('ar-SA') : '-'}</td>
+                                    <td>{serial.created_at ? formatShortDate(serial.created_at) : '-'}</td>
                                 </tr>
                             ))}
                         </tbody>

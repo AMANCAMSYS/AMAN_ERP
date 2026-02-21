@@ -32,7 +32,7 @@ class TestConcurrentLoad:
         def login_attempt():
             try:
                 password = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
-                username = os.environ.get("AMAN_TEST_USER", "zzzz")
+                username = os.environ.get("AMAN_TEST_USER", "aaaa")
                 response = client.post(
                     "/api/auth/login",
                     data={

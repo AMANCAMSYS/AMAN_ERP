@@ -8,6 +8,8 @@ import { formatNumber } from '../../utils/format'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Pagination, { usePagination } from '../../components/common/Pagination'
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 function ProductList() {
     const { t } = useTranslation()
     const navigate = useNavigate()
@@ -232,7 +234,7 @@ function ProductList() {
                                                                         <td style={{ fontWeight: 'bold' }}>{formatNumber(wh.average_cost)} {currency}</td>
                                                                         <td>{formatNumber(wh.total_value)} {currency}</td>
                                                                         <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                                            {wh.last_update ? new Date(wh.last_update).toLocaleDateString() : '-'}
+                                                                            {wh.last_update ? formatShortDate(wh.last_update) : '-'}
                                                                         </td>
                                                                     </tr>
                                                                 ))}

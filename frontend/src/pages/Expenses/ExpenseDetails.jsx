@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 export default function ExpenseDetails() {
   const { t, i18n } = useTranslation();
@@ -200,7 +202,7 @@ export default function ExpenseDetails() {
               <div className="info-item">
                 <span className="info-label">{t('expenses.fields.date')}</span>
                 <span className="info-value">
-                  {new Date(expense.expense_date).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US')}
+                  {formatShortDate(expense.expense_date)}
                 </span>
               </div>
 

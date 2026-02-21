@@ -6,6 +6,8 @@ import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function PaymentForm() {
     const { t } = useTranslation();
@@ -459,7 +461,7 @@ function PaymentForm() {
                                         {outstandingInvoices.filter(inv => formData.voucher_type === 'payment' ? inv.invoice_type === 'purchase' : inv.invoice_type === 'purchase_return').map(inv => (
                                             <tr key={inv.id} style={{ opacity: (inv.currency || baseCurrency) !== recordCurrency ? 0.6 : 1 }}>
                                                 <td className="font-medium text-purple-700">{inv.invoice_number}</td>
-                                                <td>{new Date(inv.invoice_date).toLocaleDateString('ar-EG')}</td>
+                                                <td>{formatShortDate(inv.invoice_date)}</td>
                                                 <td>
                                                     <span className={`badge ${(inv.currency || baseCurrency) === recordCurrency ? 'badge-primary' : 'badge-secondary'}`}>
                                                         {inv.currency || baseCurrency}

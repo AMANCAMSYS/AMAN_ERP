@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { externalAPI } from '../../utils/api';
 import '../../components/ModuleStyles.css';
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const EMPTY_FORM = {
   name: '',
   url: '',
@@ -132,13 +134,7 @@ export default function Webhooks() {
 
   const formatDate = (d) => {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('ar-EG', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatShortDate(d);
   };
 
   return (

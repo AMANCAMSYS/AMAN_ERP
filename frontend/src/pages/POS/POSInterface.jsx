@@ -17,6 +17,7 @@ import {
     UserCircle, Printer, Save,
     Clock, LayoutGrid, ArrowRightLeft, Smartphone, Package, RotateCcw
 } from 'lucide-react';
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 
 const POSInterface = () => {
     const { t, i18n } = useTranslation();
@@ -309,7 +310,7 @@ const POSInterface = () => {
                         <div className="info-content">
                             <span className="info-label">{t('pos.invoice_date')}</span>
                             <span className="info-value">
-                                {currentTime.toLocaleDateString()} {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formatShortDate(currentTime)} {formatDateTime(currentTime)}
                             </span>
                         </div>
                     </div>

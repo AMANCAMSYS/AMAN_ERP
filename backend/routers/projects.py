@@ -1367,7 +1367,7 @@ async def create_project_invoice(
         grand_total = subtotal - total_discount + total_tax
         
         # 3. Create Invoice Header
-        inv_currency = invoice_data.currency or "SAR"
+        inv_currency = invoice_data.currency or get_base_currency(db)
         exchange_rate = invoice_data.exchange_rate or 1.0
         
         inv_id = db.execute(text("""

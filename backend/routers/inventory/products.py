@@ -476,11 +476,9 @@ def delete_product(
         # Check if product is used in any transactions
         usage = db.execute(text("""
             SELECT COUNT(*) FROM (
-                SELECT 1 FROM sales_invoice_items WHERE product_id = :id
+                SELECT 1 FROM invoice_lines WHERE product_id = :id
                 UNION ALL
-                SELECT 1 FROM purchase_invoice_items WHERE product_id = :id
-                UNION ALL
-                SELECT 1 FROM purchase_order_items WHERE product_id = :id
+                SELECT 1 FROM purchase_order_lines WHERE product_id = :id
             ) AS usage
         """), {"id": id}).scalar()
 

@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function TaxAudit() {
     const { t, i18n } = useTranslation()
@@ -103,7 +105,7 @@ function TaxAudit() {
                             <tbody>
                                 {data.map((item) => (
                                     <tr key={item.id} style={{ cursor: 'pointer' }}>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{new Date(item.date).toLocaleDateString('ar-EG')}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{formatShortDate(item.date)}</td>
                                         <td>
                                             <span className="fw-bold" style={{ color: 'var(--primary)' }}>{item.number}</span>
                                         </td>

@@ -4,6 +4,9 @@ import { salesAPI } from '../../utils/api'
 import { ArrowRight, FileText, Banknote, Calendar, CreditCard, Building } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { getCurrency } from '../../utils/auth'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 export default function CustomerDetails() {
     const { t } = useTranslation()
@@ -13,7 +16,7 @@ export default function CustomerDetails() {
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState({ customer: {}, invoices: [], receipts: [] })
     const [activeTab, setActiveTab] = useState('invoices')
-    const currency = "SYP"
+    const currency = getCurrency()
 
     useEffect(() => {
         const fetchData = async () => {
@@ -155,7 +158,7 @@ export default function CustomerDetails() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                                            {new Date(inv.date).toLocaleDateString('ar-EG')}
+                                            {formatShortDate(inv.date)}
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{Number(inv.total).toLocaleString()} {currency}</td>
@@ -201,7 +204,7 @@ export default function CustomerDetails() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                                            {new Date(rec.date).toLocaleDateString('ar-EG')}
+                                            {formatShortDate(rec.date)}
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{Number(rec.amount).toLocaleString()} {currency}</td>

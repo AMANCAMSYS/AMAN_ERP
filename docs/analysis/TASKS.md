@@ -1,8 +1,8 @@
 # 📋 قائمة المهام الشاملة - نظام أمان ERP
 
-> **آخر تحديث:** 18 فبراير 2026  
-> **الحالة:** قيد التنفيذ (المرحلة 7)  
-> **عدد المهام:** 150+ مهمة (تم إنجاز 100+)
+> **آخر تحديث:** 21 فبراير 2026  
+> **الحالة:** قيد التنفيذ (المرحلة 9 + 10 جارية)  
+> **عدد المهام:** 150+ مهمة (تم إنجاز 115+)
 
 ---
 
@@ -1048,18 +1048,33 @@
 
 ### 9.1 API الخارجي
 
-- [ ] **[API-001]** REST API عام
-  - [ ] Endpoints موثقة (Swagger/OpenAPI)
-  - [ ] مصادقة بـ API Keys
-  - [ ] Rate limiting
+> 📝 **الملفات المُنشأة (Phase 9 - فبراير 2026):**
+> - `backend/utils/zatca.py` — ZATCA TLV + QR + RSA signing + hash chain
+> - `backend/utils/webhooks.py` — Webhook dispatch + HMAC-SHA256 + retry
+> - `backend/migrations/migrate_phase9.py` — 11 جدول جديد
+> - `backend/routers/external.py` — API Keys + Webhooks + ZATCA + WHT endpoints
+> - `backend/routers/crm.py` — Opportunities + Support Tickets CRUD
+> - `frontend/src/pages/CRM/CRMHome.jsx` — لوحة CRM
+> - `frontend/src/pages/CRM/Opportunities.jsx` — إدارة الفرص البيعية  
+> - `frontend/src/pages/CRM/SupportTickets.jsx` — دعم العملاء
+> - `frontend/src/pages/Settings/ApiKeys.jsx` — إدارة مفاتيح API
+> - `frontend/src/pages/Settings/Webhooks.jsx` — إدارة Webhooks
+> - `frontend/src/pages/Taxes/WithholdingTax.jsx` — ضريبة الاستقطاع
+
+- [x] **[API-001]** REST API عام ✅ (باكند + فرونتإند)
+  - [x] Endpoints موثقة (Swagger/OpenAPI) — `/api/docs` موجود مسبقاً
+  - [x] مصادقة بـ API Keys — جدول `api_keys` + إنشاء/حذف مفاتيح + SHA-256 hashing
+  - [x] Rate limiting — `slowapi` middleware مضاف
   - [ ] Versioning (v1, v2)
-  - [ ] CORS configuration
-- [ ] **[API-002]** Webhooks
-  - [ ] تسجيل webhooks
-  - [ ] أحداث قابلة للتخصيص (طلب جديد / دفعة مستلمة / طلب إجازة)
-  - [ ] إرسال POST عند الحدث
-  - [ ] إعادة المحاولة عند الفشل
-  - [ ] سجل Webhooks
+  - [x] CORS configuration — موجود مسبقاً
+  - [x] واجهة إدارة مفاتيح API — `pages/Settings/ApiKeys.jsx`
+- [x] **[API-002]** Webhooks ✅ (باكند + فرونتإند)
+  - [x] تسجيل webhooks — جدول `webhooks` CRUD كامل
+  - [x] 20 حدث قابل للتخصيص (invoice.created / payment.received / ...)
+  - [x] إرسال POST عند الحدث — HMAC-SHA256 signature
+  - [x] إعادة المحاولة عند الفشل — Exponential backoff في خيوط منفصلة
+  - [x] سجل Webhooks — جدول `webhook_logs` + عرض في الواجهة
+  - [x] واجهة إدارة Webhooks — `pages/Settings/Webhooks.jsx`
 
 ### 9.2 تطبيق الجوال
 
@@ -1179,19 +1194,26 @@
 - [ ] **[CRM-001]** إدارة العملاء المتقدمة
   - [ ] نقاط اتصال (Touchpoints) + تاريخ التفاعل
   - [ ] تصنيف العملاء + دورة حياة العميل
-- [ ] **[CRM-002]** الفرص البيعية (Opportunities)
-  - [ ] جدول `sales_opportunities`
-  - [ ] مراحل البيع (Lead → Qualified → Proposal → Won/Lost)
-  - [ ] القيمة المتوقعة + احتمالية النجاح + تحويل إلى عرض سعر
+- [x] **[CRM-002]** الفرص البيعية (Opportunities) ✅ (باكند + فرونتإند)
+  - [x] جدول `sales_opportunities` + `opportunity_activities`
+  - [x] مراحل البيع (Lead → Qualified → Proposal → Negotiation → Won/Lost)
+  - [x] القيمة المتوقعة + احتمالية النجاح (تلقائية حسب المرحلة)
+  - [x] تسجيل الأنشطة (مكالمة/بريد/اجتماع/مهمة)
+  - [x] لوحة Pipeline بملخص الفرص حسب المرحلة
+  - [x] واجهة `pages/CRM/Opportunities.jsx` + `pages/CRM/CRMHome.jsx`
+  - [ ] تحويل إلى عرض سعر
 - [ ] **[CRM-003]** الحملات التسويقية
   - [ ] جدول `marketing_campaigns`
   - [ ] استهداف شرائح العملاء + إرسال بريد جماعي
   - [ ] تتبع النتائج (Open Rate, Click Rate)
-- [ ] **[CRM-004]** دعم العملاء (Tickets)
-  - [ ] جدول `support_tickets`
-  - [ ] فتح تذكرة + تعيين للموظف
-  - [ ] حالات (مفتوح/قيد المعالجة/محلول/مغلق)
-  - [ ] أولوية (منخفض/متوسط/عالي/حرج) + SLA
+- [x] **[CRM-004]** دعم العملاء (Tickets) ✅ (باكند + فرونتإند)
+  - [x] جدول `support_tickets` + `ticket_comments`
+  - [x] فتح تذكرة + تعيين للموظف + ترقيم تلقائي (TKT-YYYY-XXX)
+  - [x] حالات (open / in_progress / resolved / closed) + timestamps تلقائية
+  - [x] أولوية (critical/high/medium/low) + SLA بالساعات + كشف الخرق
+  - [x] تعليقات + is_internal للتعليقات الداخلية
+  - [x] إحصائيات: avg_resolution_hours + critical_open
+  - [x] واجهة `pages/CRM/SupportTickets.jsx`
 - [ ] **[CRM-005]** قاعدة المعرفة
   - [ ] جدول `knowledge_base`
   - [ ] أسئلة شائعة (FAQ) + مقالات مساعدة + بحث
@@ -1222,12 +1244,15 @@
   - [ ] دالة `compliance_check` للتحقق من حالة الشركة
   - [ ] تخزين الشهادة والمفاتيح بشكل آمن
 
-- [ ] **[ZATCA-002]** التوقيع الرقمي للفواتير
-  - [ ] إنشاء Signature Service باستخدام SHA-256 مع RSA
-  - [ ] توقيع كل فاتورة رقمياً قبل الإرسال
-  - [ ] توليد Hash فريد لكل فاتورة باستخدام SHA-256
-  - [ ] تخزين hash الفواتير للمراجعة المستقبلية
-  - [ ] سلسلة الهاشات (Invoice Hash Chain)
+- [x] **[ZATCA-002]** التوقيع الرقمي للفواتير ✅ (باكند)
+  - [x] `utils/zatca.py` — Signature Service كامل
+  - [x] توقيع رقمي RSA-2048 + SHA-256
+  - [x] `compute_invoice_hash()` — Hash فريد لكل فاتورة
+  - [x] تخزين hash في عمود `zatca_hash` على جدول invoices
+  - [x] سلسلة الهاشات (Invoice Hash Chain) — ربط بـ hash الفاتورة السابقة
+  - [x] `generate_rsa_keypair()` + تخزين المفاتيح في company_settings
+  - [x] `verify_invoice_signature()` — endpoint للتحقق
+  - [ ] شهادة CSID حقيقية من ZATCA (يتطلب تسجيل فعلي)
 
 - [ ] **[ZATCA-003]** إرسال واستقبال الفواتير
   - [ ] إرسال الفواتير إلى بوابة ZATCA
@@ -1235,16 +1260,20 @@
   - [ ] إعادة المحاولة عند الفشل
   - [ ] Audit Trail لجميع عمليات الإرسال والاستقبال
 
-- [ ] **[ZATCA-004]** QR Code على الفواتير
-  - [ ] دالة `generate_zatca_qr_code` لتوليد QR Code
-  - [ ] TLV encoding (Tag-Length-Value) بدلاً من JSON
-  - [ ] تضمين البيانات الإلزامية:
-    - [ ] Seller Name (اسم البائع)
-    - [ ] VAT Registration Number (رقم التسجيل الضريبي)
-    - [ ] Timestamp (تاريخ ووقت الفاتورة — ISO 8601)
-    - [ ] Total Amount (المبلغ الإجمالي شامل الضريبة)
-    - [ ] VAT Amount (مبلغ الضريبة)
-  - [ ] عرض QR Code على نموذج الفاتورة (Frontend) بوضوح
+- [x] **[ZATCA-004]** QR Code على الفواتير ✅ (باكند + فرونتإند)
+  - [x] `generate_zatca_qr_base64()` في `utils/zatca.py`
+  - [x] TLV encoding حسب مواصفات ZATCA (Tags 1-7)
+  - [x] `build_zatca_tlv()` + `decode_zatca_tlv()` للتشفير والفك
+  - [x] Seller Name — Tag 1
+  - [x] VAT Registration Number — Tag 2
+  - [x] Timestamp ISO 8601 — Tag 3
+  - [x] Total Amount — Tag 4
+  - [x] VAT Amount — Tag 5
+  - [x] Invoice Hash — Tag 6
+  - [x] Digital Signature — Tag 7
+  - [x] توليد تلقائي عند إنشاء كل فاتورة (`process_invoice_for_zatca` في invoices.py)
+  - [x] عرض QR Code في `pages/Sales/InvoiceDetails.jsx` مع حالة ZATCA
+  - [x] endpoint `POST /external/zatca/generate-qr` + `GET /external/zatca/verify/{id}`
 
 - [ ] **[ZATCA-005]** Simplified Tax Invoice — B2C
   - [ ] صيغة فاتورة مبسطة حسب مواصفات ZATCA
@@ -1267,9 +1296,12 @@
 
 ### 10.2 الضرائب الأخرى
 
-- [ ] **[TAX-001]** ضريبة الاستقطاع (Withholding Tax — WHT)
-  - [ ] جدول معدلات WHT
-  - [ ] حساب تلقائي عند الدفع للموردين
+- [x] **[TAX-001]** ضريبة الاستقطاع (Withholding Tax — WHT) ✅ (باكند + فرونتإند)
+  - [x] جدول `wht_rates` مع 8 نسب سعودية جاهزة (خدمات، إيجار، استشارات...)
+  - [x] جدول `wht_transactions` لتسجيل كل معاملة استقطاع
+  - [x] `POST /external/wht/calculate` — حساب الاستقطاع بدون حفظ
+  - [x] `POST /external/wht/transactions` — إنشاء معاملة استقطاع
+  - [x] واجهة `pages/Taxes/WithholdingTax.jsx` — حاسبة + جداول النسب والمعاملات
   - [ ] قيود GL تلقائية (مدين: الدائنون، دائن: WHT مستحقة)
   - [ ] إقرار WHT + شهادة استقطاع للمورد
 
@@ -1323,8 +1355,8 @@
 | 🟡 المرحلة 6: المشاريع والتقارير | 10 | ✅ مكتمل |
 | ✅ المرحلة 7: تحسينات النظام | 18 | ✅ مكتمل |
 | ✅ المرحلة 8: إكمال الوحدات للوصول إلى 100% | 65+ | ✅ مكتمل (باكند) — بقي POS-001/002/005 + SALES-005 |
-| 🔵 المرحلة 9: التكامل الخارجي | 50+ | ❌ لم يبدأ |
-| 🔵 المرحلة 10: الامتثال الضريبي (ZATCA) | 11 | ❌ لم يبدأ |
+| 🔵 المرحلة 9: التكامل الخارجي | 50+ | 🟡 جارٍ (API Keys ✅ + Webhooks ✅ + CRM-002 ✅ + CRM-004 ✅) |
+| 🔵 المرحلة 10: الامتثال الضريبي (ZATCA) | 11 | 🟡 جارٍ (ZATCA-002 ✅ + ZATCA-004 ✅ + WHT ✅) |
 | **الإجمالي** | **~237 مهمة** | |
 
 ### نسبة اكتمال كل وحدة
@@ -1340,7 +1372,7 @@
 | الأصول الثابتة | **95%** | 100% | ✅ 3 طرق إهلاك + نقل/تقييم/تأمين/QR (باكند) |
 | التصنيع | 95% | 100% | ✅ مكتمل تقريباً |
 | المشاريع | 90% | 100% | ✅ مكتمل تقريباً |
-| الضرائب | 60% | 100% | ينقصه ZATCA Phase 2 |
+| الضرائب | 75% | 100% | ✅ ZATCA QR + توقيع رقمي + WHT (باكند) — بقي ZATCA-001/003/005-007 |
 | نقاط البيع | **85%** | 100% | ✅ خصومات + ولاء + طاولات + KDS (باكند) — بقي Offline/طباعة |
 | التقارير | 85% | 100% | ✅ تم إضافة 15 تقرير جديد |
 | الأمان | **100%** | 100% | ✅ مكتمل (Token Blacklist + HTTPS + Sanitization) |
@@ -1354,10 +1386,10 @@
 
 | الفئة | العدد |
 |-------|-------|
-| إجمالي API Endpoints | ~330+ |
-| إجمالي صفحات Frontend | ~154+ |
-| إجمالي أسطر Backend | ~23,000+ |
-| جداول قاعدة البيانات | 112+ |
+| إجمالي API Endpoints | ~380+ |
+| إجمالي صفحات Frontend | ~163+ |
+| إجمالي أسطر Backend | ~26,000+ |
+| جداول قاعدة البيانات | 122+ |
 | Triggers | 25 |
 | Indexes | 40+ |
 
@@ -1420,6 +1452,6 @@
 
 ---
 
-**آخر تحديث:** 20 فبراير 2026  
-**الحالة:** المرحلة 8 مكتملة (باكند) ✅ — بقي POS-001/002/005 + SALES-005 (فرونتإند/أجهزة)  
-**التقييم:** تم إنجاز حوالي 92% من النظام الأساسي (باكند) — المرحلة التالية: 9 (التكامل الخارجي) + 10 (ZATCA)
+**آخر تحديث:** 21 فبراير 2026  
+**الحالة:** المرحلة 8 مكتملة ✅ — المرحلة 9 جارية (API Keys + Webhooks + CRM-002/004) — المرحلة 10 بدأت (ZATCA-002/004 + WHT)  
+**التقييم:** تم إنجاز حوالي 94% من النظام الأساسي — الجديد: نظام CRM + مفاتيح API + Webhooks + ZATCA QR + WHT

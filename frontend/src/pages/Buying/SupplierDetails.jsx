@@ -4,6 +4,9 @@ import { purchasesAPI } from '../../utils/api'
 import { ArrowRight, FileText, Banknote, Calendar, CreditCard, Building, Edit2, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { getCurrency } from '../../utils/auth'
+
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 
 export default function SupplierDetails() {
     const { t, i18n } = useTranslation()
@@ -14,7 +17,7 @@ export default function SupplierDetails() {
     const [data, setData] = useState({ supplier: {}, invoices: [], payments: [], receipts: [] })
     const [activeTab, setActiveTab] = useState('invoices')
     const [balanceView, setBalanceView] = useState('supplier')
-    const currency = "SYP"
+    const currency = getCurrency()
 
     useEffect(() => {
         const fetchData = async () => {
@@ -221,7 +224,7 @@ export default function SupplierDetails() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                                            {new Date(inv.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                                            {formatShortDate(inv.date)}
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{Number(inv.total).toLocaleString()} {inv.currency}</td>
@@ -267,7 +270,7 @@ export default function SupplierDetails() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                                            {new Date(pay.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                                            {formatShortDate(pay.date)}
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{Number(pay.amount).toLocaleString()} {pay.currency}</td>
@@ -315,7 +318,7 @@ export default function SupplierDetails() {
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <Calendar size={14} style={{ color: 'var(--text-secondary)' }} />
-                                            {new Date(rec.date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                                            {formatShortDate(rec.date)}
                                         </div>
                                     </td>
                                     <td style={{ fontWeight: '600' }}>{Number(rec.amount).toLocaleString()} {rec.currency}</td>

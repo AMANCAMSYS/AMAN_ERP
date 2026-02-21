@@ -1,5 +1,5 @@
 """HR module Pydantic schemas."""
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -144,8 +144,7 @@ class AttendanceResponse(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LeaveRequestCreate(BaseModel):

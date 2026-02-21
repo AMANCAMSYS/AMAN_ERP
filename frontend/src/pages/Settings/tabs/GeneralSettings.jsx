@@ -1,13 +1,26 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { getCountry, getCurrency } from '../../../utils/auth';
+
+const COUNTRIES = [
+    { code: 'SA', name: 'المملكة العربية السعودية', flag: '🇸🇦' },
+    { code: 'SY', name: 'سوريا', flag: '🇸🇾' },
+    { code: 'AE', name: 'الإمارات', flag: '🇦🇪' },
+    { code: 'EG', name: 'مصر', flag: '🇪🇬' },
+    { code: 'KW', name: 'الكويت', flag: '🇰🇼' },
+    { code: 'TR', name: 'تركيا', flag: '🇹🇷' },
+];
 
 const GeneralSettings = ({ formData, handleChange }) => {
     const { t } = useTranslation();
+    const country = getCountry();
+    const currency = getCurrency();
+    const countryInfo = COUNTRIES.find(c => c.code === country);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group">
-                <label className="form-label" htmlFor="company_name">{t('settings.company.name') || '{t("settings.general.company_name")}'}</label>
+                <label className="form-label" htmlFor="company_name">{t('settings.company.name') || 'اسم الشركة'}</label>
                 <input
                     type="text"
                     id="company_name"
@@ -21,7 +34,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="company_name_en">{t('settings.company.name_en') || '{t("settings.general.name_en")}'}</label>
+                <label className="form-label" htmlFor="company_name_en">{t('settings.company.name_en') || 'اسم الشركة (إنجليزي)'}</label>
                 <input
                     type="text"
                     id="company_name_en"
@@ -34,7 +47,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="email">{t('settings.company.email') || '{t("settings.general.email")}'}</label>
+                <label className="form-label" htmlFor="email">{t('settings.company.email') || 'البريد الإلكتروني'}</label>
                 <input
                     type="email"
                     id="email"
@@ -48,7 +61,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="phone">{t('settings.company.phone') || '{t("settings.general.phone")}'}</label>
+                <label className="form-label" htmlFor="phone">{t('settings.company.phone') || 'الهاتف'}</label>
                 <input
                     type="text"
                     id="phone"
@@ -62,7 +75,7 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group md:col-span-2">
-                <label className="form-label" htmlFor="address">{t('settings.company.address') || '{t("settings.general.address")}'}</label>
+                <label className="form-label" htmlFor="address">{t('settings.company.address') || 'العنوان'}</label>
                 <textarea
                     id="address"
                     name="address"
@@ -75,7 +88,24 @@ const GeneralSettings = ({ formData, handleChange }) => {
             </div>
 
             <div className="form-group">
-                <label className="form-label">{t('settings.company.plan') || '{t("settings.general.subscription_plan")}'}</label>
+                <label className="form-label">{t('settings.company.country') || 'الدولة'}</label>
+                <div className="form-input" style={{ background: 'var(--bg-main)', cursor: 'not-allowed', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '20px' }}>{countryInfo?.flag || '🌍'}</span>
+                    <span>{countryInfo?.name || country || '-'}</span>
+                </div>
+                <small className="text-muted">{t('settings.company.country_note') || 'يتم تحديد الدولة عند التسجيل'}</small>
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">{t('settings.company.base_currency') || 'العملة الأساسية'}</label>
+                <div className="form-input" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                    {currency || '-'}
+                </div>
+                <small className="text-muted">{t('settings.company.currency_note') || 'العملة الأساسية تُحدد عند التسجيل'}</small>
+            </div>
+
+            <div className="form-group">
+                <label className="form-label">{t('settings.company.plan') || 'خطة الاشتراك'}</label>
                 <input
                     type="text"
                     name="plan_type"

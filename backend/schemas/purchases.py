@@ -48,7 +48,7 @@ class POCreate(BaseModel):
     items: List[PurchaseLineItem]
     notes: Optional[str] = None
     branch_id: Optional[int] = None
-    currency: Optional[str] = "SYP"
+    currency: Optional[str] = None
     exchange_rate: Optional[float] = 1.0
 
 

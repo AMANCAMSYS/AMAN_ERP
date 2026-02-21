@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { inventoryAPI, currenciesAPI, purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { getCurrency } from '../../utils/auth'
 
 function SupplierForm() {
     const { t } = useTranslation()
@@ -20,7 +21,7 @@ function SupplierForm() {
         phone: '',
         tax_number: '',
         address: '',
-        currency: 'SYP'
+        currency: getCurrency()
     })
 
     useEffect(() => {
@@ -37,7 +38,7 @@ function SupplierForm() {
                     phone: s.phone || '',
                     tax_number: s.tax_number || '',
                     address: s.address || '',
-                    currency: s.currency || 'SYP'
+                    currency: s.currency || getCurrency()
                 })
             } catch (err) {
                 setError(t('common.error_loading'))

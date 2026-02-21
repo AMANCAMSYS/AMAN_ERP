@@ -8,7 +8,7 @@ from datetime import date, datetime
 from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
 from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse
 from utils.permissions import require_permission, validate_branch_access, check_permission
-from utils.accounting import get_mapped_account_id
+from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.audit import log_activity
 from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
 
@@ -638,15 +638,17 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         if acc_loan and acc_cash:
             import random
             je_num = f"JE-LOAN-{loan_id}-{random.randint(100, 999)}"
+            base_currency = get_base_currency(conn)
             je_id = conn.execute(text("""
                 INSERT INTO journal_entries (
                     entry_number, entry_date, reference, description, status, created_by,
                     currency, exchange_rate
                 )
-                VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, 'SYP', 1.0) RETURNING id
+                VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :currency, 1.0) RETURNING id
             """), {
                 "num": je_num, "ref": f"LOAN-{loan_id}", 
-                "desc": f"صرف سلفة لموظف - رقم {loan_id}", "uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id
+                "desc": f"صرف سلفة لموظف - رقم {loan_id}", "uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                "currency": base_currency
             }).scalar()
             
             # Debit: Employee Loans (Asset)
@@ -877,16 +879,18 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
         branch_id = current_user.get("branch_id") if isinstance(current_user, dict) else (current_user.allowed_branches[0] if current_user.allowed_branches else None)
         
+        base_currency = get_base_currency(conn)
         je_id = conn.execute(text("""
             INSERT INTO journal_entries (
                 entry_number, entry_date, description, status, branch_id, created_by,
                 currency, exchange_rate
             )
-            VALUES (:num, :date, :desc, 'posted', :bid, :uid, 'SYP', 1.0) RETURNING id
+            VALUES (:num, :date, :desc, 'posted', :bid, :uid, :currency, 1.0) RETURNING id
         """), {
             "num": je_num, "date": datetime.now().date(),
             "desc": f"Payroll for period {period.name}",
-            "bid": branch_id, "uid": user_id
+            "bid": branch_id, "uid": user_id,
+            "currency": base_currency
         }).fetchone()[0]
         
         from utils.accounting import update_account_balance
@@ -896,8 +900,8 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         if acc_salaries_exp:
             conn.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:je, :acc, :amount, 0, 'مصروف رواتب وأجور - Salaries Expense', :amount, 'SYP')
-            """), {"je": je_id, "acc": acc_salaries_exp, "amount": totals_gross})
+                VALUES (:je, :acc, :amount, 0, 'مصروف رواتب وأجور - Salaries Expense', :amount, :currency)
+            """), {"je": je_id, "acc": acc_salaries_exp, "amount": totals_gross, "currency": base_currency})
             update_account_balance(conn, account_id=acc_salaries_exp, debit_base=totals_gross, credit_base=0)
 
         # Line 2: Dr GOSI Employer Expense
@@ -906,8 +910,8 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             if acc_gosi_exp:
                 conn.execute(text("""
                     INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, :amount, 0, 'مصروف تأمينات اجتماعية (حصة صاحب العمل) - GOSI Employer', :amount, 'SYP')
-                """), {"je": je_id, "acc": acc_gosi_exp, "amount": total_gosi_empr})
+                    VALUES (:je, :acc, :amount, 0, 'مصروف تأمينات اجتماعية (حصة صاحب العمل) - GOSI Employer', :amount, :currency)
+                """), {"je": je_id, "acc": acc_gosi_exp, "amount": total_gosi_empr, "currency": base_currency})
                 update_account_balance(conn, account_id=acc_gosi_exp, debit_base=total_gosi_empr, credit_base=0)
 
         # Line 3: Cr GOSI Payable (employee + employer shares)
@@ -917,8 +921,8 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             if acc_gosi_payable:
                 conn.execute(text("""
                     INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'التأمينات المستحقة (حصة موظف + صاحب عمل) - GOSI Payable', :amount, 'SYP')
-                """), {"je": je_id, "acc": acc_gosi_payable, "amount": total_gosi})
+                    VALUES (:je, :acc, 0, :amount, 'التأمينات المستحقة (حصة موظف + صاحب عمل) - GOSI Payable', :amount, :currency)
+                """), {"je": je_id, "acc": acc_gosi_payable, "amount": total_gosi, "currency": base_currency})
                 update_account_balance(conn, account_id=acc_gosi_payable, debit_base=0, credit_base=total_gosi)
 
         # Line 4: Cr Employee Loans (Deductions)
@@ -927,8 +931,8 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             if acc_loans_adv:
                 conn.execute(text("""
                     INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'استقطاع سلف موظفين - Loan Repayment', :amount, 'SYP')
-                """), {"je": je_id, "acc": acc_loans_adv, "amount": total_loans})
+                    VALUES (:je, :acc, 0, :amount, 'استقطاع سلف موظفين - Loan Repayment', :amount, :currency)
+                """), {"je": je_id, "acc": acc_loans_adv, "amount": total_loans, "currency": base_currency})
                 update_account_balance(conn, account_id=acc_loans_adv, debit_base=0, credit_base=total_loans)
             
         # Line 5: Cr Bank (Net Payout)
@@ -936,8 +940,8 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         if acc_bank:
             conn.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:je, :acc, 0, :amount, 'صافي الرواتب المحولة - Net Salary Payment', :amount, 'SYP')
-            """), {"je": je_id, "acc": acc_bank, "amount": total_net})
+                VALUES (:je, :acc, 0, :amount, 'صافي الرواتب المحولة - Net Salary Payment', :amount, :currency)
+            """), {"je": je_id, "acc": acc_bank, "amount": total_net, "currency": base_currency})
             update_account_balance(conn, account_id=acc_bank, debit_base=0, credit_base=total_net)
 
         # 7. Update Period Status

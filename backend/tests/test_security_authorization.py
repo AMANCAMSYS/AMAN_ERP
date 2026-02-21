@@ -117,7 +117,7 @@ class TestAuthorizationSecurity:
         # الحصول على token جديد
         time.sleep(2)
         password = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
-        username = os.environ.get("AMAN_TEST_USER", "zzzz")
+        username = os.environ.get("AMAN_TEST_USER", "aaaa")
         
         login_response = client.post(
             "/api/auth/login",

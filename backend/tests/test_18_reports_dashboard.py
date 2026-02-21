@@ -245,7 +245,7 @@ class TestSettingsScenarios:
         r = client.post("/api/settings/bulk", json={
             "settings": {
                 "company_name": "شركة أمان التجريبية",
-                "default_currency": "SAR",
+                "default_currency": "SYP",
             }
         }, headers=admin_headers)
         assert r.status_code in [200, 400]

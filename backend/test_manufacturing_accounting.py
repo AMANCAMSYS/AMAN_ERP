@@ -79,7 +79,7 @@ def test_manufacturing_flow():
         print("Bypassing login via manual token generation...")
         from jose import jwt
         from config import settings
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         # We need a user_id from the company database for 'admin'
         user = conn.execute(text("SELECT id FROM company_users WHERE username = 'admin' LIMIT 1")).fetchone()
@@ -103,8 +103,8 @@ def test_manufacturing_flow():
             "permissions": ["*"],
             "type": "company_user"
         }
-        expire = datetime.utcnow() + timedelta(minutes=30)
-        token_data.update({"exp": expire, "iat": datetime.utcnow()})
+        expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+        token_data.update({"exp": expire, "iat": datetime.now(timezone.utc)})
         token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
         headers = {"Authorization": f"Bearer {token}"}

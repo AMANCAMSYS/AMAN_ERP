@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
+from utils.accounting import get_base_currency
 
 router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"])
 
@@ -19,7 +20,7 @@ class NoteReceivableCreate(BaseModel):
     drawer_name: Optional[str] = None
     bank_name: Optional[str] = None
     amount: float
-    currency: str = "SAR"
+    currency: Optional[str] = None
     issue_date: Optional[str] = None
     due_date: str
     maturity_date: Optional[str] = None
@@ -34,7 +35,7 @@ class NotePayableCreate(BaseModel):
     beneficiary_name: Optional[str] = None
     bank_name: Optional[str] = None
     amount: float
-    currency: str = "SAR"
+    currency: Optional[str] = None
     issue_date: Optional[str] = None
     due_date: str
     maturity_date: Optional[str] = None
@@ -62,10 +63,10 @@ def _ensure_notes_accounts(db):
             ), {"code": parent_code}).fetchone()
             db.execute(text("""
                 INSERT INTO accounts (account_number, account_code, name, name_en, account_type, parent_id, is_active, currency)
-                VALUES (:code, :code, :name, :name_en, :type, :pid, TRUE, 'SAR')
+                VALUES (:code, :code, :name, :name_en, :type, :pid, TRUE, :currency)
                 ON CONFLICT (account_number) DO NOTHING
             """), {"code": code, "name": name, "name_en": name_en, "type": acc_type,
-                   "pid": parent.id if parent else None})
+                   "pid": parent.id if parent else None, "currency": get_base_currency(db)})
             db.commit()
 
 
@@ -707,9 +708,11 @@ def notes_due_alerts(days_ahead: int = 7, current_user: dict = Depends(get_curre
         # Branch filtering
         branch_filter = ""
         params = {"cutoff": cutoff}
-        if current_user.get("role") != "admin" and current_user.get("allowed_branches"):
+        user_role = current_user.role if hasattr(current_user, 'role') else current_user.get("role")
+        user_branches = current_user.allowed_branches if hasattr(current_user, 'allowed_branches') else current_user.get("allowed_branches")
+        if user_role != "admin" and user_branches:
              branch_filter = " AND n.branch_id = ANY(:branches)"
-             params["branches"] = current_user.get("allowed_branches")
+             params["branches"] = user_branches
 
         receivable_due = db.execute(text(f"""
             SELECT n.id, n.note_number, n.drawer_name as name, n.amount, n.currency, n.due_date,

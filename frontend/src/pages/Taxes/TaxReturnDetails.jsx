@@ -6,6 +6,8 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
+import { formatShortDate } from '../../utils/dateUtils';
+
 function TaxReturnDetails() {
     const { t } = useTranslation()
     const { id } = useParams()
@@ -224,7 +226,7 @@ function TaxReturnDetails() {
                                         <td>
                                             <span className="fw-bold" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{p.payment_number}</span>
                                         </td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{new Date(p.payment_date).toLocaleDateString('ar-EG')}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{formatShortDate(p.payment_date)}</td>
                                         <td style={{ textAlign: 'left', fontWeight: '700', whiteSpace: 'nowrap' }}>
                                             {formatNumber(p.amount)} <span className="text-muted fw-normal small">{currency}</span>
                                         </td>

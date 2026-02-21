@@ -1,5 +1,5 @@
 """Treasury module Pydantic schemas."""
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date
 
@@ -25,8 +25,7 @@ class TreasuryAccountResponse(TreasuryAccountCreate):
     branch_name: Optional[str] = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionCreate(BaseModel):

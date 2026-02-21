@@ -139,7 +139,7 @@ class TestSettingsAdvanced:
         # تحديث إعداد واحد
         update_data = {
             "settings": [
-                {"key": "default_currency", "value": "SAR"}
+                {"key": "default_currency", "value": "SYP"}
             ]
         }
         r2 = client.post("/api/settings/bulk", json=update_data,
@@ -163,8 +163,9 @@ class TestCompaniesManagement:
             "cr_number": "1010000000",
             "email": "test@company.com",
             "phone": "+966500000000",
-            "address": "الرياض، المملكة العربية السعودية",
-            "currency": "SAR"
+            "address": "دمشق، سوريا",
+            "currency": "SYP",
+            "country": "SY"
         }
         r = client.post("/api/companies/register", json=company_data,
                         headers=admin_headers)
@@ -253,7 +254,7 @@ class TestCompaniesManagement:
             "tax_number": "300000000000003",  # نفس الرقم
             "cr_number": "1010000001",
             "email": "duplicate@test.com",
-            "currency": "SAR"
+            "currency": "SYP"
         }
         # إنشاء الأولى
         r1 = client.post("/api/companies/register", json=company_data,

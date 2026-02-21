@@ -6,6 +6,8 @@ import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import './TaxHome.css'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function TaxHome() {
     const { t } = useTranslation()
@@ -262,8 +264,8 @@ function TaxHome() {
                                         <td>{rate.tax_name}</td>
                                         <td>{rate.tax_name_en || <span className="text-muted">—</span>}</td>
                                         <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{rate.rate_value}%</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_from ? new Date(rate.effective_from).toLocaleDateString('ar-EG') : <span className="text-muted">—</span>}</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_to ? new Date(rate.effective_to).toLocaleDateString('ar-EG') : <span className="text-muted">—</span>}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_from ? formatShortDate(rate.effective_from) : <span className="text-muted">—</span>}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_to ? formatShortDate(rate.effective_to) : <span className="text-muted">—</span>}</td>
                                         <td>
                                             <span style={{ background: rate.is_active ? 'rgb(220, 252, 231)' : 'rgb(254, 226, 226)', color: rate.is_active ? 'rgb(22, 163, 74)' : 'rgb(220, 38, 38)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
                                                 {rate.is_active ? '✅ ' + (t('common.active') || 'نشط') : '❌ ' + (t('common.inactive') || 'معطل')}
@@ -328,7 +330,7 @@ function TaxHome() {
                                             {formatNumber(r.total_amount)} <span className="text-muted fw-normal small">{currency}</span>
                                         </td>
                                         <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{formatNumber(r.paid_amount || 0)}</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{r.due_date ? new Date(r.due_date).toLocaleDateString('ar-EG') : <span className="text-muted">—</span>}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{r.due_date ? formatShortDate(r.due_date) : <span className="text-muted">—</span>}</td>
                                         <td>{getStatusBadge(r.status)}</td>
                                         <td>
                                             <button className="btn btn-sm btn-outline-primary" style={{ borderRadius: '8px', fontSize: '12px' }} onClick={(e) => { e.stopPropagation(); navigate(`/taxes/returns/${r.id}`); }}>

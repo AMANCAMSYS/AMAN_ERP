@@ -1,5 +1,5 @@
 """Parties module Pydantic schemas - unified Customer/Supplier model."""
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 
@@ -38,8 +38,7 @@ class PartyResponse(BaseModel):
     credit_limit: Optional[float] = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Backward-compatible aliases

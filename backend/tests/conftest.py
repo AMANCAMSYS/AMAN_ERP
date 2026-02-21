@@ -20,7 +20,7 @@ from main import app
 from config import settings
 from database import get_db_connection
 
-DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_7b4e2b6b"
+DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_be67ce39"
 
 TOLERANCE = Decimal("0.01")
 
@@ -33,8 +33,9 @@ TEST_ADMIN_USERNAME = "admin"
 TEST_ADMIN_PASSWORD = os.environ.get("AMAN_ADMIN_PASSWORD", "admin")  # bcrypt hash is in .env
 
 # Company user credentials (for API tests that need company_id)
-TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "zzzz")
+TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "aaaa")
 TEST_COMPANY_PASSWORD = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
+TEST_COMPANY_ID = "be67ce39"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -44,7 +45,8 @@ TEST_COMPANY_PASSWORD = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
 @pytest.fixture(scope="session")
 def client():
     """TestClient للتطبيق - يُستخدم طوال الجلسة"""
-    with TestClient(app, base_url="http://testserver") as c:
+    # نستخدم localhost لتجنب اعادة التوجيه من HTTPSRedirectMiddleware
+    with TestClient(app, base_url="http://localhost") as c:
         yield c
 
 
@@ -103,6 +105,16 @@ def company_id(company_info):
     if not cid:
         pytest.skip("لا يوجد company_id")
     return cid
+
+
+@pytest.fixture(scope="session")
+def base_currency(client, admin_headers):
+    """العملة الأساسية للشركة - يتم جلبها ديناميكياً من API"""
+    response = client.get("/api/auth/me", headers=admin_headers)
+    if response.status_code == 200:
+        data = response.json()
+        return data.get("currency", "SYP")
+    return "SYP"
 
 
 @pytest.fixture(scope="session")

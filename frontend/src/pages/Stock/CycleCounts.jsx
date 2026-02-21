@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function CycleCounts() {
     const { t } = useTranslation()
@@ -269,7 +271,7 @@ function CycleCounts() {
                                         ) : '-'}
                                     </td>
                                     <td>{getStatusBadge(cc.status)}</td>
-                                    <td>{cc.created_at ? new Date(cc.created_at).toLocaleDateString('ar-SA') : '-'}</td>
+                                    <td>{cc.created_at ? formatShortDate(cc.created_at) : '-'}</td>
                                     <td>
                                         <div style={{ display: 'flex', gap: '6px' }}>
                                             {cc.status === 'draft' && (

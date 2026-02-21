@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, ConfigDict, constr
 from datetime import datetime, date
 
 # --- WORK CENTERS ---
@@ -20,8 +20,7 @@ class WorkCenterResponse(WorkCenterBase):
     id: int
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- ROUTING ---
 class OperationBase(BaseModel):
@@ -44,8 +43,7 @@ class OperationResponse(OperationBase):
     id: int
     work_center_name: Optional[str] = None # Calculated field
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RouteResponse(RouteBase):
     id: int
@@ -53,8 +51,7 @@ class RouteResponse(RouteBase):
     operations: List[OperationResponse] = []
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- BILL OF MATERIALS (BOM) ---
 class BOMComponentBase(BaseModel):
@@ -84,8 +81,7 @@ class BOMComponentResponse(BOMComponentBase):
     component_uom: Optional[str] = None
     computed_quantity: Optional[float] = None  # populated by compute-materials endpoint
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BOMResponse(BOMBase):
     id: int
@@ -95,8 +91,7 @@ class BOMResponse(BOMBase):
     outputs: List["BOMOutputResponse"] = []
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- PRODUCTION ORDERS ---
 class ProductionOrderOperationBase(BaseModel):
@@ -136,8 +131,7 @@ class ProductionOrderOperationResponse(ProductionOrderOperationBase):
     product_name: Optional[str] = None
     work_center_name: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductionOrderResponse(ProductionOrderBase):
     id: int
@@ -157,8 +151,7 @@ class ProductionOrderResponse(ProductionOrderBase):
     materials: List[dict] = []
     transactions: List[dict] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- MRP (Material Requirements Planning) ---
 class MRPSubItem(BaseModel):
@@ -181,8 +174,7 @@ class MRPPlanResponse(BaseModel):
     calculated_at: datetime
     items: List[MRPSubItem] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- BOM OUTPUTS (By-products) ---
 class BOMOutputBase(BaseModel):
@@ -198,8 +190,7 @@ class BOMOutputResponse(BOMOutputBase):
     id: int
     product_name: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- EQUIPMENT & MAINTENANCE ---
 class EquipmentBase(BaseModel):
@@ -220,8 +211,7 @@ class EquipmentResponse(EquipmentBase):
     work_center_name: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MaintenanceLogBase(BaseModel):
     equipment_id: int
@@ -244,5 +234,4 @@ class MaintenanceLogResponse(MaintenanceLogBase):
     performed_by_name: Optional[str] = None
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

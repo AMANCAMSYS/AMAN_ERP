@@ -7,6 +7,8 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 const SalesReturnForm = () => {
     const { t } = useTranslation();
@@ -301,7 +303,7 @@ const SalesReturnForm = () => {
                             <option value="">{t('sales.returns.form.invoice_placeholder')}</option>
                             {invoices.map(inv => (
                                 <option key={inv.id} value={inv.id}>
-                                    #{inv.invoice_number} ({new Date(inv.invoice_date).toLocaleDateString('ar-EG')}) - {formatNumber(inv.total)} {currency}
+                                    #{inv.invoice_number} ({formatShortDate(inv.invoice_date)}) - {formatNumber(inv.total)} {currency}
                                 </option>
                             ))}
                         </select>

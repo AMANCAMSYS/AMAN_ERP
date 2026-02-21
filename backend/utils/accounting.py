@@ -45,12 +45,12 @@ def get_account_id_legacy(db, account_code: str) -> Optional[int]:
 def get_base_currency(db) -> str:
     """
     Resolve the company's base currency dynamically.
-    Checks currencies table first, then company_settings, falls back to 'SAR'.
+    Checks currencies table first, then company_settings, falls back to 'SYP'.
     """
     row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
     if not row:
         row = db.execute(text("SELECT setting_value AS code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
-    return row[0] if row else "SAR"
+    return row[0] if row else "SYP"
 
 def update_account_balance(db, account_id: int, debit_base: float, credit_base: float, debit_curr: float = 0, credit_curr: float = 0, currency: str = None):
     """

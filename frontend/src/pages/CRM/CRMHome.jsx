@@ -20,8 +20,16 @@ function CRMHome() {
                     crmAPI.getPipelineSummary(),
                     crmAPI.getTicketStats()
                 ])
-                setPipeline(pipelineRes.data)
-                setTicketStats(ticketRes.data)
+                const stagesData = pipelineRes.data?.pipeline || []
+                setPipeline({
+                    total_opportunities: stagesData.reduce((sum, s) => sum + (parseInt(s.count) || 0), 0),
+                    total_value: stagesData.reduce((sum, s) => sum + (parseFloat(s.total_value) || 0), 0),
+                    stages: stagesData
+                })
+                setTicketStats({
+                    open: ticketRes.data?.open_count ?? 0,
+                    critical: ticketRes.data?.critical_open ?? 0
+                })
             } catch (err) {
                 console.error('Failed to fetch CRM data', err)
             } finally {
@@ -123,7 +131,7 @@ function CRMHome() {
                                         </span>
                                     </td>
                                     <td>{stage.count}</td>
-                                    <td>{formatNumber(stage.value)} {currency}</td>
+                                    <td>{formatNumber(stage.total_value)} {currency}</td>
                                 </tr>
                             ))}
                             {(!pipeline.stages || pipeline.stages.length === 0) && (

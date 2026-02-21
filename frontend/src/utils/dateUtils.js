@@ -1,67 +1,104 @@
 /**
  * AMAN ERP - Date Utilities
- * مساعدات التواريخ مع دعم اللغة العربية
+ * مساعدات التواريخ مع دعم المنطقة الزمنية للشركة
+ *
+ * Architecture:
+ *  - DB stores UTC (TIMESTAMPTZ)
+ *  - Backend returns ISO 8601 strings (e.g. "2026-02-21T10:30:00+00:00")
+ *  - Frontend converts to company timezone for display
  */
 
 import dayjs from 'dayjs';
-import 'dayjs/locale/ar-sa';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
+import 'dayjs/locale/ar';
 
 // تحميل الإضافات
+dayjs.extend(utc);
+dayjs.extend(timezone);
 dayjs.extend(relativeTime);
 dayjs.extend(localizedFormat);
 
-// تعيين اللغة الافتراضية - السعودية
-// Default to 'en' to ensure Latin numerals (1, 2, 3) are used globally
+// Latin numerals by default
 dayjs.locale('en');
 
 /**
- * تنسيق التاريخ
- * @param {string|Date} date - التاريخ
- * @param {string} format - الصيغة (اختياري)
- * @returns {string}
+ * الحصول على المنطقة الزمنية للشركة من localStorage
+ * @returns {string} - e.g. "Europe/Istanbul", "Asia/Damascus"
  */
-export const formatDate = (date, format = 'YYYY/MM/DD') => {
-    if (!date) return '-';
-    return dayjs(date).format(format);
+export const getCompanyTimezone = () => {
+    try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.timezone || 'UTC';
+    } catch {
+        return 'UTC';
+    }
 };
 
 /**
- * تنسيق التاريخ والوقت
- * @param {string|Date} date - التاريخ
- * @returns {string}
+ * تحويل تاريخ UTC إلى المنطقة الزمنية للشركة
+ * @param {string|Date} date - تاريخ UTC
+ * @param {string} [tz] - المنطقة الزمنية (اختياري، يُستخدم توقيت الشركة افتراضيًا)
+ * @returns {dayjs.Dayjs}
  */
-export const formatDateTime = (date) => {
-    if (!date) return '-';
-    return dayjs(date).format('YYYY/MM/DD HH:mm');
+const toCompanyTz = (date, tz) => {
+    const targetTz = tz || getCompanyTimezone();
+    // If the string lacks timezone info (no Z, no +HH:MM), treat it as UTC
+    if (typeof date === 'string' && !date.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(date)) {
+        return dayjs.utc(date).tz(targetTz);
+    }
+    return dayjs(date).tz(targetTz);
 };
 
 /**
- * تنسيق الوقت النسبي (منذ...)
- * @param {string|Date} date - التاريخ
+ * تنسيق التاريخ بتوقيت الشركة
+ * @param {string|Date} date
+ * @param {string} [format]
+ * @param {string} [tz]
+ * @returns {string}
+ */
+export const formatDate = (date, format = 'YYYY/MM/DD', tz) => {
+    if (!date) return '-';
+    return toCompanyTz(date, tz).format(format);
+};
+
+/**
+ * تنسيق التاريخ والوقت بتوقيت الشركة
+ * @param {string|Date} date
+ * @param {string} [tz]
+ * @returns {string}
+ */
+export const formatDateTime = (date, tz) => {
+    if (!date) return '-';
+    return toCompanyTz(date, tz).format('YYYY/MM/DD HH:mm');
+};
+
+/**
+ * تنسيق الوقت النسبي (منذ...) بتوقيت الشركة
+ * @param {string|Date} date
  * @returns {string}
  */
 export const formatRelative = (date) => {
     if (!date) return '-';
-    // For relative time like "منذ ساعة", we might still want Arabic text but Latin numerals?
-    // dayjs handles this via locale. If we want Arabic text, we use 'ar'.
-    return dayjs(date).locale('ar').fromNow();
+    return toCompanyTz(date).locale('ar').fromNow();
 };
 
 /**
- * تنسيق التاريخ القصير
- * @param {string|Date} date - التاريخ
+ * تنسيق التاريخ القصير بتوقيت الشركة
+ * @param {string|Date} date
+ * @param {string} [tz]
  * @returns {string}
  */
-export const formatShortDate = (date) => {
+export const formatShortDate = (date, tz) => {
     if (!date) return '-';
-    return dayjs(date).format('YYYY/MM/DD');
+    return toCompanyTz(date, tz).format('YYYY/MM/DD');
 };
 
 /**
- * الحصول على التاريخ للـ input[type=date]
- * @param {string|Date} date - التاريخ
+ * الحصول على التاريخ للـ input[type=date] — لا يحتاج تحويل منطقة زمنية
+ * @param {string|Date} date
  * @returns {string} - YYYY-MM-DD
  */
 export const toInputDate = (date) => {
@@ -71,7 +108,7 @@ export const toInputDate = (date) => {
 
 /**
  * التحقق من صلاحية التاريخ
- * @param {string|Date} date - التاريخ
+ * @param {string|Date} date
  * @returns {boolean}
  */
 export const isValidDate = (date) => {

@@ -9,6 +9,8 @@ import { customReportsAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 export default function ReportBuilder() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -266,7 +268,7 @@ export default function ReportBuilder() {
                                                             {r.report_name}
                                                         </td>
                                                         <td>{r.description || '-'}</td>
-                                                        <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                                                        <td>{formatShortDate(r.created_at)}</td>
                                                         <td>
                                                             <button className="btn btn-icon btn-sm text-danger" onClick={() => deleteReport(r.id)}>
                                                                 <Trash2 size={14} />

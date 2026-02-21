@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import logging
 
@@ -15,6 +15,7 @@ from database import get_system_db, verify_password, get_db_connection
 from config import settings
 from schemas import Token, UserResponse
 from utils.audit import log_activity, log_system_activity
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["المصادقة"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
@@ -31,7 +32,10 @@ LOCKOUT_DURATION = timedelta(minutes=15)
 def check_rate_limit(request: Request, username: str = None):
     """Check if IP or username has exceeded login attempt limit"""
     client_ip = request.client.host if request.client else "unknown"
-    now = datetime.utcnow()
+    # Exclude localhost/internal IPs from rate limiting (dev environment & Vite proxy)
+    if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
+        return
+    now = datetime.now(timezone.utc)
     
     # Check IP-based limit
     if client_ip in _login_attempts:
@@ -64,7 +68,7 @@ def check_rate_limit(request: Request, username: str = None):
 def record_failed_attempt(request: Request, username: str = None):
     """Record a failed login attempt for both IP and username"""
     client_ip = request.client.host if request.client else "unknown"
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if client_ip in _login_attempts:
         _login_attempts[client_ip]["count"] += 1
         _login_attempts[client_ip]["last_attempt"] = now
@@ -138,9 +142,9 @@ def add_token_to_blacklist(token: str, username: str = None, reason: str = "logo
                              options={"verify_exp": False})
         exp = payload.get("exp")
         if exp:
-            expires_at = datetime.utcfromtimestamp(exp)
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc).replace(tzinfo=None)
         else:
-            expires_at = datetime.utcnow() + timedelta(hours=24)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
         from database import engine as sys_engine
         with sys_engine.connect() as conn:
@@ -202,10 +206,10 @@ token_blacklist = _token_blacklist_cache
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "iat": datetime.utcnow()})
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -217,6 +221,7 @@ def decode_token(token: str) -> dict:
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("10/minute")
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     """تسجيل الدخول - يبحث تلقائياً في جميع الشركات"""
     # Rate limit check (IP + username)
@@ -329,7 +334,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                             # Update last login
                             company_conn.execute(
                                 text("UPDATE company_users SET last_login = :now WHERE id = :user_id"),
-                                {"now": datetime.utcnow(), "user_id": result[0]}
+                                {"now": datetime.now(timezone.utc), "user_id": result[0]}
                             )
                             
                             # Fetch Allowed Branches
@@ -434,14 +439,26 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                             ).scalar()
 
                             decimal_places = 2
+                            company_country = "SY"
+                            company_timezone = "Asia/Damascus"
                             try:
                                 dp_res = company_conn.execute(
                                     text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
                                 ).scalar()
                                 if dp_res:
                                     decimal_places = int(dp_res)
+                                cc_res = company_conn.execute(
+                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
+                                ).scalar()
+                                if cc_res:
+                                    company_country = cc_res
+                                tz_res = company_conn.execute(
+                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
+                                ).scalar()
+                                if tz_res:
+                                    company_timezone = tz_res
                             except Exception as e:
-                                logger.warning(f"Failed to fetch decimal_places setting: {e}")
+                                logger.warning(f"Failed to fetch settings: {e}")
 
                             company_engine.dispose()
                             logger.info(f"✅ Login: {result[1]} -> {company_id}")
@@ -458,7 +475,9 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                                     "role": result[5],
                                     "permissions": final_permissions,
                                     "currency": currency,
+                                    "country": company_country,
                                     "decimal_places": decimal_places,
+                                    "timezone": company_timezone,
                                     "allowed_branches": allowed_branches
                                 },
                                 company_id=company_id
@@ -588,14 +607,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
                 # Fetch Decimal Places Setting
                 decimal_places = 2
+                company_country = "SY"
+                company_timezone = "Asia/Damascus"
                 try:
                     dp_res = company_conn.execute(
                         text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
                     ).scalar()
                     if dp_res:
                         decimal_places = int(dp_res)
+                    cc_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
+                    ).scalar()
+                    if cc_res:
+                        company_country = cc_res
+                    tz_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
+                    ).scalar()
+                    if tz_res:
+                        company_timezone = tz_res
                 except Exception as e:
-                    logger.warning(f"Failed to fetch decimal_places setting in /me: {e}")
+                    logger.warning(f"Failed to fetch settings in /me: {e}")
 
                 return UserResponse(
                     id=result[0],
@@ -606,7 +637,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                     is_active=result[5],
                     company_id=company_id,
                     currency=currency,
+                    country=company_country,
                     decimal_places=decimal_places,
+                    timezone=company_timezone,
                     permissions=final_permissions,
                     allowed_branches=allowed_branches
                 )

@@ -177,7 +177,7 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
         base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
         if not base_currency_row:
             base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
-        base_currency = base_currency_row[0] if base_currency_row else "SAR"
+        base_currency = base_currency_row[0] if base_currency_row else "SYP"
 
         # 1. Fetch Return details
         header = db.execute(text("SELECT * FROM sales_returns WHERE id = :id"), {"id": return_id}).fetchone()

@@ -42,7 +42,7 @@ class TestAPIPerformance:
             client.post,
             "/api/auth/login",
             data={
-                "username": os.environ.get("AMAN_TEST_USER", "zzzz"),
+                "username": os.environ.get("AMAN_TEST_USER", "aaaa"),
                 "password": password,
                 "grant_type": "password"
             }

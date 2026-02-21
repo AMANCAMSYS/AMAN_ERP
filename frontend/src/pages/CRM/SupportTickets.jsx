@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { crmAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 const statusOptions = [
     { value: 'open', label: 'مفتوحة' },
@@ -177,7 +179,7 @@ function SupportTickets() {
     const formatDate = (dateStr) => {
         if (!dateStr) return '-'
         try {
-            return new Date(dateStr).toLocaleDateString('ar-SA')
+            return formatShortDate(dateStr)
         } catch {
             return dateStr
         }

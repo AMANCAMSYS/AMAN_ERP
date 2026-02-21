@@ -16,18 +16,34 @@ function Register() {
         email: '',
         phone: '',
         address: '',
+        country: 'SY',
         currency: 'SYP',
         admin_username: '',
         admin_email: '',
         admin_full_name: '',
         admin_password: '',
         admin_password_confirm: '',
-        timezone: 'Asia/Riyadh',
+        timezone: 'Asia/Damascus',
         plan_type: 'basic'
     })
 
+    const COUNTRY_DEFAULTS = {
+        SA: { currency: 'SAR', timezone: 'Asia/Riyadh' },
+        SY: { currency: 'SYP', timezone: 'Asia/Damascus' },
+        AE: { currency: 'AED', timezone: 'Asia/Dubai' },
+        EG: { currency: 'EGP', timezone: 'Africa/Cairo' },
+        KW: { currency: 'KWD', timezone: 'Asia/Kuwait' },
+        TR: { currency: 'TRY', timezone: 'Europe/Istanbul' },
+    }
+
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value })
+        const { name, value } = e.target;
+        if (name === 'country') {
+            const defaults = COUNTRY_DEFAULTS[value] || {};
+            setFormData(prev => ({ ...prev, country: value, currency: defaults.currency || prev.currency, timezone: defaults.timezone || prev.timezone }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     }
 
     const handleSubmit = async (e) => {
@@ -226,21 +242,41 @@ function Register() {
                         <h3 className="section-title">{t('auth.settings')}</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label" htmlFor="currency">{t('auth.currency')}</label>
-                                <select name="currency" id="currency" className="form-input" value={formData.currency} onChange={handleChange}>
-                                    <option value="SYP">{t("auth.register.syp")}</option>
-                                    <option value="SAR">{t("auth.register.sar")}</option>
-                                    <option value="USD">{t("auth.register.usd")}</option>
-                                    <option value="TRY">{t("auth.register.try_currency")}</option>
-                                    <option value="EUR">{t("auth.register.eur")}</option>
-                                    <option value="EGP">{t("auth.register.egp")}</option>
+                                <label className="form-label" htmlFor="country">{t('auth.country') || 'الدولة'} *</label>
+                                <select name="country" id="country" className="form-input" value={formData.country} onChange={handleChange} required>
+                                    <option value="SY">🇸🇾 {t('countries.SY') || 'سوريا'}</option>
+                                    <option value="SA">🇸🇦 {t('countries.SA') || 'السعودية'}</option>
+                                    <option value="AE">🇦🇪 {t('countries.AE') || 'الإمارات'}</option>
+                                    <option value="EG">🇪🇬 {t('countries.EG') || 'مصر'}</option>
+                                    <option value="KW">🇰🇼 {t('countries.KW') || 'الكويت'}</option>
+                                    <option value="TR">🇹🇷 {t('countries.TR') || 'تركيا'}</option>
                                 </select>
                             </div>
                             <div className="form-group">
+                                <label className="form-label" htmlFor="currency">{t('auth.currency')}</label>
+                                <select name="currency" id="currency" className="form-input" value={formData.currency} onChange={handleChange}>
+                                    <option value="SYP">{t('auth.register.syp') || 'ليرة سورية (SYP)'}</option>
+                                    <option value="SAR">{t('auth.register.sar') || 'ريال سعودي (SAR)'}</option>
+                                    <option value="USD">{t('auth.register.usd') || 'دولار أمريكي (USD)'}</option>
+                                    <option value="AED">{t('auth.register.aed') || 'درهم إماراتي (AED)'}</option>
+                                    <option value="EGP">{t('auth.register.egp') || 'جنيه مصري (EGP)'}</option>
+                                    <option value="KWD">{t('auth.register.kwd') || 'دينار كويتي (KWD)'}</option>
+                                    <option value="TRY">{t('auth.register.try_currency') || 'ليرة تركية (TRY)'}</option>
+                                    <option value="EUR">{t('auth.register.eur') || 'يورو (EUR)'}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
                                 <label className="form-label" htmlFor="timezone">{t('auth.timezone')}</label>
                                 <select name="timezone" id="timezone" className="form-input" value={formData.timezone} onChange={handleChange}>
-                                    <option value="Asia/Riyadh">{t("auth.register.riyadh_tz")}</option>
-                                    <option value="UTC">{t("auth.register.utc_tz")}</option>
+                                    <option value="Asia/Damascus">دمشق (GMT+3)</option>
+                                    <option value="Asia/Riyadh">الرياض (GMT+3)</option>
+                                    <option value="Asia/Dubai">دبي (GMT+4)</option>
+                                    <option value="Africa/Cairo">القاهرة (GMT+2)</option>
+                                    <option value="Asia/Kuwait">الكويت (GMT+3)</option>
+                                    <option value="Europe/Istanbul">إسطنبول (GMT+3)</option>
+                                    <option value="UTC">UTC</option>
                                 </select>
                             </div>
                         </div>

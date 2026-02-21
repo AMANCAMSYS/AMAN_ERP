@@ -23,7 +23,7 @@ class TestSuppliers:
             "name_en": "Auto Test Supplier",
             "phone": "0598765432",
             "email": "supplier@test.com",
-            "currency": "SYP"
+            "currency": "SYP"  # العملة الأساسية
         }
         response = client.post(
             "/api/inventory/suppliers",

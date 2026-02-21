@@ -16,7 +16,7 @@ import json
 
 from schemas.costing_policies import CostingPolicySet, CostingPolicyHistoryResponse
 
-router = APIRouter(prefix="/api/costing-policies", tags=["Costing Policies"])
+router = APIRouter(prefix="/costing-policies", tags=["Costing Policies"])
 
 @router.get("/current", dependencies=[Depends(require_permission("settings.view"))])
 def get_current_policy(current_user: dict = Depends(get_current_user)):

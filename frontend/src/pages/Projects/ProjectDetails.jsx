@@ -15,6 +15,8 @@ import Timesheets from './Timesheets';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 export default function ProjectDetails() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -564,7 +566,7 @@ export default function ProjectDetails() {
                                             <div className="card-body p-3 d-flex flex-column align-items-center text-center">
                                                 <div className="mb-2 text-primary"><FileText size={32} /></div>
                                                 <h6 className="text-truncate w-100" title={doc.file_name}>{doc.file_name}</h6>
-                                                <small className="text-muted d-block mb-2">{new Date(doc.created_at).toLocaleDateString()}</small>
+                                                <small className="text-muted d-block mb-2">{formatShortDate(doc.created_at)}</small>
                                                 <div className="mt-auto d-flex gap-2">
                                                     <a href={`/api${doc.file_url}`} target="_blank" className="btn btn-sm btn-light btn-icon" download>
                                                         <Download size={14} />

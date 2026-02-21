@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 const ShipmentList = () => {
     const { t } = useTranslation();
@@ -114,7 +116,7 @@ const ShipmentList = () => {
                                 <td>{s.item_count}</td>
                                 <td>{getStatusBadge(s.status)}</td>
                                 <td className="text-muted">
-                                    {new Date(s.created_at).toLocaleDateString('ar-SA')}
+                                    {formatShortDate(s.created_at)}
                                 </td>
                                 <td>
                                     <Link to={`/stock/shipments/${s.id}`} className="btn btn-sm btn-secondary">

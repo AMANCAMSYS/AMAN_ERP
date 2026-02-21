@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
@@ -7,7 +7,9 @@ from datetime import datetime
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.ws_manager import ws_manager
 import logging
+import asyncio
 
 logger = logging.getLogger("aman.notifications")
 
@@ -47,7 +49,9 @@ async def get_notifications(
     db = get_db_connection(company_id)
     try:
         result = db.execute(text("""
-            SELECT * FROM notifications 
+            SELECT id, user_id, title, message, link, is_read, 
+                   type, created_at
+            FROM notifications 
             WHERE user_id = :uid 
             ORDER BY created_at DESC 
             LIMIT :limit
@@ -129,18 +133,31 @@ async def create_and_send_notification(
     db = get_db_connection(company_id)
     try:
         # 1. Create in-app notification
-        db.execute(text("""
+        notif_row = db.execute(text("""
             INSERT INTO notifications (user_id, title, message, link, is_read, type, created_at)
             VALUES (:uid, :title, :msg, :link, FALSE, :type, CURRENT_TIMESTAMP)
+            RETURNING id, created_at
         """), {
             "uid": data.user_id,
             "title": data.title,
             "msg": data.message,
             "link": data.link,
             "type": data.type
-        })
+        }).fetchone()
 
         results = {"in_app": True, "email": None, "sms": None}
+
+        # Push via WebSocket in real-time
+        if notif_row:
+            asyncio.ensure_future(push_notification(company_id, data.user_id, {
+                "id": notif_row.id,
+                "title": data.title,
+                "message": data.message,
+                "link": data.link,
+                "type": data.type,
+                "is_read": False,
+                "created_at": notif_row.created_at.isoformat() if notif_row.created_at else None
+            }))
 
         # 2. Send email if requested
         if data.send_email:
@@ -284,3 +301,68 @@ async def test_email_connection(current_user: dict = Depends(get_current_user)):
         raise HTTPException(500, str(e))
     finally:
         db.close()
+
+
+# ===================== WebSocket Endpoint =====================
+
+@router.websocket("/ws")
+async def notifications_ws(ws: WebSocket, token: str = ""):
+    """
+    WebSocket endpoint for real-time notifications.
+    Connect: ws://host/api/notifications/ws?token=JWT_TOKEN
+    """
+    from jose import jwt, JWTError
+    from config import settings as app_settings
+
+    # Authenticate via token query param
+    if not token:
+        await ws.close(code=4001, reason="Missing token")
+        return
+
+    try:
+        payload = jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        user_id = payload.get("user_id")
+        company_id = payload.get("company_id")
+        if not user_id or not company_id:
+            await ws.close(code=4001, reason="Invalid token")
+            return
+    except JWTError:
+        await ws.close(code=4001, reason="Invalid token")
+        return
+
+    await ws_manager.connect(ws, company_id, user_id)
+    try:
+        while True:
+            # Keep alive — client can send pings, we just read and discard
+            data = await ws.receive_text()
+            if data == "ping":
+                await ws.send_text("pong")
+    except WebSocketDisconnect:
+        ws_manager.disconnect(ws, company_id, user_id)
+    except Exception:
+        ws_manager.disconnect(ws, company_id, user_id)
+
+
+# ===================== Push Helper =====================
+
+async def push_notification(company_id: str, user_id: int, notification: dict):
+    """
+    Helper to push a notification to a connected user via WebSocket.
+    Call this from any router after inserting a notification into the DB.
+    
+    Usage:
+        from routers.notifications import push_notification
+        await push_notification(company_id, user_id, {
+            "id": notif_id, "title": "...", "message": "...",
+            "type": "info", "link": "/...", "is_read": False,
+            "created_at": datetime.now().isoformat()
+        })
+    """
+    try:
+        await ws_manager.send_to_user(company_id, user_id, {
+            "event": "new_notification",
+            "data": notification
+        })
+    except Exception as e:
+        logger.debug(f"WS push failed for {company_id}:{user_id}: {e}")
+

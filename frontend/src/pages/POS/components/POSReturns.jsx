@@ -3,6 +3,8 @@ import { RotateCcw, Search, Package, Check, X, AlertCircle } from 'lucide-react'
 import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
+import { formatShortDate } from '../../../utils/dateUtils';
+
 
 const POSReturns = ({ onClose, onComplete }) => {
     const { t } = useTranslation();
@@ -125,7 +127,7 @@ const POSReturns = ({ onClose, onComplete }) => {
                         <div className="order-summary">
                             <span>#{order.order_number}</span>
                             <span>{order.customer_name}</span>
-                            <span>{new Date(order.created_at).toLocaleDateString('ar-SA')}</span>
+                            <span>{formatShortDate(order.created_at)}</span>
                         </div>
 
                         <div className="items-list">

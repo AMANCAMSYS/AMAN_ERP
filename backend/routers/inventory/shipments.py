@@ -86,7 +86,7 @@ def create_shipment(
             d_manager_id = dest_branch_info.manager_id
 
             db.execute(text("""
-                INSERT INTO notifications (user_id, notification_type, title, message, link, created_at)
+                INSERT INTO notifications (user_id, type, title, message, link, created_at)
                 SELECT DISTINCT u.id, 'shipment_incoming', :title, :message, :link, NOW()
                 FROM company_users u
                 LEFT JOIN user_branches ub ON u.id = ub.user_id
@@ -358,7 +358,7 @@ def confirm_shipment(
 
         # Notify sender
         db.execute(text("""
-            INSERT INTO notifications (user_id, notification_type, title, message, link, created_at)
+            INSERT INTO notifications (user_id, type, title, message, link, created_at)
             VALUES (:user, 'shipment_confirmed', :title, :message, :link, NOW())
         """), {
             "user": shipment.created_by,

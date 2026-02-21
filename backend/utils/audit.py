@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import text
 from fastapi import Request
 from database import engine
@@ -70,7 +70,7 @@ def log_activity(
                 "det": details_json,
                 "ip": ip_address,
                 "bid": branch_id,
-                "now": datetime.utcnow()
+                "now": datetime.now(timezone.utc)
             }
         )
         db_conn.commit()

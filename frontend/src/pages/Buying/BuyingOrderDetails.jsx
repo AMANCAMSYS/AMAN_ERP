@@ -4,6 +4,8 @@ import { getCurrency } from '../../utils/auth'
 import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 function BuyingOrderDetails() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
@@ -72,10 +74,10 @@ function BuyingOrderDetails() {
                     <div style={{ textAlign: 'left' }}>
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('buying.orders.details.additional_details')}:</h4>
                         <div>
-                            <span className="text-secondary">{t('buying.orders.details.order_date')}:</span> {new Date(order.order_date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                            <span className="text-secondary">{t('buying.orders.details.order_date')}:</span> {formatShortDate(order.order_date)}
                         </div>
                         <div>
-                            <span className="text-secondary">{t('buying.orders.details.expected_date')}:</span> {order.expected_date ? new Date(order.expected_date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US') : '-'}
+                            <span className="text-secondary">{t('buying.orders.details.expected_date')}:</span> {order.expected_date ? formatShortDate(order.expected_date) : '-'}
                         </div>
                     </div>
                 </div>

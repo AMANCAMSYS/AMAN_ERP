@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function SalesQuotationDetails() {
     const { t } = useTranslation()
@@ -45,7 +47,7 @@ function SalesQuotationDetails() {
                                         quotation.status === 'converted' ? t('sales.quotations.status.converted') : quotation.status}
                         </span>
                     </div>
-                    <p className="workspace-subtitle">{t('sales.quotations.details.date')}: {new Date(quotation.quotation_date).toLocaleDateString('ar-EG')}</p>
+                    <p className="workspace-subtitle">{t('sales.quotations.details.date')}: {formatShortDate(quotation.quotation_date)}</p>
                 </div>
                 <div className="header-actions">
                     <button
@@ -72,7 +74,7 @@ function SalesQuotationDetails() {
                     </div>
                     <div style={{ textAlign: 'left' }}>
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('sales.quotations.details.expiry')}:</h4>
-                        <div>{quotation.expiry_date ? new Date(quotation.expiry_date).toLocaleDateString('ar-EG') : '-'}</div>
+                        <div>{quotation.expiry_date ? formatShortDate(quotation.expiry_date) : '-'}</div>
                     </div>
                 </div>
 

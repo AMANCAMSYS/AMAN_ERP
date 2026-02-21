@@ -37,7 +37,7 @@ echo -e "${YELLOW}📦 التحقق من المتطلبات...${NC}"
 pip install -q pytest pytest-cov pytest-asyncio httpx
 
 # متغيرات البيئة
-export AMAN_TEST_USER="${AMAN_TEST_USER:-zzzz}"
+export AMAN_TEST_USER="${AMAN_TEST_USER:-aaaa}"
 export AMAN_TEST_PASSWORD="${AMAN_TEST_PASSWORD:-As123321}"
 export AMAN_ADMIN_PASSWORD="${AMAN_ADMIN_PASSWORD:-admin}"
 
@@ -66,11 +66,25 @@ echo "════════════════════════�
 pytest tests/test_security_authentication.py \
     tests/test_security_authorization.py \
     tests/test_security_injection.py \
+    tests/test_38_security_2fa.py \
     -v --tb=short
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
-echo "4️⃣  اختبارات الأداء (Performance Tests)"
+echo "4️⃣  اختبارات الوحدات الجديدة (New Module Tests)"
+echo "═══════════════════════════════════════════════════════════"
+pytest tests/test_35_crm.py \
+    tests/test_36_approvals.py \
+    tests/test_37_notifications.py \
+    tests/test_39_external_api.py \
+    tests/test_40_hr_advanced.py \
+    tests/test_41_data_import.py \
+    tests/test_42_scheduled_reports.py \
+    -v --tb=short
+
+echo ""
+echo "═══════════════════════════════════════════════════════════"
+echo "5️⃣  اختبارات الأداء (Performance Tests)"
 echo "═══════════════════════════════════════════════════════════"
 pytest tests/test_performance_api.py \
     -v --tb=short -m "not slow"

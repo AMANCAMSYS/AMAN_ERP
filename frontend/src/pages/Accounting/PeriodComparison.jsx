@@ -4,6 +4,8 @@ import { reportsAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 
 import DateInput from '../../components/common/DateInput';
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const REPORT_TYPES = {
     'profit-loss': { ar: 'قائمة الدخل', en: 'Income Statement' },
     'balance-sheet': { ar: 'الميزانية العمومية', en: 'Balance Sheet' },
@@ -59,7 +61,7 @@ function getPresetPeriods(preset) {
             }
             const mLabel = (offset) => {
                 const d = new Date(y, m + offset, 1)
-                return d.toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })
+                return formatShortDate(d)
             }
             return [
                 { start: mStart(0), end: mEnd(0), label: mLabel(0) },

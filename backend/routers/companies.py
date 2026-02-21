@@ -8,7 +8,7 @@ from sqlalchemy import text
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from database import (
@@ -33,7 +33,10 @@ def check_register_rate_limit(request):
     """Limit company registrations to prevent abuse"""
     from datetime import timedelta
     client_ip = request.client.host if request.client else "unknown"
-    now = datetime.utcnow()
+    # Exclude localhost/internal from rate limiting
+    if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
+        return
+    now = datetime.now(timezone.utc)
     
     if client_ip in _register_attempts:
         info = _register_attempts[client_ip]
@@ -119,7 +122,8 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 request_body.admin_password,
                 request_body.admin_full_name,
                 request_body.timezone,
-                request_body.currency
+                request_body.currency,
+                request_body.country
             )
             
             if not success:
@@ -147,7 +151,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 "db_user": db_user,
                 "currency": request_body.currency,
                 "plan": request_body.plan_type,
-                "now": datetime.utcnow()
+                "now": datetime.now(timezone.utc)
             })
             
             db.commit()
@@ -160,7 +164,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 database_name=db_name,
                 message=f"تم إنشاء الشركة بنجاح. معرف الشركة: {company_id}",
                 admin_username=request_body.admin_username,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             
         except Exception as e:

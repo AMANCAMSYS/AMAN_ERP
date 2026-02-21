@@ -5,6 +5,8 @@ import { purchasesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function SupplierPayments() {
     const { t } = useTranslation();
@@ -86,7 +88,7 @@ function SupplierPayments() {
                             filteredPayments.map((payment) => (
                                 <tr key={payment.id} onClick={() => navigate(`/buying/payments/${payment.id}`)} style={{ cursor: 'pointer' }}>
                                     <td className="font-medium text-purple-700">{payment.voucher_number}</td>
-                                    <td>{new Date(payment.voucher_date).toLocaleDateString('ar-EG')}</td>
+                                    <td>{formatShortDate(payment.voucher_date)}</td>
                                     <td>{payment.supplier_name}</td>
                                     <td className="font-bold">{Number(payment.amount).toLocaleString()} {currency}</td>
                                     <td>

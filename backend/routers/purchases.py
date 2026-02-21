@@ -360,6 +360,7 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
         inv_params = {"id": id}
         
         from utils.accounting import get_base_currency
+        from utils.permissions import validate_branch_access
         base_currency = get_base_currency(db)
         branch_id = validate_branch_access(current_user, branch_id)
         
@@ -430,11 +431,11 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
         # 4. Get basic info for header
         supplier = db.execute(text("SELECT name as supplier_name, current_balance, currency FROM parties WHERE id = :id"), {"id": id}).fetchone()
         
-        supplier_currency = supplier.currency if supplier and supplier.currency else "SYP"
+        supplier_currency = supplier.currency if supplier and supplier.currency else base_currency
         balance = float(supplier.current_balance or 0) if supplier else 0
         exchange_rate = 1.0
         
-        if supplier_currency != "SYP":
+        if supplier_currency != base_currency:
              # Fetch current exchange rate
              rate_row = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": supplier_currency}).scalar()
              if rate_row:

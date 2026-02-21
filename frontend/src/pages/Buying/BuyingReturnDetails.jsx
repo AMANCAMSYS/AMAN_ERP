@@ -4,6 +4,8 @@ import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 function BuyingReturnDetails() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
@@ -63,7 +65,7 @@ function BuyingReturnDetails() {
                     <div style={{ textAlign: 'left' }}>
                         <h4 style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>{t('buying.returns.details.date')}:</h4>
                         <div style={{ fontSize: '18px' }}>
-                            {new Date(invoice.invoice_date).toLocaleDateString(i18n.language === 'ar' ? 'ar-EG' : 'en-US')}
+                            {formatShortDate(invoice.invoice_date)}
                         </div>
                         <div style={{ color: 'var(--text-secondary)' }}>{t('buying.returns.details.created_by')}: {t('common.admin')}</div>
                     </div>

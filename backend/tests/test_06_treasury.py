@@ -54,7 +54,7 @@ class TestTreasuryAccounts:
             "name": "صندوق اختبار آلي",
             "name_en": "Auto Test Cash Box",
             "account_type": "cash",
-            "currency": "SYP",
+            "currency": "SYP",  # يتوافق مع العملة الأساسية
             "opening_balance": 0,
             "exchange_rate": 1
         }

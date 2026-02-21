@@ -4,6 +4,8 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import '../../components/ModuleStyles.css'
 
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 export default function WithholdingTax() {
     const currency = getCurrency()
     const [activeTab, setActiveTab] = useState('rates')
@@ -128,7 +130,7 @@ export default function WithholdingTax() {
 
     const formatDate = (d) => {
         if (!d) return '—'
-        return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })
+        return formatShortDate(d)
     }
 
     return (

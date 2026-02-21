@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'
 import Pagination, { usePagination } from '../../components/common/Pagination'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function CustomerList() {
     const { t } = useTranslation()
@@ -143,7 +145,7 @@ function CustomerList() {
                                         </span>
                                     </td>
                                     <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                        {new Date(customer.created_at).toLocaleDateString('ar-EG')}
+                                        {formatShortDate(customer.created_at)}
                                     </td>
                                 </tr>
                             ))

@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 
 from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
+from utils.accounting import get_base_currency
 from fastapi import Request
 
 from schemas.accounting import AccountCreate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
@@ -438,7 +439,7 @@ async def create_journal_entry(
         base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
         if not base_currency_row:
              base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
-        base_currency = base_currency_row[0] if base_currency_row else "SAR"
+        base_currency = base_currency_row[0] if base_currency_row else "SYP"
 
         currency = entry_data.get("currency", base_currency)
         exchange_rate = float(entry_data.get("exchange_rate", 1.0))
@@ -1573,8 +1574,8 @@ def create_recurring_template(data: dict = Body(...), current_user: dict = Depen
             "next_run_date": data.get("next_run_date") or data.get("start_date"),
             "is_active": data.get("is_active", True),
             "auto_post": data.get("auto_post", False),
-            "branch_id": data.get("branch_id") or current_user.branch_id,
-            "currency": data.get("currency", "SAR"),
+            "branch_id": data.get("branch_id") or getattr(current_user, "branch_id", None),
+            "currency": data.get("currency", get_base_currency(db)),
             "exchange_rate": data.get("exchange_rate", 1.0),
             "max_runs": data.get("max_runs"),
             "created_by": current_user.id,
@@ -1820,8 +1821,8 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
         "desc": description,
         "ref": tmpl.reference or f"REC-{tmpl.id}",
         "status": entry_status,
-        "branch": tmpl.branch_id or current_user.branch_id,
-        "currency": tmpl.currency or "SAR",
+        "branch": tmpl.branch_id or getattr(current_user, "branch_id", None),
+        "currency": tmpl.currency or get_base_currency(db),
         "rate": float(tmpl.exchange_rate or 1),
         "user": current_user.id,
     })
@@ -1995,7 +1996,7 @@ def save_opening_balances(
                 "num": number,
                 "dt": entry_date,
                 "desc": "أرصدة افتتاحية / Opening Balances",
-                "branch": current_user.branch_id,
+                "branch": getattr(current_user, "branch_id", None),
                 "user": current_user.id,
             })
             entry_id = result.fetchone()[0]
@@ -2207,7 +2208,7 @@ def generate_closing_entries(
             """), {
                 "num": num1, "dt": entry_date_str,
                 "desc": f"إقفال حسابات الإيرادات - {start_date_str} إلى {end_date_str}",
-                "branch": branch_id or current_user.branch_id, "user": current_user.id,
+                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
             })
             eid1 = r1.fetchone()[0]
 
@@ -2240,7 +2241,7 @@ def generate_closing_entries(
             """), {
                 "num": num2, "dt": entry_date_str,
                 "desc": f"إقفال حسابات المصاريف - {start_date_str} إلى {end_date_str}",
-                "branch": branch_id or current_user.branch_id, "user": current_user.id,
+                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
             })
             eid2 = r2.fetchone()[0]
 
@@ -2273,7 +2274,7 @@ def generate_closing_entries(
             """), {
                 "num": num3, "dt": entry_date_str,
                 "desc": f"ترحيل ملخص الدخل إلى الأرباح المبقاة - صافي: {net_income}",
-                "branch": branch_id or current_user.branch_id, "user": current_user.id,
+                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
             })
             eid3 = r3.fetchone()[0]
 

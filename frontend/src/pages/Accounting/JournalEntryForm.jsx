@@ -4,12 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { accountingAPI, costCentersAPI, currenciesAPI } from '../../utils/api';
+import { accountingAPI, costCentersAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import CurrencySelector from '../../components/common/CurrencySelector';
-
-import DateInput from '../../components/common/DateInput';
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 const JournalEntryForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -174,11 +173,9 @@ const JournalEntryForm = () => {
                             </div>
                             <div className="col-md-2 mb-3">
                                 <label className="form-label">{t('common.date')}</label>
-                                <input
-                                   
-                                    className="form-input"
-                                    value={formData.date}
-                                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                <CustomDatePicker
+                                    selected={formData.date}
+                                    onChange={(dateStr) => setFormData({ ...formData, date: dateStr })}
                                     required
                                 />
                             </div>

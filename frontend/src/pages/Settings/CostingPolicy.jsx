@@ -14,6 +14,7 @@ import {
     History as HistoryIcon
 } from 'lucide-react';
 import api from '../../utils/api';
+import { costingPolicyAPI, branchesAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
 
@@ -39,9 +40,9 @@ const CostingPolicy = () => {
         try {
             setLoading(true);
             const [policyRes, historyRes, branchesRes] = await Promise.all([
-                api.costingPolicy.getCurrent(),
-                api.costingPolicy.getHistory(),
-                api.branches.list()
+                costingPolicyAPI.getCurrent(),
+                costingPolicyAPI.getHistory(),
+                branchesAPI.list()
             ]);
             setCurrentPolicy(policyRes.data);
             setHistory(historyRes.data);
@@ -89,7 +90,7 @@ const CostingPolicy = () => {
 
         try {
             setProcessing(true);
-            await api.costingPolicy.setPolicy({
+            await costingPolicyAPI.setPolicy({
                 policy_type: type,
                 reason: "Changed via Settings UI"
             });

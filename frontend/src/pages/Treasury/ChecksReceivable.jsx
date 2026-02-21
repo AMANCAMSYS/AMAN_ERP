@@ -28,7 +28,7 @@ function ChecksReceivable() {
     const [treasuryAccounts, setTreasuryAccounts] = useState([])
     const [form, setForm] = useState({
         check_number: '', drawer_name: '', bank_name: '', branch_name: '',
-        amount: '', currency: 'SAR', issue_date: new Date().toISOString().split('T')[0],
+        amount: '', currency: getCurrency(), issue_date: new Date().toISOString().split('T')[0],
         due_date: '', party_id: '', treasury_account_id: '', notes: ''
     })
     const [saving, setSaving] = useState(false)
@@ -78,7 +78,7 @@ function ChecksReceivable() {
     const openCreate = () => {
         setForm({
             check_number: '', drawer_name: '', bank_name: '', branch_name: '',
-            amount: '', currency: 'SAR', issue_date: new Date().toISOString().split('T')[0],
+            amount: '', currency: getCurrency(), issue_date: new Date().toISOString().split('T')[0],
             due_date: '', party_id: '', treasury_account_id: '', notes: ''
         })
         loadCreateData()

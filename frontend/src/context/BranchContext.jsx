@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { branchesAPI } from '../utils/api';
-import { isAuthenticated, getUser } from '../utils/auth';
+import { isAuthenticated, getUser, getCurrency } from '../utils/auth';
 
 const BranchContext = createContext();
 
@@ -10,6 +10,15 @@ export const useBranch = () => {
         throw new Error('useBranch must be used within a BranchProvider');
     }
     return context;
+};
+
+/**
+ * Get the effective currency for the current branch.
+ * Falls back to company base currency from auth.
+ */
+export const useBranchCurrency = () => {
+    const { currentBranch } = useBranch();
+    return currentBranch?.default_currency || getCurrency();
 };
 
 export const BranchProvider = ({ children }) => {

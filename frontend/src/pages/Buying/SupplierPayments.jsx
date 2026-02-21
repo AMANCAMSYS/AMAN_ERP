@@ -4,6 +4,8 @@ import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function SupplierPayments() {
     const { t } = useTranslation()
@@ -96,7 +98,7 @@ function SupplierPayments() {
                                         </Link>
                                     </td>
                                     <td>{payment.supplier_name}</td>
-                                    <td>{new Date(payment.voucher_date).toLocaleDateString('ar-EG')}</td>
+                                    <td>{formatShortDate(payment.voucher_date)}</td>
                                     <td className="font-bold">
                                         {parseFloat(payment.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} {payment.currency || currency}
                                     </td>

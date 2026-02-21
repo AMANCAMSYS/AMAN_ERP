@@ -13,6 +13,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import date
 from database import get_db_connection
+from routers.auth import get_current_user
 from utils.permissions import require_permission
 
 advanced_router = APIRouter(prefix="/advanced", tags=["Advanced Inventory Phase 2"])
@@ -86,8 +87,9 @@ async def list_variants(
     product_id: Optional[int] = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
-    db=Depends(get_db_connection)
+    current_user: dict = Depends(get_current_user)
 ):
+    db = get_db_connection(current_user.company_id)
     try:
         conditions = []
         params = {}
@@ -123,10 +125,13 @@ async def list_variants(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.post("/variants")
-async def create_variant(data: ProductVariantCreate, db=Depends(get_db_connection)):
+async def create_variant(data: ProductVariantCreate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
             INSERT INTO product_variants (product_id, variant_sku, variant_name, additional_cost, additional_price, is_active)
@@ -150,10 +155,13 @@ async def create_variant(data: ProductVariantCreate, db=Depends(get_db_connectio
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.put("/variants/{variant_id}")
-async def update_variant(variant_id: int, data: ProductVariantUpdate, db=Depends(get_db_connection)):
+async def update_variant(variant_id: int, data: ProductVariantUpdate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         fields = []
         params = {"vid": variant_id}
@@ -171,6 +179,8 @@ async def update_variant(variant_id: int, data: ProductVariantUpdate, db=Depends
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 # ==================== BIN LOCATIONS (INV-107) ====================
@@ -180,8 +190,9 @@ async def list_bins(
     warehouse_id: Optional[int] = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
-    db=Depends(get_db_connection)
+    current_user: dict = Depends(get_current_user)
 ):
+    db = get_db_connection(current_user.company_id)
     try:
         conditions = []
         params = {}
@@ -207,10 +218,13 @@ async def list_bins(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.post("/bins")
-async def create_bin(data: BinLocationCreate, db=Depends(get_db_connection)):
+async def create_bin(data: BinLocationCreate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
             INSERT INTO bin_locations (warehouse_id, aisle, rack, shelf, bin, location_type, capacity, is_active)
@@ -223,10 +237,13 @@ async def create_bin(data: BinLocationCreate, db=Depends(get_db_connection)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.put("/bins/{bin_id}")
-async def update_bin(bin_id: int, data: BinLocationUpdate, db=Depends(get_db_connection)):
+async def update_bin(bin_id: int, data: BinLocationUpdate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         fields = []
         params = {"bid": bin_id}
@@ -244,6 +261,8 @@ async def update_bin(bin_id: int, data: BinLocationUpdate, db=Depends(get_db_con
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 # ==================== PRODUCT KITS (INV-108) ====================
@@ -252,8 +271,9 @@ async def update_bin(bin_id: int, data: BinLocationUpdate, db=Depends(get_db_con
 async def list_kits(
     limit: int = Query(100, le=500),
     offset: int = 0,
-    db=Depends(get_db_connection)
+    current_user: dict = Depends(get_current_user)
 ):
+    db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
             SELECT pk.*, p.product_name, p.product_code
@@ -268,10 +288,13 @@ async def list_kits(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.get("/kits/{kit_id}")
-async def get_kit(kit_id: int, db=Depends(get_db_connection)):
+async def get_kit(kit_id: int, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
             SELECT pk.*, p.product_name, p.product_code
@@ -298,10 +321,13 @@ async def get_kit(kit_id: int, db=Depends(get_db_connection)):
         if "does not exist" in str(e):
             raise HTTPException(status_code=404, detail="Table not migrated yet")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.post("/kits")
-async def create_kit(data: ProductKitCreate, db=Depends(get_db_connection)):
+async def create_kit(data: ProductKitCreate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
             INSERT INTO product_kits (kit_product_id, assembly_cost, notes, is_active)
@@ -321,10 +347,13 @@ async def create_kit(data: ProductKitCreate, db=Depends(get_db_connection)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @advanced_router.put("/kits/{kit_id}")
-async def update_kit(kit_id: int, data: ProductKitUpdate, db=Depends(get_db_connection)):
+async def update_kit(kit_id: int, data: ProductKitUpdate, current_user: dict = Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
     try:
         fields = []
         params = {"kid": kit_id}
@@ -342,6 +371,8 @@ async def update_kit(kit_id: int, data: ProductKitUpdate, db=Depends(get_db_conn
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 # ==================== COSTING POLICIES (INV-109) ====================
@@ -369,9 +400,10 @@ async def get_product_ledger(
     end_date: Optional[str] = None,
     limit: int = Query(100, le=500),
     offset: int = 0,
-    db=Depends(get_db_connection)
+    current_user: dict = Depends(get_current_user)
 ):
     """Get product ledger (كشف حساب المنتج) with running balance"""
+    db = get_db_connection(current_user.company_id)
     try:
         conditions = ["it.product_id = :product_id"]
         params = {"product_id": product_id, "limit": limit, "offset": offset}
@@ -422,3 +454,5 @@ async def get_product_ledger(
         return {"data": rows, "total": total}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

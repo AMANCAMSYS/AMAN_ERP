@@ -11,7 +11,7 @@ const NotesReceivable = () => {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
     const [notes, setNotes] = useState([]);
-    const currency = getCurrency() || 'ل.س';
+    const currency = getCurrency() || '';
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('');
@@ -23,7 +23,7 @@ const NotesReceivable = () => {
     const [treasuryAccounts, setTreasuryAccounts] = useState([]);
     const [form, setForm] = useState({
         note_number: '', drawer_name: '', bank_name: '', amount: '',
-        currency: 'SAR', issue_date: new Date().toISOString().split('T')[0],
+        currency: getCurrency(), issue_date: new Date().toISOString().split('T')[0],
         due_date: '', maturity_date: '', party_id: '', treasury_account_id: '', notes: ''
     });
     const [collectForm, setCollectForm] = useState({ collection_date: new Date().toISOString().split('T')[0], treasury_account_id: '' });
@@ -65,7 +65,7 @@ const NotesReceivable = () => {
             await notesAPI.createReceivable({ ...form, amount: parseFloat(form.amount), branch_id: currentBranch?.id });
             toastEmitter.emit('تم إنشاء ورقة القبض بنجاح', 'success');
             setShowCreate(false);
-            setForm({ note_number: '', drawer_name: '', bank_name: '', amount: '', currency: 'SAR',
+            setForm({ note_number: '', drawer_name: '', bank_name: '', amount: '', currency: getCurrency(),
                 issue_date: new Date().toISOString().split('T')[0], due_date: '', maturity_date: '',
                 party_id: '', treasury_account_id: '', notes: '' });
             loadData();

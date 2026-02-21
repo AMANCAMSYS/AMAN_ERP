@@ -5,6 +5,8 @@ import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function CustomerReceipts() {
     const { t } = useTranslation();
@@ -102,7 +104,7 @@ function CustomerReceipts() {
                                             {voucher.type === 'receipt' ? t('sales.receipts.form.type_receipt') : t('sales.payments.form.type_refund')}
                                         </span>
                                     </td>
-                                    <td>{new Date(voucher.voucher_date).toLocaleDateString('ar-EG')}</td>
+                                    <td>{formatShortDate(voucher.voucher_date)}</td>
                                     <td>{voucher.customer_name}</td>
                                     <td className="font-bold">{Number(voucher.amount).toLocaleString()} {currency}</td>
                                     <td>

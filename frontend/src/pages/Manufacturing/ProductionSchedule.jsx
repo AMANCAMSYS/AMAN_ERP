@@ -7,6 +7,8 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 const ProductionSchedule = () => {
     const { t } = useTranslation();
     const [viewMode, setViewMode] = useState('list'); // Default to list for better clarity initially
@@ -208,7 +210,7 @@ const ProductionSchedule = () => {
                                                 <td>
                                                     <span className="text-gray-500 flex items-center gap-1">
                                                         <FaClock className="text-[10px]" />
-                                                        {op.planned_start_time ? new Date(op.planned_start_time).toLocaleDateString() : '-'}
+                                                        {op.planned_start_time ? formatShortDate(op.planned_start_time) : '-'}
                                                     </span>
                                                 </td>
                                                 <td>

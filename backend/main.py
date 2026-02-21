@@ -12,12 +12,31 @@ from fastapi.exceptions import HTTPException as FastAPIHTTPException
 import os
 from contextlib import asynccontextmanager
 from sqlalchemy import text
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from config import settings
 from database import engine
-from routers import auth, companies, accounting, sales, inventory, purchases, reports, audit, roles, currencies, settings as company_settings, parties, projects, expenses
+
+# ── Core & Auth ────────────────────────────────────────────────────────────────
+from routers import auth, companies, roles, branches, settings as company_settings
+from routers import audit, notifications, approvals, security, data_import
+
+# ── Accounting & Finance ────────────────────────────────────────────────────────
+from routers import accounting, currencies, cost_centers, budgets, reconciliation
+from routers import treasury, taxes, costing_policies, checks, notes, assets
+
+# ── Sales, Purchases & Inventory ───────────────────────────────────────────────
+from routers import sales, purchases, inventory, parties
+
+# ── HR & Manufacturing ──────────────────────────────────────────────────────────
+from routers import hr, hr_advanced, manufacturing
+
+# ── Projects, Expenses & Reports ───────────────────────────────────────────────
+from routers import projects, expenses, reports, scheduled_reports, dashboard
+
+# ── Commerce & External ────────────────────────────────────────────────────────
+from routers import pos, contracts, crm, external
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,6 +71,57 @@ async def lifespan(app: FastAPI):
                 CREATE INDEX IF NOT EXISTS idx_system_user_index_username 
                     ON system_user_index(username);
             """))
+            
+            # Create system_companies table for company registry
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS system_companies (
+                    id VARCHAR(100) PRIMARY KEY,
+                    company_name VARCHAR(255) NOT NULL,
+                    company_name_en VARCHAR(255),
+                    commercial_registry VARCHAR(100),
+                    tax_number VARCHAR(100),
+                    phone VARCHAR(50),
+                    email VARCHAR(255),
+                    address TEXT,
+                    city VARCHAR(100),
+                    country VARCHAR(100) DEFAULT 'SA',
+                    logo_url TEXT,
+                    database_name VARCHAR(255),
+                    database_user VARCHAR(255),
+                    currency VARCHAR(10) DEFAULT 'SAR',
+                    timezone VARCHAR(50) DEFAULT 'Asia/Riyadh',
+                    status VARCHAR(20) DEFAULT 'active',
+                    plan_type VARCHAR(50) DEFAULT 'basic',
+                    max_users INTEGER DEFAULT 10,
+                    subscription_end DATE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    activated_at TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_system_companies_status 
+                    ON system_companies(status);
+            """))
+            
+            # Create system_activity_log table for global audit trail
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS system_activity_log (
+                    id SERIAL PRIMARY KEY,
+                    company_id VARCHAR(100),
+                    action_type VARCHAR(100) NOT NULL,
+                    action_description TEXT,
+                    performed_by VARCHAR(255),
+                    ip_address VARCHAR(50),
+                    user_agent TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_system_activity_log_action 
+                    ON system_activity_log(action_type);
+                CREATE INDEX IF NOT EXISTS idx_system_activity_log_date 
+                    ON system_activity_log(created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_system_activity_log_company 
+                    ON system_activity_log(company_id);
+            """))
+            
             conn.commit()
         logger.info("✅ Database connected")
         
@@ -97,24 +167,31 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
-# CORS
-origins = [settings.FRONTEND_URL]
-if settings.FRONTEND_URL_PRODUCTION:
-    origins.append(settings.FRONTEND_URL_PRODUCTION)
+# CORS — قائمة بيضاء دقيقة للـ origins
+def _build_origins() -> list[str]:
+    """Build allowed origins from settings — supports comma-separated ALLOWED_ORIGINS env var"""
+    if settings.ALLOWED_ORIGINS:
+        return [o.strip() for o in settings.ALLOWED_ORIGINS.split(',') if o.strip()]
+    origins = [settings.FRONTEND_URL]
+    if settings.FRONTEND_URL_PRODUCTION:
+        origins.append(settings.FRONTEND_URL_PRODUCTION)
+    return origins
 
+origins = _build_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin"],
+    expose_headers=["Content-Disposition"],
+    max_age=600,
 )
 
-# API-001: Rate Limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+# API-001: Rate Limiting — مشترك عبر shared limiter
+from utils.limiter import limiter
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -157,88 +234,55 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+
+# ── Core & Auth ─────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api")
 app.include_router(companies.router, prefix="/api")
-app.include_router(inventory.router, prefix="/api")
-app.include_router(sales.router, prefix="/api")
-app.include_router(accounting.router, prefix="/api")
-app.include_router(purchases.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
-app.include_router(audit.router, prefix="/api")
 app.include_router(roles.router, prefix="/api")
+app.include_router(branches.router, prefix="/api")
+app.include_router(company_settings.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
+app.include_router(approvals.router, prefix="/api")
+app.include_router(security.router, prefix="/api")
+app.include_router(data_import.router, prefix="/api")
 
-from routers import cost_centers
+# ── Accounting & Finance ─────────────────────────────────────────
+app.include_router(accounting.router, prefix="/api")
+app.include_router(currencies.router, prefix="/api")
 app.include_router(cost_centers.router, prefix="/api")
+app.include_router(budgets.router, prefix="/api")
+app.include_router(reconciliation.router, prefix="/api")
+app.include_router(treasury.router, prefix="/api")
+app.include_router(taxes.router, prefix="/api")
+app.include_router(costing_policies.router, prefix="/api")
+app.include_router(checks.router, prefix="/api")
+app.include_router(notes.router, prefix="/api")
+app.include_router(assets.router, prefix="/api")
 
-from routers import hr
+# ── Sales, Purchases & Inventory ────────────────────────────────
+app.include_router(sales.router, prefix="/api")
+app.include_router(purchases.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api")
+app.include_router(parties.router, prefix="/api")
+
+# ── HR & Manufacturing ───────────────────────────────────────────
 app.include_router(hr.router, prefix="/api")
-
-from routers import hr_advanced
-from routers import manufacturing
 app.include_router(hr_advanced.router, prefix="/api")
 app.include_router(manufacturing.router, prefix="/api")
 
-from routers import treasury
-app.include_router(treasury.router, prefix="/api")
-
-from routers import branches
-app.include_router(branches.router)
-
-from routers import budgets
-app.include_router(budgets.router, prefix="/api")
-
-from routers import reconciliation
-app.include_router(reconciliation.router, prefix="/api")
-
-from routers import pos
-app.include_router(pos.router, prefix="/api")
-
-from routers import assets
-app.include_router(assets.router, prefix="/api")
-
-from routers import dashboard
-app.include_router(dashboard.router, prefix="/api")
-
-app.include_router(company_settings.router, prefix="/api")
-app.include_router(parties.router, prefix="/api")
+# ── Projects, Expenses & Reports ────────────────────────────────
 app.include_router(projects.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
-app.include_router(currencies.router, prefix="/api")
-
-from routers import contracts, taxes, costing_policies
-
-app.include_router(contracts.router, prefix="/api")
-app.include_router(taxes.router, prefix="/api")
-app.include_router(costing_policies.router)
-
-from routers import checks
-app.include_router(checks.router, prefix="/api")
-
-from routers import notes
-from routers import scheduled_reports
-
-app.include_router(notes.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 app.include_router(scheduled_reports.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 
-from routers import notifications
-app.include_router(notifications.router, prefix="/api")
-
-from routers import approvals
-app.include_router(approvals.router, prefix="/api")
-
-from routers import security
-app.include_router(security.router, prefix="/api")
-
-from routers import data_import
-app.include_router(data_import.router, prefix="/api")
-
-from routers import external, crm
-app.include_router(external.router, prefix="/api")
+# ── Commerce & External ──────────────────────────────────────────
+app.include_router(pos.router, prefix="/api")
+app.include_router(contracts.router, prefix="/api")
 app.include_router(crm.router, prefix="/api")
-
-from routers import external, crm
 app.include_router(external.router, prefix="/api")
-app.include_router(crm.router, prefix="/api")
 
 
 @app.get("/")
@@ -264,12 +308,12 @@ def health_check():
         return {
             "status": "healthy",
             "database": "connected",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         return {
             "status": "unhealthy",
             "database": "disconnected",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }

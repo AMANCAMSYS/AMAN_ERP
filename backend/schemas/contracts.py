@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -18,8 +18,7 @@ class ContractItemResponse(ContractItemBase):
     total: float
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ContractBase(BaseModel):
     contract_number: str
@@ -29,7 +28,7 @@ class ContractBase(BaseModel):
     end_date: Optional[date] = None
     billing_interval: str = "monthly"
     total_amount: float = 0
-    currency: str = "SAR"
+    currency: Optional[str] = None
     notes: Optional[str] = None
 
 class ContractCreate(ContractBase):
@@ -44,5 +43,4 @@ class ContractResponse(ContractBase):
     items: List[ContractItemResponse]
     party_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

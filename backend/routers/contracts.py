@@ -9,6 +9,7 @@ from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from schemas.contracts import ContractCreate, ContractResponse
 from utils.permissions import require_permission
+from utils.accounting import get_base_currency
 
 logger = logging.getLogger(__name__)
 
@@ -320,7 +321,7 @@ def generate_contract_invoice(
             "sub": subtotal, "tax": tax_total, "total": total,
             "notes": f"فاتورة عقد #{contract.contract_number}",
             "uid": current_user.id,
-            "curr": contract.currency or 'SYP'
+            "curr": contract.currency or get_base_currency(db)
         }).scalar()
         
         for item in items:

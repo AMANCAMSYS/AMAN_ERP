@@ -1,0 +1,72 @@
+import api from './apiClient'
+
+export const salesAPI = {
+    listCustomers: (params) => api.get('/sales/customers', { params }),
+    createCustomer: (data) => api.post('/sales/customers', data),
+    listInvoices: (params) => api.get('/sales/invoices', { params }),
+    createInvoice: (data) => api.post('/sales/invoices', data),
+    getInvoice: (id) => api.get(`/sales/invoices/${id}`),
+    cancelInvoice: (id) => api.post(`/sales/invoices/${id}/cancel`),
+
+    // Sales Orders
+    listOrders: (params) => api.get('/sales/orders', { params }),
+    getOrder: (id) => api.get(`/sales/orders/${id}`),
+    createOrder: (data) => api.post('/sales/orders', data),
+
+    // Quotations
+    listQuotations: (params) => api.get('/sales/quotations', { params }),
+    getQuotation: (id) => api.get(`/sales/quotations/${id}`),
+    createQuotation: (data) => api.post('/sales/quotations', data),
+
+    // Customer Groups
+    listCustomerGroups: (params) => api.get('/sales/customer-groups', { params }),
+    createCustomerGroup: (data) => api.post('/sales/customer-groups', data),
+    updateCustomerGroup: (id, data) => api.put(`/sales/customer-groups/${id}`, data),
+    deleteCustomerGroup: (id) => api.delete(`/sales/customer-groups/${id}`),
+
+    // Sales Returns
+    listReturns: (params) => api.get('/sales/returns', { params }),
+    getReturn: (id) => api.get(`/sales/returns/${id}`),
+    createReturn: (data) => api.post('/sales/returns', data),
+    approveReturn: (id) => api.post(`/sales/returns/${id}/approve`),
+
+    // Customer Receipts
+    createReceipt: (data) => api.post('/sales/receipts', data),
+    listReceipts: (params) => api.get('/sales/receipts', { params }),
+    getReceipt: (id) => api.get(`/sales/receipts/${id}`),
+    getOutstandingInvoices: (customerId, params) => api.get(`/sales/customers/${customerId}/outstanding-invoices`, { params }),
+    getInvoicePaymentHistory: (invoiceId) => api.get(`/sales/invoices/${invoiceId}/payment-history`),
+    getCustomerTransactions: (customerId, branchId) => api.get(`/sales/customers/${customerId}/transactions`, { params: { branch_id: branchId } }),
+
+    // Customer Payments (Refunds)
+    createPayment: (data) => api.post('/sales/payments', data),
+    listPayments: (params) => api.get('/sales/payments', { params }),
+    getPayment: (id) => api.get(`/sales/payments/${id}`),
+
+    // Sales Credit Notes
+    listCreditNotes: (params) => api.get('/sales/credit-notes', { params }),
+    getCreditNote: (id) => api.get(`/sales/credit-notes/${id}`),
+    createCreditNote: (data) => api.post('/sales/credit-notes', data),
+
+    // Sales Debit Notes
+    listDebitNotes: (params) => api.get('/sales/debit-notes', { params }),
+    getDebitNote: (id) => api.get(`/sales/debit-notes/${id}`),
+    createDebitNote: (data) => api.post('/sales/debit-notes', data),
+
+    getSummary: (params) => api.get('/sales/summary', { params }),
+
+    // Phase 8.12 - Sales Improvements
+    convertQuotation: (sqId) => api.post(`/sales/quotations/${sqId}/convert`),
+    // Commissions
+    listCommissionRules: () => api.get('/sales/commissions/rules'),
+    createCommissionRule: (data) => api.post('/sales/commissions/rules', data),
+    listCommissions: (params) => api.get('/sales/commissions', { params }),
+    calculateCommissions: (data) => api.post('/sales/commissions/calculate', data),
+    getCommissionSummary: (params) => api.get('/sales/commissions/summary', { params }),
+    // Partial Invoicing
+    createPartialInvoice: (orderId, data) => api.post(`/sales/orders/${orderId}/partial-invoice`, data),
+    // Credit Limit
+    getCreditStatus: (partyId) => api.get(`/sales/customers/${partyId}/credit-status`),
+    updateCreditLimit: (partyId, data) => api.put(`/sales/customers/${partyId}/credit-limit`, data),
+    checkCredit: (data) => api.post('/sales/credit-check', data),
+}

@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import { toastEmitter } from '../../utils/toastEmitter';
+import { formatShortDate } from '../../utils/dateUtils';
+
 
 function PurchaseOrderDetails() {
     const { t } = useTranslation();
@@ -121,12 +123,12 @@ function PurchaseOrderDetails() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                     <div>
                         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('buying.orders.table.date')}</div>
-                        <div style={{ fontWeight: '500' }}>{new Date(order.order_date).toLocaleDateString('ar-EG')}</div>
+                        <div style={{ fontWeight: '500' }}>{formatShortDate(order.order_date)}</div>
                     </div>
                     {order.expected_date && (
                         <div>
                             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t('buying.orders.expected_date')}</div>
-                            <div style={{ fontWeight: '500' }}>{new Date(order.expected_date).toLocaleDateString('ar-EG')}</div>
+                            <div style={{ fontWeight: '500' }}>{formatShortDate(order.expected_date)}</div>
                         </div>
                     )}
                     <div>
@@ -225,7 +227,7 @@ function PurchaseOrderDetails() {
                                                 <span style={{ fontWeight: 'bold' }}>{tx.quantity}</span> x {tx.product_name}
                                             </span>
                                             <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                                                {new Date(tx.date).toLocaleDateString('ar-EG')}
+                                                {formatShortDate(tx.date)}
                                             </span>
                                         </li>
                                     ))}
@@ -250,7 +252,7 @@ function PurchaseOrderDetails() {
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontWeight: 'bold' }}>{formatNumber(je.amount)} <small>{currency}</small></div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(je.date).toLocaleDateString('ar-EG')}</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatShortDate(je.date)}</div>
                                             </div>
                                         </li>
                                     ))}
@@ -275,7 +277,7 @@ function PurchaseOrderDetails() {
                                             </div>
                                             <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontWeight: 'bold' }}>{formatNumber(inv.total)} <small>{currency}</small></div>
-                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(inv.invoice_date).toLocaleDateString('ar-EG')}</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatShortDate(inv.invoice_date)}</div>
                                             </div>
                                         </li>
                                     ))}

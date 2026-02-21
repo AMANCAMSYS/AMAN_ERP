@@ -8,7 +8,7 @@ from schemas import BranchCreate, BranchResponse
 from utils.permissions import require_permission
 
 router = APIRouter(
-    prefix="/api/branches",
+    prefix="/branches",
     tags=["branches"]
 )
 
@@ -36,7 +36,7 @@ def list_branches(
         if user_role in ['admin', 'superuser', 'system_admin']:
             query = text("""
                 SELECT id, branch_code, branch_name, branch_name_en, address, 
-                       city, country, phone, email, is_active, is_default, created_at
+                       city, country, country_code, default_currency, phone, email, is_active, is_default, created_at
                 FROM branches
                 ORDER BY id
             """)
@@ -45,7 +45,7 @@ def list_branches(
             # Filter by allowed branches
             query = text("""
                 SELECT b.id, b.branch_code, b.branch_name, b.branch_name_en, b.address, 
-                       b.city, b.country, b.phone, b.email, b.is_active, b.is_default, b.created_at
+                       b.city, b.country, b.country_code, b.default_currency, b.phone, b.email, b.is_active, b.is_default, b.created_at
                 FROM branches b
                 JOIN user_branches ub ON b.id = ub.branch_id
                 WHERE ub.user_id = :uid
@@ -66,6 +66,8 @@ def list_branches(
                 "address": row.address,
                 "city": row.city,
                 "country": row.country,
+                "country_code": getattr(row, 'country_code', None),
+                "default_currency": getattr(row, 'default_currency', None),
                 "phone": row.phone,
                 "email": row.email,
                 "is_active": row.is_active,
@@ -103,10 +105,10 @@ def create_branch(
         query = text("""
             INSERT INTO branches (
                 branch_code, branch_name, branch_name_en, address, 
-                city, country, phone, email, is_active, is_default
+                city, country, country_code, default_currency, phone, email, is_active, is_default
             ) VALUES (
                 :code, :name, :name_en, :address, 
-                :city, :country, :phone, :email, :active, :is_default
+                :city, :country, :country_code, :default_currency, :phone, :email, :active, :is_default
             ) RETURNING id, created_at, is_default
         """)
         
@@ -117,6 +119,8 @@ def create_branch(
             "address": branch.address,
             "city": branch.city,
             "country": branch.country,
+            "country_code": branch.country_code,
+            "default_currency": branch.default_currency,
             "phone": branch.phone,
             "email": branch.email,
             "active": branch.is_active,
@@ -193,6 +197,8 @@ def update_branch(
                 address = :address,
                 city = :city,
                 country = :country,
+                country_code = :country_code,
+                default_currency = :default_currency,
                 phone = :phone,
                 email = :email,
                 is_active = :active
@@ -208,6 +214,8 @@ def update_branch(
             "address": branch.address,
             "city": branch.city,
             "country": branch.country,
+            "country_code": branch.country_code,
+            "default_currency": branch.default_currency,
             "phone": branch.phone,
             "email": branch.email,
             "active": branch.is_active

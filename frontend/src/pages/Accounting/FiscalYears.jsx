@@ -6,6 +6,8 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
+import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+
 function FiscalYears() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
@@ -194,7 +196,7 @@ function FiscalYears() {
                                             ? `${fy.retained_earnings_account_number} - ${fy.retained_earnings_account_name}`
                                             : (isRTL ? 'غير محدد' : 'Not set')}
                                     </td>
-                                    <td>{fy.closed_at ? new Date(fy.closed_at).toLocaleDateString() : '—'}</td>
+                                    <td>{fy.closed_at ? formatShortDate(fy.closed_at) : '—'}</td>
                                     <td>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             {fy.status === 'open' ? (

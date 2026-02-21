@@ -1,17 +1,14 @@
 import React, { useEffect, useState, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useToast } from './context/ToastContext'
 import { isAuthenticated, hasPermission, getUser } from './utils/auth'
+import { requestManager } from './utils/requestManager'
+import { PageLoading } from './components/common/LoadingStates'
 import Layout from './components/Layout'
 
-// Loading Component
-const PageLoader = () => (
-    <div className="page-center">
-        <div className="spinner"></div>
-        <p style={{ marginTop: '10px' }}>Loading...</p>
-    </div>
-)
+// Suspense fallback uses unified PageLoading
+const PageLoader = () => <PageLoading text="Loading..." />
 
 // Pages
 const Login = React.lazy(() => import('./pages/Login'))
@@ -278,11 +275,19 @@ function PermissionDeniedRedirect() {
 
 function App() {
     const { i18n } = useTranslation();
+    const location = useLocation();
 
     useEffect(() => {
         document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = i18n.language;
     }, [i18n.language]);
+
+    // Abort all pending API requests when route changes
+    useEffect(() => {
+        return () => {
+            requestManager.abortAll();
+        };
+    }, [location.pathname]);
 
     return (
         <Suspense fallback={<PageLoader />}>
