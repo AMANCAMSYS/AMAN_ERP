@@ -2690,3 +2690,259 @@ def _generate_custom_report_data(db, config: CustomReportConfig, user_id: int):
     # Execute
     result = db.execute(text(query), params).fetchall()
     return [dict(r._mapping) for r in result]
+
+
+# ═══════════════════════════════════════════════════════════
+# RPT-103: Detailed P&L by Product/Customer/Category
+# تقرير أرباح وخسائر تفصيلي
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/accounting/profit-loss/detailed", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+def detailed_profit_loss(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    group_by: str = "customer",  # customer, product, category
+    branch_id: Optional[int] = None,
+    format: Optional[str] = None,  # excel, pdf, None=json
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    تقرير أرباح وخسائر تفصيلي — مجمَّع حسب العميل أو المنتج أو فئة المنتج.
+    Detailed P&L Report — grouped by customer, product, or product category.
+    Shows Revenue, COGS, Gross Profit, Gross Margin% per group.
+    """
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(current_user.company_id)
+    try:
+        s_date = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else date.today().replace(day=1, month=1)
+        e_date = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
+
+        branch_filter = "AND i.branch_id = :branch_id" if branch_id else ""
+        params = {"start": s_date, "end": e_date}
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        if group_by == "product":
+            group_col = "COALESCE(p.product_name, il.description, 'غير محدد')"
+            group_label = "product_name"
+            join_extra = "LEFT JOIN products p ON il.product_id = p.id"
+        elif group_by == "category":
+            group_col = "COALESCE(pc.name, 'غير مصنف')"
+            group_label = "category"
+            join_extra = """LEFT JOIN products p ON il.product_id = p.id
+                           LEFT JOIN product_categories pc ON p.category_id = pc.id"""
+        else:  # customer
+            group_col = "COALESCE(pa.name, c.name, 'غير محدد')"
+            group_label = "customer_name"
+            join_extra = """LEFT JOIN parties pa ON i.party_id = pa.id
+                           LEFT JOIN customers c ON i.party_id = c.id"""
+
+        # Revenue from sales invoices
+        revenue_query = f"""
+            SELECT {group_col} as group_name,
+                   SUM(il.quantity * il.unit_price - COALESCE(il.discount, 0)) as revenue,
+                   SUM(il.quantity * COALESCE(p2.cost_price, 0)) as cogs,
+                   COUNT(DISTINCT i.id) as invoice_count,
+                   SUM(il.quantity) as total_qty
+            FROM invoice_lines il
+            JOIN invoices i ON il.invoice_id = i.id
+            LEFT JOIN products p2 ON il.product_id = p2.id
+            {join_extra}
+            WHERE i.invoice_type = 'sales'
+              AND i.status NOT IN ('cancelled', 'draft')
+              AND i.invoice_date BETWEEN :start AND :end
+              {branch_filter}
+            GROUP BY {group_col}
+            ORDER BY revenue DESC
+        """
+
+        rows = db.execute(text(revenue_query), params).fetchall()
+
+        report_rows = []
+        total_revenue = 0
+        total_cogs = 0
+
+        for r in rows:
+            revenue = float(r.revenue or 0)
+            cogs = float(r.cogs or 0)
+            gross_profit = revenue - cogs
+            margin = round((gross_profit / revenue * 100), 1) if revenue > 0 else 0
+
+            total_revenue += revenue
+            total_cogs += cogs
+
+            report_rows.append({
+                group_label: r.group_name or "غير محدد",
+                "revenue": round(revenue, 2),
+                "cogs": round(cogs, 2),
+                "gross_profit": round(gross_profit, 2),
+                "gross_margin_pct": margin,
+                "invoice_count": r.invoice_count or 0,
+                "total_qty": float(r.total_qty or 0),
+            })
+
+        total_gp = total_revenue - total_cogs
+        overall_margin = round((total_gp / total_revenue * 100), 1) if total_revenue > 0 else 0
+
+        result = {
+            "report_name": f"Detailed P&L by {group_by.title()} — أرباح وخسائر تفصيلي",
+            "period": {"start": str(s_date), "end": str(e_date)},
+            "group_by": group_by,
+            "details": report_rows,
+            "totals": {
+                "total_revenue": round(total_revenue, 2),
+                "total_cogs": round(total_cogs, 2),
+                "total_gross_profit": round(total_gp, 2),
+                "overall_gross_margin_pct": overall_margin,
+            }
+        }
+
+        if format in ("excel", "pdf"):
+            export_data = []
+            for r in report_rows:
+                export_data.append({
+                    f"{'العميل' if group_by == 'customer' else 'المنتج' if group_by == 'product' else 'الفئة'} / {group_by.title()}": r[group_label],
+                    "الإيرادات / Revenue": r["revenue"],
+                    "تكلفة المبيعات / COGS": r["cogs"],
+                    "الربح الإجمالي / Gross Profit": r["gross_profit"],
+                    "هامش الربح % / Margin %": f"{r['gross_margin_pct']}%",
+                    "عدد الفواتير / Invoices": r["invoice_count"],
+                })
+            columns = list(export_data[0].keys()) if export_data else []
+            if format == "excel":
+                buffer = generate_excel(export_data, columns, sheet_name=f"P&L by {group_by}")
+                return create_export_response(buffer, f"detailed_pl_{group_by}_{s_date}_{e_date}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                pdf_data = [columns] + [[str(row.get(c, '')) for c in columns] for row in export_data]
+                buffer = generate_pdf(pdf_data, f"Detailed P&L by {group_by.title()} ({s_date} to {e_date})")
+                return create_export_response(buffer, f"detailed_pl_{group_by}_{s_date}_{e_date}.pdf", "application/pdf")
+
+        return result
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════
+# RPT-105: Sales Commission Report (تقرير عمولات المبيعات)
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/sales/commissions/report", dependencies=[Depends(require_permission(["sales.view", "reports.view"]))])
+def sales_commission_report(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    salesperson_id: Optional[int] = None,
+    status_filter: Optional[str] = None,  # pending, paid, all
+    format: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    تقرير عمولات المبيعات مع إمكانية إنشاء قيد محاسبي عند الصرف.
+    Sales Commission Report with GL integration.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        s_date = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else date.today().replace(day=1, month=1)
+        e_date = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
+
+        query = """
+            SELECT sc.*, 
+                   COALESCE(sc.salesperson_name, cu.full_name, '') as sp_name
+            FROM sales_commissions sc
+            LEFT JOIN company_users cu ON sc.salesperson_id = cu.id
+            WHERE sc.invoice_date BETWEEN :start AND :end
+        """
+        params = {"start": s_date, "end": e_date}
+
+        if salesperson_id:
+            query += " AND sc.salesperson_id = :sp_id"
+            params["sp_id"] = salesperson_id
+        if status_filter and status_filter != "all":
+            query += " AND sc.status = :status"
+            params["status"] = status_filter
+
+        query += " ORDER BY sc.salesperson_id, sc.invoice_date"
+
+        rows = db.execute(text(query), params).fetchall()
+
+        # Build detailed report
+        report_rows = []
+        sp_summary = {}
+
+        for r in rows:
+            rm = r._mapping
+            sp_id = rm.get("salesperson_id")
+            sp_name = rm.get("sp_name") or rm.get("salesperson_name", "غير محدد")
+
+            report_rows.append({
+                "salesperson_id": sp_id,
+                "salesperson_name": sp_name,
+                "invoice_number": rm.get("invoice_number", ""),
+                "invoice_date": str(rm.get("invoice_date", "")),
+                "invoice_total": float(rm.get("invoice_total", 0)),
+                "commission_rate": float(rm.get("commission_rate", 0)),
+                "commission_amount": float(rm.get("commission_amount", 0)),
+                "status": rm.get("status", "pending"),
+            })
+
+            if sp_id not in sp_summary:
+                sp_summary[sp_id] = {
+                    "salesperson_name": sp_name,
+                    "total_sales": 0, "total_commission": 0,
+                    "pending": 0, "paid": 0, "invoice_count": 0
+                }
+            sp_summary[sp_id]["total_sales"] += float(rm.get("invoice_total", 0))
+            sp_summary[sp_id]["total_commission"] += float(rm.get("commission_amount", 0))
+            sp_summary[sp_id]["invoice_count"] += 1
+            if rm.get("status") == "paid":
+                sp_summary[sp_id]["paid"] += float(rm.get("commission_amount", 0))
+            else:
+                sp_summary[sp_id]["pending"] += float(rm.get("commission_amount", 0))
+
+        total_commission = sum(s["total_commission"] for s in sp_summary.values())
+        total_pending = sum(s["pending"] for s in sp_summary.values())
+        total_paid = sum(s["paid"] for s in sp_summary.values())
+
+        result = {
+            "report_name": "Sales Commission Report — تقرير عمولات المبيعات",
+            "period": {"start": str(s_date), "end": str(e_date)},
+            "details": report_rows,
+            "salesperson_summary": [
+                {"salesperson_id": k, **v} for k, v in sp_summary.items()
+            ],
+            "totals": {
+                "total_commission": round(total_commission, 2),
+                "total_pending": round(total_pending, 2),
+                "total_paid": round(total_paid, 2),
+                "salesperson_count": len(sp_summary),
+                "record_count": len(report_rows),
+            }
+        }
+
+        if format in ("excel", "pdf"):
+            export_data = []
+            for r in report_rows:
+                export_data.append({
+                    "مندوب المبيعات / Salesperson": r["salesperson_name"],
+                    "رقم الفاتورة / Invoice #": r["invoice_number"],
+                    "تاريخ الفاتورة / Date": r["invoice_date"],
+                    "مبلغ الفاتورة / Invoice Total": r["invoice_total"],
+                    "نسبة العمولة % / Rate %": r["commission_rate"],
+                    "مبلغ العمولة / Commission": r["commission_amount"],
+                    "الحالة / Status": "مدفوع" if r["status"] == "paid" else "معلق",
+                })
+            columns = list(export_data[0].keys()) if export_data else []
+            if format == "excel":
+                buffer = generate_excel(export_data, columns, sheet_name="Commissions")
+                return create_export_response(buffer, f"commissions_{s_date}_{e_date}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                pdf_data = [columns] + [[str(row.get(c, '')) for c in columns] for row in export_data]
+                buffer = generate_pdf(pdf_data, f"Sales Commission Report ({s_date} to {e_date})")
+                return create_export_response(buffer, f"commissions_{s_date}_{e_date}.pdf", "application/pdf")
+
+        return result
+    finally:
+        db.close()

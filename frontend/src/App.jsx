@@ -215,6 +215,7 @@ const TaxHome = React.lazy(() => import('./pages/Taxes/TaxHome'))
 const TaxReturnForm = React.lazy(() => import('./pages/Taxes/TaxReturnForm'))
 const TaxReturnDetails = React.lazy(() => import('./pages/Taxes/TaxReturnDetails'))
 const WithholdingTax = React.lazy(() => import('./pages/Taxes/WithholdingTax'))
+const TaxCompliance = React.lazy(() => import('./pages/Taxes/TaxCompliance'))
 
 // CRM
 const CRMHome = React.lazy(() => import('./pages/CRM/CRMHome'))
@@ -294,7 +295,7 @@ function App() {
             <Routes>
                 <Route path="/login" element={isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+                <Route path="/dashboard" element={<PrivateRoute permission="dashboard.view"><Dashboard /></PrivateRoute>} />
                 <Route path="/accounting" element={<PrivateRoute permission="accounting.view"><AccountingHome /></PrivateRoute>} />
                 <Route path="/accounting/coa" element={<PrivateRoute permission="accounting.view"><ChartOfAccounts /></PrivateRoute>} />
                 <Route path="/accounting/cost-centers" element={<PrivateRoute permission="accounting.view"><CostCenterList /></PrivateRoute>} />
@@ -316,7 +317,7 @@ function App() {
                 <Route path="/accounting/trial-balance" element={<PrivateRoute permission="accounting.view"><TrialBalance /></PrivateRoute>} />
                 <Route path="/accounting/income-statement" element={<PrivateRoute permission="accounting.view"><IncomeStatement /></PrivateRoute>} />
                 <Route path="/accounting/balance-sheet" element={<PrivateRoute permission="accounting.view"><BalanceSheet /></PrivateRoute>} />
-                <Route path="/accounting/currencies" element={<PrivateRoute permission="accounting.view"><CurrencyList /></PrivateRoute>} />
+                <Route path="/accounting/currencies" element={<PrivateRoute permission="currencies.view"><CurrencyList /></PrivateRoute>} />
                 <Route path="/stock/valuation-report" element={<PrivateRoute permission="reports.view"><InventoryValuation /></PrivateRoute>} />
                 <Route path="/admin/companies" element={<PrivateRoute role="system_admin"><CompanyList /></PrivateRoute>} />
                 <Route path="/admin/audit-logs" element={<PrivateRoute permission="audit.view"><AuditLogs /></PrivateRoute>} />
@@ -325,9 +326,9 @@ function App() {
                 {/* Approvals */}
                 <Route path="/approvals" element={<PrivateRoute permission="approvals.view"><ApprovalsPage /></PrivateRoute>} />
                 <Route path="/approvals/new" element={<PrivateRoute permission="approvals.create"><WorkflowEditor /></PrivateRoute>} />
-                <Route path="/approvals/:id/edit" element={<PrivateRoute permission="approvals.edit"><WorkflowEditor /></PrivateRoute>} />
+                <Route path="/approvals/:id/edit" element={<PrivateRoute permission="approvals.manage"><WorkflowEditor /></PrivateRoute>} />
 
-                <Route path="/data-import" element={<PrivateRoute permission="settings.view"><DataImportPage /></PrivateRoute>} />
+                <Route path="/data-import" element={<PrivateRoute permission="data_import.view"><DataImportPage /></PrivateRoute>} />
 
                 <Route path="/profile" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
 
@@ -502,17 +503,18 @@ function App() {
                 <Route path="/expenses/:id/edit" element={<PrivateRoute permission="expenses.edit"><ExpenseForm /></PrivateRoute>} />
 
                 {/* Taxes Routes */}
-                <Route path="/taxes" element={<PrivateRoute permission="accounting.view"><TaxHome /></PrivateRoute>} />
-                <Route path="/taxes/returns/new" element={<PrivateRoute permission="accounting.edit"><TaxReturnForm /></PrivateRoute>} />
-                <Route path="/taxes/returns/:id" element={<PrivateRoute permission="accounting.view"><TaxReturnDetails /></PrivateRoute>} />
-                <Route path="/taxes/wht" element={<PrivateRoute permission="accounting.view"><WithholdingTax /></PrivateRoute>} />
+                <Route path="/taxes" element={<PrivateRoute permission="taxes.view"><TaxHome /></PrivateRoute>} />
+                <Route path="/taxes/returns/new" element={<PrivateRoute permission="taxes.manage"><TaxReturnForm /></PrivateRoute>} />
+                <Route path="/taxes/returns/:id" element={<PrivateRoute permission="taxes.view"><TaxReturnDetails /></PrivateRoute>} />
+                <Route path="/taxes/wht" element={<PrivateRoute permission="taxes.view"><WithholdingTax /></PrivateRoute>} />
+                <Route path="/taxes/compliance" element={<PrivateRoute permission="taxes.view"><TaxCompliance /></PrivateRoute>} />
 
                 {/* CRM Routes */}
                 <Route path="/crm" element={<PrivateRoute permission="sales.view"><CRMHome /></PrivateRoute>} />
                 <Route path="/crm/opportunities" element={<PrivateRoute permission="sales.view"><Opportunities /></PrivateRoute>} />
                 <Route path="/crm/tickets" element={<PrivateRoute permission="sales.view"><SupportTickets /></PrivateRoute>} />
 
-                <Route path="/settings" element={<PrivateRoute permission="admin.companies"><CompanySettings /></PrivateRoute>} />
+                <Route path="/settings" element={<PrivateRoute permission="settings.view"><CompanySettings /></PrivateRoute>} />
                 <Route path="/settings/branches" element={<PrivateRoute permission="branches.view"><Branches /></PrivateRoute>} />
                 <Route path="/settings/costing-policy" element={<PrivateRoute permission="settings.view"><CostingPolicy /></PrivateRoute>} />
                 <Route path="/settings/api-keys" element={<PrivateRoute permission="settings.view"><ApiKeys /></PrivateRoute>} />

@@ -1925,6 +1925,8 @@ def get_financial_tables_sql() -> str:
         due_date DATE,
         filed_date DATE,
         status VARCHAR(20) DEFAULT 'draft',
+        branch_id INTEGER REFERENCES branches(id),
+        jurisdiction_code VARCHAR(2),
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -1944,6 +1946,59 @@ def get_financial_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
+    -- ===== TAX COMPLIANCE TABLES (3) =====
+    CREATE TABLE IF NOT EXISTS tax_regimes (
+        id SERIAL PRIMARY KEY,
+        country_code VARCHAR(2) NOT NULL,
+        tax_type VARCHAR(50) NOT NULL,
+        name_ar VARCHAR(255) NOT NULL,
+        name_en VARCHAR(255) NOT NULL,
+        default_rate NUMERIC(10, 4) DEFAULT 0,
+        is_required BOOLEAN DEFAULT FALSE,
+        applies_to VARCHAR(50) DEFAULT 'all',
+        filing_frequency VARCHAR(20) DEFAULT 'quarterly',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(country_code, tax_type)
+    );
+
+    CREATE TABLE IF NOT EXISTS branch_tax_settings (
+        id SERIAL PRIMARY KEY,
+        branch_id INTEGER NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+        tax_regime_id INTEGER NOT NULL REFERENCES tax_regimes(id) ON DELETE CASCADE,
+        is_registered BOOLEAN DEFAULT FALSE,
+        registration_number VARCHAR(100),
+        custom_rate NUMERIC(10, 4),
+        is_exempt BOOLEAN DEFAULT FALSE,
+        exemption_reason TEXT,
+        exemption_certificate VARCHAR(100),
+        exemption_expiry DATE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(branch_id, tax_regime_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS company_tax_settings (
+        id SERIAL PRIMARY KEY,
+        country_code VARCHAR(2) NOT NULL,
+        is_vat_registered BOOLEAN DEFAULT FALSE,
+        vat_number VARCHAR(50),
+        zakat_number VARCHAR(50),
+        tax_registration_number VARCHAR(100),
+        commercial_registry VARCHAR(100),
+        fiscal_year_start VARCHAR(5) DEFAULT '01-01',
+        default_filing_frequency VARCHAR(20) DEFAULT 'quarterly',
+        zatca_phase VARCHAR(20) DEFAULT 'none',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(country_code)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tax_regimes_country ON tax_regimes(country_code);
+    CREATE INDEX IF NOT EXISTS idx_branch_tax_settings_branch ON branch_tax_settings(branch_id);
+
     -- ===== PROJECTS (5) =====
     CREATE TABLE IF NOT EXISTS projects (
         id SERIAL PRIMARY KEY,
@@ -3578,6 +3633,50 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                 INSERT INTO tax_rates (tax_code, tax_name, tax_name_en, rate_type, rate_value, is_active)
                 VALUES ('VAT15', 'ضريبة القيمة المضافة', 'VAT', 'percentage', 15, TRUE)
             """))
+
+            # ── Tax Compliance: Seed tax_regimes for the company's country ───
+            _tax_regimes = {
+                "SA": [
+                    ("vat", "ضريبة القيمة المضافة", "Value Added Tax (VAT)", 15.00, True, "all", "quarterly"),
+                    ("zakat", "الزكاة", "Zakat", 2.50, True, "saudi_owned", "annual"),
+                    ("income_tax", "ضريبة الدخل", "Corporate Income Tax", 20.00, True, "foreign_owned", "annual"),
+                    ("withholding", "ضريبة الاستقطاع", "Withholding Tax", 5.00, False, "cross_border", "monthly"),
+                ],
+                "SY": [
+                    ("income_tax", "ضريبة الدخل", "Income Tax", 22.00, True, "all", "annual"),
+                    ("salary_tax", "ضريبة الرواتب والأجور", "Salary Tax", 0.00, True, "all", "monthly"),
+                    ("stamp_duty", "رسوم الطوابع", "Stamp Duty", 0.60, False, "contracts", "per_transaction"),
+                ],
+                "AE": [
+                    ("vat", "ضريبة القيمة المضافة", "Value Added Tax (VAT)", 5.00, True, "all", "quarterly"),
+                    ("corporate_tax", "ضريبة الشركات", "Corporate Tax", 9.00, True, "all", "annual"),
+                ],
+                "EG": [
+                    ("vat", "ضريبة القيمة المضافة", "Value Added Tax (VAT)", 14.00, True, "all", "monthly"),
+                    ("income_tax", "ضريبة الدخل", "Corporate Income Tax", 22.50, True, "all", "annual"),
+                ],
+                "JO": [
+                    ("sales_tax", "ضريبة المبيعات", "General Sales Tax", 16.00, True, "all", "monthly"),
+                    ("income_tax", "ضريبة الدخل", "Corporate Income Tax", 20.00, True, "all", "annual"),
+                ],
+                "KW": [
+                    ("income_tax", "ضريبة الدخل", "Corporate Income Tax", 15.00, True, "foreign_owned", "annual"),
+                    ("zakat", "الزكاة", "Zakat (NLST)", 1.00, True, "all", "annual"),
+                ],
+            }
+            country_regimes = _tax_regimes.get(country, _tax_regimes.get("SA", []))
+            for reg in country_regimes:
+                conn.execute(text("""
+                    INSERT INTO tax_regimes (country_code, tax_type, name_ar, name_en, default_rate, is_required, applies_to, filing_frequency)
+                    VALUES (:cc, :type, :ar, :en, :rate, :req, :applies, :freq)
+                    ON CONFLICT (country_code, tax_type) DO NOTHING
+                """), {"cc": country, "type": reg[0], "ar": reg[1], "en": reg[2], "rate": reg[3], "req": reg[4], "applies": reg[5], "freq": reg[6]})
+
+            # Company tax settings for the main country
+            conn.execute(text("""
+                INSERT INTO company_tax_settings (country_code) VALUES (:cc)
+                ON CONFLICT (country_code) DO NOTHING
+            """), {"cc": country})
 
             # Default Costing Policy
             conn.execute(text("""

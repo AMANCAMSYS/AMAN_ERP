@@ -23,19 +23,38 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     # inventory.* is an umbrella for stock + products
     "inventory.view":   ["stock.view", "products.view"],
     "inventory.delete": ["products.delete", "stock.adjustment"],
-    "inventory.*":      ["stock.view", "stock.adjustment", "stock.transfer", "stock.manage",
+    "inventory.*":      ["stock.view", "stock.view_cost", "stock.adjustment", "stock.transfer",
+                         "stock.manage", "stock.reports",
                          "products.view", "products.create", "products.edit", "products.delete"],
     # projects.manage covers all project CRUD
     "projects.manage":  ["projects.view", "projects.create", "projects.edit", "projects.delete"],
     # admin.users is an alias that grants user-related admin access
-    "admin.users":      ["admin.roles", "settings.view"],
-    # sales.edit/delete — route to the actual enforced keys
+    "admin.users":      ["admin.roles", "settings.view", "settings.edit"],
+    # admin.branches → branches.manage (fix inconsistency)
+    "admin.branches":   ["branches.view", "branches.manage"],
+    # sales aliases
     "sales.edit":       ["sales.create"],
     "sales.delete":     ["sales.create"],
-    # buying.reports routes to buying.view for now
+    # buying.reports routes to buying.view
     "buying.reports":   ["buying.view"],
     # hr.reports routes to hr.view
     "hr.reports":       ["hr.view"],
+    # reports.financial implies reports.view
+    "reports.financial": ["reports.view"],
+    # manufacturing.reports implies manufacturing.view
+    "manufacturing.reports": ["manufacturing.view"],
+    # notifications.send implies notifications.view
+    "notifications.send": ["notifications.view"],
+    # approvals edit is an alias for approvals.manage
+    "approvals.manage": ["approvals.view", "approvals.create"],
+    # accounting.manage implies view + edit
+    "accounting.manage": ["accounting.view", "accounting.edit"],
+    # treasury.manage implies view + create + edit
+    "treasury.manage": ["treasury.view", "treasury.create", "treasury.edit"],
+    # taxes.manage implies taxes.view
+    "taxes.manage": ["taxes.view"],
+    # settings.manage implies settings.view + settings.edit
+    "settings.manage": ["settings.view", "settings.edit"],
 }
 
 

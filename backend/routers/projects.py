@@ -8,7 +8,7 @@ import shutil
 import os
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
@@ -1431,8 +1431,81 @@ async def create_project_invoice(
             "uid": current_user.id
         })
         
+        # 6. Create GL Journal Entry (PRJ-103)
+        # Dr: Accounts Receivable (acc_map_ar)
+        # Cr: Sales Revenue (acc_map_sales_rev) — subtotal
+        # Cr: VAT Output (acc_map_vat_out) — tax_amount (if any)
+        je_id = None
+        ar_acc = get_mapped_account_id(db, "acc_map_ar")
+        rev_acc = get_mapped_account_id(db, "acc_map_sales_rev") or get_mapped_account_id(db, "acc_map_project_revenue")
+        base_currency = get_base_currency(db)
+        
+        if ar_acc and rev_acc and grand_total > 0:
+            entry_num = generate_sequential_number(db, f"PINV-{datetime.now().year}", "journal_entries", "entry_number")
+            
+            je_id = db.execute(text("""
+                INSERT INTO journal_entries (
+                    entry_number, entry_date, description, status,
+                    currency, exchange_rate, created_by
+                ) VALUES (:num, :date, :desc, 'posted', :curr, :rate, :uid)
+                RETURNING id
+            """), {
+                "num": entry_num, "date": invoice_data.invoice_date,
+                "desc": f"فاتورة مشروع: {project.project_name} — {inv_num}",
+                "curr": inv_currency, "rate": exchange_rate, "uid": current_user.id
+            }).scalar()
+            
+            # Dr: Accounts Receivable = grand_total
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
+                VALUES (:jid, :aid, :amt, 0, :desc, :curr, :rate)
+            """), {
+                "jid": je_id, "aid": ar_acc, "amt": grand_total,
+                "desc": f"ذمم مدينة — فاتورة مشروع {inv_num}",
+                "curr": inv_currency, "rate": exchange_rate
+            })
+            update_account_balance(db, account_id=ar_acc, debit_base=grand_total * exchange_rate, credit_base=0,
+                                   debit_curr=grand_total, credit_curr=0, currency=inv_currency)
+            
+            # Cr: Revenue = subtotal (before tax)
+            net_revenue = subtotal - total_discount
+            if net_revenue > 0:
+                db.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
+                    VALUES (:jid, :aid, 0, :amt, :desc, :curr, :rate)
+                """), {
+                    "jid": je_id, "aid": rev_acc, "amt": net_revenue,
+                    "desc": f"إيراد مشروع {project.project_name}",
+                    "curr": inv_currency, "rate": exchange_rate
+                })
+                update_account_balance(db, account_id=rev_acc, debit_base=0, credit_base=net_revenue * exchange_rate,
+                                       debit_curr=0, credit_curr=net_revenue, currency=inv_currency)
+            
+            # Cr: VAT Output = tax_amount (if applicable)
+            if total_tax > 0:
+                vat_acc = get_mapped_account_id(db, "acc_map_vat_out") or get_mapped_account_id(db, "acc_map_tax_payable")
+                if vat_acc:
+                    db.execute(text("""
+                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
+                        VALUES (:jid, :aid, 0, :amt, :desc, :curr, :rate)
+                    """), {
+                        "jid": je_id, "aid": vat_acc, "amt": total_tax,
+                        "desc": f"ضريبة القيمة المضافة — فاتورة مشروع {inv_num}",
+                        "curr": inv_currency, "rate": exchange_rate
+                    })
+                    update_account_balance(db, account_id=vat_acc, debit_base=0, credit_base=total_tax * exchange_rate,
+                                           debit_curr=0, credit_curr=total_tax, currency=inv_currency)
+            
+            # Update invoice with journal entry reference
+            db.execute(text("UPDATE invoices SET notes = notes || ' | JE: ' || :je_num WHERE id = :id"),
+                       {"je_num": entry_num, "id": inv_id})
+        
         db.commit()
-        return {"success": True, "invoice_id": inv_id, "invoice_number": inv_num, "message": "تم إنشاء الفاتورة بنجاح"}
+        return {
+            "success": True, "invoice_id": inv_id, "invoice_number": inv_num,
+            "journal_entry_id": je_id,
+            "message": "تم إنشاء الفاتورة والقيد المحاسبي بنجاح" if je_id else "تم إنشاء الفاتورة بنجاح (بدون قيد — تحقق من إعداد الحسابات)"
+        }
         
     except Exception as e:
         db.rollback()
@@ -1738,6 +1811,205 @@ async def close_project(
     except Exception as e:
         db.rollback()
         logger.error(f"Error closing project: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════
+# PRJ-107: Retainer Auto-Billing (فوترة دورية تلقائية)
+# ═══════════════════════════════════════════════════════════
+
+class RetainerSetup(BaseModel):
+    retainer_amount: float
+    billing_cycle: str = "monthly"  # monthly, quarterly, yearly
+    next_billing_date: Optional[date] = None
+
+@router.put("/{project_id}/retainer-setup", dependencies=[Depends(require_permission("projects.edit"))])
+async def setup_retainer(
+    project_id: int,
+    data: RetainerSetup,
+    current_user: dict = Depends(get_current_user)
+):
+    """إعداد الفوترة الدورية لعقد Retainer"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
+        if not project:
+            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+        
+        next_date = data.next_billing_date or date.today()
+        db.execute(text("""
+            UPDATE projects SET 
+                contract_type = 'retainer',
+                retainer_amount = :amt,
+                billing_cycle = :cycle,
+                next_billing_date = :next_date,
+                updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "amt": data.retainer_amount, "cycle": data.billing_cycle,
+            "next_date": next_date, "id": project_id
+        })
+        db.commit()
+        return {"success": True, "message": "تم إعداد الفوترة الدورية بنجاح"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/retainer/generate-invoices", dependencies=[Depends(require_permission("projects.edit"))])
+async def generate_retainer_invoices(
+    request: Request,
+    billing_date: Optional[date] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    توليد فواتير دورية تلقائية لعقود Retainer المستحقة.
+    Generate automatic periodic invoices for due Retainer contracts.
+    Creates invoice + GL entry (Dr AR / Cr Revenue) for each project.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        target_date = billing_date or date.today()
+        
+        # Find retainer projects due for billing
+        projects = db.execute(text("""
+            SELECT p.*, 
+                   COALESCE(c.name, pa.name, '') as customer_name,
+                   COALESCE(p.customer_id, p.party_id) as bill_to_id
+            FROM projects p
+            LEFT JOIN customers c ON p.customer_id = c.id
+            LEFT JOIN parties pa ON p.party_id = pa.id
+            WHERE p.contract_type = 'retainer'
+              AND p.retainer_amount > 0
+              AND p.status NOT IN ('completed', 'cancelled')
+              AND (p.next_billing_date IS NULL OR p.next_billing_date <= :target)
+        """), {"target": target_date}).fetchall()
+        
+        if not projects:
+            return {"success": True, "generated": 0, "message": "لا توجد عقود مستحقة للفوترة"}
+        
+        base_currency = get_base_currency(db)
+        ar_acc = get_mapped_account_id(db, "acc_map_ar")
+        rev_acc = get_mapped_account_id(db, "acc_map_sales_rev") or get_mapped_account_id(db, "acc_map_project_revenue")
+        
+        generated = []
+        
+        for proj in projects:
+            p = proj._mapping
+            amount = float(p["retainer_amount"])
+            if amount <= 0:
+                continue
+            
+            # Generate invoice
+            inv_num = generate_sequential_number(db, f"RET-{target_date.year}", "invoices", "invoice_number")
+            bill_to = p.get("bill_to_id") or p.get("customer_id")
+            
+            inv_id = db.execute(text("""
+                INSERT INTO invoices (
+                    invoice_number, party_id, invoice_type, invoice_date, due_date,
+                    subtotal, tax_amount, discount, total, paid_amount, status, notes,
+                    payment_method, created_by, branch_id, currency, exchange_rate
+                ) VALUES (
+                    :num, :cust, 'sales', :inv_date, :due_date,
+                    :amt, 0, 0, :amt, 0, 'unpaid',
+                    :notes, 'credit', :uid, :branch, :curr, 1.0
+                ) RETURNING id
+            """), {
+                "num": inv_num, "cust": bill_to,
+                "inv_date": target_date,
+                "due_date": target_date + timedelta(days=30),
+                "amt": amount,
+                "notes": f"فاتورة دورية (Retainer) — مشروع: {p['project_name']}",
+                "uid": current_user.id, "branch": p.get("branch_id"),
+                "curr": base_currency
+            }).scalar()
+            
+            # Invoice line
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv_id, :desc, 1, :price, 0, 0, :total)
+            """), {
+                "inv_id": inv_id, "desc": f"رسوم اشتراك — مشروع {p['project_name']}",
+                "price": amount, "total": amount
+            })
+            
+            # Link to project revenues
+            db.execute(text("""
+                INSERT INTO project_revenues (project_id, revenue_type, revenue_date, amount, description, invoice_id, status, created_by)
+                VALUES (:pid, 'retainer', :date, :amt, :desc, :inv_id, 'approved', :uid)
+            """), {
+                "pid": p["id"], "date": target_date, "amt": amount,
+                "desc": f"فاتورة Retainer #{inv_num}", "inv_id": inv_id, "uid": current_user.id
+            })
+            
+            # GL Entry: Dr AR / Cr Revenue
+            je_id = None
+            if ar_acc and rev_acc:
+                entry_num = generate_sequential_number(db, f"RETJE-{target_date.year}", "journal_entries", "entry_number")
+                je_id = db.execute(text("""
+                    INSERT INTO journal_entries (entry_number, entry_date, description, status, currency, exchange_rate, created_by)
+                    VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid) RETURNING id
+                """), {
+                    "num": entry_num, "date": target_date,
+                    "desc": f"فاتورة Retainer — {p['project_name']} — {inv_num}",
+                    "curr": base_currency, "uid": current_user.id
+                }).scalar()
+                
+                db.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                    VALUES (:jid, :aid, :amt, 0, :desc)
+                """), {"jid": je_id, "aid": ar_acc, "amt": amount,
+                       "desc": f"ذمم مدينة — Retainer {p['project_name']}"})
+                update_account_balance(db, ar_acc, debit_base=amount, credit_base=0)
+                
+                db.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                    VALUES (:jid, :aid, 0, :amt, :desc)
+                """), {"jid": je_id, "aid": rev_acc, "amt": amount,
+                       "desc": f"إيراد Retainer {p['project_name']}"})
+                update_account_balance(db, rev_acc, debit_base=0, credit_base=amount)
+            
+            # Calculate next billing date
+            cycle = p.get("billing_cycle", "monthly")
+            if cycle == "monthly":
+                next_date = target_date + timedelta(days=30)
+            elif cycle == "quarterly":
+                next_date = target_date + timedelta(days=90)
+            elif cycle == "yearly":
+                next_date = target_date + timedelta(days=365)
+            else:
+                next_date = target_date + timedelta(days=30)
+            
+            db.execute(text("""
+                UPDATE projects SET last_billed_date = :billed, next_billing_date = :next, updated_at = NOW()
+                WHERE id = :id
+            """), {"billed": target_date, "next": next_date, "id": p["id"]})
+            
+            generated.append({
+                "project_id": p["id"], "project_name": p["project_name"],
+                "invoice_id": inv_id, "invoice_number": inv_num,
+                "amount": amount, "journal_entry_id": je_id
+            })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "generated": len(generated),
+            "invoices": generated,
+            "message": f"تم إنشاء {len(generated)} فاتورة Retainer بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error generating retainer invoices: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()

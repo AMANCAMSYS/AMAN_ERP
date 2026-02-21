@@ -18,22 +18,41 @@ import logging
 from config import settings
 from database import engine
 
+# ── Observability ──────────────────────────────────────────────────────────────
+import os
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if _SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+        sentry_sdk.init(
+            dsn=_SENTRY_DSN,
+            integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+            traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+            environment=os.environ.get("APP_ENV", "production"),
+            release=f"aman-erp@2.0.0",
+        )
+        logger_sentry = logging.getLogger(__name__)
+        logger_sentry.info("✅ Sentry initialized")
+    except ImportError:
+        pass  # sentry-sdk not installed — skip silently
+
 # ── Core & Auth ────────────────────────────────────────────────────────────────
 from routers import auth, companies, roles, branches, settings as company_settings
 from routers import audit, notifications, approvals, security, data_import
 
-# ── Accounting & Finance ────────────────────────────────────────────────────────
-from routers import accounting, currencies, cost_centers, budgets, reconciliation
-from routers import treasury, taxes, costing_policies, checks, notes, assets
+# ── Accounting & Finance (routers/finance/) ─────────────────────────────────────
+from routers import finance
 
 # ── Sales, Purchases & Inventory ───────────────────────────────────────────────
 from routers import sales, purchases, inventory, parties
 
-# ── HR & Manufacturing ──────────────────────────────────────────────────────────
-from routers import hr, hr_advanced, manufacturing
+# ── HR (routers/hr/) & Manufacturing (routers/manufacturing/) ───────────────────
+from routers import hr, manufacturing
 
-# ── Projects, Expenses & Reports ───────────────────────────────────────────────
-from routers import projects, expenses, reports, scheduled_reports, dashboard
+# ── Projects & Reports ─────────────────────────────────────────────────────────
+from routers import projects, reports, scheduled_reports, dashboard
 
 # ── Commerce & External ────────────────────────────────────────────────────────
 from routers import pos, contracts, crm, external
@@ -159,12 +178,90 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AMAN ERP System",
-    description="نظام أمان لإدارة الموارد المؤسسية - 91 جدول متكامل ",
-    version="1.0.0",
-    # Trigger reload
+    description="""
+# نظام أمان لإدارة الموارد المؤسسية (AMAN ERP)
+
+نظام ERP متكامل متعدد الشركات (Multi-Tenant) مبني بـ **FastAPI** و **PostgreSQL**.
+
+## الوحدات الرئيسية
+
+| الوحدة | الوصف |
+|--------|-------|
+| 📊 المحاسبة | دليل حسابات، قيود يومية، ميزان مراجعة، قوائم مالية |
+| 💰 المبيعات | فواتير، أوامر بيع، عروض أسعار، مرتجعات |
+| 🛒 المشتريات | أوامر شراء، موردين، RFQ، اتفاقيات |
+| 📦 المخزون | منتجات، مستودعات، تحويلات، تتبع دفعات وأرقام تسلسلية |
+| 🏦 الخزينة | حسابات بنكية، تسويات، شيكات، سندات |
+| 👥 الموارد البشرية | موظفين، رواتب، حضور، إجازات، تقييم أداء |
+| 🏭 التصنيع | قوائم مواد (BOM)، أوامر إنتاج، مراكز عمل |
+| 🏪 نقاط البيع | واجهة POS، عروض، برامج ولاء |
+| 📐 المشاريع | إدارة مشاريع، مهام، موارد، Gantt |
+| 📈 التقارير | تقارير مالية وتشغيلية، تقارير مجدولة |
+
+## المصادقة
+
+يستخدم النظام **JWT Bearer Token** — أرسل التوكن في header:
+```
+Authorization: Bearer <token>
+```
+""",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    openapi_tags=[
+        # ── Core & Auth ──
+        {"name": "المصادقة", "description": "تسجيل الدخول، JWT tokens، المصادقة الثنائية (2FA)، إدارة الجلسات"},
+        {"name": "إدارة الشركات", "description": "إنشاء وإدارة الشركات (Multi-Tenant)، تهيئة قاعدة البيانات لكل شركة"},
+        {"name": "إدارة الأدوار", "description": "أدوار المستخدمين والصلاحيات التفصيلية (RBAC)"},
+        {"name": "branches", "description": "إدارة فروع الشركة وربط المستخدمين بالفروع"},
+        {"name": "إعدادات الشركة", "description": "إعدادات عامة للشركة: عملة افتراضية، سنة مالية، شعار، إلخ"},
+        {"name": "سجلات المراقبة", "description": "سجل المراجعة (Audit Log) — تتبع جميع العمليات والتعديلات"},
+        {"name": "الإشعارات", "description": "إشعارات فورية عبر WebSocket وHTTP — إنشاء، قراءة، حذف"},
+        {"name": "الاعتمادات", "description": "نظام الموافقات متعدد المستويات — سير عمل قابل للتخصيص"},
+        {"name": "الأمان", "description": "إدارة مفاتيح API، Webhooks، سجل الأحداث الأمنية"},
+        {"name": "استيراد/تصدير البيانات", "description": "استيراد بيانات من Excel/CSV — حسابات، منتجات، عملاء، موظفين"},
+
+        # ── Accounting & Finance ──
+        {"name": "المحاسبة", "description": "دليل الحسابات، القيود اليومية، الأرصدة الافتتاحية، قيود الإقفال، القيود المتكررة"},
+        {"name": "accounting", "description": "العملات وأسعار الصرف — تحديث يومي وسجل تاريخي"},
+        {"name": "مراكز التكلفة", "description": "إنشاء وإدارة مراكز التكلفة وتوزيع المصاريف"},
+        {"name": "Budgets", "description": "إعداد الميزانيات التقديرية ومقارنتها بالفعلي — تنبيهات التجاوز"},
+        {"name": "تسوية البنك", "description": "التسوية البنكية — استيراد كشف حساب، مطابقة تلقائية، تأكيد"},
+        {"name": "الخزينة والمصروفات", "description": "حسابات بنكية ونقدية، مصروفات، تحويلات بين الحسابات، تقرير تدفقات نقدية"},
+        {"name": "الضرائب", "description": "إعداد معدلات الضريبة، الإقرارات الضريبية، ضريبة الاستقطاع (WHT)"},
+        {"name": "Costing Policies", "description": "سياسات تكلفة المخزون — FIFO, LIFO, متوسط مرجح، تكلفة معيارية"},
+        {"name": "checks", "description": "شيكات القبض والدفع — إصدار، تحصيل، رفض، تحويل"},
+        {"name": "أوراق القبض والدفع", "description": "سندات القبض والصرف — إنشاء، تأكيد، طباعة"},
+        {"name": "الأصول الثابتة", "description": "إدارة الأصول — إهلاك، إعادة تقييم، صيانة، تأمين"},
+        {"name": "المصاريف", "description": "مطالبات المصروفات — تقديم، موافقة، صرف، تقارير"},
+
+        # ── Sales & Purchases ──
+        {"name": "المبيعات", "description": "فواتير المبيعات، أوامر البيع، عروض الأسعار، المرتجعات، إيصالات القبض، إشعارات دائنة/مدينة"},
+        {"name": "المشتريات", "description": "أوامر الشراء، فواتير المشتريات، المرتجعات، طلبات عروض أسعار (RFQ)، تقييم الموردين"},
+        {"name": "المخزون", "description": "المنتجات، المستودعات، التحويلات، التسويات، حركات المخزون، الشحنات"},
+        {"name": "Advanced Inventory Phase 2", "description": "تتبع الدفعات والأرقام التسلسلية، فحص الجودة، الجرد الدوري"},
+        {"name": "الجهات (العملاء والموردين)", "description": "إدارة موحدة للعملاء والموردين — بيانات، كشوف حساب، أرصدة"},
+
+        # ── HR ──
+        {"name": "HR & Employees", "description": "الموظفين، الأقسام، المناصب، الرواتب، الحضور، الإجازات، القروض"},
+        {"name": "HR Advanced - الموارد البشرية المتقدمة", "description": "تقييم الأداء، التدريب، المخالفات، العهد، التوظيف، العمل الإضافي"},
+
+        # ── Manufacturing ──
+        {"name": "Manufacturing (Phase 5)", "description": "مراكز العمل، خطوط الإنتاج، قوائم المواد (BOM)، أوامر الإنتاج، بطاقات العمل، MRP"},
+
+        # ── Projects & Reports ──
+        {"name": "المشاريع", "description": "إدارة المشاريع — مهام، موارد، ميزانيات، Gantt chart، تقارير تقدم"},
+        {"name": "التقارير", "description": "ميزان المراجعة، قائمة الدخل، الميزانية العمومية، كشف حساب، تقارير المبيعات والمشتريات"},
+        {"name": "Scheduled Reports", "description": "تقارير مجدولة — إعداد تقارير تلقائية تُرسل بالبريد الإلكتروني"},
+        {"name": "لوحة التحكم", "description": "لوحة قيادة شاملة — إحصائيات مالية، رسوم بيانية، مؤشرات أداء"},
+
+        # ── Commerce & External ──
+        {"name": "Point of Sale", "description": "نقطة البيع — واجهة بيع، جلسات، عروض ترويجية، برامج ولاء، طاولات مطعم"},
+        {"name": "Contracts", "description": "إدارة العقود — إنشاء، تجديد، إنهاء، تنبيهات الانتهاء"},
+        {"name": "إدارة العلاقات CRM", "description": "فرص البيع (Pipeline)، تذاكر الدعم الفني، إدارة العملاء المحتملين"},
+        {"name": "التكامل الخارجي", "description": "مفاتيح API، Webhooks، تكامل مع أنظمة خارجية"},
+    ]
 )
 
 # CORS — قائمة بيضاء دقيقة للـ origins
@@ -200,6 +297,18 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 from utils.security_middleware import HTTPSRedirectMiddleware, InputSanitizationMiddleware
 app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
+
+# ── Prometheus Metrics ─────────────────────────────────────────────────────────
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator(
+        should_group_status_codes=True,
+        should_ignore_untemplated=True,
+        excluded_handlers=["/health", "/metrics", "/api/health"],
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+    logger.info("✅ Prometheus metrics exposed at /metrics")
+except ImportError:
+    logger.warning("⚠️ prometheus-fastapi-instrumentator not installed — metrics disabled")
 
 # Static Files (Logos, attachments)
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
@@ -247,18 +356,8 @@ app.include_router(approvals.router, prefix="/api")
 app.include_router(security.router, prefix="/api")
 app.include_router(data_import.router, prefix="/api")
 
-# ── Accounting & Finance ─────────────────────────────────────────
-app.include_router(accounting.router, prefix="/api")
-app.include_router(currencies.router, prefix="/api")
-app.include_router(cost_centers.router, prefix="/api")
-app.include_router(budgets.router, prefix="/api")
-app.include_router(reconciliation.router, prefix="/api")
-app.include_router(treasury.router, prefix="/api")
-app.include_router(taxes.router, prefix="/api")
-app.include_router(costing_policies.router, prefix="/api")
-app.include_router(checks.router, prefix="/api")
-app.include_router(notes.router, prefix="/api")
-app.include_router(assets.router, prefix="/api")
+# ── Accounting & Finance (12 sub-routers from routers/finance/) ──
+app.include_router(finance.router, prefix="/api")
 
 # ── Sales, Purchases & Inventory ────────────────────────────────
 app.include_router(sales.router, prefix="/api")
@@ -266,14 +365,12 @@ app.include_router(purchases.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(parties.router, prefix="/api")
 
-# ── HR & Manufacturing ───────────────────────────────────────────
+# ── HR (2 sub-routers) & Manufacturing ────────────────────────────
 app.include_router(hr.router, prefix="/api")
-app.include_router(hr_advanced.router, prefix="/api")
 app.include_router(manufacturing.router, prefix="/api")
 
-# ── Projects, Expenses & Reports ────────────────────────────────
+# ── Projects & Reports ───────────────────────────────────────────
 app.include_router(projects.router, prefix="/api")
-app.include_router(expenses.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(scheduled_reports.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
@@ -289,31 +386,68 @@ app.include_router(external.router, prefix="/api")
 def root():
     return {
         "system": "AMAN ERP",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "running",
         "features": {
             "auto_company_id": True,
             "multi_tenant": True,
-            "total_tables": 91
+            "total_tables": 178
         },
         "docs": "/api/docs"
     }
 
 
-@app.get("/health")
+@app.get("/api/health", tags=["Health"], summary="Health Check", include_in_schema=True)
 def health_check():
+    """
+    فحص صحة النظام — يتحقق من:
+    - اتصال قاعدة البيانات الرئيسية
+    - عدد الشركات المسجلة
+    - اتصال Redis (اختياري)
+    - وقت الاستجابة
+    """
+    import time
+    start = time.monotonic()
+    
+    checks: dict = {}
+    overall = "healthy"
+
+    # ── Database check ──
     try:
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+            result = conn.execute(text("SELECT COUNT(*) FROM system_companies"))
+            company_count = result.scalar()
+        checks["database"] = {"status": "ok", "companies": company_count}
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
+        checks["database"] = {"status": "error", "detail": str(e)[:120]}
+        overall = "degraded"
+
+    # ── Redis check (optional) ──
+    try:
+        if settings.REDIS_URL:
+            import redis as redis_lib
+            r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+            r.ping()
+            checks["redis"] = {"status": "ok"}
+        else:
+            checks["redis"] = {"status": "not_configured"}
+    except Exception as e:
+        checks["redis"] = {"status": "error", "detail": str(e)[:80]}
+        # Redis is optional — don't degrade overall health
+
+    elapsed_ms = round((time.monotonic() - start) * 1000, 2)
+
+    return {
+        "status": overall,
+        "version": "2.0.0",
+        "environment": os.environ.get("APP_ENV", "development"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "response_time_ms": elapsed_ms,
+        "checks": checks,
+    }
+
+
+@app.get("/health", include_in_schema=False)
+def health_check_root():
+    """Alias for /api/health — used by Docker/load balancer health probes"""
+    return health_check()

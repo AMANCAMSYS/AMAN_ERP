@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AMAN ERP — Backend Dockerfile
+# Multi-stage build: builder (deps) → runtime (slim)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: Build dependencies ───────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+# System build deps (psycopg2 needs libpq-dev, reportlab needs fonts)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps into a prefix so we can copy them cleanly
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+WORKDIR /app
+
+# Runtime system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application code (excluding .env, __pycache__, venv, etc.)
+COPY . .
+
+# Create non-root user for security
+RUN addgroup --system aman && adduser --system --ingroup aman aman \
+    && chown -R aman:aman /app
+USER aman
+
+# Expose port
+EXPOSE 8000
+
+# Health check — Docker will restart the container if unhealthy
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start server (no --reload in production)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--workers", "4", "--log-level", "info", \
+     "--access-log", "--no-use-colors"]

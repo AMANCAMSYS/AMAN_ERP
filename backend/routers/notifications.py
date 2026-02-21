@@ -118,7 +118,7 @@ async def mark_all_read(current_user: dict = Depends(get_current_user)):
 
 # ===================== Create Notification with Email/SMS =====================
 
-@router.post("/send")
+@router.post("/send", dependencies=[Depends(require_permission(["notifications.send", "admin"]))])
 async def create_and_send_notification(
     data: NotificationCreate,
     current_user: dict = Depends(get_current_user)

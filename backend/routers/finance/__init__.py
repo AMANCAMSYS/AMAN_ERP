@@ -1,0 +1,40 @@
+"""
+AMAN ERP - Finance & Accounting Module
+المحاسبة والمالية
+
+Sub-modules:
+  accounting, currencies, cost_centers, budgets, reconciliation,
+  treasury, taxes, tax_compliance, costing_policies, checks, notes, assets, expenses
+"""
+
+from fastapi import APIRouter
+
+from .accounting import router as accounting_router
+from .currencies import router as currencies_router
+from .cost_centers import router as cost_centers_router
+from .budgets import router as budgets_router
+from .reconciliation import router as reconciliation_router
+from .treasury import router as treasury_router
+from .taxes import router as taxes_router
+from .tax_compliance import router as tax_compliance_router
+from .costing_policies import router as costing_policies_router
+from .checks import router as checks_router
+from .notes import router as notes_router
+from .assets import router as assets_router
+from .expenses import router as expenses_router
+
+# Combined router — each sub-module keeps its own prefix
+router = APIRouter()
+router.include_router(accounting_router)
+router.include_router(currencies_router)
+router.include_router(cost_centers_router)
+router.include_router(budgets_router)
+router.include_router(reconciliation_router)
+router.include_router(treasury_router)
+router.include_router(taxes_router)
+router.include_router(tax_compliance_router)
+router.include_router(costing_policies_router)
+router.include_router(checks_router)
+router.include_router(notes_router)
+router.include_router(assets_router)
+router.include_router(expenses_router)

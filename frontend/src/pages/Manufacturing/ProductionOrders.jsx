@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import DateInput from '../../components/common/DateInput';
 import '../../components/ModuleStyles.css';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const ProductionOrders = () => {
     const { t } = useTranslation();
@@ -190,7 +191,7 @@ const ProductionOrders = () => {
                                         {order.produced_quantity} / {order.quantity}
                                     </td>
                                     <td>{getStatusBadge(order.status)}</td>
-                                    <td style={{ fontSize: '13px' }}>{order.due_date}</td>
+                                    <td style={{ fontSize: '13px' }}>{formatDate(order.due_date)}</td>
                                     <td>
                                         <button
                                             className="table-action-btn"
@@ -285,7 +286,7 @@ const ProductionOrders = () => {
                                            
                                             className="form-input"
                                             required
-                                            value={formData.due_date}
+                                            value={formatDate(formData.due_date)}
                                             onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                                         />
                                     </div>

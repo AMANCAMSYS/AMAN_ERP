@@ -5,6 +5,7 @@ import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 function JournalEntryList() {
     const { t, i18n } = useTranslation()
@@ -162,7 +163,7 @@ function JournalEntryList() {
                                 <tr key={e.id} style={{ cursor: 'pointer' }}
                                     onClick={() => handleViewDetail(e.id)}>
                                     <td><strong>{e.entry_number}</strong></td>
-                                    <td>{e.entry_date}</td>
+                                    <td>{formatDate(e.entry_date)}</td>
                                     <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {e.description}
                                     </td>
@@ -218,7 +219,7 @@ function JournalEntryList() {
                         </div>
                         <div className="modal-body">
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-                                <div><strong>{t('common.date')}:</strong> {selectedEntry.entry_date}</div>
+                                <div><strong>{t('common.date')}:</strong> {formatDate(selectedEntry.entry_date)}</div>
                                 <div><strong>{t('common.reference')}:</strong> {selectedEntry.reference || '—'}</div>
                                 <div style={{ gridColumn: '1 / -1' }}><strong>{t('common.description')}:</strong> {selectedEntry.description}</div>
                                 <div><strong>{t('common.currency') || (isRTL ? 'العملة:' : 'Currency:')}:</strong> {selectedEntry.currency}</div>

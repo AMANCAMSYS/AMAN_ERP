@@ -8,6 +8,7 @@ import { Plus, FileCheck, Play, ShoppingCart } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const PurchaseAgreements = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
@@ -91,7 +92,7 @@ const PurchaseAgreements = () => {
                                         <td className="font-semibold">{a.title}</td>
                                         <td>{a.supplier_name || `#${a.supplier_id}`}</td>
                                         <td>{statusBadge(a.status)}</td>
-                                        <td className="text-sm">{a.start_date} → {a.end_date}</td>
+                                        <td className="text-sm">{formatDate(a.start_date)} → {formatDate(a.end_date)}</td>
                                         <td>
                                             <div className="d-flex gap-2">
                                                 {a.status === 'draft' && <button className="btn btn-sm btn-success" onClick={() => handleActivate(a.id)} title={t('buying.activate')}><Play size={14} /></button>}
@@ -123,9 +124,9 @@ const PurchaseAgreements = () => {
                                 </select></div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="form-group"><label className="form-label">{t('buying.agreement_start')}</label>
-                                    <DateInput className="form-input" required value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
+                                    <DateInput className="form-input" required value={formatDate(form.start_date)} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
                                 <div className="form-group"><label className="form-label">{t('buying.agreement_end')}</label>
-                                    <DateInput className="form-input" required value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} /></div>
+                                    <DateInput className="form-input" required value={formatDate(form.end_date)} onChange={e => setForm({ ...form, end_date: e.target.value })} /></div>
                             </div>
                             <div className="d-flex gap-3 pt-3">
                                 <button type="submit" className="btn btn-primary flex-1">{t('buying.create')}</button>

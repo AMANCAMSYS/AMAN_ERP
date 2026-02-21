@@ -7,6 +7,8 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission
 from database import get_db_connection
 from utils.accounting import update_account_balance, get_base_currency
+from utils.exports import generate_excel, generate_pdf, create_export_response
+from utils.exports import generate_excel, generate_pdf, create_export_response
 from schemas import UserResponse
 from schemas.manufacturing_advanced import (
     WorkCenterCreate, WorkCenterResponse,
@@ -1793,6 +1795,155 @@ def report_production_summary(
             ],
             "equipment_maintenance_due": maint_due or 0,
         }
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════
+# MFG-109: Direct Labor Report (تقرير العمالة المباشرة)
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/reports/direct-labor", dependencies=[Depends(require_permission("manufacturing.view"))])
+def report_direct_labor(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    work_center_id: Optional[int] = None,
+    format: Optional[str] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    تقرير العمالة المباشرة: ساعات العمل الفعلية، التكلفة، الكفاءة لكل عامل/مركز عمل/أمر إنتاج.
+    Direct Labor Report: Actual hours, cost, efficiency per worker/work center/production order.
+    """
+    conn = get_db_connection(current_user.company_id)
+    try:
+        date_filter = ""
+        params = {}
+        if start_date:
+            date_filter += " AND poo.start_time >= :start"
+            params["start"] = start_date
+        if end_date:
+            date_filter += " AND poo.end_time <= :end"
+            params["end"] = end_date
+        if work_center_id:
+            date_filter += " AND poo.work_center_id = :wcid"
+            params["wcid"] = work_center_id
+
+        # Per work center labor breakdown
+        rows = conn.execute(text(f"""
+            SELECT 
+                wc.id as work_center_id,
+                wc.name as work_center_name,
+                wc.code as work_center_code,
+                wc.cost_per_hour,
+                po.id as order_id,
+                po.order_number,
+                p.product_name,
+                po.quantity as order_quantity,
+                poo.name as operation_name,
+                poo.status as operation_status,
+                COALESCE(poo.actual_run_time, 0) as actual_run_time_min,
+                COALESCE(poo.planned_run_time, 0) as planned_run_time_min,
+                COALESCE(poo.completed_quantity, 0) as completed_quantity,
+                poo.start_time,
+                poo.end_time
+            FROM production_order_operations poo
+            JOIN production_orders po ON poo.production_order_id = po.id
+            JOIN products p ON po.product_id = p.id
+            LEFT JOIN work_centers wc ON poo.work_center_id = wc.id
+            WHERE poo.status IN ('completed', 'in_progress')
+            {date_filter}
+            ORDER BY wc.name, po.order_number, poo.sequence
+        """), params).fetchall()
+
+        # Build detailed report
+        report_rows = []
+        total_actual_hours = 0
+        total_planned_hours = 0
+        total_labor_cost = 0
+
+        for r in rows:
+            actual_hours = round(float(r.actual_run_time_min or 0) / 60.0, 2)
+            planned_hours = round(float(r.planned_run_time_min or 0) / 60.0, 2)
+            cost_per_hour = float(r.cost_per_hour or 0)
+            labor_cost = round(actual_hours * cost_per_hour, 2)
+            efficiency = round((planned_hours / actual_hours * 100), 1) if actual_hours > 0 else 0
+
+            total_actual_hours += actual_hours
+            total_planned_hours += planned_hours
+            total_labor_cost += labor_cost
+
+            report_rows.append({
+                "work_center": r.work_center_name or "غير محدد",
+                "work_center_code": r.work_center_code or "",
+                "order_number": r.order_number,
+                "product_name": r.product_name,
+                "operation": r.operation_name or "",
+                "planned_hours": planned_hours,
+                "actual_hours": actual_hours,
+                "efficiency_pct": efficiency,
+                "cost_per_hour": cost_per_hour,
+                "labor_cost": labor_cost,
+                "completed_qty": float(r.completed_quantity or 0),
+                "cost_per_unit": round(labor_cost / float(r.completed_quantity), 2) if r.completed_quantity else 0,
+            })
+
+        # Summary by work center
+        wc_summary = {}
+        for r in report_rows:
+            wc = r["work_center"]
+            if wc not in wc_summary:
+                wc_summary[wc] = {"hours": 0, "cost": 0, "operations": 0}
+            wc_summary[wc]["hours"] += r["actual_hours"]
+            wc_summary[wc]["cost"] += r["labor_cost"]
+            wc_summary[wc]["operations"] += 1
+
+        overall_efficiency = round((total_planned_hours / total_actual_hours * 100), 1) if total_actual_hours > 0 else 0
+
+        result = {
+            "report_name": "Direct Labor Report - تقرير العمالة المباشرة",
+            "period": {"start": str(start_date) if start_date else "All", "end": str(end_date) if end_date else "All"},
+            "details": report_rows,
+            "work_center_summary": [
+                {"work_center": k, "total_hours": round(v["hours"], 2), "total_cost": round(v["cost"], 2), "operations_count": v["operations"]}
+                for k, v in wc_summary.items()
+            ],
+            "totals": {
+                "total_actual_hours": round(total_actual_hours, 2),
+                "total_planned_hours": round(total_planned_hours, 2),
+                "overall_efficiency_pct": overall_efficiency,
+                "total_labor_cost": round(total_labor_cost, 2),
+                "total_operations": len(report_rows),
+            }
+        }
+
+        # Export if format specified
+        if format in ("excel", "pdf"):
+            export_data = []
+            for r in report_rows:
+                export_data.append({
+                    "مركز العمل / Work Center": r["work_center"],
+                    "أمر الإنتاج / Order #": r["order_number"],
+                    "المنتج / Product": r["product_name"],
+                    "العملية / Operation": r["operation"],
+                    "ساعات مخططة / Planned Hrs": r["planned_hours"],
+                    "ساعات فعلية / Actual Hrs": r["actual_hours"],
+                    "الكفاءة % / Efficiency": f"{r['efficiency_pct']}%",
+                    "تكلفة الساعة / Cost/Hr": r["cost_per_hour"],
+                    "تكلفة العمالة / Labor Cost": r["labor_cost"],
+                })
+            columns = list(export_data[0].keys()) if export_data else []
+            period_str = f"{start_date or 'all'}_{end_date or 'all'}"
+            if format == "excel":
+                buffer = generate_excel(export_data, columns, sheet_name="Direct Labor")
+                return create_export_response(buffer, f"direct_labor_{period_str}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                pdf_data = [columns] + [[str(row.get(c, '')) for c in columns] for row in export_data]
+                buffer = generate_pdf(pdf_data, f"Direct Labor Report ({period_str})")
+                return create_export_response(buffer, f"direct_labor_{period_str}.pdf", "application/pdf")
+
+        return result
     finally:
         conn.close()
 

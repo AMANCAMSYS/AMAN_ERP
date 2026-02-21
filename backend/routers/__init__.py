@@ -1,11 +1,39 @@
-from . import auth, companies, inventory, sales, accounting, purchases, reports, audit, roles, cost_centers, hr, hr_advanced, treasury, branches, budgets, reconciliation, pos, assets, dashboard, settings, parties, projects, expenses, currencies, manufacturing, contracts, taxes, costing_policies, approvals, security, data_import, checks, notes, notifications, scheduled_reports
+"""
+AMAN ERP - Router Package
+نظام أمان — تسجيل جميع الراوترات
+
+Structure:
+  routers/
+  ├── auth.py, companies.py, roles.py, ...   (core & admin)
+  ├── finance/                               (accounting, treasury, taxes, ...)
+  ├── hr/                                    (core + advanced)
+  ├── manufacturing/                         (production, BOM, MRP, ...)
+  ├── inventory/                             (products, warehouses, transfers, ...)
+  └── sales/                                 (customers, invoices, orders, ...)
+"""
+
+# ── Core & Admin (top-level) ───────────────────────────────────────────────────
+from . import (
+    auth, companies, roles, branches, settings,
+    audit, notifications, approvals, security, data_import,
+)
+
+# ── Grouped packages ──────────────────────────────────────────────────────────
+from . import finance, hr, manufacturing, inventory, sales
+
+# ── Remaining top-level routers ────────────────────────────────────────────────
+from . import (
+    purchases, parties, projects, reports, scheduled_reports,
+    dashboard, pos, contracts, crm, external,
+)
 
 __all__ = [
-    "auth", "companies", "inventory", "sales", "accounting", "purchases",
-    "reports", "audit", "roles", "cost_centers", "hr", "hr_advanced", "treasury",
-    "branches", "budgets", "reconciliation", "pos", "assets", "dashboard",
-    "settings", "parties", "projects", "expenses", "currencies",
-    "manufacturing", "contracts", "taxes", "costing_policies",
-    "approvals", "security", "data_import",
-    "checks", "notes", "notifications", "scheduled_reports"
+    # Core & Admin
+    "auth", "companies", "roles", "branches", "settings",
+    "audit", "notifications", "approvals", "security", "data_import",
+    # Grouped packages
+    "finance", "hr", "manufacturing", "inventory", "sales",
+    # Remaining top-level
+    "purchases", "parties", "projects", "reports", "scheduled_reports",
+    "dashboard", "pos", "contracts", "crm", "external",
 ]

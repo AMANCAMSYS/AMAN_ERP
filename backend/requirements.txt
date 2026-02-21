@@ -15,7 +15,9 @@ redis
 qrcode[pil]
 slowapi
 cryptography
-qrcode
-slowapi
 pillow
-cryptography
+pydantic-settings
+
+# ── Observability ─────────────────────
+sentry-sdk[fastapi]
+prometheus-fastapi-instrumentator

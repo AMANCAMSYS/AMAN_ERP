@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { format, differenceInDays, addDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import './GanttChart.css';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 export default function GanttChart({ tasks = [] }) {
     const { t, i18n } = useTranslation();
@@ -75,7 +76,7 @@ export default function GanttChart({ tasks = [] }) {
                                         left, width,
                                         backgroundColor: task.status === 'completed' ? '#28a745' : '#007bff'
                                     }}
-                                    title={`${task.task_name} (${task.start_date} - ${task.end_date})`}>
+                                    title={`${task.task_name} (${formatDate(task.start_date)} - ${formatDate(task.end_date)})`}>
                                     <span className="gantt-task-label">{task.task_name}</span>
                                     <div className="gantt-task-progress" style={{ width: `${task.progress || 0}%` }}></div>
                                 </div>

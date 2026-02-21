@@ -4,6 +4,7 @@ import { getCurrency, hasPermission } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const SupplierStatement = () => {
     const { t } = useTranslation();
@@ -150,7 +151,7 @@ const SupplierStatement = () => {
                                     )}
                                     {statement.transactions.map((t, idx) => (
                                         <tr key={idx}>
-                                            <td>{t.date}</td>
+                                            <td>{formatDate(t.date)}</td>
                                             <td className="font-medium text-primary">{t.ref}</td>
                                             <td>
                                                 <span className={`badge ${t.type === 'invoice' ? 'badge-danger' : 'badge-success'}`}>

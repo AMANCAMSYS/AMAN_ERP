@@ -29,54 +29,54 @@ export function useNotificationSocket(onNotification) {
         const timerId = setTimeout(() => {
             if (abortSignal?.aborted) return
 
-        try {
-            const ws = new WebSocket(url)
-            wsRef.current = ws
+            try {
+                const ws = new WebSocket(url)
+                wsRef.current = ws
 
-            ws.onopen = () => {
-                if (abortSignal?.aborted) { ws.close(); return }
-                setConnected(true)
-                attempt.current = 0
-            }
+                ws.onopen = () => {
+                    if (abortSignal?.aborted) { ws.close(); return }
+                    setConnected(true)
+                    attempt.current = 0
+                }
 
-            ws.onmessage = (event) => {
-                try {
-                    const msg = JSON.parse(event.data)
-                    if (msg.event === 'new_notification' && onNotification) {
-                        onNotification(msg.data)
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data)
+                        if (msg.event === 'new_notification' && onNotification) {
+                            onNotification(msg.data)
+                        }
+                    } catch {
+                        // Ignore non-JSON messages (pong, etc.)
                     }
-                } catch {
-                    // Ignore non-JSON messages (pong, etc.)
                 }
-            }
 
-            ws.onclose = (e) => {
+                ws.onclose = (e) => {
+                    setConnected(false)
+                    wsRef.current = null
+                    // Don't reconnect if cleanup already ran (StrictMode) or auth failure
+                    if (abortSignal?.aborted || e.code === 4001) return
+                    // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+                    const delay = Math.min(1000 * Math.pow(2, attempt.current), 30000)
+                    attempt.current++
+                    reconnectTimer.current = setTimeout(() => connect(abortSignal), delay)
+                }
+
+                ws.onerror = () => {
+                    ws.close()
+                }
+
+                // Send ping every 25s to keep connection alive
+                const pingInterval = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send('ping')
+                    }
+                }, 25000)
+
+                ws._pingInterval = pingInterval
+            } catch {
+                // WebSocket constructor can throw in some environments
                 setConnected(false)
-                wsRef.current = null
-                // Don't reconnect if cleanup already ran (StrictMode) or auth failure
-                if (abortSignal?.aborted || e.code === 4001) return
-                // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
-                const delay = Math.min(1000 * Math.pow(2, attempt.current), 30000)
-                attempt.current++
-                reconnectTimer.current = setTimeout(() => connect(abortSignal), delay)
             }
-
-            ws.onerror = () => {
-                ws.close()
-            }
-
-            // Send ping every 25s to keep connection alive
-            const pingInterval = setInterval(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send('ping')
-                }
-            }, 25000)
-
-            ws._pingInterval = pingInterval
-        } catch {
-            // WebSocket constructor can throw in some environments
-            setConnected(false)
-        }
         }, 50) // end setTimeout
 
         // Store timer id so cleanup can cancel it

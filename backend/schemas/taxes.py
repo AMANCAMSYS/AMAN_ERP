@@ -10,6 +10,7 @@ class TaxRateCreate(BaseModel):
     tax_name_en: Optional[str] = None
     rate_type: str = "percentage"
     rate_value: float = 0
+    country_code: Optional[str] = None
     description: Optional[str] = None
     effective_from: Optional[date] = None
     effective_to: Optional[date] = None
@@ -20,6 +21,7 @@ class TaxRateUpdate(BaseModel):
     tax_name: Optional[str] = None
     tax_name_en: Optional[str] = None
     rate_value: Optional[float] = None
+    country_code: Optional[str] = None
     description: Optional[str] = None
     effective_from: Optional[date] = None
     effective_to: Optional[date] = None

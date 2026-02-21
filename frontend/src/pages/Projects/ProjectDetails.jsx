@@ -451,11 +451,11 @@ export default function ProjectDetails() {
                             <div className="col-md-6">
                                 <div className="mb-3">
                                     <small className="text-muted d-block">{t('projects.fields.start_date', 'تاريخ البدء')}</small>
-                                    <span className="fw-medium">{project.start_date || '-'}</span>
+                                    <span className="fw-medium">{formatDate(project.start_date)}</span>
                                 </div>
                                 <div className="mb-3">
                                     <small className="text-muted d-block">{t('projects.fields.end_date', 'تاريخ الانتهاء')}</small>
-                                    <span className="fw-medium">{project.end_date || '-'}</span>
+                                    <span className="fw-medium">{formatDate(project.end_date)}</span>
                                 </div>
                                 <div className="mb-3">
                                     <small className="text-muted d-block">{t('projects.fields.description', 'الوصف')}</small>
@@ -759,12 +759,12 @@ export default function ProjectDetails() {
                 <div className="row g-3">
                     <div className="col-6">
                         <label className="form-label">{t('projects.fields.start_date', 'البدء')}</label>
-                        <DateInput className="form-input" value={taskForm.start_date}
+                        <DateInput className="form-input" value={formatDate(taskForm.start_date)}
                             onChange={e => setTaskForm({ ...taskForm, start_date: e.target.value })} />
                     </div>
                     <div className="col-6">
                         <label className="form-label">{t('projects.fields.end_date', 'الانتهاء')}</label>
-                        <DateInput className="form-input" value={taskForm.end_date}
+                        <DateInput className="form-input" value={formatDate(taskForm.end_date)}
                             onChange={e => setTaskForm({ ...taskForm, end_date: e.target.value })} />
                     </div>
                 </div>
@@ -892,12 +892,12 @@ export default function ProjectDetails() {
                 <div className="row g-3 mb-3">
                     <div className="col-6">
                         <label className="form-label">{t('common.date', 'التاريخ')} *</label>
-                        <DateInput className="form-input" value={invoiceForm.invoice_date}
+                        <DateInput className="form-input" value={formatDate(invoiceForm.invoice_date)}
                             onChange={e => setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })} />
                     </div>
                     <div className="col-6">
                         <label className="form-label">{t('common.due_date', 'تاريخ الاستحقاق')} *</label>
-                        <DateInput className="form-input" value={invoiceForm.due_date}
+                        <DateInput className="form-input" value={formatDate(invoiceForm.due_date)}
                             onChange={e => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })} />
                     </div>
                 </div>

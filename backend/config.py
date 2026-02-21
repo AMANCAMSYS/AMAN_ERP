@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     SYSTEM_EMAIL: str = "admin@aman-erp.com"
     MAX_COMPANIES_PER_INSTANCE: int = 1000
     COMPANY_ID_LENGTH: int = 8
+
+    # ── Observability ──────────────────────────────────────────
+    APP_ENV: str = "development"          # development | staging | production
+    SENTRY_DSN: str = ""                  # Leave empty to disable Sentry
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
     
     @property
     def DATABASE_URL(self) -> str:

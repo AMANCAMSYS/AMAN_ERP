@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import { getCurrency, hasPermission } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const ApprovalsPage = () => {
     const { t, i18n } = useTranslation();
@@ -192,7 +193,7 @@ const ApprovalsPage = () => {
                                                     {item.description && <div className="text-xs italic mt-1 text-base-content/60 max-w-xs truncate">{item.description}</div>}
                                                 </td>
                                                 <td>{item.requested_by_name || '—'}</td>
-                                                <td>{item.created_at?.split(' ')[0]}</td>
+                                                <td>{formatDate(item.created_at)}</td>
                                                 <td>
                                                     <div className="badge badge-outline badge-sm">{t('approvals.table.step')} {item.current_step} / {item.total_steps}</div>
                                                 </td>
@@ -257,7 +258,7 @@ const ApprovalsPage = () => {
                                                     <div className="text-xs opacity-70">{t('approvals.table.ref')}: {item.document_id} • <strong>{formatNumber(item.amount)} {currency}</strong></div>
                                                 </td>
                                                 <td>{item.requested_by_name || '—'}</td>
-                                                <td>{item.created_at?.split(' ')[0]}</td>
+                                                <td>{formatDate(item.created_at)}</td>
                                                 <td>{getStatusBadge(item.status)}</td>
                                                 <td>
                                                     <button className="btn btn-ghost btn-xs text-primary" title={t('common.view_details')}>

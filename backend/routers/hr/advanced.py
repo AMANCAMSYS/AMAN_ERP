@@ -11,6 +11,7 @@ from decimal import Decimal
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission
+from utils.exports import generate_excel, generate_pdf, create_export_response
 
 from schemas.hr_advanced import (
     SalaryStructureCreate, SalaryStructureUpdate, SalaryStructureResponse,
@@ -322,6 +323,115 @@ def calculate_gosi(current_user: UserResponse = Depends(get_current_user)):
                 "total_contribution": round(emp_share + empr_share + occ_hazard, 2)
             })
         return results
+    finally:
+        conn.close()
+
+
+@router.get("/gosi-export", dependencies=[Depends(require_permission("hr.view"))])
+def export_gosi(
+    format: str = "excel",
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """
+    تصدير ملف GOSI (التأمينات الاجتماعية) بتنسيق Excel أو PDF
+    Export GOSI contribution file for submission to Saudi GOSI system
+    """
+    conn = get_db_connection(current_user.company_id)
+    try:
+        # Get active settings
+        settings = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
+        emp_pct = float(settings.employee_share_percentage) if settings else 9.75
+        empr_pct = float(settings.employer_share_percentage) if settings else 11.75
+        occ_pct = float(settings.occupational_hazard_percentage) if settings else 2.0
+        max_sal = float(settings.max_contributable_salary) if settings else 45000
+
+        # Get employees with additional GOSI-relevant fields
+        employees = conn.execute(text("""
+            SELECT e.id, e.employee_number, e.first_name || ' ' || e.last_name as name,
+                   e.salary, e.housing_allowance, e.national_id, e.nationality,
+                   e.date_of_birth, e.hire_date, e.department
+            FROM employees e
+            WHERE e.status = 'active'
+            ORDER BY e.department, e.first_name
+        """)).fetchall()
+
+        target_month = month or date.today().month
+        target_year = year or date.today().year
+
+        export_data = []
+        total_emp_share = 0
+        total_empr_share = 0
+        total_occ_hazard = 0
+        total_all = 0
+
+        for emp in employees:
+            basic = float(emp.salary or 0)
+            housing = float(emp.housing_allowance or 0)
+            contributable = min(basic + housing, max_sal)
+            emp_share = round(contributable * emp_pct / 100, 2)
+            empr_share = round(contributable * empr_pct / 100, 2)
+            occ_hazard = round(contributable * occ_pct / 100, 2)
+            total = round(emp_share + empr_share + occ_hazard, 2)
+
+            total_emp_share += emp_share
+            total_empr_share += empr_share
+            total_occ_hazard += occ_hazard
+            total_all += total
+
+            export_data.append({
+                "رقم الموظف / Emp #": getattr(emp, 'employee_number', '') or emp.id,
+                "الاسم / Name": emp.name,
+                "رقم الهوية / National ID": getattr(emp, 'national_id', '') or '',
+                "الجنسية / Nationality": getattr(emp, 'nationality', '') or '',
+                "القسم / Department": getattr(emp, 'department', '') or '',
+                "الراتب الأساسي / Basic Salary": basic,
+                "بدل السكن / Housing": housing,
+                "الراتب الخاضع / Contributable": contributable,
+                f"حصة الموظف {emp_pct}% / Employee Share": emp_share,
+                f"حصة صاحب العمل {empr_pct}% / Employer Share": empr_share,
+                f"أخطار مهنية {occ_pct}% / Occ. Hazard": occ_hazard,
+                "الإجمالي / Total": total,
+            })
+
+        # Summary row
+        export_data.append({
+            "رقم الموظف / Emp #": "",
+            "الاسم / Name": "الإجمالي / TOTAL",
+            "رقم الهوية / National ID": "",
+            "الجنسية / Nationality": "",
+            "القسم / Department": "",
+            "الراتب الأساسي / Basic Salary": "",
+            "بدل السكن / Housing": "",
+            "الراتب الخاضع / Contributable": "",
+            f"حصة الموظف {emp_pct}% / Employee Share": round(total_emp_share, 2),
+            f"حصة صاحب العمل {empr_pct}% / Employer Share": round(total_empr_share, 2),
+            f"أخطار مهنية {occ_pct}% / Occ. Hazard": round(total_occ_hazard, 2),
+            "الإجمالي / Total": round(total_all, 2),
+        })
+
+        columns = list(export_data[0].keys())
+        period_str = f"{target_year}-{str(target_month).zfill(2)}"
+
+        if format == "excel":
+            buffer = generate_excel(export_data, columns, sheet_name=f"GOSI {period_str}")
+            return create_export_response(buffer, f"gosi_report_{period_str}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        elif format == "csv":
+            import csv, io
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=columns)
+            writer.writeheader()
+            writer.writerows(export_data)
+            csv_bytes = io.BytesIO(output.getvalue().encode('utf-8-sig'))
+            return create_export_response(csv_bytes, f"gosi_report_{period_str}.csv", "text/csv")
+        else:
+            pdf_data = [columns]
+            for row in export_data:
+                pdf_data.append([str(row.get(c, '')) for c in columns])
+            buffer = generate_pdf(pdf_data, f"GOSI Report - تقرير التأمينات الاجتماعية ({period_str})")
+            return create_export_response(buffer, f"gosi_report_{period_str}.pdf", "application/pdf")
     finally:
         conn.close()
 

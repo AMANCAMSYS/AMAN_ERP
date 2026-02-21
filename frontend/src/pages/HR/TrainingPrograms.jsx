@@ -6,6 +6,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const TrainingPrograms = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -115,8 +116,8 @@ const TrainingPrograms = () => {
                                 <td>{i + 1}</td>
                                 <td style={{ fontWeight: 600 }}>{p.name}</td>
                                 <td>{p.trainer || '-'}</td>
-                                <td>{p.start_date || '-'}</td>
-                                <td>{p.end_date || '-'}</td>
+                                <td>{formatDate(p.start_date)}</td>
+                                <td>{formatDate(p.end_date)}</td>
                                 <td>{p.location || '-'}</td>
                                 <td>{getStatusBadge(p.status)}</td>
                                 <td>
@@ -151,11 +152,11 @@ const TrainingPrograms = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
                                 <label>{isRTL ? 'تاريخ البداية' : 'Start Date'}</label>
-                                <DateInput className="form-input" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+                                <DateInput className="form-input" value={formatDate(form.start_date)} onChange={e => setForm({ ...form, start_date: e.target.value })} />
                             </div>
                             <div className="form-group">
                                 <label>{isRTL ? 'تاريخ النهاية' : 'End Date'}</label>
-                                <DateInput className="form-input" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
+                                <DateInput className="form-input" value={formatDate(form.end_date)} onChange={e => setForm({ ...form, end_date: e.target.value })} />
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>

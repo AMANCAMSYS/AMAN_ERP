@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 function GeneralLedger() {
     const { t, i18n } = useTranslation()
@@ -207,7 +208,7 @@ function GeneralLedger() {
                                     ) : (
                                         entriesWithBalance.map((entry, idx) => (
                                             <tr key={idx} className="hover-row">
-                                                <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{entry.entry_date}</td>
+                                                <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{formatDate(entry.entry_date)}</td>
                                                 <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{entry.entry_number}</td>
                                                 <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.description}</td>
                                                 <td style={{ color: entry.reference ? 'var(--text-primary)' : 'var(--text-light)' }}>{entry.reference || '-'}</td>

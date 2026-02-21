@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Secrets & local config
+.env
+*.log
+backend.log
+frontend.log
+
+# Tests & docs (not needed in runtime image)
+tests/
+migrations/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp

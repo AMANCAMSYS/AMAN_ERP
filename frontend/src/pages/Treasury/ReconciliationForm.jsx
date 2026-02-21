@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const ReconciliationForm = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -625,7 +626,7 @@ const ReconciliationForm = () => {
                                         onClick={() => !isPosted && setSelectedLedgerLine(
                                             selectedLedgerLine?.id === line.id ? null : line
                                         )}>
-                                        <td className="small">{line.entry_date}</td>
+                                        <td className="small">{formatDate(line.entry_date)}</td>
                                         <td>
                                             <div className="fw-bold text-dark" style={{ fontSize: '13px' }}>{line.entry_number}</div>
                                             <div className="small text-muted">{line.line_desc || line.header_desc}</div>

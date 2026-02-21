@@ -7,6 +7,7 @@ import {
     FaIndustry, FaRoute, FaLayerGroup, FaClipboardList, FaCogs, FaChartLine, FaArrowRight, FaPlus, FaIdCard, FaBoxes, FaTools, FaCalendarAlt
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const ManufacturingHome = () => {
     const { t } = useTranslation();
@@ -184,7 +185,7 @@ const ManufacturingHome = () => {
                                                     </td>
                                                     <td>{order.product_name}</td>
                                                     <td className="font-bold">{order.produced_quantity} / {order.quantity}</td>
-                                                    <td>{order.due_date}</td>
+                                                    <td>{formatDate(order.due_date)}</td>
                                                     <td>{getStatusBadge(order.status)}</td>
                                                 </tr>
                                             ))}

@@ -15,6 +15,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
+from utils.accounting import get_mapped_account_id, update_account_balance, generate_sequential_number, get_base_currency
 
 logger = logging.getLogger(__name__)
 sales_improvements_router = APIRouter()
@@ -285,6 +286,97 @@ def commission_summary(current_user=Depends(get_current_user)):
             ORDER BY total_commission DESC
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@sales_improvements_router.post("/commissions/pay", dependencies=[Depends(require_permission("sales.create"))])
+def pay_commission(data: dict, current_user=Depends(get_current_user)):
+    """
+    صرف العمولات وإنشاء قيد محاسبي.
+    Pay commissions and create GL entry:
+    Dr: Sales Commission Expense (acc_map_sales_commission / 5217)
+    Cr: Bank/Cash (acc_map_bank)
+    
+    data: { "commission_ids": [1,2,3], "payment_date": "2026-01-15" }
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        commission_ids = data.get("commission_ids", [])
+        payment_date = data.get("payment_date", str(date.today()))
+        
+        if not commission_ids:
+            raise HTTPException(status_code=400, detail="لم يتم تحديد عمولات للصرف")
+        
+        # Fetch pending commissions
+        placeholders = ",".join(str(int(cid)) for cid in commission_ids)
+        commissions = db.execute(text(f"""
+            SELECT * FROM sales_commissions 
+            WHERE id IN ({placeholders}) AND status = 'pending'
+        """)).fetchall()
+        
+        if not commissions:
+            raise HTTPException(status_code=400, detail="لا توجد عمولات معلقة بالأرقام المحددة")
+        
+        total_amount = sum(float(c.commission_amount) for c in commissions)
+        
+        # Create GL Entry
+        commission_acc = get_mapped_account_id(db, "acc_map_sales_commission")
+        bank_acc = get_mapped_account_id(db, "acc_map_bank")
+        base_currency = get_base_currency(db)
+        
+        je_id = None
+        if commission_acc and bank_acc:
+            entry_num = generate_sequential_number(db, f"COMPAY-{date.today().year}", "journal_entries", "entry_number")
+            
+            sp_names = set()
+            for c in commissions:
+                sp_names.add(c.salesperson_name or str(c.salesperson_id))
+            
+            je_id = db.execute(text("""
+                INSERT INTO journal_entries (entry_number, entry_date, description, status, currency, exchange_rate, created_by)
+                VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid) RETURNING id
+            """), {
+                "num": entry_num, "date": payment_date,
+                "desc": f"صرف عمولات مبيعات — {', '.join(sp_names)} — {total_amount:.2f}",
+                "curr": base_currency, "uid": current_user.id
+            }).scalar()
+            
+            # Dr: Commission Expense
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jid, :aid, :amt, 0, :desc)
+            """), {"jid": je_id, "aid": commission_acc, "amt": total_amount,
+                   "desc": f"عمولات مبيعات — {len(commissions)} عمولة"})
+            update_account_balance(db, commission_acc, debit_base=total_amount, credit_base=0)
+            
+            # Cr: Bank
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jid, :aid, 0, :amt, :desc)
+            """), {"jid": je_id, "aid": bank_acc, "amt": total_amount,
+                   "desc": f"صرف عمولات مبيعات"})
+            update_account_balance(db, bank_acc, debit_base=0, credit_base=total_amount)
+        
+        # Update commission status
+        db.execute(text(f"""
+            UPDATE sales_commissions SET status = 'paid', updated_at = NOW()
+            WHERE id IN ({placeholders}) AND status = 'pending'
+        """))
+        
+        db.commit()
+        return {
+            "success": True,
+            "paid_count": len(commissions),
+            "total_amount": round(total_amount, 2),
+            "journal_entry_id": je_id,
+            "message": f"تم صرف {len(commissions)} عمولة بمبلغ {total_amount:.2f} وإنشاء القيد المحاسبي"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

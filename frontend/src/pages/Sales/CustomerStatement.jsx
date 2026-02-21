@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const CustomerStatement = () => {
     const { t } = useTranslation();
@@ -151,7 +152,7 @@ const CustomerStatement = () => {
                                     )}
                                     {statement.transactions.map((t_item, idx) => (
                                         <tr key={idx}>
-                                            <td>{t_item.date}</td>
+                                            <td>{formatDate(t_item.date)}</td>
                                             <td className="font-medium text-primary">{t_item.ref}</td>
                                             <td>
                                                 <span className={`badge ${t_item.type === 'invoice' ? 'badge-warning' : 'badge-success'}`}>

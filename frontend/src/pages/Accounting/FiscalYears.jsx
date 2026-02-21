@@ -174,8 +174,8 @@ function FiscalYears() {
                             ) : fiscalYears.map(fy => (
                                 <tr key={fy.id}>
                                     <td><strong>{fy.year}</strong></td>
-                                    <td>{fy.start_date}</td>
-                                    <td>{fy.end_date}</td>
+                                    <td>{formatDate(fy.start_date)}</td>
+                                    <td>{formatDate(fy.end_date)}</td>
                                     <td>
                                         <span className={`badge ${fy.status === 'open' ? 'badge-success' : 'badge-secondary'}`}>
                                             {fy.status === 'open'
@@ -441,8 +441,8 @@ function FiscalYears() {
                                     {periods.map(p => (
                                         <tr key={p.id}>
                                             <td>{p.name}</td>
-                                            <td>{p.start_date}</td>
-                                            <td>{p.end_date}</td>
+                                            <td>{formatDate(p.start_date)}</td>
+                                            <td>{formatDate(p.end_date)}</td>
                                             <td>{p.entry_count}</td>
                                             <td>
                                                 <span className={`badge ${p.is_closed ? 'badge-secondary' : 'badge-success'}`}>

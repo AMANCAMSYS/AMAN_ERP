@@ -5,6 +5,7 @@ import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const EquipmentMaintenance = () => {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('equipment');
@@ -176,7 +177,7 @@ const EquipmentMaintenance = () => {
                                                 </td>
                                                 <td>{eq.last_maintenance_date || '-'}</td>
                                                 <td style={{ color: (eq.next_maintenance_date && new Date(eq.next_maintenance_date) < new Date()) ? 'var(--danger)' : undefined, fontWeight: (eq.next_maintenance_date && new Date(eq.next_maintenance_date) < new Date()) ? 700 : undefined }}>
-                                                    {eq.next_maintenance_date || '-'}
+                                                    {formatDate(eq.next_maintenance_date)}
                                                 </td>
                                                 <td>
                                                     <button onClick={() => {
@@ -264,7 +265,7 @@ const EquipmentMaintenance = () => {
                                 <div className="form-group">
                                     <label className="form-label">{t('manufacturing.next_maintenance_date')}</label>
                                     <DateInput className="form-control-sm w-full"
-                                        value={equipForm.next_maintenance_date} onChange={e => setEquipForm({ ...equipForm, next_maintenance_date: e.target.value })} />
+                                        value={formatDate(equipForm.next_maintenance_date)} onChange={e => setEquipForm({ ...equipForm, next_maintenance_date: e.target.value })} />
                                 </div>
                             </div>
                             <div className="modal-footer">

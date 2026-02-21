@@ -20,8 +20,11 @@ function TaxHome() {
     const [returns, setReturns] = useState([])
     const [activeTab, setActiveTab] = useState('overview')
     const [showRateModal, setShowRateModal] = useState(false)
-    const [rateForm, setRateForm] = useState({ tax_code: '', tax_name: '', tax_name_en: '', rate_value: 15, description: '' })
+    const [rateForm, setRateForm] = useState({ tax_code: '', tax_name: '', tax_name_en: '', rate_value: 15, description: '', country_code: '' })
     const [editingRate, setEditingRate] = useState(null)
+    const [branchAnalysis, setBranchAnalysis] = useState(null)
+    const [employeeTaxes, setEmployeeTaxes] = useState(null)
+    const [filterYear, setFilterYear] = useState(new Date().getFullYear())
 
     const fetchAll = async () => {
         try {
@@ -31,7 +34,7 @@ function TaxHome() {
             
             const [summaryRes, ratesRes, returnsRes] = await Promise.all([
                 taxesAPI.getSummary(params),
-                taxesAPI.listRates(),
+                taxesAPI.listRates(currentBranch ? { country_code: currentBranch.country_code } : {}),
                 taxesAPI.listReturns(params)
             ])
             setSummary(summaryRes.data)
@@ -44,7 +47,29 @@ function TaxHome() {
         }
     }
 
+    const fetchBranchAnalysis = async () => {
+        try {
+            const params = { start_date: `${filterYear}-01-01`, end_date: `${filterYear}-12-31` }
+            if (currentBranch) params.branch_id = currentBranch.id
+            const res = await taxesAPI.getBranchAnalysis(params)
+            setBranchAnalysis(res.data)
+        } catch (err) { console.error(err) }
+    }
+
+    const fetchEmployeeTaxes = async () => {
+        try {
+            const params = { year: filterYear }
+            if (currentBranch) params.branch_id = currentBranch.id
+            const res = await taxesAPI.getEmployeeTaxes(params)
+            setEmployeeTaxes(res.data)
+        } catch (err) { console.error(err) }
+    }
+
     useEffect(() => { fetchAll() }, [currentBranch])
+    useEffect(() => {
+        if (activeTab === 'branch_analysis') fetchBranchAnalysis()
+        if (activeTab === 'employee_taxes') fetchEmployeeTaxes()
+    }, [activeTab, filterYear, currentBranch])
 
     const handleCreateRate = async () => {
         try {
@@ -84,7 +109,8 @@ function TaxHome() {
             tax_name: rate.tax_name,
             tax_name_en: rate.tax_name_en || '',
             rate_value: rate.rate_value,
-            description: rate.description || ''
+            description: rate.description || '',
+            country_code: rate.country_code || ''
         })
         setShowRateModal(true)
     }
@@ -160,11 +186,13 @@ function TaxHome() {
 
             {/* Tabs */}
             <div className="tabs mt-4">
-                {['overview', 'rates', 'returns'].map(tab => (
+                {['overview', 'rates', 'returns', 'branch_analysis', 'employee_taxes'].map(tab => (
                     <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
                         {tab === 'overview' && (t('taxes.tab_overview') || 'نظرة عامة')}
                         {tab === 'rates' && (t('taxes.tab_rates') || 'أنواع الضرائب')}
                         {tab === 'returns' && (t('taxes.tab_returns') || 'الإقرارات الضريبية')}
+                        {tab === 'branch_analysis' && (t('taxes.tab_branch_analysis') || '📊 تحليل الفروع')}
+                        {tab === 'employee_taxes' && (t('taxes.tab_employee_taxes') || '👥 ضرائب الموظفين')}
                     </button>
                 ))}
             </div>
@@ -189,6 +217,9 @@ function TaxHome() {
                                 <button className="btn btn-outline" onClick={() => setActiveTab('rates')} style={{ textAlign: 'center' }}>
                                     ⚙️ {t('taxes.manage_rates') || 'إدارة أنواع الضرائب'}
                                 </button>
+                                <Link to="/taxes/compliance" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                    🛡️ {t('taxes.tax_compliance') || 'الامتثال الضريبي متعدد الدول'}
+                                </Link>
                             </div>
                         </div>
 
@@ -235,7 +266,7 @@ function TaxHome() {
                 <div className="card mt-4">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <h3 className="section-title" style={{ margin: 0 }}>{t('taxes.tax_rates') || 'أنواع الضرائب'}</h3>
-                        <button className="btn btn-primary btn-sm" onClick={() => { setEditingRate(null); setRateForm({ tax_code: '', tax_name: '', tax_name_en: '', rate_value: 15, description: '' }); setShowRateModal(true) }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => { setEditingRate(null); setRateForm({ tax_code: '', tax_name: '', tax_name_en: '', rate_value: 15, description: '', country_code: '' }); setShowRateModal(true) }}>
                             + {t('taxes.add_rate') || 'إضافة نوع'}
                         </button>
                     </div>
@@ -247,6 +278,7 @@ function TaxHome() {
                                     <th>{t('taxes.tax_name') || 'الاسم'}</th>
                                     <th>{t('taxes.tax_name_en') || 'الاسم (EN)'}</th>
                                     <th>{t('taxes.rate_value') || 'النسبة %'}</th>
+                                    <th>{t('taxes.country_code') || 'الدولة'}</th>
                                     <th>{t('taxes.effective_from') || 'تاريخ البدء'}</th>
                                     <th>{t('taxes.effective_to') || 'تاريخ الانتهاء'}</th>
                                     <th>{t('common.status') || 'الحالة'}</th>
@@ -255,7 +287,7 @@ function TaxHome() {
                             </thead>
                             <tbody>
                                 {rates.length === 0 ? (
-                                    <tr><td colSpan="8" className="text-center text-muted">{t('taxes.no_rates') || 'لا توجد أنواع ضرائب'}</td></tr>
+                                    <tr><td colSpan="9" className="text-center text-muted">{t('taxes.no_rates') || 'لا توجد أنواع ضرائب'}</td></tr>
                                 ) : rates.map(rate => (
                                     <tr key={rate.id}>
                                         <td>
@@ -264,6 +296,13 @@ function TaxHome() {
                                         <td>{rate.tax_name}</td>
                                         <td>{rate.tax_name_en || <span className="text-muted">—</span>}</td>
                                         <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{rate.rate_value}%</td>
+                                        <td>
+                                            {rate.country_code ? (
+                                                <span style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                                                    {rate.country_code}
+                                                </span>
+                                            ) : <span className="text-muted" style={{ fontSize: '11px' }}>🌍 {t('taxes.global') || 'عالمي'}</span>}
+                                        </td>
                                         <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_from ? formatShortDate(rate.effective_from) : <span className="text-muted">—</span>}</td>
                                         <td style={{ whiteSpace: 'nowrap' }}>{rate.effective_to ? formatShortDate(rate.effective_to) : <span className="text-muted">—</span>}</td>
                                         <td>
@@ -301,6 +340,7 @@ function TaxHome() {
                                     <th>{t('taxes.return_number') || 'رقم الإقرار'}</th>
                                     <th>{t('taxes.period') || 'الفترة'}</th>
                                     <th>{t('taxes.tax_type') || 'النوع'}</th>
+                                    <th>{t('common.branch') || 'الفرع'}</th>
                                     <th style={{ textAlign: 'left' }}>{t('taxes.taxable_amount') || 'المبلغ الخاضع'}</th>
                                     <th style={{ textAlign: 'left' }}>{t('taxes.tax_amount') || 'مبلغ الضريبة'}</th>
                                     <th style={{ textAlign: 'left' }}>{t('taxes.total_amount') || 'الإجمالي'}</th>
@@ -312,7 +352,7 @@ function TaxHome() {
                             </thead>
                             <tbody>
                                 {returns.length === 0 ? (
-                                    <tr><td colSpan="10" className="text-center text-muted">{t('taxes.no_returns') || 'لا توجد إقرارات'}</td></tr>
+                                    <tr><td colSpan="11" className="text-center text-muted">{t('taxes.no_returns') || 'لا توجد إقرارات'}</td></tr>
                                 ) : returns.map(r => (
                                     <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/taxes/returns/${r.id}`)}>
                                         <td>
@@ -324,6 +364,7 @@ function TaxHome() {
                                                 {r.tax_type === 'vat' ? 'ض.ق.م' : r.tax_type}
                                             </span>
                                         </td>
+                                        <td style={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{r.branch_name || <span className="text-muted">—</span>}</td>
                                         <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{formatNumber(r.taxable_amount)}</td>
                                         <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{formatNumber(r.tax_amount)}</td>
                                         <td style={{ textAlign: 'left', fontWeight: '700', whiteSpace: 'nowrap' }}>
@@ -381,6 +422,25 @@ function TaxHome() {
                                     onChange={e => setRateForm({...rateForm, rate_value: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
+                                <label className="form-label">{t('taxes.country_code') || 'رمز الدولة'}</label>
+                                <select className="form-control" value={rateForm.country_code || ''}
+                                    onChange={e => setRateForm({...rateForm, country_code: e.target.value || null})}>
+                                    <option value="">{t('taxes.all_countries') || 'جميع الدول (عالمي)'}</option>
+                                    <option value="SA">🇸🇦 السعودية</option>
+                                    <option value="SY">🇸🇾 سوريا</option>
+                                    <option value="AE">🇦🇪 الإمارات</option>
+                                    <option value="EG">🇪🇬 مصر</option>
+                                    <option value="JO">🇯🇴 الأردن</option>
+                                    <option value="KW">🇰🇼 الكويت</option>
+                                    <option value="BH">🇧🇭 البحرين</option>
+                                    <option value="OM">🇴🇲 عمان</option>
+                                    <option value="QA">🇶🇦 قطر</option>
+                                    <option value="IQ">🇮🇶 العراق</option>
+                                    <option value="LB">🇱🇧 لبنان</option>
+                                    <option value="TR">🇹🇷 تركيا</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
                                 <label className="form-label">{t('taxes.description') || 'الوصف'}</label>
                                 <textarea className="form-control" rows="2" value={rateForm.description}
                                     onChange={e => setRateForm({...rateForm, description: e.target.value})} />
@@ -395,6 +455,190 @@ function TaxHome() {
                                 {editingRate ? (t('common.save') || 'حفظ') : (t('common.create') || 'إنشاء')}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ Branch Tax Analysis Tab ═══ */}
+            {activeTab === 'branch_analysis' && (
+                <div className="card mt-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 className="section-title" style={{ margin: 0 }}>📊 {t('taxes.branch_analysis_title') || 'تحليل الضرائب حسب الفرع'}</h3>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <label style={{ fontSize: '13px' }}>{t('common.year') || 'السنة'}:</label>
+                            <select className="form-control" style={{ width: '100px' }} value={filterYear}
+                                onChange={e => setFilterYear(parseInt(e.target.value))}>
+                                {[...Array(5)].map((_, i) => {
+                                    const y = new Date().getFullYear() - i
+                                    return <option key={y} value={y}>{y}</option>
+                                })}
+                            </select>
+                        </div>
+                    </div>
+
+                    {branchAnalysis && branchAnalysis.totals && (
+                        <div className="metrics-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.total_output_vat') || 'إجمالي ضريبة المخرجات'}</div>
+                                <div className="metric-value text-secondary">{formatNumber(branchAnalysis.totals.output_vat)} <small>{currency}</small></div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.total_input_vat') || 'إجمالي ضريبة المدخلات'}</div>
+                                <div className="metric-value text-primary">{formatNumber(branchAnalysis.totals.input_vat)} <small>{currency}</small></div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.net_vat') || 'صافي الضريبة'}</div>
+                                <div className={`metric-value ${branchAnalysis.totals.net_vat >= 0 ? 'text-error' : 'text-success'}`}>
+                                    {formatNumber(Math.abs(branchAnalysis.totals.net_vat))} <small>{currency}</small>
+                                </div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.branches_count') || 'عدد الفروع'}</div>
+                                <div className="metric-value">{branchAnalysis.totals.branch_count}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="data-table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t('common.branch') || 'الفرع'}</th>
+                                    <th>{t('taxes.jurisdiction') || 'الاختصاص'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.taxable_sales') || 'المبيعات الخاضعة'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.output_vat') || 'ضريبة المخرجات'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.input_vat') || 'ضريبة المدخلات'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.net_vat') || 'صافي الضريبة'}</th>
+                                    <th>{t('taxes.invoices') || 'الفواتير'}</th>
+                                    <th>{t('taxes.returns_filed') || 'إقرارات مقدمة'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(!branchAnalysis || !branchAnalysis.branches || branchAnalysis.branches.length === 0) ? (
+                                    <tr><td colSpan="8" className="text-center text-muted">{t('taxes.no_branch_data') || 'لا توجد بيانات ضريبية للفروع'}</td></tr>
+                                ) : branchAnalysis.branches.map(b => (
+                                    <tr key={b.branch_id}>
+                                        <td style={{ fontWeight: '600' }}>{b.branch_name}</td>
+                                        <td>
+                                            <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                                                {b.jurisdiction}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{formatNumber(b.taxable_sales)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--secondary)' }}>{formatNumber(b.output_vat)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--primary)' }}>{formatNumber(b.input_vat)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontWeight: '700', color: b.net_vat >= 0 ? 'var(--error)' : 'var(--success)' }}>
+                                            {formatNumber(Math.abs(b.net_vat))} {b.net_vat >= 0 ? '↑' : '↓'}
+                                        </td>
+                                        <td style={{ textAlign: 'center' }}>{b.invoice_count}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <span style={{ fontSize: '12px' }}>
+                                                {b.returns_paid > 0 && <span style={{ color: 'var(--success)' }}>✅{b.returns_paid}</span>}
+                                                {b.returns_filed > 0 && <span style={{ color: 'var(--primary)', marginInlineStart: '4px' }}>📤{b.returns_filed}</span>}
+                                                {b.returns_draft > 0 && <span style={{ color: 'var(--warning)', marginInlineStart: '4px' }}>⏳{b.returns_draft}</span>}
+                                                {!b.returns_count && <span className="text-muted">—</span>}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ Employee Taxes Tab ═══ */}
+            {activeTab === 'employee_taxes' && (
+                <div className="card mt-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 className="section-title" style={{ margin: 0 }}>👥 {t('taxes.employee_taxes_title') || 'الالتزامات الضريبية للموظفين'}</h3>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <label style={{ fontSize: '13px' }}>{t('common.year') || 'السنة'}:</label>
+                            <select className="form-control" style={{ width: '100px' }} value={filterYear}
+                                onChange={e => setFilterYear(parseInt(e.target.value))}>
+                                {[...Array(5)].map((_, i) => {
+                                    const y = new Date().getFullYear() - i
+                                    return <option key={y} value={y}>{y}</option>
+                                })}
+                            </select>
+                        </div>
+                    </div>
+
+                    {employeeTaxes && employeeTaxes.summary && (
+                        <div className="metrics-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.total_employees') || 'عدد الموظفين'}</div>
+                                <div className="metric-value">{employeeTaxes.summary.total_employees}</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.total_gross_salaries') || 'إجمالي الرواتب'}</div>
+                                <div className="metric-value text-primary">{formatNumber(employeeTaxes.summary.total_gross)} <small>{currency}</small></div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.gosi_employee_total') || 'تأمينات الموظف'}</div>
+                                <div className="metric-value text-warning">{formatNumber(employeeTaxes.summary.total_gosi_employee)} <small>{currency}</small></div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-label">{t('taxes.gosi_employer_total') || 'تأمينات صاحب العمل'}</div>
+                                <div className="metric-value text-secondary">{formatNumber(employeeTaxes.summary.total_gosi_employer)} <small>{currency}</small></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {employeeTaxes?.gosi_settings && (
+                        <div className="alert alert-info mb-3" style={{ display: 'flex', gap: '20px', fontSize: '13px', padding: '10px 16px', background: 'rgba(59, 130, 246, 0.06)', borderRadius: '8px' }}>
+                            <span>🏛️ <strong>{t('taxes.gosi_settings') || 'إعدادات التأمينات'}:</strong></span>
+                            <span>{t('taxes.employee_share') || 'حصة الموظف'}: <b>{employeeTaxes.gosi_settings.employee_pct}%</b></span>
+                            <span>{t('taxes.employer_share') || 'حصة صاحب العمل'}: <b>{employeeTaxes.gosi_settings.employer_pct}%</b></span>
+                            <span>{t('taxes.max_salary') || 'الحد الأقصى'}: <b>{formatNumber(employeeTaxes.gosi_settings.max_salary)} {currency}</b></span>
+                        </div>
+                    )}
+
+                    <div className="data-table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t('hr.employee_code') || 'الرمز'}</th>
+                                    <th>{t('hr.employee_name') || 'الموظف'}</th>
+                                    <th>{t('common.branch') || 'الفرع'}</th>
+                                    <th>{t('taxes.jurisdiction') || 'الاختصاص'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.total_gross') || 'إجمالي الراتب'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.gosi_employee') || 'تأمينات (موظف)'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.gosi_employer') || 'تأمينات (شركة)'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.income_tax') || 'ضريبة دخل'}</th>
+                                    <th style={{ textAlign: 'left' }}>{t('taxes.total_net') || 'صافي الراتب'}</th>
+                                    <th>{t('taxes.payslips') || 'كشوف'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(!employeeTaxes || !employeeTaxes.employees || employeeTaxes.employees.length === 0) ? (
+                                    <tr><td colSpan="10" className="text-center text-muted">{t('taxes.no_employee_data') || 'لا توجد بيانات رواتب للسنة المحددة'}</td></tr>
+                                ) : employeeTaxes.employees.map(emp => (
+                                    <tr key={emp.employee_id}>
+                                        <td><span style={{ fontFamily: 'monospace', color: 'var(--primary)', fontWeight: '600' }}>{emp.employee_code}</span></td>
+                                        <td style={{ fontWeight: '600' }}>{emp.employee_name}</td>
+                                        <td style={{ whiteSpace: 'nowrap', fontSize: '12px' }}>{emp.branch_name || '—'}</td>
+                                        <td>
+                                            <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'rgb(59, 130, 246)', padding: '3px 8px', borderRadius: '6px', fontSize: '11px' }}>
+                                                {emp.jurisdiction}
+                                            </span>
+                                        </td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{formatNumber(emp.total_gross)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--warning)' }}>{formatNumber(emp.gosi_employee)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', color: 'var(--secondary)' }}>{formatNumber(emp.gosi_employer)}</td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                                            {emp.income_tax_due > 0 ? (
+                                                <span style={{ color: 'var(--error)', fontWeight: '600' }}>{formatNumber(emp.income_tax_due)} ({emp.income_tax_rate}%)</span>
+                                            ) : (
+                                                <span className="text-muted">—</span>
+                                            )}
+                                        </td>
+                                        <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontWeight: '700' }}>{formatNumber(emp.total_net)}</td>
+                                        <td style={{ textAlign: 'center' }}>{emp.payslip_count}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

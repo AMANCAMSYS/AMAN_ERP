@@ -4,6 +4,7 @@ import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 export default function OpeningBalances() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
@@ -101,7 +102,7 @@ export default function OpeningBalances() {
                         <h2>📋 {isAr ? 'الأرصدة الافتتاحية' : 'Opening Balances'}</h2>
                         {entryInfo && (
                             <small className="text-muted">
-                                {isAr ? 'قيد رقم: ' : 'Entry #'}{entryInfo.entry_number} — {entryInfo.entry_date}
+                                {isAr ? 'قيد رقم: ' : 'Entry #'}{entryInfo.entry_number} — {formatDate(entryInfo.entry_date)}
                             </small>
                         )}
                     </div>

@@ -7,6 +7,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const NotesReceivable = () => {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
@@ -181,7 +182,7 @@ const NotesReceivable = () => {
                                 <td>{note.bank_name || '-'}</td>
                                 <td className="text-end font-monospace fw-bold">{fmt(note.amount)}</td>
                                 <td>
-                                    {note.due_date}
+                                    {formatDate(note.due_date)}
                                     {isOverdue(note) && <span className="badge badge-danger ms-1" style={{ fontSize: '10px' }}>متأخر</span>}
                                 </td>
                                 <td>{statusBadge(note.status)}</td>
@@ -236,11 +237,11 @@ const NotesReceivable = () => {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">تاريخ الإصدار</label>
-                                    <DateInput className="form-input" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
+                                    <DateInput className="form-input" value={formatDate(form.issue_date)} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">تاريخ الاستحقاق *</label>
-                                    <DateInput className="form-input" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                                    <DateInput className="form-input" value={formatDate(form.due_date)} onChange={e => setForm({ ...form, due_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">العميل</label>

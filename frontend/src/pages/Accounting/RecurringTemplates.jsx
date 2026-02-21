@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 const FREQ_LABELS = {
     daily: { ar: 'يومي', en: 'Daily' },
     weekly: { ar: 'أسبوعي', en: 'Weekly' },
@@ -341,7 +342,7 @@ export default function RecurringTemplates() {
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-3">
                                         <label className="form-label">{isAr ? 'تاريخ البداية *' : 'Start Date *'}</label>
-                                        <DateInput className="form-control" required value={form.start_date}
+                                        <DateInput className="form-control" required value={formatDate(form.start_date)}
                                             onChange={e => setForm(f => ({
                                                 ...f, start_date: e.target.value,
                                                 next_run_date: f.next_run_date || e.target.value
@@ -349,7 +350,7 @@ export default function RecurringTemplates() {
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label">{isAr ? 'تاريخ النهاية' : 'End Date'}</label>
-                                        <DateInput className="form-control" value={form.end_date}
+                                        <DateInput className="form-control" value={formatDate(form.end_date)}
                                             onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">
@@ -503,8 +504,8 @@ export default function RecurringTemplates() {
                                     </div>
                                 </div>
                                 <div className="row mb-3">
-                                    <div className="col-md-3"><strong>{isAr ? 'البداية:' : 'Start:'}</strong> {detailData.start_date}</div>
-                                    <div className="col-md-3"><strong>{isAr ? 'النهاية:' : 'End:'}</strong> {detailData.end_date || '-'}</div>
+                                    <div className="col-md-3"><strong>{isAr ? 'البداية:' : 'Start:'}</strong> {formatDate(detailData.start_date)}</div>
+                                    <div className="col-md-3"><strong>{isAr ? 'النهاية:' : 'End:'}</strong> {formatDate(detailData.end_date)}</div>
                                     <div className="col-md-3"><strong>{isAr ? 'التالي:' : 'Next:'}</strong> {detailData.next_run_date}</div>
                                     <div className="col-md-3"><strong>{isAr ? 'آخر تنفيذ:' : 'Last:'}</strong> {detailData.last_run_date || '-'}</div>
                                 </div>

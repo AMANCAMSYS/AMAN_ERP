@@ -11,6 +11,7 @@ import { formatNumber } from '../../utils/format';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const PayrollDetails = () => {
     const { t, i18n } = useTranslation();
@@ -96,9 +97,9 @@ const PayrollDetails = () => {
                     <div>
                         <h1 className="workspace-title">{period.name}</h1>
                         <div className="workspace-subtitle">
-                            <span>{period.start_date}</span>
+                            <span>{formatDate(period.start_date)}</span>
                             <span className="mx-2">{t('common.to')}</span>
-                            <span>{period.end_date}</span>
+                            <span>{formatDate(period.end_date)}</span>
                         </div>
                     </div>
                 </div>

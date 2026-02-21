@@ -40,6 +40,31 @@ export function getCountry() {
     return user?.country || ''
 }
 
+// Permission aliases — mirrors backend PERMISSION_ALIASES
+// If a user has the KEY permission, they implicitly have VALUE permissions
+const PERMISSION_ALIASES = {
+    'inventory.view':   ['stock.view', 'products.view'],
+    'inventory.delete': ['products.delete', 'stock.adjustment'],
+    'inventory.*':      ['stock.view', 'stock.view_cost', 'stock.adjustment', 'stock.transfer',
+                         'stock.manage', 'stock.reports',
+                         'products.view', 'products.create', 'products.edit', 'products.delete'],
+    'projects.manage':  ['projects.view', 'projects.create', 'projects.edit', 'projects.delete'],
+    'admin.users':      ['admin.roles', 'settings.view', 'settings.edit'],
+    'admin.branches':   ['branches.view', 'branches.manage'],
+    'sales.edit':       ['sales.create'],
+    'sales.delete':     ['sales.create'],
+    'buying.reports':   ['buying.view'],
+    'hr.reports':       ['hr.view'],
+    'reports.financial': ['reports.view'],
+    'manufacturing.reports': ['manufacturing.view'],
+    'notifications.send': ['notifications.view'],
+    'approvals.manage': ['approvals.view', 'approvals.create'],
+    'accounting.manage': ['accounting.view', 'accounting.edit'],
+    'treasury.manage': ['treasury.view', 'treasury.create', 'treasury.edit'],
+    'taxes.manage': ['taxes.view'],
+    'settings.manage': ['settings.view', 'settings.edit'],
+}
+
 export function hasPermission(permission) {
     const user = getUser()
     if (!user || !user.permissions || !Array.isArray(user.permissions)) {
@@ -63,6 +88,13 @@ export function hasPermission(permission) {
             const sectionWildcard = parts[0] + '.*'
             if (user.permissions.includes(sectionWildcard)) return true
         }
+
+        // Alias expansion: check if any user permission implies the required one
+        for (const userPerm of user.permissions) {
+            const implied = PERMISSION_ALIASES[userPerm]
+            if (implied && implied.includes(perm)) return true
+        }
+
         return false
     })
 }

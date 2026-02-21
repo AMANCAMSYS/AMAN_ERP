@@ -3,7 +3,7 @@ import api from './apiClient'
 export const taxesAPI = {
     getVATReport: (params) => api.get('/taxes/vat-report', { params }),
     getTaxAudit: (params) => api.get('/taxes/audit-report', { params }),
-    getSummary: () => api.get('/taxes/summary'),
+    getSummary: (params) => api.get('/taxes/summary', { params }),
     // Tax Rates
     listRates: (params) => api.get('/taxes/rates', { params }),
     getRate: (id) => api.get(`/taxes/rates/${id}`),
@@ -23,5 +23,37 @@ export const taxesAPI = {
     listPayments: (params) => api.get('/taxes/payments', { params }),
     createPayment: (data) => api.post('/taxes/payments', data),
     // Settlement
-    settle: (data) => api.post('/taxes/settle', data)
+    settle: (data) => api.post('/taxes/settle', data),
+    // Branch Tax Analysis
+    getBranchAnalysis: (params) => api.get('/taxes/branch-analysis', { params }),
+    // Employee Tax Obligations
+    getEmployeeTaxes: (params) => api.get('/taxes/employee-taxes', { params }),
+}
+
+// ── Tax Compliance API ──────────────────────────────────────
+export const taxComplianceAPI = {
+    // Tax regimes
+    listRegimes: (params) => api.get('/tax-compliance/regimes', { params }),
+    listCountries: () => api.get('/tax-compliance/countries'),
+
+    // Company tax settings
+    getCompanySettings: () => api.get('/tax-compliance/company-settings'),
+    updateCompanySettings: (data) => api.put('/tax-compliance/company-settings', data),
+
+    // Branch tax settings
+    getBranchSettings: (branchId) => api.get(`/tax-compliance/branch-settings/${branchId}`),
+    updateBranchSetting: (data) => api.put('/tax-compliance/branch-settings', data),
+
+    // Applicable taxes per branch
+    getApplicableTaxes: (branchId) => api.get(`/tax-compliance/applicable-taxes/${branchId}`),
+
+    // Country-specific reports
+    getSaudiVATReport: (params) => api.get('/tax-compliance/reports/sa-vat', { params }),
+    getSyrianIncomeReport: (params) => api.get('/tax-compliance/reports/sy-income', { params }),
+    getUAEVATReport: (params) => api.get('/tax-compliance/reports/ae-vat', { params }),
+    getEgyptVATReport: (params) => api.get('/tax-compliance/reports/eg-vat', { params }),
+    getGenericIncomeReport: (params) => api.get('/tax-compliance/reports/generic-income', { params }),
+
+    // Compliance overview
+    getOverview: () => api.get('/tax-compliance/overview'),
 }

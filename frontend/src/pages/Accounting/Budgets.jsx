@@ -8,6 +8,7 @@ import { budgetsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 const Budgets = () => {
     const { t } = useTranslation();
@@ -257,11 +258,11 @@ const Budgets = () => {
                                     <div className="row g-2 mb-3">
                                         <div className="col-6">
                                             <div className="text-muted small mb-1">{t('common.start_date')}</div>
-                                            <div className="fw-semibold small" style={{ color: 'var(--text-primary)' }}>{budget.start_date}</div>
+                                            <div className="fw-semibold small" style={{ color: 'var(--text-primary)' }}>{formatDate(budget.start_date)}</div>
                                         </div>
                                         <div className="col-6">
                                             <div className="text-muted small mb-1">{t('common.end_date')}</div>
-                                            <div className="fw-semibold small" style={{ color: 'var(--text-primary)' }}>{budget.end_date}</div>
+                                            <div className="fw-semibold small" style={{ color: 'var(--text-primary)' }}>{formatDate(budget.end_date)}</div>
                                         </div>
                                     </div>
 
@@ -348,7 +349,7 @@ const Budgets = () => {
                                     <div className="col-6 mb-4">
                                         <CustomDatePicker
                                             label={t('common.start_date')}
-                                            selected={formData.start_date}
+                                            selected={formatDate(formData.start_date)}
                                             onChange={(dateStr) => setFormData({ ...formData, start_date: dateStr })}
                                             required
                                         />
@@ -356,7 +357,7 @@ const Budgets = () => {
                                     <div className="col-6 mb-4">
                                         <CustomDatePicker
                                             label={t('common.end_date')}
-                                            selected={formData.end_date}
+                                            selected={formatDate(formData.end_date)}
                                             onChange={(dateStr) => setFormData({ ...formData, end_date: dateStr })}
                                             required
                                         />

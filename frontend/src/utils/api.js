@@ -47,7 +47,7 @@ export { manufacturingAPI } from '../services/manufacturing'
 export { contractsAPI } from '../services/contracts'
 
 // Taxes
-export { taxesAPI } from '../services/taxes'
+export { taxesAPI, taxComplianceAPI } from '../services/taxes'
 
 // Projects
 export { projectsAPI } from '../services/projects'

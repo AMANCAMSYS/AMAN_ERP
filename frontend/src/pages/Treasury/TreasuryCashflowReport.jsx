@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { treasuryAPI } from '../../utils/api';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 function TreasuryCashflowReport() {
     const { t, i18n } = useTranslation();
@@ -241,7 +242,7 @@ function TreasuryCashflowReport() {
                                     <tbody>
                                         {data.daily_trend.map((d, idx) => (
                                             <tr key={idx}>
-                                                <td>{d.date}</td>
+                                                <td>{formatDate(d.date)}</td>
                                                 <td className="text-end text-success">{formatNumber(d.inflow)}</td>
                                                 <td className="text-end text-danger">{formatNumber(d.outflow)}</td>
                                                 <td className="text-end" style={{ fontWeight: 600 }}>
