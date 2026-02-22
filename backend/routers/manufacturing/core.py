@@ -313,15 +313,20 @@ def calculate_production_cost(conn, bom_id: int, order_quantity: float, order_id
         
         for comp in components:
             waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
-            required_qty = comp.quantity * order_quantity * waste_factor
+            # Handle percentage-based BOM components
+            if comp.is_percentage:
+                base_qty = comp.quantity / 100.0 * order_quantity
+                required_qty = base_qty * waste_factor
+            else:
+                required_qty = comp.quantity * order_quantity * waste_factor
             unit_cost = comp.cost_price or 0
             line_cost = required_qty * unit_cost
             total_material_cost += line_cost
             component_details.append({
                 "product_name": comp.product_name,
                 "product_id": comp.component_product_id,
-                "base_qty": comp.quantity * order_quantity,
-                "waste_qty": required_qty - (comp.quantity * order_quantity),
+                "base_qty": (comp.quantity / 100.0 * order_quantity) if comp.is_percentage else comp.quantity * order_quantity,
+                "waste_qty": required_qty - ((comp.quantity / 100.0 * order_quantity) if comp.is_percentage else comp.quantity * order_quantity),
                 "total_qty": required_qty,
                 "unit_cost": unit_cost,
                 "total_cost": line_cost,
@@ -899,7 +904,13 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
             
             for comp in components:
                 waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
-                total_material_cost += (comp.quantity * order.quantity * waste_factor * (comp.cost_price or 0))
+                # Handle percentage-based BOM components
+                if comp.is_percentage:
+                    base_qty = comp.quantity / 100.0 * order.quantity
+                    required_qty = base_qty * waste_factor
+                else:
+                    required_qty = comp.quantity * order.quantity * waste_factor
+                total_material_cost += (required_qty * (comp.cost_price or 0))
 
         # B. Labor & Overhead Cost
         # Calculate actual run time from operations

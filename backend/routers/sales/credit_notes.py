@@ -333,6 +333,13 @@ def create_sales_credit_note(
                 WHERE id = :id
             """), {"amt": total, "id": related_invoice_id})
 
+        # Update customer balance (credit note REDUCES what customer owes)
+        gl_total_base = round(total * exchange_rate, 4)
+        db.execute(text("""
+            UPDATE parties SET current_balance = current_balance - :amt
+            WHERE id = :pid
+        """), {"amt": gl_total_base, "pid": party_id})
+
         db.commit()
 
         log_activity(
@@ -636,6 +643,13 @@ def create_sales_debit_note(
                 credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
                 currency=jl["currency"],
             )
+
+        # Update customer balance (debit note INCREASES what customer owes)
+        gl_total_base = round(total * exchange_rate, 4)
+        db.execute(text("""
+            UPDATE parties SET current_balance = current_balance + :amt
+            WHERE id = :pid
+        """), {"amt": gl_total_base, "pid": party_id})
 
         db.commit()
 

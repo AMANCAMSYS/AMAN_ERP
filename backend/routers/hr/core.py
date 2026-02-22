@@ -830,6 +830,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         total_gosi_empr = float(totals.total_gosi_empr or 0)
         total_violations = float(totals.total_violations or 0)
         total_loans = float(totals.total_loans or 0)
+        total_comp_ded = float(totals.total_comp_ded or 0)
         
         if total_net == 0:
             raise HTTPException(status_code=400, detail="No payroll calculated to post")
@@ -934,8 +935,28 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                     VALUES (:je, :acc, 0, :amount, 'استقطاع سلف موظفين - Loan Repayment', :amount, :currency)
                 """), {"je": je_id, "acc": acc_loans_adv, "amount": total_loans, "currency": base_currency})
                 update_account_balance(conn, account_id=acc_loans_adv, debit_base=0, credit_base=total_loans)
-            
-        # Line 5: Cr Bank (Net Payout)
+
+        # Line 5: Cr Violation Deductions
+        if total_violations > 0:
+            acc_violations = get_mapped_account_id(conn, "acc_map_violations") or get_mapped_account_id(conn, "acc_map_other_payable")
+            if acc_violations:
+                conn.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
+                    VALUES (:je, :acc, 0, :amount, 'استقطاع مخالفات موظفين - Violation Deductions', :amount, :currency)
+                """), {"je": je_id, "acc": acc_violations, "amount": total_violations, "currency": base_currency})
+                update_account_balance(conn, account_id=acc_violations, debit_base=0, credit_base=total_violations)
+
+        # Line 6: Cr Salary Component Deductions (other deductions)
+        if total_comp_ded > 0:
+            acc_comp_ded = get_mapped_account_id(conn, "acc_map_other_deductions") or get_mapped_account_id(conn, "acc_map_other_payable")
+            if acc_comp_ded:
+                conn.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
+                    VALUES (:je, :acc, 0, :amount, 'استقطاعات عناصر الراتب - Salary Component Deductions', :amount, :currency)
+                """), {"je": je_id, "acc": acc_comp_ded, "amount": total_comp_ded, "currency": base_currency})
+                update_account_balance(conn, account_id=acc_comp_ded, debit_base=0, credit_base=total_comp_ded)
+
+        # Line 7: Cr Bank (Net Payout)
         acc_bank = get_mapped_account_id(conn, "acc_map_bank")
         if acc_bank:
             conn.execute(text("""
@@ -1505,7 +1526,8 @@ def calculate_end_of_service(
     try:
         # Get employee details
         emp = conn.execute(text("""
-            SELECT id, employee_name, join_date, basic_salary, 
+            SELECT id, CONCAT(first_name, ' ', last_name) as employee_name, 
+                   hire_date, salary as basic_salary, 
                    COALESCE(housing_allowance, 0) as housing_allowance,
                    COALESCE(transport_allowance, 0) as transport_allowance
             FROM employees WHERE id = :eid
@@ -1515,7 +1537,7 @@ def calculate_end_of_service(
             raise HTTPException(status_code=404, detail="الموظف غير موجود")
         
         termination_date = data.termination_date or date.today()
-        join_date = emp.join_date
+        join_date = emp.hire_date
         
         if not join_date:
             raise HTTPException(status_code=400, detail="تاريخ التعيين غير محدد للموظف")
@@ -1983,16 +2005,66 @@ def generate_single_payslip(data: PayslipGenerateRequest, current_user: UserResp
         housing = float(emp.housing_allowance or 0)
         transport = float(emp.transport_allowance or 0)
         other = float(emp.other_allowances or 0)
-        net = basic + housing + transport + other
+        gross = basic + housing + transport + other
+
+        # Calculate GOSI deductions
+        gosi_settings = conn.execute(text("SELECT * FROM gosi_settings LIMIT 1")).fetchone()
+        gosi_emp = 0
+        gosi_empr = 0
+        if gosi_settings:
+            gosi_max_sal = float(gosi_settings.max_contributable_salary or 45000)
+            emp_rate = float(gosi_settings.employee_percentage or 9.75) / 100
+            empr_rate = float(gosi_settings.employer_percentage or 11.75) / 100
+            contributable = min(basic + housing, gosi_max_sal)
+            gosi_emp = round(contributable * emp_rate, 2)
+            gosi_empr = round(contributable * empr_rate, 2)
+
+        # Calculate violation deductions for the month
+        violation_total = conn.execute(text("""
+            SELECT COALESCE(SUM(deduction_amount), 0) FROM employee_violations
+            WHERE employee_id = :eid AND violation_date BETWEEN :start AND :end AND status = 'approved'
+        """), {"eid": data.employee_id, "start": start_date, "end": end_date}).scalar() or 0
+        violation_deduction = float(violation_total)
+
+        # Calculate loan deductions
+        loan_deduction = 0
+        active_loan = conn.execute(text("""
+            SELECT monthly_deduction FROM employee_loans
+            WHERE employee_id = :eid AND status = 'active' AND paid_amount < amount
+            LIMIT 1
+        """), {"eid": data.employee_id}).fetchone()
+        if active_loan:
+            loan_deduction = float(active_loan.monthly_deduction or 0)
+
+        # Calculate salary component earnings/deductions
+        comp_earning = 0
+        comp_deduction = 0
+        components = conn.execute(text("""
+            SELECT sc.amount, sc.component_type
+            FROM salary_components sc
+            WHERE sc.employee_id = :eid AND sc.is_active = TRUE
+        """), {"eid": data.employee_id}).fetchall()
+        for comp in components:
+            if comp.component_type == 'earning':
+                comp_earning += float(comp.amount or 0)
+            elif comp.component_type == 'deduction':
+                comp_deduction += float(comp.amount or 0)
+
+        total_deductions = gosi_emp + violation_deduction + loan_deduction + comp_deduction
+        net = gross + comp_earning - total_deductions
 
         conn.execute(text("""
             INSERT INTO payroll_entries
             (period_id,employee_id,basic_salary,housing_allowance,transport_allowance,other_allowances,
              salary_components_earning,salary_components_deduction,overtime_amount,
              gosi_employee_share,gosi_employer_share,violation_deduction,loan_deduction,deductions,net_salary)
-            VALUES (:pid,:eid,:basic,:housing,:transport,:other,0,0,0,0,0,0,0,0,:net)
+            VALUES (:pid,:eid,:basic,:housing,:transport,:other,:comp_earn,:comp_ded,0,:gosi_emp,:gosi_empr,:violation,:loan,:deductions,:net)
         """), {"pid": period_id, "eid": data.employee_id, "basic": basic,
-               "housing": housing, "transport": transport, "other": other, "net": net})
+               "housing": housing, "transport": transport, "other": other,
+               "comp_earn": comp_earning, "comp_ded": comp_deduction,
+               "gosi_emp": gosi_emp, "gosi_empr": gosi_empr,
+               "violation": violation_deduction, "loan": loan_deduction,
+               "deductions": total_deductions, "net": net})
         conn.commit()
         return {"message": "Payslip generated successfully"}
     finally:

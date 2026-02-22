@@ -434,10 +434,10 @@ async def get_product_ledger(
         # Calculate running balance
         running_balance = 0
         for row in rows:
-            qty = float(row.get("quantity", 0))
+            qty = abs(float(row.get("quantity", 0)))
             tx_type = row.get("transaction_type", "")
             
-            if tx_type in ("receipt", "initial", "adjustment_in", "return_in", "transfer_in"):
+            if tx_type in ("receipt", "initial", "adjustment_in", "return_in", "transfer_in", "stock_in", "production_in"):
                 running_balance += qty
                 row["qty_in"] = qty
                 row["qty_out"] = 0

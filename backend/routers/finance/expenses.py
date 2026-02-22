@@ -359,8 +359,13 @@ async def create_expense(
                 UPDATE expenses SET journal_entry_id = :jid WHERE id = :id
             """), {"jid": je_id, "id": expense_id})
             
-            # Update treasury balance
+            # Update treasury balance (with sufficiency check)
             if expense.treasury_id:
+                treasury_balance = db.execute(text(
+                    "SELECT current_balance FROM treasury_accounts WHERE id = :id"
+                ), {"id": expense.treasury_id}).scalar() or 0
+                if float(treasury_balance) < float(expense.amount):
+                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {float(treasury_balance):.2f}, المطلوب: {float(expense.amount):.2f}")
                 db.execute(text("""
                     UPDATE treasury_accounts 
                     SET current_balance = current_balance - :amt 
@@ -558,8 +563,13 @@ async def approve_expense(
                 UPDATE expenses SET journal_entry_id = :jid WHERE id = :id
             """), {"jid": je_id, "id": expense_id})
             
-            # Update treasury balance
+            # Update treasury balance (with sufficiency check)
             if expense["treasury_id"]:
+                treasury_balance = db.execute(text(
+                    "SELECT current_balance FROM treasury_accounts WHERE id = :id"
+                ), {"id": expense["treasury_id"]}).scalar() or 0
+                if float(treasury_balance) < float(expense["amount"]):
+                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {float(treasury_balance):.2f}, المطلوب: {float(expense['amount']):.2f}")
                 db.execute(text("""
                     UPDATE treasury_accounts 
                     SET current_balance = current_balance - :amt 

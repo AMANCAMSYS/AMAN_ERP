@@ -1104,7 +1104,10 @@ def get_purchase_invoice(
         
         if not invoice:
             raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
-            
+
+        # Get base currency for fallback
+        base_currency = get_base_currency(db)
+
         # 2. Fetch Invoice Lines
         lines = db.execute(text("""
             SELECT il.*, p.product_name, p.product_code 
@@ -1773,9 +1776,9 @@ def create_purchase_return(
         return_number = f"PR-{year}-{str(count + 1).zfill(4)}"
 
         # 3. Create Invoice Record (Type: purchase_return)
-        # Calculate totals
-        subtotal = sum(float(item.quantity) * float(item.unit_price) for item in invoice.items)
-        tax_total = sum(float(item.quantity) * float(item.unit_price) * (float(item.tax_rate) / 100) for item in invoice.items)
+        # Calculate totals (including line discounts)
+        subtotal = sum(float(item.quantity) * float(item.unit_price) - float(getattr(item, 'discount', 0) or 0) for item in invoice.items)
+        tax_total = sum((float(item.quantity) * float(item.unit_price) - float(getattr(item, 'discount', 0) or 0)) * (float(item.tax_rate) / 100) for item in invoice.items)
         total = subtotal + tax_total
 
         # Determine warehouse: Use original invoice's warehouse if possible
@@ -2701,6 +2704,13 @@ def create_purchase_credit_note(
                 WHERE id = :id
             """), {"amt": total, "id": related_invoice_id})
 
+        # Update supplier balance (credit note REDUCES what we owe supplier)
+        gl_total_base = round(total * exchange_rate, 4)
+        db.execute(text("""
+            UPDATE parties SET current_balance = current_balance - :amt
+            WHERE id = :pid
+        """), {"amt": gl_total_base, "pid": party_id})
+
         db.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="buying.credit_note.create", resource_type="purchase_credit_note",
@@ -2951,6 +2961,13 @@ def create_purchase_debit_note(
                                    debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
                                    credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
                                    currency=jl["currency"])
+
+        # Update supplier balance (debit note INCREASES what we owe supplier)
+        gl_total_base = round(total * exchange_rate, 4)
+        db.execute(text("""
+            UPDATE parties SET current_balance = current_balance + :amt
+            WHERE id = :pid
+        """), {"amt": gl_total_base, "pid": party_id})
 
         db.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username,

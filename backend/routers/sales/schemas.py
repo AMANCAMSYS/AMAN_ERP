@@ -1,5 +1,5 @@
 """Sales module Pydantic schemas."""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
 from datetime import date
 
@@ -50,6 +50,24 @@ class InvoiceLineItem(BaseModel):
     unit_price: float
     tax_rate: float = 15.0
     discount: float = 0
+
+    @validator("quantity")
+    def quantity_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("الكمية يجب أن تكون أكبر من صفر")
+        return v
+
+    @validator("unit_price")
+    def price_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("سعر الوحدة لا يمكن أن يكون سالباً")
+        return v
+
+    @validator("discount")
+    def discount_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("الخصم لا يمكن أن يكون سالباً")
+        return v
 
 
 class InvoiceCreate(BaseModel):

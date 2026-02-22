@@ -34,6 +34,18 @@ def create_stock_receipt(
         txn_date = movement.date or datetime.now().strftime("%Y-%m-%d")
 
         for item in movement.items:
+            # Update WAC before quantity change
+            unit_cost = float(getattr(item, 'unit_cost', 0) or 0)
+            if unit_cost > 0:
+                from services.costing_service import CostingService
+                CostingService.update_cost(
+                    db,
+                    product_id=item.product_id,
+                    warehouse_id=movement.warehouse_id,
+                    new_qty=item.quantity,
+                    new_price=unit_cost,
+                )
+
             # Upsert inventory
             exists = db.execute(text("""
                 SELECT 1 FROM inventory WHERE product_id = :pid AND warehouse_id = :wh

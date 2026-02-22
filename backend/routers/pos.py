@@ -398,10 +398,11 @@ def create_order(
     if order_in.status == 'paid':
         total_payments = sum(p.amount for p in order_in.payments)
         if total_payments < total:
-            # Auto-adjust: if payments are less than total, use total as payment amount
-            # This prevents unbalanced journal entries
-            if len(order_in.payments) == 1:
+            if len(order_in.payments) == 1 and abs(total_payments - total) < 0.01:
+                # Auto-adjust only for rounding differences
                 order_in.payments[0].amount = total
+            elif total_payments < total:
+                raise HTTPException(status_code=400, detail=f"المبلغ المدفوع ({total_payments:.2f}) أقل من إجمالي الطلب ({total:.2f})")
 
     # Fetch session info for branch_id if not provided
     pos_session = db.execute(text("SELECT branch_id, warehouse_id, treasury_account_id FROM pos_sessions WHERE id = :id"), {"id": order_in.session_id}).fetchone()
@@ -474,7 +475,7 @@ def create_order(
             "tax_a": tax_amount,
             "sub": item_subtotal,
             "tot": item_total,
-            "wh": order_in.warehouse_id
+            "wh": warehouse_id
         })
         
         # 3. Update Inventory if Paid
@@ -500,7 +501,7 @@ def create_order(
             """), {
                 "qty": item.quantity,
                 "pid": item.product_id,
-                "wh": order_in.warehouse_id
+                "wh": warehouse_id
             })
 
             # Log Inventory Transaction
@@ -515,7 +516,7 @@ def create_order(
                 )
             """), {
                 "pid": item.product_id,
-                "wh": order_in.warehouse_id,
+                "wh": warehouse_id,
                 "order_id": order_id,
                 "order_num": order_number,
                 "qty": -item.quantity,
@@ -854,11 +855,12 @@ def create_return(
             raise HTTPException(status_code=400, detail=f"رصيد الصندوق غير كافٍ للمرتجع. الرصيد الحالي: {session_info.cash_balance:.2f}, المطلوب: {total_refund:.2f}")
     
     total_refund = 0  # Reset for actual calculation
+    total_refund_tax = 0  # Track VAT on returns
     
     for item in return_in.items:
         # Get original item details
         orig_item = db.execute(text("""
-            SELECT product_id, unit_price, quantity 
+            SELECT product_id, unit_price, quantity, tax_rate 
             FROM pos_order_lines WHERE id = :id AND order_id = :order_id
         """), {"id": item.item_id, "order_id": order_id}).fetchone()
         
@@ -869,7 +871,9 @@ def create_return(
             raise HTTPException(status_code=400, detail=f"Return quantity exceeds original quantity")
         
         refund_amount = item.quantity * orig_item.unit_price
+        refund_tax = refund_amount * (float(orig_item.tax_rate or 0) / 100)
         total_refund += refund_amount
+        total_refund_tax += refund_tax
         
         # Update stock (add back) - use 'inventory' table (not warehouse_stock)
         if order.warehouse_id:
@@ -951,11 +955,14 @@ def create_return(
     acc_cash = get_acc_id("BOX")
     acc_cogs = get_acc_id("CGS")
     acc_inventory = get_acc_id("INV")
+    acc_vat_out = get_acc_id("VAT-OUT")
     
     # Get treasury for session
     session_treasury = db.execute(text("SELECT treasury_account_id FROM pos_sessions WHERE id = :id"), {"id": order.session_id}).fetchone()
     if session_treasury and session_treasury.treasury_account_id:
         acc_cash = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": session_treasury.treasury_account_id}).scalar() or acc_cash
+    
+    total_refund_with_tax = total_refund + total_refund_tax
     
     if acc_sales and acc_cash:
         import uuid
@@ -977,16 +984,24 @@ def create_return(
             "base_curr": base_currency
         }).scalar()
         
-        # Reverse: Debit Sales, Credit Cash
+        # Reverse: Debit Sales Revenue (net subtotal)
         db.execute(text("""
             INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
             VALUES (:jid, :aid, :amt, 0, :desc)
         """), {"jid": je_id, "aid": acc_sales, "amt": total_refund, "desc": f"POS Return Revenue Reversal"})
         
+        # Reverse: Debit VAT Output (tax portion)
+        if total_refund_tax > 0 and acc_vat_out:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jid, :aid, :amt, 0, :desc)
+            """), {"jid": je_id, "aid": acc_vat_out, "amt": total_refund_tax, "desc": f"POS Return VAT Reversal"})
+        
+        # Credit: Cash/Bank (total including tax)
         db.execute(text("""
             INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
             VALUES (:jid, :aid, 0, :amt, :desc)
-        """), {"jid": je_id, "aid": acc_cash, "amt": total_refund, "desc": f"POS Return Cash Refund"})
+        """), {"jid": je_id, "aid": acc_cash, "amt": total_refund_with_tax, "desc": f"POS Return Cash Refund"})
         
         # Reverse COGS if applicable
         total_cogs_return = 0
@@ -1010,15 +1025,17 @@ def create_return(
         # Update account balances
         from utils.accounting import update_account_balance
         update_account_balance(db, account_id=acc_sales, debit_base=total_refund, credit_base=0)
-        update_account_balance(db, account_id=acc_cash, debit_base=0, credit_base=total_refund)
+        update_account_balance(db, account_id=acc_cash, debit_base=0, credit_base=total_refund_with_tax)
+        if total_refund_tax > 0 and acc_vat_out:
+            update_account_balance(db, account_id=acc_vat_out, debit_base=total_refund_tax, credit_base=0)
         if total_cogs_return > 0 and acc_cogs and acc_inventory:
             update_account_balance(db, account_id=acc_inventory, debit_base=total_cogs_return, credit_base=0)
             update_account_balance(db, account_id=acc_cogs, debit_base=0, credit_base=total_cogs_return)
 
-        # Update treasury balance for the refund
-        if session_treasury and session_treasury.treasury_account_id:
+        # Update treasury balance only for cash refunds
+        if return_in.refund_method == 'cash' and session_treasury and session_treasury.treasury_account_id:
             db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"),
-                       {"amt": total_refund, "id": session_treasury.treasury_account_id})
+                       {"amt": total_refund_with_tax, "id": session_treasury.treasury_account_id})
     
     db.commit()
     

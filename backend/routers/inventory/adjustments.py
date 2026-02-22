@@ -99,10 +99,14 @@ def create_adjustment(
 
         adjustment_type = 'increase' if difference > 0 else 'decrease'
 
-        # 2. Generate Number
+        # 2. Generate Number (unique via MAX)
         year = datetime.now().year
-        count = db.execute(text("SELECT count(*) FROM stock_adjustments")).scalar() or 0
-        adj_number = f"ADJ-{year}-{str(count + 1).zfill(4)}"
+        max_num = db.execute(text("""
+            SELECT MAX(CAST(SUBSTRING(adjustment_number FROM 'ADJ-\\d{4}-(\\d+)') AS INTEGER))
+            FROM stock_adjustments 
+            WHERE adjustment_number LIKE :pattern
+        """), {"pattern": f"ADJ-{year}-%"}).scalar() or 0
+        adj_number = f"ADJ-{year}-{str(max_num + 1).zfill(4)}"
 
         # 3. Create Adjustment Record
         adj_id_result = db.execute(text("""

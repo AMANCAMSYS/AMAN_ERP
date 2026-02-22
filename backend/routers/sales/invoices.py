@@ -210,14 +210,12 @@ def create_sales_invoice(
 
             # Calculate COGS using costing service
             try:
-                cogs_result = costing_service.calculate_cogs(
+                unit_cost = costing_service.get_cogs_cost(
+                    db,
                     product_id=item["product_id"],
                     warehouse_id=wh_id,
-                    quantity=item["quantity"],
-                    reference_type="invoice",
-                    reference_id=invoice_id
                 )
-                item_cogs = cogs_result.get("total_cost", 0)
+                item_cogs = unit_cost * item["quantity"]
             except Exception:
                 # Fallback: use product cost_price
                 cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"),

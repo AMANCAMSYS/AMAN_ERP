@@ -279,27 +279,41 @@ def transfer_stock(
                 prod_name = db.execute(text("SELECT product_name FROM products WHERE id = :pid"), {"pid": item.product_id}).scalar()
                 raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}")
 
-            # 1. Deduct from Source
+            # 1. Get source cost for WAC calculation
+            source_inv = db.execute(text("""
+                SELECT average_cost FROM inventory 
+                WHERE product_id = :pid AND warehouse_id = :wh
+            """), {"pid": item.product_id, "wh": transfer.source_warehouse_id}).fetchone()
+            source_cost = float(source_inv.average_cost or 0) if source_inv else 0
+
+            # 2. Deduct from Source
             db.execute(text("""
                 UPDATE inventory SET quantity = quantity - :qty 
                 WHERE product_id = :pid AND warehouse_id = :wh
             """), {"qty": item.quantity, "pid": item.product_id, "wh": transfer.source_warehouse_id})
 
-            # 2. Add to Destination
+            # 3. Add to Destination with WAC recalculation
             exists_dest = db.execute(text("""
-                SELECT 1 FROM inventory WHERE product_id = :pid AND warehouse_id = :wh
-            """), {"pid": item.product_id, "wh": transfer.destination_warehouse_id}).scalar()
+                SELECT quantity, average_cost FROM inventory WHERE product_id = :pid AND warehouse_id = :wh
+            """), {"pid": item.product_id, "wh": transfer.destination_warehouse_id}).fetchone()
 
             if exists_dest:
+                dest_qty = float(exists_dest.quantity or 0)
+                dest_cost = float(exists_dest.average_cost or 0)
+                new_total_qty = dest_qty + item.quantity
+                if new_total_qty > 0:
+                    new_avg_cost = ((dest_qty * dest_cost) + (item.quantity * source_cost)) / new_total_qty
+                else:
+                    new_avg_cost = source_cost
                 db.execute(text("""
-                    UPDATE inventory SET quantity = quantity + :qty 
+                    UPDATE inventory SET quantity = :qty, average_cost = :cost
                     WHERE product_id = :pid AND warehouse_id = :wh
-                """), {"qty": item.quantity, "pid": item.product_id, "wh": transfer.destination_warehouse_id})
+                """), {"qty": new_total_qty, "cost": new_avg_cost, "pid": item.product_id, "wh": transfer.destination_warehouse_id})
             else:
                 db.execute(text("""
-                    INSERT INTO inventory (product_id, warehouse_id, quantity)
-                    VALUES (:pid, :wh, :qty)
-                """), {"pid": item.product_id, "wh": transfer.destination_warehouse_id, "qty": item.quantity})
+                    INSERT INTO inventory (product_id, warehouse_id, quantity, average_cost)
+                    VALUES (:pid, :wh, :qty, :cost)
+                """), {"pid": item.product_id, "wh": transfer.destination_warehouse_id, "qty": item.quantity, "cost": source_cost})
 
             # 3. Log Transactions
             db.execute(text("""
