@@ -160,6 +160,12 @@ const ManufacturingHome = () => {
                                 <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
                                     👷 {t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}
                                 </Link>
+                                <Link to="/manufacturing/reports/analytics" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
+                                    📊 {t('manufacturing.analytics.title', 'تحليل الإنتاج')}
+                                </Link>
+                                <Link to="/manufacturing/reports/work-orders" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
+                                    📋 {t('manufacturing.work_orders_report.title', 'حالة أوامر العمل')}
+                                </Link>
                             </div>
                         </div>
 

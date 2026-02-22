@@ -40,6 +40,8 @@ const MRPPlanning = React.lazy(() => import('./pages/Manufacturing/MRPPlanning')
 const EquipmentMaintenance = React.lazy(() => import('./pages/Manufacturing/EquipmentMaintenance'))
 const ProductionSchedule = React.lazy(() => import('./pages/Manufacturing/ProductionSchedule'))
 const DirectLaborReport = React.lazy(() => import('./pages/Manufacturing/DirectLaborReport'))
+const ProductionAnalytics = React.lazy(() => import('./pages/Manufacturing/ProductionAnalytics'))
+const WorkOrderStatusReport = React.lazy(() => import('./pages/Manufacturing/WorkOrderStatusReport'))
 
 
 // Accounting
@@ -208,6 +210,8 @@ const ProjectList = React.lazy(() => import('./pages/Projects/ProjectList'))
 const ProjectForm = React.lazy(() => import('./pages/Projects/ProjectForm'))
 const ProjectDetails = React.lazy(() => import('./pages/Projects/ProjectDetails'))
 const ResourceManagement = React.lazy(() => import('./pages/Projects/ResourceManagement'))
+const ProjectFinancialsReport = React.lazy(() => import('./pages/Projects/ProjectFinancialsReport'))
+const ResourceUtilizationReport = React.lazy(() => import('./pages/Projects/ResourceUtilizationReport'))
 
 // Expenses
 const ExpenseList = React.lazy(() => import('./pages/Expenses/ExpenseList'))
@@ -390,6 +394,8 @@ function App() {
                 <Route path="/manufacturing/equipment" element={<PrivateRoute permission="manufacturing.view"><EquipmentMaintenance /></PrivateRoute>} />
                 <Route path="/manufacturing/schedule" element={<PrivateRoute permission="manufacturing.view"><ProductionSchedule /></PrivateRoute>} />
                 <Route path="/manufacturing/reports/direct-labor" element={<PrivateRoute permission="manufacturing.view"><DirectLaborReport /></PrivateRoute>} />
+                <Route path="/manufacturing/reports/analytics" element={<PrivateRoute permission="manufacturing.view"><ProductionAnalytics /></PrivateRoute>} />
+                <Route path="/manufacturing/reports/work-orders" element={<PrivateRoute permission="manufacturing.view"><WorkOrderStatusReport /></PrivateRoute>} />
 
                 {/* Stock Routes */}
                 <Route path="/stock" element={<PrivateRoute permission="stock.view"><StockHome /></PrivateRoute>} />
@@ -507,6 +513,8 @@ function App() {
                 <Route path="/projects/new" element={<PrivateRoute permission="projects.create"><ProjectForm /></PrivateRoute>} />
                 <Route path="/projects/:id" element={<PrivateRoute permission="projects.view"><ProjectDetails /></PrivateRoute>} />
                 <Route path="/projects/:id/edit" element={<PrivateRoute permission="projects.edit"><ProjectForm /></PrivateRoute>} />
+                <Route path="/projects/reports/financials" element={<PrivateRoute permission="projects.view"><ProjectFinancialsReport /></PrivateRoute>} />
+                <Route path="/projects/reports/resources" element={<PrivateRoute permission="projects.view"><ResourceUtilizationReport /></PrivateRoute>} />
 
                 {/* Expenses Routes */}
                 <Route path="/expenses" element={<PrivateRoute permission="expenses.view"><ExpenseList /></PrivateRoute>} />

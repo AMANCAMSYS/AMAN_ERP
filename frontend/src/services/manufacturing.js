@@ -24,7 +24,7 @@ export const manufacturingAPI = {
     listOperations: (params) => api.get('/manufacturing/operations', { params }),
 
     // Orders
-    listOrders: () => api.get('/manufacturing/orders'),
+    listOrders: (params) => api.get('/manufacturing/orders', { params }),
     getOrder: (id) => api.get(`/manufacturing/orders/${id}`),
     createOrder: (data) => api.post('/manufacturing/orders', data),
     completeOrder: (id) => api.post(`/manufacturing/orders/${id}/complete`),
@@ -43,5 +43,6 @@ export const manufacturingAPI = {
     // Reports
     getDirectLaborReport: (params) => api.get('/manufacturing/reports/direct-labor', { params }),
     getProductionCostReport: (params) => api.get('/manufacturing/reports/production-cost', { params }),
-    getWorkCenterEfficiency: (params) => api.get('/manufacturing/reports/work-center-efficiency', { params })
+    getWorkCenterEfficiency: (params) => api.get('/manufacturing/reports/work-center-efficiency', { params }),
+    getProductionSummary: (params) => api.get('/manufacturing/reports/production-summary', { params })
 }

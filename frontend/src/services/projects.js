@@ -22,6 +22,8 @@ export const projectsAPI = {
     deleteTimesheet: (id) => api.delete(`/projects/timesheets/${id}`),
     approveTimesheets: (id, data) => api.post(`/projects/${id}/timesheets/approve`, data),
     getResourceAllocation: (params) => api.get('/projects/resources/allocation', { params }),
+    getProfitabilityReport: (params) => api.get('/projects/reports/profitability', { params }),
+    getResourceUtilization: (params) => api.get('/projects/reports/resource-utilization', { params }),
 
     // Documents
     uploadDocument: (id, formData) => api.post(`/projects/${id}/documents`, formData, {

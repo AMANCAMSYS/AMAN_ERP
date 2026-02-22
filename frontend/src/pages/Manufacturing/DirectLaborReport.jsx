@@ -58,21 +58,21 @@ const DirectLaborReport = () => {
             </div>
 
             {/* Filters */}
-            <div className="section-card" style={{ marginBottom: 16 }}>
+            <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
-                        <label>{t('common.from_date', 'من تاريخ')}</label>
-                        <input type="date" className="form-control" value={filters.start_date}
+                        <label className="form-label">{t('common.from_date', 'من تاريخ')}</label>
+                        <input type="date" className="form-input" value={filters.start_date}
                             onChange={e => setFilters(p => ({ ...p, start_date: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
-                        <label>{t('common.to_date', 'إلى تاريخ')}</label>
-                        <input type="date" className="form-control" value={filters.end_date}
+                        <label className="form-label">{t('common.to_date', 'إلى تاريخ')}</label>
+                        <input type="date" className="form-input" value={filters.end_date}
                             onChange={e => setFilters(p => ({ ...p, end_date: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: 180 }}>
-                        <label>{t('manufacturing.work_center', 'مركز العمل')}</label>
-                        <select className="form-control" value={filters.work_center_id}
+                        <label className="form-label">{t('manufacturing.work_center', 'مركز العمل')}</label>
+                        <select className="form-input" value={filters.work_center_id}
                             onChange={e => setFilters(p => ({ ...p, work_center_id: e.target.value }))}>
                             <option value="">{t('common.all', 'الكل')}</option>
                             {workCenters.map(wc => (

@@ -229,6 +229,16 @@ function CRMHome() {
                 </div>
             </div>
 
+            {/* CRM Tools */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+                <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
+                    📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
+                </Link>
+                <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
+                    📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
+                </Link>
+            </div>
+
             {/* Tabs */}
             <div className="tabs mt-4">
                 {['overview', 'opportunities', 'tickets'].map(tab => (
@@ -281,15 +291,7 @@ function CRMHome() {
                             </table>
                         </div>
                     )}
-                    {/* CRM Tools */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
-                        <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
-                            📣 {t('crm.marketing_campaigns', 'الحملات التسويقية')}
-                        </Link>
-                        <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
-                            📚 {t('crm.knowledge_base', 'قاعدة المعرفة')}
-                        </Link>
-                    </div>
+
                 </div>
             )}
 
