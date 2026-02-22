@@ -31,7 +31,7 @@ function ContractForm() {
     })
 
     const [items, setItems] = useState([
-        { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15 }
+        { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0 }
     ])
 
     useEffect(() => {
@@ -84,8 +84,11 @@ function ContractForm() {
         setItems(newItems)
     }
 
-    const addItem = () => setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15 }])
-    const removeItem = (index) => setItems(items.filter((_, i) => i !== index))
+    const addItem = () => setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0 }])
+    const removeItem = (index) => {
+        if (items.length <= 1) return
+        setItems(items.filter((_, i) => i !== index))
+    }
 
     const getTotals = () => {
         let subtotal = 0

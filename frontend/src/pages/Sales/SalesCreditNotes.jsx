@@ -78,13 +78,13 @@ function SalesCreditNotes() {
     const openCreate = () => {
         setForm({
             party_id: '', related_invoice_id: '', invoice_date: new Date().toISOString().split('T')[0],
-            notes: '', lines: [{ product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15, discount: 0 }]
+            notes: '', lines: [{ product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0 }]
         })
         loadCreateData()
         setShowCreate(true)
     }
 
-    const addLine = () => setForm(f => ({ ...f, lines: [...f.lines, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15, discount: 0 }] }))
+    const addLine = () => setForm(f => ({ ...f, lines: [...f.lines, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0 }] }))
     const removeLine = (i) => setForm(f => {
         if (f.lines.length <= 1) return f;
         return { ...f, lines: f.lines.filter((_, idx) => idx !== i) };

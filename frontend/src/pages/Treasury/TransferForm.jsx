@@ -42,6 +42,10 @@ function TransferForm() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        if (form.treasury_id && form.target_treasury_id && form.treasury_id === form.target_treasury_id) {
+            setError(t('treasury.error_same_account') || 'Source and destination accounts cannot be the same')
+            return
+        }
         setLoading(true)
         setError(null)
         try {

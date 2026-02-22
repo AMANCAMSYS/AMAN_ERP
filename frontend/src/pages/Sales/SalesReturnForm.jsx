@@ -133,6 +133,7 @@ const SalesReturnForm = () => {
     };
 
     const removeItem = (index) => {
+        if (formData.items.length <= 1) return;
         const newItems = formData.items.filter((_, i) => i !== index);
         setFormData({ ...formData, items: newItems });
     };

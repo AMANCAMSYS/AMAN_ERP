@@ -39,7 +39,7 @@ function PurchaseInvoiceForm() {
     })
 
     const [items, setItems] = useState([
-        { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15, discount: 0, discount_percent: 0, total: 0 }
+        { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0, total: 0 }
     ])
 
     useEffect(() => {
