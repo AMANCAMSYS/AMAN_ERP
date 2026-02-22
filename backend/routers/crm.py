@@ -555,7 +555,7 @@ def list_campaigns(
         rows = db.execute(text(f"""
             SELECT c.*, u.full_name as created_by_name
             FROM marketing_campaigns c
-            LEFT JOIN users u ON c.created_by = u.id
+            LEFT JOIN company_users u ON c.created_by = u.id
             WHERE {' AND '.join(conditions)}
             ORDER BY c.created_at DESC
         """), params).fetchall()
@@ -666,8 +666,8 @@ def list_articles(
 
         rows = db.execute(text(f"""
             SELECT kb.*, u.full_name as author_name
-            FROM knowledge_base kb
-            LEFT JOIN users u ON kb.created_by = u.id
+            FROM crm_knowledge_base kb
+            LEFT JOIN company_users u ON kb.created_by = u.id
             WHERE {' AND '.join(conditions)}
             ORDER BY kb.created_at DESC
         """), params).fetchall()
@@ -681,11 +681,11 @@ def get_article(article_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         # increment view count
-        db.execute(text("UPDATE knowledge_base SET views = COALESCE(views, 0) + 1 WHERE id = :id"), {"id": article_id})
+        db.execute(text("UPDATE crm_knowledge_base SET views = COALESCE(views, 0) + 1 WHERE id = :id"), {"id": article_id})
         db.commit()
         row = db.execute(text("""
             SELECT kb.*, u.full_name as author_name
-            FROM knowledge_base kb LEFT JOIN users u ON kb.created_by = u.id
+            FROM crm_knowledge_base kb LEFT JOIN company_users u ON kb.created_by = u.id
             WHERE kb.id = :id
         """), {"id": article_id}).fetchone()
         if not row:
@@ -700,7 +700,7 @@ def create_article(data: ArticleCreate, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         aid = db.execute(text("""
-            INSERT INTO knowledge_base (title, category, content, tags, is_published, created_by)
+            INSERT INTO crm_knowledge_base (title, category, content, tags, is_published, created_by)
             VALUES (:title, :cat, :content, :tags, :pub, :uid) RETURNING id
         """), {
             "title": data.title, "cat": data.category, "content": data.content,
@@ -724,7 +724,7 @@ def update_article(article_id: int, data: ArticleUpdate, current_user=Depends(ge
             raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
         updates["id"] = article_id
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
-        db.execute(text(f"UPDATE knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
+        db.execute(text(f"UPDATE crm_knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
         return {"message": "تم تحديث المقالة"}
     finally:
@@ -735,7 +735,7 @@ def update_article(article_id: int, data: ArticleUpdate, current_user=Depends(ge
 def delete_article(article_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        db.execute(text("DELETE FROM knowledge_base WHERE id = :id"), {"id": article_id})
+        db.execute(text("DELETE FROM crm_knowledge_base WHERE id = :id"), {"id": article_id})
         db.commit()
         return {"message": "تم حذف المقالة"}
     finally:

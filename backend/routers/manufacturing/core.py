@@ -1850,10 +1850,14 @@ def report_direct_labor(
                 po.order_number,
                 p.product_name,
                 po.quantity as order_quantity,
-                poo.name as operation_name,
+                COALESCE(mo.description, '') as operation_name,
                 poo.status as operation_status,
                 COALESCE(poo.actual_run_time, 0) as actual_run_time_min,
-                COALESCE(poo.planned_run_time, 0) as planned_run_time_min,
+                COALESCE(
+                    EXTRACT(EPOCH FROM (poo.planned_end_time - poo.planned_start_time)) / 60.0,
+                    mo.cycle_time * po.quantity,
+                    0
+                ) as planned_run_time_min,
                 COALESCE(poo.completed_quantity, 0) as completed_quantity,
                 poo.start_time,
                 poo.end_time
@@ -1861,9 +1865,10 @@ def report_direct_labor(
             JOIN production_orders po ON poo.production_order_id = po.id
             JOIN products p ON po.product_id = p.id
             LEFT JOIN work_centers wc ON poo.work_center_id = wc.id
+            LEFT JOIN manufacturing_operations mo ON poo.operation_id = mo.id
             WHERE poo.status IN ('completed', 'in_progress')
             {date_filter}
-            ORDER BY wc.name, po.order_number, poo.sequence
+            ORDER BY wc.name, po.order_number, mo.sequence
         """), params).fetchall()
 
         # Build detailed report

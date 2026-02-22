@@ -1431,7 +1431,7 @@ def create_tax_calendar_item(
         import json
         row = db.execute(text("""
             INSERT INTO tax_calendar (title, tax_type, due_date, reminder_days, is_recurring, recurrence_months, notes, created_by)
-            VALUES (:title, :tax_type, :due_date, :reminder_days::jsonb, :is_recurring, :recurrence_months, :notes, :user_id)
+            VALUES (:title, :tax_type, :due_date, CAST(:reminder_days AS jsonb), :is_recurring, :recurrence_months, :notes, :user_id)
             RETURNING *
         """), {
             "title": data.title,
@@ -1470,7 +1470,7 @@ def update_tax_calendar_item(
                 updates.append(f"{field} = :{field}")
                 params[field] = val
         if data.reminder_days is not None:
-            updates.append("reminder_days = :reminder_days::jsonb")
+            updates.append("reminder_days = CAST(:reminder_days AS jsonb)")
             params["reminder_days"] = json.dumps(data.reminder_days)
         if not updates:
             raise HTTPException(400, "No fields to update")
@@ -1533,15 +1533,21 @@ def complete_tax_calendar_item(
         if item.get("is_recurring"):
             import json
             months = item.get("recurrence_months", 3)
+            next_due = item["due_date"]
+            from dateutil.relativedelta import relativedelta
+            if hasattr(next_due, 'date'):
+                next_due = next_due
+            next_due = next_due + relativedelta(months=months)
             next_row = db.execute(text("""
                 INSERT INTO tax_calendar (title, tax_type, due_date, reminder_days, is_recurring, recurrence_months, notes, created_by)
-                VALUES (:title, :tax_type, :due_date + INTERVAL ':months months', :reminder_days::jsonb, true, :months, :notes, :user_id)
+                VALUES (:title, :tax_type, :next_due, CAST(:reminder_days AS jsonb), true, :months, :notes, :user_id)
                 RETURNING id
-            """.replace(":months months", f"{months} months").replace(":months,", f"{months},")), {
+            """), {
                 "title": item["title"],
                 "tax_type": item.get("tax_type"),
-                "due_date": item["due_date"],
+                "next_due": next_due,
                 "reminder_days": json.dumps(item.get("reminder_days", [7, 3, 1])),
+                "months": months,
                 "notes": item.get("notes"),
                 "user_id": current_user.id
             }).fetchone()
