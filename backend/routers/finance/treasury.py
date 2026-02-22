@@ -585,6 +585,8 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
 
         return {"success": True, "message": "تم تسجيل المصروف بنجاح", "transaction_id": trans_id}
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Expense Error: {e}")
@@ -739,6 +741,8 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
 
         return {"success": True, "message": "تم التحويل بنجاح", "transaction_id": trans_id}
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Transfer Error: {e}")

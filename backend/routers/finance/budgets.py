@@ -81,13 +81,17 @@ def delete_budget(budget_id: int, current_user: UserResponse = Depends(get_curre
     conn = get_db_connection(current_user.company_id)
     try:
         # Verify budget exists
-        budget = conn.execute(text("SELECT id FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
+        budget = conn.execute(text("SELECT id, status FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
+        if budget.status == 'active':
+            raise HTTPException(status_code=400, detail="لا يمكن حذف ميزانية نشطة. يرجى إلغاء تنشيطها أولاً.")
             
         conn.execute(text("DELETE FROM budgets WHERE id = :id"), {"id": budget_id})
         conn.commit()
         return {"message": "Budget deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

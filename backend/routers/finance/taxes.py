@@ -356,7 +356,7 @@ def create_tax_return(
             month_end = quarter * 3
             start_date = f"{year}-{month_start:02d}-01"
             if month_end == 12:
-                end_date = f"{year}-12-31"
+                end_date = f"{int(year) + 1}-01-01"
             else:
                 end_date = f"{year}-{month_end + 1:02d}-01"
         else:
@@ -423,8 +423,7 @@ def create_tax_return(
 
         net_output_vat = float(output.vat or 0) - float(output_returns.vat or 0)
         net_input_vat = float(input_vat.vat or 0) - float(input_returns.vat or 0)
-        taxable_amount = (float(output.taxable or 0) - float(output_returns.taxable or 0)) + \
-                         (float(input_vat.taxable or 0) - float(input_returns.taxable or 0))
+        taxable_amount = float(output.taxable or 0) - float(output_returns.taxable or 0)
         tax_amount = net_output_vat - net_input_vat
 
         return_number = generate_sequential_number(db, "TR", "tax_returns", "return_number")
@@ -643,7 +642,7 @@ def create_tax_payment(
         # ===== ACCOUNTING INTEGRATION =====
         vat_account_id = get_mapped_account_id(db, "acc_map_vat_out")
         if not vat_account_id:
-            vat_account_id = get_mapped_account_id(db, "acc_map_vat_in")
+            raise HTTPException(status_code=400, detail="حساب ضريبة المخرجات (VAT Output) غير محدد في الإعدادات")
 
         bank_account_id = None
         if data.treasury_account_id:
@@ -1008,21 +1007,21 @@ def create_tax_settlement(
 
         settle_amount = min(float(output), float(input_v))
         if settle_amount > 0:
-            # Debit Input VAT (clear input)
+            # Debit Output VAT (reduce liability)
             db.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
                 VALUES (:jid, :aid, :amt, 0, :desc, :curr, :amt)
-            """), {"jid": je_id, "aid": vat_in_id, "amt": settle_amount,
-                   "desc": "تسوية ضريبة المدخلات", "curr": base_currency})
-            update_account_balance(db, vat_in_id, debit_base=settle_amount, credit_base=0)
+            """), {"jid": je_id, "aid": vat_out_id, "amt": settle_amount,
+                   "desc": "تسوية ضريبة المخرجات", "curr": base_currency})
+            update_account_balance(db, vat_out_id, debit_base=settle_amount, credit_base=0)
 
-            # Credit Output VAT (reduce output by input amount)
+            # Credit Input VAT (reduce asset)
             db.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
                 VALUES (:jid, :aid, 0, :amt, :desc, :curr, :amt)
-            """), {"jid": je_id, "aid": vat_out_id, "amt": settle_amount,
+            """), {"jid": je_id, "aid": vat_in_id, "amt": settle_amount,
                    "desc": "تسوية ضريبة المدخلات مع المخرجات", "curr": base_currency})
-            update_account_balance(db, vat_out_id, debit_base=0, credit_base=settle_amount)
+            update_account_balance(db, vat_in_id, debit_base=0, credit_base=settle_amount)
 
         db.commit()
 

@@ -358,6 +358,13 @@ async def update_account(
         existing = db.execute(text("SELECT 1 FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
         if not existing:
              raise HTTPException(status_code=404, detail="الحساب غير موجود")
+        
+        # Check for duplicate account_code
+        new_code = account_data.get("account_code")
+        if new_code:
+            dup = db.execute(text("SELECT 1 FROM accounts WHERE account_code = :code AND id != :id"), {"code": new_code, "id": account_id}).fetchone()
+            if dup:
+                raise HTTPException(status_code=400, detail=f"رمز الحساب '{new_code}' مستخدم بالفعل")
              
         db.execute(text("""
             UPDATE accounts 
@@ -366,7 +373,7 @@ async def update_account(
         """), {
             "name": account_data.get("name"),
             "name_en": account_data.get("name_en"),
-            "code": account_data.get("account_code"),
+            "code": new_code,
             "id": account_id
         })
         db.commit()
@@ -407,10 +414,24 @@ async def create_journal_entry(
     """
     db = get_db_connection(current_user.company_id)
     try:
-        # 1. Validation: Debits must equal Credits
+        # 1. Validation
+        if "lines" not in entry_data or not entry_data["lines"]:
+            raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
+
+        for i, line in enumerate(entry_data["lines"]):
+            d = float(line.get("debit", 0))
+            c = float(line.get("credit", 0))
+            if d < 0 or c < 0:
+                raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن إدخال مبالغ سالبة")
+            if d > 0 and c > 0:
+                raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن أن يكون مدين ودائن معاً في نفس السطر")
+
         total_debit = sum(float(line.get("debit", 0)) for line in entry_data["lines"])
         total_credit = sum(float(line.get("credit", 0)) for line in entry_data["lines"])
         
+        if total_debit == 0 and total_credit == 0:
+            raise HTTPException(status_code=400, detail="لا يمكن إنشاء قيد بمبالغ صفرية")
+
         if abs(total_debit - total_credit) > 0.01:
              raise HTTPException(status_code=400, detail="القيود غير موزونة (المدين لا يساوي الدائن)")
 
@@ -716,19 +737,31 @@ async def post_journal_entry(
 
         # Get lines and update account balances
         lines = db.execute(text("""
-            SELECT account_id, debit, credit, currency FROM journal_lines
+            SELECT account_id, debit, credit, currency, amount_currency FROM journal_lines
             WHERE journal_entry_id = :id
         """), {"id": entry_id}).fetchall()
 
+        # Get the exchange rate from the journal entry
+        je_rate = float(entry.exchange_rate or 1.0)
+
         from utils.accounting import update_account_balance
         for line in lines:
+            debit_base = float(line.debit)
+            credit_base = float(line.credit)
+            # Reverse the base amounts to get original currency amounts
+            if je_rate != 0:
+                debit_curr = debit_base / je_rate
+                credit_curr = credit_base / je_rate
+            else:
+                debit_curr = debit_base
+                credit_curr = credit_base
             update_account_balance(
                 db,
                 account_id=line.account_id,
-                debit_base=float(line.debit),
-                credit_base=float(line.credit),
-                debit_curr=float(line.debit),
-                credit_curr=float(line.credit),
+                debit_base=debit_base,
+                credit_base=credit_base,
+                debit_curr=debit_curr,
+                credit_curr=credit_curr,
                 currency=line.currency
             )
 
@@ -839,11 +872,23 @@ async def void_journal_entry(
             })
             
             # Reverse balance: original was (debit, credit), reversal is (credit, debit)
+            je_rate = float(original.exchange_rate or 1.0)
+            debit_base = float(line.credit)
+            credit_base = float(line.debit)
+            if je_rate != 0:
+                debit_curr = debit_base / je_rate
+                credit_curr = credit_base / je_rate
+            else:
+                debit_curr = debit_base
+                credit_curr = credit_base
             update_account_balance(
                 db, 
                 account_id=line.account_id,
-                debit_base=float(line.credit),
-                credit_base=float(line.debit)
+                debit_base=debit_base,
+                credit_base=credit_base,
+                debit_curr=debit_curr,
+                credit_curr=credit_curr,
+                currency=line.currency
             )
         
         # 5. Mark original as voided
@@ -1050,11 +1095,11 @@ def preview_year_end_closing(
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.credit - jl.debit), 0) AS balance
             FROM accounts a
-            LEFT JOIN journal_lines jl ON jl.account_id = a.id
-            LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-                AND je.entry_date BETWEEN :start AND :end
-                AND je.status = 'posted'
+            JOIN journal_lines jl ON jl.account_id = a.id
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
             WHERE a.account_type = 'revenue'
+            AND je.entry_date BETWEEN :start AND :end
+            AND je.status = 'posted'
             GROUP BY a.id, a.account_number, a.name, a.name_en
             HAVING COALESCE(SUM(jl.credit - jl.debit), 0) != 0
             ORDER BY a.account_number
@@ -1065,11 +1110,11 @@ def preview_year_end_closing(
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.debit - jl.credit), 0) AS balance
             FROM accounts a
-            LEFT JOIN journal_lines jl ON jl.account_id = a.id
-            LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-                AND je.entry_date BETWEEN :start AND :end
-                AND je.status = 'posted'
+            JOIN journal_lines jl ON jl.account_id = a.id
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
             WHERE a.account_type = 'expense'
+            AND je.entry_date BETWEEN :start AND :end
+            AND je.status = 'posted'
             GROUP BY a.id, a.account_number, a.name, a.name_en
             HAVING COALESCE(SUM(jl.debit - jl.credit), 0) != 0
             ORDER BY a.account_number
@@ -2084,11 +2129,11 @@ def preview_closing_entries(
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.credit - jl.debit), 0) as balance
             FROM accounts a
-            LEFT JOIN journal_lines jl ON a.id = jl.account_id
-            LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-                AND je.entry_date BETWEEN :start AND :end
-                AND je.status = 'posted' {branch_filter}
+            JOIN journal_lines jl ON a.id = jl.account_id
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
             WHERE a.account_type = 'revenue'
+            AND je.entry_date BETWEEN :start AND :end
+            AND je.status = 'posted' {branch_filter}
             GROUP BY a.id, a.account_number, a.name, a.name_en
             HAVING COALESCE(SUM(jl.credit - jl.debit), 0) != 0
             ORDER BY a.account_number
@@ -2098,11 +2143,11 @@ def preview_closing_entries(
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.debit - jl.credit), 0) as balance
             FROM accounts a
-            LEFT JOIN journal_lines jl ON a.id = jl.account_id
-            LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
-                AND je.entry_date BETWEEN :start AND :end
-                AND je.status = 'posted' {branch_filter}
+            JOIN journal_lines jl ON a.id = jl.account_id
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
             WHERE a.account_type = 'expense'
+            AND je.entry_date BETWEEN :start AND :end
+            AND je.status = 'posted' {branch_filter}
             GROUP BY a.id, a.account_number, a.name, a.name_en
             HAVING COALESCE(SUM(jl.debit - jl.credit), 0) != 0
             ORDER BY a.account_number
@@ -2355,8 +2400,8 @@ def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depend
         je_num = f"JE-BD-PROV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         desc = req.description or "مخصص ديون معدومة"
         je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
-            VALUES (:num, CURRENT_DATE, 'BAD-DEBT-PROV', :desc, 'posted', :uid, :br, :curr, 1) RETURNING id
+            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate, posted_at)
+            VALUES (:num, CURRENT_DATE, 'BAD-DEBT-PROV', :desc, 'posted', :uid, :br, :curr, 1, NOW()) RETURNING id
         """), {"num": je_num, "desc": desc, "uid": current_user.id, "br": branch_id, "curr": base_currency}).scalar()
 
         for acc_id, debit, credit, line_desc in [
@@ -2402,8 +2447,8 @@ def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(g
         je_num = f"JE-LV-PROV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         desc = req.description or "مخصص إجازات الموظفين"
         je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
-            VALUES (:num, CURRENT_DATE, 'LEAVE-PROV', :desc, 'posted', :uid, :br, :curr, 1) RETURNING id
+            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate, posted_at)
+            VALUES (:num, CURRENT_DATE, 'LEAVE-PROV', :desc, 'posted', :uid, :br, :curr, 1, NOW()) RETURNING id
         """), {"num": je_num, "desc": desc, "uid": current_user.id, "br": branch_id, "curr": base_currency}).scalar()
 
         for acc_id, debit, credit, line_desc in [
@@ -2458,7 +2503,8 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
         # Find all accounts with balances in this currency
         balances = db.execute(text("""
             SELECT jl.account_id, a.account_number, a.name,
-                   SUM(jl.amount_currency) as fc_balance,
+                   SUM(CASE WHEN jl.debit > 0 THEN jl.amount_currency
+                            ELSE -jl.amount_currency END) as fc_balance,
                    SUM(jl.debit - jl.credit) as base_balance
             FROM journal_lines jl
             JOIN journal_entries je ON jl.journal_entry_id = je.id
@@ -2466,7 +2512,8 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
             WHERE jl.currency = :curr AND je.status = 'posted'
                   AND a.account_type IN ('asset', 'liability')
             GROUP BY jl.account_id, a.account_number, a.name
-            HAVING SUM(jl.amount_currency) != 0
+            HAVING SUM(CASE WHEN jl.debit > 0 THEN jl.amount_currency
+                            ELSE -jl.amount_currency END) != 0
         """), {"curr": req.currency_code}).fetchall()
 
         if not balances:

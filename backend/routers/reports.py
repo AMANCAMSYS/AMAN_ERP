@@ -4,7 +4,11 @@ from sqlalchemy import text
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
+import json
+import logging
 from database import get_db_connection
+
+logger = logging.getLogger(__name__)
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
 
@@ -81,7 +85,7 @@ def get_sales_summary(
                     'invoice' as source
                 FROM invoices 
                 WHERE invoice_type = 'sales' 
-                AND status != 'cancelled'
+                AND status NOT IN ('cancelled', 'draft')
                 
                 UNION ALL
                 
@@ -571,11 +575,12 @@ def get_purchases_summary(
         summary = db.execute(text(f"""
             SELECT 
                 COUNT(*) as count,
-                COALESCE(SUM(total), 0) as total_purchases,
-                COALESCE(SUM(paid_amount), 0) as total_paid,
-                COALESCE(SUM(total - paid_amount), 0) as total_due
+                COALESCE(SUM(total * COALESCE(exchange_rate, 1.0)), 0) as total_purchases,
+                COALESCE(SUM(paid_amount * COALESCE(exchange_rate, 1.0)), 0) as total_paid,
+                COALESCE(SUM((total - paid_amount) * COALESCE(exchange_rate, 1.0)), 0) as total_due
             FROM invoices 
             WHERE invoice_type = 'purchase' 
+            AND status NOT IN ('cancelled', 'draft')
             AND invoice_date BETWEEN :start AND :end
             {branch_filter}
         """), params).fetchone()
@@ -612,9 +617,10 @@ def get_purchases_trend(
             SELECT 
                 invoice_date as date,
                 COUNT(*) as count,
-                COALESCE(SUM(total), 0) as total
+                COALESCE(SUM(total * COALESCE(exchange_rate, 1.0)), 0) as total
             FROM invoices 
             WHERE invoice_type = 'purchase' 
+            AND status NOT IN ('cancelled', 'draft')
             AND invoice_date >= :start
             {branch_filter}
             GROUP BY invoice_date
@@ -643,10 +649,11 @@ def get_purchases_by_supplier(
             SELECT 
                 p.name as name,
                 COUNT(i.id) as invoice_count,
-                COALESCE(SUM(i.total), 0) as total_purchases
+                COALESCE(SUM(i.total * COALESCE(i.exchange_rate, 1.0)), 0) as total_purchases
             FROM invoices i
             JOIN parties p ON i.party_id = p.id
             WHERE i.invoice_type = 'purchase'
+            AND i.status NOT IN ('cancelled', 'draft')
             {branch_filter}
             GROUP BY p.id, p.name
             ORDER BY total_purchases DESC
@@ -1170,7 +1177,7 @@ def _get_balance_sheet_data(db, as_of_date, branch_id=None):
     # Compute totals
     total_assets = sum(r["balance"] for r in roots if r.get("account_type") == "asset")
     total_liabilities = sum(r["balance"] for r in roots if r.get("account_type") == "liability")
-    total_equity = sum(r["balance"] for r in roots if r.get("account_type") == "equity") + retained_earnings
+    total_equity = sum(r["balance"] for r in roots if r.get("account_type") == "equity")
 
     return {
         "period": {"start": as_of_date, "end": as_of_date},
@@ -1398,6 +1405,29 @@ def get_general_ledger(
             branch_filter = "AND je.branch_id = :branch_id"
             params["branch_id"] = branch_id
 
+        # Get account info for sign convention
+        acct_info = db.execute(text("SELECT account_type FROM accounts WHERE id = :account_id"), {"account_id": account_id}).fetchone()
+        acct_type = acct_info.account_type if acct_info else "asset"
+
+        # Compute opening balance (all posted entries before start_date)
+        opening_query = f"""
+            SELECT COALESCE(SUM(jl.debit), 0) as total_debit,
+                   COALESCE(SUM(jl.credit), 0) as total_credit
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE jl.account_id = :account_id
+            AND je.entry_date < :start
+            AND je.status = 'posted'
+            {branch_filter}
+        """
+        opening_row = db.execute(text(opening_query), params).fetchone()
+        opening_debit = float(opening_row.total_debit) if opening_row else 0
+        opening_credit = float(opening_row.total_credit) if opening_row else 0
+        if acct_type in ('asset', 'expense'):
+            opening_balance = opening_debit - opening_credit
+        else:
+            opening_balance = opening_credit - opening_debit
+
         query = f"""
             SELECT 
                 je.entry_date,
@@ -1418,21 +1448,31 @@ def get_general_ledger(
         
         result = db.execute(text(query), params).fetchall()
         
+        running_balance = opening_balance
         entries = []
         for row in result:
+            debit = float(row.debit)
+            credit = float(row.credit)
+            if acct_type in ('asset', 'expense'):
+                running_balance += debit - credit
+            else:
+                running_balance += credit - debit
             entries.append({
                 "entry_date": str(row.entry_date),
                 "entry_number": row.entry_number,
                 "description": row.line_description or row.description,
                 "reference": row.reference,
-                "debit": float(row.debit),
-                "credit": float(row.credit)
+                "debit": debit,
+                "credit": credit,
+                "running_balance": round(running_balance, 2)
             })
         
         return {
             "account_id": account_id,
             "period": {"start": start_date, "end": end_date},
-            "entries": entries
+            "opening_balance": round(opening_balance, 2),
+            "entries": entries,
+            "closing_balance": round(running_balance, 2)
         }
     finally:
         db.close()
@@ -1936,13 +1976,13 @@ def export_cashflow(
     branch_id = validate_branch_access(current_user, branch_id)
     data = get_cashflow_report(start_date=start_date, end_date=end_date, branch_id=branch_id, current_user=current_user)
     flat = []
-    for section_name, section_data in [("Operating", data.get("operating", {})), ("Investing", data.get("investing", {})), ("Financing", data.get("financing", {}))]:
-        if isinstance(section_data, dict):
-            for k, v in section_data.items():
-                if k != "total":
-                    flat.append({"Section": section_name, "Item": k, "Amount": f"{float(v or 0):,.2f}"})
-            flat.append({"Section": section_name, "Item": "المجموع", "Amount": f"{float(section_data.get('total', 0)):,.2f}"})
-    flat.append({"Section": "", "Item": "صافي التغير في النقدية", "Amount": f"{float(data.get('net_change', 0)):,.2f}"})
+    for item in data.get("inflows", []):
+        flat.append({"Section": "تدفقات داخلة", "Item": item.get("category", ""), "Amount": f"{float(item.get('amount', 0)):,.2f}"})
+    flat.append({"Section": "تدفقات داخلة", "Item": "المجموع", "Amount": f"{float(data.get('total_inflow', 0)):,.2f}"})
+    for item in data.get("outflows", []):
+        flat.append({"Section": "تدفقات خارجة", "Item": item.get("category", ""), "Amount": f"{float(item.get('amount', 0)):,.2f}"})
+    flat.append({"Section": "تدفقات خارجة", "Item": "المجموع", "Amount": f"{float(data.get('total_outflow', 0)):,.2f}"})
+    flat.append({"Section": "", "Item": "صافي التدفقات النقدية", "Amount": f"{float(data.get('net_cash_flow', 0)):,.2f}"})
     cols = ["Section", "Item", "Amount"]
     fname = f"cashflow_{start_date}_{end_date}"
     if format == "excel":
@@ -2092,7 +2132,7 @@ def financial_ratios(
         gross_profit = revenue - cogs
 
         # Inventory
-        inventory = code_sum("1103%") + code_sum("1103%")  # net balance
+        inventory = code_sum("1103%")  # net balance
         ar = code_sum("1102%")
         ap = abs(code_sum("2101%"))
 

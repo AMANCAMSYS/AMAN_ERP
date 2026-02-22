@@ -316,7 +316,8 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         
         # Use UUID OR simple generation
         import uuid
-        je_num = f"JE-ASSET-DISP-{asset_id}"
+        ts = datetime.now().strftime('%Y%m%d%H%M%S')
+        je_num = f"JE-ASSET-DISP-{asset_id}-{ts}"
         
         # Check if JE exists for this asset disposal (to avoid double posting)
         exists = conn.execute(text("SELECT 1 FROM journal_entries WHERE reference = :ref"), {"ref": f"ASSET-DISP-{asset_id}"}).fetchone()
@@ -453,7 +454,8 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
                 (acc_inter, 0, cost, f"نقل أصل #{asset_id} من فرع {from_branch_id}")
             ]),
         ]:
-            je_num = f"JE-ASSET-XFER-{je_type}-{asset_id}"
+            ts = datetime.now().strftime('%Y%m%d%H%M%S')
+            je_num = f"JE-ASSET-XFER-{je_type}-{asset_id}-{ts}"
             je_id = conn.execute(text("""
                 INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
                 VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :br, :curr, 1)
@@ -520,10 +522,13 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         acc_fixed = get_mapped_account_id(conn, "acc_map_fixed_assets")
         acc_reval = get_mapped_account_id(conn, "acc_map_revaluation_reserve")
         acc_loss = get_mapped_account_id(conn, "acc_map_asset_loss")
-        if not acc_reval and not acc_loss:
-            raise HTTPException(status_code=400, detail="لم يتم تعيين حساب احتياطي التقييم أو خسائر الأصول")
+        if diff > 0 and not acc_reval:
+            raise HTTPException(status_code=400, detail="لم يتم تعيين حساب احتياطي إعادة التقييم في الإعدادات")
+        if diff < 0 and not acc_loss:
+            raise HTTPException(status_code=400, detail="لم يتم تعيين حساب خسائر الأصول في الإعدادات")
 
-        je_num = f"JE-ASSET-REVAL-{asset_id}"
+        ts = datetime.now().strftime('%Y%m%d%H%M%S')
+        je_num = f"JE-ASSET-REVAL-{asset_id}-{ts}"
         je_id = conn.execute(text("""
             INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
             VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :br, :curr, 1) RETURNING id
