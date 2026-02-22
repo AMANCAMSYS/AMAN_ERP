@@ -77,7 +77,7 @@ const AssetList = () => {
                                 name="asset_search"
                                 id="asset_search"
                                 placeholder={t('common.search')}
-                                className="form-control form-control-sm"
+                                className="form-input form-input-sm"
                                 autoComplete="off"
                             />
                         </div>

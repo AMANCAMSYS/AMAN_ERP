@@ -140,11 +140,11 @@ const ProductionSchedule = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="form-group mb-0">
                         <label className="form-label text-xs uppercase tracking-wider text-gray-400">{t('common.from_date')}</label>
-                        <DateInput className="form-control-sm w-full" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                        <DateInput className="form-input-sm w-full" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     </div>
                     <div className="form-group mb-0">
                         <label className="form-label text-xs uppercase tracking-wider text-gray-400">{t('common.to_date')}</label>
-                        <DateInput className="form-control-sm w-full" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                        <DateInput className="form-input-sm w-full" value={endDate} onChange={e => setEndDate(e.target.value)} />
                     </div>
                     <div className="form-group mb-0">
                         <label className="form-label text-xs uppercase tracking-wider text-gray-400">{t('manufacturing.work_center')}</label>

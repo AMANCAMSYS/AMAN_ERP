@@ -312,12 +312,12 @@ export default function RecurringTemplates() {
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-4">
                                         <label className="form-label">{t('recurring.template_name') + ' *'}</label>
-                                        <input className="form-control" required value={form.name}
+                                        <input className="form-input" required value={form.name}
                                             onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                                     </div>
                                     <div className="col-md-4">
                                         <label className="form-label">{t('recurring.reference')}</label>
-                                        <input className="form-control" value={form.reference}
+                                        <input className="form-input" value={form.reference}
                                             onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} />
                                     </div>
                                     <div className="col-md-4">
@@ -333,7 +333,7 @@ export default function RecurringTemplates() {
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.start_date') + ' *'}</label>
-                                        <DateInput className="form-control" required value={formatDate(form.start_date)}
+                                        <DateInput className="form-input" required value={formatDate(form.start_date)}
                                             onChange={e => setForm(f => ({
                                                 ...f, start_date: e.target.value,
                                                 next_run_date: f.next_run_date || e.target.value
@@ -341,17 +341,17 @@ export default function RecurringTemplates() {
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.end_date')}</label>
-                                        <DateInput className="form-control" value={formatDate(form.end_date)}
+                                        <DateInput className="form-input" value={formatDate(form.end_date)}
                                             onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.next_run_date')}</label>
-                                        <DateInput className="form-control" value={form.next_run_date}
+                                        <DateInput className="form-input" value={form.next_run_date}
                                             onChange={e => setForm(f => ({ ...f, next_run_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.max_runs')}</label>
-                                        <input type="number" className="form-control" min="1" value={form.max_runs}
+                                        <input type="number" className="form-input" min="1" value={form.max_runs}
                                             placeholder={t('recurring.unlimited')}
                                             onChange={e => setForm(f => ({ ...f, max_runs: e.target.value }))} />
                                     </div>
@@ -359,7 +359,7 @@ export default function RecurringTemplates() {
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-8">
                                         <label className="form-label">{t('recurring.description')}</label>
-                                        <input className="form-control" value={form.description}
+                                        <input className="form-input" value={form.description}
                                             onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
                                     </div>
                                     <div className="col-md-2">
@@ -413,17 +413,17 @@ export default function RecurringTemplates() {
                                                         </select>
                                                     </td>
                                                     <td>
-                                                        <input type="number" className="form-control form-control-sm"
+                                                        <input type="number" className="form-input form-input-sm"
                                                             step="0.01" min="0" value={line.debit}
                                                             onChange={e => updateLine(idx, 'debit', e.target.value)} />
                                                     </td>
                                                     <td>
-                                                        <input type="number" className="form-control form-control-sm"
+                                                        <input type="number" className="form-input form-input-sm"
                                                             step="0.01" min="0" value={line.credit}
                                                             onChange={e => updateLine(idx, 'credit', e.target.value)} />
                                                     </td>
                                                     <td>
-                                                        <input className="form-control form-control-sm" value={line.description}
+                                                        <input className="form-input form-input-sm" value={line.description}
                                                             onChange={e => updateLine(idx, 'description', e.target.value)} />
                                                     </td>
                                                     <td className="text-center">

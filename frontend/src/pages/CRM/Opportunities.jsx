@@ -162,7 +162,7 @@ function Opportunities() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={openCreate}>+ {t('crm.new_opportunity')}</button>
                 <select
-                    className="search-bar"
+                    className="form-input"
                     style={{ maxWidth: 200 }}
                     value={filterStage}
                     onChange={e => setFilterStage(e.target.value)}
@@ -258,7 +258,7 @@ function Opportunities() {
                                             <input
                                                 type="text"
                                                 name="title"
-                                                className="form-control"
+                                                className="form-input"
                                                 value={formData.title}
                                                 onChange={handleChange}
                                                 required
@@ -266,7 +266,7 @@ function Opportunities() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">{t('common.customer')}</label>
-                                            <select className="form-control" name="customer_id" value={formData.customer_id} onChange={handleChange}>
+                                            <select className="form-input" name="customer_id" value={formData.customer_id} onChange={handleChange}>
                                                 <option value="">{t('crm.select_customer')}</option>
                                                 {customers.map(c => (
                                                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -275,7 +275,7 @@ function Opportunities() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">{t('crm.stage')}</label>
-                                            <select className="form-control" name="stage" value={formData.stage} onChange={handleChange} required>
+                                            <select className="form-input" name="stage" value={formData.stage} onChange={handleChange} required>
                                                 {stageOptions.map(s => (
                                                     <option key={s.value} value={s.value}>{s.label}</option>
                                                 ))}
@@ -286,7 +286,7 @@ function Opportunities() {
                                             <input
                                                 type="number"
                                                 name="probability"
-                                                className="form-control"
+                                                className="form-input"
                                                 min="0"
                                                 max="100"
                                                 value={formData.probability}
@@ -298,7 +298,7 @@ function Opportunities() {
                                             <input
                                                 type="number"
                                                 name="expected_value"
-                                                className="form-control"
+                                                className="form-input"
                                                 min="0"
                                                 step="0.01"
                                                 value={formData.expected_value}
@@ -310,7 +310,7 @@ function Opportunities() {
                                             <input
                                                 type="date"
                                                 name="expected_close_date"
-                                                className="form-control"
+                                                className="form-input"
                                                 value={formData.expected_close_date}
                                                 onChange={handleChange}
                                             />
@@ -320,7 +320,7 @@ function Opportunities() {
                                             <input
                                                 type="text"
                                                 name="source"
-                                                className="form-control"
+                                                className="form-input"
                                                 value={formData.source}
                                                 onChange={handleChange}
                                             />
@@ -329,7 +329,7 @@ function Opportunities() {
                                             <label className="form-label">{t('common.notes')}</label>
                                             <textarea
                                                 name="notes"
-                                                className="form-control"
+                                                className="form-input"
                                                 rows={3}
                                                 value={formData.notes}
                                                 onChange={handleChange}

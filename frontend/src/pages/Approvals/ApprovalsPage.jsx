@@ -383,7 +383,7 @@ const ApprovalsPage = () => {
                         </div>
                     )}
 
-                    <div className="form-control">
+                    <div className="form-input">
                         <label className="label">
                             <span className="label-text font-medium">{t('common.notes')}</span>
                         </label>

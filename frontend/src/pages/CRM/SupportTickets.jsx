@@ -199,7 +199,7 @@ function SupportTickets() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={openCreate}>+ {t('crm.new_ticket')}</button>
                 <select
-                    className="search-bar"
+                    className="form-input"
                     style={{ maxWidth: 180 }}
                     value={filterStatus}
                     onChange={e => setFilterStatus(e.target.value)}
@@ -210,7 +210,7 @@ function SupportTickets() {
                     ))}
                 </select>
                 <select
-                    className="search-bar"
+                    className="form-input"
                     style={{ maxWidth: 180 }}
                     value={filterPriority}
                     onChange={e => setFilterPriority(e.target.value)}
@@ -379,7 +379,7 @@ function SupportTickets() {
                                             <input
                                                 type="text"
                                                 name="subject"
-                                                className="form-control"
+                                                className="form-input"
                                                 value={formData.subject}
                                                 onChange={handleChange}
                                                 required
@@ -389,7 +389,7 @@ function SupportTickets() {
                                             <label className="form-label">{t('common.description')}</label>
                                             <textarea
                                                 name="description"
-                                                className="form-control"
+                                                className="form-input"
                                                 rows={4}
                                                 value={formData.description}
                                                 onChange={handleChange}
@@ -397,7 +397,7 @@ function SupportTickets() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">{t('common.customer')}</label>
-                                            <select className="form-control" name="customer_id" value={formData.customer_id} onChange={handleChange}>
+                                            <select className="form-input" name="customer_id" value={formData.customer_id} onChange={handleChange}>
                                                 <option value="">{t('crm.select_customer')}</option>
                                                 {customers.map(c => (
                                                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -406,7 +406,7 @@ function SupportTickets() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">{t('crm.priority')}</label>
-                                            <select className="form-control" name="priority" value={formData.priority} onChange={handleChange} required>
+                                            <select className="form-input" name="priority" value={formData.priority} onChange={handleChange} required>
                                                 {priorityOptions.map(p => (
                                                     <option key={p.value} value={p.value}>{p.label}</option>
                                                 ))}
@@ -417,7 +417,7 @@ function SupportTickets() {
                                             <input
                                                 type="text"
                                                 name="category"
-                                                className="form-control"
+                                                className="form-input"
                                                 value={formData.category}
                                                 onChange={handleChange}
                                             />
@@ -427,7 +427,7 @@ function SupportTickets() {
                                             <input
                                                 type="number"
                                                 name="sla_hours"
-                                                className="form-control"
+                                                className="form-input"
                                                 min="1"
                                                 value={formData.sla_hours}
                                                 onChange={handleChange}

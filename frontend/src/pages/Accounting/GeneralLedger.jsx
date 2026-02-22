@@ -103,12 +103,12 @@ function GeneralLedger() {
                     <div style={{ minWidth: '280px', flex: 1 }}>
                         <label className="form-label">{t('accounting.general_ledger.select_account')}</label>
                         {loadingAccounts ? (
-                            <select className="form-control" disabled>
+                            <select className="form-input" disabled>
                                 <option>{t('common.loading')}...</option>
                             </select>
                         ) : (
                             <select
-                                className="form-control"
+                                className="form-input"
                                 value={selectedAccount}
                                 onChange={(e) => setSelectedAccount(e.target.value)}
                             >

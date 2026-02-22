@@ -72,11 +72,11 @@ function TreasuryCashflowReport() {
                     <div className="display-flex gap-4 align-center" style={{ flexWrap: 'wrap' }}>
                         <div style={{ width: '200px' }}>
                             <label className="form-label">{t('common.start_date')}</label>
-                            <CustomDatePicker selected={startDate} onChange={d => setStartDate(d)} className="form-control" />
+                            <CustomDatePicker selected={startDate} onChange={d => setStartDate(d)} className="form-input" />
                         </div>
                         <div style={{ width: '200px' }}>
                             <label className="form-label">{t('common.end_date')}</label>
-                            <CustomDatePicker selected={endDate} onChange={d => setEndDate(d)} className="form-control" />
+                            <CustomDatePicker selected={endDate} onChange={d => setEndDate(d)} className="form-input" />
                         </div>
                     </div>
                 </div>

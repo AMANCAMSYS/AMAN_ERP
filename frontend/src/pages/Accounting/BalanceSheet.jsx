@@ -181,7 +181,7 @@ function BalanceSheet() {
                             <CustomDatePicker
                                 selected={asOfDate}
                                 onChange={date => setAsOfDate(date)}
-                                className="form-control"
+                                className="form-input"
                             />
                         </div>
 
@@ -204,7 +204,7 @@ function BalanceSheet() {
                                 <CustomDatePicker
                                     selected={compareDate}
                                     onChange={date => setCompareDate(date)}
-                                    className="form-control"
+                                    className="form-input"
                                 />
                             </div>
                         )}

@@ -244,7 +244,7 @@ function TaxCompliance() {
                             <select
                                 value={selectedCountry}
                                 onChange={(e) => setSelectedCountry(e.target.value)}
-                                className="form-control"
+                                className="form-input"
                                 style={{ maxWidth: '250px' }}
                             >
                                 <option value="">{t('tax_compliance.select_country')}</option>
@@ -303,7 +303,7 @@ function TaxCompliance() {
                             <div>
                                 <label className="form-label">{t('tax_compliance.report_type')}</label>
                                 <select value={reportType} onChange={e => { setReportType(e.target.value); setReportData(null) }}
-                                    className="form-control" style={{ minWidth: '220px' }}>
+                                    className="form-input" style={{ minWidth: '220px' }}>
                                     <option value="">{t('tax_compliance.select_report')}</option>
                                     <option value="sa-vat">🇸🇦 {t('tax_compliance.report_sa_vat')}</option>
                                     <option value="sy-income">🇸🇾 {t('tax_compliance.report_sy_income')}</option>
@@ -315,12 +315,12 @@ function TaxCompliance() {
                             <div>
                                 <label className="form-label">{t('tax_compliance.year')}</label>
                                 <input type="number" value={reportYear} onChange={e => setReportYear(parseInt(e.target.value))}
-                                    className="form-control" style={{ width: '120px' }} min={2020} max={2030} />
+                                    className="form-input" style={{ width: '120px' }} min={2020} max={2030} />
                             </div>
                             <div>
                                 <label className="form-label">{t('tax_compliance.period')}</label>
                                 <input type="text" value={reportPeriod} onChange={e => setReportPeriod(e.target.value)}
-                                    className="form-control" style={{ width: '150px' }} placeholder="Q1, Q2, 01, 02..." />
+                                    className="form-input" style={{ width: '150px' }} placeholder="Q1, Q2, 01, 02..." />
                             </div>
                             <button className="btn btn-primary" onClick={handleGenerateReport} disabled={!reportType || reportLoading}>
                                 {reportLoading ? <span className="loading-sm"></span> : <FileText size={16} />}

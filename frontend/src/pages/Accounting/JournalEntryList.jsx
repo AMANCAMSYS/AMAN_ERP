@@ -114,7 +114,7 @@ function JournalEntryList() {
             {/* Filters */}
             <div className="card mt-3 p-3" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <select
-                    className="form-control"
+                    className="form-input"
                     style={{ width: '180px' }}
                     value={statusFilter}
                     onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
@@ -126,7 +126,7 @@ function JournalEntryList() {
                 </select>
                 <input
                     type="text"
-                    className="form-control"
+                    className="form-input"
                     style={{ width: '250px' }}
                     placeholder={t('common.search')}
                     value={search}

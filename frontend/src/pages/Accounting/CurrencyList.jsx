@@ -185,7 +185,7 @@ export default function CurrencyList() {
                         <input
                             type="text"
                             placeholder={t('common.search')}
-                            className="form-control form-control-sm"
+                            className="form-input form-input-sm"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />

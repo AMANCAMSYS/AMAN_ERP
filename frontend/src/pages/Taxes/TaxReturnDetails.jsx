@@ -263,13 +263,13 @@ function TaxReturnDetails() {
                             <p>{t('taxes.file_confirm_msg')}</p>
                             <div className="form-group mt-3">
                                 <label className="form-label">{t('taxes.penalty_amount')}</label>
-                                <input type="number" className="form-control" min="0" step="0.01"
+                                <input type="number" className="form-input" min="0" step="0.01"
                                     value={fileForm.penalty_amount}
                                     onChange={e => setFileForm({...fileForm, penalty_amount: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.interest_amount')}</label>
-                                <input type="number" className="form-control" min="0" step="0.01"
+                                <input type="number" className="form-input" min="0" step="0.01"
                                     value={fileForm.interest_amount}
                                     onChange={e => setFileForm({...fileForm, interest_amount: parseFloat(e.target.value) || 0})} />
                             </div>
@@ -301,19 +301,19 @@ function TaxReturnDetails() {
                             </div>
                             <div className="form-group mt-3">
                                 <label className="form-label">{t('taxes.amount')} *</label>
-                                <input type="number" className="form-control" min="0.01" step="0.01"
+                                <input type="number" className="form-input" min="0.01" step="0.01"
                                     max={data.remaining_amount}
                                     value={payForm.amount}
                                     onChange={e => setPayForm({...payForm, amount: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.payment_date')} *</label>
-                                <DateInput className="form-control" value={payForm.payment_date}
+                                <DateInput className="form-input" value={payForm.payment_date}
                                     onChange={e => setPayForm({...payForm, payment_date: e.target.value})} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.payment_method')}</label>
-                                <select className="form-control" value={payForm.payment_method}
+                                <select className="form-input" value={payForm.payment_method}
                                     onChange={e => setPayForm({...payForm, payment_method: e.target.value})}>
                                     <option value="bank_transfer">{t('taxes.bank_transfer')}</option>
                                     <option value="cash">{t('taxes.cash')}</option>
@@ -323,7 +323,7 @@ function TaxReturnDetails() {
                             {treasuryAccounts.length > 0 && (
                                 <div className="form-group">
                                     <label className="form-label">{t('taxes.treasury_account')}</label>
-                                    <select className="form-control" value={payForm.treasury_account_id || ''}
+                                    <select className="form-input" value={payForm.treasury_account_id || ''}
                                         onChange={e => setPayForm({...payForm, treasury_account_id: e.target.value})}>
                                         <option value="">{t('taxes.auto_select')}</option>
                                         {treasuryAccounts.map(ta => (
@@ -334,13 +334,13 @@ function TaxReturnDetails() {
                             )}
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.reference')}</label>
-                                <input className="form-control" value={payForm.reference}
+                                <input className="form-input" value={payForm.reference}
                                     onChange={e => setPayForm({...payForm, reference: e.target.value})}
                                     placeholder={t('taxes.ref_placeholder')} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.notes')}</label>
-                                <textarea className="form-control" rows="2" value={payForm.notes}
+                                <textarea className="form-input" rows="2" value={payForm.notes}
                                     onChange={e => setPayForm({...payForm, notes: e.target.value})} />
                             </div>
                         </div>

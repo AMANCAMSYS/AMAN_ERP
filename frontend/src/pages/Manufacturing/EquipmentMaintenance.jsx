@@ -245,12 +245,12 @@ const EquipmentMaintenance = () => {
                             <div className="modal-body">
                                 <div className="form-group">
                                     <label className="form-label">{t('common.name')}</label>
-                                    <input type="text" className="form-control-sm w-full" required
+                                    <input type="text" className="form-input-sm w-full" required
                                         value={equipForm.name} onChange={e => setEquipForm({ ...equipForm, name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('common.code')}</label>
-                                    <input type="text" className="form-control-sm w-full" required
+                                    <input type="text" className="form-input-sm w-full" required
                                         value={equipForm.code} onChange={e => setEquipForm({ ...equipForm, code: e.target.value })} />
                                 </div>
                                 <div className="form-group">
@@ -264,7 +264,7 @@ const EquipmentMaintenance = () => {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('manufacturing.next_maintenance_date')}</label>
-                                    <DateInput className="form-control-sm w-full"
+                                    <DateInput className="form-input-sm w-full"
                                         value={formatDate(equipForm.next_maintenance_date)} onChange={e => setEquipForm({ ...equipForm, next_maintenance_date: e.target.value })} />
                                 </div>
                             </div>

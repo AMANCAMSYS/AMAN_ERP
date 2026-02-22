@@ -64,7 +64,7 @@ function CashFlowReport() {
                             <CustomDatePicker
                                 selected={startDate}
                                 onChange={date => setStartDate(date)}
-                                className="form-control"
+                                className="form-input"
                             />
                         </div>
                         <div style={{ width: '200px' }}>
@@ -72,7 +72,7 @@ function CashFlowReport() {
                             <CustomDatePicker
                                 selected={endDate}
                                 onChange={date => setEndDate(date)}
-                                className="form-control"
+                                className="form-input"
                             />
                         </div>
                     </div>

@@ -136,7 +136,7 @@ const BudgetItems = () => {
                             <span className="input-group-text"><Search size={18} className="text-gray-500" /></span>
                             <input
                                 type="text"
-                                className="form-control"
+                                className="form-input"
                                 placeholder={t('common.search')}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -183,7 +183,7 @@ const BudgetItems = () => {
                                                 <div className="input-group input-group-sm input-group-solid">
                                                     <input
                                                         type="number"
-                                                        className="form-control text-center"
+                                                        className="form-input text-center"
                                                         value={budgetItems[acc.id]?.monthly || (budgetItems[acc.id]?.planned / 12) || ''}
                                                         onChange={(e) => handleAmountChange(acc.id, 'monthly', e.target.value)}
                                                         placeholder="0.00"
@@ -195,7 +195,7 @@ const BudgetItems = () => {
                                                 <div className="input-group input-group-sm input-group-solid">
                                                     <input
                                                         type="number"
-                                                        className="form-control text-center fw-bold text-primary"
+                                                        className="form-input text-center fw-bold text-primary"
                                                         value={budgetItems[acc.id]?.planned || ''}
                                                         onChange={(e) => handleAmountChange(acc.id, 'annual', e.target.value)}
                                                         placeholder="0.00"

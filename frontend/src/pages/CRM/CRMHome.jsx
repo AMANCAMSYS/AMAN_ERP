@@ -289,7 +289,7 @@ function CRMHome() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_opportunities')}</h3>
-                            <select className="form-control" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
+                            <select className="form-input" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
                                 <option value="">{t('crm.all_stages')}</option>
                                 {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
@@ -364,40 +364,40 @@ function CRMHome() {
                                             <div className="form-grid">
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.title_label')}</label>
-                                                    <input type="text" className="form-control" value={oppForm.title} onChange={e => setOppForm(p => ({ ...p, title: e.target.value }))} required />
+                                                    <input type="text" className="form-input" value={oppForm.title} onChange={e => setOppForm(p => ({ ...p, title: e.target.value }))} required />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('common.customer')}</label>
-                                                    <select className="form-control" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
+                                                    <select className="form-input" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
                                                         <option value="">{t('crm.select_customer')}</option>
                                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.stage')}</label>
-                                                    <select className="form-control" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
+                                                    <select className="form-input" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
                                                         {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.probability')} (%)</label>
-                                                    <input type="number" className="form-control" min="0" max="100" value={oppForm.probability} onChange={e => setOppForm(p => ({ ...p, probability: e.target.value }))} />
+                                                    <input type="number" className="form-input" min="0" max="100" value={oppForm.probability} onChange={e => setOppForm(p => ({ ...p, probability: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.expected_value')}</label>
-                                                    <input type="number" className="form-control" min="0" step="0.01" value={oppForm.expected_value} onChange={e => setOppForm(p => ({ ...p, expected_value: e.target.value }))} />
+                                                    <input type="number" className="form-input" min="0" step="0.01" value={oppForm.expected_value} onChange={e => setOppForm(p => ({ ...p, expected_value: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.expected_close')}</label>
-                                                    <input type="date" className="form-control" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
+                                                    <input type="date" className="form-input" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.source')}</label>
-                                                    <input type="text" className="form-control" value={oppForm.source} onChange={e => setOppForm(p => ({ ...p, source: e.target.value }))} />
+                                                    <input type="text" className="form-input" value={oppForm.source} onChange={e => setOppForm(p => ({ ...p, source: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                                     <label className="form-label">{t('common.notes')}</label>
-                                                    <textarea className="form-control" rows={3} value={oppForm.notes} onChange={e => setOppForm(p => ({ ...p, notes: e.target.value }))} />
+                                                    <textarea className="form-input" rows={3} value={oppForm.notes} onChange={e => setOppForm(p => ({ ...p, notes: e.target.value }))} />
                                                 </div>
                                             </div>
                                         </div>
@@ -419,11 +419,11 @@ function CRMHome() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_tickets')}</h3>
-                            <select className="form-control" style={{ width: '160px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <select className="form-input" style={{ width: '160px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="">{t('common.all_statuses')}</option>
                                 {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
-                            <select className="form-control" style={{ width: '150px' }} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+                            <select className="form-input" style={{ width: '150px' }} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
                                 <option value="">{t('crm.all_priorities')}</option>
                                 {priorityOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </select>
@@ -508,7 +508,7 @@ function CRMHome() {
                                                                         )}
                                                                         <form onSubmit={handleAddComment} style={{ marginTop: 8 }}>
                                                                             <div className="form-group">
-                                                                                <textarea className="form-control" rows={3} placeholder={t('crm.add_comment_placeholder')} value={commentText} onChange={e => setCommentText(e.target.value)} required style={{ width: '100%' }} />
+                                                                                <textarea className="form-input" rows={3} placeholder={t('crm.add_comment_placeholder')} value={commentText} onChange={e => setCommentText(e.target.value)} required style={{ width: '100%' }} />
                                                                             </div>
                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
                                                                                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -542,32 +542,32 @@ function CRMHome() {
                                             <div className="form-grid">
                                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                                     <label className="form-label">{t('crm.subject')}</label>
-                                                    <input type="text" className="form-control" value={ticketForm.subject} onChange={e => setTicketForm(p => ({ ...p, subject: e.target.value }))} required />
+                                                    <input type="text" className="form-input" value={ticketForm.subject} onChange={e => setTicketForm(p => ({ ...p, subject: e.target.value }))} required />
                                                 </div>
                                                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                                     <label className="form-label">{t('common.description')}</label>
-                                                    <textarea className="form-control" rows={4} value={ticketForm.description} onChange={e => setTicketForm(p => ({ ...p, description: e.target.value }))} />
+                                                    <textarea className="form-input" rows={4} value={ticketForm.description} onChange={e => setTicketForm(p => ({ ...p, description: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('common.customer')}</label>
-                                                    <select className="form-control" value={ticketForm.customer_id} onChange={e => setTicketForm(p => ({ ...p, customer_id: e.target.value }))}>
+                                                    <select className="form-input" value={ticketForm.customer_id} onChange={e => setTicketForm(p => ({ ...p, customer_id: e.target.value }))}>
                                                         <option value="">{t('crm.select_customer')}</option>
                                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.priority')}</label>
-                                                    <select className="form-control" value={ticketForm.priority} onChange={e => setTicketForm(p => ({ ...p, priority: e.target.value }))} required>
+                                                    <select className="form-input" value={ticketForm.priority} onChange={e => setTicketForm(p => ({ ...p, priority: e.target.value }))} required>
                                                         {priorityOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.category')}</label>
-                                                    <input type="text" className="form-control" value={ticketForm.category} onChange={e => setTicketForm(p => ({ ...p, category: e.target.value }))} />
+                                                    <input type="text" className="form-input" value={ticketForm.category} onChange={e => setTicketForm(p => ({ ...p, category: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.sla_hours')}</label>
-                                                    <input type="number" className="form-control" min="1" value={ticketForm.sla_hours} onChange={e => setTicketForm(p => ({ ...p, sla_hours: e.target.value }))} />
+                                                    <input type="number" className="form-input" min="1" value={ticketForm.sla_hours} onChange={e => setTicketForm(p => ({ ...p, sla_hours: e.target.value }))} />
                                                 </div>
                                             </div>
                                         </div>

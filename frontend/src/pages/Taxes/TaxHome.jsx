@@ -398,32 +398,32 @@ function TaxHome() {
                             {!editingRate && (
                                 <div className="form-group">
                                     <label className="form-label">{t('taxes.tax_code')} *</label>
-                                    <input className="form-control" value={rateForm.tax_code}
+                                    <input className="form-input" value={rateForm.tax_code}
                                         onChange={e => setRateForm({...rateForm, tax_code: e.target.value})}
                                         placeholder="مثال: VAT15, WHT5" />
                                 </div>
                             )}
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.tax_name')} *</label>
-                                <input className="form-control" value={rateForm.tax_name}
+                                <input className="form-input" value={rateForm.tax_name}
                                     onChange={e => setRateForm({...rateForm, tax_name: e.target.value})}
                                     placeholder="مثال: ضريبة القيمة المضافة" />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.tax_name_en')}</label>
-                                <input className="form-control" value={rateForm.tax_name_en}
+                                <input className="form-input" value={rateForm.tax_name_en}
                                     onChange={e => setRateForm({...rateForm, tax_name_en: e.target.value})}
                                     placeholder="e.g. VAT" />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.rate_value')} *</label>
-                                <input className="form-control" type="number" min="0" max="100" step="0.01"
+                                <input className="form-input" type="number" min="0" max="100" step="0.01"
                                     value={rateForm.rate_value}
                                     onChange={e => setRateForm({...rateForm, rate_value: parseFloat(e.target.value) || 0})} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.country_code')}</label>
-                                <select className="form-control" value={rateForm.country_code || ''}
+                                <select className="form-input" value={rateForm.country_code || ''}
                                     onChange={e => setRateForm({...rateForm, country_code: e.target.value || null})}>
                                     <option value="">{t('taxes.all_countries')}</option>
                                     <option value="SA">🇸🇦 السعودية</option>
@@ -442,7 +442,7 @@ function TaxHome() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.description')}</label>
-                                <textarea className="form-control" rows="2" value={rateForm.description}
+                                <textarea className="form-input" rows="2" value={rateForm.description}
                                     onChange={e => setRateForm({...rateForm, description: e.target.value})} />
                             </div>
                         </div>
@@ -466,7 +466,7 @@ function TaxHome() {
                         <h3 className="section-title" style={{ margin: 0 }}>📊 {t('taxes.branch_analysis_title')}</h3>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <label style={{ fontSize: '13px' }}>{t('common.year')}:</label>
-                            <select className="form-control" style={{ width: '100px' }} value={filterYear}
+                            <select className="form-input" style={{ width: '100px' }} value={filterYear}
                                 onChange={e => setFilterYear(parseInt(e.target.value))}>
                                 {[...Array(5)].map((_, i) => {
                                     const y = new Date().getFullYear() - i
@@ -554,7 +554,7 @@ function TaxHome() {
                         <h3 className="section-title" style={{ margin: 0 }}>👥 {t('taxes.employee_taxes_title')}</h3>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <label style={{ fontSize: '13px' }}>{t('common.year')}:</label>
-                            <select className="form-control" style={{ width: '100px' }} value={filterYear}
+                            <select className="form-input" style={{ width: '100px' }} value={filterYear}
                                 onChange={e => setFilterYear(parseInt(e.target.value))}>
                                 {[...Array(5)].map((_, i) => {
                                     const y = new Date().getFullYear() - i

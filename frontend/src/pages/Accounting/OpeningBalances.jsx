@@ -115,7 +115,7 @@ export default function OpeningBalances() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                 <div className="card p-3 text-center">
                     <div className="small text-muted">{t('opening.entry_date')}</div>
-                    <DateInput className="form-control form-control-sm mt-1"
+                    <DateInput className="form-input form-input-sm mt-1"
                         value={entryDate} onChange={e => setEntryDate(e.target.value)} />
                 </div>
                 <div className="card p-3 text-center">
@@ -143,7 +143,7 @@ export default function OpeningBalances() {
             {/* Filters */}
             <div className="row g-2 mb-3">
                 <div className="col-md-6">
-                    <input className="form-control form-control-sm" placeholder={t('opening.search')}
+                    <input className="form-input form-input-sm" placeholder={t('opening.search')}
                         value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="col-md-3">
@@ -184,13 +184,13 @@ export default function OpeningBalances() {
                                         <td>{i18n.language === 'ar' ? a.name : (a.name_en || a.name)}</td>
                                         <td><span className={`badge bg-${tl.color || 'secondary'}`}>{tl.label || a.account_type}</span></td>
                                         <td>
-                                            <input type="number" className="form-control form-control-sm"
+                                            <input type="number" className="form-input form-input-sm"
                                                 step="0.01" min="0" value={a.debit || ''}
                                                 placeholder="0.00"
                                                 onChange={e => updateAccount(a.id, 'debit', e.target.value)} />
                                         </td>
                                         <td>
-                                            <input type="number" className="form-control form-control-sm"
+                                            <input type="number" className="form-input form-input-sm"
                                                 step="0.01" min="0" value={a.credit || ''}
                                                 placeholder="0.00"
                                                 onChange={e => updateAccount(a.id, 'credit', e.target.value)} />

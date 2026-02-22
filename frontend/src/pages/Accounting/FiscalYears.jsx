@@ -238,7 +238,7 @@ function FiscalYears() {
                         <div className="modal-body">
                             <div className="form-group mb-3">
                                 <label className="form-label">{t('accounting.fiscal_years.year')}</label>
-                                <input type="number" className="form-control"
+                                <input type="number" className="form-input"
                                     value={newYear.year}
                                     onChange={e => {
                                         const y = parseInt(e.target.value)
@@ -252,14 +252,14 @@ function FiscalYears() {
                             </div>
                             <div className="form-group mb-3">
                                 <label className="form-label">{t('accounting.fiscal_years.start_date')}</label>
-                                <DateInput className="form-control"
+                                <DateInput className="form-input"
                                     value={newYear.start_date}
                                     onChange={e => setNewYear({ ...newYear, start_date: e.target.value })}
                                 />
                             </div>
                             <div className="form-group mb-3">
                                 <label className="form-label">{t('accounting.fiscal_years.end_date')}</label>
-                                <DateInput className="form-control"
+                                <DateInput className="form-input"
                                     value={newYear.end_date}
                                     onChange={e => setNewYear({ ...newYear, end_date: e.target.value })}
                                 />
@@ -494,7 +494,7 @@ function FiscalYears() {
                                     {t('accounting.fiscal_years.reason_for_reopening_optional')}
                                 </label>
                                 <textarea
-                                    className="form-control"
+                                    className="form-input"
                                     rows={3}
                                     value={reopenReason}
                                     onChange={e => setReopenReason(e.target.value)}
