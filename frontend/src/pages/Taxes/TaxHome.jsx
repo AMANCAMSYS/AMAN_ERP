@@ -220,6 +220,9 @@ function TaxHome() {
                                 <Link to="/taxes/compliance" className="btn btn-outline" style={{ textAlign: 'center' }}>
                                     🛡️ {t('taxes.tax_compliance')}
                                 </Link>
+                                <Link to="/taxes/wht" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                    ✂️ {t('wht.title')}
+                                </Link>
                             </div>
                         </div>
 
