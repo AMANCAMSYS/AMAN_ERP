@@ -4831,6 +4831,7 @@
     "create": "إنشاء",
     "employee_code": "رمز الموظف",
     "employee_name": "اسم الموظف",
+    "select_employee": "-- اختر موظف --",
 
     "payslip_total_count": "عدد الكشوف",
     "payslip_total_basic": "إجمالي الأساسي",

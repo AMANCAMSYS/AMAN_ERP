@@ -794,6 +794,7 @@
     "create": "Create",
     "employee_code": "Employee Code",
     "employee_name": "Employee Name",
+    "select_employee": "-- Select Employee --",
 
     "payslip_total_count": "Payslip Count",
     "payslip_total_basic": "Total Basic",

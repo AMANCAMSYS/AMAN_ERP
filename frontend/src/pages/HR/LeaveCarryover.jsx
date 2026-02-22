@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { Calendar, RotateCcw, Users, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Calendar, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 const LeaveCarryover = () => {
@@ -189,7 +189,10 @@ const LeaveCarryover = () => {
             )}
 
             {loading && (
-                <div className="card section-card text-center p-6">...</div>
+                <div className="card section-card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                    <div className="spinner" style={{ margin: '0 auto 8px' }} />
+                    {t('common.loading')}
+                </div>
             )}
 
             {/* Carryover Modal */}
