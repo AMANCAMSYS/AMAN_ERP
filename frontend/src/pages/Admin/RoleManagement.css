@@ -409,12 +409,13 @@
 }
 
 .permissions-sections-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 50vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    max-height: 60vh;
     overflow-y: auto;
     padding-inline-end: 4px;
+    align-items: start;
 }
 
 .perm-section-card {
@@ -530,9 +531,9 @@
 }
 
 .perm-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     padding: 0 16px 12px;
 }
 
@@ -661,7 +662,7 @@
         grid-template-columns: 1fr;
     }
 
-    .perm-list {
+    .permissions-sections-list {
         grid-template-columns: 1fr;
     }
 
