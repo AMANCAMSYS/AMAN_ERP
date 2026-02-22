@@ -39,6 +39,7 @@
     "cost_id": "Cost ID",
     "detailed_pl": {
       "title": "Detailed Profit & Loss",
+      "subtitle": "Profit & loss breakdown by customer, product, or category",
       "group_by": "Group By",
       "by_customer": "By Customer",
       "by_product": "By Product",
@@ -46,7 +47,8 @@
       "revenue": "Revenue",
       "cogs": "Cost of Goods Sold",
       "gross_profit": "Gross Profit",
-      "gross_margin": "Gross Margin %"
+      "gross_margin": "Gross Margin %",
+      "chart_title": "Top 10 — Revenue vs Cost vs Profit"
     },
     "commissions": {
       "title": "Sales Commission Report",
@@ -63,6 +65,48 @@
       "total_pending": "Total Pending",
       "total_paid": "Total Paid",
       "gl_created": "GL Entry Created"
+    },
+    "scheduled": {
+      "title": "Scheduled Reports",
+      "subtitle": "Manage automated report generation and emailing",
+      "new": "New Schedule",
+      "edit": "Edit Schedule",
+      "report_name": "Report Name",
+      "report_name_placeholder": "e.g. Monthly P&L for Management",
+      "report_type": "Report Type",
+      "frequency": "Frequency",
+      "recipients": "Recipients (comma separated emails)",
+      "branch": "Branch",
+      "next_run": "Next Run",
+      "status": "Active",
+      "last_status_col": "Last Status",
+      "total": "Total Schedules",
+      "active_count": "Active",
+      "last_failed": "Failed",
+      "run_now": "Run Now",
+      "run_started": "Report execution started"
+    },
+    "frequency": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly"
+    },
+    "sharing": {
+      "title": "Share Report",
+      "share": "Share",
+      "share_with": "Share With",
+      "permission": "Permission",
+      "view": "View Only",
+      "edit": "Can Edit",
+      "message": "Message (optional)",
+      "message_placeholder": "Add a note...",
+      "shared_success": "Report shared successfully",
+      "shared_with_list": "Currently Shared With",
+      "shared_with_me": "Shared With Me",
+      "shared_by": "Shared By",
+      "shared_on": "Shared On",
+      "no_shared": "No reports shared with you yet",
+      "permission_label": "Permission"
     },
     "builder_subtitle": "Create custom reports",
     "builder_title": "Report Builder",

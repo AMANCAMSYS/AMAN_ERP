@@ -15,7 +15,8 @@ const ReportCenter = () => {
             reports: [
                 { name: t('reports_center.reports.sales_analytics'), path: '/sales/reports/analytics', desc: t('reports_center.reports.sales_analytics_desc') },
                 { name: t('reports_center.reports.customer_statement'), path: '/sales/reports/customer-statement', desc: t('reports_center.reports.customer_statement_desc') },
-                { name: t('reports_center.reports.aging_report'), path: '/sales/reports/aging', desc: t('reports_center.reports.aging_report_desc') }
+                { name: t('reports_center.reports.aging_report'), path: '/sales/reports/aging', desc: t('reports_center.reports.aging_report_desc') },
+                { name: t('reports.commissions.title', 'Sales Commission Report'), path: '/sales/commissions', desc: t('reports_center.reports.commissions_desc', 'Track salesperson commissions and payouts') }
             ]
         },
         {
@@ -48,7 +49,8 @@ const ReportCenter = () => {
                 { name: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', desc: t('accounting.general_ledger.subtitle') },
                 { name: t('accounting.home.links.income_statement'), path: '/accounting/income-statement', desc: t('accounting.income_statement.subtitle') },
                 { name: t('accounting.home.links.balance_sheet'), path: '/accounting/balance-sheet', desc: t('accounting.balance_sheet.subtitle') },
-                { name: t('reports_center.reports.cashflow'), path: '/accounting/cashflow', desc: t('reports_center.reports.cashflow_desc') }
+                { name: t('reports_center.reports.cashflow'), path: '/accounting/cashflow', desc: t('reports_center.reports.cashflow_desc') },
+                { name: t('reports.detailed_pl.title', 'Detailed P&L'), path: '/reports/detailed-pl', desc: t('reports_center.reports.detailed_pl_desc', 'Profit & loss breakdown by customer, product, or category') }
             ]
         },
         {
@@ -108,7 +110,9 @@ const ReportCenter = () => {
             permission: 'reports.create',
             reports: [
                 { name: t('reports_center.reports.builder', 'Report Builder'), path: '/reports/builder', desc: t('reports_center.reports.builder_desc', 'Create and save custom reports') },
-                { name: t('reports_center.reports.saved_reports', 'Saved Reports'), path: '/reports/builder', desc: t('reports_center.reports.saved_reports_desc', 'View and run your saved reports') }
+                { name: t('reports_center.reports.saved_reports', 'Saved Reports'), path: '/reports/builder', desc: t('reports_center.reports.saved_reports_desc', 'View and run your saved reports') },
+                { name: t('reports.scheduled.title', 'Scheduled Reports'), path: '/reports/scheduled', desc: t('reports_center.reports.scheduled_desc', 'Automate report delivery via email') },
+                { name: t('reports.sharing.shared_with_me', 'Shared With Me'), path: '/reports/shared', desc: t('reports_center.reports.shared_desc', 'Reports that colleagues have shared with you') }
             ]
         }
     ].filter(g => hasPermission(g.permission || 'reports.view'));
@@ -206,6 +210,12 @@ const ReportCenter = () => {
                     </button>
                     <button className="btn btn-secondary" onClick={() => navigate('/reports/scheduled')}>
                         ⏰ {t('reports.scheduled.title', 'Scheduled Reports')}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => navigate('/reports/detailed-pl')}>
+                        📊 {t('reports.detailed_pl.title', 'Detailed P&L')}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => navigate('/sales/commissions')}>
+                        💰 {t('reports.commissions.title', 'Commissions')}
                     </button>
                 </div>
             </div>

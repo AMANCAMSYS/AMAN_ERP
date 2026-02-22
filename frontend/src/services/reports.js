@@ -40,9 +40,26 @@ export const customReportsAPI = {
 }
 
 export const scheduledReportsAPI = {
-    list: (params) => api.get('/reports/scheduled', { params }),
-    create: (data) => api.post('/reports/scheduled', data),
+    list: (params) => api.get('/reports/scheduled/', { params }),
+    create: (data) => api.post('/reports/scheduled/', data),
     update: (id, data) => api.put(`/reports/scheduled/${id}`, data),
     delete: (id) => api.delete(`/reports/scheduled/${id}`),
-    toggle: (id, active) => api.put(`/reports/scheduled/${id}/toggle`, null, { params: { active } })
+    toggle: (id, active) => api.put(`/reports/scheduled/${id}/toggle`, null, { params: { active } }),
+    runNow: (id) => api.post(`/reports/scheduled/${id}/run`),
+    getTypes: () => api.get('/reports/scheduled/types'),
+}
+
+// ─── Detailed P&L & Commission Reports ────────────────────────
+export const detailedReportsAPI = {
+    getDetailedPL: (params) => api.get('/reports/accounting/profit-loss/detailed', { params }),
+    getCommissionReport: (params) => api.get('/reports/sales/commissions/report', { params }),
+}
+
+// ─── RPT-106: Report Sharing ──────────────────────────────────
+export const reportSharingAPI = {
+    share: (data) => api.post('/reports/share', data),
+    unshare: (id) => api.delete(`/reports/share/${id}`),
+    listShared: () => api.get('/reports/shared/'),
+    getReportShares: (reportType, reportId) => api.get(`/reports/shared/by-report/${reportType}/${reportId}`),
+    listUsers: () => api.get('/reports/users/'),
 }

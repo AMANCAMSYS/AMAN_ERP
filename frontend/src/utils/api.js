@@ -22,7 +22,7 @@ export { companiesAPI } from '../services/companies'
 export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, currenciesAPI } from '../services/accounting'
 
 // Reports
-export { reportsAPI, customReportsAPI, scheduledReportsAPI } from '../services/reports'
+export { reportsAPI, customReportsAPI, scheduledReportsAPI, detailedReportsAPI, reportSharingAPI } from '../services/reports'
 
 // Sales & Purchases
 export { salesAPI } from '../services/sales'

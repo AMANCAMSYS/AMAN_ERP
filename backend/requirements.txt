@@ -9,6 +9,9 @@ pandas
 openpyxl
 reportlab
 apscheduler
+arabic-reshaper
+python-bidi
+matplotlib
 python-dotenv
 requests
 redis

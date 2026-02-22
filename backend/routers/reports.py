@@ -1652,7 +1652,7 @@ def compare_balance_sheet(
 
 # ==================== Export Endpoints ====================
 
-from utils.exports import generate_pdf, generate_excel, create_export_response
+from utils.exports import generate_pdf, generate_excel, generate_excel_with_chart, generate_chart_image, create_export_response
 from fastapi.responses import StreamingResponse
 
 @router.get("/accounting/profit-loss/export", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
@@ -2849,13 +2849,36 @@ def detailed_profit_loss(
                     "عدد الفواتير / Invoices": r["invoice_count"],
                 })
             columns = list(export_data[0].keys()) if export_data else []
+
+            # Generate chart for top items
+            chart_image = None
+            try:
+                top_items = report_rows[:10]
+                if top_items:
+                    chart_labels = [r[group_label][:20] for r in top_items]
+                    chart_image = generate_chart_image(
+                        "bar", chart_labels,
+                        [
+                            {"label": "Revenue / الإيرادات", "data": [r["revenue"] for r in top_items], "color": "#2563EB"},
+                            {"label": "COGS / التكلفة", "data": [r["cogs"] for r in top_items], "color": "#DC2626"},
+                            {"label": "Gross Profit / الربح", "data": [r["gross_profit"] for r in top_items], "color": "#16A34A"},
+                        ],
+                        title=f"Detailed P&L by {group_by.title()} — أرباح وخسائر تفصيلي"
+                    )
+            except Exception:
+                pass
+
             if format == "excel":
-                buffer = generate_excel(export_data, columns, sheet_name=f"P&L by {group_by}")
+                buffer = generate_excel_with_chart(export_data, columns, sheet_name=f"P&L by {group_by}",
+                    chart_type="bar", chart_config={"title": f"P&L by {group_by}", "x_col": 0, "y_cols": [1, 2, 3]})
                 return create_export_response(buffer, f"detailed_pl_{group_by}_{s_date}_{e_date}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             else:
                 pdf_data = [columns] + [[str(row.get(c, '')) for c in columns] for row in export_data]
-                buffer = generate_pdf(pdf_data, f"Detailed P&L by {group_by.title()} ({s_date} to {e_date})")
+                buffer = generate_pdf(pdf_data,
+                    title=f"Detailed P&L by {group_by.title()} — تقرير أرباح وخسائر تفصيلي",
+                    subtitle=f"{s_date} → {e_date}",
+                    chart_image=chart_image, orientation="landscape")
                 return create_export_response(buffer, f"detailed_pl_{group_by}_{s_date}_{e_date}.pdf", "application/pdf")
 
         return result
@@ -2974,13 +2997,35 @@ def sales_commission_report(
                     "الحالة / Status": "مدفوع" if r["status"] == "paid" else "معلق",
                 })
             columns = list(export_data[0].keys()) if export_data else []
+
+            # Generate chart for commission summary by salesperson
+            chart_image = None
+            try:
+                summary_list = list(sp_summary.values())[:10]
+                if summary_list:
+                    chart_image = generate_chart_image(
+                        "bar",
+                        [s["salesperson_name"][:15] for s in summary_list],
+                        [
+                            {"label": "مبيعات / Sales", "data": [s["total_sales"] for s in summary_list], "color": "#2563EB"},
+                            {"label": "عمولة / Commission", "data": [s["total_commission"] for s in summary_list], "color": "#16A34A"},
+                        ],
+                        title="Sales Commission by Salesperson — عمولات حسب المندوب"
+                    )
+            except Exception:
+                pass
+
             if format == "excel":
-                buffer = generate_excel(export_data, columns, sheet_name="Commissions")
+                buffer = generate_excel_with_chart(export_data, columns, sheet_name="Commissions",
+                    chart_type="bar", chart_config={"title": "Commission Report", "x_col": 0, "y_cols": [3, 5]})
                 return create_export_response(buffer, f"commissions_{s_date}_{e_date}.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             else:
                 pdf_data = [columns] + [[str(row.get(c, '')) for c in columns] for row in export_data]
-                buffer = generate_pdf(pdf_data, f"Sales Commission Report ({s_date} to {e_date})")
+                buffer = generate_pdf(pdf_data,
+                    title="Sales Commission Report — تقرير عمولات المبيعات",
+                    subtitle=f"{s_date} → {e_date}",
+                    chart_image=chart_image, orientation="landscape")
                 return create_export_response(buffer, f"commissions_{s_date}_{e_date}.pdf", "application/pdf")
 
         return result

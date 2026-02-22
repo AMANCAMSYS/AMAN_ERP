@@ -842,17 +842,32 @@ def get_additional_tables_sql() -> str:
 
     CREATE TABLE IF NOT EXISTS scheduled_reports (
         id SERIAL PRIMARY KEY,
+        report_name VARCHAR(255),
         report_type VARCHAR(50) NOT NULL,
+        report_config JSONB DEFAULT '{}',
         frequency VARCHAR(20) NOT NULL,
         recipients TEXT NOT NULL,
         format VARCHAR(10) DEFAULT 'pdf',
         branch_id INTEGER REFERENCES branches(id),
         next_run_at TIMESTAMPTZ,
         last_run_at TIMESTAMPTZ,
+        last_status VARCHAR(20) DEFAULT 'pending',
         is_active BOOLEAN DEFAULT TRUE,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS shared_reports (
+        id SERIAL PRIMARY KEY,
+        report_type VARCHAR(30) NOT NULL CHECK (report_type IN ('custom', 'scheduled')),
+        report_id INTEGER NOT NULL,
+        shared_by INTEGER REFERENCES company_users(id),
+        shared_with INTEGER REFERENCES company_users(id),
+        permission VARCHAR(20) DEFAULT 'view' CHECK (permission IN ('view', 'edit')),
+        message TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(report_type, report_id, shared_with)
     );
 
     CREATE TABLE IF NOT EXISTS sales_quotations (
