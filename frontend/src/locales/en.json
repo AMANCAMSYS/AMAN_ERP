@@ -5919,6 +5919,7 @@
       "analytics": {
         "title": "Production Analytics",
         "subtitle": "Monitor production output, efficiency and manufacturing costs",
+        "subtitle_short": "Production output and efficiency",
         "total_orders": "Total Orders",
         "completed_orders": "Completed Orders",
         "in_progress_orders": "In Progress",
@@ -5944,6 +5945,7 @@
       "work_orders_report": {
         "title": "Work Order Status",
         "subtitle": "Track status and progress of work orders and production",
+        "subtitle_short": "Track status and progress of orders",
         "orders_list": "Orders List",
         "progress": "Progress",
         "produced": "Produced",

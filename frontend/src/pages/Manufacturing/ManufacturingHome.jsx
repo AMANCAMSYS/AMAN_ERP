@@ -115,109 +115,127 @@ const ManufacturingHome = () => {
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="tabs mt-4">
-                {['overview', 'orders'].map(tab => (
-                    <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-                        {tab === 'overview' && (t('manufacturing.dashboard.overview'))}
-                        {tab === 'orders' && (t('manufacturing.production_orders'))}
-                    </button>
-                ))}
+            {/* ── Quick Navigation: Grouped Cards ──────────────────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 16 }}>
+
+                {/* ① الإنتاج والتصنيع */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>🏭</span> {t('manufacturing.group_production', 'الإنتاج والتصنيع')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                        <Link to="/manufacturing/orders" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaClipboardList style={{ marginBottom: 2 }} /> {t('manufacturing.manage_orders')}
+                        </Link>
+                        <Link to="/manufacturing/job-cards" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaIdCard style={{ marginBottom: 2 }} /> {t('manufacturing.job_cards.title')}
+                        </Link>
+                        <Link to="/manufacturing/schedule" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaCalendarAlt style={{ marginBottom: 2 }} /> {t('manufacturing.production_schedule')}
+                        </Link>
+                        <Link to="/manufacturing/mrp" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaBoxes style={{ marginBottom: 2 }} /> {t('manufacturing.mrp.title')}
+                        </Link>
+                    </div>
+                </div>
+
+                {/* ② البيانات الأساسية */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>⚙️</span> {t('manufacturing.group_master_data', 'البيانات الأساسية')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                        <Link to="/manufacturing/work-centers" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaIndustry style={{ marginBottom: 2 }} /> {t('manufacturing.manage_work_centers')}
+                        </Link>
+                        <Link to="/manufacturing/routes" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaRoute style={{ marginBottom: 2 }} /> {t('manufacturing.manage_routes')}
+                        </Link>
+                        <Link to="/manufacturing/boms" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaLayerGroup style={{ marginBottom: 2 }} /> {t('manufacturing.manage_boms')}
+                        </Link>
+                        <Link to="/manufacturing/equipment" className="btn btn-outline" style={{ textAlign: 'center', padding: '10px 8px', fontSize: 13 }}>
+                            <FaTools style={{ marginBottom: 2 }} /> {t('manufacturing.equipment_maintenance')}
+                        </Link>
+                    </div>
+                </div>
+
+                {/* ③ التقارير */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>📊</span> {t('manufacturing.group_reports', 'التقارير والتحليلات')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginTop: 12 }}>
+                        <Link to="/manufacturing/reports/analytics" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', fontSize: 13 }}>
+                            <span style={{ fontSize: 16 }}>📊</span>
+                            <div style={{ textAlign: 'start' }}>
+                                <div style={{ fontWeight: 600 }}>{t('manufacturing.analytics.title', 'تحليل الإنتاج')}</div>
+                                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{t('manufacturing.analytics.subtitle_short', 'مخرجات الإنتاج والكفاءة')}</div>
+                            </div>
+                        </Link>
+                        <Link to="/manufacturing/reports/work-orders" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', fontSize: 13 }}>
+                            <span style={{ fontSize: 16 }}>📋</span>
+                            <div style={{ textAlign: 'start' }}>
+                                <div style={{ fontWeight: 600 }}>{t('manufacturing.work_orders_report.title', 'حالة أوامر العمل')}</div>
+                                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{t('manufacturing.work_orders_report.subtitle_short', 'تتبع حالة وتقدم الأوامر')}</div>
+                            </div>
+                        </Link>
+                        <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', fontSize: 13 }}>
+                            <span style={{ fontSize: 16 }}>👷</span>
+                            <div style={{ textAlign: 'start' }}>
+                                <div style={{ fontWeight: 600 }}>{t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}</div>
+                                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{t('manufacturing.direct_labor.subtitle_short', 'ساعات وتكاليف العمالة')}</div>
+                            </div>
+                        </Link>
+                    </div>
+                </div>
             </div>
 
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-                <div className="mt-4">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-                        {/* Quick Actions */}
-                        <div className="card">
-                            <h3 className="section-title">{t('common.actions')}</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                                <Link to="/manufacturing/orders" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaClipboardList /> {t('manufacturing.manage_orders')}
-                                </Link>
-                                <Link to="/manufacturing/work-centers" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaIndustry /> {t('manufacturing.manage_work_centers')}
-                                </Link>
-                                <Link to="/manufacturing/routes" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaRoute /> {t('manufacturing.manage_routes')}
-                                </Link>
-                                <Link to="/manufacturing/boms" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    <FaLayerGroup /> {t('manufacturing.manage_boms')}
-                                </Link>
-                                <Link to="/manufacturing/job-cards" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaIdCard /> {t('manufacturing.job_cards.title')}
-                                </Link>
-                                <Link to="/manufacturing/mrp" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaBoxes /> {t('manufacturing.mrp.title')}
-                                </Link>
-                                <Link to="/manufacturing/equipment" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaTools /> {t('manufacturing.equipment_maintenance')}
-                                </Link>
-                                <Link to="/manufacturing/schedule" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    <FaCalendarAlt /> {t('manufacturing.production_schedule')}
-                                </Link>
-                                <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    👷 {t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}
-                                </Link>
-                                <Link to="/manufacturing/reports/analytics" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    📊 {t('manufacturing.analytics.title', 'تحليل الإنتاج')}
-                                </Link>
-                                <Link to="/manufacturing/reports/work-orders" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
-                                    📋 {t('manufacturing.work_orders_report.title', 'حالة أوامر العمل')}
-                                </Link>
-                            </div>
-                        </div>
-
-                        {/* Recent Orders */}
-                        <div className="card">
-                            <h3 className="section-title">{t('manufacturing.recent_orders')}</h3>
-                            {stats.orders.length === 0 ? (
-                                <p className="text-muted mt-3 text-center py-8">{t('manufacturing.no_orders')}</p>
-                            ) : (
-                                <div className="data-table-container mt-3">
-                                    <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>{t('common.id')}</th>
-                                                <th>{t('products.product')}</th>
-                                                <th>{t('common.quantity')}</th>
-                                                <th>{t('common.due_date')}</th>
-                                                <th>{t('common.status')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {stats.orders.slice(0, 5).map(order => (
-                                                <tr key={order.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/manufacturing/orders/${order.id}`)}>
-                                                    <td>
-                                                        <span className="font-mono text-blue-600 font-bold">{order.order_number}</span>
-                                                    </td>
-                                                    <td>{order.product_name}</td>
-                                                    <td className="font-bold">{order.produced_quantity} / {order.quantity}</td>
-                                                    <td>{formatDate(order.due_date)}</td>
-                                                    <td>{getStatusBadge(order.status)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+            {/* ── Recent Orders Table ──────────────────────────────────────── */}
+            <div className="card" style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h3 className="section-title" style={{ margin: 0 }}>{t('manufacturing.recent_orders')}</h3>
+                    <button className="btn btn-outline btn-sm" onClick={() => navigate('/manufacturing/orders')}>
+                        {t('manufacturing.go_to_orders', 'عرض الكل')} <FaArrowRight style={{ marginRight: 4 }} />
+                    </button>
                 </div>
-            )}
-
-            {/* Orders Tab Placeholder */}
-            {activeTab === 'orders' && (
-                <div className="card mt-4">
-                    <div className="text-center py-8">
-                        <p className="text-gray-500 mb-4">{t('manufacturing.orders_tab_desc')}</p>
-                        <button className="btn btn-primary" onClick={() => navigate('/manufacturing/orders')}>
-                            {t('manufacturing.go_to_orders')} <FaArrowRight className="ml-2" />
+                {stats.orders.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '32px 16px' }}>
+                        <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
+                        <p style={{ color: '#6b7280' }}>{t('manufacturing.no_orders')}</p>
+                        <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => navigate('/manufacturing/orders')}>
+                            <FaPlus /> {t('manufacturing.new_order')}
                         </button>
                     </div>
-                </div>
-            )}
+                ) : (
+                    <div className="data-table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t('common.id')}</th>
+                                    <th>{t('products.product')}</th>
+                                    <th>{t('common.quantity')}</th>
+                                    <th>{t('common.due_date')}</th>
+                                    <th>{t('common.status')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stats.orders.slice(0, 5).map(order => (
+                                    <tr key={order.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/manufacturing/orders/${order.id}`)}>
+                                        <td>
+                                            <span className="font-mono text-blue-600 font-bold">{order.order_number}</span>
+                                        </td>
+                                        <td>{order.product_name}</td>
+                                        <td className="font-bold">{order.produced_quantity} / {order.quantity}</td>
+                                        <td>{formatDate(order.due_date)}</td>
+                                        <td>{getStatusBadge(order.status)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

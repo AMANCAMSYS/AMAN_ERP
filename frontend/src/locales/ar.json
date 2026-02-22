@@ -264,6 +264,7 @@
       "analytics": {
         "title": "تحليل الإنتاج",
         "subtitle": "مراقبة مخرجات الإنتاج والكفاءة وتكاليف التصنيع",
+        "subtitle_short": "مخرجات الإنتاج والكفاءة",
         "total_orders": "إجمالي الأوامر",
         "completed_orders": "أوامر مكتملة",
         "in_progress_orders": "قيد التنفيذ",
@@ -289,6 +290,7 @@
       "work_orders_report": {
         "title": "حالة أوامر العمل",
         "subtitle": "تتبع حالة وتقدم أوامر العمل والإنتاج",
+        "subtitle_short": "تتبع حالة وتقدم الأوامر",
         "orders_list": "قائمة الأوامر",
         "progress": "التقدم",
         "produced": "المنتج",
