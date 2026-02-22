@@ -397,39 +397,41 @@ const RoleManagement = () => {
                         </div>
 
                         <form onSubmit={handleSubmit}>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>{t('roles.roleName')}</label>
-                                    <input
-                                        type="text"
-                                        name="role_name"
-                                        value={formData.role_name}
-                                        onChange={handleInputChange}
-                                        required
-                                        placeholder="e.g. sales_manager"
-                                    />
+                            <div className="modal-form-body">
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>{t('roles.roleName')}</label>
+                                        <input
+                                            type="text"
+                                            name="role_name"
+                                            value={formData.role_name}
+                                            onChange={handleInputChange}
+                                            required
+                                            placeholder="e.g. sales_manager"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>{t('roles.roleNameAr')}</label>
+                                        <input
+                                            type="text"
+                                            name="role_name_ar"
+                                            value={formData.role_name_ar}
+                                            onChange={handleInputChange}
+                                            placeholder="مثال: مدير المبيعات"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label>{t('roles.roleNameAr')}</label>
-                                    <input
-                                        type="text"
-                                        name="role_name_ar"
-                                        value={formData.role_name_ar}
-                                        onChange={handleInputChange}
-                                        placeholder="مثال: مدير المبيعات"
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="form-group">
-                                <label>{t('roles.description')}</label>
-                                <textarea
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleInputChange}
-                                    rows={2}
-                                    placeholder={t('admin.roles.brief_description_of_this_role')}
-                                />
+                                <div className="form-group">
+                                    <label>{t('roles.description')}</label>
+                                    <textarea
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleInputChange}
+                                        rows={2}
+                                        placeholder={t('admin.roles.brief_description_of_this_role')}
+                                    />
+                                </div>
                             </div>
 
                             <div className="permissions-section">
