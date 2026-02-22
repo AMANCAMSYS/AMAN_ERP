@@ -45,3 +45,24 @@ backend/*.db
 backend/*.sqlite3
 *.db
 *.sqlite3
+
+# Cache & Build artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+**/.pytest_cache/
+.vite/
+**/.vite/
+
+# Uploads (user content)
+uploads/
+**/uploads/
+
+# Virtual environments (global)
+venv/
+.venv/
+
+# Runtime / temp files
+last_error.txt
+*.pid
