@@ -105,7 +105,7 @@ export const hrImprovementsAPI = {
     createJobOpening: (data) => api.post('/hr/recruitment/openings', data),
     updateJobOpening: (id, data) => api.put(`/hr/recruitment/openings/${id}`, data),
     listApplications: (openingId) => api.get(`/hr/recruitment/openings/${openingId}/applications`),
-    listAllApplications: () => api.get('/hr/recruitment/applications'),
+    listAllApplications: (params) => api.get('/hr/recruitment/applications', { params }),
     createApplication: (data) => api.post('/hr/recruitment/applications', data),
     updateApplicationStage: (id, data) => api.put(`/hr/recruitment/applications/${id}/stage`, data),
 }

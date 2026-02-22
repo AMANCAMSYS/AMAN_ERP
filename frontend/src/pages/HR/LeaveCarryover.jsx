@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import { useBranch } from '../../context/BranchContext';
 import { Calendar, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 const LeaveCarryover = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
+    const { currentBranch } = useBranch();
     const isRTL = i18n.language === 'ar';
     const [balances, setBalances] = useState([]);
     const [employees, setEmployees] = useState([]);
@@ -20,11 +22,13 @@ const LeaveCarryover = () => {
 
     useEffect(() => {
         fetchEmployees();
-    }, []);
+    }, [currentBranch]);
 
     const fetchEmployees = async () => {
         try {
-            const res = await hrAPI.listEmployees({ limit: 500 });
+            const params = { limit: 500 };
+            if (currentBranch?.id) params.branch_id = currentBranch.id;
+            const res = await hrAPI.listEmployees(params);
             setEmployees(res.data?.items || res.data || []);
         } catch (err) { console.error(err); }
     };

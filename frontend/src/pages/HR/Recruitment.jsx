@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import { useBranch } from '../../context/BranchContext';
 import { Briefcase, Users, Plus, ArrowRight, X, CheckCircle, ExternalLink } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
@@ -9,6 +10,7 @@ import DateInput from '../../components/common/DateInput';
 const Recruitment = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
+    const { currentBranch } = useBranch();
     const isRTL = i18n.language === 'ar';
     const [activeTab, setActiveTab] = useState('openings');
     const [openings, setOpenings] = useState([]);
@@ -25,15 +27,17 @@ const Recruitment = () => {
 
     const [filterStage, setFilterStage] = useState('all');
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { fetchData(); }, [currentBranch]);
     useEffect(() => { if (activeTab === 'applications' && applications.length === 0) fetchApplications(); }, [activeTab]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
+            const params = {};
+            if (currentBranch?.id) params.branch_id = currentBranch.id;
             const [openRes, appRes] = await Promise.all([
-                hrImprovementsAPI.listJobOpenings(),
-                hrImprovementsAPI.listAllApplications()
+                hrImprovementsAPI.listJobOpenings(params),
+                hrImprovementsAPI.listAllApplications(params)
             ]);
             setOpenings(openRes.data || []);
             setApplications(appRes.data || []);
@@ -43,7 +47,9 @@ const Recruitment = () => {
     const fetchApplications = async () => {
         try {
             setLoading(true);
-            const res = await hrImprovementsAPI.listAllApplications();
+            const params = {};
+            if (currentBranch?.id) params.branch_id = currentBranch.id;
+            const res = await hrImprovementsAPI.listAllApplications(params);
             setApplications(res.data || []);
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };

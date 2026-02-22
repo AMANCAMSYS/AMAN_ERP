@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import { useBranch } from '../../context/BranchContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { FileText, Calculator, Download, Eye, Printer, Mail, X } from 'lucide-react';
@@ -10,6 +11,7 @@ import '../../components/ModuleStyles.css';
 const Payslips = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
+    const { currentBranch } = useBranch();
     const currency = getCurrency();
     const isRTL = i18n.language === 'ar';
     const [payslips, setPayslips] = useState([]);
@@ -28,18 +30,25 @@ const Payslips = () => {
     useEffect(() => {
         fetchPayslips();
         fetchEmployees();
-    }, []);
+    }, [currentBranch]);
 
     const fetchEmployees = async () => {
         try {
-            const res = await hrAPI.listEmployees({ limit: 500 });
+            const params = { limit: 500 };
+            if (currentBranch?.id) params.branch_id = currentBranch.id;
+            const res = await hrAPI.listEmployees(params);
             setEmployees(res.data?.items || res.data || []);
         } catch (err) { console.error(err); }
     };
 
     const fetchPayslips = async () => {
-        try { setLoading(true); const res = await hrImprovementsAPI.listPayslips(); setPayslips(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        try {
+            setLoading(true);
+            const params = {};
+            if (currentBranch?.id) params.branch_id = currentBranch.id;
+            const res = await hrImprovementsAPI.listPayslips(params);
+            setPayslips(res.data || []);
+        } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
     const handleGenerate = async (e) => {

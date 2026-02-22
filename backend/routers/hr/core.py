@@ -1662,128 +1662,6 @@ def employee_payslip_history(emp_id: int, current_user=Depends(get_current_user)
         conn.close()
 
 
-# ---------- HR-012: Recruitment ----------
-
-@router.get("/recruitment/openings", dependencies=[Depends(require_permission("hr.view"))])
-def list_job_openings(status: Optional[str] = None, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        q = """SELECT jo.*,
-                      (SELECT COUNT(*) FROM job_applications ja WHERE ja.opening_id = jo.id) AS applications_count
-               FROM job_openings jo WHERE 1=1"""
-        params = {}
-        if status:
-            q += " AND jo.status = :status"
-            params["status"] = status
-        q += " ORDER BY jo.created_at DESC"
-        rows = conn.execute(text(q), params).fetchall()
-        return [dict(r._mapping) for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-
-@router.post("/recruitment/openings", dependencies=[Depends(require_permission("hr.manage"))])
-def create_job_opening(data: dict, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        result = conn.execute(text("""
-            INSERT INTO job_openings (title, department_id, position_id, description, requirements,
-                employment_type, vacancies, status, branch_id, closing_date, created_by)
-            VALUES (:title, :dept, :pos, :desc, :req, :etype, :vac, 'open', :branch, :close, :uid)
-            RETURNING *
-        """), {
-            "title": data["title"], "dept": data.get("department_id"),
-            "pos": data.get("position_id"), "desc": data.get("description"),
-            "req": data.get("requirements"), "etype": data.get("employment_type", "full_time"),
-            "vac": data.get("vacancies", 1), "branch": data.get("branch_id"),
-            "close": data.get("closing_date"), "uid": current_user.id,
-        }).fetchone()
-        conn.commit()
-        return dict(result._mapping)
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-
-@router.put("/recruitment/openings/{opening_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_opening_status(opening_id: int, data: dict, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        conn.execute(text("UPDATE job_openings SET status = :s WHERE id = :id"),
-                     {"s": data["status"], "id": opening_id})
-        conn.commit()
-        return {"message": "Opening updated"}
-    finally:
-        conn.close()
-
-
-@router.get("/recruitment/openings/{opening_id}/applications", dependencies=[Depends(require_permission("hr.view"))])
-def list_applications(opening_id: int, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        rows = conn.execute(text(
-            "SELECT * FROM job_applications WHERE opening_id = :oid ORDER BY created_at DESC"
-        ), {"oid": opening_id}).fetchall()
-        return [dict(r._mapping) for r in rows]
-    finally:
-        conn.close()
-
-
-@router.post("/recruitment/applications", dependencies=[Depends(require_permission("hr.manage"))])
-def create_application(data: dict, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        result = conn.execute(text("""
-            INSERT INTO job_applications (opening_id, applicant_name, email, phone,
-                resume_url, cover_letter, stage, status)
-            VALUES (:oid, :name, :email, :phone, :resume, :cover, 'applied', 'pending')
-            RETURNING *
-        """), {
-            "oid": data["opening_id"], "name": data["applicant_name"],
-            "email": data.get("email"), "phone": data.get("phone"),
-            "resume": data.get("resume_url"), "cover": data.get("cover_letter"),
-        }).fetchone()
-        conn.commit()
-        return dict(result._mapping)
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-
-@router.put("/recruitment/applications/{app_id}/stage", dependencies=[Depends(require_permission("hr.manage"))])
-def update_application_stage(app_id: int, data: dict, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        sets = ["stage = :stage", "updated_at = NOW()"]
-        params = {"stage": data["stage"], "id": app_id}
-        if "rating" in data:
-            sets.append("rating = :rating")
-            params["rating"] = data["rating"]
-        if "notes" in data:
-            sets.append("notes = :notes")
-            params["notes"] = data["notes"]
-        if "interview_date" in data:
-            sets.append("interview_date = :idate")
-            params["idate"] = data["interview_date"]
-        if "interviewer_id" in data:
-            sets.append("interviewer_id = :iid")
-            params["iid"] = data["interviewer_id"]
-        if data["stage"] in ("hired", "rejected"):
-            sets.append("status = :status")
-            params["status"] = data["stage"]
-        conn.execute(text(f"UPDATE job_applications SET {', '.join(sets)} WHERE id = :id"), params)
-        conn.commit()
-        return {"message": f"Application moved to {data['stage']}"}
-    finally:
-        conn.close()
-
-
 # ============================================================
 # Phase 8.15 - Payslips, Recruitment, Leave Balance
 # ============================================================
@@ -1792,10 +1670,10 @@ import calendar as cal_module
 # --- Payslips ---
 
 @router.get("/payslips", dependencies=[Depends(require_permission("hr.view"))])
-def list_all_payslips(company_id: str = Depends(get_current_user_company)):
-    conn = get_db_connection(company_id)
+def list_all_payslips(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
     try:
-        result = conn.execute(text("""
+        q = """
             SELECT pe.id, pe.employee_id, pe.period_id,
                    e.first_name || ' ' || e.last_name as employee_name,
                    pe.basic_salary,
@@ -1808,8 +1686,27 @@ def list_all_payslips(company_id: str = Depends(get_current_user_company)):
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
             JOIN payroll_periods pp ON pe.period_id = pp.id
-            ORDER BY pp.start_date DESC, e.first_name
-        """)).fetchall()
+            WHERE 1=1
+        """
+        params = {}
+        # Branch access control
+        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            if not current_user.allowed_branches:
+                return []
+            if branch_id:
+                if branch_id not in current_user.allowed_branches:
+                    raise HTTPException(status_code=403, detail="Unauthorized access to this branch")
+                q += " AND e.branch_id = :bid"
+                params["bid"] = branch_id
+            else:
+                branches_str = ",".join(map(str, current_user.allowed_branches))
+                q += f" AND e.branch_id IN ({branches_str})"
+        else:
+            if branch_id:
+                q += " AND e.branch_id = :bid"
+                params["bid"] = branch_id
+        q += " ORDER BY pp.start_date DESC, e.first_name"
+        result = conn.execute(text(q), params).fetchall()
         return [dict(row._mapping) for row in result]
     finally:
         conn.close()
@@ -2015,14 +1912,33 @@ class ApplicationStageUpdate(BaseModel):
 
 
 @router.get("/recruitment/openings", dependencies=[Depends(require_permission("hr.view"))])
-def list_job_openings(company_id: str = Depends(get_current_user_company)):
-    conn = get_db_connection(company_id)
+def list_job_openings(status: Optional[str] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
     try:
-        result = conn.execute(text("""
-            SELECT jo.*,
+        q = """SELECT jo.*,
                    (SELECT COUNT(*) FROM job_applications ja WHERE ja.opening_id = jo.id) as applications_count
-            FROM job_openings jo ORDER BY jo.created_at DESC
-        """)).fetchall()
+            FROM job_openings jo WHERE 1=1"""
+        params = {}
+        if status:
+            q += " AND jo.status = :status"
+            params["status"] = status
+        # Branch access control
+        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            if current_user.allowed_branches:
+                if branch_id:
+                    if branch_id not in current_user.allowed_branches:
+                        raise HTTPException(status_code=403, detail="Unauthorized access to this branch")
+                    q += " AND jo.branch_id = :bid"
+                    params["bid"] = branch_id
+                else:
+                    branches_str = ",".join(map(str, current_user.allowed_branches))
+                    q += f" AND (jo.branch_id IN ({branches_str}) OR jo.branch_id IS NULL)"
+        else:
+            if branch_id:
+                q += " AND jo.branch_id = :bid"
+                params["bid"] = branch_id
+        q += " ORDER BY jo.created_at DESC"
+        result = conn.execute(text(q), params).fetchall()
         return [dict(row._mapping) for row in result]
     finally:
         conn.close()
@@ -2063,9 +1979,15 @@ def update_job_opening(opening_id: int, data: JobOpeningUpdate, current_user: Us
 
 
 @router.get("/recruitment/openings/{opening_id}/applications", dependencies=[Depends(require_permission("hr.view"))])
-def list_opening_applications(opening_id: int, company_id: str = Depends(get_current_user_company)):
-    conn = get_db_connection(company_id)
+def list_opening_applications(opening_id: int, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
     try:
+        # Check branch access for this opening
+        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            opening = conn.execute(text("SELECT branch_id FROM job_openings WHERE id=:id"), {"id": opening_id}).fetchone()
+            if opening and opening.branch_id and current_user.allowed_branches:
+                if opening.branch_id not in current_user.allowed_branches:
+                    raise HTTPException(status_code=403, detail="Unauthorized access to this branch")
         result = conn.execute(text("""
             SELECT ja.*, jo.title as opening_title
             FROM job_applications ja
@@ -2078,15 +2000,31 @@ def list_opening_applications(opening_id: int, company_id: str = Depends(get_cur
 
 
 @router.get("/recruitment/applications", dependencies=[Depends(require_permission("hr.view"))])
-def list_all_applications(company_id: str = Depends(get_current_user_company)):
-    conn = get_db_connection(company_id)
+def list_all_applications(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
     try:
-        result = conn.execute(text("""
-            SELECT ja.*, jo.title as opening_title
+        q = """SELECT ja.*, jo.title as opening_title
             FROM job_applications ja
             LEFT JOIN job_openings jo ON ja.opening_id = jo.id
-            ORDER BY ja.created_at DESC
-        """)).fetchall()
+            WHERE 1=1"""
+        params = {}
+        # Branch access control via job_openings
+        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            if current_user.allowed_branches:
+                if branch_id:
+                    if branch_id not in current_user.allowed_branches:
+                        raise HTTPException(status_code=403, detail="Unauthorized")
+                    q += " AND jo.branch_id = :bid"
+                    params["bid"] = branch_id
+                else:
+                    branches_str = ",".join(map(str, current_user.allowed_branches))
+                    q += f" AND (jo.branch_id IN ({branches_str}) OR jo.branch_id IS NULL)"
+        else:
+            if branch_id:
+                q += " AND jo.branch_id = :bid"
+                params["bid"] = branch_id
+        q += " ORDER BY ja.created_at DESC"
+        result = conn.execute(text(q), params).fetchall()
         return [dict(row._mapping) for row in result]
     finally:
         conn.close()
@@ -2120,17 +2058,21 @@ def update_application_stage(app_id: int, data: ApplicationStageUpdate, current_
         conn.close()
 
 
-# --- Leave Balance & Carryover ---
+# --- Leave Balance & Carryover (with branch access) ---
 
 @router.get("/leave-balance/{emp_id}", dependencies=[Depends(require_permission("hr.view"))])
-def get_leave_balance(emp_id: int, company_id: str = Depends(get_current_user_company)):
-    conn = get_db_connection(company_id)
+def get_leave_balance(emp_id: int, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
     try:
         from datetime import datetime as dt
         emp = conn.execute(text("""
-            SELECT id, first_name||' '||last_name as name, annual_leave_entitlement
+            SELECT id, first_name||' '||last_name as name, annual_leave_entitlement, branch_id
             FROM employees WHERE id=:id
         """), {"id": emp_id}).fetchone()
+        # Branch access check
+        if emp and current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            if current_user.allowed_branches and emp.branch_id not in current_user.allowed_branches:
+                raise HTTPException(status_code=403, detail="Unauthorized access to this employee")
         if not emp:
             raise HTTPException(status_code=404, detail="Employee not found")
         year = dt.now().year
@@ -2168,11 +2110,15 @@ def calculate_leave_carryover(data: LeaveCarryoverRequest, current_user: UserRes
         year = data.year or (dt.now().year - 1)
         emp = conn.execute(text("""
             SELECT id, first_name||' '||last_name as name,
-                   annual_leave_entitlement, leave_carryover_max
+                   annual_leave_entitlement, leave_carryover_max, branch_id
             FROM employees WHERE id=:id
         """), {"id": data.employee_id}).fetchone()
         if not emp:
             raise HTTPException(status_code=404, detail="Employee not found")
+        # Branch access check
+        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
+            if current_user.allowed_branches and emp.branch_id not in current_user.allowed_branches:
+                raise HTTPException(status_code=403, detail="Unauthorized access to this employee")
         used = conn.execute(text("""
             SELECT COALESCE(SUM(days_requested),0) as used FROM leave_requests
             WHERE employee_id=:id AND status='approved' AND EXTRACT(YEAR FROM start_date)=:y
