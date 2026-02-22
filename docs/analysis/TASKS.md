@@ -568,7 +568,7 @@
   - [x] حساب المنتجات التامة (Finished Goods) — مفتاح: `acc_map_finished_goods`
   - [x] حساب العمالة المباشرة (Direct Labor) — مفتاح: `acc_map_labor_cost` *(كان موجود بالفعل)*
   - [x] حساب الأعباء الصناعية (Manufacturing Overhead) — مفتاح: `acc_map_mfg_overhead`
-  - [ ] إضافة واجهة إعداد الحسابات في صفحة الإعدادات *(واجهة أمامية)*
+  - [x] إضافة واجهة إعداد الحسابات في صفحة الإعدادات *(واجهة أمامية)* ✅
 
 > **[x] تم توسيع `AccountingMappingSettings.jsx`**: مبيعات, مشتريات, خزينة, مخزون, تصنيع, موارد بشرية, مشاريع, أصول ثابتة
 
@@ -644,7 +644,7 @@
 - [x] **[PRJ-101]** ربط الحسابات المحاسبية للمشاريع في `company_settings`
   - [x] المشاريع تستخدم مفاتيح عامة موجودة: `acc_map_sales_rev`, `acc_map_ar`, `acc_map_salaries_exp` (لا داعي لمفاتيح مخصصة)
   - [x] مفتاح `acc_map_project_pl` مدعوم كـ fallback عند إغلاق المشروع
-  - [ ] إضافة واجهة إعداد الحسابات في صفحة الإعدادات (Frontend)
+  - [x] إضافة واجهة إعداد الحسابات في صفحة الإعدادات (Frontend) ✅
 
 > **[x] تم توسيع `AccountingMappingSettings.jsx`**: مبيعات+AR, مشتريات+AP, خزينة+بنك, مخزون, تصنيع (5 حسابات), رواتب, مشاريع, أصول ثابتة
 
@@ -655,7 +655,7 @@
   - [x] ربط بـ project_id وcost_center_id في journal_entries
 - [x] **[PRJ-103]** قيد إصدار فاتورة مشروع
   - [x] create_project_invoice ينشئ السجل في invoices وproject_revenues تلقائياً
-  - [ ] قيد GL مباشر عند الإصدار (يُسجَّل عند ترحيل الفاتورة من وحدة المبيعات)
+  - [x] قيد GL مباشر عند الإصدار (يُسجَّل عند ترحيل الفاتورة من وحدة المبيعات) ✅
 - [x] **[PRJ-104]** قيد ربح/خسارة المشروع عند الإغلاق
   - [x] `POST /{project_id}/close` — يقارن إيرادات vs مصاريف
   - [x] قيد GL: PCLOSE-YYYY مع Dr/Cr للإيرادات والأرباح المحولة
@@ -676,7 +676,7 @@
 - [x] **[PRJ-107]** أنواع عقود متعددة
   - [x] حقل `contract_type VARCHAR(30)` في جدول projects (مع MIGRATION)
   - [x] قيم: fixed_price, time_and_materials, retainer, milestone
-  - [ ] فوترة دورية تلقائية للعقود من نوع Retainer
+  - [x] فوترة دورية تلقائية للعقود من نوع Retainer ✅ — `PUT /{id}/retainer-setup` + `POST /retainer/generate-invoices`
 - [x] **[PRJ-108]** تنبيهات التأخر في الجدول (Schedule Alerts)
   - [x] `GET /projects/alerts/overdue-tasks` — المهام المتأخرة مرتبة حسب درجة التأخر
   - [x] `GET /projects/alerts/over-budget` — المشاريع التي تجاوزت الميزانية + نسبة التجاوز
@@ -697,11 +697,11 @@
 - [x] **[RPT-101]** تصدير PDF احترافي ✅
   - [x] استخدام مكتبة ReportLab أو WeasyPrint
   - [x] تخطيط تقارير احترافي (Header/Footer/Logo)
-  - [ ] دعم اللغة العربية (RTL) في PDF
+  - [x] دعم اللغة العربية (RTL) في PDF ✅ — `generate_pdf(rtl=True)` في `utils/exports.py`
   - [x] قوالب قابلة للتخصيص لكل نوع تقرير
 - [x] **[RPT-102]** تصدير Excel متقدم ✅
   - [x] تنسيق الخلايا والألوان
-  - [ ] رسوم بيانية مدمجة (Charts)
+  - [x] رسوم بيانية مدمجة (Charts) ✅ — `generate_excel_with_chart` + `generate_chart_image` في `utils/exports.py`
   - [x] أوراق عمل متعددة (Multi-sheet)
   - [x] صيغ حسابية تلقائية
 
@@ -711,7 +711,7 @@
   - [x] تقرير التحليل الأفقي (Horizontal Analysis) — `GET /reports/accounting/horizontal-analysis`
   - [x] تقرير تحليل النسب المالية (Financial Ratios) — `GET /reports/accounting/financial-ratios`
   - [x] تقرير مركز التكلفة (Cost Center Report) — `GET /reports/accounting/cost-center-report`
-  - [ ] تقرير الأرباح والخسائر التفصيلي (حسب المنتج / العميل / الفئة)
+  - [x] تقرير الأرباح والخسائر التفصيلي (حسب المنتج / العميل / الفئة) ✅ — `GET /reports/accounting/detailed-pl`
   - [x] تقرير التدفقات النقدية التفاعلي — `GET /reports/accounting/cashflow/export`
 - [x] **[RPT-104]** تقارير المخزون المفقودة ✅
   - [x] تقييم المخزون بالتكلفة المتوسطة — `GET /reports/inventory/valuation`
@@ -720,7 +720,7 @@
   - [x] تقرير تكلفة البضاعة المباعة (COGS Report) — `GET /reports/inventory/cogs`
 - [x] **[RPT-105]** تقارير المبيعات والمشتريات المفقودة ✅
   - [x] تقرير أداء البائعين (Sales by Cashier) — `GET /reports/sales/by-cashier`
-  - [ ] تقرير عمولات المبيعات
+  - [x] تقرير عمولات المبيعات ✅ — `GET /reports/sales/commissions/report`
   - [x] تقرير المبيعات المستهدفة vs الفعلية — `GET /reports/sales/target-vs-actual`
 
 #### 8.3.3 منشئ التقارير (Report Builder)
@@ -729,8 +729,8 @@
   - [x] اختيار الجداول والحقول بالسحب والإفلات
   - [x] الفلترة والترتيب والتجميع
   - [x] حفظ التقارير المخصصة
-  - [ ] مشاركة التقارير مع المستخدمين
-  - [ ] جدولة التقارير (يومي/أسبوعي/شهري)
+  - [x] مشاركة التقارير مع المستخدمين ✅ — `reportSharingAPI` في `ScheduledReports.jsx`
+  - [x] جدولة التقارير (يومي/أسبوعي/شهري) ✅ — `routers/scheduled_reports.py`
 
 ### 8.4 إكمال شجرة الحسابات (COA) — من 50% إلى 100%
 
