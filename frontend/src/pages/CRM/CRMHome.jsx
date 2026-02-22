@@ -245,53 +245,56 @@ function CRMHome() {
 
             {/* ── Overview Tab ───────────────────────────────────────────────── */}
             {activeTab === 'overview' && (
-                <div className="mt-4">
-                    <div className="card section-card">
-                        <h3 className="section-title">{t('crm.pipeline_summary')}</h3>
-                        {overviewLoading ? (
-                            <div className="empty-state">{t('common.loading')}</div>
-                        ) : (
-                            <div className="data-table-container">
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>{t('crm.stage')}</th>
-                                            <th>{t('crm.opportunity_count')}</th>
-                                            <th>{t('crm.value')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(pipeline.stages || []).map(stage => (
-                                            <tr key={stage.stage}>
-                                                <td>
-                                                    <span className="badge" style={{ background: stageColors[stage.stage] || '#6b7280', color: '#fff' }}>
-                                                        {stageLabels[stage.stage] || stage.stage}
-                                                    </span>
-                                                </td>
-                                                <td>{stage.count}</td>
-                                                <td>{formatNumber(stage.total_value)} {currency}</td>
-                                            </tr>
-                                        ))}
-                                        {(!pipeline.stages || pipeline.stages.length === 0) && (
-                                            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>{t('common.no_data')}</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                <div className="card mt-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 className="section-title" style={{ margin: 0 }}>{t('crm.pipeline_summary')}</h3>
                     </div>
+                    {overviewLoading ? (
+                        <div className="empty-state">{t('common.loading')}</div>
+                    ) : (
+                        <div className="data-table-container">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>{t('crm.stage')}</th>
+                                        <th>{t('crm.opportunity_count')}</th>
+                                        <th>{t('crm.value')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(pipeline.stages || []).map(stage => (
+                                        <tr key={stage.stage}>
+                                            <td>
+                                                <span className="badge" style={{ background: stageColors[stage.stage] || '#6b7280', color: '#fff' }}>
+                                                    {stageLabels[stage.stage] || stage.stage}
+                                                </span>
+                                            </td>
+                                            <td>{stage.count}</td>
+                                            <td>{formatNumber(stage.total_value)} {currency}</td>
+                                        </tr>
+                                    ))}
+                                    {(!pipeline.stages || pipeline.stages.length === 0) && (
+                                        <tr><td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>{t('common.no_data')}</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* ── Opportunities Tab ───────────────────────────────────────────── */}
             {activeTab === 'opportunities' && (
-                <div className="mt-4">
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                        <button className="btn btn-primary" onClick={openCreateOpp}>+ {t('crm.new_opportunity')}</button>
-                        <select className="search-bar" style={{ maxWidth: 200 }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
-                            <option value="">{t('crm.all_stages')}</option>
-                            {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
+                <div className="card mt-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_opportunities')}</h3>
+                            <select className="form-control" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
+                                <option value="">{t('crm.all_stages')}</option>
+                                {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </select>
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={openCreateOpp}>+ {t('crm.new_opportunity')}</button>
                     </div>
 
                     {oppLoading ? (
@@ -412,17 +415,20 @@ function CRMHome() {
 
             {/* ── Support Tickets Tab ─────────────────────────────────────────── */}
             {activeTab === 'tickets' && (
-                <div className="mt-4">
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                        <button className="btn btn-primary" onClick={openCreateTicket}>+ {t('crm.new_ticket')}</button>
-                        <select className="search-bar" style={{ maxWidth: 180 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                            <option value="">{t('common.all_statuses')}</option>
-                            {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
-                        <select className="search-bar" style={{ maxWidth: 180 }} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-                            <option value="">{t('crm.all_priorities')}</option>
-                            {priorityOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                        </select>
+                <div className="card mt-4">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_tickets')}</h3>
+                            <select className="form-control" style={{ width: '160px' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="">{t('common.all_statuses')}</option>
+                                {statusOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </select>
+                            <select className="form-control" style={{ width: '150px' }} value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+                                <option value="">{t('crm.all_priorities')}</option>
+                                {priorityOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </select>
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={openCreateTicket}>+ {t('crm.new_ticket')}</button>
                     </div>
 
                     {ticketsLoading ? (
