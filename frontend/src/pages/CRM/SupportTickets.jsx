@@ -228,6 +228,7 @@ function SupportTickets() {
             ) : tickets.length === 0 ? (
                 <div className="empty-state">{t('crm.no_tickets')}</div>
             ) : (
+                <div className="data-table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
@@ -359,103 +360,92 @@ function SupportTickets() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
 
             {/* Create Modal */}
             {showModal && (
-                <div style={overlayStyle}>
-                    <div className="card" style={modalBoxStyle}>
-                        <h3 style={{ marginBottom: 16 }}>{t('crm.new_ticket')}</h3>
-                        <form onSubmit={handleSubmit}>
-                            <div className="form-section">
-                                <div className="form-grid">
-                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>{t('crm.subject')}</label>
-                                        <input
-                                            type="text"
-                                            name="subject"
-                                            value={formData.subject}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>{t('common.description')}</label>
-                                        <textarea
-                                            name="description"
-                                            rows={4}
-                                            value={formData.description}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('common.customer')}</label>
-                                        <select name="customer_id" value={formData.customer_id} onChange={handleChange}>
-                                            <option value="">{t('crm.select_customer')}</option>
-                                            {customers.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.priority')}</label>
-                                        <select name="priority" value={formData.priority} onChange={handleChange} required>
-                                            {priorityOptions.map(p => (
-                                                <option key={p.value} value={p.value}>{p.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.category')}</label>
-                                        <input
-                                            type="text"
-                                            name="category"
-                                            value={formData.category}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.sla_hours')}</label>
-                                        <input
-                                            type="number"
-                                            name="sla_hours"
-                                            min="1"
-                                            value={formData.sla_hours}
-                                            onChange={handleChange}
-                                        />
+                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                        <div className="modal-header">
+                            <h3>{t('crm.new_ticket')}</h3>
+                        </div>
+                        <div className="modal-body">
+                            <form id="ticket-form" onSubmit={handleSubmit}>
+                                <div className="form-section">
+                                    <div className="form-grid">
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label className="form-label">{t('crm.subject')}</label>
+                                            <input
+                                                type="text"
+                                                name="subject"
+                                                className="form-control"
+                                                value={formData.subject}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label className="form-label">{t('common.description')}</label>
+                                            <textarea
+                                                name="description"
+                                                className="form-control"
+                                                rows={4}
+                                                value={formData.description}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('common.customer')}</label>
+                                            <select className="form-control" name="customer_id" value={formData.customer_id} onChange={handleChange}>
+                                                <option value="">{t('crm.select_customer')}</option>
+                                                {customers.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.priority')}</label>
+                                            <select className="form-control" name="priority" value={formData.priority} onChange={handleChange} required>
+                                                {priorityOptions.map(p => (
+                                                    <option key={p.value} value={p.value}>{p.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.category')}</label>
+                                            <input
+                                                type="text"
+                                                name="category"
+                                                className="form-control"
+                                                value={formData.category}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.sla_hours')}</label>
+                                            <input
+                                                type="number"
+                                                name="sla_hours"
+                                                className="form-control"
+                                                min="1"
+                                                value={formData.sla_hours}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="form-actions" style={{ marginTop: 16 }}>
-                                <button type="submit" className="btn btn-primary">{t('common.create')}</button>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="submit" form="ticket-form" className="btn btn-primary">{t('common.create')}</button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('common.cancel')}</button>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     )
-}
-
-const overlayStyle = {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-}
-
-const modalBoxStyle = {
-    background: 'var(--bg-primary, #fff)',
-    borderRadius: 12,
-    padding: 24,
-    width: '90%',
-    maxWidth: 600,
-    maxHeight: '90vh',
-    overflowY: 'auto'
 }
 
 const detailPanelStyle = {

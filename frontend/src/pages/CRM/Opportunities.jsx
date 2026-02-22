@@ -180,6 +180,7 @@ function Opportunities() {
             ) : opportunities.length === 0 ? (
                 <div className="empty-state">{t('crm.no_opportunities')}</div>
             ) : (
+                <div className="data-table-container">
                 <table className="data-table">
                     <thead>
                         <tr>
@@ -212,23 +213,28 @@ function Opportunities() {
                                 <td>{opp.assigned_name || '-'}</td>
                                 <td>
                                     <div style={{ display: 'flex', gap: 6 }}>
-                                        <button className="btn btn-secondary" onClick={() => openEdit(opp)}>{t('crm.edit')}</button>
-                                        <button className="btn btn-danger" onClick={() => setDeleteConfirm(opp.id)}>{t('common.delete')}</button>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(opp)}>{t('crm.edit')}</button>
+                                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(opp.id)}>{t('common.delete')}</button>
                                     </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
 
             {/* Delete Confirmation */}
             {deleteConfirm && (
-                <div className="modal-overlay" style={overlayStyle}>
-                    <div className="card" style={modalBoxStyle}>
-                        <h3 style={{ marginBottom: 16 }}>{t('crm.confirm_delete')}</h3>
-                        <p>{t('crm.confirm_delete_opportunity')}</p>
-                        <div className="form-actions" style={{ marginTop: 16 }}>
+                <div className="modal-backdrop" onClick={() => setDeleteConfirm(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <div className="modal-header">
+                            <h3>{t('crm.confirm_delete')}</h3>
+                        </div>
+                        <div className="modal-body">
+                            <p>{t('crm.confirm_delete_opportunity')}</p>
+                        </div>
+                        <div className="modal-footer">
                             <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>{t('common.delete')}</button>
                             <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>{t('common.cancel')}</button>
                         </div>
@@ -238,124 +244,114 @@ function Opportunities() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="modal-overlay" style={overlayStyle}>
-                    <div className="card" style={{ ...modalBoxStyle, maxWidth: 600 }}>
-                        <h3 style={{ marginBottom: 16 }}>{isEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h3>
-                        <form onSubmit={handleSubmit}>
-                            <div className="form-section">
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>{t('crm.title_label')}</label>
-                                        <input
-                                            type="text"
-                                            name="title"
-                                            value={formData.title}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('common.customer')}</label>
-                                        <select name="customer_id" value={formData.customer_id} onChange={handleChange}>
-                                            <option value="">{t('crm.select_customer')}</option>
-                                            {customers.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.stage')}</label>
-                                        <select name="stage" value={formData.stage} onChange={handleChange} required>
-                                            {stageOptions.map(s => (
-                                                <option key={s.value} value={s.value}>{s.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.probability')} (%)</label>
-                                        <input
-                                            type="number"
-                                            name="probability"
-                                            min="0"
-                                            max="100"
-                                            value={formData.probability}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.expected_value')}</label>
-                                        <input
-                                            type="number"
-                                            name="expected_value"
-                                            min="0"
-                                            step="0.01"
-                                            value={formData.expected_value}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.expected_close')}</label>
-                                        <input
-                                            type="date"
-                                            name="expected_close_date"
-                                            value={formData.expected_close_date}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('crm.source')}</label>
-                                        <input
-                                            type="text"
-                                            name="source"
-                                            value={formData.source}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                        <label>{t('common.notes')}</label>
-                                        <textarea
-                                            name="notes"
-                                            rows={3}
-                                            value={formData.notes}
-                                            onChange={handleChange}
-                                        />
+                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                        <div className="modal-header">
+                            <h3>{isEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h3>
+                        </div>
+                        <div className="modal-body">
+                            <form id="opp-form" onSubmit={handleSubmit}>
+                                <div className="form-section">
+                                    <div className="form-grid">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.title_label')}</label>
+                                            <input
+                                                type="text"
+                                                name="title"
+                                                className="form-control"
+                                                value={formData.title}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('common.customer')}</label>
+                                            <select className="form-control" name="customer_id" value={formData.customer_id} onChange={handleChange}>
+                                                <option value="">{t('crm.select_customer')}</option>
+                                                {customers.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.stage')}</label>
+                                            <select className="form-control" name="stage" value={formData.stage} onChange={handleChange} required>
+                                                {stageOptions.map(s => (
+                                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.probability')} (%)</label>
+                                            <input
+                                                type="number"
+                                                name="probability"
+                                                className="form-control"
+                                                min="0"
+                                                max="100"
+                                                value={formData.probability}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.expected_value')}</label>
+                                            <input
+                                                type="number"
+                                                name="expected_value"
+                                                className="form-control"
+                                                min="0"
+                                                step="0.01"
+                                                value={formData.expected_value}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.expected_close')}</label>
+                                            <input
+                                                type="date"
+                                                name="expected_close_date"
+                                                className="form-control"
+                                                value={formData.expected_close_date}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">{t('crm.source')}</label>
+                                            <input
+                                                type="text"
+                                                name="source"
+                                                className="form-control"
+                                                value={formData.source}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label className="form-label">{t('common.notes')}</label>
+                                            <textarea
+                                                name="notes"
+                                                className="form-control"
+                                                rows={3}
+                                                value={formData.notes}
+                                                onChange={handleChange}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="form-actions" style={{ marginTop: 16 }}>
-                                <button type="submit" className="btn btn-primary">
-                                    {isEdit ? t('common.update') : t('common.create')}
-                                </button>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                    {t('common.cancel')}
-                                </button>
-                            </div>
-                        </form>
+                            </form>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="submit" form="opp-form" className="btn btn-primary">
+                                {isEdit ? t('common.update') : t('common.create')}
+                            </button>
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                                {t('common.cancel')}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     )
-}
-
-const overlayStyle = {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-}
-
-const modalBoxStyle = {
-    background: 'var(--bg-primary, #fff)',
-    borderRadius: 12,
-    padding: 24,
-    width: '90%',
-    maxWidth: 480,
-    maxHeight: '90vh',
-    overflowY: 'auto'
 }
 
 export default Opportunities

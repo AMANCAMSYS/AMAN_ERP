@@ -7,7 +7,7 @@ import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
 
 function CRMHome() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const navigate = useNavigate()
     const currency = getCurrency()
     const [loading, setLoading] = useState(true)
@@ -90,17 +90,27 @@ function CRMHome() {
                 </div>
             </div>
 
-            {/* Navigation Cards */}
-            <div className="nav-grid" style={{ marginTop: 24 }}>
-                <div className="nav-card" onClick={() => navigate('/crm/opportunities')}>
-                    <div className="nav-icon">💼</div>
-                    <div className="nav-title">{t('crm.opportunities')}</div>
-                    <div className="nav-desc">{t('crm.opportunities_subtitle')}</div>
+            {/* Navigation */}
+            <div className="modules-grid">
+                <div className="card section-card">
+                    <h3 className="section-title">{t('crm.opportunities')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/crm/opportunities')}>
+                            <span className="link-icon">💼</span>
+                            {t('crm.opportunities')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="nav-card" onClick={() => navigate('/crm/tickets')}>
-                    <div className="nav-icon">🎫</div>
-                    <div className="nav-title">{t('crm.support_tickets')}</div>
-                    <div className="nav-desc">{t('crm.support_subtitle')}</div>
+                <div className="card section-card">
+                    <h3 className="section-title">{t('crm.support_tickets')}</h3>
+                    <div className="links-list">
+                        <div className="link-item" onClick={() => navigate('/crm/tickets')}>
+                            <span className="link-icon">🎫</span>
+                            {t('crm.support_tickets')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -110,6 +120,7 @@ function CRMHome() {
                 {loading ? (
                     <div className="empty-state">{t('common.loading')}</div>
                 ) : (
+                    <div className="data-table-container">
                     <table className="data-table">
                         <thead>
                             <tr>
@@ -145,6 +156,7 @@ function CRMHome() {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
         </div>
