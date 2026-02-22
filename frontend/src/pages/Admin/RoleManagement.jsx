@@ -6,6 +6,40 @@ import { hasPermission, getUser } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import './RoleManagement.css';
 
+const PERM_AR = {
+    '*': 'صلاحيات كاملة',
+    'dashboard.view': 'لوحة التحكم',
+    'sales.*': 'المبيعات (كامل)', 'sales.view': 'عرض المبيعات', 'sales.create': 'إنشاء مبيعات', 'sales.edit': 'تعديل مبيعات', 'sales.delete': 'حذف مبيعات', 'sales.approve': 'اعتماد مبيعات',
+    'buying.*': 'المشتريات (كامل)', 'buying.view': 'عرض المشتريات', 'buying.create': 'إنشاء مشتريات', 'buying.edit': 'تعديل مشتريات', 'buying.delete': 'حذف مشتريات', 'buying.approve': 'اعتماد مشتريات',
+    'products.*': 'المنتجات (كامل)', 'products.view': 'عرض المنتجات', 'products.create': 'إنشاء منتجات', 'products.edit': 'تعديل منتجات',
+    'stock.*': 'المخزون (كامل)', 'stock.view': 'عرض المخزون', 'stock.create': 'حركات مخزون', 'stock.edit': 'تعديل مخزون',
+    'inventory.*': 'الجرد (كامل)', 'inventory.view': 'عرض الجرد', 'inventory.create': 'إنشاء جرد',
+    'accounting.*': 'المحاسبة (كامل)', 'accounting.view': 'عرض المحاسبة', 'accounting.edit': 'تعديل المحاسبة', 'accounting.create': 'إنشاء قيود', 'accounting.approve': 'اعتماد قيود', 'accounting.budgets.view': 'الميزانيات', 'accounting.cost_centers.view': 'مراكز التكلفة',
+    'treasury.*': 'الخزينة (كامل)', 'treasury.view': 'عرض الخزينة', 'treasury.create': 'إنشاء خزينة', 'treasury.edit': 'تعديل الخزينة', 'treasury.approve': 'اعتماد الخزينة',
+    'reconciliation.*': 'التسوية (كامل)', 'reconciliation.view': 'عرض التسوية', 'reconciliation.create': 'إنشاء تسوية',
+    'taxes.*': 'الضرائب (كامل)', 'taxes.view': 'عرض الضرائب', 'taxes.create': 'إنشاء ضرائب',
+    'currencies.*': 'العملات (كامل)', 'currencies.view': 'عرض العملات',
+    'reports.*': 'التقارير (كامل)', 'reports.view': 'عرض التقارير', 'reports.financial': 'التقارير المالية', 'reports.create': 'إنشاء تقارير',
+    'hr.*': 'الموارد البشرية (كامل)', 'hr.view': 'عرض الموارد البشرية', 'hr.create': 'إنشاء HR', 'hr.edit': 'تعديل HR', 'hr.reports': 'تقارير HR', 'hr.payroll.view': 'عرض الرواتب', 'hr.payroll.create': 'إنشاء رواتب',
+    'assets.*': 'الأصول (كامل)', 'assets.view': 'عرض الأصول', 'assets.create': 'إنشاء أصول', 'assets.edit': 'تعديل أصول',
+    'expenses.*': 'المصروفات (كامل)', 'expenses.view': 'عرض المصروفات', 'expenses.create': 'إنشاء مصروفات', 'expenses.approve': 'اعتماد مصروفات',
+    'contracts.*': 'العقود (كامل)', 'contracts.view': 'عرض العقود', 'contracts.create': 'إنشاء عقود', 'contracts.edit': 'تعديل عقود',
+    'projects.*': 'المشاريع (كامل)', 'projects.view': 'عرض المشاريع', 'projects.create': 'إنشاء مشاريع', 'projects.edit': 'تعديل مشاريع',
+    'pos.*': 'نقطة البيع (كامل)', 'pos.view': 'عرض نقطة البيع', 'pos.create': 'إنشاء مبيعات POS', 'pos.manage': 'إدارة نقطة البيع', '*.pos': 'نقطة البيع',
+    'manufacturing.*': 'التصنيع (كامل)', 'manufacturing.view': 'عرض التصنيع', 'manufacturing.create': 'إنشاء أوامر تصنيع', 'manufacturing.edit': 'تعديل التصنيع', 'manufacturing.reports': 'تقارير التصنيع',
+    'approvals.*': 'الاعتمادات (كامل)', 'approvals.view': 'عرض الاعتمادات', 'approvals.create': 'إنشاء اعتمادات', 'approvals.approve': 'منح الاعتمادات',
+    'notifications.view': 'الإشعارات', 'notifications.*': 'الإشعارات (كامل)',
+    'security.*': 'الأمان (كامل)', 'security.view': 'عرض الأمان',
+    'audit.*': 'سجل المراجعة (كامل)', 'audit.view': 'سجل المراجعة',
+    'data_import.*': 'استيراد البيانات (كامل)', 'data_import.view': 'استيراد البيانات',
+    'branches.*': 'الفروع (كامل)', 'branches.view': 'عرض الفروع', 'branches.create': 'إنشاء فروع',
+    'settings.*': 'الإعدادات (كامل)', 'settings.view': 'عرض الإعدادات', 'settings.edit': 'تعديل الإعدادات',
+    'admin.*': 'إدارة النظام (كامل)', 'admin.roles': 'إدارة الأدوار', 'admin.users': 'إدارة المستخدمين', 'admin.companies': 'إدارة الشركات',
+    '*.accounting': 'المحاسبة', '*.treasury': 'الخزينة', '*.reconciliation': 'التسوية', '*.sales': 'المبيعات', '*.reports': 'التقارير',
+};
+
+const permLabel = (p) => PERM_AR[p] || p;
+
 const DynamicIcon = ({ name, size = 18, ...props }) => {
     const Icon = LucideIcons[name];
     return Icon ? <Icon size={size} {...props} /> : null;
@@ -320,7 +354,7 @@ const RoleManagement = () => {
                                     </span>
                                     <div className="perm-preview">
                                         {(role.permissions || []).slice(0, 4).map(p => (
-                                            <span key={p} className="perm-tag">{p}</span>
+                                            <span key={p} className="perm-tag">{permLabel(p)}</span>
                                         ))}
                                         {(role.permissions?.length || 0) > 4 && (
                                             <span className="perm-more">+{role.permissions.length - 4}</span>
