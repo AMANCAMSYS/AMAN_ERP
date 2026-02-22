@@ -6,40 +6,6 @@ import { hasPermission, getUser } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import './RoleManagement.css';
 
-const PERM_AR = {
-    '*': 'صلاحيات كاملة',
-    'dashboard.view': 'لوحة التحكم',
-    'sales.*': 'المبيعات (كامل)', 'sales.view': 'عرض المبيعات', 'sales.create': 'إنشاء مبيعات', 'sales.edit': 'تعديل مبيعات', 'sales.delete': 'حذف مبيعات', 'sales.approve': 'اعتماد مبيعات',
-    'buying.*': 'المشتريات (كامل)', 'buying.view': 'عرض المشتريات', 'buying.create': 'إنشاء مشتريات', 'buying.edit': 'تعديل مشتريات', 'buying.delete': 'حذف مشتريات', 'buying.approve': 'اعتماد مشتريات',
-    'products.*': 'المنتجات (كامل)', 'products.view': 'عرض المنتجات', 'products.create': 'إنشاء منتجات', 'products.edit': 'تعديل منتجات',
-    'stock.*': 'المخزون (كامل)', 'stock.view': 'عرض المخزون', 'stock.create': 'حركات مخزون', 'stock.edit': 'تعديل مخزون',
-    'inventory.*': 'الجرد (كامل)', 'inventory.view': 'عرض الجرد', 'inventory.create': 'إنشاء جرد',
-    'accounting.*': 'المحاسبة (كامل)', 'accounting.view': 'عرض المحاسبة', 'accounting.edit': 'تعديل المحاسبة', 'accounting.create': 'إنشاء قيود', 'accounting.approve': 'اعتماد قيود', 'accounting.budgets.view': 'الميزانيات', 'accounting.cost_centers.view': 'مراكز التكلفة',
-    'treasury.*': 'الخزينة (كامل)', 'treasury.view': 'عرض الخزينة', 'treasury.create': 'إنشاء خزينة', 'treasury.edit': 'تعديل الخزينة', 'treasury.approve': 'اعتماد الخزينة',
-    'reconciliation.*': 'التسوية (كامل)', 'reconciliation.view': 'عرض التسوية', 'reconciliation.create': 'إنشاء تسوية',
-    'taxes.*': 'الضرائب (كامل)', 'taxes.view': 'عرض الضرائب', 'taxes.create': 'إنشاء ضرائب',
-    'currencies.*': 'العملات (كامل)', 'currencies.view': 'عرض العملات',
-    'reports.*': 'التقارير (كامل)', 'reports.view': 'عرض التقارير', 'reports.financial': 'التقارير المالية', 'reports.create': 'إنشاء تقارير',
-    'hr.*': 'الموارد البشرية (كامل)', 'hr.view': 'عرض الموارد البشرية', 'hr.create': 'إنشاء HR', 'hr.edit': 'تعديل HR', 'hr.reports': 'تقارير HR', 'hr.payroll.view': 'عرض الرواتب', 'hr.payroll.create': 'إنشاء رواتب',
-    'assets.*': 'الأصول (كامل)', 'assets.view': 'عرض الأصول', 'assets.create': 'إنشاء أصول', 'assets.edit': 'تعديل أصول',
-    'expenses.*': 'المصروفات (كامل)', 'expenses.view': 'عرض المصروفات', 'expenses.create': 'إنشاء مصروفات', 'expenses.approve': 'اعتماد مصروفات',
-    'contracts.*': 'العقود (كامل)', 'contracts.view': 'عرض العقود', 'contracts.create': 'إنشاء عقود', 'contracts.edit': 'تعديل عقود',
-    'projects.*': 'المشاريع (كامل)', 'projects.view': 'عرض المشاريع', 'projects.create': 'إنشاء مشاريع', 'projects.edit': 'تعديل مشاريع',
-    'pos.*': 'نقطة البيع (كامل)', 'pos.view': 'عرض نقطة البيع', 'pos.create': 'إنشاء مبيعات POS', 'pos.manage': 'إدارة نقطة البيع', '*.pos': 'نقطة البيع',
-    'manufacturing.*': 'التصنيع (كامل)', 'manufacturing.view': 'عرض التصنيع', 'manufacturing.create': 'إنشاء أوامر تصنيع', 'manufacturing.edit': 'تعديل التصنيع', 'manufacturing.reports': 'تقارير التصنيع',
-    'approvals.*': 'الاعتمادات (كامل)', 'approvals.view': 'عرض الاعتمادات', 'approvals.create': 'إنشاء اعتمادات', 'approvals.approve': 'منح الاعتمادات',
-    'notifications.view': 'الإشعارات', 'notifications.*': 'الإشعارات (كامل)',
-    'security.*': 'الأمان (كامل)', 'security.view': 'عرض الأمان',
-    'audit.*': 'سجل المراجعة (كامل)', 'audit.view': 'سجل المراجعة',
-    'data_import.*': 'استيراد البيانات (كامل)', 'data_import.view': 'استيراد البيانات',
-    'branches.*': 'الفروع (كامل)', 'branches.view': 'عرض الفروع', 'branches.create': 'إنشاء فروع',
-    'settings.*': 'الإعدادات (كامل)', 'settings.view': 'عرض الإعدادات', 'settings.edit': 'تعديل الإعدادات',
-    'admin.*': 'إدارة النظام (كامل)', 'admin.roles': 'إدارة الأدوار', 'admin.users': 'إدارة المستخدمين', 'admin.companies': 'إدارة الشركات',
-    '*.accounting': 'المحاسبة', '*.treasury': 'الخزينة', '*.reconciliation': 'التسوية', '*.sales': 'المبيعات', '*.reports': 'التقارير',
-};
-
-const permLabel = (p) => PERM_AR[p] || p;
-
 const DynamicIcon = ({ name, size = 18, ...props }) => {
     const Icon = LucideIcons[name];
     return Icon ? <Icon size={size} {...props} /> : null;
@@ -67,6 +33,36 @@ const RoleManagement = () => {
         description: '',
         permissions: []
     });
+
+    // Build a lookup map: permission key → Arabic/English label
+    const permLabelMap = useMemo(() => {
+        const map = {};
+        permissions.forEach(p => {
+            map[p.key] = { ar: p.label_ar || p.key, en: p.label_en || p.key };
+        });
+        return map;
+    }, [permissions]);
+
+    // Get display label for a permission key
+    const getPermLabel = (key) => {
+        if (key === '*') return isRTL ? 'الكل' : 'All';
+        const entry = permLabelMap[key];
+        if (!entry) {
+            // Fallback: show section label from sections map
+            const sectionKey = key.split('.')[0];
+            const sec = sections[sectionKey];
+            return isRTL ? (sec?.label_ar || key) : (sec?.label_en || key);
+        }
+        return isRTL ? entry.ar : entry.en;
+    };
+
+    // Get section label for a permission key
+    const getPermSectionLabel = (key) => {
+        if (key === '*') return isRTL ? 'صلاحيات كاملة' : 'Full Access';
+        const sectionKey = key.split('.')[0];
+        const sec = sections[sectionKey];
+        return isRTL ? (sec?.label_ar || sectionKey) : (sec?.label_en || sectionKey);
+    };
 
     useEffect(() => {
         if (user?.role === 'system_admin') {
@@ -280,18 +276,23 @@ const RoleManagement = () => {
     const totalPerms = permissions.length;
 
     return (
-        <div className="role-management-container">
-            <div className="role-header">
+        <div className="workspace fade-in">
+            <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
                 <div>
-                    <h1><LucideIcons.Shield size={28} style={{ verticalAlign: 'middle', marginLeft: isRTL ? 8 : 0, marginRight: isRTL ? 0 : 8 }} /> {t('roles.title')}</h1>
-                    <p className="subtitle">{t('roles.subtitle')}</p>
+                    <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className="p-2 rounded-lg" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', borderRadius: 10, padding: '8px', display: 'inline-flex' }}>
+                            <LucideIcons.Shield size={24} />
+                        </span>
+                        {t('roles.title')}
+                    </h1>
+                    <p className="workspace-subtitle">{t('roles.subtitle')}</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn-secondary" onClick={handleInitDefaults} disabled={initLoading || (user?.role === 'system_admin' && !selectedCompany)}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-secondary" onClick={handleInitDefaults} disabled={initLoading || (user?.role === 'system_admin' && !selectedCompany)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <LucideIcons.RefreshCw size={16} className={initLoading ? 'spin' : ''} />
-                        {' '}{t('roles.initDefaults')}
+                        {t('roles.initDefaults')}
                     </button>
-                    <button className="btn-primary" onClick={() => openModal()} disabled={user?.role === 'system_admin' && !selectedCompany}>
+                    <button className="btn btn-primary" onClick={() => openModal()} disabled={user?.role === 'system_admin' && !selectedCompany} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <LucideIcons.Plus size={16} /> {t('roles.addRole')}
                     </button>
                 </div>
@@ -325,7 +326,21 @@ const RoleManagement = () => {
                                 : t('common.no_data')}
                         </div>
                     ) : (
-                        roles.map(role => (
+                        roles.map(role => {
+                            // Group permissions by section for display
+                            const permSections = {};
+                            (role.permissions || []).forEach(p => {
+                                if (p === '*') {
+                                    permSections['*'] = ['*'];
+                                } else {
+                                    const sec = p.split('.')[0];
+                                    if (!permSections[sec]) permSections[sec] = [];
+                                    permSections[sec].push(p);
+                                }
+                            });
+                            const sectionKeys = Object.keys(permSections);
+
+                            return (
                             <div key={role.id} className={`role-card ${role.is_system_role ? 'system' : ''}`}>
                                 {role.is_system_role && (
                                     <div className="system-badge-row">
@@ -353,11 +368,27 @@ const RoleManagement = () => {
                                         {' '}{role.permissions?.includes('*') ? t('roles.fullAccess') : `${role.permissions?.length || 0} ${t('roles.permissions')}`}
                                     </span>
                                     <div className="perm-preview">
-                                        {(role.permissions || []).slice(0, 4).map(p => (
-                                            <span key={p} className="perm-tag">{permLabel(p)}</span>
-                                        ))}
-                                        {(role.permissions?.length || 0) > 4 && (
-                                            <span className="perm-more">+{role.permissions.length - 4}</span>
+                                        {role.permissions?.includes('*') ? (
+                                            <span className="perm-tag perm-tag-full">
+                                                <LucideIcons.Star size={12} /> {isRTL ? 'جميع الصلاحيات' : 'All Permissions'}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                {sectionKeys.slice(0, 4).map(sec => {
+                                                    const secMeta = sections[sec];
+                                                    const IconName = secMeta?.icon || 'Circle';
+                                                    const DynIcon = LucideIcons[IconName];
+                                                    return (
+                                                        <span key={sec} className="perm-tag" title={permSections[sec].map(p => getPermLabel(p)).join('، ')}>
+                                                            {DynIcon && <DynIcon size={12} />}
+                                                            {isRTL ? (secMeta?.label_ar || sec) : (secMeta?.label_en || sec)}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {sectionKeys.length > 4 && (
+                                                    <span className="perm-more">+{sectionKeys.length - 4}</span>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -378,7 +409,8 @@ const RoleManagement = () => {
                                     </button>
                                 </div>
                             </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             )}
@@ -397,41 +429,39 @@ const RoleManagement = () => {
                         </div>
 
                         <form onSubmit={handleSubmit}>
-                            <div className="modal-form-body">
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label>{t('roles.roleName')}</label>
-                                        <input
-                                            type="text"
-                                            name="role_name"
-                                            value={formData.role_name}
-                                            onChange={handleInputChange}
-                                            required
-                                            placeholder="e.g. sales_manager"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>{t('roles.roleNameAr')}</label>
-                                        <input
-                                            type="text"
-                                            name="role_name_ar"
-                                            value={formData.role_name_ar}
-                                            onChange={handleInputChange}
-                                            placeholder="مثال: مدير المبيعات"
-                                        />
-                                    </div>
-                                </div>
-
+                            <div className="form-row">
                                 <div className="form-group">
-                                    <label>{t('roles.description')}</label>
-                                    <textarea
-                                        name="description"
-                                        value={formData.description}
+                                    <label>{t('roles.roleName')}</label>
+                                    <input
+                                        type="text"
+                                        name="role_name"
+                                        value={formData.role_name}
                                         onChange={handleInputChange}
-                                        rows={2}
-                                        placeholder={t('admin.roles.brief_description_of_this_role')}
+                                        required
+                                        placeholder="e.g. sales_manager"
                                     />
                                 </div>
+                                <div className="form-group">
+                                    <label>{t('roles.roleNameAr')}</label>
+                                    <input
+                                        type="text"
+                                        name="role_name_ar"
+                                        value={formData.role_name_ar}
+                                        onChange={handleInputChange}
+                                        placeholder="مثال: مدير المبيعات"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>{t('roles.description')}</label>
+                                <textarea
+                                    name="description"
+                                    value={formData.description}
+                                    onChange={handleInputChange}
+                                    rows={2}
+                                    placeholder={t('admin.roles.brief_description_of_this_role')}
+                                />
                             </div>
 
                             <div className="permissions-section">
