@@ -7177,6 +7177,9 @@
     "title_label": "العنوان",
     "total_opportunities": "إجمالي الفرص",
     "user": "المستخدم",
-    "value": "القيمة"
+    "value": "القيمة",
+    "tab_overview": "نظرة عامة",
+    "tab_opportunities": "الفرص",
+    "tab_tickets": "تذاكر الدعم"
   }
 }

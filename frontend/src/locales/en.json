@@ -7143,6 +7143,9 @@
     "title_label": "Title",
     "total_opportunities": "Total Opportunities",
     "user": "User",
-    "value": "Value"
+    "value": "Value",
+    "tab_overview": "Overview",
+    "tab_opportunities": "Opportunities",
+    "tab_tickets": "Support Tickets"
   }
 }
