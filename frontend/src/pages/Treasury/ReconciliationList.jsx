@@ -5,6 +5,7 @@ import { Plus, Landmark, Trash2, CheckCircle, Clock, FileText } from 'lucide-rea
 import { treasuryAPI, reconciliationAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 const ReconciliationList = () => {
     const { t, i18n } = useTranslation();
@@ -85,6 +86,7 @@ const ReconciliationList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="d-flex justify-content-between align-items-center">
                     <div>
                         <h1 className="workspace-title">{t('treasury.reconciliation.title')}</h1>

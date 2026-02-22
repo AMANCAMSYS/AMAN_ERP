@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 const SalesReturnForm = () => {
@@ -260,6 +261,7 @@ const SalesReturnForm = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">↩️ {t('sales.returns.form.create_title')}</h1>
                 </div>

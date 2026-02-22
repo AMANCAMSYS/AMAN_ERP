@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import BackButton from '../../components/common/BackButton';
 
 function CustomerForm() {
     const { t } = useTranslation()
@@ -54,6 +55,7 @@ function CustomerForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{t('sales.customers.form.create_title')}</h1>
                 <p className="workspace-subtitle">{t('sales.customers.form.create_subtitle')}</p>
             </div>

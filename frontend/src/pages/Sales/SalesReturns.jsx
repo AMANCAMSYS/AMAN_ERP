@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { formatShortDate } from '../../utils/dateUtils';
 import { useBranch } from '../../context/BranchContext';
+import BackButton from '../../components/common/BackButton';
 
 const SalesReturns = () => {
     const { t } = useTranslation();
@@ -32,6 +33,7 @@ const SalesReturns = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">↩️ {t('sales.returns.title')}</h1>
                     <p className="workspace-subtitle">{t('sales.returns.subtitle')}</p>

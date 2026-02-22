@@ -6,6 +6,7 @@ import { formatNumber, getStep } from '../../utils/format'
 import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
+import BackButton from '../../components/common/BackButton';
 
 function ContractForm() {
     const { t } = useTranslation()
@@ -137,6 +138,7 @@ function ContractForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{id ? t("sales.contracts.form.edit") : t("sales.contracts.form.create")}</h1>
             </div>
 

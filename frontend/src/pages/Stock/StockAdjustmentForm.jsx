@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, AlertCircle, Trash2 } from 'lucide-react';
+import { Save, AlertCircle, Trash2 } from 'lucide-react';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
+import BackButton from '../../components/common/BackButton';
 
 const StockAdjustmentForm = () => {
     const { t } = useTranslation();
@@ -76,9 +77,7 @@ const StockAdjustmentForm = () => {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate('/stock/adjustments')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('stock.adjustments.form.title')}</h1>
                             <p className="workspace-subtitle">{t('stock.adjustments.form.subtitle')}</p>

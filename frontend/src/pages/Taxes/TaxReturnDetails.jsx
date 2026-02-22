@@ -7,6 +7,7 @@ import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function TaxReturnDetails() {
     const { t } = useTranslation()
@@ -122,6 +123,7 @@ function TaxReturnDetails() {
         <div className="workspace fade-in">
             {/* Header */}
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
                         <h1 className="workspace-title">📋 {t('taxes.return_details')}</h1>

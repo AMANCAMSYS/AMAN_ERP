@@ -7,6 +7,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function PaymentForm() {
@@ -330,6 +331,7 @@ function PaymentForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{formData.voucher_type === 'payment' ? t('buying.payments.form.create_title') : t('buying.payments.form.create_refund_title')}</h1>
                 <p className="workspace-subtitle">{formData.voucher_type === 'payment' ? t('buying.payments.form.create_subtitle') : t('buying.payments.form.create_refund_subtitle')}</p>
             </div>

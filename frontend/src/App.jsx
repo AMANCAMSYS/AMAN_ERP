@@ -233,6 +233,11 @@ const SupportTickets = React.lazy(() => import('./pages/CRM/SupportTickets'))
 const MarketingCampaigns = React.lazy(() => import('./pages/CRM/MarketingCampaigns'))
 const KnowledgeBase = React.lazy(() => import('./pages/CRM/KnowledgeBase'))
 
+// Services
+const ServicesHome = React.lazy(() => import('./pages/Services/ServicesHome'))
+const ServiceRequests = React.lazy(() => import('./pages/Services/ServiceRequests'))
+const DocumentManagement = React.lazy(() => import('./pages/Services/DocumentManagement'))
+
 // Common & Settings
 const CompanySettings = React.lazy(() => import('./pages/Settings/CompanySettings'))
 const Branches = React.lazy(() => import('./pages/Settings/Branches'))
@@ -536,6 +541,11 @@ function App() {
                 <Route path="/crm/tickets" element={<PrivateRoute permission="sales.view"><SupportTickets /></PrivateRoute>} />
                 <Route path="/crm/campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
                 <Route path="/crm/knowledge-base" element={<PrivateRoute permission="sales.view"><KnowledgeBase /></PrivateRoute>} />
+
+                {/* Services Routes */}
+                <Route path="/services" element={<PrivateRoute permission="services.view"><ServicesHome /></PrivateRoute>} />
+                <Route path="/services/requests" element={<PrivateRoute permission="services.view"><ServiceRequests /></PrivateRoute>} />
+                <Route path="/services/documents" element={<PrivateRoute permission="services.view"><DocumentManagement /></PrivateRoute>} />
 
                 <Route path="/settings" element={<PrivateRoute permission="settings.view"><CompanySettings /></PrivateRoute>} />
                 <Route path="/settings/branches" element={<PrivateRoute permission="branches.view"><Branches /></PrivateRoute>} />

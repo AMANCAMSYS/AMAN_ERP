@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const IncomingShipments = () => {
     const { t, i18n } = useTranslation();
@@ -58,6 +59,7 @@ const IncomingShipments = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📥 {t('stock.shipments.incoming_page.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.shipments.incoming_page.subtitle')}</p>

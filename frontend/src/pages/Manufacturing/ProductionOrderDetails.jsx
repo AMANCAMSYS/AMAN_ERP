@@ -8,6 +8,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
 import SimpleModal from '../../components/common/SimpleModal'
 import '../../components/ModuleStyles.css'
+import BackButton from '../../components/common/BackButton';
 
 export default function ProductionOrderDetails() {
     const { t, i18n } = useTranslation()
@@ -127,13 +128,7 @@ export default function ProductionOrderDetails() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button
-                            onClick={() => navigate('/manufacturing/orders')}
-                            className="table-action-btn"
-                            style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            {isRTL ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <span style={{ padding: '8px', borderRadius: '12px', background: '#fff8e1' }}>

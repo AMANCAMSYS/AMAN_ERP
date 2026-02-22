@@ -7,7 +7,8 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import { toInputDate } from '../../utils/dateUtils';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
-import { ArrowLeft, Save, Building, DollarSign, Calendar, Hash, Briefcase, MapPin } from 'lucide-react';
+import { Save, Building, DollarSign, Calendar, Hash, Briefcase, MapPin } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 
 const AssetForm = () => {
     const { t, i18n } = useTranslation();
@@ -84,13 +85,7 @@ const AssetForm = () => {
             <div className="workspace-header mb-4">
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div className="d-flex align-items-center gap-3">
-                        <button
-                            className="btn-icon bg-white shadow-sm border rounded-circle"
-                            onClick={() => navigate('/assets')}
-                            title={t('common.back')}
-                        >
-                            <ArrowLeft size={20} style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title h3 mb-1 fw-bold">
                                 {isEdit ? t('assets.edit', 'Edit Asset') : t('assets.new', 'New Fixed Asset')}

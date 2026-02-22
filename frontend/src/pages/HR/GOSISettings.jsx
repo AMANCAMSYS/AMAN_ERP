@@ -4,6 +4,7 @@ import { hrAdvancedAPI } from '../../utils/api';
 import { Save, Calculator, Shield } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const GOSISettings = () => {
     const { t, i18n } = useTranslation();
@@ -58,6 +59,7 @@ const GOSISettings = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('hr.gosi.social_insurance_gosi')}</h1>
                     <p className="workspace-subtitle">{t('hr.gosi.gosi_settings_and_calculations')}</p>

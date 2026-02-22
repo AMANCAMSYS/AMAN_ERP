@@ -7,6 +7,7 @@ import { Briefcase, Users, Plus, ArrowRight, X, CheckCircle, ExternalLink } from
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const Recruitment = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
@@ -135,6 +136,7 @@ const Recruitment = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-indigo-50 text-indigo-600"><Briefcase size={24} /></span> {t('hr.recruitment_title')}</h1>

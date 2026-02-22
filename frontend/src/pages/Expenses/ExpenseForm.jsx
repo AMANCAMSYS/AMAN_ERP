@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api, { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { Save, ArrowLeft, FileText, CreditCard, FolderOpen } from 'lucide-react';
+import { Save, FileText, CreditCard, FolderOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import BackButton from '../../components/common/BackButton';
 
 export default function ExpenseForm() {
   const { t, i18n } = useTranslation();
@@ -154,9 +155,7 @@ export default function ExpenseForm() {
       <div className="workspace-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button onClick={() => navigate('/expenses')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
-              <ArrowLeft size={20} />
-            </button>
+                        <BackButton />
             <div>
               <h1 className="workspace-title">
                 {isEdit ? t('expenses.editTitle') : t('expenses.newTitle')}

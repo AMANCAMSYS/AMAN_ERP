@@ -5,6 +5,7 @@ import { inventoryAPI, settingsAPI } from '../../utils/api'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
 import { getStep } from '../../utils/format'
+import BackButton from '../../components/common/BackButton';
 
 function ProductForm() {
     const { t } = useTranslation()
@@ -113,6 +114,7 @@ function ProductForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{id ? t('stock.products.form.edit_title') : t('stock.products.form.title')}</h1>
                 <p className="workspace-subtitle">{t('stock.products.form.subtitle')}</p>
             </div>

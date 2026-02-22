@@ -7,7 +7,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group">
-                <label className="form-label" htmlFor="tax_number">{t('settings.company.tax_number') || '{t("settings.financial.tax_number")}'}</label>
+                <label className="form-label" htmlFor="tax_number">{t('settings.company.tax_number')}</label>
                 <input
                     type="text"
                     id="tax_number"
@@ -20,7 +20,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="commercial_registry">{t('settings.company.cr_number') || '{t("settings.financial.commercial_reg")}'}</label>
+                <label className="form-label" htmlFor="commercial_registry">{t('settings.company.cr_number')}</label>
                 <input
                     type="text"
                     id="commercial_registry"
@@ -49,7 +49,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             <div className="divider col-span-2"></div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="vat_enabled">{t('settings.financial.vat_enabled') || '{t("settings.financial.enable_vat")}'}</label>
+                <label className="form-label" htmlFor="vat_enabled">{t('settings.financial.vat_enabled')}</label>
                 <select
                     name="vat_enabled"
                     id="vat_enabled"
@@ -63,7 +63,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="vat_rate">{t('settings.financial.vat_rate') || '{t("settings.financial.tax_rate")}'}</label>
+                <label className="form-label" htmlFor="vat_rate">{t('settings.financial.vat_rate')}</label>
                 <input
                     type="number"
                     name="vat_rate"
@@ -75,7 +75,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="fiscal_year_start">{t('settings.financial.fiscal_year_start') || '{t("settings.financial.fiscal_year_start")}'}</label>
+                <label className="form-label" htmlFor="fiscal_year_start">{t('settings.financial.fiscal_year_start')}</label>
                 <select
                     name="fiscal_year_start"
                     id="fiscal_year_start"
@@ -91,7 +91,7 @@ const FinancialSettings = ({ formData, handleChange, settings, handleSettingChan
             </div>
 
             <div className="form-group">
-                <label className="form-label" htmlFor="decimal_places">{t('settings.financial.decimal_places') || '{t("settings.financial.decimal_places")}'}</label>
+                <label className="form-label" htmlFor="decimal_places">{t('settings.financial.decimal_places')}</label>
                 <select
                     name="decimal_places"
                     id="decimal_places"

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Building } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 const DepartmentList = () => {
     const { t } = useTranslation();
@@ -55,6 +56,7 @@ const DepartmentList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t("hr.departments.title")}</h1>
                     <p className="workspace-subtitle">{t("hr.departments.subtitle")}</p>

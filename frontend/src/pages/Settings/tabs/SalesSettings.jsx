@@ -26,11 +26,11 @@ const SalesSettings = ({ settings, handleSettingChange, currency }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Users size={20} className="text-primary" />
-                    {t('settings.sales.customers_title') || '{t("settings.sales.default_customers")}'}
+                    {t('settings.sales.customers_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.sales.default_customer') || '{t("settings.sales.default_cash_customer")}'}</label>
+                        <label className="form-label">{t('settings.sales.default_customer')}</label>
                         <select
                             className="form-input"
                             value={settings.sales_default_customer || ''}
@@ -42,12 +42,12 @@ const SalesSettings = ({ settings, handleSettingChange, currency }) => {
                             ))}
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.sales.customer_hint') || '{t("settings.sales.cash_customer_note")}'}
+                            {t('settings.sales.customer_hint')}
                         </p>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">{t('settings.sales.default_credit_limit') || '{t("settings.sales.default_credit_limit")}'}</label>
+                        <label className="form-label">{t('settings.sales.default_credit_limit')}</label>
                         <div className="relative">
                             <input
                                 type="number"
@@ -67,11 +67,11 @@ const SalesSettings = ({ settings, handleSettingChange, currency }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Receipt size={20} className="text-primary" />
-                    {t('settings.sales.invoicing_rules') || '{t("settings.sales.billing_rules")}'}
+                    {t('settings.sales.invoicing_rules')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.sales.quotation_expiry') || '{t("settings.sales.quote_validity")}'}</label>
+                        <label className="form-label">{t('settings.sales.quotation_expiry')}</label>
                         <div className="relative">
                             <input
                                 type="number"

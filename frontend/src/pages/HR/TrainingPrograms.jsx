@@ -7,6 +7,7 @@ import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 const TrainingPrograms = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -83,6 +84,7 @@ const TrainingPrograms = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('hr.training.training_programs')}</h1>
                     <p className="workspace-subtitle">{t('hr.training.manage_employee_training_programs')}</p>

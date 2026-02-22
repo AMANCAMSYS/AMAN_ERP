@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
-import { ArrowRight, FileText, Banknote, Calendar, CreditCard, Building } from 'lucide-react'
+import { FileText, Banknote, Calendar, CreditCard, Building } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 export default function CustomerDetails() {
@@ -39,13 +40,7 @@ export default function CustomerDetails() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <button
-                        onClick={() => navigate('/sales/customers')}
-                        className="btn btn-icon"
-                        style={{ background: 'var(--bg-secondary)', width: '40px', height: '40px', borderRadius: '50%' }}
-                    >
-                        <ArrowRight size={20} />
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Building style={{ color: 'var(--primary)' }} size={24} />

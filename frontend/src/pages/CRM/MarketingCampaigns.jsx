@@ -4,6 +4,7 @@ import { crmAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const typeColors = {
     email: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -79,6 +80,7 @@ function MarketingCampaigns() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📢 {t('crm.campaigns_title', 'الحملات التسويقية')}</h1>
                     <p className="workspace-subtitle">{t('crm.campaigns_subtitle', 'إدارة الحملات التسويقية وتتبع الأداء')}</p>

@@ -12,6 +12,7 @@ import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const PayrollDetails = () => {
     const { t, i18n } = useTranslation();
@@ -91,9 +92,7 @@ const PayrollDetails = () => {
             {/* Header */}
             <div className="workspace-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <button className="btn-icon" onClick={() => navigate('/hr/payroll')}>
-                        {isRTL ? <ArrowLeft size={20} style={{ transform: 'rotate(180deg)' }} /> : <ArrowLeft size={20} />}
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title">{period.name}</h1>
                         <div className="workspace-subtitle">

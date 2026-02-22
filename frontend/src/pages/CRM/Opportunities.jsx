@@ -5,6 +5,7 @@ import { crmAPI, salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
+import BackButton from '../../components/common/BackButton';
 
 const stageBadgeStyles = {
     lead: 'badge-info',
@@ -176,6 +177,7 @@ function Opportunities() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{t('crm.opportunities_title')}</h1>
                 <p className="workspace-subtitle">{t('crm.opportunities_desc')}</p>
             </div>

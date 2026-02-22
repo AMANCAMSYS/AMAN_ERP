@@ -5,6 +5,7 @@ import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
+import BackButton from '../../components/common/BackButton';
 
 const SalesReports = () => {
     const { t } = useTranslation();
@@ -182,6 +183,7 @@ const SalesReports = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📊 {t('sales.reports.analytics.title')}</h1>
                     <p className="workspace-subtitle">{t('sales.reports.analytics.subtitle')}</p>

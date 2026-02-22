@@ -200,69 +200,94 @@ function TaxHome() {
             {/* Overview Tab */}
             {activeTab === 'overview' && (
                 <div className="mt-4">
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        {/* Quick Actions */}
+                    {/* Grouped Navigation Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+
+                        {/* Tax Returns */}
                         <div className="card">
-                            <h3 className="section-title">{t('taxes.quick_actions')}</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                                <Link to="/taxes/returns/new" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                📝 {t('taxes.returns_management', 'إدارة الإقرارات')}
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                                <Link to="/taxes/returns/new" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                     📝 {t('taxes.create_return')}
                                 </Link>
-                                <Link to="/accounting/vat-report" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                <button className="btn btn-outline" onClick={() => setActiveTab('returns')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                    📋 {t('taxes.tab_returns')}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Reports & Analysis */}
+                        <div className="card">
+                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                📊 {t('taxes.reports_analysis', 'التقارير والتحليل')}
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                                <Link to="/accounting/vat-report" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                     📊 {t('taxes.vat_report')}
                                 </Link>
-                                <Link to="/accounting/tax-audit" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                <Link to="/accounting/tax-audit" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                     🔍 {t('taxes.audit_report')}
                                 </Link>
-                                <button className="btn btn-outline" onClick={() => setActiveTab('rates')} style={{ textAlign: 'center' }}>
-                                    ⚙️ {t('taxes.manage_rates')}
-                                </button>
-                                <Link to="/taxes/compliance" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                <Link to="/taxes/compliance" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                     🛡️ {t('taxes.tax_compliance')}
-                                </Link>
-                                <Link to="/taxes/wht" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    ✂️ {t('wht.title')}
-                                </Link>
-                                <Link to="/taxes/calendar" className="btn btn-outline" style={{ textAlign: 'center' }}>
-                                    📅 {t('taxes.tax_calendar', 'التقويم الضريبي')}
                                 </Link>
                             </div>
                         </div>
 
-                        {/* Recent Returns */}
+                        {/* Settings & Tools */}
                         <div className="card">
-                            <h3 className="section-title">{t('taxes.recent_returns')}</h3>
-                            {returns.length === 0 ? (
-                                <p className="text-muted mt-3">{t('taxes.no_returns')}</p>
-                            ) : (
-                                <div className="data-table-container mt-3">
-                                    <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>{t('taxes.return_number')}</th>
-                                                <th>{t('taxes.period')}</th>
-                                                <th style={{ textAlign: 'left' }}>{t('taxes.amount')}</th>
-                                                <th>{t('common.status')}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {returns.slice(0, 5).map(r => (
-                                                <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/taxes/returns/${r.id}`)}>
-                                                    <td>
-                                                        <span className="fw-bold" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{r.return_number}</span>
-                                                    </td>
-                                                    <td style={{ whiteSpace: 'nowrap' }}>{r.tax_period}</td>
-                                                    <td style={{ textAlign: 'left', fontWeight: '700', whiteSpace: 'nowrap' }}>
-                                                        {formatNumber(r.total_amount)} <span className="text-muted fw-normal small">{currency}</span>
-                                                    </td>
-                                                    <td>{getStatusBadge(r.status)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                ⚙️ {t('taxes.settings_tools', 'الإعدادات والأدوات')}
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                                <button className="btn btn-outline" onClick={() => setActiveTab('rates')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                    ⚙️ {t('taxes.manage_rates')}
+                                </button>
+                                <Link to="/taxes/wht" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                    ✂️ {t('wht.title')}
+                                </Link>
+                                <Link to="/taxes/calendar" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                    📅 {t('taxes.tax_calendar', 'التقويم الضريبي')}
+                                </Link>
+                            </div>
                         </div>
+                    </div>
+
+                    {/* Recent Returns Table */}
+                    <div className="card">
+                        <h3 className="section-title">{t('taxes.recent_returns')}</h3>
+                        {returns.length === 0 ? (
+                            <p className="text-muted mt-3">{t('taxes.no_returns')}</p>
+                        ) : (
+                            <div className="data-table-container mt-3">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('taxes.return_number')}</th>
+                                            <th>{t('taxes.period')}</th>
+                                            <th style={{ textAlign: 'left' }}>{t('taxes.amount')}</th>
+                                            <th>{t('common.status')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {returns.slice(0, 5).map(r => (
+                                            <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/taxes/returns/${r.id}`)}>
+                                                <td>
+                                                    <span className="fw-bold" style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{r.return_number}</span>
+                                                </td>
+                                                <td style={{ whiteSpace: 'nowrap' }}>{r.tax_period}</td>
+                                                <td style={{ textAlign: 'left', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                                                    {formatNumber(r.total_amount)} <span className="text-muted fw-normal small">{currency}</span>
+                                                </td>
+                                                <td>{getStatusBadge(r.status)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

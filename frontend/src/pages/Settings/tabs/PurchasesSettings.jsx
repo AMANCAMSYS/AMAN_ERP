@@ -25,17 +25,17 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Calendar size={20} className="text-primary" />
-                    {t('settings.purchases.terms_title') || '{t("settings.purchases.payment_terms")}'}
+                    {t('settings.purchases.terms_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.purchases.default_payment_term') || '{t("settings.purchases.default_payment_period")}'}</label>
+                        <label className="form-label">{t('settings.purchases.default_payment_term')}</label>
                         <select
                             className="form-input"
                             value={settings.purchases_payment_term || '30'}
                             onChange={(e) => handleSettingChange('purchases_payment_term', e.target.value)}
                         >
-                            <option value="0">{t('common.immediate') || '{t("settings.purchases.cash_payment")}'}</option>
+                            <option value="0">{t('common.immediate')}</option>
                             <option value="15">15 {t('common.days')}</option>
                             <option value="30">30 {t('common.days')}</option>
                             <option value="45">45 {t('common.days')}</option>
@@ -43,7 +43,7 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
                             <option value="90">90 {t('common.days')}</option>
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.purchases.term_hint') || '{t("settings.purchases.payment_period_note")}'}
+                            {t('settings.purchases.term_hint')}
                         </p>
                     </div>
                 </div>
@@ -53,11 +53,11 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Truck size={20} className="text-primary" />
-                    {t('settings.purchases.defaults_title') || '{t("settings.purchases.po_settings")}'}
+                    {t('settings.purchases.defaults_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.purchases.default_supplier') || '{t("settings.purchases.default_supplier")}'}</label>
+                        <label className="form-label">{t('settings.purchases.default_supplier')}</label>
                         <div className="relative">
                             <select
                                 className="form-select"
@@ -84,7 +84,7 @@ const PurchasesSettings = ({ settings, handleSettingChange, currency }) => {
                             onChange={(e) => handleSettingChange('purchases_auto_approve', e.target.checked.toString())}
                         />
                         <label className="cursor-pointer font-medium" htmlFor="purchases_auto_approve">
-                            {t('settings.purchases.auto_approve') || '{t("settings.purchases.auto_approve_small")}'}
+                            {t('settings.purchases.auto_approve')}
                         </label>
                     </div>
                 </div>

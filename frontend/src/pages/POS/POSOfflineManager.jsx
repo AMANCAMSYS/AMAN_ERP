@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { posAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 /**
  * POS-001: Offline Mode + Auto Sync
@@ -142,6 +143,7 @@ function POSOfflineManager() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📡 {t('pos.offline.title', 'وضع العمل بدون إنترنت')}</h1>
                     <p className="workspace-subtitle">{t('pos.offline.subtitle', 'إدارة الطلبات المعلقة والمزامنة التلقائية')}</p>

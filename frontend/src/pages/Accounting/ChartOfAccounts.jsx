@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import CurrencySelector from '../../components/common/CurrencySelector'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function ChartOfAccounts() {
     const { t } = useTranslation()
@@ -230,6 +231,7 @@ function ChartOfAccounts() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('accounting.coa.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.coa.subtitle')}</p>

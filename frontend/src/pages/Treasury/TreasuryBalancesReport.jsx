@@ -4,6 +4,7 @@ import { useBranch } from '../../context/BranchContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { treasuryAPI } from '../../utils/api';
+import BackButton from '../../components/common/BackButton';
 
 function TreasuryBalancesReport() {
     const { t, i18n } = useTranslation();
@@ -37,6 +38,7 @@ function TreasuryBalancesReport() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🏦 {t('treasury_reports.balances.title')}</h1>
                     <p className="workspace-subtitle">{t('treasury_reports.balances.subtitle')}</p>

@@ -6,6 +6,7 @@ import {
     FaLayerGroup, FaPlus, FaEdit, FaTrash, FaTimesCircle, FaBoxes, FaPercentage
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const BOMs = () => {
     const { t } = useTranslation();
@@ -194,6 +195,7 @@ const BOMs = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title flex items-center gap-2">
                         <FaLayerGroup /> {t('manufacturing.bom_title')}

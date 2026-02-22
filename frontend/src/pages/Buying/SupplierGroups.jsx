@@ -4,6 +4,7 @@ import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function SupplierGroups() {
     const { t } = useTranslation()
@@ -108,6 +109,7 @@ function SupplierGroups() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📁 {t('buying.supplier_groups.title')}</h1>
                     <p className="workspace-subtitle">{t('buying.supplier_groups.subtitle')}</p>

@@ -11,20 +11,20 @@ const POSSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Printer size={20} className="text-primary" />
-                    {t('settings.pos.printing_title') || '{t("settings.pos.print_settings")}'}
+                    {t('settings.pos.printing_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.pos.default_printer') || '{t("settings.pos.default_printer")}'}</label>
+                        <label className="form-label">{t('settings.pos.default_printer')}</label>
                         <select
                             className="form-input"
                             value={settings.pos_default_printer || 'system_default'}
                             onChange={(e) => handleSettingChange('pos_default_printer', e.target.value)}
                         >
-                            <option value="system_default">{t('settings.pos.system_default') || '{t("settings.pos.system_printer")}'}</option>
-                            <option value="thermal_80">{t('settings.pos.thermal_80') || '{t("settings.pos.thermal_80")}'}</option>
-                            <option value="thermal_58">{t('settings.pos.thermal_58') || '{t("settings.pos.thermal_58")}'}</option>
-                            <option value="a4">{t('settings.pos.printer_a4') || '{t("settings.pos.a4_printer")}'}</option>
+                            <option value="system_default">{t('settings.pos.system_default')}</option>
+                            <option value="thermal_80">{t('settings.pos.thermal_80')}</option>
+                            <option value="thermal_58">{t('settings.pos.thermal_58')}</option>
+                            <option value="a4">{t('settings.pos.printer_a4')}</option>
                         </select>
                     </div>
 
@@ -38,7 +38,7 @@ const POSSettings = ({ settings, handleSettingChange }) => {
                                 onChange={(e) => handleSettingChange('pos_silent_print', e.target.checked.toString())}
                             />
                             <label className="cursor-pointer font-medium" htmlFor="pos_silent_print">
-                                {t('settings.pos.silent_print') || '{t("settings.pos.silent_print")}'}
+                                {t('settings.pos.silent_print')}
                             </label>
                         </div>
 
@@ -53,7 +53,7 @@ const POSSettings = ({ settings, handleSettingChange }) => {
                             <div className="flex items-center gap-2">
                                 <Scissors size={16} className="text-base-content/50" />
                                 <label className="cursor-pointer font-medium" htmlFor="pos_auto_cut">
-                                    {t('settings.pos.auto_cut') || '{t("settings.pos.auto_cut")}'}
+                                    {t('settings.pos.auto_cut')}
                                 </label>
                             </div>
                         </div>
@@ -65,7 +65,7 @@ const POSSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Monitor size={20} className="text-primary" />
-                    {t('settings.pos.behavior_title') || '{t("settings.pos.ui_behavior")}'}
+                    {t('settings.pos.behavior_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
@@ -80,7 +80,7 @@ const POSSettings = ({ settings, handleSettingChange }) => {
                             <div className="flex items-center gap-2">
                                 <Disc size={16} className="text-base-content/50" />
                                 <label className="cursor-pointer font-medium" htmlFor="pos_open_drawer">
-                                    {t('settings.pos.open_drawer') || '{t("settings.pos.auto_cash_drawer")}'}
+                                    {t('settings.pos.open_drawer')}
                                 </label>
                             </div>
                         </div>
@@ -96,21 +96,21 @@ const POSSettings = ({ settings, handleSettingChange }) => {
                             <div className="flex items-center gap-2">
                                 <Keyboard size={16} className="text-base-content/50" />
                                 <label className="cursor-pointer font-medium" htmlFor="pos_onscreen_keyboard">
-                                    {t('settings.pos.onscreen_keyboard') || '{t("settings.pos.touch_keyboard")}'}
+                                    {t('settings.pos.onscreen_keyboard')}
                                 </label>
                             </div>
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">{t('settings.pos.default_payment') || '{t("settings.pos.default_payment")}'}</label>
+                        <label className="form-label">{t('settings.pos.default_payment')}</label>
                         <select
                             className="form-select"
                             value={settings.pos_default_payment || 'cash'}
                             onChange={(e) => handleSettingChange('pos_default_payment', e.target.value)}
                         >
-                            <option value="cash">{t('common.cash') || '{t("settings.pos.cash")}'}</option>
-                            <option value="card">{t('common.card') || '{t("settings.pos.card_mada")}'}</option>
+                            <option value="cash">{t('common.cash')}</option>
+                            <option value="card">{t('common.card')}</option>
                         </select>
                     </div>
                 </div>

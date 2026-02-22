@@ -4,6 +4,7 @@ import { salesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function CustomerGroups() {
     const { t } = useTranslation()
@@ -108,6 +109,7 @@ function CustomerGroups() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📁 {t('sales.groups.title')}</h1>
                     <p className="workspace-subtitle">{t('sales.groups.subtitle')}</p>

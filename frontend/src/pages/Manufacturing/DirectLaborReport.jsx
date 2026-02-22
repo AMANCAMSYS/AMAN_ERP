@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const DirectLaborReport = () => {
     const { t } = useTranslation();
@@ -47,6 +48,7 @@ const DirectLaborReport = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">👷 {t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}</h1>
                     <p className="workspace-subtitle">{t('manufacturing.direct_labor.subtitle', 'تفاصيل ساعات العمل والتكاليف حسب مركز العمل')}</p>

@@ -36,8 +36,25 @@ const ApprovalsPage = () => {
     const [submittingAction, setSubmittingAction] = useState(false);
 
     useEffect(() => {
+        fetchAllOnMount();
+    }, []);
+
+    useEffect(() => {
         fetchData();
     }, [activeTab]);
+
+    const fetchAllOnMount = async () => {
+        try {
+            const [pRes, rRes, wRes] = await Promise.allSettled([
+                api.get('/approvals/pending'),
+                api.get('/approvals/requests'),
+                api.get('/approvals/workflows')
+            ]);
+            if (pRes.status === 'fulfilled') setPendingItems(pRes.value.data.items || []);
+            if (rRes.status === 'fulfilled') setAllRequests(rRes.value.data.items || []);
+            if (wRes.status === 'fulfilled') setWorkflows(wRes.value.data || []);
+        } catch { }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -113,53 +130,61 @@ const ApprovalsPage = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
-                        <h1 className="workspace-title">{t('approvals.title')}</h1>
-                        <p className="workspace-subtitle">
-                            {activeTab === 'pending' ? t('approvals.pending_actions') :
-                                activeTab === 'requests' ? t('approvals.all_requests') :
-                                    t('approvals.workflows')}
-                        </p>
+                        <h1 className="workspace-title">✅ {t('approvals.title')}</h1>
+                        <p className="workspace-subtitle">{t('approvals.pending_actions')}</p>
                     </div>
-                    {activeTab === 'workflows' && canCreate && (
-                        <button
-                            onClick={() => navigate('/approvals/new')}
-                            className="btn btn-primary shadow-lg"
-                        >
-                            <Plus size={20} />
-                            {t('approvals.create_workflow')}
-                        </button>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        {canCreate && (
+                            <button onClick={() => navigate('/approvals/new')} className="btn btn-primary">
+                                <Plus size={18} />
+                                {t('approvals.create_workflow')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Metrics */}
+            <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                <div className="metric-card" style={{ cursor: 'pointer', borderColor: activeTab === 'pending' ? 'var(--primary)' : undefined }} onClick={() => setActiveTab('pending')}>
+                    <div className="metric-label">⏳ {t('approvals.pending_actions')}</div>
+                    <div className="metric-value text-warning">{loading && activeTab === 'pending' ? '...' : pendingItems.length}</div>
+                    <div className="metric-change">{t('approvals.table.requires_action', 'يتطلب إجراء')}</div>
+                </div>
+                <div className="metric-card" style={{ cursor: 'pointer', borderColor: activeTab === 'requests' ? 'var(--primary)' : undefined }} onClick={() => setActiveTab('requests')}>
+                    <div className="metric-label">📋 {t('approvals.all_requests')}</div>
+                    <div className="metric-value text-primary">{loading && activeTab === 'requests' ? '...' : allRequests.length}</div>
+                    <div className="metric-change">{t('approvals.table.total_requests', 'جميع الطلبات')}</div>
+                </div>
+                <div className="metric-card" style={{ cursor: 'pointer', borderColor: activeTab === 'workflows' ? 'var(--primary)' : undefined }} onClick={() => setActiveTab('workflows')}>
+                    <div className="metric-label">⚙️ {t('approvals.workflows')}</div>
+                    <div className="metric-value">{loading && activeTab === 'workflows' ? '...' : workflows.length}</div>
+                    <div className="metric-change">{t('approvals.table.configured', 'تدفقات معرّفة')}</div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="card p-1 mb-6" style={{ width: 'fit-content', borderRadius: '12px' }}>
-                <div className="tabs tabs-boxed bg-transparent">
-                    <button
-                        className={`tab tab-md px-6 ${activeTab === 'pending' ? 'tab-active bg-primary text-white' : ''}`}
-                        onClick={() => setActiveTab('pending')}
-                    >
-                        {t('approvals.pending_actions')}
-                        {pendingItems.length > 0 && <span className="badge badge-sm ml-2 bg-white text-primary border-none font-bold">{pendingItems.length}</span>}
-                    </button>
-                    <button
-                        className={`tab tab-md px-6 ${activeTab === 'requests' ? 'tab-active bg-primary text-white' : ''}`}
-                        onClick={() => setActiveTab('requests')}
-                    >
-                        {t('approvals.all_requests')}
-                    </button>
-                    <button
-                        className={`tab tab-md px-6 ${activeTab === 'workflows' ? 'tab-active bg-primary text-white' : ''}`}
-                        onClick={() => setActiveTab('workflows')}
-                    >
-                        {t('approvals.workflows')}
-                    </button>
-                </div>
+            <div className="tabs mt-4">
+                <button className={`tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+                    {t('approvals.pending_actions')}
+                    {pendingItems.length > 0 && (
+                        <span style={{ background: 'var(--error)', color: '#fff', borderRadius: '12px', padding: '1px 7px', fontSize: '11px', fontWeight: '700', marginInlineStart: '6px' }}>
+                            {pendingItems.length}
+                        </span>
+                    )}
+                </button>
+                <button className={`tab ${activeTab === 'requests' ? 'active' : ''}`} onClick={() => setActiveTab('requests')}>
+                    {t('approvals.all_requests')}
+                </button>
+                <button className={`tab ${activeTab === 'workflows' ? 'active' : ''}`} onClick={() => setActiveTab('workflows')}>
+                    {t('approvals.workflows')}
+                </button>
             </div>
 
             {/* Content Container */}
+            <div className="card mt-4">
             <div className="data-table-container">
                 {loading ? (
                     <div className="flex justify-center items-center py-20">
@@ -338,6 +363,7 @@ const ApprovalsPage = () => {
                         )}
                     </>
                 )}
+            </div>
             </div>
 
             {/* Action Modal */}

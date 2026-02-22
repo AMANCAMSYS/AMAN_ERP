@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 const NotesReceivable = () => {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
@@ -104,6 +105,7 @@ const NotesReceivable = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📜 أوراق القبض</h1>
                     <p className="workspace-subtitle">إدارة وتتبع أوراق القبض (الكمبيالات / السندات لأمر)</p>

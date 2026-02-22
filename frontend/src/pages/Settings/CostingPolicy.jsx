@@ -17,6 +17,7 @@ import api from '../../utils/api';
 import { costingPolicyAPI, branchesAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
+import BackButton from '../../components/common/BackButton';
 
 const CostingPolicy = () => {
     const { t } = useTranslation();
@@ -154,14 +155,15 @@ const CostingPolicy = () => {
     return (
         <div className="workspace fade-in" dir="rtl">
             <div className="workspace-header">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h1 className="workspace-title flex items-center gap-2">
-                            <Database className="w-8 h-8 text-primary" style={{ color: 'var(--primary)' }} />
-                            {t('settings.costing.title')}
-                        </h1>
-                        <p className="workspace-subtitle">{t('settings.costing.subtitle')}</p>
-                    </div>
+                <BackButton />
+                <div className="header-title">
+                    <h1 className="workspace-title flex items-center gap-2">
+                        <Database className="w-8 h-8 text-primary" style={{ color: 'var(--primary)' }} />
+                        {t('settings.costing.title')}
+                    </h1>
+                    <p className="workspace-subtitle">{t('settings.costing.subtitle')}</p>
+                </div>
+                <div className="header-actions">
                     <div className={`badge ${currentPolicy?.is_active ? 'badge-success' : 'badge-secondary'}`} style={{ fontSize: '16px', padding: '8px 16px' }}>
                         {t('settings.costing.current_policy')}: {currentPolicy?.policy_name || t('settings.costing.not_set')}
                     </div>

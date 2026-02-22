@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportSharingAPI } from '../../services/reports';
 import { useToast } from '../../context/ToastContext';
+import BackButton from '../../components/common/BackButton';
 
 const SharedReports = () => {
     const { t } = useTranslation();
@@ -29,6 +30,7 @@ const SharedReports = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🔗 {t('reports.sharing.shared_with_me', 'Shared With Me')}</h1>
                     <p className="workspace-subtitle">

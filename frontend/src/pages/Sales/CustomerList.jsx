@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'
 import Pagination, { usePagination } from '../../components/common/Pagination'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function CustomerList() {
@@ -41,6 +42,7 @@ function CustomerList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('sales.customers.title')}</h1>

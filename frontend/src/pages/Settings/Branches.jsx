@@ -7,6 +7,7 @@ import { Plus, Edit, Trash, MapPin, CheckCircle, XCircle, Globe, Banknote } from
 import { hasPermission } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../index.css';
+import BackButton from '../../components/common/BackButton';
 
 const COUNTRIES = [
     { code: 'SA', name: 'المملكة العربية السعودية', name_en: 'Saudi Arabia', currency: 'SAR', currencyName: 'ريال سعودي', flag: '🇸🇦' },
@@ -123,6 +124,7 @@ const Branches = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🏢 {t('branches.title')}</h1>
                     <p className="workspace-subtitle">{t('branches.subtitle')}</p>

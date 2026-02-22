@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { TrendingUp, BarChart3, Plus, GitCompareArrows } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const BudgetAdvanced = () => {
     const { t, i18n } = useTranslation();
@@ -67,6 +68,7 @@ const BudgetAdvanced = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-amber-50 text-amber-600"><BarChart3 size={24} /></span> {t('budget.advanced_title')}</h1>

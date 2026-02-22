@@ -6,6 +6,7 @@ import {
     FaRoute, FaPlus, FaEdit, FaTrash, FaTimesCircle, FaCogs, FaClock, FaListOl
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const Routings = () => {
     const { t } = useTranslation();
@@ -142,6 +143,7 @@ const Routings = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title flex items-center gap-2">
                         <FaRoute /> {t('manufacturing.routings')}

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 /**
  * POS-002: Thermal Printing Support
@@ -166,6 +167,7 @@ function ThermalPrintSettings() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🖨️ {t('pos.thermal.title', 'إعدادات الطباعة الحرارية')}</h1>
                     <p className="workspace-subtitle">{t('pos.thermal.subtitle', 'تكوين طابعة الإيصالات وشاشة العميل')}</p>

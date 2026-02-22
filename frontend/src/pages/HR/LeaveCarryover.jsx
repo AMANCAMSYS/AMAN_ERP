@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { useBranch } from '../../context/BranchContext';
 import { Calendar, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const LeaveCarryover = () => {
     const { t, i18n } = useTranslation();
@@ -96,6 +97,7 @@ const LeaveCarryover = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-blue-50 text-blue-600"><Calendar size={24} /></span> {t('hr.leave_balance_title')}</h1>

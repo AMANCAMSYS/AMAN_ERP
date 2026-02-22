@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 const ShipmentList = () => {
@@ -54,6 +55,7 @@ const ShipmentList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📦 {t('stock.shipments.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.shipments.subtitle')}</p>

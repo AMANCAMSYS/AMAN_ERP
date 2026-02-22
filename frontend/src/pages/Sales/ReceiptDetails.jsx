@@ -5,7 +5,8 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber } from '../../utils/format'
-import { Printer, ArrowLeft, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
+import { Printer, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
+import BackButton from '../../components/common/BackButton';
 
 function ReceiptDetails() {
     const { t, i18n } = useTranslation();
@@ -46,6 +47,7 @@ function ReceiptDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{voucher.voucher_number}</h1>
@@ -66,10 +68,7 @@ function ReceiptDetails() {
                         <Printer size={18} style={{ marginLeft: '8px' }} />
                         {t('sales.receipts.details.print')}
                     </button>
-                    <button className="btn btn-secondary" onClick={() => navigate('/sales/receipts')}>
-                        <ArrowLeft size={18} style={{ marginLeft: '8px' }} />
-                        {t('sales.receipts.details.back')}
-                    </button>
+
                 </div>
             </div>
 

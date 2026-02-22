@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, ArrowLeft, Search } from 'lucide-react';
+import { Save, Search } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { budgetsAPI, accountingAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
+import BackButton from '../../components/common/BackButton';
 
 const BudgetItems = () => {
     const { t, i18n } = useTranslation();
@@ -114,9 +115,7 @@ const BudgetItems = () => {
         <div className="workspace fade-in">
             <div className="workspace-header mb-4">
                 <div className="d-flex align-items-center gap-3">
-                    <button onClick={() => navigate('/accounting/budgets')} className="btn-icon">
-                        <ArrowLeft size={20} />
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title mb-0">{t('accounting.budgets.items', 'Budget Items')}</h1>
                     </div>

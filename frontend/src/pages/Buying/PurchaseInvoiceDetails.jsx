@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber, formatCurrency } from '../../utils/format'
 import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileText, User } from 'lucide-react'
+import BackButton from '../../components/common/BackButton';
 
 function PurchaseInvoiceDetails() {
     const { t, i18n } = useTranslation()
@@ -61,6 +62,7 @@ function PurchaseInvoiceDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{invoice.invoice_number}</h1>

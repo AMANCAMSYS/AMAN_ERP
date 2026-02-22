@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const ProjectFinancialsReport = () => {
     const { t } = useTranslation();
@@ -39,6 +40,7 @@ const ProjectFinancialsReport = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">💰 {t('projects.reports.financials_title', 'ماليات المشاريع')}</h1>
                     <p className="workspace-subtitle">{t('projects.reports.financials_subtitle', 'تحليل الربحية والتكاليف لكل مشروع')}</p>

@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function ReceiptForm() {
@@ -273,6 +274,7 @@ function ReceiptForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">
                     {formData.voucher_type === 'receipt' ? t('sales.receipts.form.create_title') : t('sales.payments.form.create_title')}
                 </h1>

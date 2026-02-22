@@ -31,7 +31,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
                 value={settings[settingKey] || ''}
                 onChange={(e) => handleSettingChange(settingKey, e.target.value)}
             >
-                <option value="">— اختر حساباً —</option>
+                <option value="">{t('common.select_account')}</option>
                 {accounts.map(acc => (
                     <option key={acc.id} value={acc.id.toString()}>
                         {acc.account_number} - {acc.name}

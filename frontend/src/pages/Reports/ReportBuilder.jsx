@@ -10,6 +10,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 export default function ReportBuilder() {
     const { t, i18n } = useTranslation();
@@ -144,9 +145,7 @@ export default function ReportBuilder() {
             <div className="workspace-header">
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div className="d-flex align-items-center gap-3">
-                        <button className="btn btn-icon btn-light" onClick={() => navigate('/reports')}>
-                            <ArrowRight size={20} style={{ transform: isRTL ? 'none' : 'scaleX(-1)' }} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title mb-0">{t('reports.builder_title')}</h1>
                             <p className="workspace-subtitle mb-0">{t('reports.builder_subtitle')}</p>

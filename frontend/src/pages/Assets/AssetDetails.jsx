@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { assetsAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { ArrowLeft, Trash2, Calendar, DollarSign, Activity, FileText } from 'lucide-react';
+import { Trash2, Calendar, DollarSign, Activity, FileText } from 'lucide-react';
 import { getCurrency } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const AssetDetails = () => {
     const { t, i18n } = useTranslation();
@@ -68,9 +69,7 @@ const AssetDetails = () => {
             <div className="workspace-header">
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div className="d-flex align-items-center gap-3">
-                        <button className="btn-icon bg-white shadow-sm border" onClick={() => navigate('/assets')}>
-                            {isRTL ? <ArrowLeft size={20} style={{ transform: 'rotate(180deg)' }} /> : <ArrowLeft size={20} />}
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title text-primary">{asset.name}</h1>
                             <p className="workspace-subtitle text-muted fw-medium">

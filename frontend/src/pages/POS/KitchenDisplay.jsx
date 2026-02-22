@@ -4,6 +4,7 @@ import { posAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { ChefHat, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const KitchenDisplay = () => {
     const { t, i18n } = useTranslation();
@@ -38,6 +39,7 @@ const KitchenDisplay = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-red-50 text-red-600"><ChefHat size={24} /></span> {t('pos.kitchen_title')}</h1>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
+import BackButton from '../../components/common/BackButton';
 
 const StockReports = () => {
     const { t } = useTranslation();
@@ -46,6 +47,7 @@ const StockReports = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('stock.reports.balance.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.reports.balance.subtitle')}</p>

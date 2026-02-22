@@ -6,6 +6,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const PerformanceReviews = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -64,6 +65,7 @@ const PerformanceReviews = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('hr.performance.performance_reviews')}</h1>
                     <p className="workspace-subtitle">{t('hr.performance.employee_performance_evaluations')}</p>

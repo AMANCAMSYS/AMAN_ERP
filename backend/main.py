@@ -55,7 +55,7 @@ from routers import hr, manufacturing
 from routers import projects, reports, scheduled_reports, dashboard
 
 # ── Commerce & External ────────────────────────────────────────────────────────
-from routers import pos, contracts, crm, external
+from routers import pos, contracts, crm, external, services
 
 logging.basicConfig(
     level=logging.INFO,
@@ -380,6 +380,7 @@ app.include_router(pos.router, prefix="/api")
 app.include_router(contracts.router, prefix="/api")
 app.include_router(crm.router, prefix="/api")
 app.include_router(external.router, prefix="/api")
+app.include_router(services.router, prefix="/api")
 
 
 @app.get("/")

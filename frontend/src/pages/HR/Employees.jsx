@@ -13,6 +13,7 @@ import Pagination, { usePagination } from '../../components/common/Pagination';
 import '../../index.css';
 
 import { useLocation } from 'react-router-dom';
+import BackButton from '../../components/common/BackButton';
 
 const Employees = () => {
     const { t } = useTranslation();
@@ -181,6 +182,7 @@ const Employees = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t("hr.employees.title")}</h1>
                     <p className="workspace-subtitle">{t("hr.employees.subtitle")}</p>

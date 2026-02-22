@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { Printer, ArrowLeft, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
+import BackButton from '../../components/common/BackButton';
 
 function PaymentDetails() {
     const { t, i18n } = useTranslation()
@@ -39,6 +40,7 @@ function PaymentDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{payment.voucher_number}</h1>

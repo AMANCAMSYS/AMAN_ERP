@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { Plus, ArrowRightLeft, CheckCircle, RefreshCw, Shield, Wrench, QrCode } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const AssetManagement = () => {
     const { t, i18n } = useTranslation();
@@ -63,6 +64,7 @@ const AssetManagement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-violet-50 text-violet-600"><ArrowRightLeft size={24} /></span> {t('assets.management_title')}</h1>

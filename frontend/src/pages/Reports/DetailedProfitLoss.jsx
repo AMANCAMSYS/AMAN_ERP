@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import BackButton from '../../components/common/BackButton';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -82,6 +83,7 @@ const DetailedProfitLoss = () => {
         <div className="workspace fade-in">
             {/* Header */}
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📊 {t('reports.detailed_pl.title')}</h1>
                     <p className="workspace-subtitle">

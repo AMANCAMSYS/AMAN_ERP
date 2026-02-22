@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, Trash2, X, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
 import { costCentersAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import { useNavigate } from 'react-router-dom';
+import BackButton from '../../../components/common/BackButton';
 
 const CostCenterList = () => {
     const { t } = useTranslation();
@@ -98,9 +99,7 @@ const CostCenterList = () => {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate('/accounting')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('cost_centers.title')}</h1>
                             <p className="workspace-subtitle">{t('cost_centers.subtitle')}</p>

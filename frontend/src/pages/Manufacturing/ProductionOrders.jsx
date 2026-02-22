@@ -10,6 +10,7 @@ import {
 import DateInput from '../../components/common/DateInput';
 import '../../components/ModuleStyles.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const ProductionOrders = () => {
     const { t } = useTranslation();
@@ -145,6 +146,7 @@ const ProductionOrders = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title flex items-center gap-2">
                         <FaClipboardList /> {t('manufacturing.production_orders')}

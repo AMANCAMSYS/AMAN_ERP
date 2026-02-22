@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const ResourceUtilizationReport = () => {
     const { t } = useTranslation();
@@ -50,6 +51,7 @@ const ResourceUtilizationReport = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">👥 {t('projects.reports.resources_title', 'استغلال الموارد')}</h1>
                     <p className="workspace-subtitle">{t('projects.reports.resources_subtitle', 'تتبع توزيع الموظفين وأعباء العمل عبر المشاريع')}</p>

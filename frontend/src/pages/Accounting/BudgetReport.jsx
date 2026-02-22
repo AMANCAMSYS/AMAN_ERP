@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { } from 'lucide-react'
 import { budgetsAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import { toInputDate } from '../../utils/dateUtils'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 function BudgetReport() {
     const { t, i18n } = useTranslation()
@@ -77,9 +78,7 @@ function BudgetReport() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate('/accounting/budgets')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('reports.budget_vs_actual.title')}</h1>
                         </div>

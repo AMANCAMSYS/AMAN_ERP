@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 /**
  * POS-005: Customer Display + Cash Drawer Control
@@ -124,6 +125,7 @@ function CustomerDisplay() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📺 {t('pos.customer_display.title', 'شاشة العميل ودرج النقود')}</h1>
                     <p className="workspace-subtitle">{t('pos.customer_display.subtitle', 'إعدادات العرض للعميل والتحكم بدرج النقود')}</p>

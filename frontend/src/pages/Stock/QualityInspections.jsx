@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function QualityInspections() {
@@ -178,6 +179,7 @@ function QualityInspections() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">🔬 {t('stock.quality.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.quality.subtitle')}</p>

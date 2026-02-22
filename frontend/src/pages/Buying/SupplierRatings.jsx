@@ -4,6 +4,7 @@ import { purchasesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { Star, Plus } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const SupplierRatings = () => {
     const { t, i18n } = useTranslation();
@@ -43,6 +44,7 @@ const SupplierRatings = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-yellow-50 text-yellow-600"><Star size={24} /></span> {t('buying.ratings_title')}</h1>

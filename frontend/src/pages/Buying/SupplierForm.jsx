@@ -4,6 +4,7 @@ import { inventoryAPI, currenciesAPI, purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
+import BackButton from '../../components/common/BackButton';
 
 function SupplierForm() {
     const { t } = useTranslation()
@@ -96,6 +97,7 @@ function SupplierForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{isEdit ? t('buying.suppliers.form.title_edit') : t('buying.suppliers.form.title_new')}</h1>
             </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
+import BackButton from '../../components/common/BackButton';
 
 function WarehouseDetails() {
     const { t } = useTranslation();
@@ -60,14 +61,13 @@ function WarehouseDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{warehouse.name}</h1>
                         <p className="workspace-subtitle">{t('stock.warehouses.details.code')} {warehouse.code || '-'}</p>
                     </div>
-                    <button className="btn btn-secondary" onClick={() => navigate('/stock/warehouses')}>
-                        {t('common.back_to_list')}
-                    </button>
+
                 </div>
             </div>
 

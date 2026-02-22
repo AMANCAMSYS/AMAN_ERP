@@ -6,6 +6,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const CustodyManagement = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -69,6 +70,7 @@ const CustodyManagement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('hr.custody.custody_management')}</h1>
                     <p className="workspace-subtitle">{t('hr.custody.track_employee_custody_items')}</p>

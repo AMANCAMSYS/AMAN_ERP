@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function GeneralLedger() {
     const { t, i18n } = useTranslation()
@@ -85,6 +86,7 @@ function GeneralLedger() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📚 {t('accounting.general_ledger.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.general_ledger.subtitle')}</p>

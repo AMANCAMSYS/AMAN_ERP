@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber, getStep } from '../../utils/format'
+import BackButton from '../../components/common/BackButton';
 
 function PurchaseInvoiceForm() {
     const { t } = useTranslation()
@@ -256,6 +257,7 @@ function PurchaseInvoiceForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('buying.purchase_invoices.form.title_new')}</h1>
                     <p className="workspace-subtitle">{t('buying.purchase_invoices.form.subtitle_new')}</p>

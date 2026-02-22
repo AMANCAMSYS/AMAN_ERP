@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
+import BackButton from '../../components/common/BackButton';
 
 function SalesOrderForm() {
     const { t } = useTranslation()
@@ -219,6 +220,7 @@ function SalesOrderForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('sales.orders.form.create_title')}</h1>
                     <p className="workspace-subtitle">{t('sales.orders.form.create_subtitle')}</p>

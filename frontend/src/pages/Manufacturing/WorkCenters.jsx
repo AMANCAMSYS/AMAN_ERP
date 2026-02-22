@@ -6,6 +6,7 @@ import {
     FaIndustry, FaPlus, FaEdit, FaTrash, FaSearch, FaDollarSign, FaClock
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const WorkCenters = () => {
     const { t } = useTranslation();
@@ -109,6 +110,7 @@ const WorkCenters = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title flex items-center gap-2">
                         <FaIndustry /> {t('manufacturing.work_centers')}

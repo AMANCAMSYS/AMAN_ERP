@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function BuyingOrders() {
     const { t, i18n } = useTranslation()
@@ -73,6 +74,7 @@ function BuyingOrders() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('buying.orders.title')}</h1>
                     <p className="workspace-subtitle">{t('buying.orders.subtitle')}</p>

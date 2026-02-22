@@ -5,6 +5,7 @@ import { arSA, enUS } from 'date-fns/locale';
 import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, User, AlertCircle } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
 import './ResourceManagement.css';
+import BackButton from '../../components/common/BackButton';
 
 const ResourceManagement = () => {
     const { t, i18n } = useTranslation();
@@ -58,6 +59,7 @@ const ResourceManagement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('projects.resource_allocation')}</h1>
                     <p className="workspace-subtitle">{t('projects.resource_subtitle')}</p>

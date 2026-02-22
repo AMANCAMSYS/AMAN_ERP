@@ -4,6 +4,7 @@ import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 export default function ClosingEntries() {
     const { t, i18n } = useTranslation()
@@ -63,6 +64,7 @@ export default function ClosingEntries() {
     return (
         <div className="workspace fade-in" dir={i18n.dir()}>
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">🔒 {t('closing.title')}</h1>
                     <p className="workspace-subtitle">

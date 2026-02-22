@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function SupplierPayments() {
@@ -43,6 +44,7 @@ function SupplierPayments() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('buying.payments.title')}</h1>

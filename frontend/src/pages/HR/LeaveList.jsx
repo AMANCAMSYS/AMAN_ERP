@@ -15,6 +15,7 @@ import Pagination, { usePagination } from '../../components/common/Pagination';
 import { formatShortDate } from '../../utils/dateUtils';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const LeaveList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -132,6 +133,7 @@ const LeaveList = () => {
         <div className="workspace fade-in">
             {/* Header */}
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                     <div className="d-flex align-items-center gap-4">
                         <div>

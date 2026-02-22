@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function JournalEntryList() {
     const { t, i18n } = useTranslation()
@@ -96,6 +97,7 @@ function JournalEntryList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">
                         {t('accounting.journal_entries.title')}

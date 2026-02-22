@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ArrowRight, ClipboardList, AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
+import { ClipboardList, AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
 import api from '../../utils/api'
 import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
+import BackButton from '../../components/common/BackButton';
 
 export default function MRPView() {
     const { t, i18n } = useTranslation()
@@ -42,9 +43,7 @@ export default function MRPView() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="d-flex align-items-center gap-3">
-                    <button onClick={() => navigate(-1)} className="btn btn-sm btn-light">
-                        {isRTL ? <ArrowRight size={18} /> : <ArrowLeft size={18} />}
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title">{t('manufacturing.mrp.title')}</h1>
                         <p className="text-muted small">{mrp.plan_name}</p>

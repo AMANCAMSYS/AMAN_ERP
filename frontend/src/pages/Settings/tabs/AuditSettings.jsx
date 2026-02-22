@@ -11,12 +11,12 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Clock size={20} className="text-primary" />
-                    {t('settings.audit.retention_title') || '{t("settings.audit.retention_scope")}'}
+                    {t('settings.audit.retention_title')}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.audit.activity_logs') || '{t("settings.audit.activity_logs")}'}</label>
+                        <label className="form-label">{t('settings.audit.activity_logs')}</label>
                         <select
                             className="form-input"
                             value={settings.audit_retention_days || '365'}
@@ -26,12 +26,12 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
                             <option value="180">180 {t('common.days')}</option>
                             <option value="365">1 {t('common.year')}</option>
                             <option value="1095">3 {t('common.years')}</option>
-                            <option value="forest">10 {t('common.years')}</option>
+                            <option value="3650">10 {t('common.years')}</option>
                         </select>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">{t('settings.audit.login_history') || '{t("settings.audit.login_logs")}'}</label>
+                        <label className="form-label">{t('settings.audit.login_history')}</label>
                         <select
                             className="form-input"
                             value={settings.audit_login_retention || '90'}
@@ -49,7 +49,7 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Shield size={20} className="text-primary" />
-                    {t('settings.audit.level_title') || '{t("settings.audit.detail_level")}'}
+                    {t('settings.audit.level_title')}
                 </h3>
 
                 <div className="space-y-3">
@@ -63,10 +63,10 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
                         />
                         <div>
                             <label className="cursor-pointer font-medium block" htmlFor="audit_log_sensitive">
-                                {t('settings.audit.log_sensitive') || '{t("settings.audit.sensitive_data")}'}
+                                {t('settings.audit.log_sensitive')}
                             </label>
                             <p className="text-xs text-base-content/40 mt-1">
-                                {t('settings.audit.sensitive_hint') || '{t("settings.audit.sensitive_data_desc")}'}
+                                {t('settings.audit.sensitive_hint')}
                             </p>
                         </div>
                     </div>
@@ -80,7 +80,7 @@ const AuditSettings = ({ settings, handleSettingChange }) => {
                             onChange={(e) => handleSettingChange('audit_log_view', e.target.checked.toString())}
                         />
                         <label className="cursor-pointer font-medium" htmlFor="audit_log_view">
-                            {t('settings.audit.log_view') || '{t("settings.audit.view_events")}'}
+                            {t('settings.audit.log_view')}
                         </label>
                     </div>
                 </div>

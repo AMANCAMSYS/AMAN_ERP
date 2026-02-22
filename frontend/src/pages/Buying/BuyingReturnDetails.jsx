@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function BuyingReturnDetails() {
     const { t, i18n } = useTranslation()
@@ -36,6 +37,7 @@ function BuyingReturnDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{t('buying.returns.details.title')} #{invoice.invoice_number}</h1>

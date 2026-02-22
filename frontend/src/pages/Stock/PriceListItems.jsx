@@ -4,6 +4,7 @@ import { inventoryAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 const PriceListItems = () => {
     const { t } = useTranslation();
@@ -70,6 +71,7 @@ const PriceListItems = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('stock.price_lists.edit_prices.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.price_lists.edit_prices.subtitle', { name: listName })}</p>

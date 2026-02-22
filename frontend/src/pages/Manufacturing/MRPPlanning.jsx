@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import { Boxes, Package, ArrowRight, AlertTriangle, CheckCircle, Search } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 export default function MRPPlanning() {
     const { t, i18n } = useTranslation();
@@ -48,6 +49,7 @@ export default function MRPPlanning() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title flex items-center gap-2">
                         <Boxes size={24} className="text-primary" />

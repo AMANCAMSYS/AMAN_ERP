@@ -6,6 +6,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 const EquipmentMaintenance = () => {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('equipment');
@@ -104,6 +105,7 @@ const EquipmentMaintenance = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title flex items-center gap-2">
                         <FaTools /> {t('manufacturing.equipment_maintenance', 'Equipment & Maintenance')}

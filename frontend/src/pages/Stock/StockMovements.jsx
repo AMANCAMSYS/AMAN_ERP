@@ -6,6 +6,7 @@ import { formatShortDate, formatDateTime} from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
 import { Filter, Search, Warehouse, Activity, Calendar } from 'lucide-react';
 import { useBranch } from '../../context/BranchContext';
+import BackButton from '../../components/common/BackButton';
 
 const StockMovements = () => {
     const { t, i18n } = useTranslation();
@@ -91,6 +92,7 @@ const StockMovements = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('stock.reports.movements.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.reports.movements.subtitle')}</p>

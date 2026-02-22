@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Save, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { accountingAPI, costCentersAPI } from '../../utils/api';
@@ -9,6 +9,7 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import CurrencySelector from '../../components/common/CurrencySelector';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import BackButton from '../../components/common/BackButton';
 const JournalEntryForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -130,9 +131,7 @@ const JournalEntryForm = () => {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate(-1)} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('accounting.home.links.journal_entry')}</h1>
                             <p className="workspace-subtitle">{t('accounting.journal.subtitle')}</p>

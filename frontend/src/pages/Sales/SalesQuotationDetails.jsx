@@ -4,6 +4,7 @@ import { salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function SalesQuotationDetails() {
@@ -37,6 +38,7 @@ function SalesQuotationDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{t('sales.quotations.details.title')}: {quotation.sq_number}</h1>

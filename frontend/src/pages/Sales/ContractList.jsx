@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
+import BackButton from '../../components/common/BackButton';
 
 function ContractList() {
     const { t } = useTranslation()
@@ -44,6 +45,7 @@ function ContractList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('sales.contracts.title')}</h1>

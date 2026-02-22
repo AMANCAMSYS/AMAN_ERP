@@ -6,6 +6,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import Pagination, { usePagination } from '../../components/common/Pagination'
+import BackButton from '../../components/common/BackButton';
 
 function InvoiceList() {
     const { t } = useTranslation()
@@ -38,6 +39,7 @@ function InvoiceList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('sales.invoices.title')}</h1>

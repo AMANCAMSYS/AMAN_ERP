@@ -5,6 +5,7 @@ import { hasPermission } from '../../utils/auth';
 import { Plus, Edit2, Trash2, DollarSign, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const SalaryStructures = () => {
     const { t, i18n } = useTranslation();
@@ -73,6 +74,7 @@ const SalaryStructures = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('hr.salary_structures.salary_structures_components')}</h1>
                     <p className="workspace-subtitle">{t('hr.salary_structures.manage_salary_structures_and_components')}</p>

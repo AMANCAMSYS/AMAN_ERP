@@ -9,6 +9,7 @@ import { Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import '../../components/ModuleStyles.css'
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 function ChecksReceivable() {
     const { t } = useTranslation()
     const { currentBranch } = useBranch()
@@ -166,6 +167,7 @@ function ChecksReceivable() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div>
                         <h1 className="workspace-title">📥 شيكات تحت التحصيل</h1>

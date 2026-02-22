@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import { ShieldCheck, Globe, Building2, FileText, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react'
+import BackButton from '../../components/common/BackButton';
 
 const COUNTRY_FLAGS = {
     SA: '🇸🇦', SY: '🇸🇾', AE: '🇦🇪', EG: '🇪🇬', JO: '🇯🇴',
@@ -135,6 +136,7 @@ function TaxCompliance() {
         <div className="workspace fade-in">
             {/* Header */}
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
                         <h1 className="workspace-title"><ShieldCheck size={24} style={{ display: 'inline', marginInlineEnd: '8px' }} />{t('tax_compliance.title')}</h1>

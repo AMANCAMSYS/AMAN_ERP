@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Pagination, { usePagination } from '../../components/common/Pagination'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function ProductList() {
     const { t } = useTranslation()
@@ -98,6 +99,7 @@ function ProductList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('stock.products.title')}</h1>

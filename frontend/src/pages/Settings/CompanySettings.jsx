@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { companiesAPI, settingsAPI } from '../../utils/api';
 import { getUser, updateUser, hasPermission } from '../../utils/auth';
 import api from '../../utils/api';
@@ -8,8 +8,9 @@ import {
     Settings, Wallet, Palette, ShoppingCart, Truck, Users, Box, FileText,
     Heart, Monitor, Bell, BarChart3, ShieldCheck, Link, Zap, Receipt,
     Briefcase, CheckSquare, Share2, GitBranch, History, Database,
-    ArrowLeft, ChevronRight, Sparkles, TrendingUp
+    ChevronRight, Sparkles, TrendingUp, Key, Globe, Scale, Building2, Upload
 } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 import GeneralSettings from './tabs/GeneralSettings';
 import FinancialSettings from './tabs/FinancialSettings';
 import BrandingSettings from './tabs/BrandingSettings';
@@ -37,6 +38,7 @@ import ComingSoon from './tabs/ComingSoon';
 const CompanySettings = () => {
     const { t, i18n } = useTranslation();
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const user = getUser();
     const isRTL = i18n.dir() === 'rtl';
 
@@ -237,18 +239,47 @@ const CompanySettings = () => {
                                 );
                             })}
                         </div>
+
+                        {/* Advanced Tools */}
+                        {hasPermission('admin.companies') && (
+                            <div style={{ marginTop: '2.5rem' }}>
+                                <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-secondary, #6b7280)' }}>
+                                    {t('settings.advanced_tools') || 'أدوات متقدمة'}
+                                </h2>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                                    {[
+                                        { icon: Building2, label: t('nav.branches') || 'الفروع', desc: t('settings.advanced_tools_desc.branches'), path: '/settings/branches', permission: 'branches.view' },
+                                        { icon: Scale, label: t('nav.costingPolicy') || 'سياسة التكلفة', desc: t('settings.advanced_tools_desc.costing_policy'), path: '/settings/costing-policy' },
+                                        { icon: Upload, label: t('nav.dataImport') || 'استيراد البيانات', desc: t('settings.advanced_tools_desc.data_import'), path: '/data-import' },
+                                        { icon: Key, label: t('nav.api_keys') || 'مفاتيح API', desc: t('settings.advanced_tools_desc.api_keys'), path: '/settings/api-keys' },
+                                        { icon: Globe, label: t('nav.webhooks') || 'الويب هوك', desc: t('settings.advanced_tools_desc.webhooks'), path: '/settings/webhooks' },
+                                    ].filter(item => !item.permission || hasPermission(item.permission)).map((item) => {
+                                        const Icon = item.icon;
+                                        return (
+                                            <button
+                                                key={item.path}
+                                                onClick={() => navigate(item.path)}
+                                                className="card bg-base-100 shadow-sm hover:shadow-md transition-all duration-300 border border-base-200 group text-center flex flex-col items-center justify-center p-6 rounded-[2rem]"
+                                                style={{ height: '200px', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                                            >
+                                                <div className="mb-4 transition-transform duration-300 group-hover:scale-110" style={{ color: 'var(--primary, #4f46e5)' }}>
+                                                    <Icon size={36} strokeWidth={1.5} />
+                                                </div>
+                                                <h3 className="text-lg font-bold text-base-content mb-1 group-hover:text-primary transition-colors">{item.label}</h3>
+                                                <p className="text-sm text-base-content/60 leading-relaxed max-w-[200px]">{item.desc}</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     /* Detail View (Full Page) */
                     <div className="animate-slide-up">
                         {/* Navigation Header */}
                         <div className="flex items-center gap-4 mb-8">
-                            <button
-                                onClick={() => setSearchParams({})}
-                                className="btn btn-circle btn-ghost hover:bg-base-200"
-                            >
-                                <ArrowLeft size={24} className={isRTL ? 'rotate-180' : ''} />
-                            </button>
+                            <BackButton onClick={() => setSearchParams({})} />
                             <div>
                                 <h1 className="text-2xl font-bold flex items-center gap-3">
                                     <span className="text-base-content/50 font-normal">{t('settings.company.title')}</span>

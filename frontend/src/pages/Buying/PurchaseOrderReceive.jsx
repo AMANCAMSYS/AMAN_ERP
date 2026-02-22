@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 function PurchaseOrderReceive() {
     const { t } = useTranslation();
@@ -135,6 +136,7 @@ function PurchaseOrderReceive() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📥 {t('buying.receive.title')}</h1>
                     <p className="workspace-subtitle">{order.po_number} - {order.supplier_name}</p>

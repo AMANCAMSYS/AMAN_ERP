@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, FileText, ArrowLeft, BarChart2, X, Trash2, AlertTriangle, PlayCircle, Lock, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, FileText, BarChart2, X, Trash2, AlertTriangle, PlayCircle, Lock, TrendingUp, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { budgetsAPI } from '../../utils/api';
@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const Budgets = () => {
     const { t } = useTranslation();
@@ -119,9 +120,7 @@ const Budgets = () => {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button onClick={() => navigate('/accounting')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('accounting.budgets.title')}</h1>
                             <p className="text-muted small mb-0">{t('accounting.budgets.subtitle')}</p>

@@ -4,6 +4,29 @@ import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
+import BackButton from '../../components/common/BackButton';
+
+const EVENT_LABELS = {
+  'invoice.created': 'settings.webhooks.evt_invoice_created',
+  'invoice.paid': 'settings.webhooks.evt_invoice_paid',
+  'invoice.cancelled': 'settings.webhooks.evt_invoice_cancelled',
+  'order.created': 'settings.webhooks.evt_order_created',
+  'order.confirmed': 'settings.webhooks.evt_order_confirmed',
+  'order.delivered': 'settings.webhooks.evt_order_delivered',
+  'payment.received': 'settings.webhooks.evt_payment_received',
+  'payment.refunded': 'settings.webhooks.evt_payment_refunded',
+  'inventory.low_stock': 'settings.webhooks.evt_inventory_low_stock',
+  'inventory.adjustment': 'settings.webhooks.evt_inventory_adjustment',
+  'purchase.created': 'settings.webhooks.evt_purchase_created',
+  'purchase.approved': 'settings.webhooks.evt_purchase_approved',
+  'employee.leave_request': 'settings.webhooks.evt_employee_leave',
+  'employee.attendance': 'settings.webhooks.evt_employee_attendance',
+  'ticket.created': 'settings.webhooks.evt_ticket_created',
+  'ticket.resolved': 'settings.webhooks.evt_ticket_resolved',
+  'opportunity.won': 'settings.webhooks.evt_opportunity_won',
+  'opportunity.lost': 'settings.webhooks.evt_opportunity_lost',
+  'opportunity.stage_changed': 'settings.webhooks.evt_opportunity_stage',
+};
 
 const EMPTY_FORM = {
   name: '',
@@ -142,10 +165,16 @@ export default function Webhooks() {
   return (
     <div className="workspace fade-in">
       <div className="workspace-header">
-        <h1 className="workspace-title">{t('settings.webhooks.title')}</h1>
-        <button className="btn btn-primary" onClick={openCreate}>
-          + {t('settings.webhooks.create_new')}
-        </button>
+        <BackButton />
+        <div className="header-title">
+          <h1 className="workspace-title">{t('settings.webhooks.title')}</h1>
+          <p className="workspace-subtitle">{t('settings.webhooks.subtitle')}</p>
+        </div>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={openCreate}>
+            + {t('settings.webhooks.create_new')}
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -175,7 +204,7 @@ export default function Webhooks() {
                 <td>
                   {(wh.events || []).map((ev) => (
                     <span key={ev} className="badge badge-info" style={{ marginInlineEnd: 4, marginBottom: 2, display: 'inline-block' }}>
-                      {ev}
+                      {t(EVENT_LABELS[ev] || `settings.webhooks.evt_${ev.replace('.', '_')}`, ev)}
                     </span>
                   ))}
                 </td>
@@ -220,80 +249,79 @@ export default function Webhooks() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                <div className="form-section">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>{t('common.name')}</label>
-                      <input
-                        type="text"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t('settings.webhooks.url_label')}</label>
-                      <input
-                        type="url"
-                        value={form.url}
-                        onChange={(e) => setForm({ ...form, url: e.target.value })}
-                        required
-                        style={{ direction: 'ltr' }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t('settings.webhooks.retry_count')}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={form.retry_count}
-                        onChange={(e) => setForm({ ...form, retry_count: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t('settings.webhooks.timeout_seconds')}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={form.timeout_seconds}
-                        onChange={(e) => setForm({ ...form, timeout_seconds: Number(e.target.value) })}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>{t('settings.webhooks.events')}</label>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-                      {availableEvents.length === 0 && <span>{t('settings.webhooks.no_events')}</span>}
-                      {availableEvents.map((evt) => {
-                        const evtValue = typeof evt === 'string' ? evt : evt.value ?? evt.name ?? evt;
-                        return (
-                          <label key={evtValue} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input
-                              type="checkbox"
-                              checked={form.events.includes(evtValue)}
-                              onChange={() => toggleEvent(evtValue)}
-                            />
-                            {evtValue}
-                          </label>
-                        );
-                      })}
-                    </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('common.name')}</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.webhooks.url_label')}</label>
+                  <input
+                    className="form-input"
+                    type="url"
+                    value={form.url}
+                    onChange={(e) => setForm({ ...form, url: e.target.value })}
+                    required
+                    style={{ direction: 'ltr' }}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.webhooks.retry_count')}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={0}
+                    value={form.retry_count}
+                    onChange={(e) => setForm({ ...form, retry_count: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.webhooks.timeout_seconds')}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={1}
+                    value={form.timeout_seconds}
+                    onChange={(e) => setForm({ ...form, timeout_seconds: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.webhooks.events')}</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginTop: 8 }}>
+                    {availableEvents.length === 0 && <span className="text-base-content/50">{t('settings.webhooks.no_events')}</span>}
+                    {availableEvents.map((evt) => {
+                      const evtValue = typeof evt === 'string' ? evt : evt.value ?? evt.name ?? evt;
+                      return (
+                        <label key={evtValue} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-primary"
+                            checked={form.events.includes(evtValue)}
+                            onChange={() => toggleEvent(evtValue)}
+                          />
+                          <span className="font-medium text-sm">{t(EVENT_LABELS[evtValue] || `settings.webhooks.evt_${evtValue.replace('.', '_')}`, evtValue)}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
               <div className="modal-footer">
-                <div className="form-actions">
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? t('common.saving') : editingId ? t('common.update') : t('common.create')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowFormModal(false)}
-                  >
-                    {t('common.cancel')}
-                  </button>
-                </div>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? t('common.saving') : editingId ? t('common.update') : t('common.create')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowFormModal(false)}
+                >
+                  {t('common.cancel')}
+                </button>
               </div>
             </form>
           </div>

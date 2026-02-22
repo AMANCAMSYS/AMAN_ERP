@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function PurchaseOrderDetails() {
@@ -81,6 +82,7 @@ function PurchaseOrderDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📋 {order.po_number}</h1>
                     <p className="workspace-subtitle">{order.supplier_name}</p>

@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function SupplierPayments() {
@@ -36,6 +37,7 @@ function SupplierPayments() {
         return (
             <div className="workspace fade-in">
                 <div className="workspace-header">
+                    <BackButton />
                     <h1 className="workspace-title">{t('buying.supplier_payments.title')}</h1>
                 </div>
                 <div className="card" style={{ textAlign: 'center', padding: '40px' }}>

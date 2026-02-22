@@ -196,6 +196,25 @@ body {
 
 .workspace-header {
   margin-bottom: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.workspace-header > * {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+.workspace-header > .back-button {
+  flex: 0 0 auto;
+  margin-inline-end: 16px;
+  margin-top: 4px;
+}
+
+.workspace-header > .back-button + * {
+  flex: 1 1 0%;
+  min-width: 0;
 }
 
 .workspace-title {

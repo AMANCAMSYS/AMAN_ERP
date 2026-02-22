@@ -73,3 +73,5 @@ export { crmAPI } from '../services/crm'
 // External Integrations
 export { externalAPI } from '../services/external'
 
+// Services & Documents
+export { servicesAPI } from '../services/services'

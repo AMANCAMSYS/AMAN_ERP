@@ -8,6 +8,7 @@ import { Plus, Send, GitCompare, ArrowRightCircle, FileText, ChevronDown, X } fr
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const RFQList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -83,6 +84,7 @@ const RFQList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-indigo-50 text-indigo-600"><FileText size={24} /></span> {t('buying.rfq_title')}</h1>

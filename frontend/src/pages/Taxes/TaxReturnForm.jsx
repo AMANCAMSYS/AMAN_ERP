@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { getCurrency } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 function TaxReturnForm() {
     const { t } = useTranslation()
@@ -83,6 +84,7 @@ function TaxReturnForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📝 {t('taxes.new_return_title')}</h1>
                     <p className="workspace-subtitle">{t('taxes.new_return_subtitle')}</p>

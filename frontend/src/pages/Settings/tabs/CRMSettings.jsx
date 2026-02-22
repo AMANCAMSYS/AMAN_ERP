@@ -11,7 +11,7 @@ const CRMSettings = ({ settings, handleSettingChange, currency }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Gift size={20} className="text-primary" />
-                    {t('settings.crm.loyalty_title') || '{t("settings.crm.loyalty_program")}'}
+                    {t('settings.crm.loyalty_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-start gap-3">
@@ -26,10 +26,10 @@ const CRMSettings = ({ settings, handleSettingChange, currency }) => {
                         </div>
                         <div>
                             <label className="cursor-pointer font-medium block" htmlFor="crm_loyalty_enabled">
-                                {t('settings.crm.enable_loyalty') || '{t("settings.crm.enable_points")}'}
+                                {t('settings.crm.enable_loyalty')}
                             </label>
                             <p className="text-xs text-base-content/40 mt-1">
-                                {t('settings.crm.loyalty_hint') || '{t("settings.crm.points_note")}'}
+                                {t('settings.crm.loyalty_hint')}
                             </p>
                         </div>
                     </div>
@@ -37,7 +37,7 @@ const CRMSettings = ({ settings, handleSettingChange, currency }) => {
 
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 transition-all ${settings.crm_loyalty_enabled === 'true' ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.crm.earn_rate') || '{t("settings.crm.earn_rate")}'}</label>
+                        <label className="form-label">{t('settings.crm.earn_rate')}</label>
                         <div className="flex items-center gap-2">
                             <span className="text-sm">{t('settings.crm.per')}</span>
                             <input
@@ -51,7 +51,7 @@ const CRMSettings = ({ settings, handleSettingChange, currency }) => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">{t('settings.crm.redeem_rate') || '{t("settings.crm.redeem_rate")}'}</label>
+                        <label className="form-label">{t('settings.crm.redeem_rate')}</label>
                         <div className="flex items-center gap-2">
                             <span className="text-sm">{t('settings.crm.per')}</span>
                             <input

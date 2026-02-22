@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BarChart2, Calendar, FileText, ArrowLeft } from 'lucide-react';
+import { BarChart2, Calendar, FileText } from 'lucide-react';
 import PayrollReport from './PayrollReport';
 import LeaveReport from './LeaveReport';
 import '../../../components/ModuleStyles.css';
+import BackButton from '../../../components/common/BackButton';
 
 const HRReports = () => {
     const { t, i18n } = useTranslation();
@@ -23,9 +24,7 @@ const HRReports = () => {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <button className="btn-icon" onClick={() => navigate('/hr')}>
-                        {isRTL ? <ArrowLeft size={20} style={{ transform: 'rotate(180deg)' }} /> : <ArrowLeft size={20} />}
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title">{t('hr.reports.title', 'HR Reports')}</h1>
                         <p className="workspace-subtitle">{t('hr.reports.subtitle', 'Analytics and Insights')}</p>

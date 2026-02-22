@@ -5,6 +5,7 @@ import { inventoryAPI, purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 function BuyingOrderForm() {
     const { t } = useTranslation()
@@ -176,6 +177,7 @@ function BuyingOrderForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{t('buying.orders.form.title_new')}</h1>
                 <p className="workspace-subtitle">{t('buying.orders.form.subtitle_new')}</p>
             </div>

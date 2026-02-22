@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { crmAPI } from '../../utils/api';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const categoryColors = {
     faq: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -70,6 +71,7 @@ function KnowledgeBase() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📚 {t('crm.kb_title', 'قاعدة المعرفة')}</h1>
                     <p className="workspace-subtitle">{t('crm.kb_subtitle', 'مقالات مساعدة وأسئلة شائعة وأدلة استخدام')}</p>

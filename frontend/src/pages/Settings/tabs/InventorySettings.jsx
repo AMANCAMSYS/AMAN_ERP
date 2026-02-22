@@ -25,7 +25,7 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <AlertTriangle size={20} className="text-warning" />
-                    {t('settings.inventory.policy_title') || '{t("settings.inventory.policies")}'}
+                    {t('settings.inventory.policy_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="flex items-start gap-3">
@@ -40,10 +40,10 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
                         </div>
                         <div>
                             <label className="cursor-pointer font-medium block" htmlFor="allow_negative_stock">
-                                {t('settings.inventory.allow_negative') || '{t("settings.inventory.allow_negative")}'}
+                                {t('settings.inventory.allow_negative')}
                             </label>
                             <p className="text-xs text-base-content/40 mt-1">
-                                {t('settings.inventory.negative_hint') || '{t("settings.inventory.negative_note")}'}
+                                {t('settings.inventory.negative_hint')}
                             </p>
                         </div>
                     </div>
@@ -54,12 +54,12 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <MapPin size={20} className="text-primary" />
-                    {t('settings.inventory.defaults_title') || '{t("settings.inventory.warehouses_links")}'}
+                    {t('settings.inventory.defaults_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
                         <label className="form-label" htmlFor="default_warehouse">
-                            {t('settings.inventory.default_warehouse') || '{t("settings.inventory.default_warehouse")}'}
+                            {t('settings.inventory.default_warehouse')}
                         </label>
                         <select
                             id="default_warehouse"
@@ -73,7 +73,7 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
                             ))}
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.inventory.warehouse_hint') || '{t("settings.inventory.warehouse_note")}'}
+                            {t('settings.inventory.warehouse_hint')}
                         </p>
                     </div>
                 </div>
@@ -83,11 +83,11 @@ const InventorySettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Box size={20} className="text-primary" />
-                    {t('settings.inventory.valuation_title') || '{t("settings.inventory.valuation")}'}
+                    {t('settings.inventory.valuation_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.inventory.valuation_method') || '{t("settings.inventory.valuation_method")}'}</label>
+                        <label className="form-label">{t('settings.inventory.valuation_method')}</label>
                         <select
                             className="form-select"
                             value={settings.valuation_method || 'moving_average'}

@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext'
 import Pagination, { usePagination } from '../../components/common/Pagination'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function SupplierList() {
     const { t, i18n } = useTranslation()
@@ -51,6 +52,7 @@ function SupplierList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('buying.suppliers.title')}</h1>

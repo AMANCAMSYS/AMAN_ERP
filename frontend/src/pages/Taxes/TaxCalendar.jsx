@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { taxesAPI } from '../../services/taxes';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const TAX_TYPES = [
     { value: 'vat', label: 'ضريبة القيمة المضافة' },
@@ -120,6 +121,7 @@ function TaxCalendar() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📅 {t('tax_calendar.title', 'تقويم الالتزامات الضريبية')}</h1>
                     <p className="workspace-subtitle">{t('tax_calendar.subtitle', 'متابعة مواعيد التقديم والسداد الضريبي')}</p>

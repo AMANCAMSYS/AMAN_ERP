@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, FolderKanban, TrendingUp, Clock, CheckCircle2, PauseCircle, XCircle } from 'lucide-react';
+import { Plus, Search, FolderKanban, TrendingUp, Clock, CheckCircle2, PauseCircle, XCircle, BarChart3, Users, DollarSign, Calendar } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import { useBranch } from '../../context/BranchContext';
@@ -126,6 +126,57 @@ export default function ProjectList() {
                     <div className="metric-info">
                         <span className="metric-label">{t('projects.metrics.total_budget')}</span>
                         <span className="metric-value text-dark" style={{ fontSize: '20px' }}>{formatNumber(summary.total_budget || 0)}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Navigation Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+
+                {/* Project Management */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <FolderKanban size={18} style={{ color: 'var(--primary)' }} /> {t('projects.management', 'إدارة المشاريع')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                        <Link to="/projects/new" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <Plus size={14} /> {t('projects.new')}
+                        </Link>
+                        <Link to="/projects/resources" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <Users size={14} /> {t('projects.resource_allocation')}
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Reports */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <BarChart3 size={18} style={{ color: 'var(--success)' }} /> {t('common.reports', 'التقارير')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                        <Link to="/projects/reports/financials" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <DollarSign size={14} /> {t('projects.reports.financials', 'التقرير المالي للمشاريع')}
+                        </Link>
+                        <Link to="/projects/reports/resources" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <Users size={14} /> {t('projects.reports.resources', 'استخدام الموارد')}
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Summary Stats Card */}
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <TrendingUp size={18} style={{ color: 'var(--secondary)' }} /> {t('projects.overview', 'نظرة عامة')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('projects.status.planning')}</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--primary)' }}>{summary.planning || 0}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('projects.status.on_hold')}</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--warning, #f59e0b)' }}>{summary.on_hold || 0}</div>
+                        </div>
                     </div>
                 </div>
             </div>

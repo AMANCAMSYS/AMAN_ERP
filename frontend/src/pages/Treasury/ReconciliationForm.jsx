@@ -9,6 +9,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 const ReconciliationForm = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -212,9 +213,7 @@ const ReconciliationForm = () => {
             <div className="workspace fade-in">
                 <div className="workspace-header">
                     <div className="d-flex align-items-center gap-3">
-                        <button className="btn-icon" onClick={() => navigate('/treasury/reconciliation')}>
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">{t('treasury.reconciliation.new')}</h1>
                             <p className="workspace-subtitle">{t('treasury.reconciliation.new_subtitle')}</p>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash, Save, Trash2, Info } from 'lucide-react';
+import { Plus, Trash, Save, Trash2, Info } from 'lucide-react';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import BackButton from '../../components/common/BackButton';
 
 const WorkflowEditor = () => {
     const { t, i18n } = useTranslation();
@@ -169,13 +170,7 @@ const WorkflowEditor = () => {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <button
-                            onClick={() => navigate('/approvals')}
-                            className="btn btn-ghost btn-circle"
-                            style={{ background: 'var(--bg-secondary)' }}
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title">
                                 {id ? t('approvals.edit_workflow') : t('approvals.new_workflow')}

@@ -8,6 +8,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function BuyingReturnForm() {
     const { t } = useTranslation()
@@ -248,6 +249,7 @@ function BuyingReturnForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title" style={{ color: 'var(--error)' }}>{t('buying.returns.form.title_new')}</h1>
                 <p className="workspace-subtitle">{t('buying.returns.form.subtitle_new')}</p>
             </div>

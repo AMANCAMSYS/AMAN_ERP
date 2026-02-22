@@ -5,6 +5,7 @@ import { Play, Pause, CheckCircle, Clock, User as UserIcon, Factory } from 'luci
 import api from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
+import BackButton from '../../components/common/BackButton';
 
 export default function JobCards() {
     const { t, i18n } = useTranslation()
@@ -63,6 +64,7 @@ export default function JobCards() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">
                     <Clock size={24} className="text-primary" /> {t('manufacturing.job_cards.title')}
                 </h1>

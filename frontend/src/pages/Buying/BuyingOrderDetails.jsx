@@ -5,6 +5,7 @@ import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 function BuyingOrderDetails() {
     const { t, i18n } = useTranslation()
@@ -37,6 +38,7 @@ function BuyingOrderDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{t('buying.orders.details.title')} #{order.po_number}</h1>

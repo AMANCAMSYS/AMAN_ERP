@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const SupplierStatement = () => {
     const { t } = useTranslation();
@@ -48,6 +49,7 @@ const SupplierStatement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📜 {t('buying.reports.statement.title')}</h1>
                     <p className="workspace-subtitle">{t('buying.reports.statement.subtitle')}</p>

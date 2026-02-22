@@ -229,14 +229,53 @@ function CRMHome() {
                 </div>
             </div>
 
-            {/* CRM Tools */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
-                <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
-                    📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
-                </Link>
-                <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
-                    📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
-                </Link>
+            {/* Grouped Navigation Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '16px' }}>
+
+                {/* Sales Activities */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🤝 {t('crm.sales_activities', 'النشاطات التجارية')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                        <button className="btn btn-outline" onClick={() => setActiveTab('opportunities')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            💼 {t('crm.tab_opportunities')}
+                        </button>
+                        <button className="btn btn-primary btn-sm" onClick={openCreateOpp} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            + {t('crm.new_opportunity')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Customer Support */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🎧 {t('crm.customer_support', 'دعم العملاء')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                        <button className="btn btn-outline" onClick={() => setActiveTab('tickets')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            🎫 {t('crm.tab_tickets')}
+                        </button>
+                        <button className="btn btn-primary btn-sm" onClick={openCreateTicket} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            + {t('crm.new_ticket')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Marketing */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        📣 {t('crm.marketing', 'التسويق')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                        <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
+                        </Link>
+                        <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
+                        </Link>
+                    </div>
+                </div>
             </div>
 
             {/* Tabs */}

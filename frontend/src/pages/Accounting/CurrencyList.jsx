@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import { Plus, Search, Edit2, Trash2, History, RefreshCw, DollarSign, X } from 'lucide-react'
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 export default function CurrencyList() {
     const { t } = useTranslation()
     const { showToast } = useToast()
@@ -150,6 +151,7 @@ export default function CurrencyList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div>
                         <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

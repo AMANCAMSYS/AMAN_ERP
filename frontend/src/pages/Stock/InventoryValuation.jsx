@@ -4,6 +4,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
+import BackButton from '../../components/common/BackButton';
 
 function InventoryValuation() {
     const { t, i18n } = useTranslation()
@@ -37,6 +38,7 @@ function InventoryValuation() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('reports.inventory_valuation.title')}</h1>
                     <p className="workspace-subtitle">{t('reports.inventory_valuation.subtitle')}</p>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { crmAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 const statusBadgeStyles = {
@@ -191,6 +192,7 @@ function SupportTickets() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{t('crm.tickets_title')}</h1>
                 <p className="workspace-subtitle">{t('crm.tickets_desc')}</p>
             </div>

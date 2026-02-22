@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 const StockShipmentForm = () => {
     const { t } = useTranslation();
@@ -100,6 +101,7 @@ const StockShipmentForm = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🚚 {t('stock.shipments.form.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.shipments.form.subtitle')}</p>

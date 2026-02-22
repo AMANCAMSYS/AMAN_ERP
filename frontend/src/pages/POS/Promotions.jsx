@@ -6,6 +6,7 @@ import { Plus, Tag, Trash2, Edit, Gift } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const Promotions = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
@@ -66,6 +67,7 @@ const Promotions = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">

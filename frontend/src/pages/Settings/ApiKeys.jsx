@@ -4,8 +4,15 @@ import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
+import BackButton from '../../components/common/BackButton';
 
-const PERMISSION_OPTIONS = ['read', 'write', 'invoices', 'reports', 'inventory'];
+const PERMISSION_OPTIONS = [
+  { value: 'read', labelKey: 'settings.api_keys.perm_read' },
+  { value: 'write', labelKey: 'settings.api_keys.perm_write' },
+  { value: 'invoices', labelKey: 'settings.api_keys.perm_invoices' },
+  { value: 'reports', labelKey: 'settings.api_keys.perm_reports' },
+  { value: 'inventory', labelKey: 'settings.api_keys.perm_inventory' },
+];
 
 export default function ApiKeys() {
   const { t } = useTranslation();
@@ -87,10 +94,16 @@ export default function ApiKeys() {
   return (
     <div className="workspace fade-in">
       <div className="workspace-header">
-        <h1 className="workspace-title">{t('settings.api_keys.title')}</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-          + {t('settings.api_keys.create_new')}
-        </button>
+        <BackButton />
+        <div className="header-title">
+          <h1 className="workspace-title">{t('settings.api_keys.title')}</h1>
+          <p className="workspace-subtitle">{t('settings.api_keys.subtitle')}</p>
+        </div>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
+            + {t('settings.api_keys.create_new')}
+          </button>
+        </div>
       </div>
 
       {newKeyResult?.key && (
@@ -151,7 +164,7 @@ export default function ApiKeys() {
                 <td>
                   {(k.permissions || []).map((p) => (
                     <span key={p} className="badge badge-info" style={{ marginInlineEnd: 4 }}>
-                      {p}
+                      {t(`settings.api_keys.perm_${p}`)}
                     </span>
                   ))}
                 </td>
@@ -185,67 +198,65 @@ export default function ApiKeys() {
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">
-                <div className="form-section">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>{t('common.name')}</label>
-                      <input
-                        type="text"
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t('settings.api_keys.rate_limit_per_minute')}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={form.rate_limit_per_minute}
-                        onChange={(e) =>
-                          setForm({ ...form, rate_limit_per_minute: Number(e.target.value) })
-                        }
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>{t('settings.api_keys.expiry_date_optional')}</label>
-                      <input
-                        type="date"
-                        value={form.expires_at}
-                        onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>{t('settings.api_keys.permissions')}</label>
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
-                      {PERMISSION_OPTIONS.map((perm) => (
-                        <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <input
-                            type="checkbox"
-                            checked={form.permissions.includes(perm)}
-                            onChange={() => togglePermission(perm)}
-                          />
-                          {perm}
-                        </label>
-                      ))}
-                    </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('common.name')}</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.api_keys.rate_limit_per_minute')}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min={1}
+                    value={form.rate_limit_per_minute}
+                    onChange={(e) =>
+                      setForm({ ...form, rate_limit_per_minute: Number(e.target.value) })
+                    }
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.api_keys.expiry_date_optional')}</label>
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.expires_at}
+                    onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label className="form-label">{t('settings.api_keys.permissions')}</label>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 8 }}>
+                    {PERMISSION_OPTIONS.map((perm) => (
+                      <label key={perm.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-primary"
+                          checked={form.permissions.includes(perm.value)}
+                          onChange={() => togglePermission(perm.value)}
+                        />
+                        <span className="font-medium">{t(perm.labelKey)}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               </div>
               <div className="modal-footer">
-                <div className="form-actions">
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
-                    {submitting ? t('settings.api_keys.creating') : t('common.create')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowCreateModal(false)}
-                  >
-                    {t('common.cancel')}
-                  </button>
-                </div>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? t('settings.api_keys.creating') : t('common.create')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  {t('common.cancel')}
+                </button>
               </div>
             </form>
           </div>

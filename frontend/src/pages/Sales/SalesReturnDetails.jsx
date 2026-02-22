@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 const SalesReturnDetails = () => {
@@ -54,6 +55,7 @@ const SalesReturnDetails = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div className="flex items-center gap-3">
                         <h1 className="workspace-title">{t('sales.returns.details.title')} #{ret.return_number}</h1>

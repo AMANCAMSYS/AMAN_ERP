@@ -11,6 +11,7 @@ import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 export default function ExpenseDetails() {
@@ -121,9 +122,7 @@ export default function ExpenseDetails() {
       <div className="workspace-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button onClick={() => navigate('/expenses')} className="table-action-btn" style={{ background: 'var(--bg-hover)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none' }}>
-              <ArrowLeft size={20} />
-            </button>
+                        <BackButton />
             <div>
               <h1 className="workspace-title">{expense.expense_number}</h1>
               <p className="text-muted small mb-0">{t('expenses.detailsSubtitle')}</p>

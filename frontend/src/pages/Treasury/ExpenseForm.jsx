@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 function ExpenseForm() {
     const { t } = useTranslation()
@@ -99,6 +100,7 @@ function ExpenseForm() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <h1 className="workspace-title">{t('treasury.menu.expense')}</h1>
                 <p className="workspace-subtitle">{t('treasury.subtitle')}</p>
             </div>

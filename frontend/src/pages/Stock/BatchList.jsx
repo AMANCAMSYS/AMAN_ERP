@@ -5,6 +5,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useNavigate } from 'react-router-dom'
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 function BatchList() {
     const { t } = useTranslation()
     const navigate = useNavigate()
@@ -115,6 +116,7 @@ function BatchList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">📦 {t('stock.batches.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.batches.subtitle')}</p>

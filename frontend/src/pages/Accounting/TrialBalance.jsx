@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { accountingAPI, companiesAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
+import BackButton from '../../components/common/BackButton';
 
 function TrialBalance() {
     const { t } = useTranslation()
@@ -91,6 +92,7 @@ function TrialBalance() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">⚖️ {t('accounting.trial_balance.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.trial_balance.subtitle')}</p>

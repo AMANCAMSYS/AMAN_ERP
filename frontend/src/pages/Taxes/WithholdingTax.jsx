@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import '../../components/ModuleStyles.css'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 export default function WithholdingTax() {
     const { t, i18n } = useTranslation()
@@ -184,6 +185,7 @@ export default function WithholdingTax() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t('wht.title')}</h1>
                     <p className="workspace-subtitle">{t('wht.subtitle')}</p>

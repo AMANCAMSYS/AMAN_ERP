@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Save, FolderKanban, Users, Calendar, DollarSign } from 'lucide-react';
+import { Save, FolderKanban, Users, Calendar, DollarSign } from 'lucide-react';
 import { projectsAPI, salesAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 export default function ProjectForm() {
     const { t, i18n } = useTranslation();
@@ -125,9 +126,7 @@ export default function ProjectForm() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="d-flex align-items-center gap-3">
-                    <button className="btn btn-icon btn-light" onClick={() => navigate('/projects')}>
-                        <ArrowRight size={20} style={{ transform: isRTL ? 'none' : 'scaleX(-1)' }} />
-                    </button>
+                        <BackButton />
                     <div>
                         <h1 className="workspace-title">
                             {isEdit ? t('projects.edit') : t('projects.new')}

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, Edit2, RefreshCw, FileText, XCircle, Calendar, DollarSign, User, Clock } from 'lucide-react'
+import { Edit2, RefreshCw, FileText, XCircle, Calendar, DollarSign, User, Clock } from 'lucide-react'
 import { contractsAPI } from '../../utils/api'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
 import SimpleModal from '../../components/common/SimpleModal'
 import '../../components/ModuleStyles.css'
+import BackButton from '../../components/common/BackButton';
 
 export default function ContractDetails() {
     const { t, i18n } = useTranslation()
@@ -138,9 +139,7 @@ export default function ContractDetails() {
             <div className="workspace-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button className="btn btn-ghost" onClick={() => navigate('/sales/contracts')}>
-                            <ArrowRight size={18} />
-                        </button>
+                        <BackButton />
                         <div>
                             <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {contract.contract_number}

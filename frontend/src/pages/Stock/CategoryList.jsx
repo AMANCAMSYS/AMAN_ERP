@@ -4,6 +4,7 @@ import { inventoryAPI } from '../../utils/api'
 import { Edit2, Trash2, Plus, X, Search, Layers } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 function CategoryList() {
     const { t } = useTranslation()
@@ -87,6 +88,7 @@ function CategoryList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Layers size={28} className="text-primary" />

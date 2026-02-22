@@ -4,6 +4,7 @@ import { posAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { Plus, Trash2, Users, Coffee } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const TableManagement = () => {
     const { t, i18n } = useTranslation();
@@ -51,6 +52,7 @@ const TableManagement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-teal-50 text-teal-600"><Coffee size={24} /></span> {t('pos.table_management_title')}</h1>

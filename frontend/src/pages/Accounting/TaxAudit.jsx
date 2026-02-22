@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function TaxAudit() {
@@ -43,6 +44,7 @@ function TaxAudit() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('reports.tax_audit.title')}</h1>
                     <p className="workspace-subtitle">{t('reports.tax_audit.subtitle')}</p>

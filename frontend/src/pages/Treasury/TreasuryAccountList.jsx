@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext'
 import { currenciesAPI } from '../../utils/api'
 import SimpleModal from '../../components/common/SimpleModal'
 import { toastEmitter } from '../../utils/toastEmitter'
+import BackButton from '../../components/common/BackButton';
 
 export default function TreasuryAccountList() {
     const { t } = useTranslation()
@@ -143,6 +144,7 @@ export default function TreasuryAccountList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">{t('treasury.menu.accounts')}</h1>

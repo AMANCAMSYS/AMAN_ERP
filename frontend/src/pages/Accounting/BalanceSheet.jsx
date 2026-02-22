@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
+import BackButton from '../../components/common/BackButton';
 
 function BalanceSheet() {
     const { t, i18n } = useTranslation()
@@ -136,6 +137,7 @@ function BalanceSheet() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header display-flex justify-between align-center">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">🏦 {t('accounting.balance_sheet.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.balance_sheet.subtitle')}</p>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const ShipmentDetails = () => {
     const { t, i18n } = useTranslation();
@@ -54,6 +55,7 @@ const ShipmentDetails = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🚚 {t('stock.shipments.view')} {shipment.shipment_ref}</h1>
                     <p className="workspace-subtitle">{t('stock.shipments.subtitle')}</p>

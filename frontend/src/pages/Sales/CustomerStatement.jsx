@@ -6,6 +6,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const CustomerStatement = () => {
     const { t } = useTranslation();
@@ -49,6 +50,7 @@ const CustomerStatement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📜 {t('sales.reports.statement.title')}</h1>
                     <p className="workspace-subtitle">{t('sales.reports.statement.subtitle')}</p>

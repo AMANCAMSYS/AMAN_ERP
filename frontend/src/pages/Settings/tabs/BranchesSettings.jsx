@@ -26,7 +26,7 @@ const BranchesSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <GitBranch size={20} className="text-primary" />
-                    {t('settings.branches.main_title') || '{t("settings.branches.title")}'}
+                    {t('settings.branches.main_title')}
                 </h3>
 
                 <div className="flex items-center gap-3 mb-6">
@@ -39,17 +39,17 @@ const BranchesSettings = ({ settings, handleSettingChange }) => {
                     />
                     <div>
                         <label className="cursor-pointer font-medium block" htmlFor="multi_branch_enabled">
-                            {t('settings.branches.enable_multi') || '{t("settings.branches.enable_multi")}'}
+                            {t('settings.branches.enable_multi')}
                         </label>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.branches.enable_hint') || '{t("settings.branches.multi_note")}'}
+                            {t('settings.branches.enable_hint')}
                         </p>
                     </div>
                 </div>
 
                 <div className={`space-y-4 transition-all ${settings.multi_branch_enabled === 'true' ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
                     <div className="form-group">
-                        <label className="form-label">{t('settings.branches.main_branch') || '{t("settings.branches.main_branch")}'}</label>
+                        <label className="form-label">{t('settings.branches.main_branch')}</label>
                         <select
                             className="form-select"
                             value={settings.main_branch_id || ''}
@@ -63,7 +63,7 @@ const BranchesSettings = ({ settings, handleSettingChange }) => {
                             ))}
                         </select>
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.branches.main_branch_hint') || '{t("settings.branches.main_note")}'}
+                            {t('settings.branches.main_branch_hint')}
                         </p>
                     </div>
                 </div>

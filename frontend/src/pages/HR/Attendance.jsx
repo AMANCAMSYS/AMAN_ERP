@@ -4,6 +4,7 @@ import { attendanceAPI } from '../../utils/api';
 import { Clock, Calendar, AlertCircle, Play, Square, LogOut, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 const Attendance = () => {
     const { t } = useTranslation();
@@ -98,6 +99,7 @@ const Attendance = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">
                         <Clock size={24} className="me-2 text-primary" />

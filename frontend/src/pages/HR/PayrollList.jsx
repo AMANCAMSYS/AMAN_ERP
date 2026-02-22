@@ -11,6 +11,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import Pagination, { usePagination } from '../../components/common/Pagination';
 
 import DateInput from '../../components/common/DateInput';
+import BackButton from '../../components/common/BackButton';
 const PayrollList = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -58,6 +59,7 @@ const PayrollList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">{t("hr.payroll.title")}</h1>
                     <p className="workspace-subtitle">{t("hr.payroll.subtitle")}</p>

@@ -16,6 +16,7 @@ import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 export default function ProjectDetails() {
     const { t, i18n } = useTranslation();
@@ -320,9 +321,7 @@ export default function ProjectDetails() {
             <div className="workspace-header">
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div className="d-flex align-items-center gap-3">
-                        <button className="btn btn-icon btn-light" onClick={() => navigate('/projects')}>
-                            <ArrowRight size={20} style={{ transform: isRTL ? 'none' : 'scaleX(-1)' }} />
-                        </button>
+                        <BackButton />
                         <div>
                             <div className="d-flex align-items-center gap-2">
                                 <h1 className="workspace-title mb-0">{project.project_name}</h1>

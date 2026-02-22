@@ -8,6 +8,7 @@ import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileTe
 import { formatNumber } from '../../utils/format'
 import { toastEmitter } from '../../utils/toastEmitter'
 import InvoicePrintModal from './InvoicePrintModal'
+import BackButton from '../../components/common/BackButton';
 
 function InvoiceDetails() {
     const { t, i18n } = useTranslation()
@@ -64,6 +65,7 @@ function InvoiceDetails() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <h1 className="workspace-title">{invoice.invoice_number}</h1>

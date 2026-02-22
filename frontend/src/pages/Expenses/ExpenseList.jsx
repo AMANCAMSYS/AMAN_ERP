@@ -157,6 +157,61 @@ export default function ExpenseList() {
         </div>
       </div>
 
+      {/* Quick Navigation Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+
+        {/* Quick Actions */}
+        <div className="card">
+          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            ⚡ {t('expenses.quick_actions', 'الإجراءات السريعة')}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate('/expenses/new')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+              <Plus size={14} /> {t('expenses.addNew')}
+            </button>
+            <button className="btn btn-outline" onClick={() => { setFilters({ ...filters, approval_status: 'pending' }); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+              <Clock size={14} /> {t('expenses.status.pending')}
+            </button>
+          </div>
+        </div>
+
+        {/* Status Summary */}
+        <div className="card">
+          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            📊 {t('expenses.status_summary', 'ملخص الحالة')}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginTop: '12px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{t('expenses.status.pending')}</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#d97706' }}>{summary.pending_approval || 0}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{t('expenses.status.approved')}</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#16a34a' }}>{summary.approved || 0}</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{t('expenses.status.rejected')}</div>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: '#dc2626' }}>{summary.rejected || 0}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Shortcut */}
+        <div className="card">
+          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            🔍 {t('common.filter', 'تصفية')}
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-outline" onClick={() => { setFilters({ expense_type: '', approval_status: '', start_date: '', end_date: '' }); setSearch(''); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
+              ✕ {t('common.clear_filters', 'مسح الفلاتر')}
+            </button>
+            <button className="btn btn-outline" onClick={() => { setFilters({ ...filters, approval_status: 'approved' }); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
+              ✅ {t('expenses.status.approved')}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
         <div className="card-body p-3">

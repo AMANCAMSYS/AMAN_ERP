@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { Plus, DollarSign, Calculator, TrendingUp } from 'lucide-react';
 import '../../components/ModuleStyles.css';
+import BackButton from '../../components/common/BackButton';
 
 const SalesCommissions = () => {
     const { t, i18n } = useTranslation();
@@ -56,6 +57,7 @@ const SalesCommissions = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title"><span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><DollarSign size={24} /></span> {t('sales.commissions_title')}</h1>

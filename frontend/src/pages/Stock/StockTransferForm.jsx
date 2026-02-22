@@ -5,6 +5,7 @@ import { inventoryAPI } from '../../utils/api';
 
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 
 const StockTransferForm = () => {
     const { t } = useTranslation();
@@ -114,6 +115,7 @@ const StockTransferForm = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">🚚 {t('stock.transfer.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.transfer.subtitle')}</p>
