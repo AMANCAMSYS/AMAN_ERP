@@ -45,8 +45,8 @@ def list_service_requests(
                    cu.full_name as created_by_name
             FROM service_requests sr
             LEFT JOIN parties p ON sr.customer_id = p.id
-            LEFT JOIN users u ON sr.assigned_to = u.id
-            LEFT JOIN users cu ON sr.created_by = cu.id
+            LEFT JOIN company_users u ON sr.assigned_to = u.id
+            LEFT JOIN company_users cu ON sr.created_by = cu.id
             WHERE 1=1
         """
         params = {}
@@ -103,8 +103,8 @@ def get_service_request(request_id: int, current_user: UserResponse = Depends(ge
                    cu.full_name as created_by_name
             FROM service_requests sr
             LEFT JOIN parties p ON sr.customer_id = p.id
-            LEFT JOIN users u ON sr.assigned_to = u.id
-            LEFT JOIN users cu ON sr.created_by = cu.id
+            LEFT JOIN company_users u ON sr.assigned_to = u.id
+            LEFT JOIN company_users cu ON sr.created_by = cu.id
             WHERE sr.id = :id
         """), {"id": request_id}).fetchone()
         if not req:
@@ -339,7 +339,7 @@ def list_documents(
         query = """
             SELECT d.*, u.full_name as created_by_name
             FROM documents d
-            LEFT JOIN users u ON d.created_by = u.id
+            LEFT JOIN company_users u ON d.created_by = u.id
             WHERE 1=1
         """
         params = {}
@@ -366,7 +366,7 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
         doc = db.execute(text("""
             SELECT d.*, u.full_name as created_by_name
             FROM documents d
-            LEFT JOIN users u ON d.created_by = u.id
+            LEFT JOIN company_users u ON d.created_by = u.id
             WHERE d.id = :id
         """), {"id": doc_id}).fetchone()
         if not doc:
@@ -376,7 +376,7 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
         versions = db.execute(text("""
             SELECT dv.*, u.full_name as uploaded_by_name
             FROM document_versions dv
-            LEFT JOIN users u ON dv.uploaded_by = u.id
+            LEFT JOIN company_users u ON dv.uploaded_by = u.id
             WHERE dv.document_id = :id ORDER BY dv.version_number DESC
         """), {"id": doc_id}).fetchall()
         result["versions"] = [dict(v._mapping) for v in versions]
@@ -583,7 +583,7 @@ def list_technicians(current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         users = db.execute(text("""
-            SELECT id, full_name, email FROM users WHERE is_active = true ORDER BY full_name
+            SELECT id, full_name, email FROM company_users WHERE is_active = true ORDER BY full_name
         """)).fetchall()
         return [dict(u._mapping) for u in users]
     finally:
