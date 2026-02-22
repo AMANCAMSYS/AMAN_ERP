@@ -1,0 +1,275 @@
+import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '../../utils/format';
+import { getCurrency } from '../../utils/auth';
+import '../../components/ModuleStyles.css';
+
+/**
+ * POS-005: Customer Display + Cash Drawer Control
+ * Shows a customer-facing display preview and cash drawer management
+ */
+
+function CustomerDisplay() {
+    const { t } = useTranslation();
+    const currency = getCurrency();
+    const displayWindowRef = useRef(null);
+
+    const [config, setConfig] = useState({
+        displayEnabled: false,
+        showLogo: true,
+        welcomeMessage: 'مرحباً بكم في أمان',
+        thankYouMessage: 'شكراً لتعاملكم معنا',
+        idleMessage: 'أجود المنتجات بأفضل الأسعار',
+        fontSize: 'large',
+        theme: 'dark',
+        drawerMode: 'auto', // auto, manual, disabled
+        drawerPin: 'pin2',
+    });
+
+    const [displayState, setDisplayState] = useState('welcome'); // welcome, scanning, total, thankYou
+    const [currentItem, setCurrentItem] = useState(null);
+    const [cartItems, setCartItems] = useState([
+        { name: 'قهوة عربية', price: 15, qty: 2 },
+        { name: 'كعكة شوكولاتة', price: 25, qty: 1 },
+    ]);
+    const [total, setTotal] = useState(55);
+    const [drawerLog, setDrawerLog] = useState([
+        { time: '10:30:00', reason: 'بيع', amount: 97.75, user: 'أحمد' },
+        { time: '09:15:00', reason: 'فتح الصندوق', amount: 500, user: 'محمد' },
+    ]);
+
+    useEffect(() => {
+        const sum = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+        setTotal(sum);
+    }, [cartItems]);
+
+    const openCustomerDisplay = () => {
+        if (displayWindowRef.current && !displayWindowRef.current.closed) {
+            displayWindowRef.current.focus();
+            return;
+        }
+        const win = window.open('', 'customer_display', 'width=800,height=480,menubar=no,toolbar=no,location=no');
+        displayWindowRef.current = win;
+        updateDisplayWindow(win);
+    };
+
+    const updateDisplayWindow = (win) => {
+        if (!win || win.closed) return;
+        const isDark = config.theme === 'dark';
+        const bg = isDark ? '#1a1a2e' : '#ffffff';
+        const fg = isDark ? '#e0e0e0' : '#1a1a2e';
+        const accent = '#4f46e5';
+
+        let content = '';
+        if (displayState === 'welcome') {
+            content = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;">
+                    <div style="font-size:48px;">🛒</div>
+                    <div style="font-size:32px;font-weight:700;color:${accent}">${config.welcomeMessage}</div>
+                    <div style="font-size:18px;opacity:0.7">${config.idleMessage}</div>
+                </div>
+            `;
+        } else if (displayState === 'scanning') {
+            const itemsHtml = cartItems.map(i => `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid ${isDark ? '#333' : '#eee'}">
+                    <span>${i.name} × ${i.qty}</span>
+                    <span>${formatNumber(i.price * i.qty)} ${currency}</span>
+                </div>
+            `).join('');
+            content = `
+                <div style="padding:30px;">
+                    <div style="font-size:20px;font-weight:600;margin-bottom:20px;">العناصر المضافة</div>
+                    ${itemsHtml}
+                    <div style="display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:3px solid ${accent};font-size:28px;font-weight:700;">
+                        <span>الإجمالي</span>
+                        <span style="color:${accent}">${formatNumber(total)} ${currency}</span>
+                    </div>
+                </div>
+            `;
+        } else if (displayState === 'total') {
+            content = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;">
+                    <div style="font-size:24px;opacity:0.7">المبلغ المطلوب</div>
+                    <div style="font-size:64px;font-weight:700;color:${accent}">${formatNumber(total)} ${currency}</div>
+                    <div style="font-size:18px;opacity:0.5">${cartItems.length} عناصر</div>
+                </div>
+            `;
+        } else {
+            content = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;">
+                    <div style="font-size:64px;">✅</div>
+                    <div style="font-size:32px;font-weight:700;color:#10b981">${config.thankYouMessage}</div>
+                </div>
+            `;
+        }
+
+        win.document.open();
+        win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>شاشة العميل</title>
+        <style>*{margin:0;padding:0;box-sizing:border-box;} body{font-family:'Segoe UI',Tahoma,sans-serif;background:${bg};color:${fg};overflow:hidden;}</style>
+        </head><body>${content}</body></html>`);
+        win.document.close();
+    };
+
+    useEffect(() => {
+        if (displayWindowRef.current && !displayWindowRef.current.closed) {
+            updateDisplayWindow(displayWindowRef.current);
+        }
+    }, [displayState, cartItems, config]);
+
+    const handleOpenDrawer = () => {
+        const now = new Date().toLocaleTimeString('ar-SA');
+        setDrawerLog(prev => [{ time: now, reason: 'فتح يدوي', amount: 0, user: 'المستخدم' }, ...prev]);
+    };
+
+    return (
+        <div className="workspace fade-in">
+            <div className="workspace-header">
+                <div className="header-title">
+                    <h1 className="workspace-title">📺 {t('pos.customer_display.title', 'شاشة العميل ودرج النقود')}</h1>
+                    <p className="workspace-subtitle">{t('pos.customer_display.subtitle', 'إعدادات العرض للعميل والتحكم بدرج النقود')}</p>
+                </div>
+                <div className="header-actions">
+                    <button className="btn btn-primary" onClick={openCustomerDisplay}>📺 {t('pos.customer_display.open', 'فتح شاشة العميل')}</button>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Display Settings */}
+                <div className="section-card">
+                    <h3 className="section-title">{t('pos.customer_display.display_settings', 'إعدادات العرض')}</h3>
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.customer_display.theme', 'السمة')}</label>
+                            <select className="form-input" value={config.theme} onChange={e => setConfig(p => ({ ...p, theme: e.target.value }))}>
+                                <option value="dark">{t('pos.customer_display.dark', 'داكنة')}</option>
+                                <option value="light">{t('pos.customer_display.light', 'فاتحة')}</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.customer_display.welcome_msg', 'رسالة الترحيب')}</label>
+                            <input className="form-input" value={config.welcomeMessage} onChange={e => setConfig(p => ({ ...p, welcomeMessage: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.customer_display.thank_msg', 'رسالة الشكر')}</label>
+                            <input className="form-input" value={config.thankYouMessage} onChange={e => setConfig(p => ({ ...p, thankYouMessage: e.target.value }))} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.customer_display.idle_msg', 'رسالة الانتظار')}</label>
+                            <input className="form-input" value={config.idleMessage} onChange={e => setConfig(p => ({ ...p, idleMessage: e.target.value }))} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Display State Preview */}
+                <div className="section-card">
+                    <h3 className="section-title">{t('pos.customer_display.preview', 'معاينة حالة العرض')}</h3>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                        {[
+                            { key: 'welcome', label: 'ترحيب', icon: '👋' },
+                            { key: 'scanning', label: 'مسح', icon: '📦' },
+                            { key: 'total', label: 'إجمالي', icon: '💰' },
+                            { key: 'thankYou', label: 'شكراً', icon: '✅' },
+                        ].map(s => (
+                            <button key={s.key} className={`btn ${displayState === s.key ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setDisplayState(s.key)}>
+                                {s.icon} {s.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{
+                        background: config.theme === 'dark' ? '#1a1a2e' : '#f8f8f8',
+                        color: config.theme === 'dark' ? '#e0e0e0' : '#1a1a2e',
+                        borderRadius: 12, padding: 20, minHeight: 200, textAlign: 'center',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: '2px solid #4f46e5'
+                    }}>
+                        {displayState === 'welcome' && (
+                            <div>
+                                <div style={{ fontSize: 36 }}>🛒</div>
+                                <div style={{ fontSize: 22, fontWeight: 700, color: '#4f46e5', marginTop: 8 }}>{config.welcomeMessage}</div>
+                                <div style={{ fontSize: 14, opacity: 0.7, marginTop: 4 }}>{config.idleMessage}</div>
+                            </div>
+                        )}
+                        {displayState === 'scanning' && (
+                            <div style={{ width: '100%', textAlign: 'right', padding: '0 10px' }}>
+                                {cartItems.map((item, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(128,128,128,0.2)' }}>
+                                        <span>{item.name} × {item.qty}</span>
+                                        <span>{formatNumber(item.price * item.qty)}</span>
+                                    </div>
+                                ))}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 700, fontSize: 18, color: '#4f46e5' }}>
+                                    <span>الإجمالي</span><span>{formatNumber(total)} {currency}</span>
+                                </div>
+                            </div>
+                        )}
+                        {displayState === 'total' && (
+                            <div>
+                                <div style={{ fontSize: 14, opacity: 0.7 }}>المبلغ المطلوب</div>
+                                <div style={{ fontSize: 42, fontWeight: 700, color: '#4f46e5' }}>{formatNumber(total)} {currency}</div>
+                            </div>
+                        )}
+                        {displayState === 'thankYou' && (
+                            <div>
+                                <div style={{ fontSize: 36 }}>✅</div>
+                                <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981', marginTop: 8 }}>{config.thankYouMessage}</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Cash Drawer */}
+                <div className="section-card">
+                    <h3 className="section-title">💰 {t('pos.cash_drawer.title', 'درج النقود')}</h3>
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.cash_drawer.mode', 'وضع الفتح')}</label>
+                            <select className="form-input" value={config.drawerMode} onChange={e => setConfig(p => ({ ...p, drawerMode: e.target.value }))}>
+                                <option value="auto">{t('pos.cash_drawer.auto', 'تلقائي بعد كل بيع نقدي')}</option>
+                                <option value="manual">{t('pos.cash_drawer.manual', 'يدوي فقط')}</option>
+                                <option value="disabled">{t('pos.cash_drawer.disabled', 'معطّل')}</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{t('pos.cash_drawer.pin', 'منفذ الدرج')}</label>
+                            <select className="form-input" value={config.drawerPin} onChange={e => setConfig(p => ({ ...p, drawerPin: e.target.value }))}>
+                                <option value="pin2">Pin 2 (RJ11)</option>
+                                <option value="pin5">Pin 5 (RJ11)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={handleOpenDrawer} disabled={config.drawerMode === 'disabled'}>
+                        💰 {t('pos.cash_drawer.open_btn', 'فتح الدرج الآن')}
+                    </button>
+                </div>
+
+                {/* Drawer Log */}
+                <div className="section-card">
+                    <h3 className="section-title">{t('pos.cash_drawer.log', 'سجل فتح الدرج')}</h3>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>{t('common.time', 'الوقت')}</th>
+                                <th>{t('pos.cash_drawer.reason', 'السبب')}</th>
+                                <th>{t('common.amount', 'المبلغ')}</th>
+                                <th>{t('common.user', 'المستخدم')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {drawerLog.map((log, i) => (
+                                <tr key={i}>
+                                    <td>{log.time}</td>
+                                    <td>{log.reason}</td>
+                                    <td>{log.amount > 0 ? formatNumber(log.amount) : '-'}</td>
+                                    <td>{log.user}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default CustomerDisplay;

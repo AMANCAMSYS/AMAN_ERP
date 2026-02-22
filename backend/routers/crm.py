@@ -443,3 +443,300 @@ def add_comment(ticket_id: int, data: CommentCreate, current_user=Depends(get_cu
         return {"id": cid}
     finally:
         db.close()
+
+
+# ======================== CRM-001: Convert Opportunity to Quotation ========================
+
+@router.post("/opportunities/{opp_id}/convert-quotation", status_code=201,
+             dependencies=[Depends(require_permission("sales.create"))])
+def convert_to_quotation(opp_id: int, current_user=Depends(get_current_user)):
+    """تحويل فرصة بيعية إلى عرض سعر"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        opp = db.execute(text("SELECT * FROM sales_opportunities WHERE id = :id"), {"id": opp_id}).fetchone()
+        if not opp:
+            raise HTTPException(status_code=404, detail="الفرصة غير موجودة")
+        opp = opp._mapping
+
+        if not opp.get("customer_id"):
+            raise HTTPException(status_code=400, detail="يجب تحديد عميل للفرصة قبل التحويل")
+
+        # Generate quotation number
+        quot_num = generate_sequential_number(db, f"QT-{datetime.now().year}", "sales_quotations", "quotation_number")
+
+        quot_id = db.execute(text("""
+            INSERT INTO sales_quotations (
+                quotation_number, customer_id, quotation_date, valid_until,
+                subtotal, tax_amount, discount, total, status, notes, created_by, branch_id
+            ) VALUES (
+                :num, :cust, CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days',
+                :amt, 0, 0, :amt, 'draft',
+                :notes, :uid, :branch
+            ) RETURNING id
+        """), {
+            "num": quot_num,
+            "cust": opp["customer_id"],
+            "amt": opp.get("expected_value") or 0,
+            "notes": f"تم التحويل من فرصة: {opp['title']}",
+            "uid": current_user.id,
+            "branch": opp.get("branch_id")
+        }).scalar()
+
+        # Add a quotation line with opportunity value
+        if opp.get("expected_value") and opp["expected_value"] > 0:
+            db.execute(text("""
+                INSERT INTO sales_quotation_lines (quotation_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:qid, :desc, 1, :price, 0, 0, :price)
+            """), {
+                "qid": quot_id,
+                "desc": opp["title"],
+                "price": opp["expected_value"]
+            })
+
+        # Update opportunity stage to 'proposal'
+        db.execute(text("UPDATE sales_opportunities SET stage = 'proposal', updated_at = NOW() WHERE id = :id"), {"id": opp_id})
+        db.commit()
+
+        return {"quotation_id": quot_id, "quotation_number": quot_num, "message": "تم تحويل الفرصة إلى عرض سعر"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ======================== CRM-003: Marketing Campaigns ========================
+
+class CampaignCreate(BaseModel):
+    name: str
+    campaign_type: str = "email"  # email, sms, social, event
+    status: str = "draft"  # draft, active, paused, completed
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget: float = 0
+    target_audience: Optional[str] = None
+    description: Optional[str] = None
+    branch_id: Optional[int] = None
+
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    campaign_type: Optional[str] = None
+    status: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    budget: Optional[float] = None
+    target_audience: Optional[str] = None
+    description: Optional[str] = None
+    sent_count: Optional[int] = None
+    open_count: Optional[int] = None
+    click_count: Optional[int] = None
+    conversion_count: Optional[int] = None
+
+
+@router.get("/campaigns", dependencies=[Depends(require_permission("sales.view"))])
+def list_campaigns(
+    status: Optional[str] = None,
+    campaign_type: Optional[str] = None,
+    current_user=Depends(get_current_user)
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["1=1"]
+        params = {}
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+        if campaign_type:
+            conditions.append("campaign_type = :type")
+            params["type"] = campaign_type
+
+        rows = db.execute(text(f"""
+            SELECT c.*, u.full_name as created_by_name
+            FROM marketing_campaigns c
+            LEFT JOIN users u ON c.created_by = u.id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY c.created_at DESC
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.get("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.view"))])
+def get_campaign(campaign_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text("SELECT * FROM marketing_campaigns WHERE id = :id"), {"id": campaign_id}).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الحملة غير موجودة")
+        return dict(row._mapping)
+    finally:
+        db.close()
+
+
+@router.post("/campaigns", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def create_campaign(data: CampaignCreate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        cid = db.execute(text("""
+            INSERT INTO marketing_campaigns (
+                name, campaign_type, status, start_date, end_date,
+                budget, target_audience, description, created_by, branch_id
+            ) VALUES (
+                :name, :type, :status, :start, :end,
+                :budget, :audience, :desc, :uid, :branch
+            ) RETURNING id
+        """), {
+            "name": data.name, "type": data.campaign_type, "status": data.status,
+            "start": data.start_date, "end": data.end_date,
+            "budget": data.budget, "audience": data.target_audience,
+            "desc": data.description, "uid": current_user.id, "branch": data.branch_id
+        }).scalar()
+        db.commit()
+        return {"id": cid, "message": "تم إنشاء الحملة"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.put("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.create"))])
+def update_campaign(campaign_id: int, data: CampaignUpdate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
+        if not updates:
+            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+        updates["id"] = campaign_id
+        set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
+        db.execute(text(f"UPDATE marketing_campaigns SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
+        db.commit()
+        return {"message": "تم تحديث الحملة"}
+    finally:
+        db.close()
+
+
+@router.delete("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.create"))])
+def delete_campaign(campaign_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM marketing_campaigns WHERE id = :id"), {"id": campaign_id})
+        db.commit()
+        return {"message": "تم حذف الحملة"}
+    finally:
+        db.close()
+
+
+# ======================== CRM-005: Knowledge Base ========================
+
+class ArticleCreate(BaseModel):
+    title: str
+    category: str = "general"  # faq, guide, policy, general
+    content: str
+    tags: Optional[str] = None
+    is_published: bool = False
+
+class ArticleUpdate(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[str] = None
+    is_published: Optional[bool] = None
+
+
+@router.get("/knowledge-base", dependencies=[Depends(require_permission("sales.view"))])
+def list_articles(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user=Depends(get_current_user)
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["1=1"]
+        params = {}
+        if category:
+            conditions.append("category = :cat")
+            params["cat"] = category
+        if search:
+            conditions.append("(title ILIKE :q OR content ILIKE :q OR tags ILIKE :q)")
+            params["q"] = f"%{search}%"
+
+        rows = db.execute(text(f"""
+            SELECT kb.*, u.full_name as author_name
+            FROM knowledge_base kb
+            LEFT JOIN users u ON kb.created_by = u.id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY kb.created_at DESC
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.get("/knowledge-base/{article_id}", dependencies=[Depends(require_permission("sales.view"))])
+def get_article(article_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        # increment view count
+        db.execute(text("UPDATE knowledge_base SET views = COALESCE(views, 0) + 1 WHERE id = :id"), {"id": article_id})
+        db.commit()
+        row = db.execute(text("""
+            SELECT kb.*, u.full_name as author_name
+            FROM knowledge_base kb LEFT JOIN users u ON kb.created_by = u.id
+            WHERE kb.id = :id
+        """), {"id": article_id}).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="المقالة غير موجودة")
+        return dict(row._mapping)
+    finally:
+        db.close()
+
+
+@router.post("/knowledge-base", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def create_article(data: ArticleCreate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        aid = db.execute(text("""
+            INSERT INTO knowledge_base (title, category, content, tags, is_published, created_by)
+            VALUES (:title, :cat, :content, :tags, :pub, :uid) RETURNING id
+        """), {
+            "title": data.title, "cat": data.category, "content": data.content,
+            "tags": data.tags, "pub": data.is_published, "uid": current_user.id
+        }).scalar()
+        db.commit()
+        return {"id": aid, "message": "تم إنشاء المقالة"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.put("/knowledge-base/{article_id}", dependencies=[Depends(require_permission("sales.create"))])
+def update_article(article_id: int, data: ArticleUpdate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
+        if not updates:
+            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+        updates["id"] = article_id
+        set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
+        db.execute(text(f"UPDATE knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
+        db.commit()
+        return {"message": "تم تحديث المقالة"}
+    finally:
+        db.close()
+
+
+@router.delete("/knowledge-base/{article_id}", dependencies=[Depends(require_permission("sales.create"))])
+def delete_article(article_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM knowledge_base WHERE id = :id"), {"id": article_id})
+        db.commit()
+        return {"message": "تم حذف المقالة"}
+    finally:
+        db.close()

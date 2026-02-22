@@ -7,6 +7,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileText, User, XCircle } from 'lucide-react'
 import { formatNumber } from '../../utils/format'
 import { toastEmitter } from '../../utils/toastEmitter'
+import InvoicePrintModal from './InvoicePrintModal'
 
 function InvoiceDetails() {
     const { t, i18n } = useTranslation()
@@ -16,6 +17,7 @@ function InvoiceDetails() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [paymentHistory, setPaymentHistory] = useState([])
+    const [showPrintModal, setShowPrintModal] = useState(false)
     const currency = getCurrency()
 
     useEffect(() => {
@@ -98,7 +100,7 @@ function InvoiceDetails() {
                             {t('sales.invoices.details.record_payment')}
                         </button>
                     )}
-                    <button className="btn btn-secondary" onClick={() => window.print()}>
+                    <button className="btn btn-secondary" onClick={() => setShowPrintModal(true)}>
                         <Printer size={18} style={{ marginLeft: '8px' }} />
                         {t('sales.invoices.details.print')}
                     </button>
@@ -299,6 +301,8 @@ function InvoiceDetails() {
                     </div>
                 )}
             </div>
+
+            {showPrintModal && <InvoicePrintModal invoice={invoice} onClose={() => setShowPrintModal(false)} />}
         </div>
     )
 }

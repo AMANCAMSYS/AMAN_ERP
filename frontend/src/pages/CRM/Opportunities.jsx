@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { crmAPI, salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
@@ -25,6 +26,7 @@ const stageBadgeColors = {
 
 function Opportunities() {
     const { t } = useTranslation()
+    const navigate = useNavigate()
     const currency = getCurrency()
 
     const stageOptions = [
@@ -146,6 +148,26 @@ function Opportunities() {
         }
     }
 
+    const handleConvertToQuotation = async (opp) => {
+        if (!opp.customer_id) {
+            alert(t('crm.convert_no_customer', 'يجب تحديد عميل للفرصة قبل التحويل إلى عرض سعر'))
+            return
+        }
+        try {
+            const res = await crmAPI.convertToQuotation(opp.id)
+            const quotationId = res.data?.quotation_id
+            if (quotationId) {
+                navigate(`/sales/quotations/${quotationId}`)
+            } else {
+                fetchOpportunities()
+                alert(t('crm.convert_success', 'تم تحويل الفرصة إلى عرض سعر بنجاح'))
+            }
+        } catch (err) {
+            console.error('Failed to convert', err)
+            alert(err.response?.data?.detail || t('crm.convert_error', 'فشل تحويل الفرصة'))
+        }
+    }
+
     const getStageLabel = (stage) => {
         const opt = stageOptions.find(s => s.value === stage)
         return opt ? opt.label : stage
@@ -212,8 +234,13 @@ function Opportunities() {
                                 <td>{opp.expected_close_date || '-'}</td>
                                 <td>{opp.assigned_name || '-'}</td>
                                 <td>
-                                    <div style={{ display: 'flex', gap: 6 }}>
+                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                         <button className="btn btn-secondary btn-sm" onClick={() => openEdit(opp)}>{t('crm.edit')}</button>
+                                        {opp.stage !== 'won' && opp.stage !== 'lost' && opp.customer_id && (
+                                            <button className="btn btn-primary btn-sm" onClick={() => handleConvertToQuotation(opp)} title={t('crm.convert_to_quotation', 'تحويل لعرض سعر')}>
+                                                📋 {t('crm.convert_quotation_short', 'عرض سعر')}
+                                            </button>
+                                        )}
                                         <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(opp.id)}>{t('common.delete')}</button>
                                     </div>
                                 </td>

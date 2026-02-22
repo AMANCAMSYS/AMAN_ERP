@@ -23,6 +23,9 @@ const Promotions = React.lazy(() => import('./pages/POS/Promotions'))
 const LoyaltyPrograms = React.lazy(() => import('./pages/POS/LoyaltyPrograms'))
 const TableManagement = React.lazy(() => import('./pages/POS/TableManagement'))
 const KitchenDisplay = React.lazy(() => import('./pages/POS/KitchenDisplay'))
+const POSOfflineManager = React.lazy(() => import('./pages/POS/POSOfflineManager'))
+const ThermalPrintSettings = React.lazy(() => import('./pages/POS/ThermalPrintSettings'))
+const CustomerDisplay = React.lazy(() => import('./pages/POS/CustomerDisplay'))
 
 // Manufacturing
 const ManufacturingHome = React.lazy(() => import('./pages/Manufacturing/ManufacturingHome'))
@@ -36,6 +39,7 @@ const MRPView = React.lazy(() => import('./pages/Manufacturing/MRPView'))
 const MRPPlanning = React.lazy(() => import('./pages/Manufacturing/MRPPlanning'))
 const EquipmentMaintenance = React.lazy(() => import('./pages/Manufacturing/EquipmentMaintenance'))
 const ProductionSchedule = React.lazy(() => import('./pages/Manufacturing/ProductionSchedule'))
+const DirectLaborReport = React.lazy(() => import('./pages/Manufacturing/DirectLaborReport'))
 
 
 // Accounting
@@ -216,11 +220,14 @@ const TaxReturnForm = React.lazy(() => import('./pages/Taxes/TaxReturnForm'))
 const TaxReturnDetails = React.lazy(() => import('./pages/Taxes/TaxReturnDetails'))
 const WithholdingTax = React.lazy(() => import('./pages/Taxes/WithholdingTax'))
 const TaxCompliance = React.lazy(() => import('./pages/Taxes/TaxCompliance'))
+const TaxCalendar = React.lazy(() => import('./pages/Taxes/TaxCalendar'))
 
 // CRM
 const CRMHome = React.lazy(() => import('./pages/CRM/CRMHome'))
 const Opportunities = React.lazy(() => import('./pages/CRM/Opportunities'))
 const SupportTickets = React.lazy(() => import('./pages/CRM/SupportTickets'))
+const MarketingCampaigns = React.lazy(() => import('./pages/CRM/MarketingCampaigns'))
+const KnowledgeBase = React.lazy(() => import('./pages/CRM/KnowledgeBase'))
 
 // Common & Settings
 const CompanySettings = React.lazy(() => import('./pages/Settings/CompanySettings'))
@@ -382,6 +389,7 @@ function App() {
                 <Route path="/manufacturing/mrp/:id" element={<PrivateRoute permission="manufacturing.view"><MRPView /></PrivateRoute>} />
                 <Route path="/manufacturing/equipment" element={<PrivateRoute permission="manufacturing.view"><EquipmentMaintenance /></PrivateRoute>} />
                 <Route path="/manufacturing/schedule" element={<PrivateRoute permission="manufacturing.view"><ProductionSchedule /></PrivateRoute>} />
+                <Route path="/manufacturing/reports/direct-labor" element={<PrivateRoute permission="manufacturing.view"><DirectLaborReport /></PrivateRoute>} />
 
                 {/* Stock Routes */}
                 <Route path="/stock" element={<PrivateRoute permission="stock.view"><StockHome /></PrivateRoute>} />
@@ -512,11 +520,14 @@ function App() {
                 <Route path="/taxes/returns/:id" element={<PrivateRoute permission="taxes.view"><TaxReturnDetails /></PrivateRoute>} />
                 <Route path="/taxes/wht" element={<PrivateRoute permission="taxes.view"><WithholdingTax /></PrivateRoute>} />
                 <Route path="/taxes/compliance" element={<PrivateRoute permission="taxes.view"><TaxCompliance /></PrivateRoute>} />
+                <Route path="/taxes/calendar" element={<PrivateRoute permission="taxes.view"><TaxCalendar /></PrivateRoute>} />
 
                 {/* CRM Routes */}
                 <Route path="/crm" element={<PrivateRoute permission="sales.view"><CRMHome /></PrivateRoute>} />
                 <Route path="/crm/opportunities" element={<PrivateRoute permission="sales.view"><Opportunities /></PrivateRoute>} />
                 <Route path="/crm/tickets" element={<PrivateRoute permission="sales.view"><SupportTickets /></PrivateRoute>} />
+                <Route path="/crm/campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
+                <Route path="/crm/knowledge-base" element={<PrivateRoute permission="sales.view"><KnowledgeBase /></PrivateRoute>} />
 
                 <Route path="/settings" element={<PrivateRoute permission="settings.view"><CompanySettings /></PrivateRoute>} />
                 <Route path="/settings/branches" element={<PrivateRoute permission="branches.view"><Branches /></PrivateRoute>} />
@@ -531,6 +542,9 @@ function App() {
                 <Route path="/pos/loyalty" element={<PrivateRoute permission="pos.view"><LoyaltyPrograms /></PrivateRoute>} />
                 <Route path="/pos/tables" element={<PrivateRoute permission="pos.view"><TableManagement /></PrivateRoute>} />
                 <Route path="/pos/kitchen" element={<PrivateRoute permission="pos.view"><KitchenDisplay /></PrivateRoute>} />
+                <Route path="/pos/offline" element={<PrivateRoute permission="pos.view"><POSOfflineManager /></PrivateRoute>} />
+                <Route path="/pos/thermal" element={<PrivateRoute permission="pos.view"><ThermalPrintSettings /></PrivateRoute>} />
+                <Route path="/pos/customer-display" element={<PrivateRoute permission="pos.view"><CustomerDisplay /></PrivateRoute>} />
 
 
                 <Route path="/" element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />

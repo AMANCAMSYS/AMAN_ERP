@@ -23,6 +23,7 @@ export const manufacturingAPI = {
     // Operations (Scheduling)
     listOperations: (params) => api.get('/manufacturing/operations', { params }),
 
+    // Orders
     listOrders: () => api.get('/manufacturing/orders'),
     getOrder: (id) => api.get(`/manufacturing/orders/${id}`),
     createOrder: (data) => api.post('/manufacturing/orders', data),
@@ -37,5 +38,10 @@ export const manufacturingAPI = {
 
     // Maintenance
     listMaintenanceLogs: (params) => api.get('/manufacturing/maintenance-logs', { params }),
-    createMaintenanceLog: (data) => api.post('/manufacturing/maintenance-logs', data)
+    createMaintenanceLog: (data) => api.post('/manufacturing/maintenance-logs', data),
+
+    // Reports
+    getDirectLaborReport: (params) => api.get('/manufacturing/reports/direct-labor', { params }),
+    getProductionCostReport: (params) => api.get('/manufacturing/reports/production-cost', { params }),
+    getWorkCenterEfficiency: (params) => api.get('/manufacturing/reports/work-center-efficiency', { params })
 }

@@ -1310,3 +1310,250 @@ def get_employee_tax_obligations(
         }
     finally:
         db.close()
+
+
+# ═══════════════════════════════════════════════════════════════
+# ██  Tax Filing Calendar  (TAX-002)
+# ═══════════════════════════════════════════════════════════════
+
+class TaxCalendarCreate(BaseModel):
+    title: str
+    tax_type: Optional[str] = None
+    due_date: date
+    reminder_days: Optional[list] = [7, 3, 1]
+    is_recurring: Optional[bool] = False
+    recurrence_months: Optional[int] = 3
+    notes: Optional[str] = None
+
+class TaxCalendarUpdate(BaseModel):
+    title: Optional[str] = None
+    tax_type: Optional[str] = None
+    due_date: Optional[date] = None
+    reminder_days: Optional[list] = None
+    is_recurring: Optional[bool] = None
+    recurrence_months: Optional[int] = None
+    is_completed: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+@router.get("/calendar")
+def list_tax_calendar(
+    status: Optional[str] = None,
+    tax_type: Optional[str] = None,
+    current_user=Depends(require_permission(["view_taxes"]))
+):
+    """List tax calendar events with optional filters"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["1=1"]
+        params = {}
+        if status == "completed":
+            conditions.append("is_completed = true")
+        elif status == "pending":
+            conditions.append("is_completed = false")
+        elif status == "overdue":
+            conditions.append("is_completed = false AND due_date < CURRENT_DATE")
+        if tax_type:
+            conditions.append("tax_type = :tax_type")
+            params["tax_type"] = tax_type
+
+        where = " AND ".join(conditions)
+        rows = db.execute(text(f"""
+            SELECT *, 
+                   CASE WHEN is_completed THEN 'completed'
+                        WHEN due_date < CURRENT_DATE THEN 'overdue'
+                        WHEN due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'upcoming'
+                        ELSE 'pending' END as status
+            FROM tax_calendar
+            WHERE {where}
+            ORDER BY due_date ASC
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception as e:
+        logger.error(f"Error listing tax calendar: {e}")
+        return []
+    finally:
+        db.close()
+
+
+@router.get("/calendar/summary")
+def tax_calendar_summary(
+    current_user=Depends(require_permission(["view_taxes"]))
+):
+    """Get tax calendar summary stats"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text("""
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE is_completed = false AND due_date >= CURRENT_DATE) as pending,
+                COUNT(*) FILTER (WHERE is_completed = false AND due_date < CURRENT_DATE) as overdue,
+                COUNT(*) FILTER (WHERE is_completed = true) as completed,
+                COUNT(*) FILTER (WHERE is_completed = false AND due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days') as upcoming_week,
+                MIN(due_date) FILTER (WHERE is_completed = false AND due_date >= CURRENT_DATE) as next_due
+            FROM tax_calendar
+        """)).fetchone()
+        return dict(row._mapping) if row else {}
+    except Exception as e:
+        logger.error(f"Error fetching calendar summary: {e}")
+        return {}
+    finally:
+        db.close()
+
+
+@router.get("/calendar/{item_id}")
+def get_tax_calendar_item(
+    item_id: int,
+    current_user=Depends(require_permission(["view_taxes"]))
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text("SELECT * FROM tax_calendar WHERE id = :id"), {"id": item_id}).fetchone()
+        if not row:
+            raise HTTPException(404, "Calendar item not found")
+        return dict(row._mapping)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.post("/calendar")
+def create_tax_calendar_item(
+    data: TaxCalendarCreate,
+    current_user=Depends(require_permission(["manage_taxes"]))
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import json
+        row = db.execute(text("""
+            INSERT INTO tax_calendar (title, tax_type, due_date, reminder_days, is_recurring, recurrence_months, notes, created_by)
+            VALUES (:title, :tax_type, :due_date, :reminder_days::jsonb, :is_recurring, :recurrence_months, :notes, :user_id)
+            RETURNING *
+        """), {
+            "title": data.title,
+            "tax_type": data.tax_type,
+            "due_date": data.due_date,
+            "reminder_days": json.dumps(data.reminder_days or [7, 3, 1]),
+            "is_recurring": data.is_recurring,
+            "recurrence_months": data.recurrence_months,
+            "notes": data.notes,
+            "user_id": current_user.id
+        }).fetchone()
+        db.commit()
+        return dict(row._mapping)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating calendar item: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/calendar/{item_id}")
+def update_tax_calendar_item(
+    item_id: int,
+    data: TaxCalendarUpdate,
+    current_user=Depends(require_permission(["manage_taxes"]))
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import json
+        updates = []
+        params = {"id": item_id}
+        for field in ["title", "tax_type", "due_date", "is_recurring", "recurrence_months", "is_completed", "notes"]:
+            val = getattr(data, field, None)
+            if val is not None:
+                updates.append(f"{field} = :{field}")
+                params[field] = val
+        if data.reminder_days is not None:
+            updates.append("reminder_days = :reminder_days::jsonb")
+            params["reminder_days"] = json.dumps(data.reminder_days)
+        if not updates:
+            raise HTTPException(400, "No fields to update")
+
+        row = db.execute(text(f"""
+            UPDATE tax_calendar SET {', '.join(updates)} WHERE id = :id RETURNING *
+        """), params).fetchone()
+        if not row:
+            raise HTTPException(404, "Calendar item not found")
+        db.commit()
+        return dict(row._mapping)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating calendar item: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/calendar/{item_id}")
+def delete_tax_calendar_item(
+    item_id: int,
+    current_user=Depends(require_permission(["manage_taxes"]))
+):
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("DELETE FROM tax_calendar WHERE id = :id"), {"id": item_id})
+        if result.rowcount == 0:
+            raise HTTPException(404, "Calendar item not found")
+        db.commit()
+        return {"message": "Deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/calendar/{item_id}/complete")
+def complete_tax_calendar_item(
+    item_id: int,
+    current_user=Depends(require_permission(["manage_taxes"]))
+):
+    """Mark a tax calendar item as completed, optionally creating next recurrence"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text("SELECT * FROM tax_calendar WHERE id = :id"), {"id": item_id}).fetchone()
+        if not row:
+            raise HTTPException(404, "Calendar item not found")
+        item = dict(row._mapping)
+
+        db.execute(text("UPDATE tax_calendar SET is_completed = true WHERE id = :id"), {"id": item_id})
+
+        # If recurring, create next occurrence
+        new_id = None
+        if item.get("is_recurring"):
+            import json
+            months = item.get("recurrence_months", 3)
+            next_row = db.execute(text("""
+                INSERT INTO tax_calendar (title, tax_type, due_date, reminder_days, is_recurring, recurrence_months, notes, created_by)
+                VALUES (:title, :tax_type, :due_date + INTERVAL ':months months', :reminder_days::jsonb, true, :months, :notes, :user_id)
+                RETURNING id
+            """.replace(":months months", f"{months} months").replace(":months,", f"{months},")), {
+                "title": item["title"],
+                "tax_type": item.get("tax_type"),
+                "due_date": item["due_date"],
+                "reminder_days": json.dumps(item.get("reminder_days", [7, 3, 1])),
+                "notes": item.get("notes"),
+                "user_id": current_user.id
+            }).fetchone()
+            new_id = next_row[0] if next_row else None
+
+        db.commit()
+        return {"message": "Completed", "next_recurrence_id": new_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error completing calendar item: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()

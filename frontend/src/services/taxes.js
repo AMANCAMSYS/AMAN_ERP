@@ -28,6 +28,14 @@ export const taxesAPI = {
     getBranchAnalysis: (params) => api.get('/taxes/branch-analysis', { params }),
     // Employee Tax Obligations
     getEmployeeTaxes: (params) => api.get('/taxes/employee-taxes', { params }),
+    // Tax Calendar
+    listCalendar: (params) => api.get('/taxes/calendar', { params }),
+    getCalendarSummary: () => api.get('/taxes/calendar/summary'),
+    getCalendarItem: (id) => api.get(`/taxes/calendar/${id}`),
+    createCalendarItem: (data) => api.post('/taxes/calendar', data),
+    updateCalendarItem: (id, data) => api.put(`/taxes/calendar/${id}`, data),
+    deleteCalendarItem: (id) => api.delete(`/taxes/calendar/${id}`),
+    completeCalendarItem: (id) => api.put(`/taxes/calendar/${id}/complete`),
 }
 
 // ── Tax Compliance API ──────────────────────────────────────
