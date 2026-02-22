@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
+import { Calendar, TrendingUp, TrendingDown, CheckCircle, AlertTriangle } from 'lucide-react'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
@@ -112,23 +113,27 @@ export default function OpeningBalances() {
             </div>
 
             {/* Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                 <div className="card p-3 text-center">
+                    <Calendar size={24} className="text-primary mb-2" />
                     <div className="small text-muted">{t('opening.entry_date')}</div>
                     <DateInput className="form-input form-input-sm mt-1"
                         value={entryDate} onChange={e => setEntryDate(e.target.value)} />
                 </div>
                 <div className="card p-3 text-center">
+                    <TrendingUp size={24} className="text-primary mb-2" />
                     <div className="small text-muted">{t('opening.total_debit')}</div>
-                    <div className="fw-bold text-primary">{formatNum(totalDebit)}</div>
+                    <div className="fw-bold fs-4 text-primary">{formatNum(totalDebit)}</div>
                 </div>
                 <div className="card p-3 text-center">
+                    <TrendingDown size={24} className="text-success mb-2" />
                     <div className="small text-muted">{t('opening.total_credit')}</div>
-                    <div className="fw-bold text-success">{formatNum(totalCredit)}</div>
+                    <div className="fw-bold fs-4 text-success">{formatNum(totalCredit)}</div>
                 </div>
                 <div className={`card p-3 text-center ${!isBalanced ? 'border-danger' : 'border-success'}`}>
+                    {isBalanced ? <CheckCircle size={24} className="text-success mb-2" /> : <AlertTriangle size={24} className="text-danger mb-2" />}
                     <div className="small text-muted">{t('opening.difference')}</div>
-                    <div className={`fw-bold ${isBalanced ? 'text-success' : 'text-danger'}`}>
+                    <div className={`fw-bold fs-4 ${isBalanced ? 'text-success' : 'text-danger'}`}>
                         {isBalanced ? '✅ 0.00' : formatNum(Math.abs(difference))}
                     </div>
                 </div>

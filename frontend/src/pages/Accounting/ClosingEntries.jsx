@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
+import { TrendingUp, TrendingDown, DollarSign, AlertTriangle } from 'lucide-react'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 
 export default function ClosingEntries() {
@@ -143,19 +144,19 @@ export default function ClosingEntries() {
                     {/* Summary Cards */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                         <div className="card p-3 text-center border-success">
-                            <div className="fs-4 mb-2">📈</div>
+                            <TrendingUp size={24} className="text-success mb-2" />
                             <div className="small text-muted">{t('closing.total_revenue')}</div>
                             <div className="fw-bold fs-4 text-success">{formatNum(preview.total_revenue)}</div>
                             <div className="small text-muted">{preview.revenues.length} {t('closing.accounts_count')}</div>
                         </div>
                         <div className="card p-3 text-center border-danger">
-                            <div className="fs-4 mb-2">📉</div>
+                            <TrendingDown size={24} className="text-danger mb-2" />
                             <div className="small text-muted">{t('closing.total_expenses')}</div>
                             <div className="fw-bold fs-4 text-danger">{formatNum(preview.total_expense)}</div>
                             <div className="small text-muted">{preview.expenses.length} {t('closing.accounts_count')}</div>
                         </div>
                         <div className={`card p-3 text-center border-${preview.net_income >= 0 ? 'success' : 'warning'}`}>
-                            <div className="fs-4 mb-2">{preview.net_income >= 0 ? '💰' : '⚠️'}</div>
+                            {preview.net_income >= 0 ? <DollarSign size={24} className="text-success mb-2" /> : <AlertTriangle size={24} className="text-warning mb-2" />}
                             <div className="small text-muted">{t('closing.net_income')}</div>
                             <div className={`fw-bold fs-4 ${preview.net_income >= 0 ? 'text-success' : 'text-warning'}`}>
                                 {formatNum(preview.net_income)}
