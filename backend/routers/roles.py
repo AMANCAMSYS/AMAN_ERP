@@ -595,9 +595,6 @@ def update_role(
         if not existing:
             raise HTTPException(status_code=404, detail="الدور غير موجود")
         
-        if existing.is_system_role:
-            raise HTTPException(status_code=400, detail="لا يمكن تعديل الأدوار الافتراضية للنظام")
-        
         # Build update query dynamically
         updates = []
         params = {"id": role_id}

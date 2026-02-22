@@ -331,8 +331,6 @@ const RoleManagement = () => {
                                     <button
                                         className="btn-edit"
                                         onClick={() => openModal(role)}
-                                        disabled={role.is_system_role}
-                                        title={role.is_system_role ? (t('admin.roles.cannot_edit_system_roles')) : ''}
                                     >
                                         <LucideIcons.Pencil size={14} /> {t('common.edit')}
                                     </button>
@@ -340,6 +338,7 @@ const RoleManagement = () => {
                                         className="btn-delete"
                                         onClick={() => handleDelete(role)}
                                         disabled={role.is_system_role}
+                                        title={role.is_system_role ? t('admin.roles.cannot_edit_system_roles') : ''}
                                     >
                                         <LucideIcons.Trash2 size={14} /> {t('common.delete')}
                                     </button>
