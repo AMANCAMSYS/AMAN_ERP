@@ -172,7 +172,9 @@ function PurchaseInvoiceForm() {
                 updatedItem.discount_percent = discountPercent
                 updatedItem.discount = discount
 
-                updatedItem[field] = value
+                updatedItem[field] = ['quantity', 'unit_price', 'tax_rate', 'discount', 'discount_percent'].includes(field)
+                    ? (value === '' ? '' : parseFloat(value) || 0)
+                    : value
                 return updatedItem
             }
             return item
@@ -201,6 +203,13 @@ function PurchaseInvoiceForm() {
 
         if (!formData.warehouse_id) {
             setError(t('buying.purchase_invoices.form.error_warehouse'))
+            window.scrollTo(0, 0)
+            return
+        }
+
+        const hasEmptyProduct = items.some(item => !item.product_id)
+        if (hasEmptyProduct) {
+            setError(t('buying.purchase_invoices.form.error_product_required') || 'Please select a product for all line items')
             window.scrollTo(0, 0)
             return
         }
@@ -596,7 +605,7 @@ function PurchaseInvoiceForm() {
                                                     checked={formData.down_payment_method === 'check'}
                                                     onChange={e => setFormData({ ...formData, down_payment_method: e.target.value })}
                                                 />
-                                                <span style={{ fontSize: '14px' }}>{t('buying.purchase_invoices.form.payment.down_payment_methods.bank')}</span>
+                                                <span style={{ fontSize: '14px' }}>{t('buying.purchase_invoices.form.payment.down_payment_methods.check')}</span>
                                             </label>
                                         </div>
 

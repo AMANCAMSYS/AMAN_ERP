@@ -80,7 +80,8 @@ export default function ExpenseForm() {
         cost_center_id: data.cost_center_id || '',
         project_id: data.project_id || '',
         receipt_number: data.receipt_number || '',
-        vendor_name: data.vendor_name || ''
+        vendor_name: data.vendor_name || '',
+        requires_approval: data.requires_approval ?? true
       });
     } catch (error) {
       showToast(t('expenses.errors.loadFailed'), 'error');
@@ -292,7 +293,9 @@ export default function ExpenseForm() {
                 onChange={handleChange}
               >
                 <option value="">{t('common.select')}</option>
-                {treasuries.map(tr => (
+                {treasuries
+                  .filter(tr => !formData.payment_method || formData.payment_method === 'credit_card' || tr.account_type === (formData.payment_method === 'bank' ? 'bank' : 'cash'))
+                  .map(tr => (
                   <option key={tr.id} value={tr.id}>{tr.name}</option>
                 ))}
               </select>

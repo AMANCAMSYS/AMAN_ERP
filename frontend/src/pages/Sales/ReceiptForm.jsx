@@ -474,7 +474,7 @@ function ReceiptForm() {
                                             step="0.01"
                                             min="0.01"
                                             value={formData.amount}
-                                            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                                            onChange={handleAmountChange}
                                             className="form-input"
                                         />
                                         <span className="absolute left-3 top-2 text-gray-400">{currency}</span>

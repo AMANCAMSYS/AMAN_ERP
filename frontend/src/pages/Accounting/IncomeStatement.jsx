@@ -17,6 +17,7 @@ function IncomeStatement() {
     const [isCompareMode, setIsCompareMode] = useState(false)
     const [compareStartDate, setCompareStartDate] = useState(new Date(new Date().getFullYear() - 1, 0, 1))
     const [compareEndDate, setCompareEndDate] = useState(new Date(new Date().getFullYear() - 1, 11, 31))
+    const [showExport, setShowExport] = useState(false)
 
     const fetchData = async () => {
         try {
@@ -61,17 +62,14 @@ function IncomeStatement() {
     const getName = (acc) => (isRTL ? acc.name : (acc.name_en || acc.name))
 
     // Flatten account tree to a list with level info
-    const flattenTree = (nodes) => {
+    const flattenTree = (nodes, level = 0) => {
         const result = []
-        const traverse = (items) => {
-            for (const item of items) {
-                result.push(item)
-                if (item.children && item.children.length > 0) {
-                    traverse(item.children)
-                }
+        for (const node of (nodes || [])) {
+            result.push({ ...node, level })
+            if (node.children && node.children.length > 0) {
+                result.push(...flattenTree(node.children, level + 1))
             }
         }
-        traverse(nodes || [])
         return result
     }
 
@@ -95,10 +93,10 @@ function IncomeStatement() {
                 <div className="display-flex gap-2">
                     {/* Export Buttons */}
                     <div className="dropdown" style={{ position: 'relative' }}>
-                        <button className="btn btn-secondary dropdown-toggle">
+                        <button className="btn btn-secondary dropdown-toggle" onClick={() => setShowExport(!showExport)}>
                             📥 {t('common.export')}
                         </button>
-                        <div className="dropdown-menu" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                        {showExport && <div className="dropdown-menu" style={{ display: 'block', position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                             <a
                                 href={`${api.defaults.baseURL}/reports/accounting/profit-loss/export?format=pdf&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}&token=${localStorage.getItem('token')}`}
                                 target="_blank"
@@ -115,7 +113,7 @@ function IncomeStatement() {
                             >
                                 📊 Excel
                             </a>
-                        </div>
+                        </div>}
                     </div>
                     <button className="btn btn-secondary" onClick={() => window.print()}>
                         {t('common.print')}

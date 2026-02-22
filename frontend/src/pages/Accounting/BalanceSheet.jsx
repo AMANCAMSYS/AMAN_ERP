@@ -15,6 +15,7 @@ function BalanceSheet() {
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
+    const [showExport, setShowExport] = useState(false)
     const currency = getCurrency()
 
     const fetchData = async () => {
@@ -141,10 +142,10 @@ function BalanceSheet() {
                 </div>
                 <div className="display-flex gap-2">
                     <div className="dropdown" style={{ position: 'relative' }}>
-                        <button className="btn btn-secondary dropdown-toggle">
+                        <button className="btn btn-secondary dropdown-toggle" onClick={() => setShowExport(!showExport)}>
                             📥 {t('common.export')}
                         </button>
-                        <div className="dropdown-menu" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                        {showExport && <div className="dropdown-menu" style={{ display: 'block', position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                             <a
                                 href={`${api.defaults.baseURL}/reports/accounting/balance-sheet/export?format=pdf&as_of_date=${asOfDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}&token=${localStorage.getItem('token')}`}
                                 target="_blank"
@@ -161,7 +162,7 @@ function BalanceSheet() {
                             >
                                 📊 Excel
                             </a>
-                        </div>
+                        </div>}
                     </div>
                     <button className="btn btn-secondary" onClick={() => window.print()}>
                         {t('common.print')}

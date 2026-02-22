@@ -198,7 +198,7 @@ function InvoiceForm() {
     }, [formData.warehouse_id]);
 
     const addItem = () => {
-        setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0 }])
+        setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15, discount: 0, discount_percent: 0 }])
     }
 
     const removeItem = (index) => {
@@ -473,8 +473,8 @@ function InvoiceForm() {
                                         type="number"
                                         step="0.000001"
                                         className="form-input form-input-sm font-mono"
-                                        value={formatNumber(formData.exchange_rate, 6)}
-                                        onChange={e => setFormData({ ...formData, exchange_rate: e.target.value })}
+                                        value={formData.exchange_rate}
+                                        onChange={e => setFormData({ ...formData, exchange_rate: parseFloat(e.target.value) || 1 })}
                                     />
                                 </div>
                             )}

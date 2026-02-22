@@ -530,12 +530,12 @@ const POSInterface = () => {
                                     {globalDiscount > 0 ? (
                                         <>
                                             <span className="value">-{globalDiscount.toLocaleString()} {currency}</span>
-                                            <button onClick={() => setGlobalDiscount(0)} className="discount-btn remove">إلغاء</button>
+                                            <button onClick={() => setGlobalDiscount(0)} className="discount-btn remove">{t('common.cancel')}</button>
                                         </>
                                     ) : (
                                         <button
                                             onClick={() => {
-                                                const d = prompt('أدخل قيمة الخصم');
+                                                const d = prompt(t('pos.enter_discount_value'));
                                                 if (d && !isNaN(d)) {
                                                     const val = Number(d);
                                                     if (val < 0) {
@@ -610,6 +610,7 @@ const POSInterface = () => {
                             </button>
                             <button
                                 disabled={!cart.length}
+                                onClick={() => window.print()}
                                 className="secondary-btn print"
                             >
                                 <Printer size={18} />
@@ -713,7 +714,7 @@ const POSInterface = () => {
                             quantity: item.quantity,
                             code: item.code,
                             barcode: item.barcode,
-                            tax_rate: item.tax_percent
+                            tax_rate: item.tax_percent ?? item.tax_rate ?? 15
                         })));
                         setShowHeldOrders(false);
                     }}

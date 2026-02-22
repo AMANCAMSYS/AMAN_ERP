@@ -79,7 +79,10 @@ function PurchaseDebitNotes() {
     }
 
     const addLine = () => setForm(f => ({ ...f, lines: [...f.lines, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 15, discount: 0 }] }))
-    const removeLine = (i) => setForm(f => ({ ...f, lines: f.lines.filter((_, idx) => idx !== i) }))
+    const removeLine = (i) => setForm(f => {
+        if (f.lines.length <= 1) return f;
+        return { ...f, lines: f.lines.filter((_, idx) => idx !== i) };
+    })
     const updateLine = (i, field, val) => {
         setForm(f => {
             const lines = [...f.lines]
