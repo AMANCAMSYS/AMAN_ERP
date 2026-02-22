@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { Briefcase, Users, Plus, ArrowRight, UserCheck, Clock, X, CheckCircle, ExternalLink, Filter } from 'lucide-react';
+import { Briefcase, Users, Plus, ArrowRight, X, CheckCircle, ExternalLink } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
@@ -23,13 +23,28 @@ const Recruitment = () => {
     const [openingForm, setOpeningForm] = useState({ title: '', department: '', positions: 1, requirements: '', deadline: '', description: '', employment_type: 'full_time' });
     const [appForm, setAppForm] = useState({ job_opening_id: '', applicant_name: '', email: '', phone: '', resume_url: '', cover_letter: '' });
 
-    useEffect(() => { fetchData(); }, [activeTab]);
+    const [filterStage, setFilterStage] = useState('all');
+
+    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { if (activeTab === 'applications' && applications.length === 0) fetchApplications(); }, [activeTab]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            if (activeTab === 'openings') { const res = await hrImprovementsAPI.listJobOpenings(); setOpenings(res.data || []); }
-            else { const res = await hrImprovementsAPI.listAllApplications(); setApplications(res.data || []); }
+            const [openRes, appRes] = await Promise.all([
+                hrImprovementsAPI.listJobOpenings(),
+                hrImprovementsAPI.listAllApplications()
+            ]);
+            setOpenings(openRes.data || []);
+            setApplications(appRes.data || []);
+        } catch (err) { console.error(err); } finally { setLoading(false); }
+    };
+
+    const fetchApplications = async () => {
+        try {
+            setLoading(true);
+            const res = await hrImprovementsAPI.listAllApplications();
+            setApplications(res.data || []);
         } catch (err) { console.error(err); } finally { setLoading(false); }
     };
 
@@ -102,12 +117,14 @@ const Recruitment = () => {
 
     // Summary stats
     const openCount = openings.filter(o => o.status !== 'closed').length;
-    const closedCount = openings.filter(o => o.status === 'closed').length;
     const totalPositions = openings.filter(o => o.status !== 'closed').reduce((s, o) => s + (o.positions || 0), 0);
     const hiredCount = applications.filter(a => a.stage === 'hired').length;
 
     // Filtered openings
     const filteredOpenings = filterStatus === 'all' ? openings : openings.filter(o => (o.status || 'open') === filterStatus);
+
+    // Filtered applications
+    const filteredApplications = filterStage === 'all' ? applications : applications.filter(a => (a.stage || 'new') === filterStage);
 
     return (
         <div className="workspace fade-in">
@@ -154,6 +171,12 @@ const Recruitment = () => {
                         <option value="all">{t('hr.filter_all')}</option>
                         <option value="open">{t('hr.status_open')}</option>
                         <option value="closed">{t('hr.status_closed')}</option>
+                    </select>
+                )}
+                {activeTab === 'applications' && (
+                    <select className="form-input" style={{ width: 'auto', minWidth: 160 }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
+                        <option value="all">{t('hr.filter_all')}</option>
+                        {stages.map(s => <option key={s} value={s}>{stageLabels[s]}</option>)}
                     </select>
                 )}
             </div>
@@ -211,7 +234,7 @@ const Recruitment = () => {
                                 <th>{t('hr.col_actions')}</th>
                             </tr></thead>
                             <tbody>
-                                {applications.map(a => (
+                                {filteredApplications.map(a => (
                                     <tr key={a.id}>
                                         <td className="font-medium" style={{ cursor: 'pointer' }} onClick={() => { setSelectedApp(a); setShowDetailModal(true); }}>
                                             {a.applicant_name}
@@ -232,7 +255,7 @@ const Recruitment = () => {
                                         </td>
                                     </tr>
                                 ))}
-                                {applications.length === 0 && <tr><td colSpan="6" className="text-center text-muted p-4">{t('hr.no_applications')}</td></tr>}
+                                {filteredApplications.length === 0 && <tr><td colSpan="6" className="text-center text-muted p-4">{applications.length === 0 ? t('hr.no_applications') : t('common.no_data')}</td></tr>}
                             </tbody>
                         </table>
                     </div>

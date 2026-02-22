@@ -20,6 +20,9 @@ const Payslips = () => {
     const [selectedPayslip, setSelectedPayslip] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [genForm, setGenForm] = useState({ employee_id: '', month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+    const [filterEmployee, setFilterEmployee] = useState('');
+    const [filterMonth, setFilterMonth] = useState('');
+    const [filterYear, setFilterYear] = useState('');
     const printRef = useRef(null);
 
     useEffect(() => {
@@ -96,8 +99,15 @@ const Payslips = () => {
         return <span className={`badge ${cls}`}>{label}</span>;
     };
 
-    const totalNet = payslips.reduce((s, p) => s + (p.net_pay || p.net_salary || 0), 0);
-    const totalBasic = payslips.reduce((s, p) => s + (p.basic_salary || 0), 0);
+    const filteredPayslips = payslips.filter(p => {
+        if (filterEmployee && String(p.employee_id) !== String(filterEmployee)) return false;
+        if (filterMonth && String(p.month) !== String(filterMonth)) return false;
+        if (filterYear && String(p.year) !== String(filterYear)) return false;
+        return true;
+    });
+
+    const totalNet = filteredPayslips.reduce((s, p) => s + (p.net_pay || p.net_salary || 0), 0);
+    const totalBasic = filteredPayslips.reduce((s, p) => s + (p.basic_salary || 0), 0);
 
     const monthNames = isRTL
         ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
@@ -115,11 +125,45 @@ const Payslips = () => {
                 </div>
             </div>
 
+            {/* Filter Bar */}
+            <div className="card section-card" style={{ marginBottom: 24 }}>
+                <div className="d-flex gap-3 align-items-end" style={{ flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: 2, minWidth: 180, marginBottom: 0 }}>
+                        <label className="form-label">{t('hr.col_employee')}</label>
+                        <select className="form-input" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                            <option value="">{t('hr.filter_all')}</option>
+                            {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: 130, marginBottom: 0 }}>
+                        <label className="form-label">{t('hr.col_month')}</label>
+                        <select className="form-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+                            <option value="">{t('hr.filter_all')}</option>
+                            {monthNames.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: 110, marginBottom: 0 }}>
+                        <label className="form-label">{t('hr.year')}</label>
+                        <select className="form-input" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
+                            <option value="">{t('hr.filter_all')}</option>
+                            {[...new Set(payslips.map(p => p.year))].sort((a,b) => b-a).map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    </div>
+                    {(filterEmployee || filterMonth || filterYear) && (
+                        <button className="btn btn-secondary" style={{ marginBottom: 0 }} onClick={() => { setFilterEmployee(''); setFilterMonth(''); setFilterYear(''); }}>
+                            {t('common.reset') || 'إعادة تعيين'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Summary Cards */}
             <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: 24 }}>
                 <div className="metric-card">
                     <div className="metric-label">{t('hr.payslip_total_count')}</div>
-                    <div className="metric-value" style={{ color: '#2563eb' }}>{payslips.length}</div>
+                    <div className="metric-value" style={{ color: '#2563eb' }}>{filteredPayslips.length}</div>
                 </div>
                 <div className="metric-card">
                     <div className="metric-label">{t('hr.payslip_total_basic')}</div>
@@ -133,7 +177,12 @@ const Payslips = () => {
 
             {/* Payslips Table */}
             <div className="card section-card">
-                {loading ? <div className="text-center p-4">...</div> : (
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                        <div className="spinner" style={{ margin: '0 auto 8px' }} />
+                        {t('common.loading')}
+                    </div>
+                ) : (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead><tr>
@@ -147,7 +196,7 @@ const Payslips = () => {
                                 <th>{t('hr.col_actions')}</th>
                             </tr></thead>
                             <tbody>
-                                {payslips.map(p => (
+                                {filteredPayslips.map(p => (
                                     <tr key={p.id}>
                                         <td className="font-medium">{p.employee_name || `#${p.employee_id}`}</td>
                                         <td>{monthNames[(p.month || 1) - 1]} {p.year}</td>
@@ -165,7 +214,7 @@ const Payslips = () => {
                                         </td>
                                     </tr>
                                 ))}
-                                {payslips.length === 0 && <tr><td colSpan="8" className="text-center text-muted p-4">{t('hr.no_payslips')}</td></tr>}
+                                {filteredPayslips.length === 0 && <tr><td colSpan="8" className="text-center text-muted p-4">{payslips.length === 0 ? t('hr.no_payslips') : t('common.no_data')}</td></tr>}
                             </tbody>
                         </table>
                     </div>
