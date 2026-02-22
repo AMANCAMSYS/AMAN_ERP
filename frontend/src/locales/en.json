@@ -497,7 +497,10 @@
     "bank_reconciliation": "Bank Reconciliation",
     "audit_logs": "Audit Logs",
     "role_management": "Role Management",
-    "costing_policies": "Costing Policies"
+    "costing_policies": "Costing Policies",
+    "crm": "CRM",
+    "api_keys": "API Keys",
+    "webhooks": "Webhooks"
   },
   "hr": {
     "attendance": {

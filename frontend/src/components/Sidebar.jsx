@@ -48,7 +48,7 @@ function Sidebar() {
         }
         // CRM Module
         if (hasPermission('sales.view')) {
-            navItems.push({ path: '/crm', label: 'إدارة العلاقات', icon: '🤝' })
+            navItems.push({ path: '/crm', label: t('nav.crm'), icon: '🤝' })
         }
         // Expenses Module
         if (hasPermission('expenses.view')) {
@@ -79,8 +79,8 @@ function Sidebar() {
         if (hasPermission('admin.companies')) {
             navItems.push({ path: '/settings/costing-policy', label: t('nav.costingPolicy') || 'سياسات التكلفة', icon: '💲' })
             navItems.push({ path: '/data-import', label: t('nav.dataImport') || 'استيراد البيانات', icon: '📥' })
-            navItems.push({ path: '/settings/api-keys', label: 'مفاتيح API', icon: '🔑' })
-            navItems.push({ path: '/settings/webhooks', label: 'الويب هوك', icon: '🔗' })
+            navItems.push({ path: '/settings/api-keys', label: t('nav.api_keys'), icon: '🔑' })
+            navItems.push({ path: '/settings/webhooks', label: t('nav.webhooks'), icon: '🔗' })
             navItems.push({ path: '/settings', label: t('nav.settings'), icon: '⚙️' })
         }
     }

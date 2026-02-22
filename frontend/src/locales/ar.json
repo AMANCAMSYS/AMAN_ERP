@@ -808,7 +808,10 @@
     "audit_logs": "سجلات المراقبة",
     "role_management": "إدارة الأدوار",
     "costing_policies": "سياسات التكلفة",
-    "taxes": "الضرائب"
+    "taxes": "الضرائب",
+    "crm": "إدارة العلاقات",
+    "api_keys": "مفاتيح API",
+    "webhooks": "الويب هوك"
   },
   "branches": {
     "title": "إدارة الفروع",
