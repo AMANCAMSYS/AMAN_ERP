@@ -34,34 +34,29 @@ const RoleManagement = () => {
         permissions: []
     });
 
-    // Build a lookup map: permission key → Arabic/English label
+    // Build lookup maps from permissions array
     const permLabelMap = useMemo(() => {
         const map = {};
         permissions.forEach(p => {
-            map[p.key] = { ar: p.label_ar || p.key, en: p.label_en || p.key };
+            map[p.key] = { ar: p.label_ar || p.key, en: p.label_en || p.key, section: p.section || p.key.split('.')[0] };
         });
         return map;
     }, [permissions]);
 
     // Get display label for a permission key
     const getPermLabel = (key) => {
-        if (key === '*') return isRTL ? 'الكل' : 'All';
+        if (key === '*') return isRTL ? 'جميع الصلاحيات' : 'All Permissions';
         const entry = permLabelMap[key];
-        if (!entry) {
-            // Fallback: show section label from sections map
-            const sectionKey = key.split('.')[0];
-            const sec = sections[sectionKey];
-            return isRTL ? (sec?.label_ar || key) : (sec?.label_en || key);
-        }
-        return isRTL ? entry.ar : entry.en;
-    };
-
-    // Get section label for a permission key
-    const getPermSectionLabel = (key) => {
-        if (key === '*') return isRTL ? 'صلاحيات كاملة' : 'Full Access';
+        if (entry) return isRTL ? entry.ar : entry.en;
         const sectionKey = key.split('.')[0];
         const sec = sections[sectionKey];
-        return isRTL ? (sec?.label_ar || sectionKey) : (sec?.label_en || sectionKey);
+        return isRTL ? (sec?.label_ar || key) : (sec?.label_en || key);
+    };
+
+    // Get the actual section key for a permission (uses API metadata, not just key prefix)
+    const getPermSection = (key) => {
+        if (key === '*') return '*';
+        return permLabelMap[key]?.section || key.split('.')[0];
     };
 
     useEffect(() => {
@@ -327,77 +322,78 @@ const RoleManagement = () => {
                         </div>
                     ) : (
                         roles.map(role => {
-                            // Group permissions by section for display
+                            // Group permissions by their ACTUAL section (from API metadata)
                             const permSections = {};
                             (role.permissions || []).forEach(p => {
                                 if (p === '*') {
                                     permSections['*'] = ['*'];
                                 } else {
-                                    const sec = p.split('.')[0];
+                                    const sec = permLabelMap[p]?.section || p.split('.')[0];
                                     if (!permSections[sec]) permSections[sec] = [];
                                     permSections[sec].push(p);
                                 }
                             });
-                            const sectionKeys = Object.keys(permSections);
+                            const sectionKeys = Object.keys(permSections).filter(k => k !== '*');
+                            const isFull = role.permissions?.includes('*');
 
                             return (
                             <div key={role.id} className={`role-card ${role.is_system_role ? 'system' : ''}`}>
-                                {role.is_system_role && (
-                                    <div className="system-badge-row">
-                                        <span className="system-badge">
-                                            <LucideIcons.Lock size={12} /> {t('roles.systemRole')}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="role-card-header">
-                                    <div className="role-icon">
+                                {/* Header */}
+                                <div className="role-card-top">
+                                    <div className="role-icon-clean">
                                         {role.is_system_role
-                                            ? <LucideIcons.ShieldCheck size={24} color="white" />
-                                            : <LucideIcons.User size={24} color="white" />}
+                                            ? <LucideIcons.ShieldCheck size={20} />
+                                            : <LucideIcons.User size={20} />}
                                     </div>
                                     <div className="role-info">
-                                        <h3>{isRTL ? (role.role_name_ar || role.role_name) : role.role_name}</h3>
-                                        {role.description && <p>{role.description}</p>}
-                                        {!isRTL && role.role_name_ar && <p className="role-name-secondary">{role.role_name_ar}</p>}
-                                        {isRTL && <p className="role-name-secondary">{role.role_name}</p>}
+                                        <h3>{isRTL ? (role.role_name_ar || role.role_name) : (role.role_name_ar || role.role_name)}</h3>
+                                        {role.description && <p className="role-desc">{role.description}</p>}
+                                        <span className="role-en-name">{role.role_name}</span>
                                     </div>
+                                    {role.is_system_role && (
+                                        <span className="system-badge">
+                                            <LucideIcons.Lock size={11} /> {t('roles.systemRole')}
+                                        </span>
+                                    )}
                                 </div>
+
+                                {/* Divider */}
+                                <div className="role-card-divider" />
+
+                                {/* Permissions */}
                                 <div className="role-permissions">
-                                    <span className="perm-count">
-                                        <LucideIcons.Key size={14} style={{ verticalAlign: 'middle' }} />
-                                        {' '}{role.permissions?.includes('*') ? t('roles.fullAccess') : `${role.permissions?.length || 0} ${t('roles.permissions')}`}
-                                    </span>
+                                    <div className="perm-count-row">
+                                        <LucideIcons.Key size={13} />
+                                        <span>{isFull ? t('roles.fullAccess') : `${role.permissions?.length || 0} ${t('roles.permissions')}`}</span>
+                                    </div>
                                     <div className="perm-preview">
-                                        {role.permissions?.includes('*') ? (
+                                        {isFull ? (
                                             <span className="perm-tag perm-tag-full">
-                                                <LucideIcons.Star size={12} /> {isRTL ? 'جميع الصلاحيات' : 'All Permissions'}
+                                                {isRTL ? 'جميع الوحدات' : 'All Modules'}
                                             </span>
                                         ) : (
                                             <>
-                                                {sectionKeys.slice(0, 4).map(sec => {
+                                                {sectionKeys.slice(0, 5).map(sec => {
                                                     const secMeta = sections[sec];
-                                                    const IconName = secMeta?.icon || 'Circle';
-                                                    const DynIcon = LucideIcons[IconName];
                                                     return (
-                                                        <span key={sec} className="perm-tag" title={permSections[sec].map(p => getPermLabel(p)).join('، ')}>
-                                                            {DynIcon && <DynIcon size={12} />}
+                                                        <span key={sec} className="perm-tag"
+                                                            title={permSections[sec].map(p => getPermLabel(p)).join('\n')}>
                                                             {isRTL ? (secMeta?.label_ar || sec) : (secMeta?.label_en || sec)}
                                                         </span>
                                                     );
                                                 })}
-                                                {sectionKeys.length > 4 && (
-                                                    <span className="perm-more">+{sectionKeys.length - 4}</span>
+                                                {sectionKeys.length > 5 && (
+                                                    <span className="perm-more">+{sectionKeys.length - 5}</span>
                                                 )}
                                             </>
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Actions */}
                                 <div className="role-actions">
-                                    <button
-                                        className="btn-edit"
-                                        onClick={() => openModal(role)}
-                                    >
-                                        <LucideIcons.Pencil size={14} /> {t('common.edit')}
+                                    <button className="btn-edit" onClick={() => openModal(role)}>
+                                        <LucideIcons.Pencil size={13} /> {t('common.edit')}
                                     </button>
                                     <button
                                         className="btn-delete"
@@ -405,7 +401,7 @@ const RoleManagement = () => {
                                         disabled={role.is_system_role}
                                         title={role.is_system_role ? t('admin.roles.cannot_edit_system_roles') : ''}
                                     >
-                                        <LucideIcons.Trash2 size={14} /> {t('common.delete')}
+                                        <LucideIcons.Trash2 size={13} /> {t('common.delete')}
                                     </button>
                                 </div>
                             </div>
@@ -535,7 +531,7 @@ const RoleManagement = () => {
                                                                 <span className="perm-label">
                                                                     {isRTL ? perm.label_ar : perm.label_en}
                                                                 </span>
-                                                                <code className="perm-key">{perm.key}</code>
+                                                                {!isRTL && <code className="perm-key">{perm.key}</code>}
                                                             </label>
                                                         ))}
                                                     </div>
