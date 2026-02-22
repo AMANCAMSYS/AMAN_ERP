@@ -108,6 +108,19 @@
       "no_shared": "No reports shared with you yet",
       "permission_label": "Permission"
     },
+    "report_types": {
+      "profit_loss": "Profit & Loss",
+      "balance_sheet": "Balance Sheet",
+      "trial_balance": "Trial Balance",
+      "general_ledger": "General Ledger",
+      "cashflow": "Cash Flow",
+      "sales_summary": "Sales Summary",
+      "sales_aging": "Aging Report",
+      "detailed_pl": "Detailed P&L",
+      "commissions": "Commissions",
+      "inventory_valuation": "Inventory Valuation",
+      "payroll_trend": "Payroll Trend"
+    },
     "builder_subtitle": "Create custom reports",
     "builder_title": "Report Builder",
     "click_preview": "Click Preview to show results",

@@ -232,6 +232,7 @@ const ReportCenter = React.lazy(() => import('./pages/Reports/ReportCenter'))
 const ScheduledReports = React.lazy(() => import('./pages/Reports/ScheduledReports'))
 const ReportBuilder = React.lazy(() => import('./pages/Reports/ReportBuilder'))
 const DetailedProfitLoss = React.lazy(() => import('./pages/Reports/DetailedProfitLoss'))
+const SharedReports = React.lazy(() => import('./pages/Reports/SharedReports'))
 
 const PaymentForm = React.lazy(() => import('./pages/Purchases/PaymentForm'))
 const PaymentDetails = React.lazy(() => import('./pages/Purchases/PaymentDetails'))
@@ -459,6 +460,7 @@ function App() {
                 <Route path="/reports/builder" element={<PrivateRoute permission="reports.create"><ReportBuilder /></PrivateRoute>} />
                 <Route path="/reports/scheduled" element={<PrivateRoute permission="reports.view"><ScheduledReports /></PrivateRoute>} />
                 <Route path="/reports/detailed-pl" element={<PrivateRoute permission="accounting.view"><DetailedProfitLoss /></PrivateRoute>} />
+                <Route path="/reports/shared" element={<PrivateRoute permission="reports.view"><SharedReports /></PrivateRoute>} />
 
                 {/* HR Routes */}
                 <Route path="/hr" element={<PrivateRoute permission="hr.view"><HRHome /></PrivateRoute>} />

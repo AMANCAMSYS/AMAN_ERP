@@ -347,6 +347,19 @@
       "no_shared": "لا توجد تقارير مشتركة معك بعد",
       "permission_label": "الصلاحية"
     },
+    "report_types": {
+      "profit_loss": "قائمة الدخل",
+      "balance_sheet": "الميزانية العمومية",
+      "trial_balance": "ميزان المراجعة",
+      "general_ledger": "دفتر الأستاذ العام",
+      "cashflow": "التدفقات النقدية",
+      "sales_summary": "ملخص المبيعات",
+      "sales_aging": "تقرير أعمار الديون",
+      "detailed_pl": "أرباح وخسائر تفصيلي",
+      "commissions": "تقرير العمولات",
+      "inventory_valuation": "تقييم المخزون",
+      "payroll_trend": "اتجاه الرواتب"
+    },
     "profit_loss": "قائمة الدخل",
     "balance_sheet": "الميزانية العمومية",
     "trial_balance": "ميزان المراجعة",

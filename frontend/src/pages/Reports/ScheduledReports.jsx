@@ -5,19 +5,11 @@ import { branchesAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 
-const REPORT_TYPES = {
-    profit_loss: 'Profit & Loss',
-    balance_sheet: 'Balance Sheet',
-    trial_balance: 'Trial Balance',
-    general_ledger: 'General Ledger',
-    cashflow: 'Cash Flow',
-    sales_summary: 'Sales Summary',
-    sales_aging: 'Aging Report',
-    detailed_pl: 'Detailed P&L',
-    commissions: 'Commissions',
-    inventory_valuation: 'Inventory Valuation',
-    payroll_trend: 'Payroll Trend',
-};
+const REPORT_TYPE_KEYS = [
+    'profit_loss', 'balance_sheet', 'trial_balance', 'general_ledger',
+    'cashflow', 'sales_summary', 'sales_aging', 'detailed_pl',
+    'commissions', 'inventory_valuation', 'payroll_trend',
+];
 
 const STATUS_COLORS = {
     pending: 'badge-secondary',
@@ -30,6 +22,8 @@ const ScheduledReports = () => {
     const { t } = useTranslation();
     const { showToast } = useToast();
     const { currentBranch } = useBranch();
+
+    const getReportTypeLabel = (key) => t(`reports.report_types.${key}`, key);
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -251,7 +245,7 @@ const ScheduledReports = () => {
                                 <tr key={report.id}>
                                     <td style={{ fontWeight: 600 }}>{report.report_name || report.report_type}</td>
                                     <td>
-                                        {REPORT_TYPES[report.report_type] || report.report_type}
+                                        {getReportTypeLabel(report.report_type)}
                                         <span className="badge badge-secondary ms-2">{(report.format || 'pdf').toUpperCase()}</span>
                                     </td>
                                     <td>{t(`reports.frequency.${report.frequency}`, report.frequency)}</td>
@@ -324,8 +318,8 @@ const ScheduledReports = () => {
                                         <label>{t('reports.scheduled.report_type', 'Report Type')}</label>
                                         <select className="form-input" value={formData.report_type}
                                             onChange={e => setFormData({ ...formData, report_type: e.target.value })}>
-                                            {Object.entries(REPORT_TYPES).map(([key, label]) => (
-                                                <option key={key} value={key}>{label}</option>
+                                            {REPORT_TYPE_KEYS.map(key => (
+                                                <option key={key} value={key}>{getReportTypeLabel(key)}</option>
                                             ))}
                                         </select>
                                     </div>

@@ -110,7 +110,6 @@ const ReportCenter = () => {
             permission: 'reports.create',
             reports: [
                 { name: t('reports_center.reports.builder', 'Report Builder'), path: '/reports/builder', desc: t('reports_center.reports.builder_desc', 'Create and save custom reports') },
-                { name: t('reports_center.reports.saved_reports', 'Saved Reports'), path: '/reports/builder', desc: t('reports_center.reports.saved_reports_desc', 'View and run your saved reports') },
                 { name: t('reports.scheduled.title', 'Scheduled Reports'), path: '/reports/scheduled', desc: t('reports_center.reports.scheduled_desc', 'Automate report delivery via email') },
                 { name: t('reports.sharing.shared_with_me', 'Shared With Me'), path: '/reports/shared', desc: t('reports_center.reports.shared_desc', 'Reports that colleagues have shared with you') }
             ]
