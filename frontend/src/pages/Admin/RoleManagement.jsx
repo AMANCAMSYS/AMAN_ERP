@@ -293,6 +293,13 @@ const RoleManagement = () => {
                     ) : (
                         roles.map(role => (
                             <div key={role.id} className={`role-card ${role.is_system_role ? 'system' : ''}`}>
+                                {role.is_system_role && (
+                                    <div className="system-badge-row">
+                                        <span className="system-badge">
+                                            <LucideIcons.Lock size={12} /> {t('roles.systemRole')}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="role-card-header">
                                     <div className="role-icon">
                                         {role.is_system_role
@@ -305,11 +312,6 @@ const RoleManagement = () => {
                                         {!isRTL && role.role_name_ar && <p className="role-name-secondary">{role.role_name_ar}</p>}
                                         {isRTL && <p className="role-name-secondary">{role.role_name}</p>}
                                     </div>
-                                    {role.is_system_role && (
-                                        <span className="system-badge">
-                                            <LucideIcons.Lock size={12} /> {t('roles.systemRole')}
-                                        </span>
-                                    )}
                                 </div>
                                 <div className="role-permissions">
                                     <span className="perm-count">

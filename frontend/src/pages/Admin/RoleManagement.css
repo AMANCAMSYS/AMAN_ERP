@@ -138,21 +138,26 @@
     color: #6c757d;
 }
 
+.system-badge-row {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 10px;
+}
+
+[dir="rtl"] .system-badge-row {
+    justify-content: flex-end;
+}
+
 .system-badge {
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: #e9ecef;
     color: #495057;
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
-}
-
-[dir="rtl"] .system-badge {
-    left: auto;
-    right: 0;
 }
 
 .role-permissions {
