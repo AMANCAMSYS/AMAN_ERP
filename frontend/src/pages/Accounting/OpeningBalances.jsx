@@ -106,9 +106,13 @@ export default function OpeningBalances() {
                             </small>
                         )}
                     </div>
-                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving ? '⏳' : '💾'} {t('opening.save')}
-                    </button>
+                    <div className="d-flex align-items-center gap-2">
+                        <DateInput className="form-input form-input-sm"
+                            value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+                        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                            {saving ? '⏳' : '💾'} {t('opening.save')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -117,8 +121,7 @@ export default function OpeningBalances() {
                 <div className="card p-3 text-center">
                     <Calendar size={24} className="text-primary mb-2" />
                     <div className="small text-muted">{t('opening.entry_date')}</div>
-                    <DateInput className="form-input form-input-sm mt-1"
-                        value={entryDate} onChange={e => setEntryDate(e.target.value)} />
+                    <div className="fw-bold fs-4">{entryDate}</div>
                 </div>
                 <div className="card p-3 text-center">
                     <TrendingUp size={24} className="text-primary mb-2" />
