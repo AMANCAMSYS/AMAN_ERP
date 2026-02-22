@@ -1079,7 +1079,10 @@
       "accounting": "المحاسبة",
       "treasury": "الخزينة",
       "hr": "الموارد البشرية",
-      "taxes": "الضرائب"
+      "taxes": "الضرائب",
+      "manufacturing": "التصنيع",
+      "projects": "المشاريع",
+      "custom": "التقارير المخصصة"
     },
     "reports": {
       "sales_analytics": "تحليل المبيعات",
@@ -1111,7 +1114,21 @@
       "vat_report": "تقرير ضريبة القيمة المضافة",
       "vat_report_desc": "ملخص ضريبة المدخلات والمخرجات والمستحق",
       "tax_audit": "تقرير التدقيق الضريبي",
-      "tax_audit_desc": "مراجعة الفواتير الخاضعة للضريبة والإقرارات"
+      "tax_audit_desc": "مراجعة الفواتير الخاضعة للضريبة والإقرارات",
+      "production_analytics": "تحليل الإنتاج",
+      "production_analytics_desc": "مراقبة مخرجات الإنتاج والكفاءة",
+      "work_order_status": "حالة أوامر العمل",
+      "work_order_status_desc": "تتبع حالة وتقدم أوامر العمل",
+      "project_financials": "ماليات المشاريع",
+      "project_financials_desc": "تحليل الربحية والتكاليف لكل مشروع",
+      "resource_utilization": "استغلال الموارد",
+      "resource_utilization_desc": "تتبع توزيع الموظفين وأعباء العمل",
+      "builder": "منشئ التقارير",
+      "builder_desc": "إنشاء وحفظ تقارير مخصصة",
+      "scheduled_desc": "جدولة إرسال التقارير تلقائياً عبر البريد الإلكتروني",
+      "shared_desc": "التقارير التي شاركها معك الزملاء",
+      "commissions_desc": "متابعة عمولات مندوبي المبيعات والمدفوعات",
+      "detailed_pl_desc": "تفاصيل الأرباح والخسائر حسب العميل أو المنتج أو الفئة"
     },
     "quick_access": {
       "title": "الوصول السريع"

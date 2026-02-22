@@ -1316,7 +1316,10 @@
       "accounting": "Accounting",
       "treasury": "Treasury",
       "hr": "Human Resources",
-      "taxes": "Taxes"
+      "taxes": "Taxes",
+      "manufacturing": "Manufacturing",
+      "projects": "Projects",
+      "custom": "Custom Reports"
     },
     "reports": {
       "sales_analytics": "Sales Analytics",
@@ -1348,7 +1351,21 @@
       "vat_report": "VAT Report",
       "vat_report_desc": "Input and output VAT summary with amount due",
       "tax_audit": "Tax Audit Report",
-      "tax_audit_desc": "Review of taxable invoices and returns"
+      "tax_audit_desc": "Review of taxable invoices and returns",
+      "production_analytics": "Production Analytics",
+      "production_analytics_desc": "Monitor production output and efficiency",
+      "work_order_status": "Work Order Status",
+      "work_order_status_desc": "Track status and progress of work orders",
+      "project_financials": "Project Financials",
+      "project_financials_desc": "Profitability and cost analysis per project",
+      "resource_utilization": "Resource Utilization",
+      "resource_utilization_desc": "Track employee allocation and workload",
+      "builder": "Report Builder",
+      "builder_desc": "Create and save custom reports",
+      "scheduled_desc": "Automate report delivery via email",
+      "shared_desc": "Reports that colleagues have shared with you",
+      "commissions_desc": "Track salesperson commissions and payouts",
+      "detailed_pl_desc": "Profit & loss breakdown by customer, product, or category"
     },
     "quick_access": {
       "title": "Quick Access"
