@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { hrImprovementsAPI } from '../../utils/api';
+import { hrImprovementsAPI, hrAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
-import { FileText, Calculator, Download, Eye, RefreshCw } from 'lucide-react';
+import { FileText, Calculator, Download, Eye, Printer, Mail, X } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 const Payslips = () => {
@@ -13,11 +13,26 @@ const Payslips = () => {
     const currency = getCurrency();
     const isRTL = i18n.language === 'ar';
     const [payslips, setPayslips] = useState([]);
+    const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showGenerate, setShowGenerate] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
+    const [selectedPayslip, setSelectedPayslip] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false);
     const [genForm, setGenForm] = useState({ employee_id: '', month: new Date().getMonth() + 1, year: new Date().getFullYear() });
+    const printRef = useRef(null);
 
-    useEffect(() => { fetchPayslips(); }, []);
+    useEffect(() => {
+        fetchPayslips();
+        fetchEmployees();
+    }, []);
+
+    const fetchEmployees = async () => {
+        try {
+            const res = await hrAPI.listEmployees({ limit: 500 });
+            setEmployees(res.data?.items || res.data || []);
+        } catch (err) { console.error(err); }
+    };
 
     const fetchPayslips = async () => {
         try { setLoading(true); const res = await hrImprovementsAPI.listPayslips(); setPayslips(res.data || []); }
@@ -33,6 +48,61 @@ const Payslips = () => {
         } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
+    const viewDetail = async (payslipId) => {
+        try {
+            setDetailLoading(true);
+            setShowDetail(true);
+            const res = await hrImprovementsAPI.getPayslip(payslipId);
+            setSelectedPayslip(res.data || res);
+        } catch (err) {
+            showToast(t('common.error'), 'error');
+            setShowDetail(false);
+        } finally { setDetailLoading(false); }
+    };
+
+    const handlePrint = () => {
+        if (!printRef.current) return;
+        const printWindow = window.open('', '_blank');
+        const content = printRef.current.innerHTML;
+        printWindow.document.write(`<!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head><title>${t('hr.payslip_print_title')}</title>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #1a1a2e; }
+                .payslip-container { max-width: 700px; margin: auto; border: 2px solid #e0e0e0; border-radius: 12px; padding: 30px; }
+                .payslip-header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; }
+                .payslip-header h2 { color: #2563eb; font-size: 22px; margin-bottom: 4px; }
+                .payslip-header p { font-size: 13px; color: #6b7280; }
+                .payslip-info { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 12px; background: #f8fafc; border-radius: 8px; }
+                .payslip-info div { font-size: 13px; }
+                .payslip-info strong { display: block; margin-bottom: 2px; color: #374151; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+                th { background: #f1f5f9; padding: 10px 12px; text-align: ${isRTL ? 'right' : 'left'}; font-size: 13px; border-bottom: 2px solid #e2e8f0; }
+                td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+                .section-label { font-weight: 600; color: #1e40af; font-size: 14px; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+                .total-row { background: #eff6ff; font-weight: 700; font-size: 15px; }
+                .total-row td { border-top: 2px solid #2563eb; padding: 12px; }
+                .text-success { color: #16a34a; }
+                .text-danger { color: #dc2626; }
+                .payslip-footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; border-top: 1px dashed #d1d5db; padding-top: 12px; }
+                @media print { body { padding: 10px; } .payslip-container { border: none; } }
+            </style></head><body>${content}</body></html>`);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.print(); }, 300);
+    };
+
+    const statusBadge = (status) => {
+        const cls = status === 'paid' ? 'bg-green-100 text-green-700' : status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700';
+        const label = status === 'paid' ? t('hr.payslip_status_paid') : status === 'approved' ? t('hr.payslip_status_approved') : t('hr.payslip_status_draft');
+        return <span className={`badge ${cls}`}>{label}</span>;
+    };
+
+    const totalNet = payslips.reduce((s, p) => s + (p.net_pay || p.net_salary || 0), 0);
+    const totalBasic = payslips.reduce((s, p) => s + (p.basic_salary || 0), 0);
+
+    const monthNames = isRTL
+        ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
+        : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
@@ -45,6 +115,23 @@ const Payslips = () => {
                 </div>
             </div>
 
+            {/* Summary Cards */}
+            <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: 24 }}>
+                <div className="metric-card">
+                    <div className="metric-label">{t('hr.payslip_total_count')}</div>
+                    <div className="metric-value" style={{ color: '#2563eb' }}>{payslips.length}</div>
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('hr.payslip_total_basic')}</div>
+                    <div className="metric-value" style={{ color: '#7c3aed' }}>{formatNumber(totalBasic)} <small style={{ fontSize: 12 }}>{currency}</small></div>
+                </div>
+                <div className="metric-card">
+                    <div className="metric-label">{t('hr.payslip_total_net')}</div>
+                    <div className="metric-value" style={{ color: '#16a34a' }}>{formatNumber(totalNet)} <small style={{ fontSize: 12 }}>{currency}</small></div>
+                </div>
+            </div>
+
+            {/* Payslips Table */}
             <div className="card section-card">
                 {loading ? <div className="text-center p-4">...</div> : (
                     <div className="data-table-container">
@@ -57,44 +144,176 @@ const Payslips = () => {
                                 <th>{t('hr.col_deductions')}</th>
                                 <th>{t('hr.col_net_pay')}</th>
                                 <th>{t('hr.col_status')}</th>
+                                <th>{t('hr.col_actions')}</th>
                             </tr></thead>
                             <tbody>
                                 {payslips.map(p => (
                                     <tr key={p.id}>
                                         <td className="font-medium">{p.employee_name || `#${p.employee_id}`}</td>
-                                        <td>{p.month}/{p.year}</td>
+                                        <td>{monthNames[(p.month || 1) - 1]} {p.year}</td>
                                         <td>{formatNumber(p.basic_salary)} {currency}</td>
                                         <td className="text-success">+{formatNumber(p.total_allowances || 0)} {currency}</td>
                                         <td className="text-danger">-{formatNumber(p.total_deductions || 0)} {currency}</td>
-                                        <td className="font-bold">{formatNumber(p.net_pay)} {currency}</td>
-                                        <td><span className={`badge ${p.status === 'paid' ? 'bg-green-100 text-green-700' : p.status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{p.status === 'paid' ? (t('hr.payslip_status_paid')) : p.status === 'approved' ? (t('hr.payslip_status_approved')) : (t('hr.payslip_status_draft'))}</span></td>
+                                        <td className="font-bold">{formatNumber(p.net_pay || p.net_salary)} {currency}</td>
+                                        <td>{statusBadge(p.status || 'draft')}</td>
+                                        <td>
+                                            <div className="d-flex gap-1">
+                                                <button className="btn btn-sm btn-secondary" title={t('hr.view_payslip')} onClick={() => viewDetail(p.id)}>
+                                                    <Eye size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
-                                {payslips.length === 0 && <tr><td colSpan="7" className="text-center text-muted p-4">{t('hr.no_payslips')}</td></tr>}
+                                {payslips.length === 0 && <tr><td colSpan="8" className="text-center text-muted p-4">{t('hr.no_payslips')}</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 )}
             </div>
 
+            {/* Generate Payslip Modal */}
             {showGenerate && (
                 <div className="modal-overlay" onClick={() => setShowGenerate(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-                        <h3 className="modal-title">{t('hr.generate_modal_title')}</h3>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h3 className="modal-title" style={{ margin: 0 }}>{t('hr.generate_modal_title')}</h3>
+                            <button type="button" onClick={() => setShowGenerate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)' }}>✕</button>
+                        </div>
                         <form onSubmit={handleGenerate} className="space-y-4">
-                            <div className="form-group"><label className="form-label">{t('hr.employee_id')}</label>
-                                <input type="number" className="form-input" required value={genForm.employee_id} onChange={e => setGenForm({ ...genForm, employee_id: e.target.value })} /></div>
+                            <div className="form-group">
+                                <label className="form-label">{t('hr.col_employee')}</label>
+                                <select className="form-input" required value={genForm.employee_id} onChange={e => setGenForm({ ...genForm, employee_id: e.target.value })}>
+                                    <option value="">{t('hr.select_employee')}</option>
+                                    {employees.map(emp => (
+                                        <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} ({emp.employee_code || emp.id})</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="form-group"><label className="form-label">{t('hr.col_month')}</label>
                                     <select className="form-input" value={genForm.month} onChange={e => setGenForm({ ...genForm, month: e.target.value })}>
-                                        {[...Array(12)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                                        {monthNames.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
                                     </select></div>
                                 <div className="form-group"><label className="form-label">{t('hr.year')}</label>
                                     <input type="number" className="form-input" value={genForm.year} onChange={e => setGenForm({ ...genForm, year: e.target.value })} /></div>
                             </div>
-                            <div className="d-flex gap-3 pt-3"><button type="submit" className="btn btn-primary flex-1"><Calculator size={16} /> {t('hr.generate_btn')}</button>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowGenerate(false)}>{t('hr.cancel')}</button></div>
+                            <div className="d-flex gap-3 pt-3">
+                                <button type="submit" className="btn btn-primary flex-1"><Calculator size={16} /> {t('hr.generate_btn')}</button>
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowGenerate(false)}>{t('hr.cancel')}</button>
+                            </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Payslip Detail Modal */}
+            {showDetail && (
+                <div className="modal-overlay" onClick={() => { setShowDetail(false); setSelectedPayslip(null); }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflow: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 className="modal-title" style={{ margin: 0 }}><FileText size={20} style={{ display: 'inline', verticalAlign: 'middle' }} /> {t('hr.payslip_detail_title')}</h3>
+                            <div className="d-flex gap-2" style={{ alignItems: 'center' }}>
+                                {selectedPayslip && (
+                                    <button className="btn btn-sm btn-primary" onClick={handlePrint}><Printer size={14} /> {t('hr.print_payslip')}</button>
+                                )}
+                                <button type="button" onClick={() => { setShowDetail(false); setSelectedPayslip(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+                            </div>
+                        </div>
+
+                        {detailLoading ? (
+                            <div className="text-center p-6">...</div>
+                        ) : selectedPayslip ? (
+                            <div ref={printRef}>
+                                <div className="payslip-container">
+                                    {/* Header */}
+                                    <div style={{ textAlign: 'center', borderBottom: '2px solid #2563eb', paddingBottom: 16, marginBottom: 20 }}>
+                                        <h2 style={{ color: '#2563eb', fontSize: 20, marginBottom: 4 }}>{t('hr.payslip_print_title')}</h2>
+                                        <p style={{ fontSize: 13, color: '#6b7280' }}>{monthNames[(selectedPayslip.month || 1) - 1]} {selectedPayslip.year} — {selectedPayslip.period_name || ''}</p>
+                                    </div>
+
+                                    {/* Employee Info */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+                                        <div>
+                                            <strong style={{ fontSize: 12, color: '#6b7280' }}>{t('hr.col_employee')}</strong>
+                                            <div style={{ fontWeight: 600 }}>{selectedPayslip.employee_name}</div>
+                                        </div>
+                                        <div>
+                                            <strong style={{ fontSize: 12, color: '#6b7280' }}>{t('hr.employee_id')}</strong>
+                                            <div>{selectedPayslip.employee_id}</div>
+                                        </div>
+                                        <div>
+                                            <strong style={{ fontSize: 12, color: '#6b7280' }}>{t('hr.col_status')}</strong>
+                                            <div>{selectedPayslip.status || 'draft'}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Earnings Table */}
+                                    <div style={{ fontWeight: 600, color: '#1e40af', fontSize: 14, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
+                                        {t('hr.payslip_earnings')}
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                                        <thead>
+                                            <tr style={{ background: '#f1f5f9' }}>
+                                                <th style={{ padding: '8px 12px', textAlign: isRTL ? 'right' : 'left', fontSize: 13 }}>{t('hr.payslip_item')}</th>
+                                                <th style={{ padding: '8px 12px', textAlign: isRTL ? 'left' : 'right', fontSize: 13 }}>{t('hr.payslip_amount')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.col_basic_salary')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.basic_salary || 0)} {currency}</td></tr>
+                                            {(selectedPayslip.housing_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_housing')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.housing_allowance)} {currency}</td></tr>}
+                                            {(selectedPayslip.transport_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_transport')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.transport_allowance)} {currency}</td></tr>}
+                                            {(selectedPayslip.other_allowances > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_other_allowances')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.other_allowances)} {currency}</td></tr>}
+                                            {(selectedPayslip.salary_components_earning > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_comp_earning')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.salary_components_earning)} {currency}</td></tr>}
+                                            {(selectedPayslip.overtime_amount > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_overtime')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.overtime_amount)} {currency}</td></tr>}
+                                        </tbody>
+                                    </table>
+
+                                    {/* Deductions Table */}
+                                    <div style={{ fontWeight: 600, color: '#dc2626', fontSize: 14, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
+                                        {t('hr.payslip_deductions')}
+                                    </div>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                                        <thead>
+                                            <tr style={{ background: '#fef2f2' }}>
+                                                <th style={{ padding: '8px 12px', textAlign: isRTL ? 'right' : 'left', fontSize: 13 }}>{t('hr.payslip_item')}</th>
+                                                <th style={{ padding: '8px 12px', textAlign: isRTL ? 'left' : 'right', fontSize: 13 }}>{t('hr.payslip_amount')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(selectedPayslip.gosi_employee_share > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_gosi_employee')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.gosi_employee_share)} {currency}</td></tr>}
+                                            {(selectedPayslip.violation_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_violations')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.violation_deduction)} {currency}</td></tr>}
+                                            {(selectedPayslip.loan_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_loan')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.loan_deduction)} {currency}</td></tr>}
+                                            {(selectedPayslip.salary_components_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_comp_deduction')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.salary_components_deduction)} {currency}</td></tr>}
+                                        </tbody>
+                                    </table>
+
+                                    {/* GOSI Employer (Info) */}
+                                    {(selectedPayslip.gosi_employer_share > 0) && (
+                                        <div style={{ background: '#fefce8', padding: '8px 12px', borderRadius: 6, fontSize: 13, marginBottom: 16, border: '1px solid #fef08a' }}>
+                                            ℹ️ {t('hr.payslip_gosi_employer')}: <strong>{formatNumber(selectedPayslip.gosi_employer_share)} {currency}</strong> <span style={{ color: '#6b7280' }}>({t('hr.payslip_gosi_employer_note')})</span>
+                                        </div>
+                                    )}
+
+                                    {/* Net Salary */}
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            <tr style={{ background: '#eff6ff', fontWeight: 700, fontSize: 16 }}>
+                                                <td style={{ padding: 14, borderTop: '2px solid #2563eb' }}>{t('hr.col_net_pay')}</td>
+                                                <td style={{ padding: 14, borderTop: '2px solid #2563eb', textAlign: isRTL ? 'left' : 'right', color: '#16a34a' }}>
+                                                    {formatNumber(selectedPayslip.net_salary || 0)} {currency}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', borderTop: '1px dashed #d1d5db', paddingTop: 10 }}>
+                                        <span>{t('hr.payslip_auto_generated')}</span>
+                                        <span>{new Date().toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             )}

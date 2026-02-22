@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { externalAPI } from '../../utils/api'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
@@ -7,9 +8,12 @@ import '../../components/ModuleStyles.css'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 
 export default function WithholdingTax() {
+    const { t, i18n } = useTranslation()
+    const isRTL = i18n.language === 'ar'
     const currency = getCurrency()
     const [activeTab, setActiveTab] = useState('rates')
     const [loading, setLoading] = useState(true)
+    const certRef = useRef(null)
 
     // Rates state
     const [rates, setRates] = useState([])
@@ -28,12 +32,16 @@ export default function WithholdingTax() {
     const [calcLoading, setCalcLoading] = useState(false)
     const [txSubmitting, setTxSubmitting] = useState(false)
 
+    // Certificate state
+    const [selectedTx, setSelectedTx] = useState(null)
+    const [showCertificate, setShowCertificate] = useState(false)
+
     const categoryLabels = {
-        services: 'خدمات',
-        rent: 'إيجار',
-        royalties: 'إتاوات',
-        consulting: 'استشارات',
-        other: 'أخرى',
+        services: t('wht.cat_services'),
+        rent: t('wht.cat_rent'),
+        royalties: t('wht.cat_royalties'),
+        consulting: t('wht.cat_consulting'),
+        other: t('wht.cat_other'),
     }
 
     const fetchRates = useCallback(async () => {
@@ -84,7 +92,7 @@ export default function WithholdingTax() {
             fetchRates()
         } catch (e) {
             console.error(e)
-            alert('حدث خطأ أثناء إنشاء النسبة')
+            alert(t('wht.error_creating_rate'))
         } finally {
             setRateSubmitting(false)
         }
@@ -101,7 +109,7 @@ export default function WithholdingTax() {
             setCalcResult(res.data ?? res)
         } catch (e) {
             console.error(e)
-            alert('حدث خطأ أثناء الحساب')
+            alert(t('wht.error_calculating'))
         } finally {
             setCalcLoading(false)
         }
@@ -122,32 +130,90 @@ export default function WithholdingTax() {
             fetchTransactions()
         } catch (e) {
             console.error(e)
-            alert('حدث خطأ أثناء إنشاء المعاملة')
+            alert(t('wht.error_creating_tx'))
         } finally {
             setTxSubmitting(false)
         }
     }
+
+    const handlePrintCertificate = () => {
+        if (!certRef.current) return;
+        const printWindow = window.open('', '_blank');
+        const content = certRef.current.innerHTML;
+        printWindow.document.write(`<!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head><title>${t('wht.certificate_title')}</title>
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #1a1a2e; }
+                .cert-container { max-width: 650px; margin: auto; border: 3px solid #1e40af; border-radius: 12px; padding: 40px; }
+                .cert-header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 20px; margin-bottom: 24px; }
+                .cert-header h1 { color: #1e40af; font-size: 24px; margin-bottom: 4px; }
+                .cert-header h2 { font-size: 16px; color: #6b7280; font-weight: 500; }
+                .cert-number { text-align: center; font-size: 14px; color: #7c3aed; margin-bottom: 20px; padding: 8px; background: #f5f3ff; border-radius: 6px; }
+                .cert-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+                .cert-field { margin-bottom: 8px; }
+                .cert-field .label { font-size: 12px; color: #6b7280; margin-bottom: 2px; }
+                .cert-field .value { font-weight: 600; font-size: 14px; }
+                .cert-amounts { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; }
+                .cert-amounts table { width: 100%; border-collapse: collapse; }
+                .cert-amounts th { text-align: ${isRTL ? 'right' : 'left'}; padding: 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
+                .cert-amounts td { padding: 8px; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+                .cert-footer { margin-top: 40px; display: flex; justify-content: space-between; }
+                .cert-footer .sign { text-align: center; min-width: 160px; }
+                .cert-footer .sign-line { border-top: 1px solid #1a1a2e; margin-top: 40px; padding-top: 8px; font-size: 12px; color: #6b7280; }
+                .cert-disclaimer { margin-top: 24px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px dashed #d1d5db; padding-top: 12px; }
+                @media print { body { padding: 10px; } .cert-container { border-width: 2px; } }
+            </style></head><body>${content}</body></html>`);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.print(); }, 300);
+    };
+
+    const openCertificate = (tx) => {
+        setSelectedTx(tx);
+        setShowCertificate(true);
+    };
 
     const formatDate = (d) => {
         if (!d) return '—'
         return formatShortDate(d)
     }
 
+    // Summary stats
+    const totalWht = transactions.reduce((s, tx) => s + (tx.wht_amount || 0), 0);
+    const totalGross = transactions.reduce((s, tx) => s + (tx.gross_amount || 0), 0);
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <div className="header-title">
-                    <h1 className="workspace-title">ضريبة الاستقطاع</h1>
-                    <p className="workspace-subtitle">إدارة نسب ومعاملات ضريبة الاستقطاع (WHT)</p>
+                    <h1 className="workspace-title">{t('wht.title')}</h1>
+                    <p className="workspace-subtitle">{t('wht.subtitle')}</p>
                 </div>
                 {activeTab === 'rates' && (
                     <div className="header-actions">
                         <button className="btn btn-primary" onClick={() => setShowRateModal(true)}>
-                            + إضافة نسبة
+                            + {t('wht.add_rate')}
                         </button>
                     </div>
                 )}
             </div>
+
+            {/* Summary */}
+            {transactions.length > 0 && (
+                <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: 24 }}>
+                    <div className="metric-card">
+                        <div className="metric-label">{t('wht.total_transactions')}</div>
+                        <div className="metric-value" style={{ color: '#2563eb' }}>{transactions.length}</div>
+                    </div>
+                    <div className="metric-card">
+                        <div className="metric-label">{t('wht.total_gross')}</div>
+                        <div className="metric-value" style={{ color: '#7c3aed' }}>{formatNumber(totalGross)} <small style={{ fontSize: 12 }}>{currency}</small></div>
+                    </div>
+                    <div className="metric-card">
+                        <div className="metric-label">{t('wht.total_withheld')}</div>
+                        <div className="metric-value" style={{ color: '#dc2626' }}>{formatNumber(totalWht)} <small style={{ fontSize: 12 }}>{currency}</small></div>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             <div className="tabs-container" style={{ marginBottom: '24px' }}>
@@ -155,13 +221,13 @@ export default function WithholdingTax() {
                     className={`tab-btn ${activeTab === 'rates' ? 'active' : ''}`}
                     onClick={() => setActiveTab('rates')}
                 >
-                    النسب
+                    {t('wht.tab_rates')}
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'transactions' ? 'active' : ''}`}
                     onClick={() => setActiveTab('transactions')}
                 >
-                    المعاملات
+                    {t('wht.tab_transactions')}
                 </button>
             </div>
 
@@ -172,18 +238,18 @@ export default function WithholdingTax() {
                         <div className="page-center"><span className="loading"></span></div>
                     ) : rates.length === 0 ? (
                         <div className="empty-state">
-                            <p>لا توجد نسب استقطاع بعد</p>
+                            <p>{t('wht.no_rates')}</p>
                         </div>
                     ) : (
                         <div className="data-table-container">
                             <table className="data-table">
                                 <thead>
                                     <tr>
-                                        <th>الاسم</th>
-                                        <th>الاسم بالعربي</th>
-                                        <th style={{ textAlign: 'center' }}>النسبة %</th>
-                                        <th style={{ textAlign: 'center' }}>الفئة</th>
-                                        <th style={{ textAlign: 'center' }}>الحالة</th>
+                                        <th>{t('wht.col_name')}</th>
+                                        <th>{t('wht.col_name_ar')}</th>
+                                        <th style={{ textAlign: 'center' }}>{t('wht.col_rate')}</th>
+                                        <th style={{ textAlign: 'center' }}>{t('wht.col_category')}</th>
+                                        <th style={{ textAlign: 'center' }}>{t('wht.col_status')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -201,7 +267,7 @@ export default function WithholdingTax() {
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <span className={`badge ${rate.is_active ? 'badge-success' : 'badge-secondary'}`}>
-                                                    {rate.is_active ? 'نشط' : 'غير نشط'}
+                                                    {rate.is_active ? t('wht.active') : t('wht.inactive')}
                                                 </span>
                                             </td>
                                         </tr>
@@ -218,16 +284,16 @@ export default function WithholdingTax() {
                 <>
                     {/* WHT Calculator */}
                     <div className="section-card" style={{ marginBottom: '24px' }}>
-                        <h3 className="section-title">حاسبة ضريبة الاستقطاع</h3>
+                        <h3 className="section-title">{t('wht.calculator_title')}</h3>
                         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <div className="form-group" style={{ flex: 1, minWidth: '200px', marginBottom: 0 }}>
-                                <label className="form-label">نسبة الاستقطاع</label>
+                                <label className="form-label">{t('wht.select_rate')}</label>
                                 <select
                                     className="form-input"
                                     value={calcRateId}
                                     onChange={(e) => setCalcRateId(e.target.value)}
                                 >
-                                    <option value="">-- اختر النسبة --</option>
+                                    <option value="">-- {t('wht.select_rate')} --</option>
                                     {rates.map((r) => (
                                         <option key={r.id} value={r.id}>
                                             {r.name_ar || r.name} ({formatNumber(r.rate, 2)}%)
@@ -236,7 +302,7 @@ export default function WithholdingTax() {
                                 </select>
                             </div>
                             <div className="form-group" style={{ flex: 1, minWidth: '200px', marginBottom: 0 }}>
-                                <label className="form-label">المبلغ الإجمالي</label>
+                                <label className="form-label">{t('wht.gross_amount')}</label>
                                 <input
                                     type="number"
                                     className="form-input"
@@ -253,7 +319,7 @@ export default function WithholdingTax() {
                                 disabled={calcLoading || !calcRateId || !calcGross}
                                 style={{ height: '42px' }}
                             >
-                                {calcLoading ? 'جاري الحساب...' : 'احسب'}
+                                {calcLoading ? t('wht.calculating') : t('wht.calculate_btn')}
                             </button>
                         </div>
 
@@ -270,13 +336,13 @@ export default function WithholdingTax() {
                                 flexWrap: 'wrap',
                             }}>
                                 <div>
-                                    <span className="text-secondary" style={{ fontSize: '13px' }}>مبلغ الاستقطاع</span>
+                                    <span className="text-secondary" style={{ fontSize: '13px' }}>{t('wht.wht_amount')}</span>
                                     <div className="font-bold text-danger" style={{ fontSize: '1.25rem' }}>
                                         {formatNumber(calcResult.wht_amount)} <small>{currency}</small>
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-secondary" style={{ fontSize: '13px' }}>المبلغ الصافي</span>
+                                    <span className="text-secondary" style={{ fontSize: '13px' }}>{t('wht.net_amount')}</span>
                                     <div className="font-bold text-success" style={{ fontSize: '1.25rem' }}>
                                         {formatNumber(calcResult.net_amount)} <small>{currency}</small>
                                     </div>
@@ -287,7 +353,7 @@ export default function WithholdingTax() {
                                     disabled={txSubmitting}
                                     style={{ marginRight: 'auto' }}
                                 >
-                                    {txSubmitting ? 'جاري الحفظ...' : 'إنشاء معاملة'}
+                                    {txSubmitting ? t('wht.saving') : t('wht.create_transaction')}
                                 </button>
                             </div>
                         )}
@@ -299,21 +365,22 @@ export default function WithholdingTax() {
                             <div className="page-center"><span className="loading"></span></div>
                         ) : transactions.length === 0 ? (
                             <div className="empty-state">
-                                <p>لا توجد معاملات استقطاع بعد</p>
+                                <p>{t('wht.no_transactions')}</p>
                             </div>
                         ) : (
                             <div className="data-table-container">
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>رقم الفاتورة</th>
-                                            <th>المورد</th>
-                                            <th style={{ textAlign: 'left' }}>المبلغ الإجمالي</th>
-                                            <th style={{ textAlign: 'center' }}>نسبة الاستقطاع</th>
-                                            <th style={{ textAlign: 'left' }}>مبلغ الاستقطاع</th>
-                                            <th style={{ textAlign: 'left' }}>المبلغ الصافي</th>
-                                            <th>رقم الشهادة</th>
-                                            <th>التاريخ</th>
+                                            <th>{t('wht.col_invoice')}</th>
+                                            <th>{t('wht.col_supplier')}</th>
+                                            <th style={{ textAlign: 'left' }}>{t('wht.gross_amount')}</th>
+                                            <th style={{ textAlign: 'center' }}>{t('wht.col_rate')}</th>
+                                            <th style={{ textAlign: 'left' }}>{t('wht.wht_amount')}</th>
+                                            <th style={{ textAlign: 'left' }}>{t('wht.net_amount')}</th>
+                                            <th>{t('wht.col_certificate')}</th>
+                                            <th>{t('wht.col_date')}</th>
+                                            <th>{t('wht.col_actions')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -335,6 +402,11 @@ export default function WithholdingTax() {
                                                 </td>
                                                 <td>{tx.certificate_number || '—'}</td>
                                                 <td className="text-muted">{formatDate(tx.created_at)}</td>
+                                                <td>
+                                                    <button className="btn btn-sm btn-secondary" onClick={() => openCertificate(tx)} title={t('wht.print_certificate')}>
+                                                        🖨️
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -350,13 +422,13 @@ export default function WithholdingTax() {
                 <div className="modal-overlay" onClick={() => setShowRateModal(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h3>إضافة نسبة استقطاع</h3>
+                            <h3>{t('wht.add_rate_modal')}</h3>
                             <button className="modal-close" onClick={() => setShowRateModal(false)}>×</button>
                         </div>
                         <form onSubmit={handleCreateRate}>
                             <div className="modal-body">
                                 <div className="form-group">
-                                    <label className="form-label">الاسم (إنجليزي)</label>
+                                    <label className="form-label">{t('wht.col_name')}</label>
                                     <input
                                         type="text"
                                         className="form-input"
@@ -367,18 +439,18 @@ export default function WithholdingTax() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">الاسم بالعربي</label>
+                                    <label className="form-label">{t('wht.col_name_ar')}</label>
                                     <input
                                         type="text"
                                         className="form-input"
                                         value={rateForm.name_ar}
                                         onChange={(e) => setRateForm({ ...rateForm, name_ar: e.target.value })}
                                         required
-                                        placeholder="مثال: استقطاع خدمات"
+                                        placeholder={t('wht.name_ar_placeholder')}
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">النسبة (%)</label>
+                                    <label className="form-label">{t('wht.col_rate')}</label>
                                     <input
                                         type="number"
                                         className="form-input"
@@ -392,29 +464,119 @@ export default function WithholdingTax() {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">الفئة</label>
+                                    <label className="form-label">{t('wht.col_category')}</label>
                                     <select
                                         className="form-input"
                                         value={rateForm.category}
                                         onChange={(e) => setRateForm({ ...rateForm, category: e.target.value })}
                                     >
-                                        <option value="services">خدمات</option>
-                                        <option value="rent">إيجار</option>
-                                        <option value="royalties">إتاوات</option>
-                                        <option value="consulting">استشارات</option>
-                                        <option value="other">أخرى</option>
+                                        <option value="services">{t('wht.cat_services')}</option>
+                                        <option value="rent">{t('wht.cat_rent')}</option>
+                                        <option value="royalties">{t('wht.cat_royalties')}</option>
+                                        <option value="consulting">{t('wht.cat_consulting')}</option>
+                                        <option value="other">{t('wht.cat_other')}</option>
                                     </select>
                                 </div>
                             </div>
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowRateModal(false)}>
-                                    إلغاء
+                                    {t('common.cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={rateSubmitting}>
-                                    {rateSubmitting ? 'جاري الحفظ...' : 'حفظ'}
+                                    {rateSubmitting ? t('wht.saving') : t('common.save')}
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ===== WHT Certificate Modal ===== */}
+            {showCertificate && selectedTx && (
+                <div className="modal-overlay" onClick={() => setShowCertificate(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflow: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 className="modal-title" style={{ margin: 0 }}>{t('wht.certificate_title')}</h3>
+                            <div className="d-flex gap-2" style={{ alignItems: 'center' }}>
+                                <button className="btn btn-sm btn-primary" onClick={handlePrintCertificate}>🖨️ {t('wht.print_certificate')}</button>
+                                <button type="button" onClick={() => setShowCertificate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)' }}>✕</button>
+                            </div>
+                        </div>
+
+                        <div ref={certRef}>
+                            <div className="cert-container" style={{ maxWidth: 650, margin: 'auto', border: '3px solid #1e40af', borderRadius: 12, padding: 40 }}>
+                                {/* Header */}
+                                <div style={{ textAlign: 'center', borderBottom: '2px solid #1e40af', paddingBottom: 20, marginBottom: 24 }}>
+                                    <h1 style={{ color: '#1e40af', fontSize: 22, marginBottom: 4 }}>{t('wht.certificate_heading')}</h1>
+                                    <h2 style={{ fontSize: 15, color: '#6b7280', fontWeight: 500 }}>Withholding Tax Certificate</h2>
+                                </div>
+
+                                {/* Certificate Number */}
+                                <div style={{ textAlign: 'center', fontSize: 14, color: '#7c3aed', marginBottom: 20, padding: 8, background: '#f5f3ff', borderRadius: 6 }}>
+                                    {t('wht.certificate_number')}: <strong>{selectedTx.certificate_number || '—'}</strong>
+                                </div>
+
+                                {/* Details Grid */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                                    <div>
+                                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{t('wht.col_supplier')}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 14 }}>{selectedTx.supplier_name || selectedTx.supplier_id || '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{t('wht.col_invoice')}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 14 }}>{selectedTx.invoice_id || '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{t('wht.col_date')}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 14 }}>{formatDate(selectedTx.created_at)}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>{t('wht.col_rate')}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 14 }}>{formatNumber(selectedTx.wht_rate, 2)}%</div>
+                                    </div>
+                                </div>
+
+                                {/* Amounts */}
+                                <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 24 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ textAlign: isRTL ? 'right' : 'left', padding: 8, fontSize: 13, borderBottom: '1px solid #e2e8f0' }}>{t('wht.cert_description')}</th>
+                                                <th style={{ textAlign: isRTL ? 'left' : 'right', padding: 8, fontSize: 13, borderBottom: '1px solid #e2e8f0' }}>{t('wht.cert_amount')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ padding: '10px 8px', borderBottom: '1px solid #f1f5f9', fontSize: 14 }}>{t('wht.gross_amount')}</td>
+                                                <td style={{ padding: '10px 8px', borderBottom: '1px solid #f1f5f9', fontSize: 14, textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedTx.gross_amount)} {currency}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ padding: '10px 8px', borderBottom: '1px solid #f1f5f9', fontSize: 14, color: '#dc2626' }}>{t('wht.wht_amount')} ({formatNumber(selectedTx.wht_rate, 2)}%)</td>
+                                                <td style={{ padding: '10px 8px', borderBottom: '1px solid #f1f5f9', fontSize: 14, textAlign: isRTL ? 'left' : 'right', color: '#dc2626', fontWeight: 600 }}>-{formatNumber(selectedTx.wht_amount)} {currency}</td>
+                                            </tr>
+                                            <tr style={{ fontWeight: 700 }}>
+                                                <td style={{ padding: '10px 8px', fontSize: 15, borderTop: '2px solid #1e40af' }}>{t('wht.net_amount')}</td>
+                                                <td style={{ padding: '10px 8px', fontSize: 15, textAlign: isRTL ? 'left' : 'right', color: '#16a34a', borderTop: '2px solid #1e40af' }}>{formatNumber(selectedTx.net_amount)} {currency}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Signatures */}
+                                <div style={{ marginTop: 40, display: 'flex', justifyContent: 'space-between' }}>
+                                    <div style={{ textAlign: 'center', minWidth: 160 }}>
+                                        <div style={{ borderTop: '1px solid #1a1a2e', marginTop: 50, paddingTop: 8, fontSize: 12, color: '#6b7280' }}>{t('wht.cert_company_stamp')}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'center', minWidth: 160 }}>
+                                        <div style={{ borderTop: '1px solid #1a1a2e', marginTop: 50, paddingTop: 8, fontSize: 12, color: '#6b7280' }}>{t('wht.cert_authorized_sig')}</div>
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: 24, fontSize: 11, color: '#9ca3af', textAlign: 'center', borderTop: '1px dashed #d1d5db', paddingTop: 12 }}>
+                                    {t('wht.cert_disclaimer')}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
