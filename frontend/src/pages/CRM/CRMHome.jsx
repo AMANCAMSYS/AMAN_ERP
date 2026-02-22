@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { crmAPI, salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
@@ -280,6 +281,15 @@ function CRMHome() {
                             </table>
                         </div>
                     )}
+                    {/* CRM Tools */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+                        <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
+                            📣 {t('crm.marketing_campaigns', 'الحملات التسويقية')}
+                        </Link>
+                        <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', padding: '12px' }}>
+                            📚 {t('crm.knowledge_base', 'قاعدة المعرفة')}
+                        </Link>
+                    </div>
                 </div>
             )}
 

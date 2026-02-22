@@ -157,6 +157,9 @@ const ManufacturingHome = () => {
                                 <Link to="/manufacturing/schedule" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
                                     <FaCalendarAlt /> {t('manufacturing.production_schedule')}
                                 </Link>
+                                <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline" style={{ textAlign: 'center', border: '1px dashed #cbd5e1' }}>
+                                    👷 {t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}
+                                </Link>
                             </div>
                         </div>
 

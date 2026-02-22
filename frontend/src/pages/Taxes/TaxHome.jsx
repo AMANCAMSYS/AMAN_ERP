@@ -223,6 +223,9 @@ function TaxHome() {
                                 <Link to="/taxes/wht" className="btn btn-outline" style={{ textAlign: 'center' }}>
                                     ✂️ {t('wht.title')}
                                 </Link>
+                                <Link to="/taxes/calendar" className="btn btn-outline" style={{ textAlign: 'center' }}>
+                                    📅 {t('taxes.tax_calendar', 'التقويم الضريبي')}
+                                </Link>
                             </div>
                         </div>
 

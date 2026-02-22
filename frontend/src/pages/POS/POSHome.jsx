@@ -248,6 +248,21 @@ const POSHome = () => {
                             {t('pos.home.kitchen_display')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
+                        <div className="link-item" onClick={() => navigate('/pos/offline')}>
+                            <span className="link-icon">📴</span>
+                            {t('pos.home.offline_mode', 'وضع عدم الاتصال')}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/pos/thermal')}>
+                            <span className="link-icon">🖨️</span>
+                            {t('pos.home.thermal_print', 'إعدادات الطباعة الحرارية')}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/pos/customer-display')}>
+                            <span className="link-icon">🖥️</span>
+                            {t('pos.home.customer_display', 'شاشة العميل')}
+                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                        </div>
                     </div>
                 </div>
             </div>
