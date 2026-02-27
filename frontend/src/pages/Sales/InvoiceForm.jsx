@@ -17,6 +17,7 @@ function InvoiceForm() {
     const currency = getCurrency()
     const [loading, setLoading] = useState(false)
     const [customers, setCustomers] = useState([])
+    const [customerGroups, setCustomerGroups] = useState([])
     const [products, setProducts] = useState([])
     const [productStocks, setProductStocks] = useState({})
     const [warehouses, setWarehouses] = useState([])
@@ -47,14 +48,16 @@ function InvoiceForm() {
         const fetchData = async () => {
             try {
                 const params = { branch_id: currentBranch?.id }
-                const [custRes, prodRes, whRes, curRes, treasRes] = await Promise.all([
+                const [custRes, groupsRes, prodRes, whRes, curRes, treasRes] = await Promise.all([
                     salesAPI.listCustomers(params),
+                    salesAPI.listCustomerGroups(params),
                     inventoryAPI.listProducts(params),
                     inventoryAPI.listWarehouses(params),
                     currenciesAPI.list(),
                     treasuryAPI.listAccounts(currentBranch?.id)
                 ])
                 setCustomers(custRes.data)
+                setCustomerGroups(groupsRes.data)
                 setProducts(prodRes.data)
                 setWarehouses(whRes.data)
                 setCurrencies(curRes.data)
@@ -140,6 +143,20 @@ function InvoiceForm() {
                         updatedItem.description = product.item_name
                         updatedItem.unit_price = product.selling_price
                         updatedItem.tax_rate = product.tax_rate !== undefined ? product.tax_rate : 15
+                        // Try applying item-level effect from group
+                        const customer = customers.find(c => c.id === parseInt(formData.customer_id));
+                        if (customer && customer.group_id) {
+                            const group = customerGroups.find(g => g.id === customer.group_id);
+                            if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                if (group.effect_type === 'discount') {
+                                    updatedItem.discount_percent = group.discount_percentage;
+                                } else if (group.effect_type === 'markup') {
+                                    // Markup applied by increasing unit_price
+                                    updatedItem.unit_price = product.selling_price * (1 + (group.discount_percentage / 100));
+                                }
+                            }
+                        }
+
                         // Fetch stock for this product
                         fetchProductStock(parseInt(value), formData.warehouse_id)
                     }
@@ -212,13 +229,59 @@ function InvoiceForm() {
         let subtotal = 0
         let discount = 0
         let tax = 0
+
+        let globalEffectType = 'discount';
+        let globalEffectPercent = 0;
+
+        // Find group effects on total
+        const customer = customers.find(c => c.id === parseInt(formData.customer_id));
+        if (customer && customer.group_id) {
+            const group = customerGroups.find(g => g.id === customer.group_id);
+            if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
+                globalEffectType = group.effect_type;
+                globalEffectPercent = parseFloat(group.discount_percentage);
+            }
+        }
+
         items.forEach(item => {
             const lineTotal = item.quantity * item.unit_price
             subtotal += lineTotal
             discount += item.discount
-            tax += (lineTotal - item.discount) * (item.tax_rate / 100)
         })
-        return { subtotal, discount, tax, total: subtotal - discount + tax }
+
+        let totalAfterLineDiscounts = subtotal - discount;
+        let globalDiscountAmount = 0;
+        let globalMarkupAmount = 0;
+
+        if (globalEffectPercent > 0) {
+            if (globalEffectType === 'discount') {
+                globalDiscountAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            } else if (globalEffectType === 'markup') {
+                globalMarkupAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            }
+        }
+
+        let baseForTax = totalAfterLineDiscounts - globalDiscountAmount + globalMarkupAmount;
+
+        items.forEach(item => {
+            const weight = (item.quantity * item.unit_price - item.discount) / totalAfterLineDiscounts || 0;
+            const itemBase = (item.quantity * item.unit_price - item.discount)
+                - (globalDiscountAmount * weight)
+                + (globalMarkupAmount * weight);
+            tax += itemBase * (item.tax_rate / 100);
+        });
+
+        return {
+            subtotal,
+            discount: discount + globalDiscountAmount,
+            markup: globalMarkupAmount,
+            tax,
+            total: baseForTax + tax,
+            globalEffectType,
+            globalEffectPercent,
+            globalMakeupAmount: globalMarkupAmount,
+            globalDiscountAmount
+        }
     }
 
     const handleSubmit = async (e) => {
@@ -253,6 +316,7 @@ function InvoiceForm() {
         setError(null)
 
         try {
+            const totals = getTotals();
             const payload = {
                 ...formData,
                 branch_id: currentBranch ? currentBranch.id : null,
@@ -264,13 +328,17 @@ function InvoiceForm() {
                 currency: formData.currency,
                 exchange_rate: parseFloat(formData.exchange_rate) || 1.0,
                 treasury_id: formData.treasury_id ? parseInt(formData.treasury_id) : null,
+                effect_type: totals.globalEffectType,
+                effect_percentage: totals.globalEffectPercent,
+                markup_amount: totals.globalMakeupAmount,
                 items: items.map(item => ({
                     ...item,
                     product_id: item.product_id ? parseInt(item.product_id) : null,
                     quantity: parseFloat(item.quantity) || 0,
                     unit_price: parseFloat(item.unit_price) || 0,
                     tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0
+                    discount: parseFloat(item.discount) || 0,
+                    markup: 0 // Handled at line level unit_price for sales now, or could pass to backend
                 }))
             }
             await salesAPI.createInvoice(payload)
@@ -317,7 +385,35 @@ function InvoiceForm() {
                             <select
                                 className="form-input"
                                 value={formData.customer_id || ''}
-                                onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, customer_id: e.target.value });
+                                    // Reset items discount when customer changes
+                                    setItems(prevItems => prevItems.map(item => {
+                                        let updated = { ...item };
+                                        if (item.product_id) {
+                                            const product = products.find(p => p.id === parseInt(item.product_id));
+                                            if (product) {
+                                                updated.unit_price = product.selling_price;
+                                                updated.discount_percent = 0;
+                                                updated.discount = 0;
+                                            }
+
+                                            const customer = customers.find(c => c.id === parseInt(e.target.value));
+                                            if (customer && customer.group_id) {
+                                                const group = customerGroups.find(g => g.id === customer.group_id);
+                                                if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                                    if (group.effect_type === 'discount') {
+                                                        updated.discount_percent = group.discount_percentage;
+                                                        updated.discount = (updated.quantity * updated.unit_price) * (group.discount_percentage / 100);
+                                                    } else if (group.effect_type === 'markup') {
+                                                        updated.unit_price = product.selling_price * (1 + (group.discount_percentage / 100));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        return updated;
+                                    }));
+                                }}
                                 required
                             >
                                 <option value="">{t('sales.invoices.form.select_customer')}</option>
@@ -629,6 +725,12 @@ function InvoiceForm() {
                             <span>{t('sales.invoices.form.totals.subtotal')}</span>
                             <span>{formData.currency} {formatNumber(getTotals().subtotal)}</span>
                         </div>
+                        {getTotals().globalEffectPercent > 0 && getTotals().globalEffectType === 'markup' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: 'var(--text-success)' }}>
+                                <span>زيادة (مجموعة) ({getTotals().globalEffectPercent}%)</span>
+                                <span>{formData.currency} {formatNumber(getTotals().markup)}</span>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span>{t('sales.invoices.form.totals.discount')}</span>
                             <span>{formData.currency} {formatNumber(getTotals().discount)}</span>

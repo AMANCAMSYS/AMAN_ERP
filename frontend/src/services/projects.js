@@ -34,4 +34,24 @@ export const projectsAPI = {
 
     // Invoicing
     createInvoice: (id, data) => api.post(`/projects/${id}/create-invoice`, data),
+
+    // Alerts
+    getAlertsDashboard: () => api.get('/projects/alerts/dashboard'),
+    getOverBudgetAlerts: () => api.get('/projects/alerts/over-budget'),
+    getOverdueTaskAlerts: () => api.get('/projects/alerts/overdue-tasks'),
+
+    // Change Orders
+    getChangeOrders: (projectId) => api.get(`/projects/${projectId}/change-orders`),
+    createChangeOrder: (projectId, data) => api.post(`/projects/${projectId}/change-orders`, data),
+    updateChangeOrder: (coId, data) => api.put(`/projects/change-orders/${coId}`, data),
+    approveChangeOrder: (coId) => api.post(`/projects/change-orders/${coId}/approve`),
+
+    // EVM & Analysis
+    getEVM: (projectId) => api.get(`/projects/${projectId}/evm`),
+    closeProject: (projectId) => api.post(`/projects/${projectId}/close`),
+    getVarianceReport: (params) => api.get('/projects/reports/variance', { params }),
+
+    // Retainer
+    setupRetainer: (projectId, data) => api.put(`/projects/${projectId}/retainer-setup`, data),
+    generateRetainerInvoices: (data) => api.post('/projects/retainer/generate-invoices', data),
 }

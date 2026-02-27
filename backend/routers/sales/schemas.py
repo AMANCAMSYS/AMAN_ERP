@@ -10,6 +10,8 @@ class CustomerGroupCreate(BaseModel):
     group_name_en: Optional[str] = None
     description: Optional[str] = None
     discount_percentage: float = 0.0
+    effect_type: str = "discount"
+    application_scope: str = "total"
     payment_days: int = 30
     status: str = "active"
 
@@ -32,6 +34,7 @@ class CustomerCreate(BaseModel):
     group_id: Optional[int] = None
     branch_id: Optional[int] = None
     currency: Optional[str] = None
+    status: str = "active"
 
 
 class CustomerResponse(BaseModel):
@@ -50,6 +53,7 @@ class InvoiceLineItem(BaseModel):
     unit_price: float
     tax_rate: float = 15.0
     discount: float = 0
+    markup: float = 0
 
     @validator("quantity")
     def quantity_must_be_positive(cls, v):
@@ -78,6 +82,7 @@ class InvoiceCreate(BaseModel):
     notes: Optional[str] = None
     payment_method: Optional[str] = None
     paid_amount: Optional[float] = 0
+    down_payment_method: Optional[str] = None   # method used when payment_method='credit' + partial down payment
     branch_id: Optional[int] = None
     warehouse_id: Optional[int] = None
     treasury_id: Optional[int] = None
@@ -85,6 +90,11 @@ class InvoiceCreate(BaseModel):
     exchange_rate: Optional[float] = 1.0
     cost_center_id: Optional[int] = None
     sales_order_id: Optional[int] = None
+
+    # Group effects
+    effect_type: str = "discount"
+    effect_percentage: float = 0.0
+    markup_amount: float = 0.0
 
 
 class InvoiceResponse(BaseModel):

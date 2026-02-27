@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { servicesAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
@@ -321,8 +321,8 @@ function ServiceRequests() {
                         ) : requests.length === 0 ? (
                             <tr><td colSpan="10" style={{ textAlign: 'center', padding: '40px' }}>{t('common.no_data')}</td></tr>
                         ) : requests.map(req => (
-                            <>
-                                <tr key={req.id} style={{ cursor: 'pointer' }} onClick={() => loadDetail(req.id)}>
+                            <Fragment key={req.id}>
+                                <tr style={{ cursor: 'pointer' }} onClick={() => loadDetail(req.id)}>
                                     <td><strong>{req.request_number}</strong></td>
                                     <td>{req.title}</td>
                                     <td>{getLabelByValue(categoryOptions, req.category)}</td>
@@ -414,7 +414,7 @@ function ServiceRequests() {
                                         </td>
                                     </tr>
                                 )}
-                            </>
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>

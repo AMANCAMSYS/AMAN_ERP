@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, CreditCard, ArrowLeftRight } from 'lucide-react';
-import api from '../../../utils/api';
+import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, CreditCard, ArrowLeftRight, RefreshCw, AlertTriangle, Calendar } from 'lucide-react';
+import api, { accountingAPI } from '../../../utils/api';
+import { toastEmitter } from '../../../utils/toastEmitter';
 
 const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar';
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Advanced Tools State
+    const [fxProcessing, setFxProcessing] = useState(false);
+    const [fxDate, setFxDate] = useState(new Date().toISOString().split('T')[0]);
+    const [badDebtProcessing, setBadDebtProcessing] = useState(false);
+    const [badDebtDays, setBadDebtDays] = useState(90);
+    const [leaveProvProcessing, setLeaveProvProcessing] = useState(false);
 
     useEffect(() => {
         const fetchAccounts = async () => {
@@ -41,6 +50,46 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             {description && <p className="text-xs text-base-content/40 mt-1">{description}</p>}
         </div>
     );
+
+    // --- Advanced Tools Handlers ---
+    const handleFxRevaluation = async () => {
+        if (!window.confirm(isRTL ? 'هل تريد تنفيذ إعادة تقييم العملات الأجنبية؟' : 'Run FX revaluation?')) return;
+        setFxProcessing(true);
+        try {
+            await accountingAPI.fxRevaluation({ valuation_date: fxDate });
+            toastEmitter.emit(isRTL ? 'تم تنفيذ إعادة تقييم العملات بنجاح' : 'FX Revaluation completed', 'success');
+        } catch (err) {
+            console.error("FX Revaluation failed", err);
+        } finally {
+            setFxProcessing(false);
+        }
+    };
+
+    const handleBadDebtProvision = async () => {
+        if (!window.confirm(isRTL ? 'هل تريد إنشاء مخصص ديون مشكوك فيها؟' : 'Create bad debt provision?')) return;
+        setBadDebtProcessing(true);
+        try {
+            await accountingAPI.createBadDebtProvision({ overdue_days: badDebtDays });
+            toastEmitter.emit(isRTL ? 'تم إنشاء مخصص الديون المشكوك فيها' : 'Bad debt provision created', 'success');
+        } catch (err) {
+            console.error("Bad debt provision failed", err);
+        } finally {
+            setBadDebtProcessing(false);
+        }
+    };
+
+    const handleLeaveProvision = async () => {
+        if (!window.confirm(isRTL ? 'هل تريد إنشاء مخصص إجازات؟' : 'Create leave provision?')) return;
+        setLeaveProvProcessing(true);
+        try {
+            await accountingAPI.createLeaveProvision({});
+            toastEmitter.emit(isRTL ? 'تم إنشاء مخصص الإجازات' : 'Leave provision created', 'success');
+        } catch (err) {
+            console.error("Leave provision failed", err);
+        } finally {
+            setLeaveProvProcessing(false);
+        }
+    };
 
     if (loading) return <div className="p-4 text-center"><span className="loading loading-spinner"></span></div>;
 
@@ -153,6 +202,59 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
                     {renderAccountSelect('حساب الأصول الثابتة', 'acc_map_fixed_assets', 'إجمالي الأصول الثابتة')}
                     {renderAccountSelect('مصاريف الاستهلاك', 'acc_map_depreciation_exp', 'قسط الإهلاك الدوري')}
                     {renderAccountSelect('مجمع الاستهلاك', 'acc_map_acc_depreciation', 'الاستهلاك المتجمع — خصم من الأصل')}
+                </div>
+            </div>
+
+            {/* ── Advanced Accounting Tools ────────────────── */}
+            <div className="bg-base-50 p-6 rounded-2xl border border-base-200" style={{ borderColor: 'var(--warning, #f59e0b)', borderWidth: 2 }}>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <RefreshCw size={20} style={{ color: 'var(--warning, #f59e0b)' }} />
+                    {isRTL ? 'أدوات محاسبية متقدمة' : 'Advanced Accounting Tools'}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* FX Revaluation */}
+                    <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
+                        <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            💱 {isRTL ? 'إعادة تقييم العملات' : 'FX Revaluation'}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                            {isRTL ? 'تحديث أرصدة العملات الأجنبية بأسعار الصرف الحالية' : 'Update foreign currency balances at current exchange rates'}
+                        </p>
+                        <input type="date" className="form-input mb-2" value={fxDate} onChange={e => setFxDate(e.target.value)} style={{ fontSize: 13 }} />
+                        <button className="btn btn-primary btn-sm btn-block" onClick={handleFxRevaluation} disabled={fxProcessing}>
+                            {fxProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'تنفيذ' : 'Run')}
+                        </button>
+                    </div>
+
+                    {/* Bad Debt Provision */}
+                    <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
+                        <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            ⚠️ {isRTL ? 'مخصص ديون مشكوك فيها' : 'Bad Debt Provision'}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                            {isRTL ? 'إنشاء مخصص للفواتير المتأخرة' : 'Create provision for overdue invoices'}
+                        </p>
+                        <div className="mb-2">
+                            <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{isRTL ? 'أيام التأخر' : 'Overdue Days'}</label>
+                            <input type="number" className="form-input" value={badDebtDays} onChange={e => setBadDebtDays(e.target.value)} style={{ fontSize: 13 }} />
+                        </div>
+                        <button className="btn btn-warning btn-sm btn-block" onClick={handleBadDebtProvision} disabled={badDebtProcessing}>
+                            {badDebtProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'إنشاء المخصص' : 'Create')}
+                        </button>
+                    </div>
+
+                    {/* Leave Provision */}
+                    <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
+                        <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            🏖️ {isRTL ? 'مخصص إجازات' : 'Leave Provision'}
+                        </div>
+                        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                            {isRTL ? 'حساب وقيد مخصص الإجازات المتراكمة' : 'Calculate and post accrued leave provision'}
+                        </p>
+                        <button className="btn btn-secondary btn-sm btn-block" onClick={handleLeaveProvision} disabled={leaveProvProcessing} style={{ marginTop: 32 }}>
+                            {leaveProvProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'إنشاء المخصص' : 'Create')}
+                        </button>
+                    </div>
                 </div>
             </div>
 

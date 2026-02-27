@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { assetsAPI } from '../../utils/api';
+import { assetsAPI, branchesAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Trash2, Calendar, DollarSign, Activity, FileText } from 'lucide-react';
+import { Trash2, Calendar, DollarSign, Activity, FileText, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { getCurrency } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
@@ -18,6 +18,17 @@ const AssetDetails = () => {
     const [asset, setAsset] = useState(null);
     const [schedule, setSchedule] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Revalue Modal State
+    const [showRevalueModal, setShowRevalueModal] = useState(false);
+    const [revalueData, setRevalueData] = useState({ new_value: '', reason: '' });
+    const [revaluing, setRevaluing] = useState(false);
+
+    // Transfer Modal State
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [transferData, setTransferData] = useState({ to_branch_id: '', notes: '' });
+    const [transferring, setTransferring] = useState(false);
+    const [branches, setBranches] = useState([]);
 
     useEffect(() => {
         fetchData();
@@ -61,6 +72,54 @@ const AssetDetails = () => {
         }
     };
 
+    // --- Revalue ---
+    const handleRevalue = async () => {
+        if (!revalueData.new_value) return;
+        setRevaluing(true);
+        try {
+            await assetsAPI.revalueAsset(id, {
+                new_value: parseFloat(revalueData.new_value),
+                reason: revalueData.reason
+            });
+            toastEmitter.emit(isRTL ? 'تم إعادة تقييم الأصل بنجاح' : 'Asset revalued successfully', 'success');
+            setShowRevalueModal(false);
+            setRevalueData({ new_value: '', reason: '' });
+            fetchData();
+        } catch (error) {
+            console.error("Failed to revalue asset", error);
+        } finally {
+            setRevaluing(false);
+        }
+    };
+
+    // --- Transfer ---
+    const openTransferModal = async () => {
+        try {
+            const res = await branchesAPI.list();
+            setBranches(res.data || []);
+        } catch (err) { console.error(err); }
+        setShowTransferModal(true);
+    };
+
+    const handleTransfer = async () => {
+        if (!transferData.to_branch_id) return;
+        setTransferring(true);
+        try {
+            await assetsAPI.transferAsset(id, {
+                to_branch_id: parseInt(transferData.to_branch_id),
+                notes: transferData.notes
+            });
+            toastEmitter.emit(isRTL ? 'تم نقل الأصل بنجاح' : 'Asset transferred successfully', 'success');
+            setShowTransferModal(false);
+            setTransferData({ to_branch_id: '', notes: '' });
+            fetchData();
+        } catch (error) {
+            console.error("Failed to transfer asset", error);
+        } finally {
+            setTransferring(false);
+        }
+    };
+
     if (loading) return <div className="text-center py-5"><span className="loading"></span></div>;
     if (!asset) return null;
 
@@ -78,12 +137,22 @@ const AssetDetails = () => {
                             </p>
                         </div>
                     </div>
-                    <div className="header-actions">
+                    <div className="header-actions d-flex align-items-center gap-2">
                         {asset.status === 'active' && (
-                            <button className="btn btn-sm btn-outline-danger me-2" onClick={handleDispose}>
-                                <Trash2 size={16} className="me-1" />
-                                {t('assets.dispose')}
-                            </button>
+                            <>
+                                <button className="btn btn-sm btn-outline-primary" onClick={() => setShowRevalueModal(true)}>
+                                    <RefreshCw size={16} className="me-1" />
+                                    {isRTL ? 'إعادة تقييم' : 'Revalue'}
+                                </button>
+                                <button className="btn btn-sm btn-outline-secondary" onClick={openTransferModal}>
+                                    <ArrowRightLeft size={16} className="me-1" />
+                                    {isRTL ? 'نقل لفرع' : 'Transfer'}
+                                </button>
+                                <button className="btn btn-sm btn-outline-danger" onClick={handleDispose}>
+                                    <Trash2 size={16} className="me-1" />
+                                    {t('assets.dispose')}
+                                </button>
+                            </>
                         )}
                         <span className={`badge ${asset.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} border px-3 py-2 fs-6`}>
                             {t(`status.${asset.status}`, asset.status)}
@@ -184,6 +253,68 @@ const AssetDetails = () => {
                     </div>
                 </div>
             </div>
+
+            {/* ========== Revalue Modal ========== */}
+            {showRevalueModal && (
+                <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowRevalueModal(false)}>
+                    <div className="card" style={{ minWidth: 420, maxWidth: 500, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                        <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <RefreshCw size={20} className="text-primary" />
+                            {isRTL ? 'إعادة تقييم الأصل' : 'Revalue Asset'}
+                        </h3>
+                        <div className="mb-3">
+                            <label className="form-label">{isRTL ? 'القيمة العادلة الجديدة' : 'New Fair Value'}</label>
+                            <input type="number" className="form-input" value={revalueData.new_value}
+                                onChange={e => setRevalueData(p => ({ ...p, new_value: e.target.value }))}
+                                placeholder={isRTL ? 'أدخل القيمة الجديدة' : 'Enter new value'} />
+                        </div>
+                        <div className="mb-4">
+                            <label className="form-label">{isRTL ? 'السبب' : 'Reason'}</label>
+                            <textarea className="form-input" rows={3} value={revalueData.reason}
+                                onChange={e => setRevalueData(p => ({ ...p, reason: e.target.value }))}
+                                placeholder={isRTL ? 'سبب إعادة التقييم' : 'Reason for revaluation'} />
+                        </div>
+                        <div className="d-flex gap-2 justify-content-end">
+                            <button className="btn btn-ghost" onClick={() => setShowRevalueModal(false)}>{t('common.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleRevalue} disabled={revaluing || !revalueData.new_value}>
+                                {revaluing ? <span className="loading loading-spinner loading-sm"></span> : (isRTL ? 'تأكيد التقييم' : 'Confirm Revalue')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== Transfer Modal ========== */}
+            {showTransferModal && (
+                <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowTransferModal(false)}>
+                    <div className="card" style={{ minWidth: 420, maxWidth: 500, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                        <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ArrowRightLeft size={20} className="text-secondary" />
+                            {isRTL ? 'نقل الأصل إلى فرع آخر' : 'Transfer Asset to Branch'}
+                        </h3>
+                        <div className="mb-3">
+                            <label className="form-label">{isRTL ? 'الفرع المستهدف' : 'Target Branch'}</label>
+                            <select className="form-input" value={transferData.to_branch_id}
+                                onChange={e => setTransferData(p => ({ ...p, to_branch_id: e.target.value }))}>
+                                <option value="">{isRTL ? 'اختر الفرع' : 'Select branch'}</option>
+                                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="mb-4">
+                            <label className="form-label">{isRTL ? 'ملاحظات' : 'Notes'}</label>
+                            <textarea className="form-input" rows={2} value={transferData.notes}
+                                onChange={e => setTransferData(p => ({ ...p, notes: e.target.value }))}
+                                placeholder={isRTL ? 'ملاحظات إضافية (اختياري)' : 'Additional notes (optional)'} />
+                        </div>
+                        <div className="d-flex gap-2 justify-content-end">
+                            <button className="btn btn-ghost" onClick={() => setShowTransferModal(false)}>{t('common.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleTransfer} disabled={transferring || !transferData.to_branch_id}>
+                                {transferring ? <span className="loading loading-spinner loading-sm"></span> : (isRTL ? 'تأكيد النقل' : 'Confirm Transfer')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

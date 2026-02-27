@@ -231,7 +231,7 @@ def create_sales_credit_note(
             "num": inv_num, "party": party_id, "date": inv_date,
             "sub": subtotal, "tax": tax_total, "disc": discount_total,
             "total": total, "notes": data.get("notes", ""),
-            "branch": branch_id or current_user.branch_id,
+            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
             "rel": related_invoice_id, "curr": currency,
             "rate": exchange_rate, "user": current_user.id,
         })
@@ -297,7 +297,7 @@ def create_sales_credit_note(
             "num": je_num, "date": inv_date,
             "desc": f"إشعار دائن مبيعات {inv_num}" + (f" - مقابل فاتورة {related_invoice_id}" if related_invoice_id else ""),
             "ref": inv_num, "user": current_user.id,
-            "branch": branch_id or current_user.branch_id,
+            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
             "curr": currency, "rate": exchange_rate,
         }).scalar()
 
@@ -556,7 +556,7 @@ def create_sales_debit_note(
             "num": inv_num, "party": party_id, "date": inv_date,
             "sub": subtotal, "tax": tax_total, "disc": discount_total,
             "total": total, "notes": data.get("notes", ""),
-            "branch": branch_id or current_user.branch_id,
+            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
             "rel": related_invoice_id, "curr": currency,
             "rate": exchange_rate, "user": current_user.id,
         })
@@ -620,7 +620,7 @@ def create_sales_debit_note(
             "num": je_num, "date": inv_date,
             "desc": f"إشعار مدين مبيعات {inv_num}",
             "ref": inv_num, "user": current_user.id,
-            "branch": branch_id or current_user.branch_id,
+            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
             "curr": currency, "rate": exchange_rate,
         }).scalar()
 

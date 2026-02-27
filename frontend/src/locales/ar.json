@@ -886,7 +886,10 @@
     "crm": "إدارة العلاقات",
     "api_keys": "مفاتيح API",
     "webhooks": "الويب هوك",
-    "services": "الخدمات والصيانة"
+    "services": "الخدمات والصيانة",
+    "company_profile": "ملف الشركة",
+    "notes_receivable": "أوراق القبض",
+    "notes_payable": "أوراق الدفع"
   },
   "branches": {
     "title": "إدارة الفروع",
@@ -957,6 +960,8 @@
     "no_account": "ليس لديك شركة؟ سجل الآن",
     "register_title": "إنشاء شركة جديدة",
     "register_subtitle": "أدخل بيانات شركتك لبدء العمل",
+    "industry_template": "نوع النشاط التجاري",
+    "template_description": "اختر نوع نشاطك لتخصيص النظام تلقائياً حسب احتياجات عملك",
     "company_info": "معلومات الشركة",
     "company_name": "اسم الشركة",
     "company_name_en": "اسم الشركة (إنجليزي)",
@@ -967,6 +972,10 @@
     "timezone": "المنطقة الزمنية",
     "admin_info": "معلومات المدير",
     "full_name": "الاسم الكامل",
+    "address": "العنوان",
+    "tax_number": "الرقم الضريبي",
+    "cr_number": "رقم السجل التجاري",
+    "plan_type": "نوع الباقة",
     "register_btn": "إنشاء الشركة",
     "has_account": "لديك حساب بالفعل؟ تسجيل الدخول",
     "success_title": "تم إنشاء الشركة بنجاح!",
@@ -1983,6 +1992,8 @@
       "form": {
         "create_title": "إضافة عميل جديد",
         "create_subtitle": "أدخل بيانات العميل الأساسية والمالية.",
+        "edit_title": "تعديل العميل",
+        "edit_subtitle": "تحديث بيانات العميل الأساسية والمالية.",
         "basic_info": "بيانات أساسية",
         "contact_info": "معلومات التواصل",
         "name_ar": "اسم العميل (عربي)",
@@ -1995,7 +2006,10 @@
         "save_btn": "حفظ العميل",
         "saving": "جاري الحفظ...",
         "success_add": "تم إضافة العميل بنجاح",
-        "error_add": "فشل إضافة العميل"
+        "error_add": "فشل إضافة العميل",
+        "group": "مجموعة العميل",
+        "select_group": "-- اختر المجموعة --",
+        "quick_add_group": "إضافة مجموعة"
       },
       "invoices": {
         "title": "فواتير المبيعات",
@@ -4924,7 +4938,6 @@
     "employee_code": "رمز الموظف",
     "employee_name": "اسم الموظف",
     "select_employee": "-- اختر موظف --",
-
     "payslip_total_count": "عدد الكشوف",
     "payslip_total_basic": "إجمالي الأساسي",
     "payslip_total_net": "إجمالي الصافي",
@@ -4948,7 +4961,6 @@
     "payslip_gosi_employer": "تأمينات اجتماعية (حصة صاحب العمل)",
     "payslip_gosi_employer_note": "هذا المبلغ يتحمله صاحب العمل ولا يخصم من الموظف",
     "payslip_auto_generated": "كشف مولّد تلقائياً",
-
     "leave_total_entitled": "إجمالي المستحق",
     "leave_total_used": "إجمالي المستخدم",
     "leave_total_remaining": "إجمالي المتبقي",
@@ -4961,7 +4973,6 @@
     "leave_used_label": "مستخدم",
     "carry_over_info": "سيتم ترحيل رصيد الإجازات المتبقية للموظف إلى السنة المحددة وفقاً لسياسة الشركة",
     "carry_over_year_hint": "السنة التي سيتم الترحيل إليها",
-
     "rec_open_positions": "الوظائف المفتوحة",
     "rec_total_vacancies": "إجمالي الشواغر",
     "rec_total_applications": "إجمالي الطلبات",
@@ -4983,7 +4994,6 @@
     "description_placeholder": "وصف الوظيفة...",
     "requirements_placeholder": "المتطلبات...",
     "resume_url": "رابط السيرة الذاتية",
-
     "custody": {
       "actions": "إجراءات",
       "active": "عهد فعالة",

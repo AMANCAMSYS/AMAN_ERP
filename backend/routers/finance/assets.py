@@ -13,6 +13,159 @@ from schemas.assets import AssetCreate, AssetUpdate, AssetDisposal
 
 router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"])
 
+# ============================================================
+# ❗️ IMPORTANT: Static routes MUST come before /{asset_id}
+#   to prevent FastAPI from treating 'transfers'/'revaluations'
+#   as an integer path parameter (causing 422 errors).
+# ============================================================
+
+# ---------- ASSET-002: Asset Transfers (STATIC - must be before /{asset_id}) ----------
+
+@router.get("/transfers", dependencies=[Depends(require_permission("assets.view"))])
+def list_asset_transfers(status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM asset_transfers WHERE 1=1"
+        params = {}
+        if status:
+            q += " AND status = :status"
+            params["status"] = status
+        q += " ORDER BY created_at DESC"
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/transfers", dependencies=[Depends(require_permission("assets.create"))])
+def create_asset_transfer(data: dict, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": data["asset_id"]}).fetchone()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        dep_sum = conn.execute(text(
+            "SELECT COALESCE(SUM(amount),0) FROM asset_depreciation_schedule WHERE asset_id = :id AND posted = true"
+        ), {"id": data["asset_id"]}).scalar()
+        book_value = float(asset.cost) - float(dep_sum or 0)
+
+        result = conn.execute(text("""
+            INSERT INTO asset_transfers (asset_id, from_branch_id, to_branch_id, transfer_date,
+                reason, book_value_at_transfer, status, created_by)
+            VALUES (:aid, :from, :to, :date, :reason, :bv, 'pending', :uid)
+            RETURNING *
+        """), {
+            "aid": data["asset_id"], "from": asset.branch_id,
+            "to": data["to_branch_id"], "date": data.get("transfer_date", date.today().isoformat()),
+            "reason": data.get("reason"), "bv": book_value, "uid": current_user.id,
+        }).fetchone()
+        conn.commit()
+        return dict(result._mapping)
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@router.put("/transfers/{transfer_id}/approve", dependencies=[Depends(require_permission("assets.create"))])
+def approve_transfer(transfer_id: int, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        t = conn.execute(text("SELECT * FROM asset_transfers WHERE id = :id"), {"id": transfer_id}).fetchone()
+        if not t or t.status != 'pending':
+            raise HTTPException(status_code=404, detail="Pending transfer not found")
+        conn.execute(text("UPDATE asset_transfers SET status = 'approved', approved_by = :uid WHERE id = :id"),
+                     {"uid": current_user.id, "id": transfer_id})
+        conn.execute(text("UPDATE assets SET branch_id = :bid WHERE id = :aid"),
+                     {"bid": t.to_branch_id, "aid": t.asset_id})
+        conn.commit()
+        return {"message": "Transfer approved, asset moved to new branch"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+# ---------- ASSET-003: Asset Revaluations (STATIC - must be before /{asset_id}) ----------
+
+@router.get("/revaluations", dependencies=[Depends(require_permission("assets.view"))])
+def list_revaluations(asset_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM asset_revaluations WHERE 1=1"
+        params = {}
+        if asset_id:
+            q += " AND asset_id = :aid"
+            params["aid"] = asset_id
+        q += " ORDER BY revaluation_date DESC"
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/revaluations", dependencies=[Depends(require_permission("assets.create"))])
+def create_revaluation(data: dict, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": data["asset_id"]}).fetchone()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Asset not found")
+        dep_sum = conn.execute(text(
+            "SELECT COALESCE(SUM(amount),0) FROM asset_depreciation_schedule WHERE asset_id = :id AND posted = true"
+        ), {"id": data["asset_id"]}).scalar()
+        old_value = float(asset.cost) - float(dep_sum or 0)
+        new_value = float(data["new_value"])
+        diff = round(new_value - old_value, 2)
+
+        result = conn.execute(text("""
+            INSERT INTO asset_revaluations (asset_id, revaluation_date, old_value, new_value, difference, reason, created_by)
+            VALUES (:aid, :date, :old, :new, :diff, :reason, :uid)
+            RETURNING *
+        """), {
+            "aid": data["asset_id"], "date": data.get("revaluation_date", date.today().isoformat()),
+            "old": old_value, "new": new_value, "diff": diff,
+            "reason": data.get("reason"), "uid": current_user.id,
+        }).fetchone()
+        conn.commit()
+        return dict(result._mapping)
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+# ---------- Maintenance complete (STATIC - must be before /{asset_id}) ----------
+
+@router.put("/maintenance/{maint_id}/complete", dependencies=[Depends(require_permission("assets.create"))])
+def complete_maintenance(maint_id: int, data: dict = {}, current_user: dict = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        conn.execute(text("""
+            UPDATE asset_maintenance SET status = 'completed', completed_date = :d,
+                cost = COALESCE(:cost, cost) WHERE id = :id
+        """), {"d": data.get("completed_date", date.today().isoformat()),
+               "cost": data.get("actual_cost"), "id": maint_id})
+        conn.commit()
+        return {"message": "Maintenance completed"}
+    finally:
+        conn.close()
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# PARAMETERIZED ROUTES (/{asset_id}) come BELOW the static routes
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
 @router.get("/", dependencies=[Depends(require_permission("assets.view"))])
 def list_assets(
     branch_id: Optional[int] = None,
@@ -665,130 +818,6 @@ def calc_sum_of_years_digits(asset_id: int, current_user: dict = Depends(get_cur
         conn.close()
 
 
-# ---------- ASSET-002: Asset Transfers Between Branches ----------
-
-@router.get("/transfers", dependencies=[Depends(require_permission("assets.view"))])
-def list_asset_transfers(status: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        q = "SELECT * FROM asset_transfers WHERE 1=1"
-        params = {}
-        if status:
-            q += " AND status = :status"
-            params["status"] = status
-        q += " ORDER BY created_at DESC"
-        rows = conn.execute(text(q), params).fetchall()
-        return [dict(r._mapping) for r in rows]
-    finally:
-        conn.close()
-
-
-@router.post("/transfers", dependencies=[Depends(require_permission("assets.create"))])
-def create_asset_transfer(data: dict, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": data["asset_id"]}).fetchone()
-        if not asset:
-            raise HTTPException(status_code=404, detail="Asset not found")
-        # Calculate current book value
-        dep_sum = conn.execute(text(
-            "SELECT COALESCE(SUM(amount),0) FROM depreciation_schedule WHERE asset_id = :id AND is_posted = true"
-        ), {"id": data["asset_id"]}).scalar()
-        book_value = float(asset.cost) - float(dep_sum or 0)
-
-        result = conn.execute(text("""
-            INSERT INTO asset_transfers (asset_id, from_branch_id, to_branch_id, transfer_date,
-                reason, book_value_at_transfer, status, created_by)
-            VALUES (:aid, :from, :to, :date, :reason, :bv, 'pending', :uid)
-            RETURNING *
-        """), {
-            "aid": data["asset_id"], "from": asset.branch_id,
-            "to": data["to_branch_id"], "date": data.get("transfer_date", date.today().isoformat()),
-            "reason": data.get("reason"), "bv": book_value, "uid": current_user.id,
-        }).fetchone()
-        conn.commit()
-        return dict(result._mapping)
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-
-@router.put("/transfers/{transfer_id}/approve", dependencies=[Depends(require_permission("assets.create"))])
-def approve_transfer(transfer_id: int, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        t = conn.execute(text("SELECT * FROM asset_transfers WHERE id = :id"), {"id": transfer_id}).fetchone()
-        if not t or t.status != 'pending':
-            raise HTTPException(status_code=404, detail="Pending transfer not found")
-        conn.execute(text("UPDATE asset_transfers SET status = 'approved', approved_by = :uid WHERE id = :id"),
-                     {"uid": current_user.id, "id": transfer_id})
-        conn.execute(text("UPDATE assets SET branch_id = :bid WHERE id = :aid"),
-                     {"bid": t.to_branch_id, "aid": t.asset_id})
-        conn.commit()
-        return {"message": "Transfer approved, asset moved to new branch"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
-
-
-# ---------- ASSET-003: Asset Revaluations ----------
-
-@router.get("/revaluations", dependencies=[Depends(require_permission("assets.view"))])
-def list_revaluations(asset_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        q = "SELECT * FROM asset_revaluations WHERE 1=1"
-        params = {}
-        if asset_id:
-            q += " AND asset_id = :aid"
-            params["aid"] = asset_id
-        q += " ORDER BY revaluation_date DESC"
-        rows = conn.execute(text(q), params).fetchall()
-        return [dict(r._mapping) for r in rows]
-    finally:
-        conn.close()
-
-
-@router.post("/revaluations", dependencies=[Depends(require_permission("assets.create"))])
-def create_revaluation(data: dict, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": data["asset_id"]}).fetchone()
-        if not asset:
-            raise HTTPException(status_code=404, detail="Asset not found")
-        dep_sum = conn.execute(text(
-            "SELECT COALESCE(SUM(amount),0) FROM depreciation_schedule WHERE asset_id = :id AND is_posted = true"
-        ), {"id": data["asset_id"]}).scalar()
-        old_value = float(asset.cost) - float(dep_sum or 0)
-        new_value = float(data["new_value"])
-        diff = round(new_value - old_value, 2)
-
-        result = conn.execute(text("""
-            INSERT INTO asset_revaluations (asset_id, revaluation_date, old_value, new_value, difference, reason, created_by)
-            VALUES (:aid, :date, :old, :new, :diff, :reason, :uid)
-            RETURNING *
-        """), {
-            "aid": data["asset_id"], "date": data.get("revaluation_date", date.today().isoformat()),
-            "old": old_value, "new": new_value, "diff": diff,
-            "reason": data.get("reason"), "uid": current_user.id,
-        }).fetchone()
-        conn.commit()
-        return dict(result._mapping)
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
 
 
 # ---------- ASSET-004: Insurance & Maintenance ----------
@@ -866,19 +895,6 @@ def add_maintenance(asset_id: int, data: dict, current_user: dict = Depends(get_
         conn.close()
 
 
-@router.put("/maintenance/{maint_id}/complete", dependencies=[Depends(require_permission("assets.create"))])
-def complete_maintenance(maint_id: int, data: dict = {}, current_user: dict = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        conn.execute(text("""
-            UPDATE asset_maintenance SET status = 'completed', completed_date = :d,
-                cost = COALESCE(:cost, cost) WHERE id = :id
-        """), {"d": data.get("completed_date", date.today().isoformat()),
-               "cost": data.get("actual_cost"), "id": maint_id})
-        conn.commit()
-        return {"message": "Maintenance completed"}
-    finally:
-        conn.close()
 
 
 # ---------- ASSET-005: QR / Barcode ----------

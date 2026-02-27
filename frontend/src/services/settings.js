@@ -2,7 +2,9 @@ import api from './apiClient'
 
 export const settingsAPI = {
     get: () => api.get('/settings/'),
-    updateBulk: (settings) => api.post('/settings/bulk', { settings })
+    updateBulk: (settings) => api.post('/settings/bulk', { settings }),
+    generateCSID: (data) => api.post('/settings/generate-csid', data),
+    testEmail: (data) => api.post('/settings/test-email', data),
 }
 
 export const rolesAPI = {
@@ -11,7 +13,9 @@ export const rolesAPI = {
     create: (data) => api.post('/roles/', data),
     update: (id, data) => api.put(`/roles/${id}`, data),
     delete: (id) => api.delete(`/roles/${id}`),
-    listPermissions: () => api.get('/roles/permissions')
+    listPermissions: () => api.get('/roles/permissions'),
+    initDefaults: () => api.post('/roles/init-defaults'),
+    getPermissionSections: () => api.get('/roles/permissions/sections'),
 }
 
 export const branchesAPI = {

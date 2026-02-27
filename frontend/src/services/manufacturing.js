@@ -44,5 +44,30 @@ export const manufacturingAPI = {
     getDirectLaborReport: (params) => api.get('/manufacturing/reports/direct-labor', { params }),
     getProductionCostReport: (params) => api.get('/manufacturing/reports/production-cost', { params }),
     getWorkCenterEfficiency: (params) => api.get('/manufacturing/reports/work-center-efficiency', { params }),
-    getProductionSummary: (params) => api.get('/manufacturing/reports/production-summary', { params })
+    getProductionSummary: (params) => api.get('/manufacturing/reports/production-summary', { params }),
+    getMaterialConsumption: (params) => api.get('/manufacturing/reports/material-consumption', { params }),
+
+    // BOM - Compute Materials
+    computeBOMMaterials: (bomId) => api.get(`/manufacturing/boms/${bomId}/compute-materials`),
+
+    // MRP
+    calculateMRP: (orderId) => api.get(`/manufacturing/mrp/calculate/${orderId}`),
+
+    // Operations Control
+    startOperation: (opId) => api.post(`/manufacturing/operations/${opId}/start`),
+    pauseOperation: (opId) => api.post(`/manufacturing/operations/${opId}/pause`),
+    completeOperation: (opId) => api.post(`/manufacturing/operations/${opId}/complete`),
+    getActiveOperations: () => api.get('/manufacturing/orders/operations/active'),
+
+    // Orders - Extended
+    updateOrder: (id, data) => api.put(`/manufacturing/orders/${id}`, data),
+    deleteOrder: (id) => api.delete(`/manufacturing/orders/${id}`),
+    checkMaterials: (params) => api.get('/manufacturing/orders/check-materials', { params }),
+    getCostEstimate: (params) => api.get('/manufacturing/orders/cost-estimate', { params }),
+
+    // Quality Control
+    getQCChecks: (orderId) => api.get(`/manufacturing/orders/${orderId}/qc-checks`),
+    createQCCheck: (orderId, data) => api.post(`/manufacturing/orders/${orderId}/qc-checks`, data),
+    getQCFailures: (params) => api.get('/manufacturing/qc-checks/failures', { params }),
+    recordQCResult: (qcId, data) => api.post(`/manufacturing/qc-checks/${qcId}/record-result`, data),
 }

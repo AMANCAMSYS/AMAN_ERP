@@ -1,16 +1,22 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { getUser } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
+import CurrencySelector from '../../components/common/CurrencySelector';
 
 function CustomerForm() {
     const { t } = useTranslation()
+    const { id } = useParams()
+    const isEdit = Boolean(id)
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const [loading, setLoading] = useState(false)
+    const [initialLoading, setInitialLoading] = useState(isEdit)
     const [error, setError] = useState(null)
+    const [groups, setGroups] = useState([])
     const [formData, setFormData] = useState({
         name: '',
         name_en: '',
@@ -18,8 +24,47 @@ function CustomerForm() {
         phone: '',
         tax_number: '',
         address: '',
-        credit_limit: 0
+        credit_limit: 0,
+        group_id: '',
+        currency: '',
+        status: 'active'
     })
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                if (isEdit) setInitialLoading(true)
+                const [groupsRes] = await Promise.all([
+                    salesAPI.listCustomerGroups()
+                ])
+                setGroups(groupsRes.data)
+
+                if (isEdit) {
+                    const customerRes = await salesAPI.getCustomer(id)
+                    const c = customerRes.data;
+                    const decimalPlaces = getUser()?.decimal_places ?? 2;
+                    setFormData({
+                        name: c.name || '',
+                        name_en: c.name_en || '',
+                        email: c.email || '',
+                        phone: c.phone || '',
+                        tax_number: c.tax_number || '',
+                        address: c.address || '',
+                        credit_limit: c.credit_limit ? parseFloat(c.credit_limit).toFixed(decimalPlaces) : (0).toFixed(decimalPlaces),
+                        group_id: c.group_id || '',
+                        currency: c.currency || '',
+                        status: c.status || 'active'
+                    })
+                }
+            } catch (err) {
+                console.error("Error fetching data:", err)
+                setError(t('common.error_loading'))
+            } finally {
+                setInitialLoading(false)
+            }
+        }
+        fetchInitialData()
+    }, [id, isEdit, t])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -35,10 +80,17 @@ function CustomerForm() {
                 phone: formData.phone || null,
                 tax_number: formData.tax_number || null,
                 address: formData.address || null,
-                branch_id: currentBranch?.id
+                group_id: formData.group_id ? parseInt(formData.group_id) : null,
+                branch_id: currentBranch?.id,
+                status: formData.status
             }
-            await salesAPI.createCustomer(payload)
-            navigate('/sales/customers')
+            if (isEdit) {
+                await salesAPI.updateCustomer(id, payload)
+                navigate(`/sales/customers/${id}`)
+            } else {
+                await salesAPI.createCustomer(payload)
+                navigate('/sales/customers')
+            }
         } catch (err) {
             console.error(err)
             const errMsg = err.response?.data?.detail
@@ -52,81 +104,151 @@ function CustomerForm() {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
+    if (initialLoading) return <div className="page-center"><span className="loading"></span></div>
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <h1 className="workspace-title">{t('sales.customers.form.create_title')}</h1>
-                <p className="workspace-subtitle">{t('sales.customers.form.create_subtitle')}</p>
+                <div>
+                    <h1 className="workspace-title">{isEdit ? t('sales.customers.form.edit_title') : t('sales.customers.form.create_title')}</h1>
+                    <p className="workspace-subtitle">{isEdit ? t('sales.customers.form.edit_subtitle') : t('sales.customers.form.create_subtitle')}</p>
+                </div>
             </div>
 
-            <div className="card" style={{ maxWidth: '800px' }}>
+            <div className="card" style={{ maxWidth: '900px', margin: '0 auto', padding: '32px', boxShadow: 'var(--shadow-lg)' }}>
                 {error && <div className="alert alert-error mb-4">{error}</div>}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-section">
-                        <h3 className="section-title">{t('sales.customers.form.basic_info')}</h3>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.name_ar')} *</label>
-                                <input
-                                    type="text" name="name" className="form-input" required
-                                    value={formData.name} onChange={handleChange}
-                                    placeholder={t('sales.customers.form.name_ar')}
-                                />
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div className="form-section-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
+                                <span style={{ fontSize: '24px' }}>🏢</span> {t('sales.customers.form.basic_info')}
+                            </h3>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.name_ar')} *</label>
+                                    <input
+                                        type="text" name="name" className="form-input" required
+                                        value={formData.name} onChange={handleChange}
+                                        placeholder={t('sales.customers.form.name_ar')}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.name_en')}</label>
+                                    <input
+                                        type="text" name="name_en" className="form-input"
+                                        value={formData.name_en} onChange={handleChange}
+                                        placeholder="e.g. Al-Noor Trading"
+                                    />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.name_en')}</label>
-                                <input
-                                    type="text" name="name_en" className="form-input"
-                                    value={formData.name_en} onChange={handleChange}
-                                    placeholder="e.g. Al-Noor Trading"
-                                />
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.tax_number')}</label>
+                                    <input
+                                        type="text" name="tax_number" className="form-input"
+                                        value={formData.tax_number} onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.group')}</label>
+                                    <div className="input-group">
+                                        <select
+                                            name="group_id"
+                                            className="form-input"
+                                            value={formData.group_id}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="">{t('sales.customers.form.select_group')}</option>
+                                            {groups.map(group => (
+                                                <option key={group.id} value={group.id}>
+                                                    {group.group_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={() => window.open('/sales/customer-groups', '_blank')}
+                                            title={t('sales.customers.form.quick_add_group')}
+                                            style={{ padding: '0 12px' }}
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.credit_limit')}</label>
+                                    <input
+                                        type="number"
+                                        name="credit_limit"
+                                        className="form-input"
+                                        step={1 / Math.pow(10, getUser()?.decimal_places ?? 2)}
+                                        value={formData.credit_limit}
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('common.currency')}</label>
+                                    <CurrencySelector
+                                        value={formData.currency}
+                                        onChange={(code) => setFormData({ ...formData, currency: code })}
+                                        className="form-input"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.table.status')}</label>
+                                    <select
+                                        name="status"
+                                        className="form-input"
+                                        value={formData.status}
+                                        onChange={handleChange}
+                                    >
+                                        <option value="active">{t('sales.customers.status.active')}</option>
+                                        <option value="inactive">{t('sales.customers.status.inactive')}</option>
+                                    </select>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    {/* Spacer */}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.tax_number')}</label>
-                                <input
-                                    type="text" name="tax_number" className="form-input"
-                                    value={formData.tax_number} onChange={handleChange}
-                                />
+                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
+                                <span style={{ fontSize: '24px' }}>📞</span> {t('sales.customers.form.contact_info')}
+                            </h3>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.phone')}</label>
+                                    <input
+                                        type="tel" name="phone" className="form-input"
+                                        value={formData.phone} onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('sales.customers.form.email')}</label>
+                                    <input
+                                        type="email" name="email" className="form-input"
+                                        value={formData.email} onChange={handleChange}
+                                    />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.credit_limit')}</label>
-                                <input
-                                    type="number" name="credit_limit" className="form-input"
-                                    value={formData.credit_limit} onChange={handleChange}
-                                />
+                            <div className="form-group" style={{ marginTop: '24px', marginBottom: 0 }}>
+                                <label className="form-label">{t('sales.customers.form.address')}</label>
+                                <textarea
+                                    name="address" className="form-input" rows="3"
+                                    value={formData.address} onChange={handleChange}
+                                ></textarea>
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="form-section">
-                        <h3 className="section-title">{t('sales.customers.form.contact_info')}</h3>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.phone')}</label>
-                                <input
-                                    type="tel" name="phone" className="form-input"
-                                    value={formData.phone} onChange={handleChange}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.customers.form.email')}</label>
-                                <input
-                                    type="email" name="email" className="form-input"
-                                    value={formData.email} onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">{t('sales.customers.form.address')}</label>
-                            <textarea
-                                name="address" className="form-input" rows="3"
-                                value={formData.address} onChange={handleChange}
-                            ></textarea>
                         </div>
                     </div>
 

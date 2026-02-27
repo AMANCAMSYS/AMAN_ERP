@@ -13,6 +13,7 @@ function BuyingOrderForm() {
     const { currentBranch } = useBranch()
     const currency = getCurrency()
     const [suppliers, setSuppliers] = useState([])
+    const [supplierGroups, setSupplierGroups] = useState([])
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -31,11 +32,13 @@ function BuyingOrderForm() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [suppRes, prodRes] = await Promise.all([
+                const [suppRes, groupsRes, prodRes] = await Promise.all([
                     inventoryAPI.listSuppliers(),
+                    purchasesAPI.listSupplierGroups(),
                     inventoryAPI.listProducts()
                 ])
                 setSuppliers(suppRes.data)
+                setSupplierGroups(groupsRes.data)
                 setProducts(prodRes.data)
             } catch (err) {
                 console.error("Error fetching data", err)
@@ -64,6 +67,20 @@ function BuyingOrderForm() {
                         updatedItem.unit_price = product.last_buying_price || product.buying_price || 0
                         // Auto-fill tax rate from product data
                         updatedItem.tax_rate = product.tax_rate !== undefined ? product.tax_rate : 15
+
+                        // Try applying item-level effect from group
+                        const supplier = suppliers.find(s => s.id === parseInt(formData.supplier_id));
+                        if (supplier && supplier.group_id) {
+                            const group = supplierGroups.find(g => g.id === supplier.group_id);
+                            if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                if (group.effect_type === 'discount') {
+                                    updatedItem.discount_percent = group.discount_percentage;
+                                } else if (group.effect_type === 'markup') {
+                                    // Markup applied by increasing unit_price
+                                    updatedItem.unit_price = updatedItem.unit_price * (1 + (group.discount_percentage / 100));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -104,20 +121,72 @@ function BuyingOrderForm() {
     }
 
     const calculateTotals = () => {
-        return items.reduce((acc, item) => {
-            const qty = parseFloat(item.quantity) || 0
-            const price = parseFloat(item.unit_price) || 0
-            const discount = parseFloat(item.discount) || 0
-            const taxRate = parseFloat(item.tax_rate) || 0
-            const lineSubtotal = qty * price
-            const taxable = lineSubtotal - discount
-            const lineTax = taxable * (taxRate / 100)
-            acc.subtotal += lineSubtotal
-            acc.discount += discount
-            acc.tax += lineTax
-            acc.total += (taxable + lineTax)
-            return acc
-        }, { subtotal: 0, discount: 0, tax: 0, total: 0 })
+        let subtotal = 0;
+        let discount = 0;
+        let tax = 0;
+        let total = 0;
+
+        let globalEffectType = 'discount';
+        let globalEffectPercent = 0;
+
+        // Find group effects on total
+        const supplier = suppliers.find(s => s.id === parseInt(formData.supplier_id));
+        if (supplier && supplier.group_id) {
+            const group = supplierGroups.find(g => g.id === supplier.group_id);
+            if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
+                globalEffectType = group.effect_type;
+                globalEffectPercent = parseFloat(group.discount_percentage);
+            }
+        }
+
+        items.forEach(item => {
+            const qty = parseFloat(item.quantity) || 0;
+            const price = parseFloat(item.unit_price) || 0;
+            const lineDiscount = parseFloat(item.discount) || 0;
+            const lineSubtotal = qty * price;
+
+            subtotal += lineSubtotal;
+            discount += lineDiscount;
+        });
+
+        let totalAfterLineDiscounts = subtotal - discount;
+        let globalDiscountAmount = 0;
+        let globalMarkupAmount = 0;
+
+        if (globalEffectPercent > 0) {
+            if (globalEffectType === 'discount') {
+                globalDiscountAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            } else if (globalEffectType === 'markup') {
+                globalMarkupAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            }
+        }
+
+        let baseForTax = totalAfterLineDiscounts - globalDiscountAmount + globalMarkupAmount;
+
+        items.forEach(item => {
+            const qty = parseFloat(item.quantity) || 0;
+            const price = parseFloat(item.unit_price) || 0;
+            const lineDiscount = parseFloat(item.discount) || 0;
+            const taxRate = parseFloat(item.tax_rate) || 0;
+
+            const weight = (qty * price - lineDiscount) / totalAfterLineDiscounts || 0;
+            const itemBase = (qty * price - lineDiscount)
+                - (globalDiscountAmount * weight)
+                + (globalMarkupAmount * weight);
+            tax += itemBase * (taxRate / 100);
+        });
+
+        total = baseForTax + tax;
+
+        return {
+            subtotal,
+            discount: discount + globalDiscountAmount,
+            tax,
+            total,
+            globalEffectType,
+            globalEffectPercent,
+            globalMarkupAmount
+        };
     }
 
     const handleSubmit = async (e) => {
@@ -139,19 +208,24 @@ function BuyingOrderForm() {
         setLoading(true)
         setError(null)
         try {
+            const totals = calculateTotals();
             const payload = {
                 supplier_id: parseInt(formData.supplier_id),
                 branch_id: currentBranch?.id,
                 order_date: formData.order_date,
                 expected_date: formData.expected_date || null,
                 notes: formData.notes,
+                effect_type: totals.globalEffectType,
+                effect_percentage: totals.globalEffectPercent,
+                markup_amount: totals.globalMarkupAmount,
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id),
                     description: item.description || '',
                     quantity: parseFloat(item.quantity) || 0,
                     unit_price: parseFloat(item.unit_price) || 0,
                     discount: parseFloat(item.discount) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0
+                    tax_rate: parseFloat(item.tax_rate) || 0,
+                    markup: 0 // Handled at line level unit_price
                 }))
             }
             await purchasesAPI.createOrder(payload)
@@ -193,7 +267,43 @@ function BuyingOrderForm() {
                             className="form-input"
                             required
                             value={formData.supplier_id || ''}
-                            onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}
+                            onChange={e => {
+                                setFormData({ ...formData, supplier_id: e.target.value });
+                                // Reset items discount when supplier changes
+                                setItems(prevItems => prevItems.map(item => {
+                                    let updated = { ...item };
+                                    if (item.product_id) {
+                                        const product = products.find(p => p.id === parseInt(item.product_id));
+                                        if (product) {
+                                            updated.unit_price = product.last_buying_price || product.buying_price || 0;
+                                            updated.discount_percent = 0;
+                                            updated.discount = 0;
+                                        }
+
+                                        const supplier = suppliers.find(s => s.id === parseInt(e.target.value));
+                                        if (supplier && supplier.group_id) {
+                                            const group = supplierGroups.find(g => g.id === supplier.group_id);
+                                            if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                                if (group.effect_type === 'discount') {
+                                                    updated.discount_percent = group.discount_percentage;
+                                                    updated.discount = (updated.quantity * updated.unit_price) * (group.discount_percentage / 100);
+                                                } else if (group.effect_type === 'markup') {
+                                                    updated.unit_price = updated.unit_price * (1 + (group.discount_percentage / 100));
+                                                }
+                                            }
+                                        }
+
+                                        // Recalculate line total
+                                        const qty = parseFloat(updated.quantity) || 0;
+                                        const price = parseFloat(updated.unit_price) || 0;
+                                        const discount = parseFloat(updated.discount) || 0;
+                                        const taxRate = parseFloat(updated.tax_rate) || 0;
+                                        const taxable = (qty * price) - discount;
+                                        updated.total = taxable + (taxable * (taxRate / 100));
+                                    }
+                                    return updated;
+                                }));
+                            }}
                         >
                             <option value="">{t('buying.orders.form.supplier_placeholder')}</option>
                             {suppliers.map(s => (
@@ -341,6 +451,12 @@ function BuyingOrderForm() {
                             <span style={{ color: 'var(--text-secondary)' }}>{t('buying.orders.form.summary.subtotal')}</span>
                             <span className="font-medium">{totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
                         </div>
+                        {totals.globalEffectPercent > 0 && totals.globalEffectType === 'markup' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', color: 'var(--text-success)' }}>
+                                <span>زيادة (مجموعة) ({totals.globalEffectPercent}%)</span>
+                                <span>{totals.globalMarkupAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>{t('buying.orders.form.summary.discount')}</span>
                             <span className="font-medium text-error">-{totals.discount.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>

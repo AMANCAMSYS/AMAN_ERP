@@ -1,14 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { companiesAPI } from '../utils/api'
 import { useTranslation } from 'react-i18next'
 
 function Register() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
+
     const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState(null)
+    const [templates, setTemplates] = useState([])
+    const [selectedTemplate, setSelectedTemplate] = useState(null)
 
     const [formData, setFormData] = useState({
         company_name: '',
@@ -16,16 +19,34 @@ function Register() {
         email: '',
         phone: '',
         address: '',
-        country: 'SY',
-        currency: 'SYP',
+        country: 'SA',
+        currency: 'SAR',
         admin_username: '',
         admin_email: '',
         admin_full_name: '',
         admin_password: '',
         admin_password_confirm: '',
-        timezone: 'Asia/Damascus',
-        plan_type: 'basic'
+        timezone: 'Asia/Riyadh',
+        plan_type: 'basic',
+        template_id: null
     })
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                const res = await companiesAPI.getTemplates()
+                setTemplates(res.data)
+                // Default to first template if available
+                if (res.data.length > 0) {
+                    setSelectedTemplate(res.data[0].id)
+                    setFormData(prev => ({ ...prev, template_id: res.data[0].id }))
+                }
+            } catch (err) {
+                console.error("Failed to fetch templates:", err)
+            }
+        }
+        fetchTemplates()
+    }, [])
 
     const COUNTRY_DEFAULTS = {
         SA: { currency: 'SAR', timezone: 'Asia/Riyadh' },
@@ -44,6 +65,11 @@ function Register() {
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
+    }
+
+    const handleTemplateSelect = (id) => {
+        setSelectedTemplate(id)
+        setFormData(prev => ({ ...prev, template_id: id }))
     }
 
     const handleSubmit = async (e) => {
@@ -67,6 +93,7 @@ function Register() {
             setLoading(false)
         }
     }
+
 
     if (success) {
         return (
@@ -283,7 +310,75 @@ function Register() {
                     </div>
 
                     <div className="form-section">
+                        <h3 className="section-title">{t('auth.industry_template') || 'نوع النشاط التجاري'}</h3>
+                        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+                            {t('auth.template_description') || 'اختر نوع نشاطك لتخصيص النظام تلقائياً'}
+                        </p>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                            gap: '12px',
+                            marginBottom: '20px'
+                        }}>
+                            {templates.map(tpl => (
+                                <div
+                                    key={tpl.id}
+                                    onClick={() => handleTemplateSelect(tpl.id)}
+                                    style={{
+                                        position: 'relative',
+                                        border: `2px solid ${selectedTemplate === tpl.id ? '#3b82f6' : '#e2e8f0'}`,
+                                        borderRadius: '12px',
+                                        padding: '16px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        background: selectedTemplate === tpl.id ? '#eff6ff' : 'white',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        textAlign: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    <div style={{
+                                        width: '40px',
+                                        height: '40px',
+                                        background: selectedTemplate === tpl.id ? '#3b82f6' : '#f1f5f9',
+                                        color: selectedTemplate === tpl.id ? 'white' : '#64748b',
+                                        borderRadius: '10px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '18px',
+                                        fontWeight: 'bold'
+                                    }}>
+                                        {tpl.icon || '💼'}
+                                    </div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                                        {i18n.language?.startsWith('ar') ? tpl.name_ar : tpl.name}
+                                    </div>
+
+                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                        {i18n.language?.startsWith('ar') ? tpl.description_ar : tpl.description}
+                                    </div>
+
+                                    {selectedTemplate === tpl.id && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '8px',
+                                            right: '8px',
+                                            fontSize: '12px'
+                                        }}>
+                                            ✅
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="form-section">
                         <h3 className="section-title">{t('auth.admin_info')}</h3>
+
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="admin_username">{t('auth.username')} *</label>

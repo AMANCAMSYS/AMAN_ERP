@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 const SalesReports = () => {
     const { t } = useTranslation();
@@ -16,18 +17,23 @@ const SalesReports = () => {
     const [topProducts, setTopProducts] = useState([]);
     const currency = getCurrency();
     const { currentBranch } = useBranch();
+    const [dates, setDates] = useState({
+        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
 
     useEffect(() => {
         fetchReports();
-    }, [currentBranch]);
+    }, [currentBranch, dates]);
 
     const fetchReports = async () => {
         try {
             setLoading(true);
             const branchId = currentBranch ? currentBranch.id : null;
+            const daysDiff = Math.ceil((new Date(dates.end) - new Date(dates.start)) / (1000 * 60 * 60 * 24)) || 30;
             const [sumRes, trendRes, custRes, prodRes] = await Promise.all([
-                reportsAPI.getSalesSummary(null, null, branchId),
-                reportsAPI.getSalesTrend(30, branchId),
+                reportsAPI.getSalesSummary(dates.start, dates.end, branchId),
+                reportsAPI.getSalesTrend(daysDiff, branchId),
                 reportsAPI.getSalesByCustomer(5, branchId),
                 reportsAPI.getSalesByProduct(5, branchId)
             ]);
@@ -189,6 +195,16 @@ const SalesReports = () => {
                     <p className="workspace-subtitle">{t('sales.reports.analytics.subtitle')}</p>
                 </div>
                 <div className="header-actions">
+                    <CustomDatePicker
+                        label={t('common.start_date')}
+                        selected={dates.start}
+                        onChange={(d) => setDates(prev => ({ ...prev, start: d }))}
+                    />
+                    <CustomDatePicker
+                        label={t('common.end_date')}
+                        selected={dates.end}
+                        onChange={(d) => setDates(prev => ({ ...prev, end: d }))}
+                    />
                     <button onClick={fetchReports} className="btn btn-secondary">🔄 {t('sales.reports.analytics.update')}</button>
                 </div>
             </div>

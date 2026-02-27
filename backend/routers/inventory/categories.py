@@ -9,8 +9,10 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.audit import log_activity
 from utils.permissions import require_permission
 from schemas import CategoryCreate, CategoryResponse
+from fastapi import Request
 
 categories_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -57,7 +59,11 @@ def get_next_category_code(current_user: dict = Depends(get_current_user)):
 
 
 @categories_router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("products.create"))])
-def create_category(category: CategoryCreate, current_user: dict = Depends(get_current_user)):
+def create_category(
+    category: CategoryCreate, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db_connection(current_user.company_id)
     try:
         # Check duplicate code
@@ -74,6 +80,18 @@ def create_category(category: CategoryCreate, current_user: dict = Depends(get_c
             "branch_id": category.branch_id
         }).fetchone()
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="inventory.category.create",
+            resource_type="category",
+            resource_id=str(result[0]),
+            details={"name": category.name, "code": category.code},
+            request=request
+        )
+
         return {**category.model_dump(), "id": result[0]}
     except HTTPException:
         raise
@@ -85,7 +103,12 @@ def create_category(category: CategoryCreate, current_user: dict = Depends(get_c
 
 
 @categories_router.put("/categories/{id}", response_model=CategoryResponse, dependencies=[Depends(require_permission("products.edit"))])
-def update_category(id: int, category: CategoryCreate, current_user: dict = Depends(get_current_user)):
+def update_category(
+    id: int, 
+    category: CategoryCreate, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db_connection(current_user.company_id)
     try:
         exists = db.execute(text("SELECT id FROM product_categories WHERE id = :id"), {"id": id}).scalar()
@@ -97,6 +120,18 @@ def update_category(id: int, category: CategoryCreate, current_user: dict = Depe
             WHERE id = :id
         """), {"name": category.name, "code": category.code, "id": id})
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="inventory.category.update",
+            resource_type="category",
+            resource_id=str(id),
+            details={"name": category.name, "code": category.code},
+            request=request
+        )
+
         return {**category.model_dump(), "id": id}
     except HTTPException:
         raise
@@ -108,11 +143,27 @@ def update_category(id: int, category: CategoryCreate, current_user: dict = Depe
 
 
 @categories_router.delete("/categories/{id}", dependencies=[Depends(require_permission("products.delete"))])
-def delete_category(id: int, current_user: dict = Depends(get_current_user)):
+def delete_category(
+    id: int, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM product_categories WHERE id = :id"), {"id": id})
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="inventory.category.delete",
+            resource_type="category",
+            resource_id=str(id),
+            details=None,
+            request=request
+        )
+
         return {"message": "top deleted"}
     except Exception as e:
         db.rollback()

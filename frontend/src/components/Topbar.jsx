@@ -388,6 +388,15 @@ function Topbar() {
                             >
                                 <span>👤</span> {t('common.user_menu.profile')}
                             </div>
+                            {hasPermission('admin.companies') && (
+                                <div
+                                    className="dropdown-item"
+                                    onClick={() => { setShowMenu(false); navigate('/admin/company-profile') }}
+                                    style={{ padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <span>🏢</span> {t('nav.company_profile') || 'ملف الشركة'}
+                                </div>
+                            )}
                             <div style={{ height: '1px', background: 'var(--border-color)', margin: '8px 0' }}></div>
                             <div
                                 className="dropdown-item text-danger"

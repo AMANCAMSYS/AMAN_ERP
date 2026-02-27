@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash, Save, Trash2, Info } from 'lucide-react';
+import { Plus, Trash, Save, Trash2, Info, Clock } from 'lucide-react';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';

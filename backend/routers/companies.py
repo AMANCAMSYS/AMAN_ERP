@@ -129,15 +129,34 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
             if not success:
                 logger.warning(f"⚠️ Warning: {message}")
             
+            # Fetch template modules
+            enabled_modules = None
+            if request_body.template_id:
+                tpl = db.execute(
+                    text("SELECT enabled_modules FROM industry_templates WHERE id = :id"),
+                    {"id": request_body.template_id}
+                ).fetchone()
+                if tpl:
+                    enabled_modules = tpl[0]
+            
+            # If no template_id or template not found, default to 'general'
+            if not enabled_modules:
+                tpl = db.execute(text("SELECT enabled_modules FROM industry_templates WHERE key = 'general'")).fetchone()
+                if tpl:
+                    enabled_modules = tpl[0]
+
+            import json
+            enabled_modules_json = json.dumps(enabled_modules) if enabled_modules else None
+
             # Register in system database
             db.execute(text("""
                 INSERT INTO system_companies 
                 (id, company_name, company_name_en, commercial_registry, tax_number, 
                  phone, email, address, database_name, database_user, currency, 
-                 status, plan_type, created_at, activated_at)
+                 status, plan_type, template_id, enabled_modules, created_at, activated_at)
                 VALUES 
                 (:id, :name, :name_en, :registry, :tax, :phone, :email, :address, 
-                 :db_name, :db_user, :currency, 'active', :plan, :now, :now)
+                 :db_name, :db_user, :currency, 'active', :plan, :tpl_id, :modules, :now, :now)
             """), {
                 "id": company_id,
                 "name": request_body.company_name,
@@ -151,8 +170,11 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 "db_user": db_user,
                 "currency": request_body.currency,
                 "plan": request_body.plan_type,
+                "tpl_id": request_body.template_id,
+                "modules": enabled_modules_json,
                 "now": datetime.now(timezone.utc)
             })
+
             
             db.commit()
             logger.info(f"✅ Created company: {request_body.company_name} (ID: {company_id})")
@@ -281,7 +303,7 @@ def get_company(
         result = db.execute(
             text("""
                 SELECT id, company_name, company_name_en, email, phone, address, 
-                       status, plan_type, currency, created_at, activated_at
+                       status, plan_type, currency, created_at, activated_at, logo_url
                 FROM system_companies WHERE id = :id
             """),
             {"id": company_id}
@@ -301,7 +323,8 @@ def get_company(
             "plan_type": result[7],
             "currency": result[8],
             "created_at": result[9],
-            "activated_at": result[10]
+            "activated_at": result[10],
+            "logo_url": result[11]
         }
     except Exception as e:
         logger.error(f"Error in get_company {company_id}: {str(e)}")
@@ -427,3 +450,30 @@ async def upload_company_logo(
     except Exception as e:
         logger.error(f"Error uploading logo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload: {str(e)}")
+
+@router.get("/public/templates")
+def get_industry_templates():
+    """عرض قوالب الأنشطة المتاحة للجمهور"""
+    from database import get_system_db
+    db = get_system_db()
+    try:
+        result = db.execute(text("SELECT id, key, name, name_ar, icon, description, description_ar FROM industry_templates ORDER BY id")).fetchall()
+        return [
+            {
+                "id": row[0],
+                "key": row[1],
+                "name": row[2],
+                "name_ar": row[3],
+                "icon": row[4],
+                "description": row[5],
+                "description_ar": row[6]
+            }
+            for row in result
+        ]
+
+    except Exception as e:
+        logger.error(f"Error in get_industry_templates: {str(e)}")
+        return []
+    finally:
+        db.close()
+

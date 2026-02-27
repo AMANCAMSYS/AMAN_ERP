@@ -231,6 +231,9 @@
     "from_date": "From Date",
     "to_date": "To Date",
     "pro_rata": " (Pro-rata)",
+    "not_set": "Not Set",
+    "created_at": "Created At",
+    "error_loading_data": "Error loading data",
     "days_full": {
       "saturday": "Saturday",
       "sunday": "Sunday",
@@ -558,7 +561,10 @@
     "crm": "CRM",
     "api_keys": "API Keys",
     "webhooks": "Webhooks",
-    "services": "Services"
+    "services": "Services",
+    "company_profile": "Company Profile",
+    "notes_receivable": "Notes Receivable",
+    "notes_payable": "Notes Payable"
   },
   "hr": {
     "attendance": {
@@ -853,7 +859,6 @@
     "employee_code": "Employee Code",
     "employee_name": "Employee Name",
     "select_employee": "-- Select Employee --",
-
     "payslip_total_count": "Payslip Count",
     "payslip_total_basic": "Total Basic",
     "payslip_total_net": "Total Net",
@@ -877,7 +882,6 @@
     "payslip_gosi_employer": "Social Insurance (Employer Share)",
     "payslip_gosi_employer_note": "This amount is borne by the employer and is not deducted from the employee",
     "payslip_auto_generated": "Auto-generated payslip",
-
     "leave_total_entitled": "Total Entitled",
     "leave_total_used": "Total Used",
     "leave_total_remaining": "Total Remaining",
@@ -890,7 +894,6 @@
     "leave_used_label": "Used",
     "carry_over_info": "The remaining leave balance will be carried over to the specified year according to company policy",
     "carry_over_year_hint": "The year to carry over to",
-
     "rec_open_positions": "Open Positions",
     "rec_total_vacancies": "Total Vacancies",
     "rec_total_applications": "Total Applications",
@@ -912,7 +915,6 @@
     "description_placeholder": "Job description...",
     "requirements_placeholder": "Requirements...",
     "resume_url": "Resume URL",
-
     "custody": {
       "actions": "Actions",
       "active": "Active",
@@ -1161,6 +1163,8 @@
     "no_account": "Don't have a company? Register Now",
     "register_title": "Create New Company",
     "register_subtitle": "Enter your company details to get started",
+    "industry_template": "Business Activity Type",
+    "template_description": "Choose your industry to automatically customize the system for your business needs",
     "company_info": "Company Information",
     "company_name": "Company Name",
     "company_name_en": "Company Name (EN)",
@@ -1171,6 +1175,10 @@
     "timezone": "Timezone",
     "admin_info": "Admin Account",
     "full_name": "Full Name",
+    "address": "Address",
+    "tax_number": "Tax Number",
+    "cr_number": "CR Number",
+    "plan_type": "Plan Type",
     "register_btn": "Create Company",
     "has_account": "Already have an account? Sign in",
     "success_title": "Company Created Successfully!",
@@ -2187,6 +2195,8 @@
       "form": {
         "create_title": "Add New Customer",
         "create_subtitle": "Enter basic and financial customer details.",
+        "edit_title": "Edit Customer",
+        "edit_subtitle": "Update basic and financial details.",
         "basic_info": "Basic Information",
         "contact_info": "Contact Information",
         "name_ar": "Customer Name (Arabic)",
@@ -2199,7 +2209,10 @@
         "save_btn": "Save Customer",
         "saving": "Saving...",
         "success_add": "Customer added successfully",
-        "error_add": "Failed to add customer"
+        "error_add": "Failed to add customer",
+        "group": "Customer Group",
+        "select_group": "-- Select Group --",
+        "quick_add_group": "Add Group"
       },
       "invoices": {
         "title": "Sales Invoices",

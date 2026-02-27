@@ -31,7 +31,10 @@ export const hrAPI = {
     // Leave Requests
     listLeaveRequests: (params) => api.get('/hr/leaves', { params }),
     createLeaveRequest: (data) => api.post('/hr/leaves', data),
-    updateLeaveStatus: (id, status) => api.put(`/hr/leaves/${id}/status`, null, { params: { status_in: status } })
+    updateLeaveStatus: (id, status) => api.put(`/hr/leaves/${id}/status`, null, { params: { status_in: status } }),
+
+    // End of Service
+    calculateEndOfService: (data) => api.post('/hr/end-of-service/calculate', data),
 }
 
 export const hrAdvancedAPI = {
@@ -89,6 +92,9 @@ export const hrAdvancedAPI = {
     createCustody: (data) => api.post('/hr-advanced/custody', data),
     updateCustody: (id, data) => api.put(`/hr-advanced/custody/${id}`, data),
     returnCustody: (id, data) => api.put(`/hr-advanced/custody/${id}/return`, data),
+
+    // GOSI Export
+    exportGOSI: (params) => api.get('/hr-advanced/gosi-export', { params, responseType: 'blob' }),
 }
 
 export const hrImprovementsAPI = {

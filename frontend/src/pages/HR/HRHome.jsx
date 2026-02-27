@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../../utils/auth';
-import { hrAPI, attendanceAPI } from '../../utils/api';
+import { hrAPI, hrAdvancedAPI, attendanceAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import {
     Users,
     Briefcase,
@@ -13,7 +14,9 @@ import {
     Plus,
     UserPlus,
     Calendar,
-    Clock
+    Clock,
+    Calculator,
+    Download
 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -21,7 +24,18 @@ import '../../components/ModuleStyles.css';
 const HRHome = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
+    const isRTL = i18n.language === 'ar';
     const [stats, setStats] = useState({ employees: 0, present: 0, payroll: 0, leaves: 0 });
+
+    // End of Service Calculator
+    const [showEOSModal, setShowEOSModal] = useState(false);
+    const [eosData, setEosData] = useState({ employee_id: '', resignation_type: 'resignation' });
+    const [eosResult, setEosResult] = useState(null);
+    const [eosLoading, setEosLoading] = useState(false);
+    const [employees, setEmployees] = useState([]);
+
+    // GOSI Export
+    const [exportingGOSI, setExportingGOSI] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -41,6 +55,49 @@ const HRHome = () => {
         };
         if (hasPermission('hr.view')) fetchStats();
     }, []);
+
+    const openEOSCalculator = async () => {
+        try {
+            const res = await hrAPI.listEmployees({ limit: 500 });
+            setEmployees(res.data?.items || res.data || []);
+        } catch (err) { console.error(err); }
+        setEosResult(null);
+        setShowEOSModal(true);
+    };
+
+    const handleCalculateEOS = async () => {
+        if (!eosData.employee_id) return;
+        setEosLoading(true);
+        try {
+            const res = await hrAPI.calculateEndOfService(eosData);
+            setEosResult(res.data);
+        } catch (error) {
+            console.error("Failed to calculate EOS", error);
+        } finally {
+            setEosLoading(false);
+        }
+    };
+
+    const handleExportGOSI = async () => {
+        setExportingGOSI(true);
+        try {
+            const res = await hrAdvancedAPI.exportGOSI({});
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `GOSI_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toastEmitter.emit(isRTL ? 'تم تصدير ملف التأمينات بنجاح' : 'GOSI file exported successfully', 'success');
+        } catch (error) {
+            console.error("Failed to export GOSI", error);
+            toastEmitter.emit(isRTL ? 'فشل التصدير' : 'Export failed', 'error');
+        } finally {
+            setExportingGOSI(false);
+        }
+    };
 
     // Dashboard metrics
     const metrics = [
@@ -151,21 +208,31 @@ const HRHome = () => {
 
                 {/* Advanced Payroll Section */}
                 <div className="card section-card">
-                    <h3 className="section-title">{i18n.language === 'ar' ? 'الرواتب المتقدمة' : 'Advanced Payroll'}</h3>
+                    <h3 className="section-title">{isRTL ? 'الرواتب المتقدمة' : 'Advanced Payroll'}</h3>
                     <div className="links-list">
                         <div className="link-item" onClick={() => navigate('/hr/salary-structures')}>
                             <span className="link-icon">🏗️</span>
-                            {i18n.language === 'ar' ? 'هياكل الرواتب والمكونات' : 'Salary Structures'}
+                            {isRTL ? 'هياكل الرواتب والمكونات' : 'Salary Structures'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/overtime')}>
                             <span className="link-icon">⏱️</span>
-                            {i18n.language === 'ar' ? 'العمل الإضافي' : 'Overtime Requests'}
+                            {isRTL ? 'العمل الإضافي' : 'Overtime Requests'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/gosi')}>
                             <span className="link-icon">🛡️</span>
-                            {i18n.language === 'ar' ? 'التأمينات الاجتماعية' : 'GOSI / Social Insurance'}
+                            {isRTL ? 'التأمينات الاجتماعية' : 'GOSI / Social Insurance'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={openEOSCalculator}>
+                            <span className="link-icon">🧮</span>
+                            {isRTL ? 'حاسبة مكافأة نهاية الخدمة' : 'End of Service Calculator'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={handleExportGOSI}>
+                            <span className="link-icon">{exportingGOSI ? '⏳' : '📥'}</span>
+                            {isRTL ? 'تصدير ملف التأمينات (GOSI)' : 'Export GOSI File'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>
@@ -173,52 +240,102 @@ const HRHome = () => {
 
                 {/* HR Management Section */}
                 <div className="card section-card">
-                    <h3 className="section-title">{i18n.language === 'ar' ? 'إدارة الموارد البشرية' : 'HR Management'}</h3>
+                    <h3 className="section-title">{isRTL ? 'إدارة الموارد البشرية' : 'HR Management'}</h3>
                     <div className="links-list">
                         <div className="link-item" onClick={() => navigate('/hr/documents')}>
                             <span className="link-icon">📄</span>
-                            {i18n.language === 'ar' ? 'مستندات الموظفين' : 'Employee Documents'}
+                            {isRTL ? 'مستندات الموظفين' : 'Employee Documents'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/performance')}>
                             <span className="link-icon">⭐</span>
-                            {i18n.language === 'ar' ? 'تقييم الأداء' : 'Performance Reviews'}
+                            {isRTL ? 'تقييم الأداء' : 'Performance Reviews'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/training')}>
                             <span className="link-icon">🎓</span>
-                            {i18n.language === 'ar' ? 'برامج التدريب' : 'Training Programs'}
+                            {isRTL ? 'برامج التدريب' : 'Training Programs'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/violations')}>
                             <span className="link-icon">⚠️</span>
-                            {i18n.language === 'ar' ? 'المخالفات والجزاءات' : 'Violations & Penalties'}
+                            {isRTL ? 'المخالفات والجزاءات' : 'Violations & Penalties'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/custody')}>
                             <span className="link-icon">📦</span>
-                            {i18n.language === 'ar' ? 'إدارة العهد' : 'Custody Management'}
+                            {isRTL ? 'إدارة العهد' : 'Custody Management'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/payslips')}>
                             <span className="link-icon">🧾</span>
-                            {i18n.language === 'ar' ? 'كشوف الرواتب' : 'Payslips'}
+                            {isRTL ? 'كشوف الرواتب' : 'Payslips'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/leave-carryover')}>
                             <span className="link-icon">🔄</span>
-                            {i18n.language === 'ar' ? 'ترحيل الإجازات' : 'Leave Carryover'}
+                            {isRTL ? 'ترحيل الإجازات' : 'Leave Carryover'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/recruitment')}>
                             <span className="link-icon">💼</span>
-                            {i18n.language === 'ar' ? 'التوظيف' : 'Recruitment'}
+                            {isRTL ? 'التوظيف' : 'Recruitment'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>
                 </div>
 
             </div>
+
+            {/* ========== End of Service Calculator Modal ========== */}
+            {showEOSModal && (
+                <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowEOSModal(false)}>
+                    <div className="card" style={{ minWidth: 450, maxWidth: 550, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                        <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            🧮 {isRTL ? 'حاسبة مكافأة نهاية الخدمة' : 'End of Service Calculator'}
+                        </h3>
+                        <div className="mb-3">
+                            <label className="form-label">{isRTL ? 'الموظف' : 'Employee'}</label>
+                            <select className="form-input" value={eosData.employee_id}
+                                onChange={e => setEosData(p => ({ ...p, employee_id: e.target.value }))}>
+                                <option value="">{isRTL ? 'اختر الموظف' : 'Select employee'}</option>
+                                {employees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>{emp.full_name || emp.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="mb-4">
+                            <label className="form-label">{isRTL ? 'نوع الانتهاء' : 'Termination Type'}</label>
+                            <select className="form-input" value={eosData.resignation_type}
+                                onChange={e => setEosData(p => ({ ...p, resignation_type: e.target.value }))}>
+                                <option value="resignation">{isRTL ? 'استقالة' : 'Resignation'}</option>
+                                <option value="termination">{isRTL ? 'إنهاء من صاحب العمل' : 'Termination by employer'}</option>
+                                <option value="end_of_contract">{isRTL ? 'انتهاء العقد' : 'End of contract'}</option>
+                            </select>
+                        </div>
+                        <button className="btn btn-primary btn-block mb-3" onClick={handleCalculateEOS} disabled={eosLoading || !eosData.employee_id}>
+                            {eosLoading ? <span className="loading loading-spinner loading-sm"></span> : (isRTL ? 'حساب المكافأة' : 'Calculate')}
+                        </button>
+
+                        {eosResult && (
+                            <div style={{ background: 'var(--bg-hover, #f9fafb)', borderRadius: 12, padding: 20, marginTop: 8 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 14 }}>
+                                    <div><span style={{ color: 'var(--text-secondary)' }}>{isRTL ? 'سنوات الخدمة:' : 'Service Years:'}</span></div>
+                                    <div style={{ fontWeight: 700 }}>{eosResult.service_years || eosResult.years || '-'}</div>
+                                    <div><span style={{ color: 'var(--text-secondary)' }}>{isRTL ? 'الراتب الأساسي:' : 'Base Salary:'}</span></div>
+                                    <div style={{ fontWeight: 700 }}>{(eosResult.base_salary || eosResult.salary || 0).toLocaleString()}</div>
+                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8 }}><span style={{ fontWeight: 700, color: 'var(--primary)' }}>{isRTL ? 'المكافأة المستحقة:' : 'EOS Amount:'}</span></div>
+                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8, fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>{(eosResult.total_amount || eosResult.amount || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="d-flex gap-2 justify-content-end mt-4">
+                            <button className="btn btn-ghost" onClick={() => setShowEOSModal(false)}>{t('common.close', 'Close')}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

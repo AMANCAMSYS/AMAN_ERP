@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { treasuryAPI } from '../../utils/api';
 import BackButton from '../../components/common/BackButton';
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 function TreasuryBalancesReport() {
     const { t, i18n } = useTranslation();
@@ -13,6 +14,7 @@ function TreasuryBalancesReport() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const currency = getCurrency();
+    const [asOfDate, setAsOfDate] = useState(new Date().toISOString().split('T')[0]);
 
     const fetchData = async () => {
         try {
@@ -20,6 +22,7 @@ function TreasuryBalancesReport() {
             setError(null);
             const params = {};
             if (currentBranch) params.branch_id = currentBranch.id;
+            if (asOfDate) params.as_of_date = asOfDate;
             const res = await treasuryAPI.getBalancesReport(params);
             setData(res.data);
         } catch (err) {
@@ -30,7 +33,7 @@ function TreasuryBalancesReport() {
         }
     };
 
-    useEffect(() => { fetchData(); }, [currentBranch]);
+    useEffect(() => { fetchData(); }, [currentBranch, asOfDate]);
 
     const cashAccounts = data?.accounts?.filter(a => a.account_type === 'cash') || [];
     const bankAccounts = data?.accounts?.filter(a => a.account_type === 'bank') || [];
@@ -44,6 +47,11 @@ function TreasuryBalancesReport() {
                     <p className="workspace-subtitle">{t('treasury_reports.balances.subtitle')}</p>
                 </div>
                 <div className="header-actions">
+                    <CustomDatePicker
+                        label={t('common.date')}
+                        selected={asOfDate}
+                        onChange={(d) => setAsOfDate(d)}
+                    />
                     <button className="btn btn-secondary" onClick={() => window.print()}>🖨️ {t('common.print')}</button>
                     <button className="btn btn-primary" onClick={fetchData}>🔄 {t('common.refresh')}</button>
                 </div>

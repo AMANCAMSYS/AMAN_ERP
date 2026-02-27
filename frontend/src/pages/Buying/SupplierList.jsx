@@ -72,17 +72,18 @@ function SupplierList() {
                     <thead>
                         <tr>
                             <th style={{ width: '12%' }}>{t('buying.suppliers.table.code')}</th>
-                            <th style={{ width: '28%' }}>{t('buying.suppliers.table.name')}</th>
+                            <th style={{ width: '25%' }}>{t('buying.suppliers.table.name')}</th>
                             <th style={{ width: '20%' }}>{t('buying.suppliers.table.contact')}</th>
-                            <th style={{ width: '20%' }}>{t('buying.suppliers.table.balance')}</th>
-                            <th style={{ width: '15%' }}>{t('buying.suppliers.table.status')}</th>
-                            <th style={{ width: '15%' }}>{t('buying.suppliers.table.created_at')}</th>
+                            <th style={{ width: '15%' }}>{t('buying.suppliers.table.balance')}</th>
+                            <th style={{ width: '10%' }}>{t('buying.suppliers.table.status')}</th>
+                            <th style={{ width: '10%' }}>{t('buying.suppliers.table.created_at')}</th>
+                            <th style={{ width: '8%', textAlign: 'center' }}>{t('common.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {suppliers.length === 0 ? (
                             <tr>
-                                <td colSpan="6" className="start-guide">
+                                <td colSpan="7" className="start-guide">
                                     <div style={{ padding: '60px 20px', textAlign: 'center' }}>
                                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏬</div>
                                         <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('buying.suppliers.empty.title')}</h3>
@@ -159,6 +160,16 @@ function SupplierList() {
                                     <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
                                         {formatShortDate(supplier.created_at)}
                                     </td>
+                                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            className="btn btn-icon"
+                                            title={t('common.edit', 'Edit')}
+                                            onClick={() => navigate(`/buying/suppliers/${supplier.id}/edit`)}
+                                            style={{ padding: '4px', color: 'var(--primary)' }}
+                                        >
+                                            ✏️
+                                        </button>
+                                    </td>
                                 </tr>
                             ))
                         )}
@@ -166,7 +177,7 @@ function SupplierList() {
                 </table>
                 <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
             </div>
-        </div>
+        </div >
     )
 }
 

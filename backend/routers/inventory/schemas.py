@@ -53,7 +53,7 @@ class SupplierCreate(BaseModel):
     tax_number: Optional[str] = None
     branch_id: Optional[int] = None
     currency: Optional[str] = None
-
+    group_id: Optional[int] = None
 
 class SupplierResponse(SupplierCreate):
     id: int

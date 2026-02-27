@@ -125,9 +125,10 @@ def get_dashboard_stats(
                     """), params_gl).scalar() or 0
                 else:
                     # No date filter: use account balances directly (fastest)
-                    total_income = db.execute(text("""
+                    # balance is stored as DR-CR, so revenue (credit-normal) is negative → negate it
+                    total_income = -(db.execute(text("""
                         SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'revenue'
-                    """)).scalar() or 0
+                    """)).scalar() or 0)
                     
                     total_expenses = db.execute(text("""
                         SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'expense'
@@ -152,7 +153,9 @@ def get_dashboard_stats(
                 "cash": float(cash_balance)
             }
 
-        # Calculate current and previous
+        # Calculate cumulative stats (matching accounting summary - all-time balances)
+        cumulative = calculate_period_stats(None)
+        # Calculate current and previous period stats for trend comparison only
         current = calculate_period_stats(this_month_start)
         previous = calculate_period_stats(prev_month_start, prev_month_end)
         
@@ -160,7 +163,10 @@ def get_dashboard_stats(
         def calc_change(curr, prev):
             if prev == 0:
                 return 0 if curr == 0 else 100
-            return round(((curr - prev) / prev) * 100, 1)
+            pct = ((curr - prev) / abs(prev)) * 100
+            # Cap extreme percentages at ±999%
+            pct = max(-999, min(999, pct))
+            return round(pct, 1)
 
         # Cash on Hand (GL-linked snapshot)
         cash_sql = f"""
@@ -203,15 +209,15 @@ def get_dashboard_stats(
         reserved_stock_list = [{"product": row.product_name, "quantity": int(row.reserved_qty)} for row in reserved_stock_data]
 
         return {
-            "sales": current["sales"],
+            "sales": cumulative["sales"],
             "sales_change": calc_change(current["sales"], previous["sales"]),
-            "expenses": current["expenses"],
+            "expenses": cumulative["expenses"],
             "expenses_change": calc_change(current["expenses"], previous["expenses"]),
-            "profit": current["profit"],
+            "profit": cumulative["profit"],
             "profit_change": calc_change(current["profit"], previous["profit"]),
-            "cash": current["cash"],
+            "cash": cumulative["cash"],
             "cash_change": calc_change(current["cash"], previous["cash"]),
-            "cash_status": "Stable" if current["cash"] > 0 else "Low",
+            "cash_status": "Stable" if cumulative["cash"] > 0 else "Low",
             "low_stock": int(low_stock),
             "reserved_stock": reserved_stock_list
         }

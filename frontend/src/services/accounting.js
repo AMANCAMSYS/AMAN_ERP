@@ -39,6 +39,13 @@ export const accountingAPI = {
     // Closing Entries (ACC-006)
     previewClosingEntries: (params) => api.get('/accounting/closing-entries/preview', { params }),
     generateClosingEntries: (data) => api.post('/accounting/closing-entries/generate', data),
+
+    // FX Revaluation (ACC-007)
+    fxRevaluation: (data) => api.post('/accounting/fx-revaluation', data),
+
+    // Provisions (ACC-008)
+    createBadDebtProvision: (data) => api.post('/accounting/provisions/bad-debt', data),
+    createLeaveProvision: (data) => api.post('/accounting/provisions/leave', data),
 }
 
 export const costCentersAPI = {

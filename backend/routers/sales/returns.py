@@ -78,7 +78,7 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
     try:
         # Generate Sequential Return Number
         from utils.accounting import generate_sequential_number
-        ret_num = generate_sequential_number(db, f"RET-{datetime.now().year}", "invoices", "invoice_number")
+        ret_num = generate_sequential_number(db, f"RET-{datetime.now().year}", "sales_returns", "return_number")
 
         # Determine Branch
         branch_id = data.branch_id

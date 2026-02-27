@@ -18,6 +18,7 @@ function PurchaseInvoiceForm() {
 
     // Data Sources
     const [suppliers, setSuppliers] = useState([])
+    const [supplierGroups, setSupplierGroups] = useState([])
     const [products, setProducts] = useState([])
     const [warehouses, setWarehouses] = useState([])
     const [currencies, setCurrencies] = useState([])
@@ -47,14 +48,16 @@ function PurchaseInvoiceForm() {
         const fetchResources = async () => {
             try {
                 const params = { branch_id: currentBranch?.id }
-                const [suppRes, prodRes, whRes, curRes, treasRes] = await Promise.all([
+                const [suppRes, groupsRes, prodRes, whRes, curRes, treasRes] = await Promise.all([
                     inventoryAPI.listSuppliers(params),
+                    purchasesAPI.listSupplierGroups(params),
                     inventoryAPI.listProducts(params),
                     inventoryAPI.listWarehouses(params),
                     currenciesAPI.list(),
                     treasuryAPI.listAccounts(currentBranch?.id)
                 ])
                 setSuppliers(suppRes.data)
+                setSupplierGroups(groupsRes.data)
                 setProducts(prodRes.data)
                 setWarehouses(whRes.data)
                 setCurrencies(curRes.data)
@@ -123,18 +126,59 @@ function PurchaseInvoiceForm() {
         let totalTax = 0
         let totalDiscount = 0
 
+        let globalEffectType = 'discount';
+        let globalEffectPercent = 0;
+
+        // Find group effects on total
+        const supplier = suppliers.find(s => s.id === parseInt(formData.supplier_id));
+        if (supplier && supplier.group_id) {
+            const group = supplierGroups.find(g => g.id === supplier.group_id);
+            if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
+                globalEffectType = group.effect_type;
+                globalEffectPercent = parseFloat(group.discount_percentage);
+            }
+        }
+
         items.forEach(item => {
             const lineTotal = item.quantity * item.unit_price
-            const taxable = lineTotal - item.discount
-            const tax = taxable * (item.tax_rate / 100)
-
             subtotal += lineTotal
             totalDiscount += item.discount
-            totalTax += tax
         })
 
-        const total = subtotal - totalDiscount + totalTax
-        return { subtotal, totalTax, totalDiscount, total }
+        let totalAfterLineDiscounts = subtotal - totalDiscount;
+        let globalDiscountAmount = 0;
+        let globalMarkupAmount = 0;
+
+        if (globalEffectPercent > 0) {
+            if (globalEffectType === 'discount') {
+                globalDiscountAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            } else if (globalEffectType === 'markup') {
+                globalMarkupAmount = totalAfterLineDiscounts * (globalEffectPercent / 100);
+            }
+        }
+
+        let baseForTax = totalAfterLineDiscounts - globalDiscountAmount + globalMarkupAmount;
+
+        items.forEach(item => {
+            const weight = (item.quantity * item.unit_price - item.discount) / totalAfterLineDiscounts || 0;
+            const itemBase = (item.quantity * item.unit_price - item.discount)
+                - (globalDiscountAmount * weight)
+                + (globalMarkupAmount * weight);
+            totalTax += itemBase * (item.tax_rate / 100);
+        });
+
+        const total = baseForTax + totalTax
+        return {
+            subtotal,
+            totalTax,
+            totalDiscount: totalDiscount + globalDiscountAmount,
+            totalMarkup: globalMarkupAmount,
+            total,
+            globalEffectType,
+            globalEffectPercent,
+            globalMarkupAmount,
+            globalDiscountAmount
+        }
     }
 
     const totals = calculateTotals()
@@ -152,6 +196,20 @@ function PurchaseInvoiceForm() {
                         // Use last_buying_price if available (UI Convenience), otherwise fall back to buying_price (WAC)
                         updatedItem.unit_price = product.last_buying_price || product.buying_price || 0
                         updatedItem.tax_rate = product.tax_rate !== undefined ? product.tax_rate : 15
+
+                        // Try applying item-level effect from group
+                        const supplier = suppliers.find(s => s.id === parseInt(formData.supplier_id));
+                        if (supplier && supplier.group_id) {
+                            const group = supplierGroups.find(g => g.id === supplier.group_id);
+                            if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                if (group.effect_type === 'discount') {
+                                    updatedItem.discount_percent = group.discount_percentage;
+                                } else if (group.effect_type === 'markup') {
+                                    // Markup applied by increasing unit_price
+                                    updatedItem.unit_price = updatedItem.unit_price * (1 + (group.discount_percentage / 100));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -233,13 +291,17 @@ function PurchaseInvoiceForm() {
                 treasury_id: formData.treasury_id ? parseInt(formData.treasury_id) : null,
                 is_prepayment: formData.is_prepayment,
                 original_invoice_id: location.state?.fromOrder?.id || null,
+                effect_type: totals.globalEffectType,
+                effect_percentage: totals.globalEffectPercent,
+                markup_amount: totals.globalMarkupAmount,
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id) || null,
                     description: item.description || '',
                     quantity: parseFloat(item.quantity) || 0,
                     unit_price: parseFloat(item.unit_price) || 0,
                     tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0
+                    discount: parseFloat(item.discount) || 0,
+                    markup: 0 // Handled at line level unit_price for purchases
                 }))
             }
 
@@ -315,7 +377,35 @@ function PurchaseInvoiceForm() {
                         <select
                             className="form-input"
                             value={formData.supplier_id || ''}
-                            onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}
+                            onChange={e => {
+                                setFormData({ ...formData, supplier_id: e.target.value });
+                                // Reset items discount when supplier changes
+                                setItems(prevItems => prevItems.map(item => {
+                                    let updated = { ...item };
+                                    if (item.product_id) {
+                                        const product = products.find(p => p.id === parseInt(item.product_id));
+                                        if (product) {
+                                            updated.unit_price = product.last_buying_price || product.buying_price || 0;
+                                            updated.discount_percent = 0;
+                                            updated.discount = 0;
+                                        }
+
+                                        const supplier = suppliers.find(s => s.id === parseInt(e.target.value));
+                                        if (supplier && supplier.group_id) {
+                                            const group = supplierGroups.find(g => g.id === supplier.group_id);
+                                            if (group && group.application_scope === 'line' && group.discount_percentage > 0) {
+                                                if (group.effect_type === 'discount') {
+                                                    updated.discount_percent = group.discount_percentage;
+                                                    updated.discount = (updated.quantity * updated.unit_price) * (group.discount_percentage / 100);
+                                                } else if (group.effect_type === 'markup') {
+                                                    updated.unit_price = updated.unit_price * (1 + (group.discount_percentage / 100));
+                                                }
+                                            }
+                                        }
+                                    }
+                                    return updated;
+                                }));
+                            }}
                             required
                         >
                             <option value="">{t('buying.purchase_invoices.form.supplier_placeholder')}</option>
@@ -654,6 +744,12 @@ function PurchaseInvoiceForm() {
                             <span>{t('buying.purchase_invoices.form.summary.subtotal')}</span>
                             <span>{formatNumber(totals.subtotal)} <small>{formData.currency}</small></span>
                         </div>
+                        {totals.globalEffectPercent > 0 && totals.globalEffectType === 'markup' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: 'var(--text-success)' }}>
+                                <span>زيادة (مجموعة) ({totals.globalEffectPercent}%)</span>
+                                <span>{formatNumber(totals.totalMarkup)} <small>{formData.currency}</small></span>
+                            </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span>{t('buying.purchase_invoices.form.summary.discount')}</span>
                             <span>{formatNumber(totals.totalDiscount)} <small>{formData.currency}</small></span>

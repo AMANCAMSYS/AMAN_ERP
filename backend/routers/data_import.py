@@ -356,7 +356,7 @@ def import_history(
     try:
         offset = (page - 1) * limit
         rows = db.execute(text("""
-            SELECT * FROM audit_log
+            SELECT * FROM audit_logs
             WHERE action = 'import'
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset

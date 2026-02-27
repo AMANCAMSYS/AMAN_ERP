@@ -109,10 +109,13 @@ async def lifespan(app: FastAPI):
                     database_user VARCHAR(255),
                     currency VARCHAR(10) DEFAULT 'SAR',
                     timezone VARCHAR(50) DEFAULT 'Asia/Riyadh',
+                    logo_url VARCHAR(255),
                     status VARCHAR(20) DEFAULT 'active',
                     plan_type VARCHAR(50) DEFAULT 'basic',
                     max_users INTEGER DEFAULT 10,
                     subscription_end DATE,
+                    template_id INTEGER,
+                    enabled_modules JSONB,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     activated_at TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -120,8 +123,45 @@ async def lifespan(app: FastAPI):
                 CREATE INDEX IF NOT EXISTS idx_system_companies_status 
                     ON system_companies(status);
             """))
+
+            # Industry Templates Table
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS industry_templates (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(50) UNIQUE NOT NULL,
+                    name VARCHAR(100) NOT NULL,
+                    name_ar VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    description_ar TEXT,
+                    icon VARCHAR(10),
+                    enabled_modules JSONB NOT NULL,
+                    default_settings JSONB
+                );
+
+            """))
             
+            # Seed Industry Templates
+            conn.execute(text("""
+                INSERT INTO industry_templates (key, name, name_ar, description, description_ar, icon, enabled_modules)
+                VALUES 
+                ('retail', 'Retail', 'التجزئة', 'Retail and direct sales', 'البيع المباشر والقطاعي', 'RT', '["accounting", "sales", "buying", "stock", "pos", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('restaurant', 'F&B', 'المطاعم والكافيهات', 'Restaurants and cafes', 'المطاعم والخدمات الغذائية', 'FB', '["accounting", "sales", "stock", "pos", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('manufacturing', 'Manufacturing', 'التصنيع', 'Factories and production', 'المصانع والإنتاج', 'MF', '["accounting", "sales", "buying", "stock", "manufacturing", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('construction', 'Construction', 'المقاولات', 'Construction and engineering', 'شركات المقاولات والهندسة', 'CN', '["accounting", "buying", "stock", "projects", "assets", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('services', 'Services', 'الخدمات', 'Professional and service firms', 'الشركات المهنية والخدمية', 'SV', '["accounting", "sales", "projects", "crm", "services", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('wholesale', 'Wholesale', 'الجملة', 'Wholesalers and distributors', 'تجار الجملة والموزعين', 'WS', '["accounting", "sales", "buying", "stock", "crm", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
+                ('general', 'Multi-Activity', 'نشاط عام', 'Comprehensive system with all modules', 'نظام شامل لجميع الأنشطة', 'GN', '["accounting", "assets", "treasury", "sales", "pos", "buying", "stock", "manufacturing", "projects", "crm", "services", "expenses", "taxes", "approvals", "hr", "reports", "audit", "data_import"]')
+                ON CONFLICT (key) DO UPDATE SET 
+                    name = EXCLUDED.name,
+                    name_ar = EXCLUDED.name_ar,
+                    description = EXCLUDED.description,
+                    description_ar = EXCLUDED.description_ar,
+                    icon = EXCLUDED.icon;
+            """))
+
+
             # Create system_activity_log table for global audit trail
+
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS system_activity_log (
                     id SERIAL PRIMARY KEY,
@@ -314,6 +354,9 @@ except ImportError:
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(os.path.join(uploads_dir, "logos"), exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+# Also mount under /api/uploads for consistency with API-prefixed calls in some components
+app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="api_uploads")
+
 
 
 # Global exception handler: sanitize 500 error messages to prevent info leakage
@@ -322,10 +365,9 @@ async def sanitize_http_exception(request: Request, exc: FastAPIHTTPException):
     if exc.status_code == 500:
         # Log the real error for debugging
         logger.error(f"Internal error on {request.method} {request.url.path}: {exc.detail}")
-        # Return generic message to client (hide SQL/internal details)
         return JSONResponse(
             status_code=500,
-            content={"detail": "حدث خطأ داخلي في الخادم. يرجى المحاولة لاحقاً أو الاتصال بالدعم الفني."}
+            content={"detail": "حدث خطأ داخلي في الخادم. يرجى المحاولة لاحقاً."}
         )
     return JSONResponse(
         status_code=exc.status_code,
@@ -337,9 +379,12 @@ async def sanitize_http_exception(request: Request, exc: FastAPIHTTPException):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}")
+    import traceback
+    tb = traceback.format_exc()
+    logger.error(tb)
     return JSONResponse(
         status_code=500,
-        content={"detail": "حدث خطأ داخلي في الخادم. يرجى المحاولة لاحقاً أو الاتصال بالدعم الفني."}
+        content={"detail": "حدث خطأ داخلي في الخادم. يرجى المحاولة لاحقاً."}
     )
 
 

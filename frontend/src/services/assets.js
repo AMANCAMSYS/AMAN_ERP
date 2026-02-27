@@ -27,4 +27,8 @@ export const assetsAPI = {
     // QR / Barcode
     updateQR: (id, data) => api.put(`/assets/${id}/qr`, data),
     getQR: (id) => api.get(`/assets/${id}/qr`),
+
+    // Individual Asset Revalue & Transfer (GL-003/GL-007)
+    revalueAsset: (assetId, data) => api.post(`/assets/${assetId}/revalue`, data),
+    transferAsset: (assetId, data) => api.post(`/assets/${assetId}/transfer`, data),
 }

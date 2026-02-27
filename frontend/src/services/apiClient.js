@@ -28,7 +28,7 @@ api.interceptors.request.use((config) => {
     return config
 })
 
-// Handle API responses — clean up AbortControllers
+// Handle API responses — clean up AbortControllers + auto token refresh
 api.interceptors.response.use(
     (response) => {
         // Clean up tracked controller on success
@@ -37,7 +37,7 @@ api.interceptors.response.use(
         }
         return response
     },
-    (error) => {
+    async (error) => {
         // Clean up tracked controller on error
         if (error.config?._abortController) {
             requestManager.removeController(error.config._abortController)
@@ -48,13 +48,42 @@ api.interceptors.response.use(
         }
         // Option to skip global toast for specific requests
         const skipToast = error.config?.skipGlobalToast;
+        const originalRequest = error.config;
 
-        if (error.response?.status === 401) {
+        // --- Auto Token Refresh ---
+        if (error.response?.status === 401 && !originalRequest._isRetry) {
+            originalRequest._isRetry = true;
+            const currentToken = localStorage.getItem('token');
+
+            if (currentToken) {
+                try {
+                    // Attempt to refresh the token
+                    const refreshRes = await axios.post(
+                        `${api.defaults.baseURL}/auth/refresh`,
+                        null,
+                        { headers: { Authorization: `Bearer ${currentToken}` } }
+                    );
+
+                    const newToken = refreshRes.data?.access_token;
+                    if (newToken) {
+                        localStorage.setItem('token', newToken);
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                        return api(originalRequest); // retry original request
+                    }
+                } catch (refreshError) {
+                    // Refresh failed — session truly expired
+                }
+            }
+
+            // If we reach here, refresh failed or no token exists
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             localStorage.removeItem('company_id');
             window.location.href = '/login';
-        } else if (!skipToast && error.response) {
+            return Promise.reject(error);
+        }
+
+        if (!skipToast && error.response) {
             const status = error.response.status;
             const detail = error.response.data?.detail;
             const lang = localStorage.getItem('i18nextLng') || 'ar';

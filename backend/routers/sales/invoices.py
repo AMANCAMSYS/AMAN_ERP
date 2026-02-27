@@ -122,6 +122,13 @@ def create_sales_invoice(
 
         # --- 3. Handle Payment ---
         paid_amount = float(invoice.paid_amount or 0)
+
+        # If payment method is immediate (cash / bank / check / card),
+        # the invoice is always fully paid — the paid_amount field is hidden
+        # in the frontend for these methods and defaults to 0, so we override it.
+        if invoice.payment_method in ('cash', 'bank', 'check', 'card'):
+            paid_amount = grand_total
+
         remaining_balance = grand_total - paid_amount
         inv_status = 'paid' if remaining_balance <= 0.01 else ('partial' if paid_amount > 0 else 'unpaid')
 
@@ -150,12 +157,14 @@ def create_sales_invoice(
                 invoice_number, party_id, invoice_type, invoice_date, due_date,
                 subtotal, tax_amount, discount, total, paid_amount, status, notes,
                 payment_method, created_by, branch_id, warehouse_id,
-                currency, exchange_rate, cost_center_id, sales_order_id
+                currency, exchange_rate, cost_center_id, sales_order_id,
+                effect_type, effect_percentage, markup_amount
             ) VALUES (
                 :num, :cust, 'sales', :inv_date, :due_date,
                 :sub, :tax, :disc, :total, :paid, :status, :notes,
                 :pay_method, :user, :branch, :wh,
-                :currency, :exchange_rate, :cc_id, :so_id
+                :currency, :exchange_rate, :cc_id, :so_id,
+                :effect_type, :effect_perc, :markup_amt
             ) RETURNING id
         """), {
             "num": inv_num, "cust": invoice.customer_id, "inv_date": invoice.invoice_date,
@@ -164,7 +173,9 @@ def create_sales_invoice(
             "status": inv_status, "notes": invoice.notes, "pay_method": invoice.payment_method,
             "user": current_user.id, "branch": invoice.branch_id, "wh": invoice.warehouse_id,
             "currency": inv_currency, "exchange_rate": exchange_rate,
-            "cc_id": invoice.cost_center_id, "so_id": invoice.sales_order_id
+            "cc_id": invoice.cost_center_id, "so_id": invoice.sales_order_id,
+            "effect_type": invoice.effect_type, "effect_perc": invoice.effect_percentage,
+            "markup_amt": invoice.markup_amount
         }).scalar()
 
         # Update Sales Order status if linked
@@ -183,14 +194,14 @@ def create_sales_invoice(
         for item in items_to_save:
             db.execute(text("""
                 INSERT INTO invoice_lines (
-                    invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total
+                    invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, markup, total
                 ) VALUES (
-                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :markup, :total
                 )
             """), {
                 "inv_id": invoice_id, "pid": item["product_id"], "desc": item["description"],
                 "qty": item["quantity"], "price": item["unit_price"], "tax_rate": item["tax_rate"],
-                "disc": item["discount"], "total": item["total"]
+                "disc": item["discount"], "markup": item.get("markup", 0), "total": item["total"]
             })
 
             # Deduct inventory
@@ -257,26 +268,71 @@ def create_sales_invoice(
             """), {"amt": remaining_balance, "id": invoice.customer_id})
 
         # --- 6.7 Payment Voucher (if paid on creation) ---
-        if paid_amount > 0 and invoice.payment_method:
+        if paid_amount > 0 and invoice.payment_method and invoice.payment_method != 'credit':
+            # For cash/bank/check: actual method = payment_method
+            # For credit + down-payment: actual method = down_payment_method
+            actual_method = invoice.payment_method
+            if invoice.payment_method == 'credit':
+                actual_method = getattr(invoice, 'down_payment_method', None) or 'cash'
+
             from utils.accounting import generate_sequential_number as gen_seq
             pv_num = gen_seq(db, f"PV-{datetime.now().year}", "payment_vouchers", "voucher_number")
 
-            db.execute(text("""
+            pv_id = db.execute(text("""
                 INSERT INTO payment_vouchers (
                     voucher_number, voucher_type, voucher_date, party_type, party_id,
-                    amount, payment_method, reference, status, created_by, branch_id,
+                    amount, payment_method, treasury_account_id, reference, status, created_by, branch_id,
                     currency, exchange_rate
                 ) VALUES (
                     :vnum, 'receipt', :vdate, 'customer', :cust,
-                    :amt, :method, :ref, 'posted', :user, :branch,
+                    :amt, :method, :treasury_id, :ref, 'posted', :user, :branch,
                     :currency, :rate
-                )
+                ) RETURNING id
             """), {
                 "vnum": pv_num, "vdate": invoice.invoice_date, "cust": invoice.customer_id,
-                "amt": paid_amount, "method": invoice.payment_method, "ref": inv_num,
+                "amt": paid_amount, "method": actual_method,
+                "treasury_id": invoice.treasury_id,
+                "ref": inv_num,
                 "user": current_user.id, "branch": invoice.branch_id,
                 "currency": inv_currency, "rate": exchange_rate
-            })
+            }).scalar()
+
+            # Link payment allocation to invoice
+            db.execute(text("""
+                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                VALUES (:vid, :iid, :amt)
+            """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
+
+        elif paid_amount > 0 and invoice.payment_method == 'credit':
+            # credit + down payment: create voucher with down_payment_method
+            actual_method = getattr(invoice, 'down_payment_method', None) or 'cash'
+            from utils.accounting import generate_sequential_number as gen_seq
+            pv_num = gen_seq(db, f"PV-{datetime.now().year}", "payment_vouchers", "voucher_number")
+
+            pv_id = db.execute(text("""
+                INSERT INTO payment_vouchers (
+                    voucher_number, voucher_type, voucher_date, party_type, party_id,
+                    amount, payment_method, treasury_account_id, reference, status, created_by, branch_id,
+                    currency, exchange_rate
+                ) VALUES (
+                    :vnum, 'receipt', :vdate, 'customer', :cust,
+                    :amt, :method, :treasury_id, :ref, 'posted', :user, :branch,
+                    :currency, :rate
+                ) RETURNING id
+            """), {
+                "vnum": pv_num, "vdate": invoice.invoice_date, "cust": invoice.customer_id,
+                "amt": paid_amount, "method": actual_method,
+                "treasury_id": invoice.treasury_id,
+                "ref": inv_num,
+                "user": current_user.id, "branch": invoice.branch_id,
+                "currency": inv_currency, "rate": exchange_rate
+            }).scalar()
+
+            # Link payment allocation to invoice
+            db.execute(text("""
+                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                VALUES (:vid, :iid, :amt)
+            """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
 
         # --- 7. GL Entry ---
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")

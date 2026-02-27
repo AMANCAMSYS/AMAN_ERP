@@ -29,6 +29,29 @@ export const reportsAPI = {
     compareProfitLoss: (params) => api.get('/reports/accounting/profit-loss/compare', { params }),
     compareBalanceSheet: (params) => api.get('/reports/accounting/balance-sheet/compare', { params }),
     compareTrialBalance: (params) => api.get('/reports/accounting/trial-balance/compare', { params }),
+
+    // Exports
+    exportBalanceSheet: (params) => api.get('/reports/accounting/balance-sheet/export', { params, responseType: 'blob' }),
+    exportCashFlow: (params) => api.get('/reports/accounting/cashflow/export', { params, responseType: 'blob' }),
+    exportProfitLoss: (params) => api.get('/reports/accounting/profit-loss/export', { params, responseType: 'blob' }),
+    exportGeneralLedger: (params) => api.get('/reports/accounting/general-ledger/export', { params, responseType: 'blob' }),
+    exportTrialBalance: (params) => api.get('/reports/accounting/trial-balance/export', { params, responseType: 'blob' }),
+    exportAging: (params) => api.get('/reports/sales/aging/export', { params, responseType: 'blob' }),
+
+    // Advanced Analytics
+    getCostCenterReport: (params) => api.get('/reports/accounting/cost-center-report', { params }),
+    getFinancialRatios: (params) => api.get('/reports/accounting/financial-ratios', { params }),
+    getHorizontalAnalysis: (params) => api.get('/reports/accounting/horizontal-analysis', { params }),
+
+    // Inventory Reports
+    getCOGSReport: (params) => api.get('/reports/inventory/cogs', { params }),
+    getDeadStockReport: (params) => api.get('/reports/inventory/dead-stock', { params }),
+    getTurnoverReport: (params) => api.get('/reports/inventory/turnover', { params }),
+    getValuationReport: (params) => api.get('/reports/inventory/valuation', { params }),
+
+    // Sales Advanced
+    getSalesByCashier: (params) => api.get('/reports/sales/by-cashier', { params }),
+    getTargetVsActual: (params) => api.get('/reports/sales/target-vs-actual', { params }),
 }
 
 export const customReportsAPI = {

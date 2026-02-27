@@ -37,19 +37,27 @@ def list_supplier_groups(
         if branch_id:
             query += " AND (branch_id = :bid OR branch_id IS NULL)"
             params["bid"] = branch_id
-        
         query += " ORDER BY id"
+        print("[DEBUG] supplier_groups query:", query)
         result = db.execute(text(query), params).fetchall()
-        
-        return [{
-            "id": row.id,
-            "group_name": row.group_name,
-            "group_name_en": row.group_name_en,
-            "description": row.description,
-            "discount_percentage": row.discount_percentage,
-            "payment_days": row.payment_days,
-            "status": row.status
-        } for row in result]
+        print("[DEBUG] supplier_groups result count:", len(result))
+        groups = []
+        for row in result:
+            try:
+                groups.append({
+                    "id": row.id,
+                    "group_name": row.group_name,
+                    "group_name_en": row.group_name_en,
+                    "description": row.description,
+                    "discount_percentage": row.discount_percentage,
+                    "effect_type": getattr(row, "effect_type", None),
+                    "application_scope": getattr(row, "application_scope", None),
+                    "payment_days": row.payment_days,
+                    "status": row.status
+                })
+            except Exception as e:
+                print("[ERROR] Failed to parse supplier_group row:", e)
+        return groups
     finally:
         db.close()
 
@@ -69,9 +77,9 @@ def create_supplier_group(
         db.execute(text("""
             INSERT INTO supplier_groups (
                 group_code, group_name, group_name_en, description, 
-                discount_percentage, payment_days, branch_id, status
+                discount_percentage, effect_type, application_scope, payment_days, branch_id, status
             ) VALUES (
-                :code, :name, :name_en, :desc, :disc, :days, :branch_id, :status
+                :code, :name, :name_en, :desc, :disc, :effect_type, :application_scope, :days, :branch_id, :status
             )
         """), {
             "code": group_code,
@@ -79,6 +87,8 @@ def create_supplier_group(
             "name_en": group.group_name_en,
             "desc": group.description,
             "disc": group.discount_percentage,
+            "effect_type": group.effect_type,
+            "application_scope": group.application_scope,
             "days": group.payment_days,
             "branch_id": group.branch_id,
             "status": group.status
@@ -118,6 +128,8 @@ def update_supplier_group(
                 group_name_en = :name_en,
                 description = :desc,
                 discount_percentage = :disc,
+                effect_type = :effect_type,
+                application_scope = :application_scope,
                 payment_days = :days,
                 status = :status
             WHERE id = :id
@@ -126,6 +138,8 @@ def update_supplier_group(
             "name_en": group.group_name_en,
             "desc": group.description,
             "disc": group.discount_percentage,
+            "effect_type": group.effect_type,
+            "application_scope": group.application_scope,
             "days": group.payment_days,
             "status": group.status,
             "id": id
@@ -684,7 +698,7 @@ def receive_purchase_order(
     try:
         # Check PO exists and is approved
         po = db.execute(text("""
-            SELECT id, status, po_number, party_id as supplier_id, branch_id, exchange_rate 
+            SELECT id, status, po_number, party_id as supplier_id, branch_id, exchange_rate, currency 
             FROM purchase_orders WHERE id = :id
         """), {"id": id}).fetchone()
         
@@ -1253,6 +1267,7 @@ async def create_purchase_invoice(
                 "unit_price": item.unit_price,
                 "tax_rate": item.tax_rate,
                 "discount": item.discount,
+                "markup": getattr(item, "markup", 0.0),
                 "total": final_total
             })
 
@@ -1276,12 +1291,12 @@ async def create_purchase_invoice(
                 invoice_number, invoice_type, party_id, invoice_date, due_date,
                 subtotal, tax_amount, discount, total, paid_amount, status, notes, 
                 down_payment_method, created_by, branch_id, warehouse_id,
-                currency, exchange_rate
+                currency, exchange_rate, effect_type, effect_percentage, markup_amount
             ) VALUES (
                 :num, 'purchase', :party_id, :date, :due,
                 :sub, :tax, :disc, :total, :paid, :status, :notes, 
                 :dp_method, :user, :branch, :wh,
-                :currency, :exchange_rate
+                :currency, :exchange_rate, :effect_type, :effect_perc, :markup_amt
             ) RETURNING id
         """), {
             "num": inv_num,
@@ -1300,7 +1315,10 @@ async def create_purchase_invoice(
             "branch": invoice.branch_id,
             "wh": wh_id,
             "currency": inv_currency,
-            "exchange_rate": exchange_rate
+            "exchange_rate": exchange_rate,
+            "effect_type": invoice.effect_type,
+            "effect_perc": invoice.effect_percentage,
+            "markup_amt": invoice.markup_amount
         }).fetchone()
         
         invoice_id = result[0]
@@ -1312,9 +1330,9 @@ async def create_purchase_invoice(
             db.execute(text("""
                 INSERT INTO invoice_lines (
                     invoice_id, product_id, description, quantity, unit_price, 
-                    tax_rate, discount, total
+                    tax_rate, discount, markup, total
                 ) VALUES (
-                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :markup, :total
                 )
             """), {
                 "inv_id": invoice_id,
@@ -1324,6 +1342,7 @@ async def create_purchase_invoice(
                 "price": line["unit_price"],
                 "tax_rate": line["tax_rate"],
                 "disc": line["discount"],
+                "markup": line.get("markup", 0.0),
                 "total": line["total"]
             })
             
@@ -2189,7 +2208,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                 
                 # Fetch current rate for treasury currency
                 treasury_rate = 1.0
-                if treasury_curr != (current_user.company_currency or base_currency):
+                if treasury_curr != base_currency:
                      # Try to get rate from currencies table
                      curr_data = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": treasury_curr}).fetchone()
                      if curr_data:
@@ -2587,7 +2606,7 @@ def create_purchase_credit_note(
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
         exchange_rate = float(data.get("exchange_rate", 1.0))
-        branch_id = data.get("branch_id") or current_user.branch_id
+        branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
         subtotal = 0
         tax_total = 0
@@ -2853,7 +2872,7 @@ def create_purchase_debit_note(
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
         exchange_rate = float(data.get("exchange_rate", 1.0))
-        branch_id = data.get("branch_id") or current_user.branch_id
+        branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
         subtotal = 0
         tax_total = 0

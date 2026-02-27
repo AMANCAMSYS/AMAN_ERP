@@ -26,6 +26,7 @@ class CompanyCreateRequest(BaseModel):
     
     timezone: str = Field(default="Asia/Damascus", max_length=100)
     plan_type: str = Field(default="basic")
+    template_id: Optional[int] = None
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -77,8 +78,10 @@ class UserResponse(BaseModel):
     timezone: str = "Asia/Damascus"
     permissions: List[str] = []
     allowed_branches: List[int] = []
+    enabled_modules: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class UserCreateRequest(BaseModel):

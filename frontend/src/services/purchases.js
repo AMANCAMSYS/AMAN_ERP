@@ -5,6 +5,10 @@ export const purchasesAPI = {
     listInvoices: (params) => api.get('/buying/invoices', { params }),
     getInvoice: (id) => api.get(`/buying/invoices/${id}`),
 
+    // Suppliers (via buying prefix)
+    listSuppliers: (params) => api.get('/buying/suppliers', { params }),
+    createSupplier: (data) => api.post('/buying/suppliers', data),
+
     // Purchase Orders
     listOrders: (params) => api.get('/buying/orders', { params }),
     getOrder: (id) => api.get(`/buying/orders/${id}`),

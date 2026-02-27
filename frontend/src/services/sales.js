@@ -2,7 +2,9 @@ import api from './apiClient'
 
 export const salesAPI = {
     listCustomers: (params) => api.get('/sales/customers', { params }),
+    getCustomer: (id) => api.get(`/sales/customers/${id}`),
     createCustomer: (data) => api.post('/sales/customers', data),
+    updateCustomer: (id, data) => api.put(`/sales/customers/${id}`, data),
     listInvoices: (params) => api.get('/sales/invoices', { params }),
     createInvoice: (data) => api.post('/sales/invoices', data),
     getInvoice: (id) => api.get(`/sales/invoices/${id}`),

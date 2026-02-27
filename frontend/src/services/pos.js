@@ -27,4 +27,21 @@ export const posAPI = {
     updateKitchenOrderStatus: (id, data) => api.put(`/pos/kitchen/orders/${id}/status`, data),
     // Session Reports
     getDetailedSessionReport: (sessionId) => api.get(`/pos/sessions/${sessionId}/detailed-report`),
+
+    // Sessions
+    openSession: (data) => api.post('/pos/sessions/open', data),
+    closeSession: (sessionId, data) => api.post(`/pos/sessions/${sessionId}/close`, data),
+    getActiveSession: () => api.get('/pos/sessions/active'),
+
+    // Orders
+    createOrder: (data) => api.post('/pos/orders', data),
+    getHeldOrders: () => api.get('/pos/orders/held'),
+    resumeOrder: (orderId) => api.post(`/pos/orders/${orderId}/resume`),
+    cancelHeldOrder: (orderId) => api.delete(`/pos/orders/${orderId}/cancel-held`),
+    getOrderDetails: (orderId) => api.get(`/pos/orders/${orderId}/details`),
+    returnOrder: (orderId, data) => api.post(`/pos/orders/${orderId}/return`, data),
+
+    // Products & Warehouses for POS
+    getProducts: (params) => api.get('/pos/products', { params }),
+    getWarehouses: () => api.get('/pos/warehouses'),
 }

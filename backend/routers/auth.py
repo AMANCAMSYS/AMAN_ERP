@@ -422,22 +422,33 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                             elif "*" in final_permissions:
                                  final_permissions = ["*"]
                             
+                            # Fetch company info (modules, currency)
+                            company_info = db.execute(
+                                text("SELECT currency, enabled_modules FROM system_companies WHERE id = :id"),
+                                {"id": company_id}
+                            ).fetchone()
+                            
+                            currency = company_info[0] if company_info else "SAR"
+                            enabled_modules = company_info[1] if company_info and company_info[1] else []
+                            
+                            if isinstance(enabled_modules, str):
+                                import json
+                                try:
+                                    enabled_modules = json.loads(enabled_modules)
+                                except:
+                                    enabled_modules = []
+
                             access_token = create_access_token({
                                 "sub": result[1],
                                 "user_id": result[0],
                                 "company_id": company_id,
                                 "role": result[5],
                                 "permissions": final_permissions,
+                                "enabled_modules": enabled_modules,
                                 "allowed_branches": allowed_branches,
                                 "type": "company_user"
                             })
                             
-                            # Get company settings
-                            currency = db.execute(
-                                text("SELECT currency FROM system_companies WHERE id = :id"),
-                                {"id": company_id}
-                            ).scalar()
-
                             decimal_places = 2
                             company_country = "SY"
                             company_timezone = "Asia/Damascus"
@@ -474,6 +485,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                                     "full_name": result[4],
                                     "role": result[5],
                                     "permissions": final_permissions,
+                                    "enabled_modules": enabled_modules,
                                     "currency": currency,
                                     "country": company_country,
                                     "decimal_places": decimal_places,
@@ -482,6 +494,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                                 },
                                 company_id=company_id
                             )
+
                 
                 company_engine.dispose()
             except Exception as e:
@@ -628,6 +641,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 except Exception as e:
                     logger.warning(f"Failed to fetch settings in /me: {e}")
 
+                # Fetch company details
+                company_info = db.execute(
+                    text("SELECT currency, enabled_modules FROM system_companies WHERE id = :id"),
+                    {"id": company_id}
+                ).fetchone()
+                
+                currency = company_info[0] if company_info else "SAR"
+                enabled_modules = company_info[1] if company_info and company_info[1] else []
+                
+                if isinstance(enabled_modules, str):
+                    import json
+                    try:
+                        enabled_modules = json.loads(enabled_modules)
+                    except:
+                        enabled_modules = []
+
                 return UserResponse(
                     id=result[0],
                     username=result[1],
@@ -641,8 +670,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                     decimal_places=decimal_places,
                     timezone=company_timezone,
                     permissions=final_permissions,
-                    allowed_branches=allowed_branches
+                    allowed_branches=allowed_branches,
+                    enabled_modules=enabled_modules
                 )
+
     finally:
         db.close()
     
@@ -687,7 +718,9 @@ async def refresh_token(token: str = Depends(oauth2_scheme)):
             "company_id": payload.get("company_id"),
             "role": payload.get("role"),
             "permissions": payload.get("permissions"),
+            "enabled_modules": payload.get("enabled_modules"),
         }
+
         # Include optional fields
         if payload.get("user_id"):
             new_payload["user_id"] = payload["user_id"]

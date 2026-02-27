@@ -98,13 +98,13 @@ def get_sales_summary(
                     id,
                     'pos' as source
                 FROM pos_orders
-                WHERE status = 'paid'
+                WHERE status IN ('paid', 'completed')
             )
             SELECT 
                 COUNT(*) as count,
                 COALESCE(SUM(total * exchange_rate), 0) as total_sales,
                 COALESCE(SUM(paid_amount * exchange_rate), 0) as total_paid,
-                COALESCE(SUM((total - paid_amount) * exchange_rate), 0) as total_due,
+                COALESCE(SUM(GREATEST(total - paid_amount, 0) * exchange_rate), 0) as total_due,
                 COALESCE(SUM((total * COALESCE(exchange_rate, 1.0) * (
                     CASE WHEN source = 'invoice' THEN 
                         (SELECT AVG(tax_rate) FROM invoice_lines WHERE invoice_id = all_sales.id)
@@ -117,65 +117,33 @@ def get_sales_summary(
             {branch_filter.replace('branch_id', 'branch_id')}
         """), params).fetchone()
         
-        # 2. Approximate Profit (Combined Invoices + POS)
-        profit_query = db.execute(text(f"""
-            WITH combined_lines AS (
-                SELECT 
-                    (il.total - (il.total * il.tax_rate / (100 + il.tax_rate))) * COALESCE(i.exchange_rate, 1.0) as revenue,
-                    il.quantity * COALESCE(p.cost_price, 0) as cogs,
-                    i.invoice_date as sale_date,
-                    i.branch_id
-                FROM invoice_lines il
-                JOIN invoices i ON il.invoice_id = i.id
-                LEFT JOIN products p ON il.product_id = p.id
-                WHERE i.invoice_type = 'sales' AND i.status != 'cancelled'
-                
-                UNION ALL
-                
-                SELECT 
-                    poi.total - poi.tax_amount as revenue,
-                    poi.quantity * COALESCE(p.cost_price, 0) as cogs,
-                    CAST(po.order_date AS DATE) as sale_date,
-                    po.branch_id
-                FROM pos_order_lines poi
-                JOIN pos_orders po ON poi.order_id = po.id
-                LEFT JOIN products p ON poi.product_id = p.id
-                WHERE po.status = 'paid'
-            )
-            SELECT 
-                COALESCE(SUM(revenue), 0) as total_revenue,
-                COALESCE(SUM(cogs), 0) as total_cogs
-            FROM combined_lines
-            WHERE sale_date BETWEEN :start AND :end
-            {branch_filter}
-        """), params).fetchone()
-        
-        revenue = float(profit_query.total_revenue or 0)
-        cogs = float(profit_query.total_cogs or 0)
-
-        gross_profit = revenue - cogs
-        
-        # 3. Operating Expenses from GL (expense accounts excluding COGS)
-        # Use journal_lines for accurate calculation based on date range
-        opex_params = {"start": start_date, "end": end_date}
-        opex_branch_filter = ""
+        # 2. Profit from GL (journal entries) - consistent with dashboard
+        profit_params = {"start": start_date, "end": end_date}
+        profit_branch_filter = ""
         if branch_id:
-            opex_branch_filter = "AND je.branch_id = :opex_branch"
-            opex_params["opex_branch"] = branch_id
-            
-        opex_query = db.execute(text(f"""
-            SELECT COALESCE(SUM(jl.debit) - SUM(jl.credit), 0)
+            profit_branch_filter = "AND je.branch_id = :profit_branch"
+            profit_params["profit_branch"] = branch_id
+
+        profit_query = db.execute(text(f"""
+            SELECT 
+                COALESCE(SUM(CASE WHEN a.account_type = 'revenue' 
+                    THEN jl.credit - jl.debit ELSE 0 END), 0) as total_revenue,
+                COALESCE(SUM(CASE WHEN a.account_code LIKE 'CGS%' 
+                    THEN jl.debit - jl.credit ELSE 0 END), 0) as total_cogs,
+                COALESCE(SUM(CASE WHEN a.account_type = 'expense' AND a.account_code NOT LIKE 'CGS%' 
+                    THEN jl.debit - jl.credit ELSE 0 END), 0) as total_opex
             FROM journal_lines jl
             JOIN journal_entries je ON je.id = jl.journal_entry_id
             JOIN accounts a ON a.id = jl.account_id
-            WHERE a.account_type = 'expense' 
-            AND a.account_code NOT IN ('CGS')
-            AND je.entry_date BETWEEN :start AND :end
+            WHERE je.entry_date BETWEEN :start AND :end
             AND je.status = 'posted'
-            {opex_branch_filter}
-        """), opex_params).scalar() or 0
-        
-        operating_expenses = float(opex_query)
+            {profit_branch_filter}
+        """), profit_params).fetchone()
+
+        revenue = float(profit_query.total_revenue or 0)
+        cogs = float(profit_query.total_cogs or 0)
+        operating_expenses = float(profit_query.total_opex or 0)
+        gross_profit = revenue - cogs
         net_profit = gross_profit - operating_expenses
         
         return {
@@ -186,7 +154,7 @@ def get_sales_summary(
                 "total_paid": float(summary.total_paid or 0),
                 "total_due": float(summary.total_due or 0),
                 "net_revenue": revenue,
-                "total_tax": float(summary.total_sales or 0) - revenue,
+                "total_tax": float(summary.total_tax or 0),
                 "total_cogs": cogs,
                 "gross_profit": gross_profit,
                 "operating_expenses": operating_expenses,
@@ -230,7 +198,7 @@ def get_sales_trend(
                     total_amount as total_bc,
                     branch_id
                 FROM pos_orders
-                WHERE status = 'paid'
+                WHERE status IN ('paid', 'completed')
             )
             SELECT 
                 sale_date as date,
@@ -277,7 +245,7 @@ def get_sales_by_customer(
                     total_amount as total_bc,
                     branch_id
                 FROM pos_orders
-                WHERE status = 'paid'
+                WHERE status IN ('paid', 'completed')
             )
             SELECT 
                 p.name as name,
@@ -330,7 +298,7 @@ def get_sales_by_product(
                     po.branch_id
                 FROM pos_order_lines poi
                 JOIN pos_orders po ON poi.order_id = po.id
-                WHERE po.status = 'paid'
+                WHERE po.status IN ('paid', 'completed')
             )
             SELECT 
                 p.product_name as name,
@@ -391,7 +359,7 @@ def get_customer_statement(
                     branch_id,
                     customer_id as party_id
                 FROM pos_orders
-                WHERE status = 'paid'
+                WHERE status IN ('paid', 'completed')
                 
                 UNION ALL
                 
@@ -441,7 +409,7 @@ def get_customer_statement(
                     0 as credit,
                     (SELECT COALESCE((SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1), (SELECT setting_value FROM company_settings WHERE setting_key = 'default_currency'), 'SYP')) as currency, 1.0 as exchange_rate, branch_id, customer_id as party_id
                 FROM pos_orders
-                WHERE status = 'paid'
+                WHERE status IN ('paid', 'completed')
                 
                 UNION ALL
                 

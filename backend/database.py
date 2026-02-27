@@ -187,6 +187,8 @@ def get_all_table_sql() -> str:
         group_name_en VARCHAR(255),
         branch_id INTEGER REFERENCES branches(id),
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
+        effect_type VARCHAR(20) DEFAULT 'discount',
+        application_scope VARCHAR(20) DEFAULT 'total',
         payment_days INTEGER DEFAULT 30,
         description TEXT,
         status VARCHAR(20) DEFAULT 'active',
@@ -336,6 +338,9 @@ def get_all_table_sql() -> str:
         subtotal DECIMAL(18, 4) DEFAULT 0,
         tax_amount DECIMAL(18, 4) DEFAULT 0,
         discount DECIMAL(18, 4) DEFAULT 0,
+        effect_type VARCHAR(20) DEFAULT 'discount',
+        effect_percentage DECIMAL(5, 2) DEFAULT 0,
+        markup_amount DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
         paid_amount DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'draft',
@@ -360,6 +365,7 @@ def get_all_table_sql() -> str:
         unit_price DECIMAL(18, 4) DEFAULT 0,
         tax_rate DECIMAL(5, 2) DEFAULT 0,
         discount DECIMAL(18, 4) DEFAULT 0,
+        markup DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -382,6 +388,8 @@ def get_all_table_sql() -> str:
         parent_id INTEGER REFERENCES supplier_groups(id),
         branch_id INTEGER REFERENCES branches(id),
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
+        effect_type VARCHAR(20) DEFAULT 'discount',
+        application_scope VARCHAR(20) DEFAULT 'total',
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -495,6 +503,8 @@ def get_additional_tables_sql() -> str:
         parent_id INTEGER REFERENCES customer_groups(id),
         branch_id INTEGER REFERENCES branches(id),
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
+        effect_type VARCHAR(20) DEFAULT 'discount',
+        application_scope VARCHAR(20) DEFAULT 'total',
         price_list_id INTEGER,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
@@ -1826,19 +1836,23 @@ def get_financial_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS asset_transfers (
         id SERIAL PRIMARY KEY,
         asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
-        from_location VARCHAR(255),
-        to_location VARCHAR(255),
-        transfer_date DATE NOT NULL,
+        from_branch_id INTEGER REFERENCES branches(id),
+        to_branch_id INTEGER REFERENCES branches(id),
+        transfer_date DATE NOT NULL DEFAULT CURRENT_DATE,
         reason TEXT,
-        condition VARCHAR(50),
+        notes TEXT,
+        book_value_at_transfer NUMERIC(15, 2) DEFAULT 0,
         approved_by INTEGER,
         status VARCHAR(20) DEFAULT 'pending',
-        notes TEXT,
+        created_by INTEGER,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_asset_transfers_asset ON asset_transfers(asset_id);
+    CREATE INDEX IF NOT EXISTS idx_asset_transfers_status ON asset_transfers(status);
+
     
     CREATE TABLE IF NOT EXISTS asset_disposals (
-        id SERIAL PRIMARY KEY,
+        id SERIAL PRIMARY KEY,ل
         asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
         disposal_date DATE NOT NULL,
         disposal_method VARCHAR(50),

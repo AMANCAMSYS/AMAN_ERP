@@ -41,6 +41,7 @@ def list_suppliers(
                 currency,
                 status = 'active' as is_active,
                 created_at,
+                party_group_id as group_id,
                 COALESCE(current_balance, 0) as current_balance
             FROM parties p
             WHERE p.is_supplier = TRUE
@@ -62,6 +63,7 @@ def list_suppliers(
                 "tax_number": row.tax_number,
                 "commercial_register": row.commercial_register,
                 "currency": row.currency,
+                "group_id": getattr(row, 'group_id', None),
                 "current_balance": float(row.current_balance or 0),
                 "is_active": row.is_active,
                 "created_at": row.created_at
@@ -84,6 +86,7 @@ def get_supplier(
                 id, name, name_en, phone, email, address, tax_number,
                 commercial_register, currency, branch_id,
                 status = 'active' as is_active, created_at,
+                party_group_id as group_id,
                 COALESCE(current_balance, 0) as current_balance
             FROM parties
             WHERE id = :id AND is_supplier = TRUE
@@ -103,6 +106,7 @@ def get_supplier(
             "commercial_register": supplier.commercial_register,
             "currency": supplier.currency,
             "branch_id": supplier.branch_id,
+            "group_id": getattr(supplier, 'group_id', None),
             "current_balance": float(supplier.current_balance or 0),
             "is_active": supplier.is_active,
             "created_at": supplier.created_at
@@ -153,6 +157,18 @@ def create_supplier(
             pid = result[0]
 
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="inventory.supplier.create",
+            resource_type="supplier",
+            resource_id=str(pid),
+            details={"name": supplier.name},
+            request=None,
+            branch_id=supplier.branch_id
+        )
 
         return {
             **supplier.model_dump(),
@@ -208,6 +224,18 @@ def update_supplier(
         })
 
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="inventory.supplier.update",
+            resource_type="supplier",
+            resource_id=str(id),
+            details={"name": supplier.name},
+            request=None,
+            branch_id=supplier.branch_id
+        )
 
         return {
             **supplier.model_dump(),

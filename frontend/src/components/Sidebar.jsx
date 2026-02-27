@@ -12,64 +12,81 @@ function Sidebar() {
     if (user?.role === 'system_admin') {
         navItems.push({ path: '/admin/companies', label: t('nav.companies'), icon: '🏢' })
     } else {
-        if (hasPermission('accounting.view')) {
+        const enabledModules = user?.enabled_modules || []
+        const isSystemAdmin = user?.role === 'system_admin'
+
+        // Helper to check if module is enabled
+        const isModuleEnabled = (moduleKey) => {
+            if (isSystemAdmin) return true
+            if (!enabledModules || enabledModules.length === 0) return true // Fallback if not set
+            return enabledModules.includes(moduleKey)
+        }
+
+        if (hasPermission('accounting.view') && isModuleEnabled('accounting')) {
             navItems.push({ path: '/accounting', label: t('nav.accounting'), icon: '📊' })
         }
-        if (hasPermission('assets.view')) {
-            navItems.push({ path: '/assets', label: t('nav.assets') || 'الأصول الثابتة', icon: '�️' })
+        if (hasPermission('assets.view') && isModuleEnabled('assets')) {
+            navItems.push({ path: '/assets', label: t('nav.assets') || 'الأصول الثابتة', icon: '🏗️' })
         }
-        if (hasPermission('treasury.view')) {
+        if (hasPermission('treasury.view') && isModuleEnabled('treasury')) {
             navItems.push({ path: '/treasury', label: t('nav.treasury'), icon: '🏦' })
+            navItems.push({ path: '/treasury/notes-receivable', label: t('nav.notes_receivable') || 'أوراق القبض', icon: '📝' })
         }
-        if (hasPermission('sales.view')) {
+        if (hasPermission('sales.view') && isModuleEnabled('sales')) {
             navItems.push({ path: '/sales', label: t('nav.sales'), icon: '💰' })
         }
         // POS Module
-        if (hasPermission(['sales.view', 'pos.view'])) {
+        if (hasPermission(['sales.view', 'pos.view']) && isModuleEnabled('pos')) {
             navItems.push({ path: '/pos', label: t('nav.pos') || 'نقاط البيع', icon: '🏪' })
         }
 
-        if (hasPermission('buying.view')) {
+        if (hasPermission('buying.view') && isModuleEnabled('buying')) {
             navItems.push({ path: '/buying', label: t('nav.buying'), icon: '🛒' })
         }
-        if (hasPermission(['stock.view', 'stock.reports'])) {
+        if (hasPermission(['stock.view', 'stock.reports']) && isModuleEnabled('stock')) {
             navItems.push({ path: '/stock', label: t('nav.inventory'), icon: '📦' })
         }
         // Manufacturing Module
-        if (hasPermission(['manufacturing.view', 'stock.view'])) {
+        if (hasPermission(['manufacturing.view', 'stock.view']) && isModuleEnabled('manufacturing')) {
             navItems.push({ path: '/manufacturing', label: t('nav.manufacturing') || 'التصنيع', icon: '🏭' })
         }
         // Projects Module
-        if (hasPermission('projects.view')) {
+        if (hasPermission('projects.view') && isModuleEnabled('projects')) {
             navItems.push({ path: '/projects', label: t('nav.projects') || 'المشاريع', icon: '📐' })
         }
         // CRM Module
-        if (hasPermission('sales.view')) {
+        if (hasPermission('sales.view') && isModuleEnabled('crm')) {
             navItems.push({ path: '/crm', label: t('nav.crm'), icon: '🤝' })
         }
         // Services Module
-        if (hasPermission('services.view') || hasPermission('admin.companies')) {
+        if ((hasPermission('services.view') || hasPermission('admin.companies')) && isModuleEnabled('services')) {
             navItems.push({ path: '/services', label: t('nav.services'), icon: '🔧' })
         }
         // Expenses Module
-        if (hasPermission('expenses.view')) {
+        if (hasPermission('expenses.view') && isModuleEnabled('expenses')) {
             navItems.push({ path: '/expenses', label: t('nav.expenses') || 'المصاريف', icon: '💸' })
         }
         // Taxes Module
-        if (hasPermission('accounting.view')) {
+        if (hasPermission('accounting.view') && isModuleEnabled('taxes')) {
             navItems.push({ path: '/taxes', label: t('nav.taxes') || 'الضرائب', icon: '🧾' })
         }
-        if (hasPermission('approvals.view')) {
+        if (hasPermission('approvals.view') && isModuleEnabled('approvals')) {
             navItems.push({ path: '/approvals', label: t('nav.approvals') || 'الاعتمادات', icon: '✅' })
         }
         if (hasPermission('reports.view') || hasPermission('reports.financial') || hasPermission('sales.reports') || hasPermission('stock.reports')) {
-            navItems.push({ path: '/reports', label: t('nav.reports'), icon: '📈' })
+            // Reports are usually general but we can tie them to 'reports' module key
+            if (isModuleEnabled('reports')) {
+                navItems.push({ path: '/reports', label: t('nav.reports'), icon: '📈' })
+            }
         }
-        if (hasPermission('hr.view')) {
+        if (hasPermission('hr.view') && isModuleEnabled('hr')) {
             navItems.push({ path: '/hr', label: t('nav.hr'), icon: '👥' })
         }
-        if (hasPermission('audit.view')) {
+        if (hasPermission('audit.view') && isModuleEnabled('audit')) {
             navItems.push({ path: '/admin/audit-logs', label: t('nav.auditLogs') || 'سجلات المراقبة', icon: '📋' })
+        }
+        if (hasPermission('data_import.view') && isModuleEnabled('data_import')) {
+            navItems.push({ path: '/data-import', label: t('nav.dataImport') || 'استيراد البيانات', icon: '📥' })
         }
         if (hasPermission('admin.roles')) {
             navItems.push({ path: '/admin/roles', label: t('nav.roles') || 'إدارة الأدوار', icon: '🔐' })
@@ -81,6 +98,7 @@ function Sidebar() {
             navItems.push({ path: '/settings', label: t('nav.settings'), icon: '⚙️' })
         }
     }
+
 
     return (
         <aside className="sidebar">

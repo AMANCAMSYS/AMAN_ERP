@@ -19,6 +19,8 @@ function SupplierGroups() {
         group_name_en: '',
         description: '',
         discount_percentage: 0,
+        effect_type: 'discount',
+        application_scope: 'total',
         payment_days: 30,
         status: 'active'
     })
@@ -49,6 +51,8 @@ function SupplierGroups() {
                 group_name_en: group.group_name_en || '',
                 description: group.description || '',
                 discount_percentage: group.discount_percentage || 0,
+                effect_type: group.effect_type || 'discount',
+                application_scope: group.application_scope || 'total',
                 payment_days: group.payment_days || 30,
                 status: group.status || 'active'
             })
@@ -59,6 +63,8 @@ function SupplierGroups() {
                 group_name_en: '',
                 description: '',
                 discount_percentage: 0,
+                effect_type: 'discount',
+                application_scope: 'total',
                 payment_days: 30,
                 status: 'active'
             })
@@ -253,6 +259,30 @@ function SupplierGroups() {
                                     <option value="active">{t('buying.supplier_groups.status.active')}</option>
                                     <option value="inactive">{t('buying.supplier_groups.status.inactive')}</option>
                                 </select>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">نوع التأثير</label>
+                                    <select
+                                        className="form-input"
+                                        value={formData.effect_type}
+                                        onChange={e => setFormData({ ...formData, effect_type: e.target.value })}
+                                    >
+                                        <option value="discount">خصم</option>
+                                        <option value="markup">زيادة</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">نطاق التطبيق</label>
+                                    <select
+                                        className="form-input"
+                                        value={formData.application_scope}
+                                        onChange={e => setFormData({ ...formData, application_scope: e.target.value })}
+                                    >
+                                        <option value="total">إجمالي</option>
+                                        <option value="line">لكل صنف</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="form-group">

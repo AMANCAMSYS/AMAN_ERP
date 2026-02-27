@@ -29,13 +29,27 @@ def get_sales_summary(branch_id: Optional[int] = None, current_user: dict = Depe
         total_customers = db.execute(text(f"SELECT COUNT(*) FROM parties WHERE party_type = 'customer' {branch_filter}"), params).scalar()
         total_invoices = db.execute(text(f"SELECT COUNT(*) FROM invoices WHERE invoice_type = 'sales' {branch_filter}"), params).scalar()
         total_revenue = db.execute(text(f"SELECT COALESCE(SUM(total), 0) FROM invoices WHERE invoice_type = 'sales' AND status != 'cancelled' {branch_filter}"), params).scalar()
-        total_receivables = db.execute(text(f"SELECT COALESCE(SUM(total - COALESCE(paid_amount, 0)), 0) FROM invoices WHERE invoice_type = 'sales' AND status IN ('unpaid', 'partial') {branch_filter}"), params).scalar()
+        total_receivables = db.execute(text(f"SELECT COALESCE(SUM((total - COALESCE(paid_amount, 0)) * COALESCE(exchange_rate, 1)), 0) FROM invoices WHERE invoice_type = 'sales' AND status IN ('unpaid', 'partial') {branch_filter}"), params).scalar()
+
+        # Monthly sales - current month
+        monthly_sales = db.execute(text(f"""
+            SELECT COALESCE(SUM(total * COALESCE(exchange_rate, 1)), 0)
+            FROM invoices
+            WHERE invoice_type = 'sales' AND status != 'cancelled'
+            AND date_trunc('month', invoice_date) = date_trunc('month', CURRENT_DATE)
+            {branch_filter}
+        """), params).scalar()
+
+        unpaid_count = db.execute(text(f"SELECT COUNT(*) FROM invoices WHERE invoice_type = 'sales' AND status IN ('unpaid', 'partial') {branch_filter}"), params).scalar()
 
         return {
             "total_customers": total_customers,
+            "customer_count": total_customers,
             "total_invoices": total_invoices,
             "total_revenue": float(total_revenue),
-            "total_receivables": float(total_receivables)
+            "total_receivables": float(total_receivables),
+            "monthly_sales": float(monthly_sales),
+            "unpaid_count": unpaid_count
         }
     finally:
         db.close()
@@ -52,7 +66,7 @@ def list_customers(branch_id: Optional[int] = None, current_user: dict = Depends
                    p.city, p.country, p.tax_number, p.current_balance,
                    p.credit_limit, p.payment_terms, p.status, p.notes,
                    p.party_group_id as group_id, g.group_name as group_name,
-                   p.name_en, p.currency
+                   p.name_en, p.currency, p.created_at
             FROM parties p
             LEFT JOIN party_groups g ON p.party_group_id = g.id
             WHERE p.party_type = 'customer' OR p.is_customer = TRUE
@@ -118,7 +132,7 @@ def create_customer(request: Request, customer: CustomerCreate, current_user: di
             )
             VALUES (
                 :code, :name, :name_en, 'customer', TRUE, :email, :phone, :mobile, :address, :city, :country,
-                :tax, :credit_limit, :payment_terms, :notes, 'active', :group_id,
+                :tax, :credit_limit, :payment_terms, :notes, :status, :group_id,
                 :branch_id, :currency
             ) RETURNING id
         """), {
@@ -127,7 +141,7 @@ def create_customer(request: Request, customer: CustomerCreate, current_user: di
             "address": customer.address, "city": customer.city, "country": customer.country,
             "tax": customer.tax_number,
             "credit_limit": customer.credit_limit, "payment_terms": customer.payment_terms,
-            "notes": customer.notes, "group_id": customer.group_id,
+            "notes": customer.notes, "status": customer.status, "group_id": customer.group_id,
             "branch_id": customer.branch_id, "currency": customer.currency
         }).fetchone()
 
@@ -148,6 +162,67 @@ def create_customer(request: Request, customer: CustomerCreate, current_user: di
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating customer: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@customers_router.get("/customers/{customer_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
+def get_customer(customer_id: int, current_user: dict = Depends(get_current_user)):
+    """عرض بيانات عميل محدد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        customer = db.execute(text("""
+            SELECT p.id, p.party_code, p.name, p.name_en, p.party_type, p.is_customer, p.email, p.phone, p.mobile, 
+                   p.address, p.city, p.country, p.tax_number, p.credit_limit, p.payment_terms, p.notes, 
+                   p.status, p.party_group_id as group_id, p.branch_id, p.currency, p.current_balance
+            FROM parties p
+            WHERE p.id = :cid AND (p.party_type = 'customer' OR p.is_customer = TRUE)
+        """), {"cid": customer_id}).fetchone()
+
+        if not customer:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
+
+        return dict(customer._mapping)
+    finally:
+        db.close()
+
+
+@customers_router.put("/customers/{customer_id}", response_model=dict, dependencies=[Depends(require_permission("sales.edit"))])
+def update_customer(customer_id: int, customer: CustomerCreate, current_user: dict = Depends(get_current_user)):
+    """تحديث عميل"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Check if exists
+        existing = db.execute(text("SELECT id FROM parties WHERE id = :id AND (party_type = 'customer' OR is_customer = TRUE)"), {"id": customer_id}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
+
+        db.execute(text("""
+            UPDATE parties 
+            SET name = :name, name_en = :name_en, email = :email, phone = :phone, mobile = :mobile, 
+                address = :address, city = :city, country = :country, tax_number = :tax, 
+                credit_limit = :credit_limit, payment_terms = :payment_terms, notes = :notes, 
+                status = :status, party_group_id = :group_id, branch_id = :branch_id, currency = :currency
+            WHERE id = :id
+        """), {
+            "id": customer_id, "name": customer.name, "name_en": customer.name_en,
+            "email": customer.email, "phone": customer.phone, "mobile": customer.mobile,
+            "address": customer.address, "city": customer.city, "country": customer.country,
+            "tax": customer.tax_number,
+            "credit_limit": customer.credit_limit, "payment_terms": customer.payment_terms,
+            "notes": customer.notes, "status": customer.status, "group_id": customer.group_id,
+            "branch_id": customer.branch_id, "currency": customer.currency
+        })
+
+        db.commit()
+
+        # Log Activity (Assuming `log_activity` exists, we can skip it for a simple PUT unless requested, but let's just return success)
+        return {"success": True, "id": customer_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating customer: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
@@ -203,20 +278,37 @@ def list_customer_groups(current_user: dict = Depends(get_current_user)):
 
 
 @customers_router.post("/customer-groups", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
-def create_customer_group(group: CustomerGroupCreate, current_user: dict = Depends(get_current_user)):
+def create_customer_group(
+    group: CustomerGroupCreate, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     """إنشاء مجموعة عملاء جديدة"""
     db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
-            INSERT INTO party_groups (group_name, group_name_en, description, discount_percentage, payment_days, status)
-            VALUES (:name, :name_en, :desc, :discount, :days, :status)
+            INSERT INTO party_groups (group_name, group_name_en, description, discount_percentage, effect_type, application_scope, payment_days, status)
+            VALUES (:name, :name_en, :desc, :discount, :effect_type, :application_scope, :days, :status)
             RETURNING id
         """), {
             "name": group.group_name, "name_en": group.group_name_en,
             "desc": group.description, "discount": group.discount_percentage,
+            "effect_type": group.effect_type, "application_scope": group.application_scope,
             "days": group.payment_days, "status": group.status
         }).fetchone()
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="sales.customer_group.create",
+            resource_type="customer_group",
+            resource_id=str(result[0]),
+            details={"group_name": group.group_name},
+            request=request
+        )
+
         return {"id": result[0], "group_name": group.group_name}
     except Exception as e:
         db.rollback()
@@ -226,21 +318,39 @@ def create_customer_group(group: CustomerGroupCreate, current_user: dict = Depen
 
 
 @customers_router.put("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_customer_group(group_id: int, group: CustomerGroupCreate, current_user: dict = Depends(get_current_user)):
+def update_customer_group(
+    group_id: int, 
+    group: CustomerGroupCreate, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     """تعديل مجموعة عملاء"""
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("""
             UPDATE party_groups SET 
                 group_name = :name, group_name_en = :name_en, description = :desc, 
-                discount_percentage = :discount, payment_days = :days, status = :status
+                discount_percentage = :discount, effect_type = :effect_type, application_scope = :application_scope, payment_days = :days, status = :status
             WHERE id = :id
         """), {
             "id": group_id, "name": group.group_name, "name_en": group.group_name_en,
             "desc": group.description, "discount": group.discount_percentage,
+            "effect_type": group.effect_type, "application_scope": group.application_scope,
             "days": group.payment_days, "status": group.status
         })
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="sales.customer_group.update",
+            resource_type="customer_group",
+            resource_id=str(group_id),
+            details={"group_name": group.group_name},
+            request=request
+        )
+
         return {"success": True}
     except Exception as e:
         db.rollback()
@@ -250,7 +360,11 @@ def update_customer_group(group_id: int, group: CustomerGroupCreate, current_use
 
 
 @customers_router.delete("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.create"))])
-def delete_customer_group(group_id: int, current_user: dict = Depends(get_current_user)):
+def delete_customer_group(
+    group_id: int, 
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     """حذف مجموعة عملاء"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -260,6 +374,18 @@ def delete_customer_group(group_id: int, current_user: dict = Depends(get_curren
             raise HTTPException(status_code=400, detail="لا يمكن حذف المجموعة لأنها مرتبطة بعملاء")
         db.execute(text("DELETE FROM party_groups WHERE id = :id"), {"id": group_id})
         db.commit()
+
+        log_activity(
+            db,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            username=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            action="sales.customer_group.delete",
+            resource_type="customer_group",
+            resource_id=str(group_id),
+            details=None,
+            request=request
+        )
+
         return {"success": True}
     except HTTPException:
         raise

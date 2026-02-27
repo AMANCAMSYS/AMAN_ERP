@@ -240,6 +240,7 @@ const DocumentManagement = React.lazy(() => import('./pages/Services/DocumentMan
 
 // Common & Settings
 const CompanySettings = React.lazy(() => import('./pages/Settings/CompanySettings'))
+const CompanyProfile = React.lazy(() => import('./pages/Settings/CompanyProfile'))
 const Branches = React.lazy(() => import('./pages/Settings/Branches'))
 const CostingPolicy = React.lazy(() => import('./pages/Settings/CostingPolicy'))
 const ApiKeys = React.lazy(() => import('./pages/Settings/ApiKeys'))
@@ -354,6 +355,7 @@ function App() {
                 <Route path="/sales" element={<PrivateRoute permission="sales.view"><SalesHome /></PrivateRoute>} />
                 <Route path="/sales/customers" element={<PrivateRoute permission="sales.view"><CustomerList /></PrivateRoute>} />
                 <Route path="/sales/customers/new" element={<PrivateRoute permission="sales.view"><CustomerForm /></PrivateRoute>} />
+                <Route path="/sales/customers/:id/edit" element={<PrivateRoute permission="sales.view"><CustomerForm /></PrivateRoute>} />
                 <Route path="/sales/customers/:id" element={<PrivateRoute permission="sales.view"><CustomerDetails /></PrivateRoute>} />
                 <Route path="/sales/invoices" element={<PrivateRoute permission="sales.view"><InvoiceList /></PrivateRoute>} />
                 <Route path="/sales/invoices/new" element={<PrivateRoute permission="sales.view"><InvoiceForm /></PrivateRoute>} />
@@ -548,6 +550,7 @@ function App() {
                 <Route path="/services/documents" element={<PrivateRoute permission="services.view"><DocumentManagement /></PrivateRoute>} />
 
                 <Route path="/settings" element={<PrivateRoute permission="settings.view"><CompanySettings /></PrivateRoute>} />
+                <Route path="/admin/company-profile" element={<PrivateRoute><CompanyProfile /></PrivateRoute>} />
                 <Route path="/settings/branches" element={<PrivateRoute permission="branches.view"><Branches /></PrivateRoute>} />
                 <Route path="/settings/costing-policy" element={<PrivateRoute permission="settings.view"><CostingPolicy /></PrivateRoute>} />
                 <Route path="/settings/api-keys" element={<PrivateRoute permission="settings.view"><ApiKeys /></PrivateRoute>} />

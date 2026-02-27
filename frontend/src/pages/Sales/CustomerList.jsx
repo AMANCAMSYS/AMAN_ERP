@@ -62,17 +62,18 @@ function CustomerList() {
                     <thead>
                         <tr>
                             <th style={{ width: '12%' }}>{t('sales.customers.table.code')}</th>
-                            <th style={{ width: '28%' }}>{t('sales.customers.table.name')}</th>
+                            <th style={{ width: '25%' }}>{t('sales.customers.table.name')}</th>
                             <th style={{ width: '20%' }}>{t('sales.customers.table.contact')}</th>
-                            <th style={{ width: '20%' }}>{t('sales.customers.table.balance')}</th>
-                            <th style={{ width: '15%' }}>{t('sales.customers.table.status')}</th>
-                            <th style={{ width: '15%' }}>{t('sales.customers.table.added_date')}</th>
+                            <th style={{ width: '15%' }}>{t('sales.customers.table.balance')}</th>
+                            <th style={{ width: '10%' }}>{t('sales.customers.table.status')}</th>
+                            <th style={{ width: '10%' }}>{t('sales.customers.table.added_date')}</th>
+                            <th style={{ width: '8%', textAlign: 'center' }}>{t('common.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {customers.length === 0 ? (
                             <tr>
-                                <td colSpan="6" className="start-guide">
+                                <td colSpan="7" className="start-guide">
                                     <div style={{ padding: '60px 20px', textAlign: 'center' }}>
                                         <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
                                         <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('sales.customers.no_customers')}</h3>
@@ -142,12 +143,22 @@ function CustomerList() {
                                         </div>
                                     </td>
                                     <td>
-                                        <span className={`badge ${customer.is_active ? 'badge-success' : 'badge-danger'}`}>
-                                            {customer.is_active ? t('sales.customers.status.active') : t('sales.customers.status.inactive')}
+                                        <span className={`badge ${customer.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                                            {customer.status === 'active' ? t('sales.customers.status.active') : t('sales.customers.status.inactive')}
                                         </span>
                                     </td>
                                     <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
                                         {formatShortDate(customer.created_at)}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            className="btn btn-icon"
+                                            title={t('common.edit', 'Edit')}
+                                            onClick={() => navigate(`/sales/customers/${customer.id}/edit`)}
+                                            style={{ padding: '4px', color: 'var(--primary)' }}
+                                        >
+                                            ✏️
+                                        </button>
                                     </td>
                                 </tr>
                             ))

@@ -70,3 +70,24 @@ export { crmAPI } from './crm'
 
 // External Integrations
 export { externalAPI } from './external'
+
+// Approvals
+export { approvalsAPI } from './approvals'
+
+// Security
+export { securityAPI } from './security'
+
+// Data Import
+export { dataImportAPI } from './dataImport'
+
+// Dashboard
+export { dashboardAPI } from './dashboard'
+
+// Services
+export { servicesAPI } from './services'
+
+// Audit
+export { auditAPI } from './audit'
+
+// Parties
+export { partiesAPI } from './parties'

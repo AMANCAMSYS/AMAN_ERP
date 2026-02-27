@@ -14,6 +14,7 @@ function SupplierForm() {
     const { currentBranch } = useBranch()
     const [loading, setLoading] = useState(false)
     const [currencies, setCurrencies] = useState([])
+    const [supplierGroups, setSupplierGroups] = useState([])
     const [error, setError] = useState(null)
     const [formData, setFormData] = useState({
         name: '',
@@ -22,7 +23,8 @@ function SupplierForm() {
         phone: '',
         tax_number: '',
         address: '',
-        currency: getCurrency()
+        currency: getCurrency(),
+        group_id: ''
     })
 
     useEffect(() => {
@@ -39,7 +41,8 @@ function SupplierForm() {
                     phone: s.phone || '',
                     tax_number: s.tax_number || '',
                     address: s.address || '',
-                    currency: s.currency || getCurrency()
+                    currency: s.currency || getCurrency(),
+                    group_id: s.group_id || ''
                 })
             } catch (err) {
                 setError(t('common.error_loading'))
@@ -48,16 +51,20 @@ function SupplierForm() {
             }
         }
 
-        const fetchCurrencies = async () => {
+        const fetchCurrenciesAndGroups = async () => {
             try {
-                const res = await currenciesAPI.list()
-                if (res.data) setCurrencies(res.data.filter(c => c.is_active))
+                const [curRes, groupRes] = await Promise.all([
+                    currenciesAPI.list(),
+                    purchasesAPI.listSupplierGroups({ branch_id: currentBranch?.id })
+                ]);
+                if (curRes.data) setCurrencies(curRes.data.filter(c => c.is_active));
+                if (groupRes.data) setSupplierGroups(groupRes.data.filter(g => g.status === 'active'));
             } catch (err) {
-                console.error("Failed to fetch currencies", err)
+                console.error("Failed to fetch currencies or groups", err);
             }
         }
         fetchSupplierData()
-        fetchCurrencies()
+        fetchCurrenciesAndGroups()
     }, [id, isEdit, currentBranch?.id, t])
 
     const handleSubmit = async (e) => {
@@ -66,10 +73,16 @@ function SupplierForm() {
         setError(null)
 
         try {
+            const payload = {
+                ...formData,
+                branch_id: currentBranch?.id,
+                group_id: formData.group_id ? parseInt(formData.group_id) : null
+            };
+
             if (isEdit) {
-                await inventoryAPI.updateSupplier(id, { ...formData, branch_id: currentBranch?.id })
+                await inventoryAPI.updateSupplier(id, payload)
             } else {
-                await inventoryAPI.createSupplier({ ...formData, branch_id: currentBranch?.id })
+                await inventoryAPI.createSupplier(payload)
             }
             navigate(isEdit ? `/buying/suppliers/${id}` : '/buying/suppliers')
         } catch (err) {
@@ -98,82 +111,126 @@ function SupplierForm() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <h1 className="workspace-title">{isEdit ? t('buying.suppliers.form.title_edit') : t('buying.suppliers.form.title_new')}</h1>
+                <div>
+                    <h1 className="workspace-title">{isEdit ? t('buying.suppliers.form.title_edit') : t('buying.suppliers.form.title_new')}</h1>
+                    <p className="workspace-subtitle">{isEdit ? t('buying.suppliers.form.subtitle_edit', 'Update supplier information') : t('buying.suppliers.form.subtitle_new', 'Add a new supplier to your system')}</p>
+                </div>
             </div>
 
-            <div className="card" style={{ maxWidth: '800px' }}>
+            <div className="card" style={{ maxWidth: '900px', margin: '0 auto', padding: '32px', boxShadow: 'var(--shadow-lg)' }}>
                 {error && <div className="alert alert-error mb-4">{error}</div>}
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-section">
-                        <h3 className="section-title">{t('buying.suppliers.form.basic_info')}</h3>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.suppliers.form.name_ar')} *</label>
-                                <input
-                                    type="text" name="name" className="form-input" required
-                                    value={formData.name} onChange={handleChange}
-                                />
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div className="form-section-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
+                                <span style={{ fontSize: '24px' }}>🏢</span> {t('buying.suppliers.form.basic_info')}
+                            </h3>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.suppliers.form.name_ar')} *</label>
+                                    <input
+                                        type="text" name="name" className="form-input" required
+                                        value={formData.name} onChange={handleChange}
+                                        placeholder={t('buying.suppliers.form.name_ar')}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.suppliers.form.name_en')}</label>
+                                    <input
+                                        type="text" name="name_en" className="form-input"
+                                        value={formData.name_en} onChange={handleChange}
+                                        placeholder="e.g. Al-Noor Trading"
+                                    />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.suppliers.form.name_en')}</label>
-                                <input
-                                    type="text" name="name_en" className="form-input"
-                                    value={formData.name_en} onChange={handleChange}
-                                />
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.suppliers.form.tax_number')}</label>
+                                    <input
+                                        type="text" name="tax_number" className="form-input"
+                                        value={formData.tax_number} onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('common.currency')}</label>
+                                    <select
+                                        name="currency"
+                                        className="form-input"
+                                        value={formData.currency}
+                                        onChange={handleChange}
+                                    >
+                                        {currencies.map(c => (
+                                            <option key={c.id} value={c.code}>
+                                                {c.name} ({c.code})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.supplier_groups.title')}</label>
+                                    <div className="input-group">
+                                        <select
+                                            name="group_id"
+                                            className="form-input"
+                                            value={formData.group_id || ''}
+                                            onChange={handleChange}
+                                        >
+                                            <option value="">{t('common.select')}</option>
+                                            {supplierGroups.map(g => (
+                                                <option key={g.id} value={g.id}>
+                                                    {g.group_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={() => window.open('/buying/supplier-groups', '_blank')}
+                                            title={t('buying.suppliers.form.quick_add_group')}
+                                            style={{ padding: '0 12px' }}
+                                        >
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    {/* Spacer */}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.suppliers.form.tax_number')}</label>
-                                <input
-                                    type="text" name="tax_number" className="form-input"
-                                    value={formData.tax_number} onChange={handleChange}
-                                />
+                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                            <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
+                                <span style={{ fontSize: '24px' }}>📞</span> {t('buying.suppliers.form.contact_info')}
+                            </h3>
+                            <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.suppliers.form.phone')}</label>
+                                    <input
+                                        type="tel" name="phone" className="form-input"
+                                        value={formData.phone} onChange={handleChange}
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label className="form-label">{t('buying.suppliers.form.email')}</label>
+                                    <input
+                                        type="email" name="email" className="form-input"
+                                        value={formData.email} onChange={handleChange}
+                                    />
+                                </div>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.currency')}</label>
-                                <select
-                                    name="currency"
-                                    className="form-input"
-                                    value={formData.currency}
-                                    onChange={handleChange}
-                                >
-                                    {currencies.map(c => (
-                                        <option key={c.id} value={c.code}>
-                                            {c.name} ({c.code})
-                                        </option>
-                                    ))}
-                                </select>
+                            <div className="form-group" style={{ marginTop: '24px', marginBottom: 0 }}>
+                                <label className="form-label">{t('buying.suppliers.form.address')}</label>
+                                <textarea
+                                    name="address" className="form-input" rows="3"
+                                    value={formData.address} onChange={handleChange}
+                                ></textarea>
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="form-section">
-                        <h3 className="section-title">{t('buying.suppliers.form.contact_info')}</h3>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.suppliers.form.phone')}</label>
-                                <input
-                                    type="tel" name="phone" className="form-input"
-                                    value={formData.phone} onChange={handleChange}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.suppliers.form.email')}</label>
-                                <input
-                                    type="email" name="email" className="form-input"
-                                    value={formData.email} onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">{t('buying.suppliers.form.address')}</label>
-                            <textarea
-                                name="address" className="form-input" rows="3"
-                                value={formData.address} onChange={handleChange}
-                            ></textarea>
                         </div>
                     </div>
 

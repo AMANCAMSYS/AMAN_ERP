@@ -11,6 +11,7 @@ class PurchaseLineItem(BaseModel):
     unit_price: float
     tax_rate: float
     discount: float = 0.0
+    markup: float = 0.0
 
 
 class PurchaseCreate(BaseModel):
@@ -30,12 +31,19 @@ class PurchaseCreate(BaseModel):
     treasury_id: Optional[int] = None
     is_prepayment: bool = False
 
+    # Group effects
+    effect_type: str = "discount"
+    effect_percentage: float = 0.0
+    markup_amount: float = 0.0
+
 
 class SupplierGroupCreate(BaseModel):
     group_name: str
     group_name_en: Optional[str] = None
     description: Optional[str] = None
     discount_percentage: float = 0.0
+    effect_type: str = "discount"
+    application_scope: str = "total"
     payment_days: int = 30
     branch_id: Optional[int] = None
     status: str = "active"
@@ -50,6 +58,11 @@ class POCreate(BaseModel):
     branch_id: Optional[int] = None
     currency: Optional[str] = None
     exchange_rate: Optional[float] = 1.0
+
+    # Group effects
+    effect_type: str = "discount"
+    effect_percentage: float = 0.0
+    markup_amount: float = 0.0
 
 
 class ReceiveItem(BaseModel):

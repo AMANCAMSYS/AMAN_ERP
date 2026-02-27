@@ -1047,14 +1047,13 @@ def create_fiscal_year(
                 # Only create if within fiscal year range
                 if end_d >= data.start_date and start_d <= data.end_date:
                     db.execute(text("""
-                        INSERT INTO fiscal_periods (name, start_date, end_date, fiscal_year, fiscal_year_id, is_closed)
-                        VALUES (:name, :start, :end, :year, :fy_id, false)
+                        INSERT INTO fiscal_periods (name, start_date, end_date, fiscal_year, is_closed)
+                        VALUES (:name, :start, :end, :year, false)
                     """), {
                         "name": f"{months_ar[m-1]} {data.year}",
                         "start": start_d,
                         "end": end_d,
-                        "year": data.year,
-                        "fy_id": fy_id
+                        "year": data.year
                     })
 
         db.commit()

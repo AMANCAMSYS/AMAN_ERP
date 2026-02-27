@@ -35,7 +35,7 @@ export default function ExpenseList() {
     if (!branchLoading) {
       loadData();
     }
-  }, [currentBranch, branchLoading]);
+  }, [currentBranch, branchLoading, filters]);
 
   const loadData = async () => {
     try {
@@ -169,7 +169,7 @@ export default function ExpenseList() {
             <button className="btn btn-primary btn-sm" onClick={() => navigate('/expenses/new')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
               <Plus size={14} /> {t('expenses.addNew')}
             </button>
-            <button className="btn btn-outline" onClick={() => { setFilters({ ...filters, approval_status: 'pending' }); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+            <button className="btn btn-outline" onClick={() => setFilters({ ...filters, approval_status: 'pending' })} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
               <Clock size={14} /> {t('expenses.status.pending')}
             </button>
           </div>
@@ -202,10 +202,10 @@ export default function ExpenseList() {
             🔍 {t('common.filter', 'تصفية')}
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-            <button className="btn btn-outline" onClick={() => { setFilters({ expense_type: '', approval_status: '', start_date: '', end_date: '' }); setSearch(''); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
+            <button className="btn btn-outline" onClick={() => { setFilters({ expense_type: '', approval_status: '', start_date: '', end_date: '' }); setSearch(''); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
               ✕ {t('common.clear_filters', 'مسح الفلاتر')}
             </button>
-            <button className="btn btn-outline" onClick={() => { setFilters({ ...filters, approval_status: 'approved' }); setTimeout(loadData, 0); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
+            <button className="btn btn-outline" onClick={() => setFilters({ ...filters, approval_status: 'approved' })} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
               ✅ {t('expenses.status.approved')}
             </button>
           </div>

@@ -2,18 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportsAPI } from '../../../utils/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import CustomDatePicker from '../../../components/common/CustomDatePicker';
 
 const LeaveReport = () => {
     const { t } = useTranslation();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [dates, setDates] = useState({
+        start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
 
     const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await reportsAPI.getLeaveUsage();
+                setLoading(true);
+                const response = await reportsAPI.getLeaveUsage({ start_date: dates.start, end_date: dates.end });
                 // Map leave types to translated labels
                 const formattedData = response.data.map(item => ({
                     ...item,
@@ -27,12 +33,25 @@ const LeaveReport = () => {
             }
         };
         fetchData();
-    }, [t]);
+    }, [t, dates]);
 
     if (loading) return <div className="text-center py-5"><span className="loading"></span></div>;
 
     return (
         <div className="fade-in">
+            {/* Date Filters */}
+            <div className="display-flex gap-3 mb-4 align-center flex-wrap">
+                <CustomDatePicker
+                    label={t('common.start_date')}
+                    selected={dates.start}
+                    onChange={(d) => setDates(prev => ({ ...prev, start: d }))}
+                />
+                <CustomDatePicker
+                    label={t('common.end_date')}
+                    selected={dates.end}
+                    onChange={(d) => setDates(prev => ({ ...prev, end: d }))}
+                />
+            </div>
             <div className="row">
                 {/* Stats Cards */}
                 <div className="col-md-12 mb-4">
