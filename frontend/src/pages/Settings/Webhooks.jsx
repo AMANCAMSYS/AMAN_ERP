@@ -5,6 +5,7 @@ import '../../components/ModuleStyles.css';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 const EVENT_LABELS = {
   'invoice.created': 'settings.webhooks.evt_invoice_created',
@@ -38,6 +39,7 @@ const EMPTY_FORM = {
 
 export default function Webhooks() {
   const { t } = useTranslation();
+  const { showToast } = useToast()
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [availableEvents, setAvailableEvents] = useState([]);
@@ -117,7 +119,7 @@ export default function Webhooks() {
       fetchWebhooks();
     } catch (err) {
       console.error(err);
-      alert(t('settings.webhooks.error_save'));
+      showToast(t('settings.webhooks.error_save', 'error'));
     } finally {
       setSubmitting(false);
     }
@@ -130,7 +132,7 @@ export default function Webhooks() {
       fetchWebhooks();
     } catch (e) {
       console.error(e);
-      alert(t('settings.webhooks.error_delete'));
+      showToast(t('settings.webhooks.error_delete', 'error'));
     }
   };
 

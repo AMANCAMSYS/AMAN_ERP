@@ -4,6 +4,7 @@ import * as LucideIcons from 'lucide-react';
 import api from '../../utils/api';
 import { hasPermission, getUser } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 import './RoleManagement.css';
 
 const DynamicIcon = ({ name, size = 18, ...props }) => {
@@ -273,6 +274,7 @@ const RoleManagement = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+                <BackButton />
                 <div>
                     <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span className="p-2 rounded-lg" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', borderRadius: 10, padding: '8px', display: 'inline-flex' }}>

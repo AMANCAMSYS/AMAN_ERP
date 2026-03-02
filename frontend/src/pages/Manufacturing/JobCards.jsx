@@ -86,7 +86,7 @@ export default function JobCards() {
                                     <span className="badge" style={{ background: style.color, color: '#fff' }}>
                                         {t(`manufacturing.status.${op.status}`, op.status)}
                                     </span>
-                                    <Link to={`/manufacturing/orders/${op.order_id}`} style={{ color: 'var(--text-muted)', fontSize: '13px', textDecoration: 'none' }}>#{op.order_number}</Link>
+                                    <Link to={`/manufacturing/orders/${op.production_order_id}`} style={{ color: 'var(--text-muted)', fontSize: '13px', textDecoration: 'none' }}>#{op.order_number}</Link>
                                 </div>
                                 <div style={{ padding: '20px' }}>
                                     <h5 style={{ fontWeight: 700, marginBottom: '6px', fontSize: '15px' }}>{op.operation_description || op.operation_name}</h5>
@@ -97,7 +97,7 @@ export default function JobCards() {
                                     <div style={{ background: 'var(--bg-hover)', borderRadius: '10px', padding: '12px', marginBottom: '16px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                                             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.planned_time')}:</span>
-                                            <span style={{ fontWeight: 700, fontSize: '13px' }}>{op.planned_cycle_time} {t('common.minutes')}</span>
+                                            <span style={{ fontWeight: 700, fontSize: '13px' }}>{op.cycle_time || op.setup_time || '-'} {t('common.minutes')}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{t('manufacturing.job_cards.actual_time')}:</span>

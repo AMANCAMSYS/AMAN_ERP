@@ -4,6 +4,8 @@ import { taxesAPI } from '../../services/taxes';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 const TAX_TYPES = [
     { value: 'vat', label: 'ضريبة القيمة المضافة' },
@@ -24,6 +26,7 @@ const STATUS_COLORS = {
 
 function TaxCalendar() {
     const { t } = useTranslation();
+  const { showToast } = useToast()
     const [items, setItems] = useState([]);
     const [summary, setSummary] = useState({});
     const [loading, setLoading] = useState(true);
@@ -87,7 +90,7 @@ function TaxCalendar() {
             setShowModal(false);
             loadData();
         } catch (e) {
-            alert(e.response?.data?.detail || 'Error');
+            showToast(e.response?.data?.detail || 'Error', 'error');
         }
     };
 
@@ -97,7 +100,7 @@ function TaxCalendar() {
             await taxesAPI.completeCalendarItem(item.id);
             loadData();
         } catch (e) {
-            alert('Error');
+            showToast('Error', 'error');
         }
     };
 
@@ -107,7 +110,7 @@ function TaxCalendar() {
             await taxesAPI.deleteCalendarItem(item.id);
             loadData();
         } catch (e) {
-            alert('Error');
+            showToast('Error', 'error');
         }
     };
 
@@ -266,7 +269,7 @@ function TaxCalendar() {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('tax_calendar.due_date', 'تاريخ الاستحقاق')} *</label>
-                                    <input type="date" className="form-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
+                                    <DateInput className="form-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
                                 </div>
                                 <div className="form-group">
                                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

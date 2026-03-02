@@ -31,10 +31,21 @@ const CustomDatePicker = ({
 
     return (
         <div className={`custom-datepicker-container ${className}`}>
-            {label && <label htmlFor={id} className="form-label">{label}{required && <span className="text-red-500"> *</span>}</label>}
-            <div className="relative flex items-center">
-                <div className={`absolute ${isRtl ? 'left-3' : 'right-3'} z-10 text-base-content/40`}>
-                    <Calendar size={18} />
+            {label && <label htmlFor={id} className="form-label">{label}{required && <span style={{ color: 'var(--danger, #ef4444)' }}> *</span>}</label>}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{
+                    position: 'absolute',
+                    [isRtl ? 'left' : 'right']: (isClearable && selected) ? '34px' : '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 2,
+                    pointerEvents: 'none',
+                    color: 'var(--text-muted, #9ca3af)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    transition: 'left 0.2s ease, right 0.2s ease',
+                }}>
+                    <Calendar size={16} />
                 </div>
                 <DatePicker
                     id={id}
@@ -44,9 +55,11 @@ const CustomDatePicker = ({
                     dateFormat="yyyy/MM/dd"
                     locale="ar-sa"
                     placeholderText={placeholder || "YYYY/MM/DD"}
-                    className="form-input w-full pr-10"
+                    className="form-input w-full"
                     isClearable={isClearable}
                     autoComplete="off"
+                    portalId="datepicker-portal"
+                    popperPlacement="bottom-start"
                 />
             </div>
         </div>

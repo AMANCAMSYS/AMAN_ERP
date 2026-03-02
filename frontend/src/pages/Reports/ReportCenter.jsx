@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { hasPermission } from '../../utils/auth';
+import BackButton from '../../components/common/BackButton';
 
 const ReportCenter = () => {
     const { t, i18n } = useTranslation();
@@ -26,7 +27,8 @@ const ReportCenter = () => {
             permission: 'buying.reports',
             reports: [
                 { name: t('reports_center.reports.buying_analytics'), path: '/buying/reports/analytics', desc: t('reports_center.reports.buying_analytics_desc') },
-                { name: t('reports_center.reports.supplier_statement'), path: '/buying/reports/supplier-statement', desc: t('reports_center.reports.supplier_statement_desc') }
+                { name: t('reports_center.reports.supplier_statement'), path: '/buying/reports/supplier-statement', desc: t('reports_center.reports.supplier_statement_desc') },
+                { name: t('purchases_aging.title'), path: '/buying/reports/aging', desc: t('purchases_aging.subtitle') }
             ]
         },
         {
@@ -50,6 +52,9 @@ const ReportCenter = () => {
                 { name: t('accounting.home.links.income_statement'), path: '/accounting/income-statement', desc: t('accounting.income_statement.subtitle') },
                 { name: t('accounting.home.links.balance_sheet'), path: '/accounting/balance-sheet', desc: t('accounting.balance_sheet.subtitle') },
                 { name: t('reports_center.reports.cashflow'), path: '/accounting/cashflow', desc: t('reports_center.reports.cashflow_desc') },
+                { name: t('cashflow_ias7.title'), path: '/reports/cashflow-ias7', desc: t('cashflow_ias7.subtitle') },
+                { name: t('fx_report.title'), path: '/reports/fx-gain-loss', desc: t('fx_report.subtitle') },
+                { name: t('consolidation.title'), path: '/reports/consolidation', desc: t('consolidation.subtitle') },
                 { name: t('reports.detailed_pl.title', 'Detailed P&L'), path: '/reports/detailed-pl', desc: t('reports_center.reports.detailed_pl_desc', 'Profit & loss breakdown by customer, product, or category') }
             ]
         },
@@ -60,7 +65,8 @@ const ReportCenter = () => {
             permission: 'treasury.view',
             reports: [
                 { name: t('reports_center.reports.treasury_balances'), path: '/treasury/reports/balances', desc: t('reports_center.reports.treasury_balances_desc') },
-                { name: t('reports_center.reports.treasury_cashflow'), path: '/treasury/reports/cashflow', desc: t('reports_center.reports.treasury_cashflow_desc') }
+                { name: t('reports_center.reports.treasury_cashflow'), path: '/treasury/reports/cashflow', desc: t('reports_center.reports.treasury_cashflow_desc') },
+                { name: t('checks_aging.title'), path: '/treasury/reports/checks-aging', desc: t('checks_aging.subtitle') }
             ]
         },
         {
@@ -71,6 +77,15 @@ const ReportCenter = () => {
             reports: [
                 { name: t('reports_center.reports.production_analytics', 'Production Analytics'), path: '/manufacturing/reports/analytics', desc: t('reports_center.reports.production_analytics_desc', 'Monitor production output and efficiency') },
                 { name: t('reports_center.reports.work_order_status', 'Work Order Status'), path: '/manufacturing/reports/work-orders', desc: t('reports_center.reports.work_order_status_desc', 'Track status and progress of work orders') }
+            ]
+        },
+        {
+            title: t('reports_center.groups.assets', 'Fixed Assets'),
+            icon: '🏗️',
+            color: '#D97706',
+            permission: 'assets.view',
+            reports: [
+                { name: t('asset_reports.title'), path: '/assets/reports', desc: t('asset_reports.subtitle') }
             ]
         },
         {
@@ -122,6 +137,7 @@ const ReportCenter = () => {
         <div className="workspace fade-in">
             {/* Header Section */}
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">📈 {t('reports_center.title')}</h1>
                     <p className="workspace-subtitle">{t('reports_center.subtitle')}</p>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { Calendar, TrendingUp, TrendingDown, CheckCircle, AlertTriangle } from 'lucide-react'
+import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
@@ -98,13 +99,16 @@ export default function OpeningBalances() {
         <div className="module-container" dir={i18n.dir()}>
             <div className="module-header">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        <h2>📋 {t('opening.title')}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <BackButton />
+                        <div>
+                            <h2>📋 {t('opening.title')}</h2>
                         {entryInfo && (
                             <small className="text-muted">
                                 {t('opening.entry_number')}{entryInfo.entry_number} — {formatDate(entryInfo.entry_date)}
                             </small>
                         )}
+                        </div>
                     </div>
                     <div className="d-flex align-items-center gap-2">
                         <DateInput className="form-input form-input-sm"

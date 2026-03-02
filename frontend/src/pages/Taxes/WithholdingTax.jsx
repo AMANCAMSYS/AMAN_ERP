@@ -7,9 +7,11 @@ import '../../components/ModuleStyles.css'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 export default function WithholdingTax() {
     const { t, i18n } = useTranslation()
+  const { showToast } = useToast()
     const isRTL = i18n.language === 'ar'
     const currency = getCurrency()
     const [activeTab, setActiveTab] = useState('rates')
@@ -93,7 +95,7 @@ export default function WithholdingTax() {
             fetchRates()
         } catch (e) {
             console.error(e)
-            alert(t('wht.error_creating_rate'))
+            showToast(t('wht.error_creating_rate', 'error'))
         } finally {
             setRateSubmitting(false)
         }
@@ -110,7 +112,7 @@ export default function WithholdingTax() {
             setCalcResult(res.data ?? res)
         } catch (e) {
             console.error(e)
-            alert(t('wht.error_calculating'))
+            showToast(t('wht.error_calculating', 'error'))
         } finally {
             setCalcLoading(false)
         }
@@ -131,7 +133,7 @@ export default function WithholdingTax() {
             fetchTransactions()
         } catch (e) {
             console.error(e)
-            alert(t('wht.error_creating_tx'))
+            showToast(t('wht.error_creating_tx', 'error'))
         } finally {
             setTxSubmitting(false)
         }

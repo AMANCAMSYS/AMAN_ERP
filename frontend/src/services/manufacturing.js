@@ -70,4 +70,21 @@ export const manufacturingAPI = {
     createQCCheck: (orderId, data) => api.post(`/manufacturing/orders/${orderId}/qc-checks`, data),
     getQCFailures: (params) => api.get('/manufacturing/qc-checks/failures', { params }),
     recordQCResult: (qcId, data) => api.post(`/manufacturing/qc-checks/${qcId}/record-result`, data),
+
+    // Equipment - Extended
+    updateEquipment: (id, data) => api.put(`/manufacturing/equipment/${id}`, data),
+    deleteEquipment: (id) => api.delete(`/manufacturing/equipment/${id}`),
+
+    // MRP Plans
+    listMRPPlans: (params) => api.get('/manufacturing/mrp/plans', { params }),
+
+    // Costing
+    calculateOrderCost: (orderId) => api.post(`/manufacturing/orders/${orderId}/calculate-cost`),
+    getCostVarianceReport: (params) => api.get('/manufacturing/cost-variance-report', { params }),
+
+    // OEE & Capacity Planning (B4)
+    calculateOEE: (params) => api.get('/manufacturing/oee', { params }),
+    listCapacityPlans: (params) => api.get('/manufacturing/capacity-plans', { params }),
+    createCapacityPlan: (data) => api.post('/manufacturing/capacity-plans', data),
+    updateCapacityPlan: (id, data) => api.put(`/manufacturing/capacity-plans/${id}`, data),
 }

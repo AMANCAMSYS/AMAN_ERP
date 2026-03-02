@@ -148,6 +148,7 @@ AVAILABLE_PERMISSIONS = [
     # ═══════════════════════ Approvals ═══════════════════════
     {"key": "approvals.view", "section": "approvals", "label_ar": "عرض طلبات الاعتماد", "label_en": "View Approval Requests"},
     {"key": "approvals.create", "section": "approvals", "label_ar": "إنشاء طلبات اعتماد", "label_en": "Create Approval Requests"},
+    {"key": "approvals.edit", "section": "approvals", "label_ar": "تعديل سلاسل الاعتماد", "label_en": "Edit Approval Workflows"},
     {"key": "approvals.approve", "section": "approvals", "label_ar": "اعتماد / رفض الطلبات", "label_en": "Approve / Reject Requests"},
     {"key": "approvals.manage", "section": "approvals", "label_ar": "إدارة سلاسل الاعتماد", "label_en": "Manage Approval Workflows"},
 
@@ -183,6 +184,20 @@ AVAILABLE_PERMISSIONS = [
     {"key": "settings.manage", "section": "settings", "label_ar": "إدارة الإعدادات العامة", "label_en": "Manage General Settings"},
     {"key": "settings.create", "section": "settings", "label_ar": "إضافة إعدادات", "label_en": "Create Settings"},
     {"key": "settings.delete", "section": "settings", "label_ar": "حذف إعدادات", "label_en": "Delete Settings"},
+
+    # ═══════════════════════ Services & Documents ═══════════════════════
+    {"key": "services.view", "section": "services", "label_ar": "عرض طلبات الخدمة والمستندات", "label_en": "View Service Requests & Documents"},
+    {"key": "services.create", "section": "services", "label_ar": "إنشاء طلبات خدمة ومستندات", "label_en": "Create Service Requests & Documents"},
+    {"key": "services.edit", "section": "services", "label_ar": "تعديل طلبات الخدمة", "label_en": "Edit Service Requests"},
+    {"key": "services.delete", "section": "services", "label_ar": "حذف طلبات الخدمة", "label_en": "Delete Service Requests"},
+
+    # ═══════════════════════ Parties ═══════════════════════
+    {"key": "parties.view", "section": "parties", "label_ar": "عرض الأطراف (عملاء/موردين)", "label_en": "View Parties (Customers/Suppliers)"},
+    {"key": "parties.manage", "section": "parties", "label_ar": "إدارة الأطراف", "label_en": "Manage Parties"},
+
+    # ═══════════════════════ Purchases (Landed Costs aliases) ═══════════════════════
+    {"key": "purchases.view", "section": "buying", "label_ar": "عرض التكاليف المحملة", "label_en": "View Landed Costs"},
+    {"key": "purchases.create", "section": "buying", "label_ar": "إنشاء تكاليف محملة", "label_en": "Create Landed Costs"},
 ]
 
 # Section labels for the frontend permission picker UI
@@ -210,6 +225,8 @@ PERMISSION_SECTIONS = {
     "audit": {"label_ar": "المراقبة", "label_en": "Audit", "icon": "Eye"},
     "security": {"label_ar": "الأمان", "label_en": "Security", "icon": "Shield"},
     "data_import": {"label_ar": "استيراد البيانات", "label_en": "Data Import", "icon": "Upload"},
+    "services": {"label_ar": "الخدمات والمستندات", "label_en": "Services & Documents", "icon": "Wrench"},
+    "parties": {"label_ar": "الأطراف", "label_en": "Parties", "icon": "Users2"},
     "admin": {"label_ar": "الإدارة", "label_en": "Admin", "icon": "Settings"},
     "branches": {"label_ar": "الفروع", "label_en": "Branches", "icon": "GitBranch"},
     "settings": {"label_ar": "إعدادات النظام", "label_en": "System Settings", "icon": "Cog"},

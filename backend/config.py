@@ -3,6 +3,7 @@ AMAN ERP - Configuration Settings
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import Optional
 from functools import lru_cache
 
@@ -45,6 +46,24 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"          # development | staging | production
     SENTRY_DSN: str = ""                  # Leave empty to disable Sentry
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+
+    # ── SEC-008: Validate SECRET_KEY strength ─────────────────
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError(
+                "SECRET_KEY must be at least 32 characters long. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        # Check entropy — reject keys that are all the same repeated character or trivially guessable
+        unique_chars = len(set(v))
+        if unique_chars < 8:
+            raise ValueError(
+                "SECRET_KEY has insufficient entropy (too many repeated characters). "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        return v
     
     @property
     def DATABASE_URL(self) -> str:
@@ -69,3 +88,32 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def setup_pgpass():
+    """
+    SEC-006: Write a .pgpass file so that CLI tools (psql, pg_dump, etc.)
+    never need PGPASSWORD in the environment.  File is chmod 0600.
+    """
+    import os, stat
+    pgpass_path = os.path.expanduser("~/.pgpass")
+    line = f"{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}:*:{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+    
+    # Read existing content to avoid duplicates
+    existing = ""
+    if os.path.exists(pgpass_path):
+        with open(pgpass_path, "r") as f:
+            existing = f.read()
+    
+    if line not in existing:
+        with open(pgpass_path, "a") as f:
+            f.write(line + "\n")
+    
+    os.chmod(pgpass_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+
+    # Remove PGPASSWORD from environment if set (defense-in-depth)
+    os.environ.pop("PGPASSWORD", None)
+
+
+# Run on import
+setup_pgpass()

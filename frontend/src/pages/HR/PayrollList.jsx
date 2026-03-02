@@ -132,7 +132,7 @@ const PayrollList = () => {
                 <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
             </div>
 
-            {/* Create Modal */}}
+            {/* Create Modal */}
             {showModal && (
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '500px' }}>

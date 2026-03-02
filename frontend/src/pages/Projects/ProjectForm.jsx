@@ -140,7 +140,7 @@ export default function ProjectForm() {
 
             <form onSubmit={handleSubmit}>
                 {/* Basic Info Card */}
-                <div className="card section-card border-0 shadow-sm mb-4">
+                <div className="card section-card mb-4">
                     <div className="card-body">
                         <div className="d-flex align-items-center gap-2 mb-4">
                             <div style={{
@@ -200,7 +200,7 @@ export default function ProjectForm() {
                 </div>
 
                 {/* People Card */}
-                <div className="card section-card border-0 shadow-sm mb-4">
+                <div className="card section-card mb-4">
                     <div className="card-body">
                         <div className="d-flex align-items-center gap-2 mb-4">
                             <div style={{
@@ -239,7 +239,7 @@ export default function ProjectForm() {
                 </div>
 
                 {/* Schedule & Budget Card */}
-                <div className="card section-card border-0 shadow-sm mb-4">
+                <div className="card section-card mb-4">
                     <div className="card-body">
                         <div className="d-flex align-items-center gap-2 mb-4">
                             <div style={{

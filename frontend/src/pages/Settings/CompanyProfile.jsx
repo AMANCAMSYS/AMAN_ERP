@@ -61,7 +61,7 @@ const CompanyProfile = () => {
             <div className="row g-4">
                 {/* Logo Card */}
                 <div className="col-md-4">
-                    <div className="card shadow-sm border-0 h-100" style={{ borderRadius: '24px' }}>
+                    <div className="card h-100">
                         <div className="card-body text-center p-5">
                             <div className="mx-auto mb-4 relative group" style={{ width: '150px', height: '150px' }}>
                                 <div className="w-100 h-100 rounded-circle bg-light border-2 border-dashed d-flex align-items-center justify-content-center overflow-hidden">
@@ -87,8 +87,8 @@ const CompanyProfile = () => {
 
                 {/* Info Card */}
                 <div className="col-md-8">
-                    <div className="card shadow-sm border-0" style={{ borderRadius: '24px' }}>
-                        <div className="card-body p-4">
+                    <div className="card">
+                        <div >
                             <h3 className="h5 fw-bold mb-4 border-bottom pb-3">{t('auth.company_info')}</h3>
                             <div className="row g-4">
                                 {details.map((item, idx) => (

@@ -6,6 +6,8 @@ import { notificationsAPI } from '../utils/api' // New generic API
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../context/BranchContext'
 import { useNotificationSocket } from '../hooks/useNotificationSocket'
+import GlobalSearch from './GlobalSearch'
+import './GlobalSearch.css'
 
 function Topbar() {
     const { t, i18n } = useTranslation()
@@ -16,11 +18,24 @@ function Topbar() {
     const [showNotifications, setShowNotifications] = useState(false)
     const [notifications, setNotifications] = useState([])
     const [unreadCount, setUnreadCount] = useState(0)
+    const [showSearch, setShowSearch] = useState(false)
     const menuRef = useRef(null)
     const notifRef = useRef(null)
     const branchRef = useRef(null)
     const [showBranchMenu, setShowBranchMenu] = useState(false)
     const { branches, currentBranch, setBranch } = useBranch()
+
+    // Global Ctrl+K / Cmd+K shortcut
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault()
+                setShowSearch(prev => !prev)
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [])
 
     // Handle incoming WebSocket notification
     const handleWsNotification = useCallback((notif) => {
@@ -113,9 +128,29 @@ function Topbar() {
 
     return (
         <header className="topbar">
-            <div className="topbar-search">
-                <input type="text" name="search" id="search" className="search-input" placeholder={t('common.search')} />
+            <div className="topbar-search" onClick={() => setShowSearch(true)} style={{ cursor: 'pointer' }}>
+                <div className="search-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted, #94a3b8)', userSelect: 'none' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                        {t('common.search')}
+                    </span>
+                    <kbd style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 6px',
+                        background: 'white',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        color: 'var(--text-muted)',
+                        fontFamily: 'inherit'
+                    }}>Ctrl+K</kbd>
+                </div>
             </div>
+
+            <GlobalSearch isOpen={showSearch} onClose={() => setShowSearch(false)} />
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {/* Language Switcher */}

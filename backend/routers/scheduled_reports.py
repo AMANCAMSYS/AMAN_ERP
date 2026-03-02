@@ -261,8 +261,10 @@ def share_report(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Verify report exists
+        # Verify report exists — SEC-003: table is from controlled whitelist, not user input
+        _ALLOWED_TABLES = {"custom_reports", "scheduled_reports"}
         table = "custom_reports" if data.report_type == "custom" else "scheduled_reports"
+        assert table in _ALLOWED_TABLES
         report = db.execute(text(f"SELECT id FROM {table} WHERE id=:id"), {"id": data.report_id}).fetchone()
         if not report:
             raise HTTPException(status_code=404, detail="Report not found")

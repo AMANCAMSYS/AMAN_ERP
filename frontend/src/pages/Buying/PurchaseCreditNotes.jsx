@@ -10,8 +10,10 @@ import '../../components/ModuleStyles.css'
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 function PurchaseCreditNotes() {
     const { t, i18n } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -109,8 +111,8 @@ function PurchaseCreditNotes() {
     const calcTotal = () => calcSubtotal() + calcTax()
 
     const handleCreate = async () => {
-        if (!form.party_id) return alert(t('buying.credit_notes.supplier_required'))
-        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return alert(t('buying.credit_notes.line_required'))
+        if (!form.party_id) return showToast(t('buying.credit_notes.supplier_required', 'warning'))
+        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return showToast(t('buying.credit_notes.line_required', 'warning'))
         try {
             setSaving(true)
             await purchasesAPI.createCreditNote({
@@ -121,7 +123,7 @@ function PurchaseCreditNotes() {
             setShowCreate(false)
             fetchList()
         } catch (err) {
-            alert(err.response?.data?.detail || t('buying.credit_notes.error_occurred'))
+            showToast(err.response?.data?.detail || t('buying.credit_notes.error_occurred', 'error'))
         } finally { setSaving(false) }
     }
 

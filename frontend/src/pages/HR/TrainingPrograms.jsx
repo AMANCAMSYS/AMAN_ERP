@@ -154,11 +154,11 @@ const TrainingPrograms = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group">
                                 <label>{t('hr.training.start_date')}</label>
-                                <DateInput className="form-input" value={formatDate(form.start_date)} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+                                <DateInput className="form-input" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
                             </div>
                             <div className="form-group">
                                 <label>{t('hr.training.end_date')}</label>
-                                <DateInput className="form-input" value={formatDate(form.end_date)} onChange={e => setForm({ ...form, end_date: e.target.value })} />
+                                <DateInput className="form-input" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>

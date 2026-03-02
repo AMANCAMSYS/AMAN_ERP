@@ -122,3 +122,12 @@ export const attendanceAPI = {
     getStatus: () => api.get('/hr/attendance/status'),
     getHistory: (params) => api.get('/hr/attendance/history', { params })
 }
+
+// WPS & Saudization (SA-specific)
+export const wpsAPI = {
+    exportWPS: (data) => api.post('/hr/wps/export', data, { responseType: 'blob' }),
+    previewWPS: (periodId) => api.get(`/hr/wps/preview/${periodId}`),
+    getSaudizationDashboard: () => api.get('/hr/saudization/dashboard'),
+    getSaudizationReport: (params) => api.get('/hr/saudization/report', { params }),
+    settleEndOfService: (data) => api.post('/hr/end-of-service/settle', data),
+}

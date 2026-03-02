@@ -67,3 +67,12 @@ export const purchasesAPI = {
     activateAgreement: (id) => api.put(`/buying/agreements/${id}/activate`),
     callOffAgreement: (id, data) => api.post(`/buying/agreements/${id}/call-off`, data),
 }
+
+// Landed Costs
+export const landedCostsAPI = {
+    list: (params) => api.get('/purchases/landed-costs', { params }),
+    get: (id) => api.get(`/purchases/landed-costs/${id}`),
+    create: (data) => api.post('/purchases/landed-costs', data),
+    allocate: (id, data) => api.post(`/purchases/landed-costs/${id}/allocate`, data),
+    post: (id) => api.post(`/purchases/landed-costs/${id}/post`),
+}

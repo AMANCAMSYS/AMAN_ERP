@@ -4,6 +4,7 @@ import { manufacturingAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
 
 const ProductionAnalytics = () => {
     const { t } = useTranslation();
@@ -72,12 +73,12 @@ const ProductionAnalytics = () => {
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
                         <label className="form-label">{t('common.from_date', 'من تاريخ')}</label>
-                        <input type="date" className="form-input" value={filters.start_date}
+                        <DateInput className="form-input" value={filters.start_date}
                             onChange={e => setFilters(p => ({ ...p, start_date: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
                         <label className="form-label">{t('common.to_date', 'إلى تاريخ')}</label>
-                        <input type="date" className="form-input" value={filters.end_date}
+                        <DateInput className="form-input" value={filters.end_date}
                             onChange={e => setFilters(p => ({ ...p, end_date: e.target.value }))} />
                     </div>
                     <button className="btn btn-primary" onClick={fetchAll} disabled={loading}>

@@ -6,6 +6,8 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 const stageBadgeStyles = {
     lead: 'badge-info',
@@ -27,6 +29,7 @@ const stageBadgeColors = {
 
 function Opportunities() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const currency = getCurrency()
 
@@ -134,7 +137,7 @@ function Opportunities() {
             fetchOpportunities()
         } catch (err) {
             console.error('Failed to save opportunity', err)
-            alert(err.response?.data?.detail || t('crm.save_error'))
+            showToast(err.response?.data?.detail || t('crm.save_error', 'error'))
         }
     }
 
@@ -145,13 +148,13 @@ function Opportunities() {
             fetchOpportunities()
         } catch (err) {
             console.error('Failed to delete opportunity', err)
-            alert(err.response?.data?.detail || t('crm.delete_error'))
+            showToast(err.response?.data?.detail || t('crm.delete_error', 'error'))
         }
     }
 
     const handleConvertToQuotation = async (opp) => {
         if (!opp.customer_id) {
-            alert(t('crm.convert_no_customer', 'يجب تحديد عميل للفرصة قبل التحويل إلى عرض سعر'))
+            showToast(t('crm.convert_no_customer', 'يجب تحديد عميل للفرصة قبل التحويل إلى عرض سعر', 'info'))
             return
         }
         try {
@@ -161,11 +164,11 @@ function Opportunities() {
                 navigate(`/sales/quotations/${quotationId}`)
             } else {
                 fetchOpportunities()
-                alert(t('crm.convert_success', 'تم تحويل الفرصة إلى عرض سعر بنجاح'))
+                showToast(t('crm.convert_success', 'تم تحويل الفرصة إلى عرض سعر بنجاح', 'success'))
             }
         } catch (err) {
             console.error('Failed to convert', err)
-            alert(err.response?.data?.detail || t('crm.convert_error', 'فشل تحويل الفرصة'))
+            showToast(err.response?.data?.detail || t('crm.convert_error', 'فشل تحويل الفرصة', 'error'))
         }
     }
 
@@ -255,7 +258,7 @@ function Opportunities() {
 
             {/* Delete Confirmation */}
             {deleteConfirm && (
-                <div className="modal-backdrop" onClick={() => setDeleteConfirm(null)}>
+                <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
                         <div className="modal-header">
                             <h3>{t('crm.confirm_delete')}</h3>
@@ -273,7 +276,7 @@ function Opportunities() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
                         <div className="modal-header">
                             <h3>{isEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h3>
@@ -336,8 +339,7 @@ function Opportunities() {
                                         </div>
                                         <div className="form-group">
                                             <label className="form-label">{t('crm.expected_close')}</label>
-                                            <input
-                                                type="date"
+                                            <DateInput
                                                 name="expected_close_date"
                                                 className="form-input"
                                                 value={formData.expected_close_date}

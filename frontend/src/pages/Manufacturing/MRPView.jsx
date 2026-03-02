@@ -51,7 +51,7 @@ export default function MRPView() {
                 </div>
             </div>
 
-            <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="card card-flush">
                 <div className="table-responsive">
                     <table className="data-table">
                         <thead>

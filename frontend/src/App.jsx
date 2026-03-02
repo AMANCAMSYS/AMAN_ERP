@@ -16,6 +16,10 @@ const Register = React.lazy(() => import('./pages/Register'))
 const Dashboard = React.lazy(() => import('./pages/Dashboard'))
 const UserProfile = React.lazy(() => import('./pages/UserProfile'))
 
+// Forgot/Reset Password
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
+
 // POS
 const POSHome = React.lazy(() => import('./pages/POS/POSHome'))
 const POSInterface = React.lazy(() => import('./pages/POS/POSInterface'))
@@ -43,6 +47,10 @@ const DirectLaborReport = React.lazy(() => import('./pages/Manufacturing/DirectL
 const ProductionAnalytics = React.lazy(() => import('./pages/Manufacturing/ProductionAnalytics'))
 const WorkOrderStatusReport = React.lazy(() => import('./pages/Manufacturing/WorkOrderStatusReport'))
 
+// Manufacturing Costing
+const ManufacturingCosting = React.lazy(() => import('./pages/Manufacturing/ManufacturingCosting'))
+const CapacityPlanning = React.lazy(() => import('./pages/Manufacturing/CapacityPlanning'))
+
 
 // Accounting
 const AccountingHome = React.lazy(() => import('./pages/Accounting/AccountingHome'))
@@ -69,10 +77,20 @@ const IncomeStatement = React.lazy(() => import('./pages/Accounting/IncomeStatem
 const BalanceSheet = React.lazy(() => import('./pages/Accounting/BalanceSheet'))
 const CurrencyList = React.lazy(() => import('./pages/Accounting/CurrencyList'))
 
+// Zakat & Fiscal Locks
+const ZakatCalculator = React.lazy(() => import('./pages/Accounting/ZakatCalculator'))
+const FiscalPeriodLocks = React.lazy(() => import('./pages/Accounting/FiscalPeriodLocks'))
+const IntercompanyTransactions = React.lazy(() => import('./pages/Accounting/IntercompanyTransactions'))
+const RevenueRecognition = React.lazy(() => import('./pages/Accounting/RevenueRecognition'))
+
 // Admin
 const CompanyList = React.lazy(() => import('./pages/Admin/CompanyList'))
 const AuditLogs = React.lazy(() => import('./pages/Admin/AuditLogs'))
 const RoleManagement = React.lazy(() => import('./pages/Admin/RoleManagement'))
+const SecurityEvents = React.lazy(() => import('./pages/Admin/SecurityEvents'))
+
+// Backup Management
+const BackupManagement = React.lazy(() => import('./pages/Admin/BackupManagement'))
 
 // Approvals
 const ApprovalsPage = React.lazy(() => import('./pages/Approvals/ApprovalsPage'))
@@ -111,6 +129,14 @@ const ContractDetails = React.lazy(() => import('./pages/Sales/ContractDetails')
 const SalesCreditNotes = React.lazy(() => import('./pages/Sales/SalesCreditNotes'))
 const SalesDebitNotes = React.lazy(() => import('./pages/Sales/SalesDebitNotes'))
 const SalesCommissions = React.lazy(() => import('./pages/Sales/SalesCommissions'))
+
+// Contract Amendments
+const ContractAmendments = React.lazy(() => import('./pages/Sales/ContractAmendments'))
+
+// Delivery Orders
+const DeliveryOrders = React.lazy(() => import('./pages/Sales/DeliveryOrders'))
+const DeliveryOrderForm = React.lazy(() => import('./pages/Sales/DeliveryOrderForm'))
+const DeliveryOrderDetails = React.lazy(() => import('./pages/Sales/DeliveryOrderDetails'))
 
 // Stock
 const StockHome = React.lazy(() => import('./pages/Stock/StockHome'))
@@ -160,6 +186,10 @@ const RFQList = React.lazy(() => import('./pages/Buying/RFQList'))
 const SupplierRatings = React.lazy(() => import('./pages/Buying/SupplierRatings'))
 const PurchaseAgreements = React.lazy(() => import('./pages/Buying/PurchaseAgreements'))
 
+// Landed Costs
+const LandedCosts = React.lazy(() => import('./pages/Buying/LandedCosts'))
+const LandedCostDetails = React.lazy(() => import('./pages/Buying/LandedCostDetails'))
+
 // Treasury
 const TreasuryHome = React.lazy(() => import('./pages/Treasury/TreasuryHome'))
 const TreasuryAccountList = React.lazy(() => import('./pages/Treasury/TreasuryAccountList'))
@@ -174,6 +204,9 @@ const ChecksPayable = React.lazy(() => import('./pages/Treasury/ChecksPayable'))
 const NotesReceivable = React.lazy(() => import('./pages/Treasury/NotesReceivable'))
 const NotesPayable = React.lazy(() => import('./pages/Treasury/NotesPayable'))
 
+// Bank Import
+const BankImport = React.lazy(() => import('./pages/Treasury/BankImport'))
+
 // HR
 const HRHome = React.lazy(() => import('./pages/HR/HRHome'))
 const Employees = React.lazy(() => import('./pages/HR/Employees'))
@@ -185,6 +218,8 @@ const LoanList = React.lazy(() => import('./pages/HR/LoanList'))
 const LeaveList = React.lazy(() => import('./pages/HR/LeaveList'))
 const Attendance = React.lazy(() => import('./pages/HR/Attendance'))
 const HRReports = React.lazy(() => import('./pages/HR/Reports/HRReports'))
+const LeaveReport = React.lazy(() => import('./pages/HR/Reports/LeaveReport'))
+const PayrollReport = React.lazy(() => import('./pages/HR/Reports/PayrollReport'))
 
 // HR Advanced (Phase 4)
 const SalaryStructures = React.lazy(() => import('./pages/HR/SalaryStructures'))
@@ -199,11 +234,18 @@ const Payslips = React.lazy(() => import('./pages/HR/Payslips'))
 const LeaveCarryover = React.lazy(() => import('./pages/HR/LeaveCarryover'))
 const Recruitment = React.lazy(() => import('./pages/HR/Recruitment'))
 
+// WPS & Saudization (SA-specific)
+const WPSExport = React.lazy(() => import('./pages/HR/WPSExport'))
+const SaudizationDashboard = React.lazy(() => import('./pages/HR/SaudizationDashboard'))
+const EOSSettlement = React.lazy(() => import('./pages/HR/EOSSettlement'))
+
 // Assets
 const AssetList = React.lazy(() => import('./pages/Assets/AssetList'))
 const AssetForm = React.lazy(() => import('./pages/Assets/AssetForm'))
 const AssetDetails = React.lazy(() => import('./pages/Assets/AssetDetails'))
 const AssetManagement = React.lazy(() => import('./pages/Assets/AssetManagement'))
+const LeaseContracts = React.lazy(() => import('./pages/Assets/LeaseContracts'))
+const ImpairmentTest = React.lazy(() => import('./pages/Assets/ImpairmentTest'))
 
 // Projects
 const ProjectList = React.lazy(() => import('./pages/Projects/ProjectList'))
@@ -212,11 +254,15 @@ const ProjectDetails = React.lazy(() => import('./pages/Projects/ProjectDetails'
 const ResourceManagement = React.lazy(() => import('./pages/Projects/ResourceManagement'))
 const ProjectFinancialsReport = React.lazy(() => import('./pages/Projects/ProjectFinancialsReport'))
 const ResourceUtilizationReport = React.lazy(() => import('./pages/Projects/ResourceUtilizationReport'))
+const ProjectRisks = React.lazy(() => import('./pages/Projects/ProjectRisks'))
+const GanttChart = React.lazy(() => import('./pages/Projects/GanttChart'))
+const Timesheets = React.lazy(() => import('./pages/Projects/Timesheets'))
 
 // Expenses
 const ExpenseList = React.lazy(() => import('./pages/Expenses/ExpenseList'))
 const ExpenseForm = React.lazy(() => import('./pages/Expenses/ExpenseForm'))
 const ExpenseDetails = React.lazy(() => import('./pages/Expenses/ExpenseDetails'))
+const ExpensePolicies = React.lazy(() => import('./pages/Expenses/ExpensePolicies'))
 
 // Taxes
 const TaxHome = React.lazy(() => import('./pages/Taxes/TaxHome'))
@@ -232,6 +278,12 @@ const Opportunities = React.lazy(() => import('./pages/CRM/Opportunities'))
 const SupportTickets = React.lazy(() => import('./pages/CRM/SupportTickets'))
 const MarketingCampaigns = React.lazy(() => import('./pages/CRM/MarketingCampaigns'))
 const KnowledgeBase = React.lazy(() => import('./pages/CRM/KnowledgeBase'))
+const CRMDashboard = React.lazy(() => import('./pages/CRM/CRMDashboard'))
+const LeadScoring = React.lazy(() => import('./pages/CRM/LeadScoring'))
+const CustomerSegments = React.lazy(() => import('./pages/CRM/CustomerSegments'))
+const PipelineAnalytics = React.lazy(() => import('./pages/CRM/PipelineAnalytics'))
+const CRMContacts = React.lazy(() => import('./pages/CRM/CRMContacts'))
+const SalesForecasts = React.lazy(() => import('./pages/CRM/SalesForecasts'))
 
 // Services
 const ServicesHome = React.lazy(() => import('./pages/Services/ServicesHome'))
@@ -245,11 +297,25 @@ const Branches = React.lazy(() => import('./pages/Settings/Branches'))
 const CostingPolicy = React.lazy(() => import('./pages/Settings/CostingPolicy'))
 const ApiKeys = React.lazy(() => import('./pages/Settings/ApiKeys'))
 const WebhooksPage = React.lazy(() => import('./pages/Settings/Webhooks'))
+
+// Print Templates
+const PrintTemplates = React.lazy(() => import('./pages/Settings/PrintTemplates'))
 const ReportCenter = React.lazy(() => import('./pages/Reports/ReportCenter'))
 const ScheduledReports = React.lazy(() => import('./pages/Reports/ScheduledReports'))
 const ReportBuilder = React.lazy(() => import('./pages/Reports/ReportBuilder'))
 const DetailedProfitLoss = React.lazy(() => import('./pages/Reports/DetailedProfitLoss'))
 const SharedReports = React.lazy(() => import('./pages/Reports/SharedReports'))
+
+// Consolidation Reports
+const ConsolidationReports = React.lazy(() => import('./pages/Reports/ConsolidationReports'))
+const KPIDashboard = React.lazy(() => import('./pages/Reports/KPIDashboard'))
+
+// New Report Pages
+const PurchasesAgingReport = React.lazy(() => import('./pages/Buying/PurchasesAgingReport'))
+const ChecksAgingReport = React.lazy(() => import('./pages/Treasury/ChecksAgingReport'))
+const FXGainLossReport = React.lazy(() => import('./pages/Reports/FXGainLossReport'))
+const AssetReports = React.lazy(() => import('./pages/Assets/AssetReports'))
+const CashFlowIAS7 = React.lazy(() => import('./pages/Reports/CashFlowIAS7'))
 
 const PaymentForm = React.lazy(() => import('./pages/Purchases/PaymentForm'))
 const PaymentDetails = React.lazy(() => import('./pages/Purchases/PaymentDetails'))
@@ -314,12 +380,14 @@ function App() {
             <Routes>
                 <Route path="/login" element={isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<PrivateRoute permission="dashboard.view"><Dashboard /></PrivateRoute>} />
                 <Route path="/accounting" element={<PrivateRoute permission="accounting.view"><AccountingHome /></PrivateRoute>} />
                 <Route path="/accounting/coa" element={<PrivateRoute permission="accounting.view"><ChartOfAccounts /></PrivateRoute>} />
                 <Route path="/accounting/cost-centers" element={<PrivateRoute permission="accounting.view"><CostCenterList /></PrivateRoute>} />
                 <Route path="/accounting/journal-entries" element={<PrivateRoute permission="accounting.view"><JournalEntryList /></PrivateRoute>} />
-                <Route path="/accounting/journal-entries/new" element={<PrivateRoute permission="accounting.view"><JournalEntryForm /></PrivateRoute>} />
+                <Route path="/accounting/journal-entries/new" element={<PrivateRoute permission="accounting.edit"><JournalEntryForm /></PrivateRoute>} />
                 <Route path="/accounting/fiscal-years" element={<PrivateRoute permission="accounting.view"><FiscalYears /></PrivateRoute>} />
                 <Route path="/accounting/recurring-templates" element={<PrivateRoute permission="accounting.view"><RecurringTemplates /></PrivateRoute>} />
                 <Route path="/accounting/period-comparison" element={<PrivateRoute permission="accounting.view"><PeriodComparison /></PrivateRoute>} />
@@ -337,10 +405,18 @@ function App() {
                 <Route path="/accounting/income-statement" element={<PrivateRoute permission="accounting.view"><IncomeStatement /></PrivateRoute>} />
                 <Route path="/accounting/balance-sheet" element={<PrivateRoute permission="accounting.view"><BalanceSheet /></PrivateRoute>} />
                 <Route path="/accounting/currencies" element={<PrivateRoute permission="currencies.view"><CurrencyList /></PrivateRoute>} />
+
+                {/* Zakat & Fiscal Locks */}
+                <Route path="/accounting/zakat" element={<PrivateRoute permission="accounting.view"><ZakatCalculator /></PrivateRoute>} />
+                <Route path="/accounting/fiscal-locks" element={<PrivateRoute permission="accounting.manage"><FiscalPeriodLocks /></PrivateRoute>} />
+                <Route path="/accounting/intercompany" element={<PrivateRoute permission="accounting.view"><IntercompanyTransactions /></PrivateRoute>} />
+                <Route path="/accounting/revenue-recognition" element={<PrivateRoute permission="accounting.view"><RevenueRecognition /></PrivateRoute>} />
                 <Route path="/stock/valuation-report" element={<PrivateRoute permission="reports.view"><InventoryValuation /></PrivateRoute>} />
                 <Route path="/admin/companies" element={<PrivateRoute role="system_admin"><CompanyList /></PrivateRoute>} />
                 <Route path="/admin/audit-logs" element={<PrivateRoute permission="audit.view"><AuditLogs /></PrivateRoute>} />
                 <Route path="/admin/roles" element={<PrivateRoute permission="admin.roles"><RoleManagement /></PrivateRoute>} />
+                <Route path="/admin/backups" element={<PrivateRoute role="system_admin"><BackupManagement /></PrivateRoute>} />
+                <Route path="/admin/security-events" element={<PrivateRoute permission="admin.security"><SecurityEvents /></PrivateRoute>} />
 
                 {/* Approvals */}
                 <Route path="/approvals" element={<PrivateRoute permission="approvals.view"><ApprovalsPage /></PrivateRoute>} />
@@ -354,39 +430,46 @@ function App() {
                 {/* Sales Routes */}
                 <Route path="/sales" element={<PrivateRoute permission="sales.view"><SalesHome /></PrivateRoute>} />
                 <Route path="/sales/customers" element={<PrivateRoute permission="sales.view"><CustomerList /></PrivateRoute>} />
-                <Route path="/sales/customers/new" element={<PrivateRoute permission="sales.view"><CustomerForm /></PrivateRoute>} />
-                <Route path="/sales/customers/:id/edit" element={<PrivateRoute permission="sales.view"><CustomerForm /></PrivateRoute>} />
+                <Route path="/sales/customers/new" element={<PrivateRoute permission="sales.create"><CustomerForm /></PrivateRoute>} />
+                <Route path="/sales/customers/:id/edit" element={<PrivateRoute permission="sales.edit"><CustomerForm /></PrivateRoute>} />
                 <Route path="/sales/customers/:id" element={<PrivateRoute permission="sales.view"><CustomerDetails /></PrivateRoute>} />
                 <Route path="/sales/invoices" element={<PrivateRoute permission="sales.view"><InvoiceList /></PrivateRoute>} />
-                <Route path="/sales/invoices/new" element={<PrivateRoute permission="sales.view"><InvoiceForm /></PrivateRoute>} />
+                <Route path="/sales/invoices/new" element={<PrivateRoute permission="sales.create"><InvoiceForm /></PrivateRoute>} />
                 <Route path="/sales/invoices/:id" element={<PrivateRoute permission="sales.view"><InvoiceDetails /></PrivateRoute>} />
                 <Route path="/sales/orders" element={<PrivateRoute permission="sales.view"><SalesOrders /></PrivateRoute>} />
-                <Route path="/sales/orders/new" element={<PrivateRoute permission="sales.view"><SalesOrderForm /></PrivateRoute>} />
+                <Route path="/sales/orders/new" element={<PrivateRoute permission="sales.create"><SalesOrderForm /></PrivateRoute>} />
                 <Route path="/sales/orders/:id" element={<PrivateRoute permission="sales.view"><SalesOrderDetails /></PrivateRoute>} />
                 <Route path="/sales/quotations" element={<PrivateRoute permission="sales.view"><SalesQuotations /></PrivateRoute>} />
-                <Route path="/sales/quotations/new" element={<PrivateRoute permission="sales.view"><SalesQuotationForm /></PrivateRoute>} />
+                <Route path="/sales/quotations/new" element={<PrivateRoute permission="sales.create"><SalesQuotationForm /></PrivateRoute>} />
                 <Route path="/sales/quotations/:id" element={<PrivateRoute permission="sales.view"><SalesQuotationDetails /></PrivateRoute>} />
                 <Route path="/sales/customer-groups" element={<PrivateRoute permission="sales.view"><CustomerGroups /></PrivateRoute>} />
                 <Route path="/sales/returns" element={<PrivateRoute permission="sales.view"><SalesReturns /></PrivateRoute>} />
-                <Route path="/sales/returns/new" element={<PrivateRoute permission="sales.view"><SalesReturnForm /></PrivateRoute>} />
+                <Route path="/sales/returns/new" element={<PrivateRoute permission="sales.create"><SalesReturnForm /></PrivateRoute>} />
                 <Route path="/sales/returns/:id" element={<PrivateRoute permission="sales.view"><SalesReturnDetails /></PrivateRoute>} />
                 <Route path="/sales/receipts" element={<PrivateRoute permission="sales.view"><CustomerReceipts /></PrivateRoute>} />
-                <Route path="/sales/receipts/new" element={<PrivateRoute permission="sales.view"><ReceiptForm /></PrivateRoute>} />
+                <Route path="/sales/receipts/new" element={<PrivateRoute permission="sales.create"><ReceiptForm /></PrivateRoute>} />
                 <Route path="/sales/receipts/:id" element={<PrivateRoute permission="sales.view"><ReceiptDetails /></PrivateRoute>} />
                 <Route path="/sales/payments" element={<PrivateRoute permission="sales.view"><CustomerReceipts /></PrivateRoute>} />
-                <Route path="/sales/payments/new" element={<PrivateRoute permission="sales.view"><ReceiptForm /></PrivateRoute>} />
+                <Route path="/sales/payments/new" element={<PrivateRoute permission="sales.create"><ReceiptForm /></PrivateRoute>} />
                 <Route path="/sales/payments/:id" element={<PrivateRoute permission="sales.view"><ReceiptDetails /></PrivateRoute>} />
                 <Route path="/sales/price-lists" element={<PrivateRoute permission="sales.view"><PriceLists /></PrivateRoute>} />
                 <Route path="/sales/reports/analytics" element={<PrivateRoute permission="sales.reports"><SalesReports /></PrivateRoute>} />
                 <Route path="/sales/reports/customer-statement" element={<PrivateRoute permission="sales.reports"><CustomerStatement /></PrivateRoute>} />
                 <Route path="/sales/reports/aging" element={<PrivateRoute permission="sales.reports"><AgingReport /></PrivateRoute>} />
                 <Route path="/sales/contracts" element={<PrivateRoute permission="sales.view"><ContractList /></PrivateRoute>} />
-                <Route path="/sales/contracts/new" element={<PrivateRoute permission="sales.view"><ContractForm /></PrivateRoute>} />
+                <Route path="/sales/contracts/new" element={<PrivateRoute permission="contracts.create"><ContractForm /></PrivateRoute>} />
                 <Route path="/sales/contracts/:id" element={<PrivateRoute permission="sales.view"><ContractDetails /></PrivateRoute>} />
-                <Route path="/sales/contracts/:id/edit" element={<PrivateRoute permission="sales.view"><ContractForm /></PrivateRoute>} />
+                <Route path="/sales/contracts/:id/edit" element={<PrivateRoute permission="contracts.edit"><ContractForm /></PrivateRoute>} />
+                <Route path="/sales/contracts/:id/amendments" element={<PrivateRoute permission="sales.view"><ContractAmendments /></PrivateRoute>} />
+                <Route path="/sales/contract-amendments" element={<PrivateRoute permission="sales.view"><ContractAmendments /></PrivateRoute>} />
                 <Route path="/sales/credit-notes" element={<PrivateRoute permission="sales.view"><SalesCreditNotes /></PrivateRoute>} />
                 <Route path="/sales/debit-notes" element={<PrivateRoute permission="sales.view"><SalesDebitNotes /></PrivateRoute>} />
                 <Route path="/sales/commissions" element={<PrivateRoute permission="sales.view"><SalesCommissions /></PrivateRoute>} />
+
+                {/* Delivery Orders */}
+                <Route path="/sales/delivery-orders" element={<PrivateRoute permission="sales.view"><DeliveryOrders /></PrivateRoute>} />
+                <Route path="/sales/delivery-orders/new" element={<PrivateRoute permission="sales.create"><DeliveryOrderForm /></PrivateRoute>} />
+                <Route path="/sales/delivery-orders/:id" element={<PrivateRoute permission="sales.view"><DeliveryOrderDetails /></PrivateRoute>} />
 
                 {/* Manufacturing Routes */}
                 <Route path="/manufacturing" element={<PrivateRoute permission="manufacturing.view"><ManufacturingHome /></PrivateRoute>} />
@@ -403,18 +486,20 @@ function App() {
                 <Route path="/manufacturing/reports/direct-labor" element={<PrivateRoute permission="manufacturing.view"><DirectLaborReport /></PrivateRoute>} />
                 <Route path="/manufacturing/reports/analytics" element={<PrivateRoute permission="manufacturing.view"><ProductionAnalytics /></PrivateRoute>} />
                 <Route path="/manufacturing/reports/work-orders" element={<PrivateRoute permission="manufacturing.view"><WorkOrderStatusReport /></PrivateRoute>} />
+                <Route path="/manufacturing/costing" element={<PrivateRoute permission="manufacturing.view"><ManufacturingCosting /></PrivateRoute>} />
+                <Route path="/manufacturing/capacity" element={<PrivateRoute permission="manufacturing.view"><CapacityPlanning /></PrivateRoute>} />
 
                 {/* Stock Routes */}
                 <Route path="/stock" element={<PrivateRoute permission="stock.view"><StockHome /></PrivateRoute>} />
                 <Route path="/stock/products" element={<PrivateRoute permission="stock.view"><ProductList /></PrivateRoute>} />
-                <Route path="/stock/products/new" element={<PrivateRoute permission="stock.view"><ProductForm /></PrivateRoute>} />
+                <Route path="/stock/products/new" element={<PrivateRoute permission="products.create"><ProductForm /></PrivateRoute>} />
                 <Route path="/stock/products/:id" element={<PrivateRoute permission="stock.view"><ProductForm /></PrivateRoute>} />
                 <Route path="/stock/categories" element={<PrivateRoute permission="stock.view"><CategoryList /></PrivateRoute>} />
                 <Route path="/stock/warehouses" element={<PrivateRoute permission="stock.view"><WarehouseList /></PrivateRoute>} />
                 <Route path="/stock/warehouses/:id" element={<PrivateRoute permission="stock.view"><WarehouseDetails /></PrivateRoute>} />
-                <Route path="/stock/transfer" element={<PrivateRoute permission="stock.view"><StockTransferForm /></PrivateRoute>} />
+                <Route path="/stock/transfer" element={<PrivateRoute permission="stock.transfer"><StockTransferForm /></PrivateRoute>} />
                 <Route path="/stock/adjustments" element={<PrivateRoute permission="stock.view"><StockAdjustments /></PrivateRoute>} />
-                <Route path="/stock/adjustments/new" element={<PrivateRoute permission="stock.view"><StockAdjustmentForm /></PrivateRoute>} />
+                <Route path="/stock/adjustments/new" element={<PrivateRoute permission="stock.adjustment"><StockAdjustmentForm /></PrivateRoute>} />
 
                 <Route path="/stock/shipments" element={<PrivateRoute permission="stock.view"><ShipmentList /></PrivateRoute>} />
                 <Route path="/stock/shipments/new" element={<PrivateRoute permission="stock.view"><StockShipmentForm /></PrivateRoute>} />
@@ -436,11 +521,11 @@ function App() {
                 {/* Buying Routes */}
                 <Route path="/buying" element={<PrivateRoute permission="buying.view"><BuyingHome /></PrivateRoute>} />
                 <Route path="/buying/suppliers" element={<PrivateRoute permission="buying.view"><SupplierList /></PrivateRoute>} />
-                <Route path="/buying/suppliers/new" element={<PrivateRoute permission="buying.view"><SupplierForm /></PrivateRoute>} />
-                <Route path="/buying/suppliers/:id/edit" element={<PrivateRoute permission="buying.view"><SupplierForm /></PrivateRoute>} />
+                <Route path="/buying/suppliers/new" element={<PrivateRoute permission="buying.create"><SupplierForm /></PrivateRoute>} />
+                <Route path="/buying/suppliers/:id/edit" element={<PrivateRoute permission="buying.edit"><SupplierForm /></PrivateRoute>} />
                 <Route path="/buying/suppliers/:id" element={<PrivateRoute permission="buying.view"><SupplierDetails /></PrivateRoute>} />
                 <Route path="/buying/invoices" element={<PrivateRoute permission="buying.view"><PurchaseInvoiceList /></PrivateRoute>} />
-                <Route path="/buying/invoices/new" element={<PrivateRoute permission="buying.view"><PurchaseInvoiceForm /></PrivateRoute>} />
+                <Route path="/buying/invoices/new" element={<PrivateRoute permission="buying.create"><PurchaseInvoiceForm /></PrivateRoute>} />
                 <Route path="/buying/invoices/:id" element={<PrivateRoute permission="buying.view"><PurchaseInvoiceDetails /></PrivateRoute>} />
 
                 <Route path="/buying/returns" element={<PrivateRoute permission="buying.view"><BuyingReturns /></PrivateRoute>} />
@@ -456,11 +541,16 @@ function App() {
                 <Route path="/buying/supplier-groups" element={<PrivateRoute permission="buying.view"><SupplierGroups /></PrivateRoute>} />
                 <Route path="/buying/reports/analytics" element={<PrivateRoute permission="buying.reports"><BuyingReports /></PrivateRoute>} />
                 <Route path="/buying/reports/supplier-statement" element={<PrivateRoute permission="buying.reports"><SupplierStatement /></PrivateRoute>} />
+                <Route path="/buying/reports/aging" element={<PrivateRoute permission="buying.reports"><PurchasesAgingReport /></PrivateRoute>} />
                 <Route path="/buying/credit-notes" element={<PrivateRoute permission="buying.view"><PurchaseCreditNotes /></PrivateRoute>} />
                 <Route path="/buying/debit-notes" element={<PrivateRoute permission="buying.view"><PurchaseDebitNotes /></PrivateRoute>} />
                 <Route path="/buying/rfq" element={<PrivateRoute permission="buying.view"><RFQList /></PrivateRoute>} />
                 <Route path="/buying/supplier-ratings" element={<PrivateRoute permission="buying.view"><SupplierRatings /></PrivateRoute>} />
                 <Route path="/buying/agreements" element={<PrivateRoute permission="buying.view"><PurchaseAgreements /></PrivateRoute>} />
+
+                {/* Landed Costs */}
+                <Route path="/buying/landed-costs" element={<PrivateRoute permission="buying.view"><LandedCosts /></PrivateRoute>} />
+                <Route path="/buying/landed-costs/:id" element={<PrivateRoute permission="buying.view"><LandedCostDetails /></PrivateRoute>} />
 
                 {/* Treasury Routes */}
                 <Route path="/treasury" element={<PrivateRoute permission="treasury.view"><TreasuryHome /></PrivateRoute>} />
@@ -471,10 +561,14 @@ function App() {
                 <Route path="/treasury/reconciliation/:id" element={<PrivateRoute permission="reconciliation.view"><ReconciliationForm /></PrivateRoute>} />
                 <Route path="/treasury/reports/cashflow" element={<PrivateRoute permission="treasury.view"><TreasuryCashflowReport /></PrivateRoute>} />
                 <Route path="/treasury/reports/balances" element={<PrivateRoute permission="treasury.view"><TreasuryBalancesReport /></PrivateRoute>} />
+                <Route path="/treasury/reports/checks-aging" element={<PrivateRoute permission="treasury.view"><ChecksAgingReport /></PrivateRoute>} />
                 <Route path="/treasury/checks-receivable" element={<PrivateRoute permission="treasury.view"><ChecksReceivable /></PrivateRoute>} />
                 <Route path="/treasury/checks-payable" element={<PrivateRoute permission="treasury.view"><ChecksPayable /></PrivateRoute>} />
                 <Route path="/treasury/notes-receivable" element={<PrivateRoute permission="treasury.view"><NotesReceivable /></PrivateRoute>} />
                 <Route path="/treasury/notes-payable" element={<PrivateRoute permission="treasury.view"><NotesPayable /></PrivateRoute>} />
+
+                {/* Bank Import */}
+                <Route path="/treasury/bank-import" element={<PrivateRoute permission="treasury.view"><BankImport /></PrivateRoute>} />
 
                 {/* Other Modules */}
                 <Route path="/reports" element={<PrivateRoute permission="reports.view"><ReportCenter /></PrivateRoute>} />
@@ -482,6 +576,10 @@ function App() {
                 <Route path="/reports/scheduled" element={<PrivateRoute permission="reports.view"><ScheduledReports /></PrivateRoute>} />
                 <Route path="/reports/detailed-pl" element={<PrivateRoute permission="accounting.view"><DetailedProfitLoss /></PrivateRoute>} />
                 <Route path="/reports/shared" element={<PrivateRoute permission="reports.view"><SharedReports /></PrivateRoute>} />
+                <Route path="/reports/consolidation" element={<PrivateRoute permission="reports.view"><ConsolidationReports /></PrivateRoute>} />
+                <Route path="/reports/kpi" element={<PrivateRoute permission="reports.view"><KPIDashboard /></PrivateRoute>} />
+                <Route path="/reports/fx-gain-loss" element={<PrivateRoute permission="reports.view"><FXGainLossReport /></PrivateRoute>} />
+                <Route path="/reports/cashflow-ias7" element={<PrivateRoute permission="accounting.view"><CashFlowIAS7 /></PrivateRoute>} />
 
                 {/* HR Routes */}
                 <Route path="/hr" element={<PrivateRoute permission="hr.view"><HRHome /></PrivateRoute>} />
@@ -494,6 +592,8 @@ function App() {
                 <Route path="/hr/leaves" element={<PrivateRoute permission="hr.view"><LeaveList /></PrivateRoute>} />
                 <Route path="/hr/attendance" element={<PrivateRoute permission="hr.view"><Attendance /></PrivateRoute>} />
                 <Route path="/hr/reports" element={<PrivateRoute permission="hr.reports"><HRReports /></PrivateRoute>} />
+                <Route path="/hr/reports/leave" element={<PrivateRoute permission="hr.reports"><LeaveReport /></PrivateRoute>} />
+                <Route path="/hr/reports/payroll" element={<PrivateRoute permission="hr.reports"><PayrollReport /></PrivateRoute>} />
 
                 {/* HR Advanced Routes */}
                 <Route path="/hr/salary-structures" element={<PrivateRoute permission="hr.view"><SalaryStructures /></PrivateRoute>} />
@@ -508,9 +608,17 @@ function App() {
                 <Route path="/hr/leave-carryover" element={<PrivateRoute permission="hr.view"><LeaveCarryover /></PrivateRoute>} />
                 <Route path="/hr/recruitment" element={<PrivateRoute permission="hr.view"><Recruitment /></PrivateRoute>} />
 
+                {/* HR - WPS & Saudization (SA-specific) */}
+                <Route path="/hr/wps" element={<PrivateRoute permission="hr.view"><WPSExport /></PrivateRoute>} />
+                <Route path="/hr/saudization" element={<PrivateRoute permission="hr.view"><SaudizationDashboard /></PrivateRoute>} />
+                <Route path="/hr/end-of-service" element={<PrivateRoute permission="hr.view"><EOSSettlement /></PrivateRoute>} />
+
                 {/* Assets Routes */}
+                <Route path="/assets/reports" element={<PrivateRoute permission="assets.view"><AssetReports /></PrivateRoute>} />
+                <Route path="/assets/leases" element={<PrivateRoute permission="assets.view"><LeaseContracts /></PrivateRoute>} />
+                <Route path="/assets/impairment" element={<PrivateRoute permission="assets.view"><ImpairmentTest /></PrivateRoute>} />
                 <Route path="/assets" element={<PrivateRoute permission="assets.view"><AssetList /></PrivateRoute>} />
-                <Route path="/assets/new" element={<PrivateRoute permission="assets.view"><AssetForm /></PrivateRoute>} />
+                <Route path="/assets/new" element={<PrivateRoute permission="assets.create"><AssetForm /></PrivateRoute>} />
                 <Route path="/assets/management" element={<PrivateRoute permission="assets.view"><AssetManagement /></PrivateRoute>} />
                 <Route path="/assets/:id" element={<PrivateRoute permission="assets.view"><AssetDetails /></PrivateRoute>} />
 
@@ -520,10 +628,14 @@ function App() {
                 <Route path="/projects/new" element={<PrivateRoute permission="projects.create"><ProjectForm /></PrivateRoute>} />
                 <Route path="/projects/:id" element={<PrivateRoute permission="projects.view"><ProjectDetails /></PrivateRoute>} />
                 <Route path="/projects/:id/edit" element={<PrivateRoute permission="projects.edit"><ProjectForm /></PrivateRoute>} />
+                <Route path="/projects/risks" element={<PrivateRoute permission="projects.view"><ProjectRisks /></PrivateRoute>} />
                 <Route path="/projects/reports/financials" element={<PrivateRoute permission="projects.view"><ProjectFinancialsReport /></PrivateRoute>} />
                 <Route path="/projects/reports/resources" element={<PrivateRoute permission="projects.view"><ResourceUtilizationReport /></PrivateRoute>} />
+                <Route path="/projects/gantt" element={<PrivateRoute permission="projects.view"><GanttChart /></PrivateRoute>} />
+                <Route path="/projects/timesheets" element={<PrivateRoute permission="projects.view"><Timesheets /></PrivateRoute>} />
 
                 {/* Expenses Routes */}
+                <Route path="/expenses/policies" element={<PrivateRoute permission="expenses.view"><ExpensePolicies /></PrivateRoute>} />
                 <Route path="/expenses" element={<PrivateRoute permission="expenses.view"><ExpenseList /></PrivateRoute>} />
                 <Route path="/expenses/new" element={<PrivateRoute permission="expenses.create"><ExpenseForm /></PrivateRoute>} />
                 <Route path="/expenses/:id" element={<PrivateRoute permission="expenses.view"><ExpenseDetails /></PrivateRoute>} />
@@ -543,6 +655,12 @@ function App() {
                 <Route path="/crm/tickets" element={<PrivateRoute permission="sales.view"><SupportTickets /></PrivateRoute>} />
                 <Route path="/crm/campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
                 <Route path="/crm/knowledge-base" element={<PrivateRoute permission="sales.view"><KnowledgeBase /></PrivateRoute>} />
+                <Route path="/crm/dashboard" element={<PrivateRoute permission="sales.view"><CRMDashboard /></PrivateRoute>} />
+                <Route path="/crm/lead-scoring" element={<PrivateRoute permission="sales.view"><LeadScoring /></PrivateRoute>} />
+                <Route path="/crm/segments" element={<PrivateRoute permission="sales.view"><CustomerSegments /></PrivateRoute>} />
+                <Route path="/crm/analytics" element={<PrivateRoute permission="sales.view"><PipelineAnalytics /></PrivateRoute>} />
+                <Route path="/crm/contacts" element={<PrivateRoute permission="sales.view"><CRMContacts /></PrivateRoute>} />
+                <Route path="/crm/forecasts" element={<PrivateRoute permission="sales.view"><SalesForecasts /></PrivateRoute>} />
 
                 {/* Services Routes */}
                 <Route path="/services" element={<PrivateRoute permission="services.view"><ServicesHome /></PrivateRoute>} />
@@ -550,11 +668,12 @@ function App() {
                 <Route path="/services/documents" element={<PrivateRoute permission="services.view"><DocumentManagement /></PrivateRoute>} />
 
                 <Route path="/settings" element={<PrivateRoute permission="settings.view"><CompanySettings /></PrivateRoute>} />
-                <Route path="/admin/company-profile" element={<PrivateRoute><CompanyProfile /></PrivateRoute>} />
+                <Route path="/admin/company-profile" element={<PrivateRoute permission="settings.view"><CompanyProfile /></PrivateRoute>} />
                 <Route path="/settings/branches" element={<PrivateRoute permission="branches.view"><Branches /></PrivateRoute>} />
                 <Route path="/settings/costing-policy" element={<PrivateRoute permission="settings.view"><CostingPolicy /></PrivateRoute>} />
                 <Route path="/settings/api-keys" element={<PrivateRoute permission="settings.view"><ApiKeys /></PrivateRoute>} />
                 <Route path="/settings/webhooks" element={<PrivateRoute permission="settings.view"><WebhooksPage /></PrivateRoute>} />
+                <Route path="/settings/print-templates" element={<PrivateRoute permission="settings.view"><PrintTemplates /></PrivateRoute>} />
 
                 {/* POS Routes */}
                 <Route path="/pos" element={<PrivateRoute permission="pos.view"><POSHome /></PrivateRoute>} />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload, Download, Check, AlertTriangle, FileText, ArrowRight, Play, Info, Eye } from 'lucide-react';
+import BackButton from '../../components/common/BackButton';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { hasPermission } from '../../utils/auth';
@@ -90,7 +91,10 @@ const DataImportPage = () => {
     return (
         <div className="p-6 space-y-6 max-w-6xl mx-auto">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">{t('data_import.title') || 'Data Import Wizard'}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <BackButton />
+                    <h1 className="text-2xl font-bold">{t('data_import.title') || 'Data Import Wizard'}</h1>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

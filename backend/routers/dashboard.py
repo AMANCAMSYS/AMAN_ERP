@@ -8,6 +8,7 @@ import json
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
+from utils.cache import cached
 import time
 
 router = APIRouter(prefix="/dashboard", tags=["لوحة التحكم"])
@@ -30,6 +31,7 @@ def get_user_company_id(user):
     return cid
 
 @router.get("/stats", response_model=Dict[str, Any], dependencies=[Depends(require_permission("dashboard.view"))])
+@cached("dashboard_stats", expire=120)
 def get_dashboard_stats(
     branch_id: int = None,
     current_user: dict = Depends(get_current_user)
@@ -97,14 +99,17 @@ def get_dashboard_stats(
                 
                 cash_balance = 0
                 if all_cash_ids:
+                    # SEC-003: Use parameterized IN clause
+                    id_params = {f"cid_{i}": cid for i, cid in enumerate(all_cash_ids)}
+                    id_placeholders = ", ".join(f":cid_{i}" for i in range(len(all_cash_ids)))
                     cash_balance = db.execute(text(f"""
                         SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
                         FROM journal_lines jl
                         JOIN journal_entries je ON jl.journal_entry_id = je.id
                         JOIN accounts a ON jl.account_id = a.id
-                        WHERE a.id IN ({','.join(map(str, all_cash_ids))})
+                        WHERE a.id IN ({id_placeholders})
                         {branch_filter_je} {date_filter_je}
-                    """), params_gl).scalar() or 0
+                    """), {**params_gl, **id_params}).scalar() or 0
             else:
                 # Company-wide: if date filters exist, sum journal lines instead of using cumulative balances
                 if start_dt or end_dt:
@@ -141,10 +146,13 @@ def get_dashboard_stats(
                 
                 cash_balance = 0
                 if all_cash_ids:
+                    # SEC-003: Use parameterized IN clause
+                    id_params = {f"cid_{i}": cid for i, cid in enumerate(all_cash_ids)}
+                    id_placeholders = ", ".join(f":cid_{i}" for i in range(len(all_cash_ids)))
                     cash_balance = db.execute(text(f"""
                         SELECT COALESCE(SUM(balance), 0) FROM accounts 
-                        WHERE id IN ({','.join(map(str, all_cash_ids))})
-                    """)).scalar() or 0
+                        WHERE id IN ({id_placeholders})
+                    """), id_params).scalar() or 0
             
             return {
                 "sales": float(total_income),
@@ -230,6 +238,7 @@ def get_dashboard_stats(
         db.close()
 
 @router.get("/charts/financial", response_model=List[Dict[str, Any]], dependencies=[Depends(require_permission("dashboard.view"))])
+@cached("dashboard_charts_financial", expire=180)
 def get_financial_chart(
     days: int = 30,
     branch_id: int = None,

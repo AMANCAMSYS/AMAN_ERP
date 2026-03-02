@@ -10,8 +10,10 @@ import '../../components/ModuleStyles.css'
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 function ChecksReceivable() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 
@@ -87,7 +89,7 @@ function ChecksReceivable() {
     }
 
     const handleCreate = async () => {
-        if (!form.check_number || !form.amount || !form.due_date) return alert('يجب تعبئة رقم الشيك والمبلغ وتاريخ الاستحقاق')
+        if (!form.check_number || !form.amount || !form.due_date) return showToast(t('checks.receivable.requiredFields', 'warning'))
         try {
             setSaving(true)
             await checksAPI.createReceivable({
@@ -100,7 +102,7 @@ function ChecksReceivable() {
             setShowCreate(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.receivable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -122,7 +124,7 @@ function ChecksReceivable() {
             setShowCollect(false); setShowDetail(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.receivable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -136,7 +138,7 @@ function ChecksReceivable() {
             setShowBounce(false); setShowDetail(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.receivable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -153,7 +155,7 @@ function ChecksReceivable() {
 
     const statusBadge = (s) => {
         const map = { pending: 'badge-warning', collected: 'badge-success', bounced: 'badge-danger' }
-        const labels = { pending: 'معلق', collected: 'محصّل', bounced: 'مرتجع' }
+        const labels = { pending: t('checks.receivable.pending'), collected: t('checks.receivable.collected'), bounced: t('checks.receivable.bounced') }
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>
     }
 
@@ -170,10 +172,10 @@ function ChecksReceivable() {
                 <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div>
-                        <h1 className="workspace-title">📥 شيكات تحت التحصيل</h1>
-                        <p className="workspace-subtitle">Checks Receivable - إدارة الشيكات الواردة</p>
+                        <h1 className="workspace-title">📥 {t('checks.receivable.title')}</h1>
+                        <p className="workspace-subtitle">{t('checks.receivable.subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary" onClick={openCreate}>+ تسجيل شيك وارد</button>
+                    <button className="btn btn-primary" onClick={openCreate}>+ {t('checks.receivable.create')}</button>
                 </div>
             </div>
 
@@ -182,25 +184,25 @@ function ChecksReceivable() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                     <div className="card p-3 text-center">
                         <Clock size={24} className="text-warning mb-2" />
-                        <div className="small text-muted">معلق</div>
+                        <div className="small text-muted">{t('checks.receivable.pending')}</div>
                         <div className="fw-bold fs-4">{stats.pending.count}</div>
                         <div className="small text-muted">{formatNumber(stats.pending.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <CheckCircle size={24} className="text-success mb-2" />
-                        <div className="small text-muted">محصّل</div>
+                        <div className="small text-muted">{t('checks.receivable.collected')}</div>
                         <div className="fw-bold fs-4 text-success">{stats.collected.count}</div>
                         <div className="small text-muted">{formatNumber(stats.collected.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <XCircle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مرتجع</div>
+                        <div className="small text-muted">{t('checks.receivable.bounced')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.bounced.count}</div>
                         <div className="small text-muted">{formatNumber(stats.bounced.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <AlertTriangle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مستحق اليوم</div>
+                        <div className="small text-muted">{t('checks.receivable.overdueToday')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.overdue.count}</div>
                         <div className="small text-muted">{formatNumber(stats.overdue.amount)} {currency}</div>
                     </div>
@@ -209,15 +211,15 @@ function ChecksReceivable() {
 
             {/* Filters */}
             <div className="card" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-                <input className="form-input" placeholder="بحث برقم الشيك أو الساحب..." value={search}
+                <input className="form-input" placeholder={t('checks.receivable.searchPlaceholder')} value={search}
                     onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
                 <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ maxWidth: 160 }}>
-                    <option value="">جميع الحالات</option>
-                    <option value="pending">معلق</option>
-                    <option value="collected">محصّل</option>
-                    <option value="bounced">مرتجع</option>
+                    <option value="">{t('checks.receivable.allStatuses')}</option>
+                    <option value="pending">{t('checks.receivable.pending')}</option>
+                    <option value="collected">{t('checks.receivable.collected')}</option>
+                    <option value="bounced">{t('checks.receivable.bounced')}</option>
                 </select>
-                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>الإجمالي: {total}</div>
+                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>{t('checks.receivable.total')}: {total}</div>
             </div>
 
             {/* Table */}
@@ -225,17 +227,17 @@ function ChecksReceivable() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم الشيك</th>
-                            <th>الساحب</th>
-                            <th>البنك</th>
-                            <th>المبلغ</th>
-                            <th>تاريخ الاستحقاق</th>
-                            <th>الحالة</th>
+                            <th>{t('checks.receivable.checkNumber')}</th>
+                            <th>{t('checks.receivable.drawer')}</th>
+                            <th>{t('checks.receivable.bank')}</th>
+                            <th>{t('checks.receivable.amount')}</th>
+                            <th>{t('checks.receivable.dueDate')}</th>
+                            <th>{t('checks.receivable.status')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.length === 0 ? (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>لا توجد شيكات</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>{t('checks.receivable.noChecks')}</td></tr>
                         ) : items.map(item => (
                             <tr key={item.id} onClick={() => viewDetail(item.id)}
                                 style={{ cursor: 'pointer', background: isOverdue(item.due_date, item.status) ? 'rgba(220,53,69,0.05)' : undefined }}>
@@ -259,58 +261,58 @@ function ChecksReceivable() {
                 <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>تسجيل شيك وارد</h2>
+                            <h2>{t('checks.receivable.create')}</h2>
                             <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                                 <div>
-                                    <label className="form-label">رقم الشيك *</label>
+                                    <label className="form-label">{t('checks.receivable.checkNumber')} *</label>
                                     <input className="form-input" value={form.check_number} onChange={e => setForm(f => ({ ...f, check_number: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">المبلغ *</label>
+                                    <label className="form-label">{t('checks.receivable.amount')} *</label>
                                     <input className="form-input" type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">اسم الساحب</label>
+                                    <label className="form-label">{t('checks.receivable.drawerName')}</label>
                                     <input className="form-input" value={form.drawer_name} onChange={e => setForm(f => ({ ...f, drawer_name: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">البنك</label>
+                                    <label className="form-label">{t('checks.receivable.bank')}</label>
                                     <input className="form-input" value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">تاريخ الإصدار</label>
+                                    <label className="form-label">{t('checks.receivable.issueDate')}</label>
                                     <DateInput className="form-input" value={form.issue_date} onChange={e => setForm(f => ({ ...f, issue_date: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">تاريخ الاستحقاق *</label>
+                                    <label className="form-label">{t('checks.receivable.dueDate')} *</label>
                                     <DateInput className="form-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">العميل</label>
+                                    <label className="form-label">{t('checks.receivable.customer')}</label>
                                     <select className="form-input" value={form.party_id} onChange={e => setForm(f => ({ ...f, party_id: e.target.value }))}>
-                                        <option value="">اختر العميل</option>
+                                        <option value="">{t('checks.receivable.selectCustomer')}</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="form-label">حساب الخزينة</label>
+                                    <label className="form-label">{t('checks.receivable.treasuryAccount')}</label>
                                     <select className="form-input" value={form.treasury_account_id} onChange={e => setForm(f => ({ ...f, treasury_account_id: e.target.value }))}>
-                                        <option value="">اختر الخزينة</option>
+                                        <option value="">{t('checks.receivable.selectTreasury')}</option>
                                         {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <label className="form-label">ملاحظات</label>
+                                    <label className="form-label">{t('checks.receivable.notes')}</label>
                                     <input className="form-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                                 </div>
                             </div>
                             <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn btn-primary" onClick={handleCreate} disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'تسجيل الشيك'}
+                                    {saving ? t('checks.receivable.saving') : t('checks.receivable.registerCheck')}
                                 </button>
                             </div>
                         </div>
@@ -323,25 +325,25 @@ function ChecksReceivable() {
                 <div className="modal-overlay" onClick={() => setShowDetail(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>شيك رقم: {detailItem.check_number}</h2>
+                            <h2>{t('checks.receivable.checkNumberTitle')} {detailItem.check_number}</h2>
                             <button className="modal-close" onClick={() => setShowDetail(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: 20 }}>
-                                <div className="metric-card"><div className="metric-label">المبلغ</div><div className="metric-value text-primary" style={{ fontSize: 20 }}>{formatNumber(detailItem.amount)} {currency}</div></div>
-                                <div className="metric-card"><div className="metric-label">الحالة</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
-                                <div className="metric-card"><div className="metric-label">الاستحقاق</div><div className="metric-value" style={{ fontSize: 14 }}>{formatShortDate(detailItem.due_date)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.receivable.amount')}</div><div className="metric-value text-primary" style={{ fontSize: 20 }}>{formatNumber(detailItem.amount)} {currency}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.receivable.status')}</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.receivable.dueDateShort')}</div><div className="metric-value" style={{ fontSize: 14 }}>{formatShortDate(detailItem.due_date)}</div></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                                <div><strong>الساحب:</strong> {detailItem.drawer_name || '—'}</div>
-                                <div><strong>البنك:</strong> {detailItem.bank_name || '—'}</div>
-                                <div><strong>العميل:</strong> {detailItem.party_name || '—'}</div>
-                                <div><strong>الخزينة:</strong> {detailItem.treasury_name || '—'}</div>
-                                <div><strong>تاريخ الإصدار:</strong> {detailItem.issue_date ? formatShortDate(detailItem.issue_date) : '—'}</div>
-                                {detailItem.collection_date && <div><strong>تاريخ التحصيل:</strong> {formatShortDate(detailItem.collection_date)}</div>}
-                                {detailItem.bounce_date && <div><strong>تاريخ الارتجاع:</strong> {formatShortDate(detailItem.bounce_date)}</div>}
-                                {detailItem.bounce_reason && <div style={{ gridColumn: '1 / -1' }}><strong>سبب الارتجاع:</strong> {detailItem.bounce_reason}</div>}
+                                <div><strong>{t('checks.receivable.drawer')}:</strong> {detailItem.drawer_name || '—'}</div>
+                                <div><strong>{t('checks.receivable.bank')}:</strong> {detailItem.bank_name || '—'}</div>
+                                <div><strong>{t('checks.receivable.customer')}:</strong> {detailItem.party_name || '—'}</div>
+                                <div><strong>{t('checks.receivable.treasury')}:</strong> {detailItem.treasury_name || '—'}</div>
+                                <div><strong>{t('checks.receivable.issueDate')}:</strong> {detailItem.issue_date ? formatShortDate(detailItem.issue_date) : '—'}</div>
+                                {detailItem.collection_date && <div><strong>{t('checks.receivable.collectionDate')}:</strong> {formatShortDate(detailItem.collection_date)}</div>}
+                                {detailItem.bounce_date && <div><strong>{t('checks.receivable.bounceDate')}:</strong> {formatShortDate(detailItem.bounce_date)}</div>}
+                                {detailItem.bounce_reason && <div style={{ gridColumn: '1 / -1' }}><strong>{t('checks.receivable.bounceReason')}:</strong> {detailItem.bounce_reason}</div>}
                             </div>
 
                             {detailItem.notes && <p style={{ color: '#666', marginBottom: 16 }}>📝 {detailItem.notes}</p>}
@@ -349,8 +351,8 @@ function ChecksReceivable() {
                             {/* Actions */}
                             {detailItem.status === 'pending' && (
                                 <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                                    <button className="btn btn-primary" onClick={openCollect}>✅ تحصيل الشيك</button>
-                                    <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={openBounce}>❌ شيك مرتجع</button>
+                                    <button className="btn btn-primary" onClick={openCollect}>✅ {t('checks.receivable.collect')}</button>
+                                    <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={openBounce}>❌ {t('checks.receivable.bounce')}</button>
                                 </div>
                             )}
                         </div>
@@ -363,27 +365,27 @@ function ChecksReceivable() {
                 <div className="modal-overlay" onClick={() => setShowCollect(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
                         <div className="modal-header">
-                            <h2>تحصيل الشيك</h2>
+                            <h2>{t('checks.receivable.collect')}</h2>
                             <button className="modal-close" onClick={() => setShowCollect(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">تاريخ التحصيل</label>
+                                <label className="form-label">{t('checks.receivable.collectionDate')}</label>
                                 <DateInput className="form-input" value={actionForm.collection_date}
                                     onChange={e => setActionForm(f => ({ ...f, collection_date: e.target.value }))} />
                             </div>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">حساب الخزينة (البنك)</label>
+                                <label className="form-label">{t('checks.receivable.treasuryBank')}</label>
                                 <select className="form-input" value={actionForm.treasury_account_id || ''}
                                     onChange={e => setActionForm(f => ({ ...f, treasury_account_id: e.target.value }))}>
-                                    <option value="">اختر الخزينة</option>
+                                    <option value="">{t('checks.receivable.selectTreasury')}</option>
                                     {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                 </select>
                             </div>
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowCollect(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowCollect(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn btn-primary" onClick={handleCollect} disabled={saving}>
-                                    {saving ? 'جاري...' : 'تأكيد التحصيل'}
+                                    {saving ? t('checks.receivable.processing') : t('checks.receivable.confirmCollect')}
                                 </button>
                             </div>
                         </div>
@@ -396,25 +398,25 @@ function ChecksReceivable() {
                 <div className="modal-overlay" onClick={() => setShowBounce(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
                         <div className="modal-header">
-                            <h2>تسجيل شيك مرتجع</h2>
+                            <h2>{t('checks.receivable.bounce')}</h2>
                             <button className="modal-close" onClick={() => setShowBounce(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">تاريخ الارتجاع</label>
+                                <label className="form-label">{t('checks.receivable.bounceDate')}</label>
                                 <DateInput className="form-input" value={actionForm.bounce_date}
                                     onChange={e => setActionForm(f => ({ ...f, bounce_date: e.target.value }))} />
                             </div>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">سبب الارتجاع</label>
+                                <label className="form-label">{t('checks.receivable.bounceReason')}</label>
                                 <textarea className="form-input" rows="3" value={actionForm.bounce_reason || ''}
                                     onChange={e => setActionForm(f => ({ ...f, bounce_reason: e.target.value }))}
-                                    placeholder="رصيد غير كافٍ، توقيع غير مطابق..." />
+                                    placeholder={t('checks.receivable.bouncePlaceholder')} />
                             </div>
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowBounce(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowBounce(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={handleBounce} disabled={saving}>
-                                    {saving ? 'جاري...' : 'تأكيد الارتجاع'}
+                                    {saving ? t('checks.receivable.processing') : t('checks.receivable.confirmBounce')}
                                 </button>
                             </div>
                         </div>

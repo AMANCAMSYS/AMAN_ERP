@@ -7,10 +7,12 @@ import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import './TaxHome.css'
 import { formatShortDate } from '../../utils/dateUtils';
+import { useToast } from '../../context/ToastContext'
 
 
 function TaxHome() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -88,7 +90,7 @@ function TaxHome() {
             setRateForm({ tax_code: '', tax_name: '', tax_name_en: '', rate_value: 15, description: '' })
             fetchAll()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -98,7 +100,7 @@ function TaxHome() {
             await taxesAPI.deleteRate(id)
             fetchAll()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 

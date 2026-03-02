@@ -10,6 +10,7 @@ from routers.auth import get_current_user, UserResponse
 from schemas.contracts import ContractCreate, ContractResponse
 from utils.permissions import require_permission
 from utils.accounting import get_base_currency
+from utils.audit import log_activity
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,34 @@ def create_contract(
             )
         
         db.commit()
+
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "create",
+                         "contracts", str(contract_id),
+                         {"contract_number": contract.contract_number, "total": final_total})
+        except Exception:
+            pass
+
+        # Notify about new contract
+        try:
+            party_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": contract.party_id}).scalar()
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'contract', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "📝 عقد جديد",
+                "message": f"تم إنشاء عقد {contract.contract_number or ''} — {party_name or ''} — {final_total:,.2f}",
+                "link": f"/contracts/{contract_id}",
+                "current_uid": current_user.id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return get_contract(contract_id, current_user)
     except Exception as e:
         db.rollback()
@@ -101,15 +130,28 @@ def create_contract(
         db.close()
 
 @router.get("", response_model=List[ContractResponse], dependencies=[Depends(require_permission("contracts.view"))])
-def list_contracts(current_user: UserResponse = Depends(get_current_user)):
+def list_contracts(
+    branch_id: Optional[int] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    from utils.permissions import validate_branch_access
+    validated_branch = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
-        contracts = db.execute(text("""
+        query = """
             SELECT c.*, p.name as party_name 
             FROM contracts c
             JOIN parties p ON c.party_id = p.id
-            ORDER BY c.created_at DESC
-        """)).fetchall()
+        """
+        params = {}
+        conditions = []
+        if validated_branch:
+            conditions.append("c.branch_id = :branch_id")
+            params["branch_id"] = validated_branch
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY c.created_at DESC"
+        contracts = db.execute(text(query), params).fetchall()
         
         result = []
         for c in contracts:
@@ -198,6 +240,14 @@ def update_contract(
             })
 
         trans.commit()
+
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "update",
+                         "contracts", str(contract_id), {"action": "update_contract"})
+        except Exception:
+            pass
+
         return get_contract(contract_id, current_user)
     except HTTPException:
         trans.rollback()
@@ -261,6 +311,14 @@ def renew_contract(
         )
         
         db.commit()
+
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "renew",
+                         "contracts", str(contract_id), {"new_start": str(new_start), "new_end": str(new_end)})
+        except Exception:
+            pass
+
         return get_contract(contract_id, current_user)
     except HTTPException:
         raise
@@ -335,6 +393,15 @@ def generate_contract_invoice(
             })
         
         db.commit()
+
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "generate_invoice",
+                         "contracts", str(contract_id),
+                         {"invoice_id": inv_id, "invoice_number": inv_num, "total": total})
+        except Exception:
+            pass
+
         return {"success": True, "invoice_id": inv_id, "invoice_number": inv_num, "total": total}
     except HTTPException:
         raise
@@ -369,6 +436,15 @@ def cancel_contract(
             {"id": contract_id}
         )
         db.commit()
+
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "cancel",
+                         "contracts", str(contract_id),
+                         {"contract_number": contract.contract_number})
+        except Exception:
+            pass
+
         return {"message": "تم إلغاء العقد بنجاح", "id": contract_id}
     except HTTPException:
         raise
@@ -459,5 +535,102 @@ def get_contracts_summary(
     except Exception as e:
         logger.error(f"Error fetching contract stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ===================== C2: Contract Amendments =====================
+
+@router.get("/{contract_id}/amendments")
+def list_amendments(contract_id: int, current_user=Depends(get_current_user)):
+    """سجل تعديلات العقد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT ca.*, u.full_name as approved_by_name
+            FROM contract_amendments ca
+            LEFT JOIN users u ON u.id = ca.approved_by
+            WHERE ca.contract_id = :cid
+            ORDER BY ca.created_at DESC
+        """), {"cid": contract_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/{contract_id}/amendments")
+def create_amendment(contract_id: int, amendment: dict, current_user=Depends(get_current_user)):
+    """إنشاء تعديل عقد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            INSERT INTO contract_amendments (contract_id, amendment_type, old_value,
+                new_value, description, effective_date, approved_by)
+            VALUES (:cid, :at, :ov, :nv, :desc, :ed, :ab)
+            RETURNING id
+        """), {
+            "cid": contract_id, "at": amendment.get("amendment_type", "modification"),
+            "ov": amendment.get("old_value"), "nv": amendment.get("new_value"),
+            "desc": amendment.get("description"), "ed": amendment.get("effective_date"),
+            "ab": current_user.id
+        })
+        aid = result.fetchone()[0]
+        db.commit()
+        return {"id": aid, "message": "تم إنشاء التعديل بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/{contract_id}/kpis")
+def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
+    """مؤشرات أداء العقد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        contract = db.execute(text("SELECT * FROM contracts WHERE id = :id"),
+                              {"id": contract_id}).fetchone()
+        if not contract:
+            raise HTTPException(404, "Contract not found")
+        c = dict(contract._mapping)
+
+        # Amendment count
+        amendments = db.execute(text(
+            "SELECT COUNT(*) FROM contract_amendments WHERE contract_id = :cid"
+        ), {"cid": contract_id}).scalar() or 0
+
+        # Related invoices
+        invoices = db.execute(text("""
+            SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total,
+                   COALESCE(SUM(balance_due), 0) as outstanding
+            FROM invoices WHERE contract_id = :cid
+        """), {"cid": contract_id}).fetchone()
+        inv = dict(invoices._mapping) if invoices else {}
+
+        # Days remaining
+        from datetime import date
+        end_date = c.get("end_date")
+        days_remaining = (end_date - date.today()).days if end_date else None
+
+        total_value = float(c.get("total_amount") or c.get("value") or 0)
+        invoiced = float(inv.get("total", 0))
+        utilization = round(invoiced / total_value * 100, 2) if total_value > 0 else 0
+
+        return {
+            "contract_id": contract_id,
+            "total_value": total_value,
+            "invoiced_amount": invoiced,
+            "outstanding_amount": float(inv.get("outstanding", 0)),
+            "utilization_pct": utilization,
+            "days_remaining": days_remaining,
+            "invoice_count": int(inv.get("count", 0)),
+            "amendment_count": amendments,
+            "status": c.get("status")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
     finally:
         db.close()

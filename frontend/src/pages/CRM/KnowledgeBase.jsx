@@ -4,6 +4,7 @@ import { crmAPI } from '../../utils/api';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 const categoryColors = {
     faq: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -14,6 +15,7 @@ const categoryColors = {
 
 function KnowledgeBase() {
     const { t } = useTranslation();
+  const { showToast } = useToast()
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -58,7 +60,7 @@ function KnowledgeBase() {
             if (isEdit) await crmAPI.updateArticle(editId, form);
             else await crmAPI.createArticle(form);
             setShowModal(false); fetchData();
-        } catch (err) { alert(err.response?.data?.detail || 'Error'); }
+        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
     };
 
     const handleDelete = async (id) => {
@@ -126,7 +128,7 @@ function KnowledgeBase() {
 
             {/* View Article Modal */}
             {showView && (
-                <div className="modal-backdrop" onClick={() => setShowView(null)}>
+                <div className="modal-overlay" onClick={() => setShowView(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '80vh', overflow: 'auto' }}>
                         <div className="modal-header">
                             <h3>{showView.title}</h3>
@@ -148,7 +150,7 @@ function KnowledgeBase() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
                         <div className="modal-header"><h3>{isEdit ? t('crm.kb_edit', 'تعديل المقالة') : t('crm.kb_new', 'مقالة جديدة')}</h3></div>
                         <div className="modal-body">

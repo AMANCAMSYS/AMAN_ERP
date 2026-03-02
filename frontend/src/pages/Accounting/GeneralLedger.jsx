@@ -19,6 +19,9 @@ function GeneralLedger() {
     const [loading, setLoading] = useState(false)
     const [loadingAccounts, setLoadingAccounts] = useState(true)
     const [error, setError] = useState(null)
+    const [isAggregated, setIsAggregated] = useState(false)
+    const [childCount, setChildCount] = useState(0)
+    const [openingBalance, setOpeningBalance] = useState(0)
     const currency = getCurrency()
 
     // Load accounts list
@@ -51,6 +54,9 @@ function GeneralLedger() {
             }
             const response = await reportsAPI.getGeneralLedger(params)
             setEntries(response.data.entries || [])
+            setIsAggregated(response.data.is_aggregated || false)
+            setChildCount(response.data.child_accounts_count || 0)
+            setOpeningBalance(response.data.opening_balance || 0)
         } catch (err) {
             console.error("Failed to fetch ledger", err)
             setError(t('accounting.general_ledger.error_loading'))
@@ -67,8 +73,8 @@ function GeneralLedger() {
 
     const selectedAccountData = accounts.find(a => String(a.id) === String(selectedAccount))
 
-    // Calculate running balance
-    let runningBalance = 0
+    // Calculate running balance (backend already computes it, but re-compute for display)
+    let runningBalance = openingBalance
     const entriesWithBalance = entries.map(entry => {
         const debit = parseFloat(entry.debit || 0)
         const credit = parseFloat(entry.credit || 0)
@@ -185,6 +191,18 @@ function GeneralLedger() {
                         </div>
                     )}
 
+                    {/* Aggregation banner */}
+                    {isAggregated && (
+                        <div className="mt-2 p-3" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', color: '#1D4ED8', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>🗂️</span>
+                            <span>
+                                {i18n.language === 'ar'
+                                    ? `يعرض هذا التقرير حركات حساب "${selectedAccountData?.name}" مع ${childCount} حساب فرعي`
+                                    : `Showing transactions for "${selectedAccountData?.name_en || selectedAccountData?.name}" and ${childCount} sub-account(s)`}
+                            </span>
+                        </div>
+                    )}
+
                     {/* Entries Table */}
                     <div className="card mt-3">
                         <div className="data-table-container">
@@ -194,6 +212,7 @@ function GeneralLedger() {
                                         <th style={{ width: '120px' }}>{t('accounting.general_ledger.date')}</th>
                                         <th style={{ width: '130px' }}>{t('accounting.general_ledger.entry_number')}</th>
                                         <th>{t('accounting.general_ledger.description')}</th>
+                                        {isAggregated && <th style={{ width: '200px' }}>{t('accounting.general_ledger.account', 'الحساب')}</th>}
                                         <th style={{ width: '120px' }}>{t('accounting.general_ledger.reference')}</th>
                                         <th style={{ textAlign: 'left', width: '140px' }}>{t('accounting.table.debit')}</th>
                                         <th style={{ textAlign: 'left', width: '140px' }}>{t('accounting.table.credit')}</th>
@@ -203,7 +222,7 @@ function GeneralLedger() {
                                 <tbody>
                                     {entriesWithBalance.length === 0 ? (
                                         <tr>
-                                            <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                                            <td colSpan={isAggregated ? 8 : 7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                                                 {t('accounting.general_ledger.no_entries')}
                                             </td>
                                         </tr>
@@ -213,6 +232,7 @@ function GeneralLedger() {
                                                 <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{formatDate(entry.entry_date)}</td>
                                                 <td className="font-mono" style={{ whiteSpace: 'nowrap' }}>{entry.entry_number}</td>
                                                 <td style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.description}</td>
+                                                {isAggregated && <td style={{ fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{entry.account_name || '-'}</td>}
                                                 <td style={{ color: entry.reference ? 'var(--text-primary)' : 'var(--text-light)' }}>{entry.reference || '-'}</td>
                                                 <td style={{ textAlign: 'left', fontWeight: parseFloat(entry.debit) > 0 ? '600' : '400', color: parseFloat(entry.debit) > 0 ? 'var(--text-primary)' : 'var(--text-light)' }}>
                                                     {parseFloat(entry.debit) > 0 ? formatNumber(entry.debit) : '-'}
@@ -233,7 +253,7 @@ function GeneralLedger() {
                                 {entriesWithBalance.length > 0 && (
                                     <tfoot>
                                         <tr style={{ background: 'var(--primary)', color: 'white', fontWeight: 'bold', fontSize: '1.05em' }}>
-                                            <td colSpan="4" style={{ textAlign: 'center' }}>{t('accounting.general_ledger.totals')}</td>
+                                            <td colSpan={isAggregated ? 5 : 4} style={{ textAlign: 'center' }}>{t('accounting.general_ledger.totals')}</td>
                                             <td style={{ textAlign: 'left' }}>{formatNumber(totalDebit)} <small>{currency}</small></td>
                                             <td style={{ textAlign: 'left' }}>{formatNumber(totalCredit)} <small>{currency}</small></td>
                                             <td style={{ textAlign: 'left' }}>

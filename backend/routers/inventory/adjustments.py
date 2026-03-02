@@ -233,6 +233,25 @@ def create_adjustment(
         except Exception as audit_err:
             logger.warning(f"Audit logging failed: {audit_err}")
 
+        # Notify about inventory adjustment
+        try:
+            prod_name = db.execute(text("SELECT name FROM products WHERE id = :id"), {"id": data.product_id}).scalar()
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'inventory', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "📦 تسوية مخزون",
+                "message": f"تسوية جرد {adj_number} — {prod_name or ''} — فرق: {difference:+}",
+                "link": "/stock/adjustments",
+                "current_uid": user_id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return {"id": adj_id, "message": "تم حفظ تسوية الجرد بنجاح"}
 
     except HTTPException:

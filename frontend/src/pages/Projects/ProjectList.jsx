@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Search, FolderKanban, TrendingUp, Clock, CheckCircle2, PauseCircle, XCircle, BarChart3, Users, DollarSign, Calendar } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
+import BackButton from '../../components/common/BackButton';
 import { useBranch } from '../../context/BranchContext';
 import Pagination, { usePagination } from '../../components/common/Pagination';
 import '../../components/ModuleStyles.css';
@@ -74,6 +75,7 @@ export default function ProjectList() {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div>
                         <h1 className="workspace-title">{t('projects.title')}</h1>
@@ -145,6 +147,12 @@ export default function ProjectList() {
                         <Link to="/projects/resources" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                             <Users size={14} /> {t('projects.resource_allocation')}
                         </Link>
+                        <Link to="/projects/gantt" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            📅 {t('projects.gantt_chart', 'مخطط جانت')}
+                        </Link>
+                        <Link to="/projects/risks" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            ⚠️ {t('projects.risks', 'سجل المخاطر')}
+                        </Link>
                     </div>
                 </div>
 
@@ -182,7 +190,7 @@ export default function ProjectList() {
             </div>
 
             {/* Search & Filter */}
-            <div className="card section-card border-0 shadow-sm">
+            <div className="card section-card">
                 <div className="card-body">
                     <div className="d-flex gap-3 mb-3 flex-wrap">
                         <div className="search-box flex-grow-1">

@@ -57,6 +57,10 @@ from routers import projects, reports, scheduled_reports, dashboard
 # ── Commerce & External ────────────────────────────────────────────────────────
 from routers import pos, contracts, crm, external, services
 
+# ── System Completion (Phase 100%) ─────────────────────────────────────────────
+from routers import delivery_orders, landed_costs, hr_wps_compliance
+from routers import system_completion
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -426,6 +430,12 @@ app.include_router(contracts.router, prefix="/api")
 app.include_router(crm.router, prefix="/api")
 app.include_router(external.router, prefix="/api")
 app.include_router(services.router, prefix="/api")
+
+# ── System Completion (New modules) ──────────────────────────────
+app.include_router(delivery_orders.router, prefix="/api")
+app.include_router(landed_costs.router, prefix="/api")
+app.include_router(hr_wps_compliance.router, prefix="/api")
+app.include_router(system_completion.router, prefix="/api")
 
 
 @app.get("/")

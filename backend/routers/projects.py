@@ -43,6 +43,8 @@ async def get_projects(
     current_user: dict = Depends(get_current_user)
 ):
     """جلب قائمة المشاريع مع ملخص مالي"""
+    from utils.permissions import validate_branch_access
+    validated_branch = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {}
@@ -51,6 +53,10 @@ async def get_projects(
         if status_filter:
             filters.append("p.status = :status")
             params["status"] = status_filter
+
+        if validated_branch:
+            filters.append("p.branch_id = :branch_id")
+            params["branch_id"] = validated_branch
 
         where = " AND ".join(filters)
 
@@ -2338,18 +2344,18 @@ async def get_overdue_tasks(current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         rows = db.execute(text("""
-            SELECT t.id, t.task_name, t.due_date, t.status, t.priority,
-                   t.progress_percentage,
+            SELECT t.id, t.task_name, t.end_date, t.status,
+                   t.progress,
                    p.id as project_id, p.project_code, p.project_name,
                    COALESCE(u.full_name, '') as assigned_to_name,
-                   (CURRENT_DATE - t.due_date) as days_overdue
+                   (CURRENT_DATE - t.end_date) as days_overdue
             FROM project_tasks t
             JOIN projects p ON t.project_id = p.id
             LEFT JOIN company_users u ON t.assigned_to = u.id
-            WHERE t.due_date < CURRENT_DATE
+            WHERE t.end_date < CURRENT_DATE
               AND t.status NOT IN ('completed', 'cancelled')
               AND p.status NOT IN ('completed', 'cancelled')
-            ORDER BY days_overdue DESC, t.priority DESC
+            ORDER BY days_overdue DESC
         """)).fetchall()
 
         tasks_list = [dict(r._mapping) for r in rows]
@@ -2419,7 +2425,7 @@ async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
         overdue_tasks_count = db.execute(text("""
             SELECT COUNT(*) FROM project_tasks t
             JOIN projects p ON t.project_id = p.id
-            WHERE t.due_date < CURRENT_DATE
+            WHERE t.end_date < CURRENT_DATE
               AND t.status NOT IN ('completed', 'cancelled')
               AND p.status NOT IN ('completed', 'cancelled')
         """)).scalar()
@@ -2492,5 +2498,155 @@ async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
                 "pending_change_orders": int(pending_cos),
             }
         }
+    finally:
+        db.close()
+
+
+# ===================== B5: Project Risks =====================
+
+@router.get("/{project_id}/risks")
+def list_project_risks(project_id: int, current_user=Depends(get_current_user)):
+    """سجل المخاطر"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT pr.*, u.full_name as owner_name
+            FROM project_risks pr
+            LEFT JOIN users u ON u.id = pr.owner_id
+            WHERE pr.project_id = :pid
+            ORDER BY pr.risk_score DESC NULLS LAST, pr.created_at DESC
+        """), {"pid": project_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/{project_id}/risks")
+def create_project_risk(project_id: int, risk: dict, current_user=Depends(get_current_user)):
+    """إضافة خطر"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        prob = float(risk.get("probability", 0.5))
+        impact = float(risk.get("impact", 0.5))
+        score = round(prob * impact, 4)
+        result = db.execute(text("""
+            INSERT INTO project_risks (project_id, title, description, probability,
+                impact, risk_score, status, mitigation_plan, owner_id, due_date)
+            VALUES (:pid, :t, :d, :p, :i, :s, :st, :mp, :oid, :dd)
+            RETURNING id
+        """), {
+            "pid": project_id, "t": risk["title"], "d": risk.get("description"),
+            "p": prob, "i": impact, "s": score,
+            "st": risk.get("status", "identified"), "mp": risk.get("mitigation_plan"),
+            "oid": risk.get("owner_id"), "dd": risk.get("due_date")
+        })
+        risk_id = result.fetchone()[0]
+        db.commit()
+        return {"id": risk_id, "message": "تم إضافة الخطر بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/risks/{risk_id}")
+def update_project_risk(risk_id: int, risk: dict, current_user=Depends(get_current_user)):
+    """تحديث خطر"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        prob = float(risk.get("probability", 0.5))
+        impact = float(risk.get("impact", 0.5))
+        score = round(prob * impact, 4)
+        db.execute(text("""
+            UPDATE project_risks SET title = :t, description = :d, probability = :p,
+                impact = :i, risk_score = :s, status = :st, mitigation_plan = :mp,
+                owner_id = :oid, due_date = :dd
+            WHERE id = :id
+        """), {
+            "t": risk["title"], "d": risk.get("description"),
+            "p": prob, "i": impact, "s": score,
+            "st": risk.get("status"), "mp": risk.get("mitigation_plan"),
+            "oid": risk.get("owner_id"), "dd": risk.get("due_date"), "id": risk_id
+        })
+        db.commit()
+        return {"message": "تم تحديث الخطر بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/risks/{risk_id}")
+def delete_project_risk(risk_id: int, current_user=Depends(get_current_user)):
+    """حذف خطر"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM project_risks WHERE id = :id"), {"id": risk_id})
+        db.commit()
+        return {"message": "تم حذف الخطر"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+# ===================== B5: Task Dependencies =====================
+
+@router.get("/{project_id}/task-dependencies")
+def list_task_dependencies(project_id: int, current_user=Depends(get_current_user)):
+    """تبعيات المهام"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT td.*, t1.name as task_name, t2.name as depends_on_name
+            FROM task_dependencies td
+            LEFT JOIN project_tasks t1 ON t1.id = td.task_id
+            LEFT JOIN project_tasks t2 ON t2.id = td.depends_on_task_id
+            WHERE td.project_id = :pid
+            ORDER BY td.task_id
+        """), {"pid": project_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/{project_id}/task-dependencies")
+def create_task_dependency(project_id: int, dep: dict, current_user=Depends(get_current_user)):
+    """إنشاء تبعية مهمة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            INSERT INTO task_dependencies (project_id, task_id, depends_on_task_id,
+                dependency_type, lag_days)
+            VALUES (:pid, :tid, :did, :dt, :ld)
+            RETURNING id
+        """), {
+            "pid": project_id, "tid": dep["task_id"], "did": dep["depends_on_task_id"],
+            "dt": dep.get("dependency_type", "FS"), "ld": dep.get("lag_days", 0)
+        })
+        dep_id = result.fetchone()[0]
+        db.commit()
+        return {"id": dep_id, "message": "تم إنشاء التبعية بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/task-dependencies/{dep_id}")
+def delete_task_dependency(dep_id: int, current_user=Depends(get_current_user)):
+    """حذف تبعية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM task_dependencies WHERE id = :id"), {"id": dep_id})
+        db.commit()
+        return {"message": "تم حذف التبعية"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
     finally:
         db.close()

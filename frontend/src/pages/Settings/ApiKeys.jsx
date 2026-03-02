@@ -5,6 +5,8 @@ import '../../components/ModuleStyles.css';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 const PERMISSION_OPTIONS = [
   { value: 'read', labelKey: 'settings.api_keys.perm_read' },
@@ -16,6 +18,7 @@ const PERMISSION_OPTIONS = [
 
 export default function ApiKeys() {
   const { t } = useTranslation();
+  const { showToast } = useToast()
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -69,7 +72,7 @@ export default function ApiKeys() {
       fetchKeys();
     } catch (e) {
       console.error(e);
-      alert(t('settings.api_keys.error_create'));
+      showToast(t('settings.api_keys.error_create', 'error'));
     } finally {
       setSubmitting(false);
     }
@@ -82,7 +85,7 @@ export default function ApiKeys() {
       fetchKeys();
     } catch (e) {
       console.error(e);
-      alert(t('settings.api_keys.error_delete'));
+      showToast(t('settings.api_keys.error_delete', 'error'));
     }
   };
 
@@ -222,9 +225,8 @@ export default function ApiKeys() {
                 </div>
                 <div className="form-group mb-3">
                   <label className="form-label">{t('settings.api_keys.expiry_date_optional')}</label>
-                  <input
+                  <DateInput
                     className="form-input"
-                    type="date"
                     value={form.expires_at}
                     onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
                   />

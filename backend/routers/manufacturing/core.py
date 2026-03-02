@@ -8,6 +8,7 @@ from utils.permissions import require_permission
 from database import get_db_connection
 from utils.accounting import update_account_balance, get_base_currency
 from utils.exports import generate_excel, generate_pdf, create_export_response
+from utils.audit import log_activity
 from schemas import UserResponse
 from schemas.manufacturing_advanced import (
     WorkCenterCreate, WorkCenterResponse,
@@ -29,10 +30,21 @@ router = APIRouter(
 # ==========================================
 
 @router.get("/work-centers", response_model=List[WorkCenterResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_work_centers(current_user: UserResponse = Depends(get_current_user)):
+def list_work_centers(
+    branch_id: Optional[int] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    from utils.permissions import validate_branch_access
+    validated_branch = validate_branch_access(current_user, branch_id)
     conn = get_db_connection(current_user.company_id)
     try:
-        rows = conn.execute(text("SELECT * FROM work_centers ORDER BY name")).fetchall()
+        query = "SELECT * FROM work_centers"
+        params = {}
+        if validated_branch:
+            query += " WHERE branch_id = :branch_id"
+            params["branch_id"] = validated_branch
+        query += " ORDER BY name"
+        rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
     finally:
         conn.close()
@@ -166,6 +178,48 @@ def create_route(route: RouteCreate, current_user: UserResponse = Depends(get_cu
     finally:
         conn.close()
 
+@router.put("/routes/{route_id}", response_model=RouteResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
+def update_route(route_id: int, route: RouteCreate, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    trans = conn.begin()
+    try:
+        existing = conn.execute(text("SELECT * FROM manufacturing_routes WHERE id = :id"), {"id": route_id}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Route not found")
+
+        conn.execute(text("""
+            UPDATE manufacturing_routes SET name=:name, product_id=:pid, is_active=:active, description=:desc, updated_at=NOW()
+            WHERE id=:id
+        """), {"name": route.name, "pid": route.product_id, "active": route.is_active, "desc": route.description, "id": route_id})
+
+        # Replace operations: delete old ones & insert new
+        conn.execute(text("DELETE FROM manufacturing_operations WHERE route_id = :rid"), {"rid": route_id})
+        for op in route.operations:
+            conn.execute(text("""
+                INSERT INTO manufacturing_operations (route_id, sequence, work_center_id, description, setup_time, cycle_time)
+                VALUES (:rid, :seq, :wcid, :desc, :setup, :cycle)
+            """), {"rid": route_id, "seq": op.sequence, "wcid": op.work_center_id, "desc": op.description, "setup": op.setup_time, "cycle": op.cycle_time})
+
+        trans.commit()
+
+        route_row = conn.execute(text("""
+            SELECT r.*, p.product_name FROM manufacturing_routes r LEFT JOIN products p ON r.product_id = p.id WHERE r.id = :id
+        """), {"id": route_id}).fetchone()
+        route_dict = dict(route_row._mapping)
+        ops = conn.execute(text("""
+            SELECT mo.*, wc.name as work_center_name FROM manufacturing_operations mo
+            LEFT JOIN work_centers wc ON mo.work_center_id = wc.id WHERE mo.route_id = :rid ORDER BY mo.sequence
+        """), {"rid": route_id}).fetchall()
+        route_dict['operations'] = [dict(op._mapping) for op in ops]
+        return route_dict
+    except HTTPException:
+        raise
+    except Exception as e:
+        trans.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+
 # ==========================================
 # 3. BILL OF MATERIALS (BOM)
 # ==========================================
@@ -282,6 +336,105 @@ def create_bom(bom: BOMCreate, current_user: UserResponse = Depends(get_current_
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
         
         return bom_dict
+    except Exception as e:
+        trans.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+
+@router.get("/boms/{bom_id}", response_model=BOMResponse, dependencies=[Depends(require_permission("manufacturing.view"))])
+def get_bom(bom_id: int, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        b = conn.execute(text("""
+            SELECT b.*, p.product_name as product_name, r.name as route_name
+            FROM bill_of_materials b
+            LEFT JOIN products p ON b.product_id = p.id
+            LEFT JOIN manufacturing_routes r ON b.route_id = r.id
+            WHERE b.id = :bid
+        """), {"bid": bom_id}).fetchone()
+        if not b:
+            raise HTTPException(status_code=404, detail="BOM not found")
+        bom_dict = dict(b._mapping)
+        comps = conn.execute(text("""
+            SELECT bc.*, p.product_name as component_name, u.unit_name as component_uom
+            FROM bom_components bc
+            LEFT JOIN products p ON bc.component_product_id = p.id
+            LEFT JOIN product_units u ON p.unit_id = u.id
+            WHERE bc.bom_id = :bid
+        """), {"bid": bom_id}).fetchall()
+        bom_dict['components'] = [dict(c._mapping) for c in comps]
+        outputs = conn.execute(text("""
+            SELECT bo.*, p.product_name FROM bom_outputs bo
+            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid
+        """), {"bid": bom_id}).fetchall()
+        bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
+        return bom_dict
+    finally:
+        conn.close()
+
+@router.put("/boms/{bom_id}", response_model=BOMResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
+def update_bom(bom_id: int, bom: BOMCreate, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    trans = conn.begin()
+    try:
+        existing = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :id"), {"id": bom_id}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="BOM not found")
+
+        conn.execute(text("""
+            UPDATE bill_of_materials SET product_id=:pid, code=:code, name=:name, yield_quantity=:yield_q,
+                route_id=:rid, is_active=:active, notes=:notes, updated_at=NOW()
+            WHERE id=:id
+        """), {
+            "pid": bom.product_id, "code": bom.code, "name": bom.name,
+            "yield_q": bom.yield_quantity, "rid": bom.route_id,
+            "active": bom.is_active, "notes": bom.notes, "id": bom_id
+        })
+
+        # Replace components
+        conn.execute(text("DELETE FROM bom_components WHERE bom_id = :bid"), {"bid": bom_id})
+        for comp in bom.components:
+            conn.execute(text("""
+                INSERT INTO bom_components (bom_id, component_product_id, quantity, waste_percentage, cost_share_percentage, is_percentage, notes)
+                VALUES (:bid, :cpid, :qty, :waste, :share, :is_pct, :notes)
+            """), {
+                "bid": bom_id, "cpid": comp.component_product_id,
+                "qty": comp.quantity, "waste": comp.waste_percentage,
+                "share": comp.cost_share_percentage, "is_pct": comp.is_percentage, "notes": comp.notes
+            })
+
+        # Replace outputs
+        conn.execute(text("DELETE FROM bom_outputs WHERE bom_id = :bid"), {"bid": bom_id})
+        for out in bom.outputs:
+            conn.execute(text("""
+                INSERT INTO bom_outputs (bom_id, product_id, quantity, cost_allocation_percentage, notes)
+                VALUES (:bid, :pid, :qty, :share, :notes)
+            """), {"bid": bom_id, "pid": out.product_id, "qty": out.quantity, "share": out.cost_allocation_percentage, "notes": out.notes})
+
+        trans.commit()
+
+        # Re-fetch with joins
+        b = conn.execute(text("""
+            SELECT b.*, p.product_name as product_name, r.name as route_name
+            FROM bill_of_materials b LEFT JOIN products p ON b.product_id = p.id
+            LEFT JOIN manufacturing_routes r ON b.route_id = r.id WHERE b.id = :bid
+        """), {"bid": bom_id}).fetchone()
+        bom_dict = dict(b._mapping)
+        comps = conn.execute(text("""
+            SELECT bc.*, p.product_name as component_name, u.unit_name as component_uom
+            FROM bom_components bc LEFT JOIN products p ON bc.component_product_id = p.id
+            LEFT JOIN product_units u ON p.unit_id = u.id WHERE bc.bom_id = :bid
+        """), {"bid": bom_id}).fetchall()
+        bom_dict['components'] = [dict(c._mapping) for c in comps]
+        outputs = conn.execute(text("""
+            SELECT bo.*, p.product_name FROM bom_outputs bo
+            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid
+        """), {"bid": bom_id}).fetchall()
+        bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
+        return bom_dict
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -453,17 +606,27 @@ def check_materials_availability(
         conn.close()
 
 @router.get("/orders", response_model=List[ProductionOrderResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_production_orders(current_user: UserResponse = Depends(get_current_user)):
+def list_production_orders(
+    branch_id: Optional[int] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    from utils.permissions import validate_branch_access
+    validated_branch = validate_branch_access(current_user, branch_id)
     conn = get_db_connection(current_user.company_id)
     try:
-        orders_db = conn.execute(text("""
+        query = """
             SELECT po.*, p.product_name as product_name, b.name as bom_name,
                    po.order_number, po.status, po.produced_quantity, po.scrapped_quantity, po.created_at
             FROM production_orders po
             LEFT JOIN products p ON po.product_id = p.id
             LEFT JOIN bill_of_materials b ON po.bom_id = b.id
-            ORDER BY po.id DESC
-        """)).fetchall()
+        """
+        params = {}
+        if validated_branch:
+            query += " WHERE po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
+        query += " ORDER BY po.id DESC"
+        orders_db = conn.execute(text(query), params).fetchall()
 
         result = []
         for o in orders_db:
@@ -790,7 +953,15 @@ def start_production_order(order_id: int, current_user: UserResponse = Depends(g
                 update_account_balance(conn, account_id=int(rm_acc_id), debit_base=0, credit_base=total_material_cost)
 
         trans.commit()
-        
+
+        # Audit log
+        try:
+            log_activity(conn, current_user.id, current_user.username, "start_production",
+                         "production_orders", str(order_id),
+                         {"material_cost": total_material_cost})
+        except Exception:
+            pass
+
         # Re-fetch full object
         o = conn.execute(text("""
             SELECT po.*, p.product_name as product_name, b.name as bom_name
@@ -1020,7 +1191,15 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
             """), {"cost": round(wac, 4), "pid": order.product_id})
 
         trans.commit()
-        
+
+        # Audit log
+        try:
+            log_activity(conn, current_user.id, current_user.username, "complete_production",
+                         "production_orders", str(order_id),
+                         {"quantity": float(order.quantity), "total_cost": total_production_cost})
+        except Exception:
+            pass
+
         # Re-fetch full object
         o = conn.execute(text("""
             SELECT po.*, p.product_name as product_name, b.name as bom_name
@@ -1363,13 +1542,15 @@ def get_active_operations(current_user: UserResponse = Depends(get_current_user)
         # Fetch active or pending operations with order details
         res = conn.execute(text("""
             SELECT poo.*, po.order_number, wc.name as work_center_name, 
-                   mo.description as operation_description, po.quantity as planned_quantity
+                   mo.description as operation_description, po.quantity as planned_quantity,
+                   mo.cycle_time, mo.setup_time, p.product_name
             FROM production_order_operations poo
             JOIN production_orders po ON poo.production_order_id = po.id
+            JOIN products p ON po.product_id = p.id
             JOIN work_centers wc ON poo.work_center_id = wc.id
             LEFT JOIN manufacturing_operations mo ON poo.operation_id = mo.id
             WHERE poo.status IN ('pending', 'in_progress', 'paused')
-            ORDER BY poo.sequence ASC, poo.created_at DESC
+            ORDER BY poo.start_time ASC NULLS LAST, poo.created_at ASC
         """)).fetchall()
         return res
     finally:
@@ -1384,50 +1565,121 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
         order = conn.execute(text("SELECT * FROM production_orders WHERE id = :id"), {"id": order_id}).fetchone()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        if not order.bom_id:
+            raise HTTPException(status_code=400, detail="Order has no BOM assigned")
 
         # Fetch BOM components
         components = conn.execute(text("""
-            SELECT bc.*, p.product_name, p.reorder_level,
-                   (SELECT SUM(quantity) FROM inventory WHERE product_id = p.id) as on_hand
+            SELECT bc.*, p.product_name, p.reorder_level, p.lead_time_days,
+                   COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) as on_hand
             FROM bom_components bc
             JOIN products p ON bc.component_product_id = p.id
             WHERE bc.bom_id = :bid
         """), {"bid": order.bom_id}).fetchall()
 
+        # Check pending purchase orders for on_order_quantity
         mrp_items = []
         for comp in components:
-            required = float(comp.quantity) * float(order.quantity)
+            # Handle waste percentage & variable BOM (is_percentage)
+            waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+            if comp.is_percentage:
+                required = (comp.quantity / 100.0 * float(order.quantity)) * waste_factor
+            else:
+                required = float(comp.quantity) * float(order.quantity) * waste_factor
+            required = round(required, 4)
+
             on_hand = float(comp.on_hand or 0)
-            shortage = max(0.0, required - on_hand)
-            
-            action = "none"
+
+            # Check pending POs for this product
+            on_order = conn.execute(text("""
+                SELECT COALESCE(SUM(pi.quantity - COALESCE(pi.received_quantity, 0)), 0)
+                FROM purchase_invoice_items pi
+                JOIN purchase_invoices p ON pi.invoice_id = p.id
+                WHERE pi.product_id = :pid AND p.status IN ('draft', 'approved', 'sent', 'partially_received')
+            """), {"pid": comp.component_product_id}).scalar() or 0
+            on_order = float(on_order)
+
+            available = on_hand + on_order
+            shortage = max(0.0, round(required - available, 4))
+
             if shortage > 0:
-                action = "purchase_order" # Simplified: Always suggest PO for now
+                action = "purchase_order"
+            elif required > on_hand and on_order > 0:
+                action = "wait_for_po"
+            else:
+                action = "none"
 
             mrp_items.append({
                 "product_id": comp.component_product_id,
                 "product_name": comp.product_name,
                 "required_quantity": required,
-                "available_quantity": on_hand,
+                "available_quantity": available,
                 "on_hand_quantity": on_hand,
-                "on_order_quantity": 0, # To be improved with PO link
+                "on_order_quantity": on_order,
                 "shortage_quantity": shortage,
-                "lead_time_days": 1, # Default
+                "lead_time_days": int(comp.lead_time_days or 1),
                 "suggested_action": action,
                 "status": "pending"
             })
 
-        # Save Plan? For now just return as response
-        from datetime import datetime
-        plan = {
-            "id": 0,
-            "plan_name": f"MRP for {order.order_number}",
+        # Save MRP Plan to database
+        plan_row = conn.execute(text("""
+            INSERT INTO mrp_plans (plan_name, production_order_id, status, calculated_at)
+            VALUES (:name, :oid, 'draft', NOW())
+            RETURNING *
+        """), {"name": f"MRP for {order.order_number}", "oid": order_id}).fetchone()
+
+        for item in mrp_items:
+            conn.execute(text("""
+                INSERT INTO mrp_items (mrp_plan_id, product_id, required_quantity, available_quantity, shortage_quantity, suggested_action, status)
+                VALUES (:pid, :prod, :req, :avail, :short, :action, :status)
+            """), {
+                "pid": plan_row.id, "prod": item["product_id"],
+                "req": item["required_quantity"], "avail": item["available_quantity"],
+                "short": item["shortage_quantity"], "action": item["suggested_action"],
+                "status": item["status"]
+            })
+
+        conn.commit()
+
+        return {
+            "id": plan_row.id,
+            "plan_name": plan_row.plan_name,
             "production_order_id": order_id,
             "status": "draft",
-            "calculated_at": datetime.now(),
+            "calculated_at": plan_row.calculated_at,
             "items": mrp_items
         }
-        return plan
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@router.get("/mrp/plans", dependencies=[Depends(require_permission("manufacturing.view"))])
+def list_mrp_plans(current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        plans = conn.execute(text("""
+            SELECT mp.*, po.order_number 
+            FROM mrp_plans mp
+            LEFT JOIN production_orders po ON mp.production_order_id = po.id
+            ORDER BY mp.calculated_at DESC
+        """)).fetchall()
+        result = []
+        for p in plans:
+            pd = dict(p._mapping)
+            items = conn.execute(text("""
+                SELECT mi.*, pr.product_name 
+                FROM mrp_items mi
+                JOIN products pr ON mi.product_id = pr.id
+                WHERE mi.mrp_plan_id = :pid
+            """), {"pid": p.id}).fetchall()
+            pd['items'] = [dict(i._mapping) for i in items]
+            result.append(pd)
+        return result
     finally:
         conn.close()
 
@@ -1469,6 +1721,56 @@ def create_equipment(equip: EquipmentCreate, current_user: UserResponse = Depend
         return dict(new_equip._mapping)
     except Exception as e:
         trans.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+
+@router.put("/equipment/{equip_id}", response_model=EquipmentResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
+def update_equipment(equip_id: int, equip: EquipmentCreate, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        updated = conn.execute(text("""
+            UPDATE manufacturing_equipment SET name=:name, code=:code, work_center_id=:wcid, status=:status,
+                purchase_date=:pdate, last_maintenance_date=:lmdate, next_maintenance_date=:nmdate, notes=:notes
+            WHERE id=:id RETURNING *
+        """), {
+            "name": equip.name, "code": equip.code, "wcid": equip.work_center_id,
+            "status": equip.status, "pdate": equip.purchase_date,
+            "lmdate": equip.last_maintenance_date, "nmdate": equip.next_maintenance_date,
+            "notes": equip.notes, "id": equip_id
+        }).fetchone()
+        if not updated:
+            raise HTTPException(status_code=404, detail="Equipment not found")
+        conn.commit()
+        result = dict(updated._mapping)
+        wc = conn.execute(text("SELECT name FROM work_centers WHERE id = :wid"), {"wid": equip.work_center_id}).fetchone() if equip.work_center_id else None
+        result['work_center_name'] = wc.name if wc else None
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
+
+@router.delete("/equipment/{equip_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
+def delete_equipment(equip_id: int, current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(current_user.company_id)
+    try:
+        # Check for maintenance logs
+        logs = conn.execute(text("SELECT COUNT(*) FROM maintenance_logs WHERE equipment_id = :id"), {"id": equip_id}).scalar()
+        if logs > 0:
+            raise HTTPException(status_code=400, detail=f"Cannot delete equipment with {logs} maintenance log(s). Delete logs first.")
+        deleted = conn.execute(text("DELETE FROM manufacturing_equipment WHERE id = :id RETURNING id"), {"id": equip_id}).fetchone()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Equipment not found")
+        conn.commit()
+        return {"detail": "Equipment deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         conn.close()
@@ -2198,5 +2500,367 @@ def get_qc_failures(current_user: UserResponse = Depends(get_current_user)):
             ORDER BY q.created_at DESC
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ACTUAL MANUFACTURING COSTING & VARIANCE ANALYSIS
+#  التكلفة الفعلية للتصنيع — تحليل الانحرافات
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ActualCostUpdate(BaseModel):
+    actual_material_cost: Optional[float] = None
+    actual_labor_cost: Optional[float] = None
+    actual_overhead_cost: Optional[float] = None
+
+
+@router.post("/orders/{order_id}/calculate-cost", dependencies=[Depends(require_permission("manufacturing.manage"))])
+def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None,
+                          current_user: UserResponse = Depends(get_current_user)):
+    """
+    حساب التكلفة الفعلية لأمر الإنتاج — المواد + العمالة + الأعباء
+    ومقارنتها بالتكلفة المعيارية (من BOM) لإنتاج تقرير الانحرافات
+    """
+    conn = get_db_connection(current_user.company_id)
+    try:
+        order = conn.execute(text("""
+            SELECT po.*, p.product_name, p.cost_price as standard_unit_cost
+            FROM production_orders po
+            JOIN products p ON po.product_id = p.id
+            WHERE po.id = :id
+        """), {"id": order_id}).fetchone()
+
+        if not order:
+            raise HTTPException(404, "أمر الإنتاج غير موجود")
+
+        qty = float(order.quantity or 1)
+
+        # ── 1. Actual Material Cost ──
+        material_consumed = conn.execute(text("""
+            SELECT COALESCE(SUM(ABS(it.quantity) * COALESCE(p.cost_price, 0)), 0)
+            FROM inventory_transactions it
+            JOIN products p ON p.id = it.product_id
+            WHERE it.reference_type = 'production_order'
+              AND it.reference_id = :oid
+              AND it.quantity < 0
+        """), {"oid": order_id}).scalar() or 0
+
+        actual_material = float(body.actual_material_cost) if body and body.actual_material_cost is not None else float(material_consumed)
+
+        # ── 2. Actual Labor Cost ──
+        labor_cost = conn.execute(text("""
+            SELECT COALESCE(SUM(
+                COALESCE(poo.actual_run_time, 0) / 60.0 * COALESCE(wc.cost_per_hour, 0)
+            ), 0)
+            FROM production_order_operations poo
+            LEFT JOIN work_centers wc ON wc.id = poo.work_center_id
+            WHERE poo.production_order_id = :oid
+        """), {"oid": order_id}).scalar() or 0
+
+        actual_labor = float(body.actual_labor_cost) if body and body.actual_labor_cost is not None else float(labor_cost)
+
+        # ── 3. Overhead ──
+        settings = conn.execute(text("SELECT * FROM company_settings LIMIT 1")).fetchone()
+        overhead_rate = float(getattr(settings, 'mfg_overhead_rate', 0) or 0) / 100.0
+        default_overhead = round(actual_labor * overhead_rate, 2) if overhead_rate > 0 else 0
+        actual_overhead = float(body.actual_overhead_cost) if body and body.actual_overhead_cost is not None else default_overhead
+
+        actual_total = round(actual_material + actual_labor + actual_overhead, 2)
+
+        # ── 4. Standard Cost (from BOM) ──
+        standard_cost = 0
+        if order.bom_id:
+            # BOM material cost from bom_components
+            bom_material = conn.execute(text("""
+                SELECT COALESCE(SUM(bc.quantity * COALESCE(p.cost_price, 0)), 0)
+                FROM bom_components bc
+                JOIN products p ON p.id = bc.component_product_id
+                WHERE bc.bom_id = :boid
+            """), {"boid": order.bom_id}).scalar() or 0
+
+            # BOM operation cost from manufacturing_operations via route
+            bom_ops = conn.execute(text("""
+                SELECT COALESCE(SUM(
+                    COALESCE(mo.cycle_time, 0) / 60.0 * COALESCE(wc.cost_per_hour, 0)
+                ), 0)
+                FROM manufacturing_operations mo
+                LEFT JOIN work_centers wc ON wc.id = mo.work_center_id
+                WHERE mo.route_id = (SELECT route_id FROM bill_of_materials WHERE id = :boid)
+            """), {"boid": order.bom_id}).scalar() or 0
+
+            standard_cost = (float(bom_material) + float(bom_ops)) * qty
+        else:
+            standard_cost = float(order.standard_unit_cost or 0) * qty
+
+        standard_cost = round(standard_cost, 2)
+
+        # ── 5. Variance ──
+        variance = round(actual_total - standard_cost, 2)
+        variance_pct = round((variance / standard_cost * 100), 2) if standard_cost > 0 else 0
+
+        if variance > 0:
+            variance_type = "unfavorable"
+            variance_type_ar = "غير مواتٍ (تجاوز)"
+        elif variance < 0:
+            variance_type = "favorable"
+            variance_type_ar = "مواتٍ (وفر)"
+        else:
+            variance_type = "none"
+            variance_type_ar = "لا انحراف"
+
+        # ── 6. Per-unit cost ──
+        actual_qty = float(order.produced_quantity or order.quantity or 1)
+        actual_unit_cost = round(actual_total / actual_qty, 4) if actual_qty > 0 else 0
+
+        # ── Update production order with costs ──
+        conn.execute(text("""
+            UPDATE production_orders SET
+                actual_material_cost = :mc, actual_labor_cost = :lc,
+                actual_overhead_cost = :oc, actual_total_cost = :tc,
+                standard_cost = :sc, variance_amount = :va,
+                variance_percentage = :vp, costing_status = 'calculated',
+                updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "mc": actual_material, "lc": actual_labor, "oc": actual_overhead,
+            "tc": actual_total, "sc": standard_cost, "va": variance,
+            "vp": variance_pct, "id": order_id
+        })
+
+        # ── Update product cost_price with actual cost ──
+        conn.execute(text("""
+            UPDATE products SET cost_price = :cost, updated_at = NOW()
+            WHERE id = :pid
+        """), {"cost": actual_unit_cost, "pid": order.product_id})
+
+        conn.commit()
+
+        return {
+            "order_id": order_id,
+            "product_name": order.product_name,
+            "planned_quantity": qty,
+            "produced_quantity": actual_qty,
+            "cost_breakdown": {
+                "material_cost": actual_material,
+                "labor_cost": actual_labor,
+                "overhead_cost": actual_overhead,
+                "total_actual_cost": actual_total,
+                "unit_actual_cost": actual_unit_cost
+            },
+            "standard_cost": standard_cost,
+            "variance": {
+                "amount": variance,
+                "percentage": variance_pct,
+                "type": variance_type,
+                "type_ar": variance_type_ar
+            },
+            "costing_status": "calculated",
+            "message": f"تم حساب التكلفة الفعلية — الانحراف: {variance:+.2f} ({variance_pct:+.1f}%)"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.get("/cost-variance-report", dependencies=[Depends(require_permission("manufacturing.view"))])
+def cost_variance_report(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """تقرير الانحرافات — مقارنة التكلفة المعيارية بالفعلية لكل أوامر الإنتاج"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        query = """
+            SELECT po.id, po.order_number, po.product_id,
+                   p.product_name, p.sku,
+                   po.quantity, po.produced_quantity,
+                   po.actual_material_cost, po.actual_labor_cost,
+                   po.actual_overhead_cost, po.actual_total_cost,
+                   po.standard_cost, po.variance_amount, po.variance_percentage,
+                   po.costing_status, po.status, po.created_at
+            FROM production_orders po
+            JOIN products p ON p.id = po.product_id
+            WHERE po.costing_status = 'calculated'
+        """
+        params = {}
+        if from_date:
+            query += " AND po.created_at >= :fd"
+            params["fd"] = from_date
+        if to_date:
+            query += " AND po.created_at <= :td"
+            params["td"] = to_date
+
+        query += " ORDER BY ABS(COALESCE(po.variance_percentage, 0)) DESC"
+
+        rows = conn.execute(text(query), params).fetchall()
+        results = [dict(r._mapping) for r in rows]
+
+        total_actual = sum(float(r.get('actual_total_cost', 0) or 0) for r in results)
+        total_standard = sum(float(r.get('standard_cost', 0) or 0) for r in results)
+        total_variance = round(total_actual - total_standard, 2)
+
+        return {
+            "orders": results,
+            "summary": {
+                "total_orders": len(results),
+                "total_actual_cost": total_actual,
+                "total_standard_cost": total_standard,
+                "total_variance": total_variance,
+                "overall_variance_pct": round((total_variance / total_standard * 100), 2) if total_standard else 0,
+                "favorable_count": sum(1 for r in results if float(r.get('variance_amount', 0) or 0) < 0),
+                "unfavorable_count": sum(1 for r in results if float(r.get('variance_amount', 0) or 0) > 0)
+            }
+        }
+    finally:
+        conn.close()
+
+
+# ===================== B4: OEE + Capacity Planning =====================
+
+@router.get("/oee")
+def calculate_oee(
+    work_center_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user=Depends(get_current_user)
+):
+    """حساب الفعالية الشاملة للمعدات OEE"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = """
+            SELECT cp.work_center_id, wc.name as work_center_name,
+                   AVG(cp.efficiency_pct) as avg_efficiency,
+                   SUM(cp.available_hours) as total_available,
+                   SUM(cp.planned_hours) as total_planned,
+                   SUM(cp.actual_hours) as total_actual
+            FROM capacity_plans cp
+            LEFT JOIN work_centers wc ON wc.id = cp.work_center_id
+            WHERE 1=1
+        """
+        params = {}
+        if work_center_id:
+            q += " AND cp.work_center_id = :wc"
+            params["wc"] = work_center_id
+        if date_from:
+            q += " AND cp.plan_date >= :df"
+            params["df"] = date_from
+        if date_to:
+            q += " AND cp.plan_date <= :dt"
+            params["dt"] = date_to
+        q += " GROUP BY cp.work_center_id, wc.name ORDER BY wc.name"
+
+        rows = conn.execute(text(q), params).fetchall()
+        results = []
+        for r in rows:
+            d = dict(r._mapping)
+            avail = float(d.get("total_available") or 1)
+            planned = float(d.get("total_planned") or 0)
+            actual = float(d.get("total_actual") or 0)
+            availability = min(actual / avail * 100, 100) if avail > 0 else 0
+            performance = min(planned / actual * 100, 100) if actual > 0 else 0
+            quality = 98.5  # placeholder - would come from QC data
+            oee = round(availability * performance * quality / 10000, 2)
+            d["availability"] = round(availability, 2)
+            d["performance"] = round(performance, 2)
+            d["quality"] = round(quality, 2)
+            d["oee"] = oee
+            results.append(d)
+        return results
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.get("/capacity-plans")
+def list_capacity_plans(
+    work_center_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user=Depends(get_current_user)
+):
+    """خطط الطاقة الإنتاجية"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = """
+            SELECT cp.*, wc.name as work_center_name
+            FROM capacity_plans cp
+            LEFT JOIN work_centers wc ON wc.id = cp.work_center_id
+            WHERE 1=1
+        """
+        params = {}
+        if work_center_id:
+            q += " AND cp.work_center_id = :wc"
+            params["wc"] = work_center_id
+        if date_from:
+            q += " AND cp.plan_date >= :df"
+            params["df"] = date_from
+        if date_to:
+            q += " AND cp.plan_date <= :dt"
+            params["dt"] = date_to
+        q += " ORDER BY cp.plan_date DESC"
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.post("/capacity-plans")
+def create_capacity_plan(plan: dict, current_user=Depends(get_current_user)):
+    """إنشاء خطة طاقة إنتاجية"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        eff = 0
+        if plan.get("available_hours") and plan.get("actual_hours"):
+            eff = round(float(plan["actual_hours"]) / float(plan["available_hours"]) * 100, 2)
+        result = conn.execute(text("""
+            INSERT INTO capacity_plans (work_center_id, plan_date, available_hours,
+                planned_hours, actual_hours, efficiency_pct, notes)
+            VALUES (:wc, :pd, :ah, :ph, :ach, :eff, :n)
+            RETURNING id
+        """), {
+            "wc": plan["work_center_id"], "pd": plan["plan_date"],
+            "ah": plan.get("available_hours", 8), "ph": plan.get("planned_hours", 0),
+            "ach": plan.get("actual_hours", 0), "eff": eff, "n": plan.get("notes")
+        })
+        plan_id = result.fetchone()[0]
+        conn.commit()
+        return {"id": plan_id, "message": "تم إنشاء خطة الطاقة بنجاح"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.put("/capacity-plans/{plan_id}")
+def update_capacity_plan(plan_id: int, plan: dict, current_user=Depends(get_current_user)):
+    """تحديث خطة طاقة إنتاجية"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        eff = 0
+        if plan.get("available_hours") and plan.get("actual_hours"):
+            eff = round(float(plan["actual_hours"]) / float(plan["available_hours"]) * 100, 2)
+        conn.execute(text("""
+            UPDATE capacity_plans SET available_hours = :ah, planned_hours = :ph,
+                actual_hours = :ach, efficiency_pct = :eff, notes = :n
+            WHERE id = :id
+        """), {
+            "ah": plan.get("available_hours"), "ph": plan.get("planned_hours"),
+            "ach": plan.get("actual_hours"), "eff": eff, "n": plan.get("notes"), "id": plan_id
+        })
+        conn.commit()
+        return {"message": "تم تحديث خطة الطاقة بنجاح"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, str(e))
     finally:
         conn.close()

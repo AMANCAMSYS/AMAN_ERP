@@ -67,6 +67,13 @@ function AccountingHome() {
             ]
         },
         {
+            title: i18n.language === 'ar' ? 'المحاسبة المتقدمة' : 'Advanced Accounting',
+            items: [
+                { label: t('accounting.intercompany', 'المعاملات بين الشركات'), path: '/accounting/intercompany', icon: '🏢', permission: 'accounting.view' },
+                { label: t('accounting.revenue_recognition', 'الاعتراف بالإيراد'), path: '/accounting/revenue-recognition', icon: '📊', permission: 'accounting.view' }
+            ]
+        },
+        {
             title: t('accounting.home.sections.reports'),
             items: [
                 { label: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', icon: '📚', permission: 'accounting.view' },
@@ -77,7 +84,11 @@ function AccountingHome() {
                 { label: t('accounting.home.links.tax_audit'), path: '/accounting/tax-audit', icon: '🔍', permission: 'accounting.view' },
                 { label: t('accounting.home.links.cashflow_report'), path: '/accounting/cashflow', icon: '🌊', permission: 'accounting.view' },
                 { label: t('accounting.home.links.inventory_valuation'), path: '/stock/valuation-report', icon: '📦', permission: 'reports.view' },
-                { label: i18n.language === 'ar' ? 'مقارنة الفترات' : 'Period Comparison', path: '/accounting/period-comparison', icon: '📊', permission: 'accounting.view' }
+                { label: i18n.language === 'ar' ? 'مقارنة الفترات' : 'Period Comparison', path: '/accounting/period-comparison', icon: '📊', permission: 'accounting.view' },
+                { label: t('cashflow_ias7.title', 'التدفق النقدي IAS 7'), path: '/reports/cashflow-ias7', icon: '💧', permission: 'accounting.view' },
+                { label: t('fx_report.title', 'أرباح/خسائر العملات'), path: '/reports/fx-gain-loss', icon: '💱', permission: 'accounting.view' },
+                { label: t('consolidation.title', 'التقارير الموحدة'), path: '/reports/consolidation', icon: '🏢', permission: 'accounting.view' },
+                { label: t('reports.detailed_pl.title', 'الربح والخسارة التفصيلي'), path: '/reports/detailed-pl', icon: '📋', permission: 'accounting.view' }
             ]
         }
     ]

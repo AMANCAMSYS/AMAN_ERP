@@ -547,6 +547,26 @@ async def create_journal_entry(
         )
 
         msg = "تم ترحيل القيد بنجاح" if entry_status == "posted" else "تم حفظ القيد كمسودة"
+
+        # Notify admins on posted entries
+        if entry_status == "posted":
+            try:
+                db.execute(text("""
+                    INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                    SELECT DISTINCT u.id, 'journal_entry', :title, :message, :link, FALSE, NOW()
+                    FROM company_users u
+                    WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                    AND u.id != :current_uid
+                """), {
+                    "title": "📝 تم ترحيل قيد يومية",
+                    "message": f"تم ترحيل القيد {entry_number} — {entry_data.get('description', '')[:80]}",
+                    "link": f"/accounting/journal/{journal_id}",
+                    "current_uid": current_user.id
+                })
+                db.commit()
+            except Exception:
+                pass
+
         return {"success": True, "message": msg, "entry_number": entry_number, "entry_id": journal_id, "status": entry_status}
         
     except HTTPException:
@@ -784,6 +804,24 @@ async def post_journal_entry(
             request=request,
             branch_id=entry.branch_id
         )
+
+        # Notify admins about posted journal entry
+        try:
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'journal_entry', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "📝 تم ترحيل قيد يومية",
+                "message": f"تم ترحيل القيد {entry.entry_number} — {entry.description[:80] if entry.description else ''}",
+                "link": f"/accounting/journal/{entry_id}",
+                "current_uid": current_user.id
+            })
+            db.commit()
+        except Exception:
+            pass
 
         return {"success": True, "message": "تم ترحيل القيد بنجاح", "entry_number": entry.entry_number}
     except HTTPException:

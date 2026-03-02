@@ -118,7 +118,7 @@ const POSHome = () => {
             </div>
 
             <div className="flex justify-center mt-10">
-                <div className="card shadow-lg max-w-2xl w-full p-10" style={{ borderRadius: '2rem' }}>
+                <div className="card shadow-lg max-w-2xl w-full p-10">
                     <div className="flex items-center gap-4 mb-8">
                         <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl">
                             <Store />

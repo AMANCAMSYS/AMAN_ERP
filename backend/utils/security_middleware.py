@@ -41,19 +41,40 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # SEC-004: CSRF — not applicable (auth via Authorization header / localStorage, not cookies).
+        # If cookies are ever used, SameSite=Lax protects against CSRF by default.
+        # We also add X-Content-Type-Options and X-Frame-Options above as defense-in-depth.
 
         # HSTS header (only on HTTPS or production)
         if is_https or not is_localhost:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # Content Security Policy
+        # SEC-005: Tightened CSP — restrict connect-src to known origins
+        from config import settings
+        allowed_connect = "'self'"
+        if settings.APP_ENV == "production":
+            # In production, only allow WebSocket connections to our own domains
+            origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+            if settings.FRONTEND_URL_PRODUCTION:
+                origins.append(settings.FRONTEND_URL_PRODUCTION)
+            ws_origins = []
+            for origin in origins:
+                ws_origin = origin.replace("https://", "wss://").replace("http://", "ws://")
+                ws_origins.append(ws_origin)
+            if ws_origins:
+                allowed_connect = "'self' " + " ".join(ws_origins)
+        else:
+            # Development: allow local ws connections
+            allowed_connect = "'self' ws://localhost:* wss://localhost:*"
+
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "img-src 'self' data: blob: https://fastapi.tiangolo.com; "
             "font-src 'self' data:; "
-            "connect-src 'self' ws: wss: http: https:;"
+            f"connect-src {allowed_connect}; "
+            "frame-ancestors 'none';"
         )
 
         return response
@@ -82,8 +103,8 @@ SQL_PATTERNS = [
     re.compile(r"(UNION\s+(ALL\s+)?SELECT)", re.IGNORECASE),
 ]
 
-# Paths to skip sanitization (file upload, etc.)
-SKIP_PATHS = ["/uploads", "/api/data-import", "/api/companies/logo"]
+# Paths to skip sanitization (file upload only — binary content)
+SKIP_PATHS = ["/uploads", "/api/companies/logo"]
 
 
 def sanitize_string(value: str) -> str:
@@ -161,9 +182,15 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
                     body = await request.body()
                     body_str = body.decode("utf-8", errors="ignore")
 
-                    # Only check for obvious script injection in body
-                    if re.search(r'<script[^>]*>.*?</script>', body_str, re.IGNORECASE | re.DOTALL):
-                        logger.warning(f"🚨 Script injection in body from {request.client.host}")
+                    # SEC-FIX-013: Check ALL XSS patterns in body, not just <script>
+                    if detect_xss(body_str):
+                        logger.warning(f"🚨 XSS injection in body from {request.client.host}")
+                        return JSONResponse(
+                            status_code=400,
+                            content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}
+                        )
+                    if detect_sql_injection(body_str):
+                        logger.warning(f"🚨 SQLi pattern in body from {request.client.host}")
                         return JSONResponse(
                             status_code=400,
                             content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}

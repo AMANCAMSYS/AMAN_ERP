@@ -1,0 +1,592 @@
+"""
+AMAN ERP — WPS Export, Saudization Tracking, End of Service Settlement
+نظام حماية الأجور (WPS) — السعودة — مكافأة نهاية الخدمة
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import text
+from typing import List, Optional
+from datetime import datetime, date
+from pydantic import BaseModel
+import io, csv, logging
+
+from database import get_db_connection
+from routers.auth import get_current_user
+from utils.permissions import require_permission
+from utils.audit import log_activity
+from utils.accounting import (
+    generate_sequential_number, get_mapped_account_id,
+    update_account_balance, get_base_currency
+)
+
+router = APIRouter(prefix="/hr", tags=["HR - WPS & Compliance"])
+logger = logging.getLogger(__name__)
+
+# ────────────────────────────────────────────────────────────────────────────
+# ⚠️  REGION NOTE — الملاحظات الإقليمية
+# The following features are REGION-SPECIFIC and should only appear in
+# the UI when the company's country_code matches:
+#
+#   🇸🇦 WPS Export (SIF)         → Saudi Arabia only (country_code = 'SA')
+#   🇸🇦 Saudization / Nitaqat   → Saudi Arabia only (country_code = 'SA')
+#   🇸🇦 GOSI Integration        → Saudi Arabia only (country_code = 'SA')
+#   🌍 End-of-Service (EOS)     → Follows Saudi labor law by default;
+#                                 other countries may have different rules.
+#
+# The backend returns data regardless of country. The FRONTEND is responsible
+# for showing/hiding these menu items based on the company's country_code.
+# Each endpoint returns a 'region' field so the frontend can filter.
+# ────────────────────────────────────────────────────────────────────────────
+
+REGION_SA = "SA"  # Saudi Arabia region code
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  WPS — Wages Protection System (Saudi Format - SIF)
+#  ⚠️ Saudi Arabia only — نظام حماية الأجور خاص بالسعودية
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class WPSExportRequest(BaseModel):
+    period_id: int
+    bank_code: Optional[str] = None  # IBAN prefix
+
+
+@router.post("/wps/export", dependencies=[Depends(require_permission("hr.manage"))])
+def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_user)):
+    """
+    تصدير ملف WPS (نظام حماية الأجور) بتنسيق SIF
+    Saudi Bank SIF format compatible with GOSI and MOL
+    
+    SIF Record Format (per line):
+    - EDR: Employer Data Record (header)
+    - FDR: File Data Record (details per employee)
+    """
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        # Get payroll period
+        period = db.execute(text("""
+            SELECT * FROM payroll_periods WHERE id = :pid
+        """), {"pid": body.period_id}).fetchone()
+        if not period:
+            raise HTTPException(404, "فترة الرواتب غير موجودة")
+        if period.status != 'posted':
+            raise HTTPException(400, "يجب ترحيل الرواتب أولاً قبل التصدير")
+
+        # Get company info
+        company = db.execute(text("""
+            SELECT c.company_name, c.mol_establishment_id, c.bank_short_name,
+                   c.bank_routing, c.bank_account_iban
+            FROM company_info c LIMIT 1
+        """)).fetchone()
+
+        # Get payroll entries with employee bank details
+        entries = db.execute(text("""
+            SELECT pe.*,
+                   e.first_name, e.last_name, e.employee_code,
+                   e.national_id, e.bank_name, e.bank_account_number,
+                   e.iban_number, e.id_number, e.nationality,
+                   COALESCE(e.nationality, 'SA') as nat_code
+            FROM payroll_entries pe
+            JOIN employees e ON pe.employee_id = e.id
+            WHERE pe.period_id = :pid AND pe.net_salary > 0
+            ORDER BY e.employee_code
+        """), {"pid": body.period_id}).fetchall()
+
+        if not entries:
+            raise HTTPException(400, "لا توجد رواتب للتصدير")
+
+        # ── Build SIF File ──
+        lines = []
+        total_amount = 0
+        record_count = 0
+        month_str = period.start_date.strftime("%m%Y") if period.start_date else datetime.now().strftime("%m%Y")
+
+        # EDR — Employer Data Record (header)
+        mol_id = getattr(company, 'mol_establishment_id', '0000000000') if company else '0000000000'
+        employer_bank = body.bank_code or (getattr(company, 'bank_short_name', 'RJHI') if company else 'RJHI')
+        employer_iban = getattr(company, 'bank_account_iban', '') if company else ''
+
+        for entry in entries:
+            net = float(entry.net_salary)
+            total_amount += net
+            record_count += 1
+
+            iban = entry.iban_number or entry.bank_account_number or ''
+            nat_id = entry.national_id or entry.id_number or ''
+            emp_name = f"{entry.first_name} {entry.last_name}".strip()
+
+            # SIF format fields
+            lines.append({
+                "employee_code": entry.employee_code or str(entry.employee_id),
+                "employee_name": emp_name,
+                "national_id": nat_id,
+                "iban": iban,
+                "bank_code": entry.bank_name or '',
+                "net_salary": f"{net:.2f}",
+                "basic_salary": f"{float(entry.basic_salary or 0):.2f}",
+                "housing_allowance": f"{float(entry.housing_allowance or 0):.2f}",
+                "other_earnings": f"{float(entry.other_allowances or 0) + float(entry.overtime_amount or 0):.2f}",
+                "deductions": f"{float(entry.deductions or 0):.2f}",
+                "nationality": entry.nat_code or 'SA'
+            })
+
+        # Build CSV output (bank-compatible format)
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Header row
+        writer.writerow([
+            "File Type", "SIF",
+            "Employer MOL ID", mol_id,
+            "Employer Bank", employer_bank,
+            "Month", month_str,
+            "Total Records", record_count,
+            "Total Amount", f"{total_amount:.2f}"
+        ])
+        writer.writerow([])  # blank row
+
+        # Column headers
+        writer.writerow([
+            "Employee Code", "Employee Name", "National/Iqama ID",
+            "IBAN", "Bank Code", "Net Salary",
+            "Basic Salary", "Housing Allowance",
+            "Other Earnings", "Deductions", "Nationality"
+        ])
+
+        for line in lines:
+            writer.writerow([
+                line["employee_code"], line["employee_name"],
+                line["national_id"], line["iban"], line["bank_code"],
+                line["net_salary"], line["basic_salary"],
+                line["housing_allowance"], line["other_earnings"],
+                line["deductions"], line["nationality"]
+            ])
+
+        # Summary row
+        writer.writerow([])
+        writer.writerow(["Total", "", "", "", "", f"{total_amount:.2f}"])
+
+        csv_content = output.getvalue()
+        filename = f"WPS_{mol_id}_{month_str}.csv"
+
+        # Log export
+        user_id = current_user.get("user_id") if isinstance(current_user, dict) else current_user.id
+        log_activity(db, user_id, "wps.export", f"تصدير WPS للفترة {period.name}", {
+            "period_id": body.period_id,
+            "records": record_count,
+            "total": total_amount
+        })
+
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"WPS export error: {e}")
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/wps/preview/{period_id}", dependencies=[Depends(require_permission("hr.manage"))])
+def preview_wps(period_id: int, current_user=Depends(get_current_user)):
+    """معاينة بيانات WPS قبل التصدير"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        period = db.execute(text("SELECT * FROM payroll_periods WHERE id = :pid"), {"pid": period_id}).fetchone()
+        if not period:
+            raise HTTPException(404, "فترة الرواتب غير موجودة")
+
+        entries = db.execute(text("""
+            SELECT pe.employee_id, pe.basic_salary, pe.housing_allowance,
+                   pe.transport_allowance, pe.other_allowances,
+                   pe.deductions, pe.net_salary,
+                   e.first_name || ' ' || e.last_name as employee_name,
+                   e.employee_code, e.national_id, e.iban_number,
+                   e.bank_name, e.nationality,
+                   CASE WHEN e.iban_number IS NULL OR e.iban_number = ''
+                        THEN 'missing_iban' ELSE 'ok' END as iban_status,
+                   CASE WHEN e.national_id IS NULL OR e.national_id = ''
+                        THEN 'missing_id' ELSE 'ok' END as id_status
+            FROM payroll_entries pe
+            JOIN employees e ON pe.employee_id = e.id
+            WHERE pe.period_id = :pid AND pe.net_salary > 0
+            ORDER BY e.employee_code
+        """), {"pid": period_id}).fetchall()
+
+        result = [dict(e._mapping) for e in entries]
+        warnings = [e for e in result if e.get('iban_status') == 'missing_iban' or e.get('id_status') == 'missing_id']
+
+        return {
+            "period": dict(period._mapping),
+            "entries": result,
+            "total_employees": len(result),
+            "total_amount": sum(float(e.get('net_salary', 0)) for e in result),
+            "warnings": warnings,
+            "warnings_count": len(warnings)
+        }
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SAUDIZATION / NITAQAT TRACKING
+#  ⚠️ Saudi Arabia only — السعودة ونطاقات خاص بالسعودية
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/saudization/dashboard", dependencies=[Depends(require_permission("hr.view"))])
+def saudization_dashboard(branch_id: Optional[int] = None, current_user=Depends(get_current_user)):
+    """
+    لوحة بيانات السعودة — نسبة السعوديين وفئة نطاقات
+    Nitaqat bands:
+    - بلاتيني (Platinum): >= 40% for most sectors
+    - أخضر مرتفع (High Green): >= 26%
+    - أخضر منخفض (Low Green): >= 16%
+    - أصفر (Yellow): >= 10%
+    - أحمر (Red): < 10%
+    """
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        branch_filter = ""
+        params = {}
+        if branch_id:
+            branch_filter = "AND e.branch_id = :bid"
+            params["bid"] = branch_id
+
+        # Count employees by nationality
+        stats = db.execute(text(f"""
+            SELECT
+                COUNT(*) as total_employees,
+                COUNT(*) FILTER (WHERE e.status = 'active') as active_employees,
+                COUNT(*) FILTER (WHERE e.status = 'active' AND (
+                    LOWER(COALESCE(e.nationality, '')) IN ('sa', 'saudi', 'سعودي', 'saudi arabian')
+                    OR COALESCE(e.is_saudi, false) = true
+                )) as saudi_count,
+                COUNT(*) FILTER (WHERE e.status = 'active' AND (
+                    LOWER(COALESCE(e.nationality, '')) NOT IN ('sa', 'saudi', 'سعودي', 'saudi arabian', '')
+                    AND COALESCE(e.is_saudi, false) = false
+                )) as non_saudi_count
+            FROM employees e
+            WHERE e.status = 'active' {branch_filter}
+        """), params).fetchone()
+
+        total = int(stats.active_employees or 0)
+        saudi = int(stats.saudi_count or 0)
+        non_saudi = int(stats.non_saudi_count or 0)
+        pct = round((saudi / total * 100), 1) if total > 0 else 0
+
+        # Nitaqat band
+        if pct >= 40:
+            band = "platinum"
+            band_ar = "بلاتيني"
+            color = "#8B5CF6"
+        elif pct >= 26:
+            band = "high_green"
+            band_ar = "أخضر مرتفع"
+            color = "#059669"
+        elif pct >= 16:
+            band = "low_green"
+            band_ar = "أخضر منخفض"
+            color = "#10B981"
+        elif pct >= 10:
+            band = "yellow"
+            band_ar = "أصفر"
+            color = "#F59E0B"
+        else:
+            band = "red"
+            band_ar = "أحمر"
+            color = "#EF4444"
+
+        # Calculate how many saudis needed for next band
+        needed_for_next = 0
+        next_band = ""
+        if band == "red":
+            needed_for_next = max(0, int(total * 0.10) - saudi + 1)
+            next_band = "أصفر"
+        elif band == "yellow":
+            needed_for_next = max(0, int(total * 0.16) - saudi + 1)
+            next_band = "أخضر منخفض"
+        elif band == "low_green":
+            needed_for_next = max(0, int(total * 0.26) - saudi + 1)
+            next_band = "أخضر مرتفع"
+        elif band == "high_green":
+            needed_for_next = max(0, int(total * 0.40) - saudi + 1)
+            next_band = "بلاتيني"
+
+        # Breakdown by department
+        dept_breakdown = db.execute(text(f"""
+            SELECT d.name as department,
+                   COUNT(*) as total,
+                   COUNT(*) FILTER (WHERE
+                       LOWER(COALESCE(e.nationality, '')) IN ('sa', 'saudi', 'سعودي')
+                       OR COALESCE(e.is_saudi, false) = true
+                   ) as saudi,
+                   COUNT(*) FILTER (WHERE
+                       LOWER(COALESCE(e.nationality, '')) NOT IN ('sa', 'saudi', 'سعودي', '')
+                       AND COALESCE(e.is_saudi, false) = false
+                   ) as non_saudi
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            WHERE e.status = 'active' {branch_filter}
+            GROUP BY d.name
+            ORDER BY total DESC
+        """), params).fetchall()
+
+        # Nationality breakdown
+        nat_breakdown = db.execute(text(f"""
+            SELECT COALESCE(e.nationality, 'غير محدد') as nationality,
+                   COUNT(*) as count
+            FROM employees e
+            WHERE e.status = 'active' {branch_filter}
+            GROUP BY e.nationality
+            ORDER BY count DESC
+        """), params).fetchall()
+
+        return {
+            "total_employees": total,
+            "saudi_count": saudi,
+            "non_saudi_count": non_saudi,
+            "saudization_percentage": pct,
+            "nitaqat_band": band,
+            "nitaqat_band_ar": band_ar,
+            "nitaqat_color": color,
+            "needed_for_next_band": needed_for_next,
+            "next_band": next_band,
+            "department_breakdown": [dict(d._mapping) for d in dept_breakdown],
+            "nationality_breakdown": [dict(n._mapping) for n in nat_breakdown]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/saudization/report", dependencies=[Depends(require_permission("hr.view"))])
+def saudization_report(current_user=Depends(get_current_user)):
+    """تقرير السعودة التفصيلي — لكل فرع"""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        branches = db.execute(text("""
+            SELECT b.id, b.branch_name,
+                   COUNT(e.id) as total,
+                   COUNT(e.id) FILTER (WHERE
+                       LOWER(COALESCE(e.nationality, '')) IN ('sa', 'saudi', 'سعودي')
+                       OR COALESCE(e.is_saudi, false) = true
+                   ) as saudi,
+                   COUNT(e.id) FILTER (WHERE
+                       LOWER(COALESCE(e.nationality, '')) NOT IN ('sa', 'saudi', 'سعودي', '')
+                       AND COALESCE(e.is_saudi, false) = false
+                   ) as non_saudi
+            FROM branches b
+            LEFT JOIN employees e ON e.branch_id = b.id AND e.status = 'active'
+            GROUP BY b.id, b.branch_name
+            ORDER BY b.branch_name
+        """)).fetchall()
+
+        results = []
+        for br in branches:
+            total = int(br.total or 0)
+            saudi = int(br.saudi or 0)
+            pct = round((saudi / total * 100), 1) if total > 0 else 0
+
+            if pct >= 40: band = "بلاتيني"
+            elif pct >= 26: band = "أخضر مرتفع"
+            elif pct >= 16: band = "أخضر منخفض"
+            elif pct >= 10: band = "أصفر"
+            else: band = "أحمر"
+
+            results.append({
+                "branch_id": br.id,
+                "branch_name": br.branch_name,
+                "total_employees": total,
+                "saudi_count": saudi,
+                "non_saudi_count": int(br.non_saudi or 0),
+                "saudization_percentage": pct,
+                "nitaqat_band": band
+            })
+
+        return results
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  END OF SERVICE — Settlement with Journal Entry
+#  🌍 Global — ينطبق على جميع الدول (حسابات خاصة بكل دولة)
+#  Default: Saudi Labor Law Art. 84/85 — يمكن تخصيص القوانين حسب البلد
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class EOSSettlementRequest(BaseModel):
+    employee_id: int
+    termination_date: Optional[str] = None
+    termination_reason: str = "termination"  # termination, resignation, retirement, contract_end
+    include_vacation_balance: bool = True
+    include_pending_salary: bool = True
+    additional_deductions: float = 0
+    notes: Optional[str] = None
+
+
+@router.post("/end-of-service/settle", dependencies=[Depends(require_permission("hr.manage"))])
+def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_current_user)):
+    """
+    تسوية نهاية الخدمة — إنشاء قيد محاسبي وتسجيل المبلغ
+    يشمل: مكافأة نهاية الخدمة + رصيد إجازات + راتب مستحق
+    """
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    user_id = current_user.get("user_id") if isinstance(current_user, dict) else current_user.id
+    db = get_db_connection(company_id)
+    try:
+        emp = db.execute(text("""
+            SELECT id, first_name || ' ' || last_name as employee_name,
+                   hire_date, salary as basic_salary,
+                   COALESCE(housing_allowance, 0) as housing_allowance,
+                   COALESCE(transport_allowance, 0) as transport_allowance,
+                   annual_leave_entitlement
+            FROM employees WHERE id = :eid
+        """), {"eid": body.employee_id}).fetchone()
+
+        if not emp:
+            raise HTTPException(404, "الموظف غير موجود")
+
+        from dateutil.relativedelta import relativedelta
+
+        term_date = datetime.strptime(body.termination_date, "%Y-%m-%d").date() if body.termination_date else date.today()
+        join_date = emp.hire_date
+        if not join_date:
+            raise HTTPException(400, "تاريخ التعيين غير محدد")
+
+        delta = relativedelta(term_date, join_date)
+        total_years = delta.years + (delta.months / 12) + (delta.days / 365.25)
+
+        base_salary = float(emp.basic_salary or 0)
+        total_salary = base_salary + float(emp.housing_allowance) + float(emp.transport_allowance)
+
+        # ── Calculate EOS Gratuity using shared helper (Saudi Labor Law Art. 84/85) ──
+        from utils.hr_helpers import calculate_eos_gratuity
+        eos = calculate_eos_gratuity(total_salary, total_years, body.termination_reason)
+        eos_amount = eos["final_gratuity"]
+
+        # ── Vacation balance ──
+        vacation_amount = 0
+        if body.include_vacation_balance:
+            used = db.execute(text("""
+                SELECT COALESCE(SUM(days_requested), 0) FROM leave_requests
+                WHERE employee_id = :eid AND status = 'approved'
+                AND leave_type = 'annual' AND EXTRACT(YEAR FROM start_date) = :y
+            """), {"eid": body.employee_id, "y": term_date.year}).scalar() or 0
+
+            entitled = float(emp.annual_leave_entitlement or 30)
+            # Prorate for months worked this year
+            months_worked = term_date.month
+            prorated = round(entitled * months_worked / 12, 1)
+            remaining_days = max(0, prorated - float(used))
+            daily_rate = total_salary / 30
+            vacation_amount = round(remaining_days * daily_rate, 2)
+
+        # ── Pending salary ──
+        pending_salary = 0
+        if body.include_pending_salary:
+            days_in_month = 30  # Standard
+            day_of_month = term_date.day
+            pending_salary = round(total_salary * day_of_month / days_in_month, 2)
+
+        total_settlement = eos_amount + vacation_amount + pending_salary - body.additional_deductions
+
+        # ── Create Journal Entry ──
+        base_currency = get_base_currency(db)
+        year = datetime.now().year
+        je_number = generate_sequential_number(db, f"JE-EOS-{year}", "journal_entries", "entry_number")
+
+        je = db.execute(text("""
+            INSERT INTO journal_entries (
+                entry_number, entry_date, reference, description,
+                status, currency, created_by
+            ) VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :curr, :uid)
+            RETURNING id
+        """), {
+            "num": je_number,
+            "ref": f"EOS-{body.employee_id}",
+            "desc": f"تسوية نهاية خدمة: {emp.employee_name}",
+            "curr": base_currency, "uid": user_id
+        })
+        je_id = je.fetchone()[0]
+
+        # Dr: EOS Expense
+        eos_exp = get_mapped_account_id(db, "acc_map_eos_expense")
+        if eos_exp and eos_amount > 0:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jeid, :aid, :amt, 0, :desc)
+            """), {"jeid": je_id, "aid": eos_exp, "amt": eos_amount, "desc": "مكافأة نهاية خدمة"})
+            update_account_balance(db, eos_exp, eos_amount, 0)
+
+        # Dr: Salary Expense (for vacation + pending)
+        salary_exp = get_mapped_account_id(db, "acc_map_salary_expense")
+        remaining_amount = vacation_amount + pending_salary
+        if salary_exp and remaining_amount > 0:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jeid, :aid, :amt, 0, :desc)
+            """), {"jeid": je_id, "aid": salary_exp, "amt": remaining_amount,
+                   "desc": f"رصيد إجازات {vacation_amount} + راتب مستحق {pending_salary}"})
+            update_account_balance(db, salary_exp, remaining_amount, 0)
+
+        # Cr: EOS Provision (reverse)
+        eos_prov = get_mapped_account_id(db, "acc_map_eos_provision")
+        if eos_prov and eos_amount > 0:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jeid, :aid, 0, :amt, :desc)
+            """), {"jeid": je_id, "aid": eos_prov, "amt": eos_amount, "desc": "عكس مخصص نهاية خدمة"})
+            update_account_balance(db, eos_prov, 0, eos_amount)
+
+        # Cr: Cash/Bank
+        cash_account = get_mapped_account_id(db, "acc_map_cash")
+        if cash_account:
+            db.execute(text("""
+                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                VALUES (:jeid, :aid, 0, :amt, :desc)
+            """), {"jeid": je_id, "aid": cash_account, "amt": total_settlement,
+                   "desc": "صرف تسوية نهاية خدمة"})
+            update_account_balance(db, cash_account, 0, total_settlement)
+
+        # Update employee status
+        db.execute(text("""
+            UPDATE employees SET status = 'terminated',
+                eos_amount = :eos, eos_eligible = false,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :eid
+        """), {"eos": total_settlement, "eid": body.employee_id})
+
+        db.commit()
+
+        return {
+            "employee_id": body.employee_id,
+            "employee_name": emp.employee_name,
+            "service_years": round(total_years, 2),
+            "termination_reason": body.termination_reason,
+            "eos_gratuity": eos_amount,
+            "vacation_balance_amount": vacation_amount,
+            "pending_salary": pending_salary,
+            "additional_deductions": body.additional_deductions,
+            "total_settlement": total_settlement,
+            "journal_entry_id": je_id,
+            "journal_entry_number": je_number,
+            "message": "تم تسوية نهاية الخدمة بنجاح"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()

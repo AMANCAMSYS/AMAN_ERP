@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, CreditCard, ArrowLeftRight, RefreshCw, AlertTriangle, Calendar } from 'lucide-react';
 import api, { accountingAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
+import DateInput from '../../../components/common/DateInput';
 
 const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -51,13 +51,15 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
         </div>
     );
 
+    const m = (key) => t(`settings.accounting_mapping.${key}`);
+
     // --- Advanced Tools Handlers ---
     const handleFxRevaluation = async () => {
-        if (!window.confirm(isRTL ? 'هل تريد تنفيذ إعادة تقييم العملات الأجنبية؟' : 'Run FX revaluation?')) return;
+        if (!window.confirm(m('confirm_fx_revaluation'))) return;
         setFxProcessing(true);
         try {
             await accountingAPI.fxRevaluation({ valuation_date: fxDate });
-            toastEmitter.emit(isRTL ? 'تم تنفيذ إعادة تقييم العملات بنجاح' : 'FX Revaluation completed', 'success');
+            toastEmitter.emit(m('fx_revaluation_success'), 'success');
         } catch (err) {
             console.error("FX Revaluation failed", err);
         } finally {
@@ -66,11 +68,11 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
     };
 
     const handleBadDebtProvision = async () => {
-        if (!window.confirm(isRTL ? 'هل تريد إنشاء مخصص ديون مشكوك فيها؟' : 'Create bad debt provision?')) return;
+        if (!window.confirm(m('confirm_bad_debt'))) return;
         setBadDebtProcessing(true);
         try {
             await accountingAPI.createBadDebtProvision({ overdue_days: badDebtDays });
-            toastEmitter.emit(isRTL ? 'تم إنشاء مخصص الديون المشكوك فيها' : 'Bad debt provision created', 'success');
+            toastEmitter.emit(m('bad_debt_success'), 'success');
         } catch (err) {
             console.error("Bad debt provision failed", err);
         } finally {
@@ -79,11 +81,11 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
     };
 
     const handleLeaveProvision = async () => {
-        if (!window.confirm(isRTL ? 'هل تريد إنشاء مخصص إجازات؟' : 'Create leave provision?')) return;
+        if (!window.confirm(m('confirm_leave_provision'))) return;
         setLeaveProvProcessing(true);
         try {
             await accountingAPI.createLeaveProvision({});
-            toastEmitter.emit(isRTL ? 'تم إنشاء مخصص الإجازات' : 'Leave provision created', 'success');
+            toastEmitter.emit(m('leave_provision_success'), 'success');
         } catch (err) {
             console.error("Leave provision failed", err);
         } finally {
@@ -100,13 +102,13 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ShoppingCart size={20} className="text-primary" />
-                    المبيعات والإيرادات
+                    {m('section_sales')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('حساب إيرادات المبيعات', 'acc_map_sales_rev', 'يُقيَّد دائناً عند إصدار فواتير البيع')}
-                    {renderAccountSelect('تكلفة البضاعة المباعة (COGS)', 'acc_map_cogs', 'يُقيَّد مديناً عند تسليم البضاعة')}
-                    {renderAccountSelect('حساب المدينون (AR)', 'acc_map_ar', 'المدينون التجاريون — يُقيَّد مديناً عند البيع')}
-                    {renderAccountSelect('حساب الخصم المسموح به', 'acc_map_sales_discount', 'خصومات العملاء من الفواتير')}
+                    {renderAccountSelect(m('sales_revenue_account'), 'acc_map_sales_rev', m('sales_revenue_account_desc'))}
+                    {renderAccountSelect(m('cogs_account'), 'acc_map_cogs', m('cogs_account_desc'))}
+                    {renderAccountSelect(m('accounts_receivable'), 'acc_map_ar', m('accounts_receivable_desc'))}
+                    {renderAccountSelect(m('sales_discount'), 'acc_map_sales_discount', m('sales_discount_desc'))}
                 </div>
             </div>
 
@@ -114,12 +116,12 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <CreditCard size={20} className="text-primary" />
-                    المشتريات والدائنون
+                    {m('section_purchases')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('حساب الدائنون (AP)', 'acc_map_ap', 'الموردون التجاريون — يُقيَّد دائناً عند الشراء')}
-                    {renderAccountSelect('حساب مصاريف الشراء', 'acc_map_purchase_exp', 'مصاريف الشحن والجمارك وما شابه')}
-                    {renderAccountSelect('حساب خصم المشتريات', 'acc_map_purchase_discount', 'الخصومات الممنوحة من الموردين')}
+                    {renderAccountSelect(m('accounts_payable'), 'acc_map_ap', m('accounts_payable_desc'))}
+                    {renderAccountSelect(m('purchase_expense'), 'acc_map_purchase_exp', m('purchase_expense_desc'))}
+                    {renderAccountSelect(m('purchase_discount'), 'acc_map_purchase_discount', m('purchase_discount_desc'))}
                 </div>
             </div>
 
@@ -127,13 +129,13 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Landmark size={20} className="text-primary" />
-                    الخزينة والبنوك
+                    {m('section_treasury')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('الصندوق الرئيسي (نقدي)', 'acc_map_cash_main', 'حسابات النقد الفعلي')}
-                    {renderAccountSelect('البنك الرئيسي', 'acc_map_bank', 'الحساب البنكي الافتراضي للتحويلات')}
-                    {renderAccountSelect('فروق العملات الأجنبية', 'acc_map_fx_difference', 'أرباح وخسائر تحويل العملات')}
-                    {renderAccountSelect('حساب بين الشركات (Intercompany)', 'acc_map_intercompany', 'نقل الأموال بين الشركات التابعة')}
+                    {renderAccountSelect(m('main_cash_box'), 'acc_map_cash_main', m('main_cash_box_desc'))}
+                    {renderAccountSelect(m('main_bank'), 'acc_map_bank', m('main_bank_desc'))}
+                    {renderAccountSelect(m('fx_difference'), 'acc_map_fx_difference', m('fx_difference_desc'))}
+                    {renderAccountSelect(m('intercompany_account'), 'acc_map_intercompany', m('intercompany_account_desc'))}
                 </div>
             </div>
 
@@ -141,14 +143,14 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Receipt size={20} className="text-primary" />
-                    المخزون والضرائب
+                    {m('section_inventory_tax')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('حساب المخزون', 'acc_map_inventory', 'رصيد المخزون في الميزانية العمومية')}
-                    {renderAccountSelect('تسوية المخزون', 'acc_map_inventory_adjustment', 'فروقات الجرد والإتلاف')}
-                    {renderAccountSelect('ضريبة القيمة المضافة — مخرجات', 'acc_map_vat_out', 'ضريبة البيع المحصلة')}
-                    {renderAccountSelect('ضريبة القيمة المضافة — مدخلات', 'acc_map_vat_in', 'ضريبة الشراء القابلة للاسترداد')}
-                    {renderAccountSelect('ضريبة الاستقطاع', 'acc_map_withholding_tax', 'ضريبة الخصم من المصدر')}
+                    {renderAccountSelect(m('inventory_account'), 'acc_map_inventory', m('inventory_account_desc'))}
+                    {renderAccountSelect(m('inventory_adjustment'), 'acc_map_inventory_adjustment', m('inventory_adjustment_desc'))}
+                    {renderAccountSelect(m('vat_output'), 'acc_map_vat_out', m('vat_output_desc'))}
+                    {renderAccountSelect(m('vat_input'), 'acc_map_vat_in', m('vat_input_desc'))}
+                    {renderAccountSelect(m('withholding_tax_account'), 'acc_map_withholding_tax', m('withholding_tax_account_desc'))}
                 </div>
             </div>
 
@@ -156,14 +158,14 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Factory size={20} className="text-primary" />
-                    التصنيع
+                    {m('section_manufacturing')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('المواد الخام', 'acc_map_raw_materials', 'مخزون المواد الأولية قبل الإنتاج')}
-                    {renderAccountSelect('إنتاج تحت التشغيل (WIP)', 'acc_map_wip', 'تكاليف الإنتاج غير المكتمل')}
-                    {renderAccountSelect('البضاعة تامة الصنع', 'acc_map_finished_goods', 'مخزون المنتجات الجاهزة')}
-                    {renderAccountSelect('تكاليف العمالة', 'acc_map_labor_cost', 'أجور العمال المباشرين في الإنتاج')}
-                    {renderAccountSelect('التكاليف الصناعية الإضافية (Overhead)', 'acc_map_mfg_overhead', 'تكاليف المصنع الغير مباشرة')}
+                    {renderAccountSelect(m('raw_materials'), 'acc_map_raw_materials', m('raw_materials_desc'))}
+                    {renderAccountSelect(m('wip'), 'acc_map_wip', m('wip_desc'))}
+                    {renderAccountSelect(m('finished_goods'), 'acc_map_finished_goods', m('finished_goods_desc'))}
+                    {renderAccountSelect(m('labor_cost'), 'acc_map_labor_cost', m('labor_cost_desc'))}
+                    {renderAccountSelect(m('manufacturing_overhead'), 'acc_map_mfg_overhead', m('manufacturing_overhead_desc'))}
                 </div>
             </div>
 
@@ -171,13 +173,13 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Users size={20} className="text-primary" />
-                    الموارد البشرية والرواتب
+                    {m('section_hr_payroll')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('مصاريف الرواتب والأجور', 'acc_map_salaries_exp', 'قيد صرف الرواتب')}
-                    {renderAccountSelect('الرواتب المستحقة (Accrued)', 'acc_map_accrued_salaries', 'الرواتب المستحقة غير المدفوعة')}
-                    {renderAccountSelect('مكافآت نهاية الخدمة', 'acc_map_eosb', 'مخصص نهاية الخدمة')}
-                    {renderAccountSelect('التأمينات الاجتماعية', 'acc_map_social_insurance', 'اشتراكات التأمين الاجتماعي')}
+                    {renderAccountSelect(m('salaries_expense'), 'acc_map_salaries_exp', m('salaries_expense_desc'))}
+                    {renderAccountSelect(m('accrued_salaries'), 'acc_map_accrued_salaries', m('accrued_salaries_desc'))}
+                    {renderAccountSelect(m('eosb'), 'acc_map_eosb', m('eosb_desc'))}
+                    {renderAccountSelect(m('social_insurance'), 'acc_map_social_insurance', m('social_insurance_desc'))}
                 </div>
             </div>
 
@@ -185,10 +187,10 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Briefcase size={20} className="text-primary" />
-                    المشاريع
+                    {m('section_projects')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('أرباح وخسائر المشاريع عند الإغلاق', 'acc_map_project_pl', 'قيد إقفال المشروع — يُستخدم عند إغلاق المشروع')}
+                    {renderAccountSelect(m('project_pl'), 'acc_map_project_pl', m('project_pl_desc'))}
                 </div>
             </div>
 
@@ -196,12 +198,12 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ArrowLeftRight size={20} className="text-primary" />
-                    الأصول الثابتة والاستهلاك
+                    {m('section_fixed_assets')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {renderAccountSelect('حساب الأصول الثابتة', 'acc_map_fixed_assets', 'إجمالي الأصول الثابتة')}
-                    {renderAccountSelect('مصاريف الاستهلاك', 'acc_map_depreciation_exp', 'قسط الإهلاك الدوري')}
-                    {renderAccountSelect('مجمع الاستهلاك', 'acc_map_acc_depreciation', 'الاستهلاك المتجمع — خصم من الأصل')}
+                    {renderAccountSelect(m('fixed_assets_account'), 'acc_map_fixed_assets', m('fixed_assets_account_desc'))}
+                    {renderAccountSelect(m('depreciation_expense'), 'acc_map_depreciation_exp', m('depreciation_expense_desc'))}
+                    {renderAccountSelect(m('accumulated_depreciation'), 'acc_map_acc_depreciation', m('accumulated_depreciation_desc'))}
                 </div>
             </div>
 
@@ -209,50 +211,50 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200" style={{ borderColor: 'var(--warning, #f59e0b)', borderWidth: 2 }}>
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <RefreshCw size={20} style={{ color: 'var(--warning, #f59e0b)' }} />
-                    {isRTL ? 'أدوات محاسبية متقدمة' : 'Advanced Accounting Tools'}
+                    {m('advanced_tools_title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* FX Revaluation */}
                     <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
                         <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            💱 {isRTL ? 'إعادة تقييم العملات' : 'FX Revaluation'}
+                            💱 {m('fx_revaluation')}
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                            {isRTL ? 'تحديث أرصدة العملات الأجنبية بأسعار الصرف الحالية' : 'Update foreign currency balances at current exchange rates'}
+                            {m('fx_revaluation_desc')}
                         </p>
-                        <input type="date" className="form-input mb-2" value={fxDate} onChange={e => setFxDate(e.target.value)} style={{ fontSize: 13 }} />
+                        <DateInput className="form-input mb-2" value={fxDate} onChange={e => setFxDate(e.target.value)} style={{ fontSize: 13 }} />
                         <button className="btn btn-primary btn-sm btn-block" onClick={handleFxRevaluation} disabled={fxProcessing}>
-                            {fxProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'تنفيذ' : 'Run')}
+                            {fxProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('run')}
                         </button>
                     </div>
 
                     {/* Bad Debt Provision */}
                     <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
                         <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            ⚠️ {isRTL ? 'مخصص ديون مشكوك فيها' : 'Bad Debt Provision'}
+                            ⚠️ {m('bad_debt_provision')}
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                            {isRTL ? 'إنشاء مخصص للفواتير المتأخرة' : 'Create provision for overdue invoices'}
+                            {m('bad_debt_provision_desc')}
                         </p>
                         <div className="mb-2">
-                            <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{isRTL ? 'أيام التأخر' : 'Overdue Days'}</label>
+                            <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{m('overdue_days')}</label>
                             <input type="number" className="form-input" value={badDebtDays} onChange={e => setBadDebtDays(e.target.value)} style={{ fontSize: 13 }} />
                         </div>
                         <button className="btn btn-warning btn-sm btn-block" onClick={handleBadDebtProvision} disabled={badDebtProcessing}>
-                            {badDebtProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'إنشاء المخصص' : 'Create')}
+                            {badDebtProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('create_provision')}
                         </button>
                     </div>
 
                     {/* Leave Provision */}
                     <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid var(--border-color)' }}>
                         <div style={{ fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            🏖️ {isRTL ? 'مخصص إجازات' : 'Leave Provision'}
+                            🏖️ {m('leave_provision')}
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                            {isRTL ? 'حساب وقيد مخصص الإجازات المتراكمة' : 'Calculate and post accrued leave provision'}
+                            {m('leave_provision_desc')}
                         </p>
                         <button className="btn btn-secondary btn-sm btn-block" onClick={handleLeaveProvision} disabled={leaveProvProcessing} style={{ marginTop: 32 }}>
-                            {leaveProvProcessing ? <span className="loading loading-spinner loading-xs"></span> : (isRTL ? 'إنشاء المخصص' : 'Create')}
+                            {leaveProvProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('create_provision')}
                         </button>
                     </div>
                 </div>
@@ -261,8 +263,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
             <div className="alert alert-info rounded-xl">
                 <GitMerge size={20} />
                 <div className="text-sm">
-                    تأكد من اختيار الحسابات الصحيحة — هذه الإعدادات تتحكم في القيود المحاسبية التلقائية لجميع العمليات.
-                    أي حساب غير محدد سيُوقف إنشاء القيود المرتبطة به.
+                    {m('mapping_warning')}
                 </div>
             </div>
         </div>

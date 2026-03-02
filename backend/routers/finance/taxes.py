@@ -1340,7 +1340,7 @@ class TaxCalendarUpdate(BaseModel):
 def list_tax_calendar(
     status: Optional[str] = None,
     tax_type: Optional[str] = None,
-    current_user=Depends(require_permission(["view_taxes"]))
+    current_user=Depends(require_permission(["taxes.view"]))
 ):
     """List tax calendar events with optional filters"""
     db = get_db_connection(current_user.company_id)
@@ -1378,7 +1378,7 @@ def list_tax_calendar(
 
 @router.get("/calendar/summary")
 def tax_calendar_summary(
-    current_user=Depends(require_permission(["view_taxes"]))
+    current_user=Depends(require_permission(["taxes.view"]))
 ):
     """Get tax calendar summary stats"""
     db = get_db_connection(current_user.company_id)
@@ -1404,7 +1404,7 @@ def tax_calendar_summary(
 @router.get("/calendar/{item_id}")
 def get_tax_calendar_item(
     item_id: int,
-    current_user=Depends(require_permission(["view_taxes"]))
+    current_user=Depends(require_permission(["taxes.view"]))
 ):
     db = get_db_connection(current_user.company_id)
     try:
@@ -1424,7 +1424,7 @@ def get_tax_calendar_item(
 @router.post("/calendar")
 def create_tax_calendar_item(
     data: TaxCalendarCreate,
-    current_user=Depends(require_permission(["manage_taxes"]))
+    current_user=Depends(require_permission(["taxes.manage"]))
 ):
     db = get_db_connection(current_user.company_id)
     try:
@@ -1457,7 +1457,7 @@ def create_tax_calendar_item(
 def update_tax_calendar_item(
     item_id: int,
     data: TaxCalendarUpdate,
-    current_user=Depends(require_permission(["manage_taxes"]))
+    current_user=Depends(require_permission(["taxes.manage"]))
 ):
     db = get_db_connection(current_user.company_id)
     try:
@@ -1495,7 +1495,7 @@ def update_tax_calendar_item(
 @router.delete("/calendar/{item_id}")
 def delete_tax_calendar_item(
     item_id: int,
-    current_user=Depends(require_permission(["manage_taxes"]))
+    current_user=Depends(require_permission(["taxes.manage"]))
 ):
     db = get_db_connection(current_user.company_id)
     try:
@@ -1516,7 +1516,7 @@ def delete_tax_calendar_item(
 @router.put("/calendar/{item_id}/complete")
 def complete_tax_calendar_item(
     item_id: int,
-    current_user=Depends(require_permission(["manage_taxes"]))
+    current_user=Depends(require_permission(["taxes.manage"]))
 ):
     """Mark a tax calendar item as completed, optionally creating next recurrence"""
     db = get_db_connection(current_user.company_id)

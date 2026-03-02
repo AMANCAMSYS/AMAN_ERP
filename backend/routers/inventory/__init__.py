@@ -16,7 +16,7 @@ from .transfers import transfers_router
 from .price_lists import price_lists_router
 from .stock_movements import stock_movements_router
 from .shipments import shipments_router
-from .notifications import notifications_router
+# notifications_router removed — unified in routers/notifications.py
 from .adjustments import adjustments_router
 from .reports import reports_router
 from .batches import batches_router
@@ -30,7 +30,7 @@ router.include_router(transfers_router)
 router.include_router(price_lists_router)
 router.include_router(stock_movements_router)
 router.include_router(shipments_router)
-router.include_router(notifications_router)
+# notifications_router removed — unified in routers/notifications.py
 router.include_router(adjustments_router)
 router.include_router(reports_router)
 router.include_router(batches_router)

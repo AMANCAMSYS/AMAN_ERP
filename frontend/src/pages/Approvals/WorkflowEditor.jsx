@@ -201,7 +201,7 @@ const WorkflowEditor = () => {
 
             <div className="workspace-content max-w-5xl">
                 {/* General Settings Card */}
-                <div className="card mb-6" style={{ borderRadius: '12px' }}>
+                <div className="card mb-6">
                     <div className="card-body p-5">
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                             <Info size={18} className="text-primary" />
@@ -292,7 +292,7 @@ const WorkflowEditor = () => {
                 </div>
 
                 {/* Steps Card */}
-                <div className="card" style={{ borderRadius: '12px' }}>
+                <div className="card">
                     <div className="card-body p-0">
                         <div className="p-5 border-b border-base-200 flex justify-between items-center">
                             <h3 className="text-lg font-bold flex items-center gap-2">

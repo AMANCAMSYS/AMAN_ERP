@@ -8,9 +8,11 @@ import { getCurrency } from '../../utils/auth'
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 function TaxReturnDetails() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const { id } = useParams()
     const navigate = useNavigate()
     const currency = getCurrency()
@@ -57,7 +59,7 @@ function TaxReturnDetails() {
             setShowFileModal(false)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         } finally {
             setActionLoading(false)
         }
@@ -70,7 +72,7 @@ function TaxReturnDetails() {
             await taxesAPI.cancelReturn(id)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         } finally {
             setActionLoading(false)
         }
@@ -91,7 +93,7 @@ function TaxReturnDetails() {
             setShowPayModal(false)
             fetchData()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         } finally {
             setActionLoading(false)
         }

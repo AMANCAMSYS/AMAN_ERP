@@ -98,7 +98,7 @@ const StockAdjustmentForm = () => {
                     </div>
                 )}
 
-                <div className="card" style={{ borderRadius: '12px', padding: '32px' }}>
+                <div className="card" style={{ padding: '32px' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="row">
                             <div className="col-md-6 mb-4">

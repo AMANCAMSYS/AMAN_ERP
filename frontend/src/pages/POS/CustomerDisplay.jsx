@@ -8,12 +8,14 @@ import BackButton from '../../components/common/BackButton';
 /**
  * POS-005: Customer Display + Cash Drawer Control
  * Shows a customer-facing display preview and cash drawer management
+ * Uses BroadcastChannel API for live cart updates from POSInterface
  */
 
 function CustomerDisplay() {
     const { t } = useTranslation();
     const currency = getCurrency();
     const displayWindowRef = useRef(null);
+    const channelRef = useRef(null);
 
     const [config, setConfig] = useState({
         displayEnabled: false,
@@ -29,19 +31,54 @@ function CustomerDisplay() {
 
     const [displayState, setDisplayState] = useState('welcome'); // welcome, scanning, total, thankYou
     const [currentItem, setCurrentItem] = useState(null);
-    const [cartItems, setCartItems] = useState([
-        { name: 'قهوة عربية', price: 15, qty: 2 },
-        { name: 'كعكة شوكولاتة', price: 25, qty: 1 },
-    ]);
-    const [total, setTotal] = useState(55);
+    const [cartItems, setCartItems] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [liveConnected, setLiveConnected] = useState(false);
     const [drawerLog, setDrawerLog] = useState([
         { time: '10:30:00', reason: 'بيع', amount: 97.75, user: 'أحمد' },
         { time: '09:15:00', reason: 'فتح الصندوق', amount: 500, user: 'محمد' },
     ]);
 
+    // BroadcastChannel: receive live cart updates from POSInterface
     useEffect(() => {
-        const sum = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-        setTotal(sum);
+        try {
+            channelRef.current = new BroadcastChannel('pos_customer_display');
+            setLiveConnected(true);
+
+            channelRef.current.onmessage = (event) => {
+                const data = event.data;
+                if (data.type === 'cart_update') {
+                    setCartItems(data.items || []);
+                    setTotal(data.totals?.total || 0);
+                    setDisplayState(data.items?.length > 0 ? 'scanning' : 'welcome');
+                } else if (data.type === 'thankYou') {
+                    setDisplayState('thankYou');
+                    setTimeout(() => {
+                        setCartItems([]);
+                        setTotal(0);
+                        setDisplayState('welcome');
+                    }, 5000);
+                } else if (data.type === 'idle') {
+                    setCartItems([]);
+                    setTotal(0);
+                    setDisplayState('welcome');
+                }
+
+                // Auto-update the popup window if open
+                if (displayWindowRef.current && !displayWindowRef.current.closed) {
+                    updateDisplayWindow(displayWindowRef.current);
+                }
+            };
+        } catch (e) {
+            console.warn('BroadcastChannel not supported');
+        }
+
+        return () => { if (channelRef.current) channelRef.current.close(); };
+    }, []);
+
+    useEffect(() => {
+        const sum = cartItems.reduce((s, i) => s + (i.total || (i.price * (i.qty || i.quantity || 1))), 0);
+        if (!total && sum > 0) setTotal(sum);
     }, [cartItems]);
 
     const openCustomerDisplay = () => {
@@ -73,8 +110,8 @@ function CustomerDisplay() {
         } else if (displayState === 'scanning') {
             const itemsHtml = cartItems.map(i => `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid ${isDark ? '#333' : '#eee'}">
-                    <span>${i.name} × ${i.qty}</span>
-                    <span>${formatNumber(i.price * i.qty)} ${currency}</span>
+                    <span>${i.name} × ${i.qty || i.quantity || 1}</span>
+                    <span>${formatNumber(i.total || (i.price * (i.qty || i.quantity || 1)))} ${currency}</span>
                 </div>
             `).join('');
             content = `
@@ -131,6 +168,11 @@ function CustomerDisplay() {
                     <p className="workspace-subtitle">{t('pos.customer_display.subtitle', 'إعدادات العرض للعميل والتحكم بدرج النقود')}</p>
                 </div>
                 <div className="header-actions">
+                    {liveConnected && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(16,185,129,0.12)', color: '#10b981', fontSize: 12, fontWeight: 600 }}>
+                            🟢 {t('pos.customer_display.live', 'متصل مباشرة')}
+                        </span>
+                    )}
                     <button className="btn btn-primary" onClick={openCustomerDisplay}>📺 {t('pos.customer_display.open', 'فتح شاشة العميل')}</button>
                 </div>
             </div>
@@ -194,10 +236,12 @@ function CustomerDisplay() {
                         )}
                         {displayState === 'scanning' && (
                             <div style={{ width: '100%', textAlign: 'right', padding: '0 10px' }}>
-                                {cartItems.map((item, i) => (
+                                {cartItems.length === 0 ? (
+                                    <div style={{ opacity: 0.5 }}>{t('pos.customer_display.no_items', 'لا توجد عناصر - سيتم التحديث تلقائياً من نقطة البيع')}</div>
+                                ) : cartItems.map((item, i) => (
                                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(128,128,128,0.2)' }}>
-                                        <span>{item.name} × {item.qty}</span>
-                                        <span>{formatNumber(item.price * item.qty)}</span>
+                                        <span>{item.name} × {item.qty || item.quantity || 1}</span>
+                                        <span>{formatNumber(item.total || (item.price * (item.qty || item.quantity || 1)))}</span>
                                     </div>
                                 ))}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 700, fontSize: 18, color: '#4f46e5' }}>

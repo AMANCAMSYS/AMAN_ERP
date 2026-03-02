@@ -710,9 +710,20 @@ def create_order(
             if cash_amount > 0:
                 db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), 
                            {"amt": cash_amount, "id": treasury_id})
-        # Since we don't have those columns yet, the total_sales update is enough for basic balancing.
 
-    
+        # 7. Update Customer Balance (if customer-linked POS sale)
+        if order_in.customer_id and order_in.status == 'paid':
+            try:
+                credit_payments = sum(p.amount for p in order_in.payments if p.method in ('credit', 'on_account'))
+                if credit_payments > 0:
+                    db.execute(text("""
+                        UPDATE parties
+                        SET current_balance = current_balance + :amt, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :pid
+                    """), {"amt": credit_payments, "pid": order_in.customer_id})
+            except Exception:
+                pass  # Non-blocking — POS must not fail for party update
+
     db.commit()
     
     return OrderResponse(
@@ -1482,3 +1493,53 @@ def update_kitchen_status(ko_id: int, data: dict, current_user: UserResponse = D
         db.execute(text("UPDATE pos_kitchen_orders SET status = :s WHERE id = :id"), {"s": new_status, "id": ko_id})
     db.commit()
     return {"message": f"Kitchen order {ko_id} → {new_status}"}
+
+
+# ===================== B7: PWA Support =====================
+
+@router.get("/pwa/manifest")
+def get_pwa_manifest(current_user: UserResponse = Depends(get_current_user)):
+    """PWA manifest for POS offline support"""
+    return {
+        "name": "نقاط البيع - أمان ERP",
+        "short_name": "POS",
+        "description": "نظام نقاط البيع",
+        "start_url": "/pos",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#1a73e8",
+        "orientation": "any",
+        "icons": [
+            {"src": "/icons/pos-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/icons/pos-512.png", "sizes": "512x512", "type": "image/png"}
+        ],
+        "categories": ["business", "finance"],
+        "lang": "ar",
+        "dir": "rtl"
+    }
+
+
+@router.get("/pwa/config")
+def get_pwa_config(current_user: UserResponse = Depends(get_current_user)):
+    """PWA offline config - cached products and settings"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        products = db.execute(text("""
+            SELECT id, name, name_ar, sku, sale_price, tax_rate, category_id, unit_id, barcode
+            FROM products WHERE is_active = TRUE
+            ORDER BY name LIMIT 5000
+        """)).fetchall()
+        tax_rates = db.execute(text("SELECT * FROM tax_rates WHERE is_active = TRUE")).fetchall()
+        payment_methods = db.execute(text(
+            "SELECT * FROM pos_payment_methods WHERE is_active = TRUE ORDER BY sort_order"
+        )).fetchall()
+        return {
+            "products": [dict(r._mapping) for r in products],
+            "tax_rates": [dict(r._mapping) for r in tax_rates],
+            "payment_methods": [dict(r._mapping) for r in payment_methods],
+            "cache_version": __import__('time').time()
+        }
+    except Exception as e:
+        return {"products": [], "tax_rates": [], "payment_methods": [], "error": str(e)}
+    finally:
+        db.close()

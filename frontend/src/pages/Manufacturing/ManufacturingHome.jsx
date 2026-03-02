@@ -176,6 +176,9 @@ const ManufacturingHome = () => {
                                 <Link to="/manufacturing/reports/work-orders" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                     📋 {t('manufacturing.work_orders_report.title', 'حالة أوامر العمل')}
                                 </Link>
+                                <Link to="/manufacturing/capacity" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                    🏭 {t('manufacturing.capacity_planning', 'تخطيط الطاقة الإنتاجية')}
+                                </Link>
                             </div>
                         </div>
                     </div>

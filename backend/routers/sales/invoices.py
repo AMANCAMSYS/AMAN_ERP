@@ -520,6 +520,24 @@ def create_sales_invoice(
         except Exception as ze:
             logger.warning(f"ZATCA QR generation skipped for {inv_num}: {ze}")
 
+        # Notify finance team about new invoice
+        try:
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'sales_invoice', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "🧾 فاتورة مبيعات جديدة",
+                "message": f"فاتورة {inv_num} — {cust_name or ''} — {grand_total:,.2f}",
+                "link": f"/sales/invoices/{invoice_id}",
+                "current_uid": current_user.id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return {
             "id": invoice_id,
             "invoice_number": inv_num,

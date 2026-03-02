@@ -10,8 +10,10 @@ import '../../components/ModuleStyles.css'
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 function ChecksPayable() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 
@@ -87,7 +89,7 @@ function ChecksPayable() {
     }
 
     const handleCreate = async () => {
-        if (!form.check_number || !form.amount || !form.due_date || !form.issue_date) return alert('يجب تعبئة رقم الشيك والمبلغ وتاريخ الإصدار وتاريخ الاستحقاق')
+        if (!form.check_number || !form.amount || !form.due_date || !form.issue_date) return showToast(t('checks.payable.requiredFields', 'warning'))
         try {
             setSaving(true)
             await checksAPI.createPayable({
@@ -100,7 +102,7 @@ function ChecksPayable() {
             setShowCreate(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.payable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -122,7 +124,7 @@ function ChecksPayable() {
             setShowClear(false); setShowDetail(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.payable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -136,7 +138,7 @@ function ChecksPayable() {
             setShowBounce(false); setShowDetail(false)
             fetchList(); fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || 'حدث خطأ')
+            showToast(err.response?.data?.detail || t('checks.payable.error', 'error'))
         } finally { setSaving(false) }
     }
 
@@ -153,7 +155,7 @@ function ChecksPayable() {
 
     const statusBadge = (s) => {
         const map = { issued: 'badge-warning', cleared: 'badge-success', bounced: 'badge-danger' }
-        const labels = { issued: 'صادر', cleared: 'مصروف', bounced: 'مرتجع' }
+        const labels = { issued: t('checks.payable.issued'), cleared: t('checks.payable.cleared'), bounced: t('checks.payable.bounced') }
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>
     }
 
@@ -170,10 +172,10 @@ function ChecksPayable() {
                 <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div>
-                        <h1 className="workspace-title">📤 شيكات تحت الدفع</h1>
-                        <p className="workspace-subtitle">Checks Payable - إدارة الشيكات الصادرة</p>
+                        <h1 className="workspace-title">📤 {t('checks.payable.title')}</h1>
+                        <p className="workspace-subtitle">{t('checks.payable.subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary" onClick={openCreate}>+ إصدار شيك</button>
+                    <button className="btn btn-primary" onClick={openCreate}>+ {t('checks.payable.create')}</button>
                 </div>
             </div>
 
@@ -182,25 +184,25 @@ function ChecksPayable() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                     <div className="card p-3 text-center">
                         <FileText size={24} className="text-warning mb-2" />
-                        <div className="small text-muted">صادر</div>
+                        <div className="small text-muted">{t('checks.payable.issued')}</div>
                         <div className="fw-bold fs-4">{stats.issued.count}</div>
                         <div className="small text-muted">{formatNumber(stats.issued.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <CheckCircle size={24} className="text-success mb-2" />
-                        <div className="small text-muted">مصروف</div>
+                        <div className="small text-muted">{t('checks.payable.cleared')}</div>
                         <div className="fw-bold fs-4 text-success">{stats.cleared.count}</div>
                         <div className="small text-muted">{formatNumber(stats.cleared.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <XCircle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مرتجع</div>
+                        <div className="small text-muted">{t('checks.payable.bounced')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.bounced.count}</div>
                         <div className="small text-muted">{formatNumber(stats.bounced.amount)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <AlertTriangle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مستحق اليوم</div>
+                        <div className="small text-muted">{t('checks.payable.overdueToday')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.overdue.count}</div>
                         <div className="small text-muted">{formatNumber(stats.overdue.amount)} {currency}</div>
                     </div>
@@ -209,15 +211,15 @@ function ChecksPayable() {
 
             {/* Filters */}
             <div className="card" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-                <input className="form-input" placeholder="بحث برقم الشيك أو المستفيد..." value={search}
+                <input className="form-input" placeholder={t('checks.payable.searchPlaceholder')} value={search}
                     onChange={e => setSearch(e.target.value)} style={{ maxWidth: 280 }} />
                 <select className="form-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ maxWidth: 160 }}>
-                    <option value="">جميع الحالات</option>
-                    <option value="issued">صادر</option>
-                    <option value="cleared">مصروف</option>
-                    <option value="bounced">مرتجع</option>
+                    <option value="">{t('checks.payable.allStatuses')}</option>
+                    <option value="issued">{t('checks.payable.issued')}</option>
+                    <option value="cleared">{t('checks.payable.cleared')}</option>
+                    <option value="bounced">{t('checks.payable.bounced')}</option>
                 </select>
-                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>الإجمالي: {total}</div>
+                <div style={{ marginRight: 'auto', fontWeight: 600, alignSelf: 'center' }}>{t('checks.payable.total')}: {total}</div>
             </div>
 
             {/* Table */}
@@ -225,17 +227,17 @@ function ChecksPayable() {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم الشيك</th>
-                            <th>المستفيد</th>
-                            <th>البنك</th>
-                            <th>المبلغ</th>
-                            <th>تاريخ الاستحقاق</th>
-                            <th>الحالة</th>
+                            <th>{t('checks.payable.checkNumber')}</th>
+                            <th>{t('checks.payable.beneficiary')}</th>
+                            <th>{t('checks.payable.bank')}</th>
+                            <th>{t('checks.payable.amount')}</th>
+                            <th>{t('checks.payable.dueDate')}</th>
+                            <th>{t('checks.payable.status')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.length === 0 ? (
-                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>لا توجد شيكات</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40 }}>{t('checks.payable.noChecks')}</td></tr>
                         ) : items.map(item => (
                             <tr key={item.id} onClick={() => viewDetail(item.id)}
                                 style={{ cursor: 'pointer', background: isOverdue(item.due_date, item.status) ? 'rgba(220,53,69,0.05)' : undefined }}>
@@ -259,58 +261,58 @@ function ChecksPayable() {
                 <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 780, maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>إصدار شيك</h2>
+                            <h2>{t('checks.payable.create')}</h2>
                             <button className="modal-close" onClick={() => setShowCreate(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                                 <div>
-                                    <label className="form-label">رقم الشيك *</label>
+                                    <label className="form-label">{t('checks.payable.checkNumber')} *</label>
                                     <input className="form-input" value={form.check_number} onChange={e => setForm(f => ({ ...f, check_number: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">المبلغ *</label>
+                                    <label className="form-label">{t('checks.payable.amount')} *</label>
                                     <input className="form-input" type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">اسم المستفيد</label>
+                                    <label className="form-label">{t('checks.payable.beneficiary')}</label>
                                     <input className="form-input" value={form.beneficiary_name} onChange={e => setForm(f => ({ ...f, beneficiary_name: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">البنك</label>
+                                    <label className="form-label">{t('checks.payable.bank')}</label>
                                     <input className="form-input" value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">تاريخ الإصدار *</label>
+                                    <label className="form-label">{t('checks.payable.issueDate')} *</label>
                                     <DateInput className="form-input" value={form.issue_date} onChange={e => setForm(f => ({ ...f, issue_date: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">تاريخ الاستحقاق *</label>
+                                    <label className="form-label">{t('checks.payable.dueDate')} *</label>
                                     <DateInput className="form-input" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
                                 </div>
                                 <div>
-                                    <label className="form-label">المورد</label>
+                                    <label className="form-label">{t('checks.payable.supplier')}</label>
                                     <select className="form-input" value={form.party_id} onChange={e => setForm(f => ({ ...f, party_id: e.target.value }))}>
-                                        <option value="">اختر المورد</option>
+                                        <option value="">{t('checks.payable.selectSupplier')}</option>
                                         {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="form-label">حساب الخزينة</label>
+                                    <label className="form-label">{t('checks.payable.treasuryAccount')}</label>
                                     <select className="form-input" value={form.treasury_account_id} onChange={e => setForm(f => ({ ...f, treasury_account_id: e.target.value }))}>
-                                        <option value="">اختر الخزينة</option>
+                                        <option value="">{t('checks.payable.selectTreasury')}</option>
                                         {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <label className="form-label">ملاحظات</label>
+                                    <label className="form-label">{t('checks.payable.notes')}</label>
                                     <input className="form-input" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
                                 </div>
                             </div>
                             <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn btn-primary" onClick={handleCreate} disabled={saving}>
-                                    {saving ? 'جاري الحفظ...' : 'إصدار الشيك'}
+                                    {saving ? t('checks.payable.saving') : t('checks.payable.issueCheck')}
                                 </button>
                             </div>
                         </div>
@@ -323,25 +325,25 @@ function ChecksPayable() {
                 <div className="modal-overlay" onClick={() => setShowDetail(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflow: 'auto' }}>
                         <div className="modal-header">
-                            <h2>شيك رقم: {detailItem.check_number}</h2>
+                            <h2>{t('checks.payable.checkNumberTitle')} {detailItem.check_number}</h2>
                             <button className="modal-close" onClick={() => setShowDetail(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', marginBottom: 20 }}>
-                                <div className="metric-card"><div className="metric-label">المبلغ</div><div className="metric-value text-primary" style={{ fontSize: 20 }}>{formatNumber(detailItem.amount)} {currency}</div></div>
-                                <div className="metric-card"><div className="metric-label">الحالة</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
-                                <div className="metric-card"><div className="metric-label">الاستحقاق</div><div className="metric-value" style={{ fontSize: 14 }}>{formatShortDate(detailItem.due_date)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.payable.amount')}</div><div className="metric-value text-primary" style={{ fontSize: 20 }}>{formatNumber(detailItem.amount)} {currency}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.payable.status')}</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('checks.payable.dueDateShort')}</div><div className="metric-value" style={{ fontSize: 14 }}>{formatShortDate(detailItem.due_date)}</div></div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                                <div><strong>المستفيد:</strong> {detailItem.beneficiary_name || '—'}</div>
-                                <div><strong>البنك:</strong> {detailItem.bank_name || '—'}</div>
-                                <div><strong>المورد:</strong> {detailItem.party_name || '—'}</div>
-                                <div><strong>الخزينة:</strong> {detailItem.treasury_name || '—'}</div>
-                                <div><strong>تاريخ الإصدار:</strong> {formatShortDate(detailItem.issue_date)}</div>
-                                {detailItem.clearance_date && <div><strong>تاريخ الصرف:</strong> {formatShortDate(detailItem.clearance_date)}</div>}
-                                {detailItem.bounce_date && <div><strong>تاريخ الارتجاع:</strong> {formatShortDate(detailItem.bounce_date)}</div>}
-                                {detailItem.bounce_reason && <div style={{ gridColumn: '1 / -1' }}><strong>سبب الارتجاع:</strong> {detailItem.bounce_reason}</div>}
+                                <div><strong>{t('checks.payable.beneficiary')}:</strong> {detailItem.beneficiary_name || '—'}</div>
+                                <div><strong>{t('checks.payable.bank')}:</strong> {detailItem.bank_name || '—'}</div>
+                                <div><strong>{t('checks.payable.supplier')}:</strong> {detailItem.party_name || '—'}</div>
+                                <div><strong>{t('checks.payable.treasuryAccount')}:</strong> {detailItem.treasury_name || '—'}</div>
+                                <div><strong>{t('checks.payable.issueDate')}:</strong> {formatShortDate(detailItem.issue_date)}</div>
+                                {detailItem.clearance_date && <div><strong>{t('checks.payable.clearanceDate')}:</strong> {formatShortDate(detailItem.clearance_date)}</div>}
+                                {detailItem.bounce_date && <div><strong>{t('checks.payable.bounceDate')}:</strong> {formatShortDate(detailItem.bounce_date)}</div>}
+                                {detailItem.bounce_reason && <div style={{ gridColumn: '1 / -1' }}><strong>{t('checks.payable.bounceReason')}:</strong> {detailItem.bounce_reason}</div>}
                             </div>
 
                             {detailItem.notes && <p style={{ color: '#666', marginBottom: 16 }}>📝 {detailItem.notes}</p>}
@@ -349,8 +351,8 @@ function ChecksPayable() {
                             {/* Actions */}
                             {detailItem.status === 'issued' && (
                                 <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-                                    <button className="btn btn-primary" onClick={openClear}>✅ صرف الشيك</button>
-                                    <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={openBounce}>❌ شيك مرتجع</button>
+                                    <button className="btn btn-primary" onClick={openClear}>✅ {t('checks.payable.clear')}</button>
+                                    <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={openBounce}>❌ {t('checks.payable.bounce')}</button>
                                 </div>
                             )}
                         </div>
@@ -363,27 +365,27 @@ function ChecksPayable() {
                 <div className="modal-overlay" onClick={() => setShowClear(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
                         <div className="modal-header">
-                            <h2>صرف الشيك</h2>
+                            <h2>{t('checks.payable.clear')}</h2>
                             <button className="modal-close" onClick={() => setShowClear(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">تاريخ الصرف</label>
+                                <label className="form-label">{t('checks.payable.clearanceDate')}</label>
                                 <DateInput className="form-input" value={actionForm.clearance_date}
                                     onChange={e => setActionForm(f => ({ ...f, clearance_date: e.target.value }))} />
                             </div>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">حساب الخزينة (البنك)</label>
+                                <label className="form-label">{t('checks.payable.treasuryBank')}</label>
                                 <select className="form-input" value={actionForm.treasury_account_id || ''}
                                     onChange={e => setActionForm(f => ({ ...f, treasury_account_id: e.target.value }))}>
-                                    <option value="">اختر الخزينة</option>
+                                    <option value="">{t('checks.payable.selectTreasury')}</option>
                                     {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                 </select>
                             </div>
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowClear(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowClear(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn btn-primary" onClick={handleClear} disabled={saving}>
-                                    {saving ? 'جاري...' : 'تأكيد الصرف'}
+                                    {saving ? t('checks.payable.processing') : t('checks.payable.confirmClear')}
                                 </button>
                             </div>
                         </div>
@@ -396,25 +398,25 @@ function ChecksPayable() {
                 <div className="modal-overlay" onClick={() => setShowBounce(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
                         <div className="modal-header">
-                            <h2>تسجيل شيك مرتجع</h2>
+                            <h2>{t('checks.payable.bounce')}</h2>
                             <button className="modal-close" onClick={() => setShowBounce(false)}>✕</button>
                         </div>
                         <div style={{ padding: 20 }}>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">تاريخ الارتجاع</label>
+                                <label className="form-label">{t('checks.payable.bounceDate')}</label>
                                 <DateInput className="form-input" value={actionForm.bounce_date}
                                     onChange={e => setActionForm(f => ({ ...f, bounce_date: e.target.value }))} />
                             </div>
                             <div style={{ marginBottom: 16 }}>
-                                <label className="form-label">سبب الارتجاع</label>
+                                <label className="form-label">{t('checks.payable.bounceReason')}</label>
                                 <textarea className="form-input" rows="3" value={actionForm.bounce_reason || ''}
                                     onChange={e => setActionForm(f => ({ ...f, bounce_reason: e.target.value }))}
-                                    placeholder="رصيد غير كافٍ، توقيع غير مطابق..." />
+                                    placeholder={t('checks.payable.bouncePlaceholder')} />
                             </div>
                             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                                <button className="btn btn-secondary" onClick={() => setShowBounce(false)}>إلغاء</button>
+                                <button className="btn btn-secondary" onClick={() => setShowBounce(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={handleBounce} disabled={saving}>
-                                    {saving ? 'جاري...' : 'تأكيد الارتجاع'}
+                                    {saving ? t('checks.payable.processing') : t('checks.payable.confirmBounce')}
                                 </button>
                             </div>
                         </div>

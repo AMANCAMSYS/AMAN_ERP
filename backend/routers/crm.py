@@ -740,3 +740,787 @@ def delete_article(article_id: int, current_user=Depends(get_current_user)):
         return {"message": "تم حذف المقالة"}
     finally:
         db.close()
+
+
+# ======================== CRM-006: Lead Scoring ========================
+
+class LeadScoringRuleCreate(BaseModel):
+    rule_name: str
+    field_name: str  # stage, source, expected_value, customer_id, etc.
+    operator: str = "equals"  # equals, greater_than, less_than, contains, exists
+    field_value: Optional[str] = None
+    score: int = 0
+
+class LeadScoringRuleUpdate(BaseModel):
+    rule_name: Optional[str] = None
+    field_name: Optional[str] = None
+    operator: Optional[str] = None
+    field_value: Optional[str] = None
+    score: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/lead-scoring/rules", dependencies=[Depends(require_permission("sales.view"))])
+def list_scoring_rules(current_user=Depends(get_current_user)):
+    """قائمة قواعد تسجيل العملاء المحتملين"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT * FROM crm_lead_scoring_rules ORDER BY score DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/lead-scoring/rules", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def create_scoring_rule(data: LeadScoringRuleCreate, current_user=Depends(get_current_user)):
+    """إنشاء قاعدة تسجيل نقاط"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rid = db.execute(text("""
+            INSERT INTO crm_lead_scoring_rules (rule_name, field_name, operator, field_value, score, created_by)
+            VALUES (:name, :field, :op, :val, :score, :uid) RETURNING id
+        """), {
+            "name": data.rule_name, "field": data.field_name,
+            "op": data.operator, "val": data.field_value,
+            "score": data.score, "uid": current_user.id
+        }).scalar()
+        db.commit()
+        return {"id": rid, "message": "تم إنشاء قاعدة التسجيل"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/lead-scoring/rules/{rule_id}", dependencies=[Depends(require_permission("sales.create"))])
+def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+        if not updates:
+            raise HTTPException(400, "لا توجد بيانات للتحديث")
+        updates["id"] = rule_id
+        set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
+        db.execute(text(f"UPDATE crm_lead_scoring_rules SET {set_clause} WHERE id = :id"), updates)
+        db.commit()
+        return {"message": "تم التحديث"}
+    finally:
+        db.close()
+
+
+@router.delete("/lead-scoring/rules/{rule_id}", dependencies=[Depends(require_permission("sales.delete"))])
+def delete_scoring_rule(rule_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM crm_lead_scoring_rules WHERE id = :id"), {"id": rule_id})
+        db.commit()
+        return {"message": "تم الحذف"}
+    finally:
+        db.close()
+
+
+@router.post("/lead-scoring/calculate", dependencies=[Depends(require_permission("sales.create"))])
+def calculate_lead_scores(current_user=Depends(get_current_user)):
+    """حساب نقاط جميع الفرص تلقائياً بناءً على القواعد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rules = db.execute(text(
+            "SELECT * FROM crm_lead_scoring_rules WHERE is_active = TRUE"
+        )).fetchall()
+        opps = db.execute(text(
+            "SELECT * FROM sales_opportunities WHERE stage NOT IN ('won','lost')"
+        )).fetchall()
+
+        scored = 0
+        for opp in opps:
+            opp_d = dict(opp._mapping)
+            total = 0
+            details = []
+            for r in rules:
+                r_d = dict(r._mapping)
+                val = str(opp_d.get(r_d["field_name"], "") or "")
+                match = False
+                if r_d["operator"] == "equals":
+                    match = val.lower() == (r_d["field_value"] or "").lower()
+                elif r_d["operator"] == "contains":
+                    match = (r_d["field_value"] or "").lower() in val.lower()
+                elif r_d["operator"] == "greater_than":
+                    try:
+                        match = float(val) > float(r_d["field_value"] or 0)
+                    except (ValueError, TypeError):
+                        pass
+                elif r_d["operator"] == "less_than":
+                    try:
+                        match = float(val) < float(r_d["field_value"] or 0)
+                    except (ValueError, TypeError):
+                        pass
+                elif r_d["operator"] == "exists":
+                    match = bool(val and val.strip())
+
+                if match:
+                    total += r_d["score"]
+                    details.append({"rule": r_d["rule_name"], "score": r_d["score"]})
+
+            grade = "A" if total >= 80 else "B" if total >= 60 else "C" if total >= 40 else "D"
+
+            import json
+            db.execute(text("""
+                INSERT INTO crm_lead_scores (opportunity_id, total_score, grade, scoring_details, last_scored_at)
+                VALUES (:oid, :score, :grade, :details, NOW())
+                ON CONFLICT (opportunity_id) DO UPDATE SET
+                    total_score = EXCLUDED.total_score,
+                    grade = EXCLUDED.grade,
+                    scoring_details = EXCLUDED.scoring_details,
+                    last_scored_at = NOW()
+            """), {
+                "oid": opp_d["id"], "score": total,
+                "grade": grade, "details": json.dumps(details)
+            })
+            scored += 1
+
+        db.commit()
+        return {"scored": scored, "message": f"تم تسجيل نقاط {scored} فرصة"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.get("/lead-scoring/scores", dependencies=[Depends(require_permission("sales.view"))])
+def get_lead_scores(grade: Optional[str] = None, current_user=Depends(get_current_user)):
+    """عرض نقاط الفرص مع التصنيف"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["1=1"]
+        params = {}
+        if grade:
+            conditions.append("ls.grade = :grade")
+            params["grade"] = grade.upper()
+
+        rows = db.execute(text(f"""
+            SELECT ls.*, o.title, o.stage, o.expected_value, o.contact_name,
+                   p.name as customer_name
+            FROM crm_lead_scores ls
+            JOIN sales_opportunities o ON ls.opportunity_id = o.id
+            LEFT JOIN parties p ON o.customer_id = p.id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY ls.total_score DESC
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+# ======================== CRM-007: Customer Segmentation ========================
+
+class SegmentCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    criteria: Optional[dict] = {}
+    color: str = "#3B82F6"
+    auto_assign: bool = False
+
+class SegmentUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    criteria: Optional[dict] = None
+    color: Optional[str] = None
+    auto_assign: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+@router.get("/segments", dependencies=[Depends(require_permission("sales.view"))])
+def list_segments(current_user=Depends(get_current_user)):
+    """قائمة شرائح العملاء"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT s.*,
+                   (SELECT COUNT(*) FROM crm_customer_segment_members m WHERE m.segment_id = s.id) as member_count
+            FROM crm_customer_segments s
+            WHERE s.is_active = TRUE
+            ORDER BY s.name
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/segments", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def create_segment(data: SegmentCreate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import json
+        sid = db.execute(text("""
+            INSERT INTO crm_customer_segments (name, description, criteria, color, auto_assign, created_by)
+            VALUES (:name, :desc, :criteria, :color, :auto, :uid) RETURNING id
+        """), {
+            "name": data.name, "desc": data.description,
+            "criteria": json.dumps(data.criteria or {}),
+            "color": data.color, "auto": data.auto_assign, "uid": current_user.id
+        }).scalar()
+        db.commit()
+        return {"id": sid, "message": "تم إنشاء شريحة العملاء"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/segments/{seg_id}", dependencies=[Depends(require_permission("sales.create"))])
+def update_segment(seg_id: int, data: SegmentUpdate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        import json
+        updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+        if "criteria" in updates:
+            updates["criteria"] = json.dumps(updates["criteria"])
+        if not updates:
+            raise HTTPException(400, "لا توجد بيانات")
+        updates["id"] = seg_id
+        set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
+        db.execute(text(f"UPDATE crm_customer_segments SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
+        db.commit()
+        return {"message": "تم التحديث"}
+    finally:
+        db.close()
+
+
+@router.delete("/segments/{seg_id}", dependencies=[Depends(require_permission("sales.delete"))])
+def delete_segment(seg_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM crm_customer_segment_members WHERE segment_id = :id"), {"id": seg_id})
+        db.execute(text("DELETE FROM crm_customer_segments WHERE id = :id"), {"id": seg_id})
+        db.commit()
+        return {"message": "تم الحذف"}
+    finally:
+        db.close()
+
+
+@router.post("/segments/{seg_id}/customers/{customer_id}",
+             status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def add_customer_to_segment(seg_id: int, customer_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("""
+            INSERT INTO crm_customer_segment_members (segment_id, customer_id)
+            VALUES (:sid, :cid) ON CONFLICT DO NOTHING
+        """), {"sid": seg_id, "cid": customer_id})
+        db.commit()
+        return {"message": "تمت الإضافة"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/segments/{seg_id}/customers/{customer_id}",
+               dependencies=[Depends(require_permission("sales.delete"))])
+def remove_customer_from_segment(seg_id: int, customer_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("""
+            DELETE FROM crm_customer_segment_members WHERE segment_id = :sid AND customer_id = :cid
+        """), {"sid": seg_id, "cid": customer_id})
+        db.commit()
+        return {"message": "تمت الإزالة"}
+    finally:
+        db.close()
+
+
+@router.get("/segments/{seg_id}/customers", dependencies=[Depends(require_permission("sales.view"))])
+def get_segment_customers(seg_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT p.id, p.name, p.email, p.phone, p.party_type, m.added_at
+            FROM crm_customer_segment_members m
+            JOIN parties p ON m.customer_id = p.id
+            WHERE m.segment_id = :sid
+            ORDER BY m.added_at DESC
+        """), {"sid": seg_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+# ======================== CRM-008: CRM Contacts ========================
+
+class ContactCreate(BaseModel):
+    customer_id: int
+    first_name: str
+    last_name: Optional[str] = None
+    job_title: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    department: Optional[str] = None
+    is_primary: bool = False
+    is_decision_maker: bool = False
+    notes: Optional[str] = None
+
+class ContactUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    job_title: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    mobile: Optional[str] = None
+    department: Optional[str] = None
+    is_primary: Optional[bool] = None
+    is_decision_maker: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+@router.get("/contacts", dependencies=[Depends(require_permission("sales.view"))])
+def list_contacts(customer_id: Optional[int] = None, current_user=Depends(get_current_user)):
+    """قائمة جهات الاتصال"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["1=1"]
+        params = {}
+        if customer_id:
+            conditions.append("c.customer_id = :cid")
+            params["cid"] = customer_id
+
+        rows = db.execute(text(f"""
+            SELECT c.*, p.name as customer_name
+            FROM crm_contacts c
+            LEFT JOIN parties p ON c.customer_id = p.id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY c.is_primary DESC, c.first_name
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/contacts", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
+def create_contact(data: ContactCreate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        # If setting as primary, unset others
+        if data.is_primary:
+            db.execute(text("UPDATE crm_contacts SET is_primary = FALSE WHERE customer_id = :cid"),
+                       {"cid": data.customer_id})
+
+        cid = db.execute(text("""
+            INSERT INTO crm_contacts (
+                customer_id, first_name, last_name, job_title,
+                email, phone, mobile, department,
+                is_primary, is_decision_maker, notes, created_by
+            ) VALUES (
+                :cust, :fname, :lname, :title,
+                :email, :phone, :mobile, :dept,
+                :primary, :decision, :notes, :uid
+            ) RETURNING id
+        """), {
+            "cust": data.customer_id, "fname": data.first_name,
+            "lname": data.last_name, "title": data.job_title,
+            "email": data.email, "phone": data.phone,
+            "mobile": data.mobile, "dept": data.department,
+            "primary": data.is_primary, "decision": data.is_decision_maker,
+            "notes": data.notes, "uid": current_user.id
+        }).scalar()
+        db.commit()
+        return {"id": cid, "message": "تم إنشاء جهة الاتصال"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/contacts/{contact_id}", dependencies=[Depends(require_permission("sales.create"))])
+def update_contact(contact_id: int, data: ContactUpdate, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+        if not updates:
+            raise HTTPException(400, "لا توجد بيانات")
+
+        # If setting as primary, unset others for same customer  
+        if updates.get("is_primary"):
+            contact = db.execute(text("SELECT customer_id FROM crm_contacts WHERE id = :id"),
+                                 {"id": contact_id}).fetchone()
+            if contact:
+                db.execute(text("UPDATE crm_contacts SET is_primary = FALSE WHERE customer_id = :cid"),
+                           {"cid": contact.customer_id})
+
+        updates["id"] = contact_id
+        set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
+        db.execute(text(f"UPDATE crm_contacts SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
+        db.commit()
+        return {"message": "تم التحديث"}
+    finally:
+        db.close()
+
+
+@router.delete("/contacts/{contact_id}", dependencies=[Depends(require_permission("sales.delete"))])
+def delete_contact(contact_id: int, current_user=Depends(get_current_user)):
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM crm_contacts WHERE id = :id"), {"id": contact_id})
+        db.commit()
+        return {"message": "تم الحذف"}
+    finally:
+        db.close()
+
+
+# ======================== CRM-009: Pipeline Analytics & Dashboard ========================
+
+@router.get("/analytics/pipeline", dependencies=[Depends(require_permission("sales.view"))])
+def pipeline_analytics(current_user=Depends(get_current_user)):
+    """تحليلات خط أنابيب المبيعات — معدلات التحويل وسرعة المبيعات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Stage conversion funnel
+        funnel = db.execute(text("""
+            SELECT stage,
+                   COUNT(*) as count,
+                   COALESCE(SUM(expected_value), 0) as total_value,
+                   COALESCE(AVG(expected_value), 0) as avg_deal_size
+            FROM sales_opportunities
+            GROUP BY stage
+            ORDER BY CASE stage
+                WHEN 'lead' THEN 1 WHEN 'qualified' THEN 2
+                WHEN 'proposal' THEN 3 WHEN 'negotiation' THEN 4
+                WHEN 'won' THEN 5 WHEN 'lost' THEN 6
+            END
+        """)).fetchall()
+
+        # Win rate
+        win_rate = db.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE stage = 'won') as won,
+                COUNT(*) FILTER (WHERE stage = 'lost') as lost,
+                COUNT(*) FILTER (WHERE stage IN ('won','lost')) as closed,
+                CASE WHEN COUNT(*) FILTER (WHERE stage IN ('won','lost')) > 0
+                     THEN ROUND(100.0 * COUNT(*) FILTER (WHERE stage = 'won') /
+                          COUNT(*) FILTER (WHERE stage IN ('won','lost')), 1)
+                     ELSE 0 END as win_rate_pct
+            FROM sales_opportunities
+        """)).fetchone()
+
+        # Sales velocity: avg days to close won deals
+        velocity = db.execute(text("""
+            SELECT
+                COALESCE(AVG(EXTRACT(DAY FROM (updated_at - created_at))), 0) as avg_days_to_close,
+                COALESCE(AVG(expected_value), 0) as avg_deal_value,
+                COUNT(*) as total_won
+            FROM sales_opportunities WHERE stage = 'won'
+        """)).fetchone()
+
+        # Monthly trend (last 12 months)
+        monthly = db.execute(text("""
+            SELECT TO_CHAR(created_at, 'YYYY-MM') as month,
+                   COUNT(*) as created,
+                   COUNT(*) FILTER (WHERE stage = 'won') as won,
+                   COUNT(*) FILTER (WHERE stage = 'lost') as lost,
+                   COALESCE(SUM(expected_value) FILTER (WHERE stage = 'won'), 0) as won_value
+            FROM sales_opportunities
+            WHERE created_at >= NOW() - INTERVAL '12 months'
+            GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+            ORDER BY month
+        """)).fetchall()
+
+        # Top performers
+        top_reps = db.execute(text("""
+            SELECT cu.username, cu.full_name,
+                   COUNT(*) FILTER (WHERE o.stage = 'won') as wins,
+                   COALESCE(SUM(o.expected_value) FILTER (WHERE o.stage = 'won'), 0) as total_value,
+                   COUNT(*) as total_assigned
+            FROM sales_opportunities o
+            JOIN company_users cu ON o.assigned_to = cu.id
+            GROUP BY cu.id, cu.username, cu.full_name
+            ORDER BY total_value DESC
+            LIMIT 10
+        """)).fetchall()
+
+        # Source analysis
+        sources = db.execute(text("""
+            SELECT COALESCE(source, 'غير محدد') as source,
+                   COUNT(*) as total,
+                   COUNT(*) FILTER (WHERE stage = 'won') as won,
+                   COALESCE(SUM(expected_value) FILTER (WHERE stage = 'won'), 0) as won_value
+            FROM sales_opportunities
+            GROUP BY source
+            ORDER BY won_value DESC
+        """)).fetchall()
+
+        return {
+            "funnel": [dict(r._mapping) for r in funnel],
+            "win_rate": dict(win_rate._mapping) if win_rate else {},
+            "velocity": dict(velocity._mapping) if velocity else {},
+            "monthly_trend": [dict(r._mapping) for r in monthly],
+            "top_performers": [dict(r._mapping) for r in top_reps],
+            "source_analysis": [dict(r._mapping) for r in sources]
+        }
+    finally:
+        db.close()
+
+
+@router.get("/analytics/forecast", dependencies=[Depends(require_permission("sales.view"))])
+def sales_forecast(current_user=Depends(get_current_user)):
+    """توقعات المبيعات المبنية على خط الأنابيب"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Weighted pipeline value
+        weighted = db.execute(text("""
+            SELECT
+                COALESCE(SUM(expected_value * probability / 100.0), 0) as weighted_value,
+                COALESCE(SUM(expected_value), 0) as total_pipeline,
+                COUNT(*) as active_deals
+            FROM sales_opportunities
+            WHERE stage NOT IN ('won', 'lost')
+        """)).fetchone()
+
+        # By expected close month
+        by_month = db.execute(text("""
+            SELECT TO_CHAR(expected_close_date, 'YYYY-MM') as month,
+                   COUNT(*) as deals,
+                   COALESCE(SUM(expected_value), 0) as total_value,
+                   COALESCE(SUM(expected_value * probability / 100.0), 0) as weighted_value
+            FROM sales_opportunities
+            WHERE stage NOT IN ('won', 'lost') AND expected_close_date IS NOT NULL
+            GROUP BY TO_CHAR(expected_close_date, 'YYYY-MM')
+            ORDER BY month
+        """)).fetchall()
+
+        # Historical actuals for comparison
+        actuals = db.execute(text("""
+            SELECT TO_CHAR(updated_at, 'YYYY-MM') as month,
+                   COALESCE(SUM(expected_value), 0) as actual_value,
+                   COUNT(*) as deals_won
+            FROM sales_opportunities
+            WHERE stage = 'won' AND updated_at >= NOW() - INTERVAL '12 months'
+            GROUP BY TO_CHAR(updated_at, 'YYYY-MM')
+            ORDER BY month
+        """)).fetchall()
+
+        # Best/Worst/Most Likely scenarios
+        scenarios = db.execute(text("""
+            SELECT
+                COALESCE(SUM(expected_value) FILTER (WHERE probability >= 75), 0) as commit_value,
+                COALESCE(SUM(expected_value) FILTER (WHERE probability >= 50), 0) as best_case,
+                COALESCE(SUM(expected_value * probability / 100.0), 0) as most_likely
+            FROM sales_opportunities
+            WHERE stage NOT IN ('won', 'lost')
+        """)).fetchone()
+
+        return {
+            "weighted_pipeline": dict(weighted._mapping) if weighted else {},
+            "by_month": [dict(r._mapping) for r in by_month],
+            "historical_actuals": [dict(r._mapping) for r in actuals],
+            "scenarios": dict(scenarios._mapping) if scenarios else {}
+        }
+    finally:
+        db.close()
+
+
+@router.get("/dashboard", dependencies=[Depends(require_permission("sales.view"))])
+def crm_dashboard(current_user=Depends(get_current_user)):
+    """لوحة معلومات CRM الشاملة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Summary KPIs
+        kpis = db.execute(text("""
+            SELECT
+                COUNT(*) as total_opportunities,
+                COUNT(*) FILTER (WHERE stage NOT IN ('won','lost')) as active_opps,
+                COUNT(*) FILTER (WHERE stage = 'won') as won_opps,
+                COUNT(*) FILTER (WHERE stage = 'lost') as lost_opps,
+                COALESCE(SUM(expected_value) FILTER (WHERE stage = 'won'), 0) as total_won_value,
+                COALESCE(SUM(expected_value) FILTER (WHERE stage NOT IN ('won','lost')), 0) as pipeline_value,
+                COALESCE(AVG(expected_value) FILTER (WHERE stage = 'won'), 0) as avg_deal_size
+            FROM sales_opportunities
+        """)).fetchone()
+
+        # Tickets summary
+        tickets = db.execute(text("""
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'open') as open_tickets,
+                COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
+                COUNT(*) FILTER (WHERE priority IN ('critical','high') AND status NOT IN ('resolved','closed')) as urgent,
+                COALESCE(AVG(EXTRACT(EPOCH FROM (COALESCE(resolved_at, NOW()) - created_at)) / 3600)
+                    FILTER (WHERE resolved_at IS NOT NULL), 0) as avg_resolution_hrs
+            FROM support_tickets
+        """)).fetchone()
+
+        # Campaigns summary
+        campaigns = db.execute(text("""
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'active') as active,
+                COALESCE(SUM(budget), 0) as total_budget,
+                COALESCE(SUM(conversion_count), 0) as total_conversions
+            FROM marketing_campaigns
+        """)).fetchone()
+
+        # Pipeline by stage
+        pipeline_by_stage = db.execute(text("""
+            SELECT stage,
+                   COUNT(*) as count,
+                   COALESCE(SUM(expected_value), 0) as total_value
+            FROM sales_opportunities
+            GROUP BY stage
+            ORDER BY CASE stage
+                WHEN 'lead' THEN 1 WHEN 'qualified' THEN 2
+                WHEN 'proposal' THEN 3 WHEN 'negotiation' THEN 4
+                WHEN 'won' THEN 5 WHEN 'lost' THEN 6 END
+        """)).fetchall()
+
+        # Win rate
+        win_rate_row = db.execute(text("""
+            SELECT CASE WHEN COUNT(*) FILTER (WHERE stage IN ('won','lost')) > 0
+                        THEN ROUND(100.0 * COUNT(*) FILTER (WHERE stage = 'won') /
+                             COUNT(*) FILTER (WHERE stage IN ('won','lost')), 1)
+                        ELSE 0 END as win_rate
+            FROM sales_opportunities
+        """)).fetchone()
+
+        # Recent activities
+        recent = db.execute(text("""
+            SELECT a.*, o.title as opportunity_title
+            FROM opportunity_activities a
+            JOIN sales_opportunities o ON a.opportunity_id = o.id
+            ORDER BY a.created_at DESC LIMIT 10
+        """)).fetchall()
+
+        # Lead scores distribution
+        scores_dist = db.execute(text("""
+            SELECT grade, COUNT(*) as count
+            FROM crm_lead_scores
+            GROUP BY grade
+            ORDER BY grade
+        """)).fetchall()
+
+        kpis_dict = dict(kpis._mapping) if kpis else {}
+        kpis_dict['win_rate'] = float(win_rate_row.win_rate) if win_rate_row else 0
+
+        return {
+            "kpis": kpis_dict,
+            "tickets": dict(tickets._mapping) if tickets else {},
+            "campaigns": dict(campaigns._mapping) if campaigns else {},
+            "pipeline_by_stage": [dict(r._mapping) for r in pipeline_by_stage],
+            "recent_activities": [dict(r._mapping) for r in recent],
+            "lead_score_distribution": [dict(r._mapping) for r in scores_dist]
+        }
+    finally:
+        db.close()
+
+
+@router.get("/analytics/conversion", dependencies=[Depends(require_permission("sales.view"))])
+def conversion_analytics(current_user=Depends(get_current_user)):
+    """تحليلات معدلات التحويل"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Win/Loss rate
+        rates = db.execute(text("""
+            SELECT
+                COUNT(*) as total_closed,
+                COUNT(*) FILTER (WHERE stage = 'won') as won,
+                COUNT(*) FILTER (WHERE stage = 'lost') as lost,
+                CASE WHEN COUNT(*) FILTER (WHERE stage IN ('won','lost')) > 0
+                     THEN ROUND(100.0 * COUNT(*) FILTER (WHERE stage = 'won') /
+                          COUNT(*) FILTER (WHERE stage IN ('won','lost')), 1) ELSE 0 END as win_rate,
+                CASE WHEN COUNT(*) FILTER (WHERE stage IN ('won','lost')) > 0
+                     THEN ROUND(100.0 * COUNT(*) FILTER (WHERE stage = 'lost') /
+                          COUNT(*) FILTER (WHERE stage IN ('won','lost')), 1) ELSE 0 END as loss_rate,
+                COALESCE(AVG(EXTRACT(DAY FROM (updated_at - created_at)))
+                    FILTER (WHERE stage = 'won'), 0) as avg_days_to_close
+            FROM sales_opportunities
+        """)).fetchone()
+
+        # Conversion by source
+        by_source = db.execute(text("""
+            SELECT COALESCE(source, 'غير محدد') as source,
+                   COUNT(*) as total,
+                   COUNT(*) FILTER (WHERE stage = 'won') as won,
+                   CASE WHEN COUNT(*) > 0
+                        THEN ROUND(100.0 * COUNT(*) FILTER (WHERE stage = 'won') / COUNT(*), 1)
+                        ELSE 0 END as conversion_rate
+            FROM sales_opportunities
+            WHERE stage IN ('won', 'lost')
+            GROUP BY source
+            ORDER BY conversion_rate DESC
+        """)).fetchall()
+
+        # Stage-to-stage conversion
+        stage_conv = db.execute(text("""
+            SELECT stage,
+                   COUNT(*) as count,
+                   COALESCE(SUM(expected_value), 0) as value
+            FROM sales_opportunities
+            GROUP BY stage
+            ORDER BY CASE stage
+                WHEN 'lead' THEN 1 WHEN 'qualified' THEN 2
+                WHEN 'proposal' THEN 3 WHEN 'negotiation' THEN 4
+                WHEN 'won' THEN 5 WHEN 'lost' THEN 6 END
+        """)).fetchall()
+
+        return {
+            "win_rate": float(rates.win_rate) if rates else 0,
+            "loss_rate": float(rates.loss_rate) if rates else 0,
+            "avg_days_to_close": float(rates.avg_days_to_close) if rates else 0,
+            "total_closed": rates.total_closed if rates else 0,
+            "won": rates.won if rates else 0,
+            "lost": rates.lost if rates else 0,
+            "by_source": [dict(r._mapping) for r in by_source],
+            "stage_distribution": [dict(r._mapping) for r in stage_conv]
+        }
+    finally:
+        db.close()
+
+
+@router.get("/analytics/campaign-roi", dependencies=[Depends(require_permission("sales.view"))])
+def campaign_roi_analytics(current_user=Depends(get_current_user)):
+    """تحليل العائد على الاستثمار في الحملات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT id, name, campaign_type, status, budget,
+                   COALESCE(sent_count, 0) as sent,
+                   COALESCE(open_count, 0) as opens,
+                   COALESCE(click_count, 0) as clicks,
+                   COALESCE(conversion_count, 0) as conversions,
+                   CASE WHEN COALESCE(sent_count, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(open_count, 0) / sent_count, 1) ELSE 0 END as open_rate,
+                   CASE WHEN COALESCE(open_count, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(click_count, 0) / open_count, 1) ELSE 0 END as click_rate,
+                   CASE WHEN COALESCE(sent_count, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(conversion_count, 0) / sent_count, 1) ELSE 0 END as conversion_rate,
+                   CASE WHEN budget > 0 AND COALESCE(conversion_count, 0) > 0
+                        THEN ROUND(budget / conversion_count, 2) ELSE 0 END as cost_per_conversion,
+                   start_date, end_date
+            FROM marketing_campaigns
+            ORDER BY COALESCE(conversion_count, 0) DESC
+        """)).fetchall()
+
+        # Summary
+        summary = db.execute(text("""
+            SELECT
+                COALESCE(SUM(budget), 0) as total_investment,
+                COALESCE(SUM(conversion_count), 0) as total_conversions,
+                CASE WHEN SUM(COALESCE(conversion_count, 0)) > 0
+                     THEN ROUND(SUM(budget) / SUM(conversion_count), 2) ELSE 0 END as avg_cpc,
+                CASE WHEN SUM(COALESCE(sent_count, 0)) > 0
+                     THEN ROUND(100.0 * SUM(COALESCE(conversion_count, 0)) / SUM(sent_count), 2)
+                     ELSE 0 END as overall_conversion_rate
+            FROM marketing_campaigns
+        """)).fetchone()
+
+        return {
+            "campaigns": [dict(r._mapping) for r in rows],
+            "summary": dict(summary._mapping) if summary else {}
+        }
+    finally:
+        db.close()

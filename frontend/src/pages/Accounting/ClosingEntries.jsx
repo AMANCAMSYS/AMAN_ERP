@@ -74,8 +74,8 @@ export default function ClosingEntries() {
             </div>
 
             {/* Period Selection */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-                <div className="card-body p-4">
+            <div className="card mb-4">
+                <div >
                     <h5 className="fw-bold mb-3">📅 {t('closing.select_period')}</h5>
                     <div className="row g-3">
                         <div className="col-md-4">
@@ -113,8 +113,8 @@ export default function ClosingEntries() {
 
             {/* Result of generation */}
             {result && (
-                <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', borderLeft: '4px solid #10b981' }}>
-                    <div className="card-body p-4">
+                <div className="card mb-4" style={{ borderLeft: '4px solid #10b981' }}>
+                    <div >
                         <h5 className="fw-bold text-success mb-3">✅ {result.message}</h5>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                             <div className="p-3 bg-light rounded text-center">
@@ -170,8 +170,8 @@ export default function ClosingEntries() {
                     </div>
 
                     {/* Target Accounts */}
-                    <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
+                    <div className="card mb-4">
+                        <div >
                             <h6 className="fw-bold mb-3">🎯 {t('closing.target_accounts')}</h6>
                             <div className="row g-3">
                                 <div className="col-md-6">
@@ -198,8 +198,8 @@ export default function ClosingEntries() {
 
                     {/* Revenue Accounts Table */}
                     {preview.revenues.length > 0 && (
-                        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-                            <div className="card-header bg-success bg-opacity-10 border-0" style={{ borderRadius: '12px 12px 0 0' }}>
+                        <div className="card mb-4">
+                            <div className="card-header bg-success bg-opacity-10 border-0" >
                                 <strong className="text-success">📈 {t('closing.revenue_accounts')}</strong>
                             </div>
                             <div className="data-table-container">
@@ -236,8 +236,8 @@ export default function ClosingEntries() {
 
                     {/* Expense Accounts Table */}
                     {preview.expenses.length > 0 && (
-                        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-                            <div className="card-header bg-danger bg-opacity-10 border-0" style={{ borderRadius: '12px 12px 0 0' }}>
+                        <div className="card mb-4">
+                            <div className="card-header bg-danger bg-opacity-10 border-0" >
                                 <strong className="text-danger">📉 {t('closing.expense_accounts')}</strong>
                             </div>
                             <div className="data-table-container">
@@ -288,7 +288,7 @@ export default function ClosingEntries() {
             )}
 
             {!preview && !result && !loading && (
-                <div className="card border-0 shadow-sm text-center p-5" style={{ borderRadius: '12px' }}>
+                <div className="card text-center p-5">
                     <div style={{ fontSize: '72px', marginBottom: '16px' }}>🔒</div>
                     <h5 className="fw-bold mb-2">{t('closing.title')}</h5>
                     <p className="text-muted">{t('closing.select_period_hint')}</p>

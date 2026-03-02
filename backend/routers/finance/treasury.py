@@ -788,21 +788,43 @@ def get_treasury_balances_report(
         total_bank = 0
         total_all = 0
 
+        # Load base currency and exchange rates once
+        base_currency = db.execute(text(
+            "SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1"
+        )).scalar() or "SAR"
+
+        fx_rates: dict = {}
+        try:
+            rate_rows = db.execute(text(
+                "SELECT code, current_rate FROM currencies WHERE is_active = true"
+            )).fetchall()
+            for rr in rate_rows:
+                fx_rates[rr.code] = float(rr.current_rate or 1.0)
+        except Exception:
+            pass
+
         for r in rows:
             bal = float(r.current_balance or 0)
+            currency = r.currency or base_currency
+            rate = fx_rates.get(currency, 1.0) if currency != base_currency else 1.0
+            bal_base = round(bal * rate, 2)
+
             acc = {
                 "id": r.id, "name": r.name, "name_en": r.name_en,
-                "account_type": r.account_type, "currency": r.currency or "",
+                "account_type": r.account_type, "currency": currency,
                 "current_balance": bal,
-                "balance_in_currency": bal, # Use current_balance as fallback
+                "balance_in_currency": bal,
+                "balance_in_base": bal_base,
+                "exchange_rate": rate,
+                "base_currency": base_currency,
                 "branch_name": r.branch_name
             }
             accounts.append(acc)
             if r.account_type == 'cash':
-                total_cash += bal
+                total_cash += bal_base
             else:
-                total_bank += bal
-            total_all += bal
+                total_bank += bal_base
+            total_all += bal_base
 
         # Recent transactions for context
         txn_q = text("""

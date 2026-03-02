@@ -5,9 +5,11 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 function SupplierForm() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const { id } = useParams()
     const isEdit = Boolean(id)
@@ -103,7 +105,7 @@ function SupplierForm() {
             navigate('/buying/suppliers')
         } catch (err) {
             const errorMsg = err.response?.data?.detail || t('common.error_deleting')
-            alert(errorMsg)
+            showToast(errorMsg, 'error')
         }
     }
 
@@ -122,7 +124,7 @@ function SupplierForm() {
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="form-section-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div className="form-section card">
                             <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
                                 <span style={{ fontSize: '24px' }}>🏢</span> {t('buying.suppliers.form.basic_info')}
                             </h3>
@@ -204,7 +206,7 @@ function SupplierForm() {
                             </div>
                         </div>
 
-                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div className="form-section card">
                             <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
                                 <span style={{ fontSize: '24px' }}>📞</span> {t('buying.suppliers.form.contact_info')}
                             </h3>

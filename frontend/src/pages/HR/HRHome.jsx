@@ -290,7 +290,7 @@ const HRHome = () => {
             {/* ========== End of Service Calculator Modal ========== */}
             {showEOSModal && (
                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowEOSModal(false)}>
-                    <div className="card" style={{ minWidth: 450, maxWidth: 550, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                    <div className="card" style={{ minWidth: 450, maxWidth: 550 }} onClick={e => e.stopPropagation()}>
                         <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             🧮 {isRTL ? 'حاسبة مكافأة نهاية الخدمة' : 'End of Service Calculator'}
                         </h3>

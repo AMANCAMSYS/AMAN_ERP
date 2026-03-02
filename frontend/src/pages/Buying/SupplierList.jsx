@@ -149,7 +149,7 @@ function SupplierList() {
                                             direction: 'ltr',
                                             textAlign: i18n.language === 'ar' ? 'right' : 'left'
                                         }}>
-                                            {supplier.current_balance.toLocaleString()} {currency}
+                                            {supplier.current_balance.toLocaleString()} {supplier.currency || currency}
                                         </div>
                                     </td>
                                     <td>

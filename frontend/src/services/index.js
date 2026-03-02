@@ -17,20 +17,20 @@ export { authAPI } from './auth'
 export { companiesAPI } from './companies'
 
 // Accounting & Finance
-export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, currenciesAPI } from './accounting'
+export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, currenciesAPI, zakatAPI, fiscalLocksAPI, consolidationAPI } from './accounting'
 
 // Reports
 export { reportsAPI, customReportsAPI, scheduledReportsAPI } from './reports'
 
 // Sales & Purchases
-export { salesAPI } from './sales'
-export { purchasesAPI } from './purchases'
+export { salesAPI, deliveryOrdersAPI } from './sales'
+export { purchasesAPI, landedCostsAPI } from './purchases'
 
 // Inventory & Costing
 export { inventoryAPI, costingPolicyAPI } from './inventory'
 
 // HR
-export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI } from './hr'
+export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI, wpsAPI } from './hr'
 
 // Assets
 export { assetsAPI } from './assets'
@@ -91,3 +91,6 @@ export { auditAPI } from './audit'
 
 // Parties
 export { partiesAPI } from './parties'
+
+// System Completion Features
+export { backupAPI, printTemplatesAPI, duplicateDetectionAPI, passwordResetAPI, manufacturingCostingAPI } from './systemCompletion'

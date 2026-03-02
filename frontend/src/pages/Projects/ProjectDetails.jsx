@@ -386,7 +386,7 @@ export default function ProjectDetails() {
             </div>
 
             {/* Progress Bar */}
-            <div className="card section-card border-0 shadow-sm mb-4">
+            <div className="card section-card mb-4">
                 <div className="card-body">
                     <div className="d-flex justify-content-between mb-2">
                         <span className="fw-medium">{t('projects.fields.progress')}</span>
@@ -430,7 +430,7 @@ export default function ProjectDetails() {
 
             {/* Tab Content */}
             {activeTab === 'overview' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="row g-4">
                             <div className="col-md-6">
@@ -467,7 +467,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'tasks' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.tasks')}</h5>
@@ -524,7 +524,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'gantt' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.gantt')}</h5>
@@ -535,7 +535,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'timesheets' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.timesheets')}</h5>
@@ -546,7 +546,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'documents' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.documents')}</h5>
@@ -562,7 +562,7 @@ export default function ProjectDetails() {
                                 {documents.map(doc => (
                                     <div key={doc.id} className="col-md-4 col-lg-3">
                                         <div className="card h-100 shadow-sm border">
-                                            <div className="card-body p-3 d-flex flex-column align-items-center text-center">
+                                            <div className="d-flex flex-column align-items-center text-center">
                                                 <div className="mb-2 text-primary"><FileText size={32} /></div>
                                                 <h6 className="text-truncate w-100" title={doc.file_name}>{doc.file_name}</h6>
                                                 <small className="text-muted d-block mb-2">{formatShortDate(doc.created_at)}</small>
@@ -585,7 +585,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'expenses' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.expenses')}</h5>
@@ -626,7 +626,7 @@ export default function ProjectDetails() {
             )}
 
             {activeTab === 'revenues' && (
-                <div className="card section-card border-0 shadow-sm">
+                <div className="card section-card">
                     <div className="card-body">
                         <div className="d-flex justify-content-between mb-3">
                             <h5 className="section-title">{t('projects.tabs.revenues')}</h5>
@@ -675,7 +675,7 @@ export default function ProjectDetails() {
                 <div className="row g-4">
                     {/* Cost Breakdown */}
                     <div className="col-md-6">
-                        <div className="card section-card border-0 shadow-sm h-100">
+                        <div className="card section-card h-100">
                             <div className="card-body">
                                 <h5 className="section-title mb-4">{t('projects.financials.cost_structure')}</h5>
                                 <div className="d-flex flex-column gap-3">
@@ -711,7 +711,7 @@ export default function ProjectDetails() {
 
                     {/* Profitability */}
                     <div className="col-md-6">
-                        <div className="card section-card border-0 shadow-sm h-100">
+                        <div className="card section-card h-100">
                             <div className="card-body">
                                 <h5 className="section-title mb-4">{t('projects.financials.profitability')}</h5>
                                 <div className="text-center py-4">
@@ -758,12 +758,12 @@ export default function ProjectDetails() {
                 <div className="row g-3">
                     <div className="col-6">
                         <label className="form-label">{t('projects.fields.start_date')}</label>
-                        <DateInput className="form-input" value={formatDate(taskForm.start_date)}
+                        <DateInput className="form-input" value={taskForm.start_date}
                             onChange={e => setTaskForm({ ...taskForm, start_date: e.target.value })} />
                     </div>
                     <div className="col-6">
                         <label className="form-label">{t('projects.fields.end_date')}</label>
-                        <DateInput className="form-input" value={formatDate(taskForm.end_date)}
+                        <DateInput className="form-input" value={taskForm.end_date}
                             onChange={e => setTaskForm({ ...taskForm, end_date: e.target.value })} />
                     </div>
                 </div>
@@ -891,12 +891,12 @@ export default function ProjectDetails() {
                 <div className="row g-3 mb-3">
                     <div className="col-6">
                         <label className="form-label">{t('common.date')} *</label>
-                        <DateInput className="form-input" value={formatDate(invoiceForm.invoice_date)}
+                        <DateInput className="form-input" value={invoiceForm.invoice_date}
                             onChange={e => setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })} />
                     </div>
                     <div className="col-6">
                         <label className="form-label">{t('common.due_date')} *</label>
-                        <DateInput className="form-input" value={formatDate(invoiceForm.due_date)}
+                        <DateInput className="form-input" value={invoiceForm.due_date}
                             onChange={e => setInvoiceForm({ ...invoiceForm, due_date: e.target.value })} />
                     </div>
                 </div>

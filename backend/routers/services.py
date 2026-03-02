@@ -399,6 +399,13 @@ async def upload_document(
 ):
     db = get_db_connection(current_user.company_id)
     try:
+        # SEC-FIX-016/017: Validate file size and type
+        from utils.sql_safety import (
+            validate_file_size, validate_file_extension,
+            MAX_DOCUMENT_SIZE, ALLOWED_DOCUMENT_EXTENSIONS, BLOCKED_FILE_EXTENSIONS
+        )
+        validate_file_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS, "المستند")
+        
         # Save file
         ext = os.path.splitext(file.filename)[1] if file.filename else ""
         unique_name = f"{uuid.uuid4().hex}{ext}"
@@ -406,8 +413,10 @@ async def upload_document(
         os.makedirs(company_dir, exist_ok=True)
         file_path = os.path.join(company_dir, unique_name)
 
+        content = await file.read()
+        validate_file_size(content, MAX_DOCUMENT_SIZE, "المستند")
+        
         with open(file_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         file_size = len(content)
 
@@ -562,9 +571,13 @@ def delete_document(doc_id: int, current_user: UserResponse = Depends(get_curren
                 paths.add(v.file_path)
         for p in paths:
             try:
-                if os.path.exists(p):
+                # SEC-FIX-018: Prevent path traversal in file deletion
+                from utils.sql_safety import validate_file_path_safety
+                if os.path.exists(p) and validate_file_path_safety(p, UPLOAD_DIR):
                     os.remove(p)
-            except:
+                elif os.path.exists(p):
+                    logger.warning(f"Blocked path traversal deletion attempt: {p}")
+            except Exception:
                 pass
 
         return {"message": "تم حذف المستند بنجاح"}

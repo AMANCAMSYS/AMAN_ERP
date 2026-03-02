@@ -9,5 +9,10 @@ export const contractsAPI = {
     cancelContract: (id) => api.post(`/contracts/${id}/cancel`),
     generateInvoice: (id) => api.post(`/contracts/${id}/generate-invoice`),
     getExpiringContracts: (days = 30) => api.get('/contracts/alerts/expiring', { params: { days } }),
-    getContractStats: () => api.get('/contracts/stats/summary')
+    getContractStats: () => api.get('/contracts/stats/summary'),
+
+    // Amendments & KPIs (C2)
+    listAmendments: (contractId) => api.get(`/contracts/${contractId}/amendments`),
+    createAmendment: (contractId, data) => api.post(`/contracts/${contractId}/amendments`, data),
+    getContractKPIs: (contractId) => api.get(`/contracts/${contractId}/kpis`),
 }

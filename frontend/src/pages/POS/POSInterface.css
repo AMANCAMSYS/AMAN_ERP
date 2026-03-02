@@ -1201,3 +1201,49 @@
         display: none;
     }
 }
+
+/* ===== Offline/Online Badge ===== */
+.pos-connection-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pos-connection-badge.online {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--pos-success);
+}
+
+.pos-connection-badge.offline {
+    background: rgba(248, 113, 113, 0.12);
+    color: var(--pos-danger);
+    animation: pulse-offline 2s infinite;
+}
+
+.pos-connection-badge .pending-badge {
+    background: var(--pos-warning);
+    color: #fff;
+    font-size: 10px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes pulse-offline {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ===== Mada Payment Method Icon ===== */
+.modal-input-icon.mada {
+    background: linear-gradient(135deg, #0066b2, #00a86b);
+    color: #fff;
+}

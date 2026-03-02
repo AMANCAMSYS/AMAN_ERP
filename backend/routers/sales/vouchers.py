@@ -198,6 +198,25 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
             request=request,
             branch_id=data.branch_id
         )
+
+        # Notify finance team
+        try:
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'payment_received', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "💵 تم تحصيل دفعة من عميل",
+                "message": f"تم تحصيل {data.amount:,.2f} من العميل {cust_name or ''} — سند {voucher_num}",
+                "link": f"/sales/receipts/{voucher_id}",
+                "current_uid": current_user.id
+            })
+            db.commit()
+        except Exception:
+            pass
+
         return {"id": voucher_id, "voucher_number": voucher_num}
     except Exception as e:
         db.rollback()

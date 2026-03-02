@@ -166,8 +166,8 @@ export default function ExpenseDetails() {
       </div>
 
       {/* Status Card */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-        <div className="card-body p-4">
+      <div className="card mb-4">
+        <div >
         <div className="d-flex justify-content-between align-items-center">
           <div>
             <h5 className="mb-1">{t('expenses.fields.status')}</h5>
@@ -188,8 +188,8 @@ export default function ExpenseDetails() {
       <div className="row">
         {/* Basic Information */}
         <div className="col-md-6 mb-4">
-          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-            <div className="card-body p-4">
+          <div className="card card-compact h-100">
+            <div >
               <div className="d-flex align-items-center gap-2 mb-3">
                 <div style={{ background: '#eff6ff', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <FileText size={18} color="#3b82f6" />
@@ -240,8 +240,8 @@ export default function ExpenseDetails() {
 
         {/* Accounting Information */}
         <div className="col-md-6 mb-4">
-          <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-            <div className="card-body p-4">
+          <div className="card card-compact h-100">
+            <div >
               <div className="d-flex align-items-center gap-2 mb-3">
                 <div style={{ background: '#dcfce7', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <DollarSign size={18} color="#16a34a" />
@@ -302,8 +302,8 @@ export default function ExpenseDetails() {
 
         {/* Approval Information */}
         <div className="col-md-12 mb-4">
-          <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-            <div className="card-body p-4">
+          <div className="card">
+            <div >
               <div className="d-flex align-items-center gap-2 mb-3">
                 <div style={{ background: '#fef3c7', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <User size={18} color="#d97706" />

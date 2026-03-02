@@ -191,7 +191,7 @@ const LoanList = () => {
                 </div>
             </div>
 
-            {/* Create Modal */}}
+            {/* Create Modal */}
             {isModalOpen && (
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ maxWidth: '500px' }}>

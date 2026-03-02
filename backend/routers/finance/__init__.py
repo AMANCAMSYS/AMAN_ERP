@@ -4,7 +4,8 @@ AMAN ERP - Finance & Accounting Module
 
 Sub-modules:
   accounting, currencies, cost_centers, budgets, reconciliation,
-  treasury, taxes, tax_compliance, costing_policies, checks, notes, assets, expenses
+  treasury, taxes, tax_compliance, costing_policies, checks, notes, assets, expenses,
+  intercompany, revenue_recognition, advanced_workflow
 """
 
 from fastapi import APIRouter
@@ -22,6 +23,9 @@ from .checks import router as checks_router
 from .notes import router as notes_router
 from .assets import router as assets_router
 from .expenses import router as expenses_router
+from .intercompany import router as intercompany_router
+from .intercompany import rev_router as revenue_recognition_router
+from .advanced_workflow import router as advanced_workflow_router
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
@@ -38,3 +42,6 @@ router.include_router(checks_router)
 router.include_router(notes_router)
 router.include_router(assets_router)
 router.include_router(expenses_router)
+router.include_router(intercompany_router)
+router.include_router(revenue_recognition_router)
+router.include_router(advanced_workflow_router)

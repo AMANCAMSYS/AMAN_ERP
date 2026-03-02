@@ -11,6 +11,9 @@ from utils.permissions import require_permission
 from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/approvals", tags=["الاعتمادات"])
 
@@ -557,6 +560,39 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
                                  "🔄 تم إرجاع طلبك للمراجعة",
                                  f"الطلب رقم {request_id}: {data.notes or ''}",
                                  f"/approvals/{request_id}")
+
+        # ── Update source document status (callback) ──
+        try:
+            new_status = None
+            if data.action == 'approve' and request.current_step >= total_steps:
+                new_status = 'approved'
+            elif data.action == 'reject':
+                new_status = 'rejected'
+
+            if new_status and request.document_type and request.document_id:
+                doc_table_map = {
+                    'purchase_order': 'purchase_orders',
+                    'expense': 'expenses',
+                    'leave_request': 'leave_requests',
+                    'payment_voucher': 'payment_vouchers',
+                    'sales_order': 'sales_orders',
+                    'transfer': 'inventory_transfers',
+                    'production_order': 'production_orders',
+                }
+                table_name = doc_table_map.get(request.document_type)
+                if table_name:
+                    # Verify table exists before updating
+                    table_exists = db.execute(text(
+                        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :t)"
+                    ), {"t": table_name}).scalar()
+                    if table_exists:
+                        db.execute(text(f"""
+                            UPDATE {table_name}
+                            SET status = :status, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = :doc_id
+                        """), {"status": new_status, "doc_id": request.document_id})
+        except Exception as cb_err:
+            logger.warning(f"Approval callback failed for {request.document_type}/{request.document_id}: {cb_err}")
 
         db.commit()
 

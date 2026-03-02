@@ -174,8 +174,8 @@ export default function ExpenseForm() {
 
       <form onSubmit={handleSubmit}>
         {/* Basic Information */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-          <div className="card-body p-4">
+        <div className="card mb-4">
+          <div >
             <div className="d-flex align-items-center gap-2 mb-3">
               <div style={{ background: '#eff6ff', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FileText size={18} color="#3b82f6" />
@@ -259,8 +259,8 @@ export default function ExpenseForm() {
         </div>
 
         {/* Payment & Accounting */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-          <div className="card-body p-4">
+        <div className="card mb-4">
+          <div >
             <div className="d-flex align-items-center gap-2 mb-3">
               <div style={{ background: '#dcfce7', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CreditCard size={18} color="#16a34a" />
@@ -336,8 +336,8 @@ export default function ExpenseForm() {
         </div>
 
         {/* Organization */}
-        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-          <div className="card-body p-4">
+        <div className="card mb-4">
+          <div >
             <div className="d-flex align-items-center gap-2 mb-3">
               <div style={{ background: '#e0f2fe', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FolderOpen size={18} color="#0284c7" />
@@ -412,8 +412,8 @@ export default function ExpenseForm() {
         </div>
 
         {/* Actions */}
-        <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
-          <div className="card-body p-3 d-flex justify-content-end gap-2">
+        <div className="card">
+          <div className="d-flex justify-content-end gap-2">
             <button
               type="button"
               className="btn btn-outline-secondary"

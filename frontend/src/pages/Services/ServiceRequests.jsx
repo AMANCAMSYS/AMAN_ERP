@@ -4,6 +4,8 @@ import { servicesAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils'
 import BackButton from '../../components/common/BackButton'
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 const statusBadgeStyles = {
     pending:     { background: '#6b7280', color: '#fff' },
@@ -23,6 +25,7 @@ const priorityBadgeStyles = {
 
 function ServiceRequests() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
 
     const statusOptions = [
         { value: 'pending',     label: t('services.status_pending') },
@@ -170,7 +173,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -181,7 +184,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -192,7 +195,7 @@ function ServiceRequests() {
             fetchStats()
             if (expandedId === id) loadDetail(id)
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -229,7 +232,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -240,7 +243,7 @@ function ServiceRequests() {
             setDetail(res.data)
             fetchRequests()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -479,7 +482,7 @@ function ServiceRequests() {
                                     </div>
                                     <div className="form-group mb-3">
                                         <label className="form-label">{t('services.scheduled')}</label>
-                                        <input className="form-input" name="scheduled_date" type="date" value={formData.scheduled_date} onChange={handleChange} />
+                                        <DateInput className="form-input" name="scheduled_date" value={formData.scheduled_date} onChange={handleChange} />
                                     </div>
                                 </div>
                                 <div className="form-group mb-3">

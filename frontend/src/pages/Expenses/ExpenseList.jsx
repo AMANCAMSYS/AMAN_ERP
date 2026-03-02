@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { useBranch } from '../../context/BranchContext';
 import { Search, Plus, Filter, Clock, CheckCircle, XCircle, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import BackButton from '../../components/common/BackButton';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
@@ -106,6 +107,7 @@ export default function ExpenseList() {
     <div className="workspace fade-in">
       {/* Header */}
       <div className="workspace-header">
+        <BackButton />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', width: '42px', height: '42px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -213,8 +215,8 @@ export default function ExpenseList() {
       </div>
 
       {/* Filters */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-        <div className="card-body p-3">
+      <div className="card mb-4">
+        <div >
           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ minWidth: '140px', flex: 1 }}>
               <label className="form-label small fw-semibold mb-1">{t('expenses.fields.type')}</label>
@@ -282,7 +284,7 @@ export default function ExpenseList() {
       </div>
 
       {/* Table */}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+      <div className="card">
         {loading ? (
           <div className="card-body text-center py-5">
             <div className="spinner-border text-primary" role="status" />

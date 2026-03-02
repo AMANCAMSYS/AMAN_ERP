@@ -157,6 +157,11 @@ function TreasuryHome() {
                                 {t('treasury.menu.balances')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
+                            <div className="link-item" onClick={() => navigate('/treasury/reports/checks-aging')}>
+                                <span className="link-icon">⏳</span>
+                                {i18n.language === 'ar' ? 'تقادم الشيكات' : 'Checks Aging'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
                         </div>
                     </div>
                 )}

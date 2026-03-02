@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { reportsAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
+import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
@@ -155,7 +156,8 @@ export default function PeriodComparison() {
 
     return (
         <div className="module-container" dir={i18n.dir()}>
-            <div className="module-header">
+            <div className="module-header" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <BackButton />
                 <h2>📊 {t('comparison.title')}</h2>
             </div>
 

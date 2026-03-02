@@ -19,20 +19,20 @@ export { authAPI } from '../services/auth'
 export { companiesAPI } from '../services/companies'
 
 // Accounting & Finance
-export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, currenciesAPI } from '../services/accounting'
+export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, currenciesAPI, zakatAPI, fiscalLocksAPI, consolidationAPI, fxReportAPI } from '../services/accounting'
 
 // Reports
 export { reportsAPI, customReportsAPI, scheduledReportsAPI, detailedReportsAPI, reportSharingAPI } from '../services/reports'
 
 // Sales & Purchases
-export { salesAPI } from '../services/sales'
-export { purchasesAPI } from '../services/purchases'
+export { salesAPI, deliveryOrdersAPI } from '../services/sales'
+export { purchasesAPI, landedCostsAPI } from '../services/purchases'
 
 // Inventory & Costing
 export { inventoryAPI, costingPolicyAPI } from '../services/inventory'
 
 // HR
-export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI } from '../services/hr'
+export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI, wpsAPI } from '../services/hr'
 
 // Assets
 export { assetsAPI } from '../services/assets'
@@ -70,8 +70,30 @@ export { settingsAPI, rolesAPI, branchesAPI } from '../services/settings'
 // CRM
 export { crmAPI } from '../services/crm'
 
+// Services
+export { servicesAPI } from '../services/services'
+
 // External Integrations
 export { externalAPI } from '../services/external'
 
-// Services & Documents
-export { servicesAPI } from '../services/services'
+// System Completion (Backup, Print Templates, Password Reset, etc.)
+export { backupAPI, printTemplatesAPI, duplicateDetectionAPI, passwordResetAPI, manufacturingCostingAPI } from '../services/systemCompletion'
+
+// Security
+export { securityAPI } from '../services/security'
+
+// Approvals
+export { approvalsAPI } from '../services/approvals'
+
+// Audit
+export { auditAPI } from '../services/audit'
+
+// Dashboard
+export { dashboardAPI } from '../services/dashboard'
+
+// Data Import
+export { dataImportAPI } from '../services/dataImport'
+
+// Parties
+export { partiesAPI } from '../services/parties'
+

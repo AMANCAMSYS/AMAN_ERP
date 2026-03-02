@@ -7,6 +7,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
@@ -105,12 +106,12 @@ const DetailedProfitLoss = () => {
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>{t('common.start_date')}</label>
-                        <input type="date" className="form-input" value={startDate}
+                        <DateInput className="form-input" value={startDate}
                             onChange={e => setStartDate(e.target.value)} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>
                         <label>{t('common.end_date')}</label>
-                        <input type="date" className="form-input" value={endDate}
+                        <DateInput className="form-input" value={endDate}
                             onChange={e => setEndDate(e.target.value)} />
                     </div>
                     <div className="form-group" style={{ margin: 0 }}>

@@ -180,7 +180,7 @@ export default function CurrencyList() {
                 </div>
             </div>
 
-            <div className="card section-card border-0 shadow-sm">
+            <div className="card section-card">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <div className="search-box">
                         <Search size={16} />

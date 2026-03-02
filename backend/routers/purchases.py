@@ -38,9 +38,7 @@ def list_supplier_groups(
             query += " AND (branch_id = :bid OR branch_id IS NULL)"
             params["bid"] = branch_id
         query += " ORDER BY id"
-        print("[DEBUG] supplier_groups query:", query)
         result = db.execute(text(query), params).fetchall()
-        print("[DEBUG] supplier_groups result count:", len(result))
         groups = []
         for row in result:
             try:
@@ -56,7 +54,7 @@ def list_supplier_groups(
                     "status": row.status
                 })
             except Exception as e:
-                print("[ERROR] Failed to parse supplier_group row:", e)
+                logger.error(f"Failed to parse supplier_group row: {e}")
         return groups
     finally:
         db.close()
@@ -77,9 +75,9 @@ def create_supplier_group(
         db.execute(text("""
             INSERT INTO supplier_groups (
                 group_code, group_name, group_name_en, description, 
-                discount_percentage, effect_type, application_scope, payment_days, branch_id, status
+                discount_percentage, payment_days, branch_id, status
             ) VALUES (
-                :code, :name, :name_en, :desc, :disc, :effect_type, :application_scope, :days, :branch_id, :status
+                :code, :name, :name_en, :desc, :disc, :days, :branch_id, :status
             )
         """), {
             "code": group_code,
@@ -87,8 +85,6 @@ def create_supplier_group(
             "name_en": group.group_name_en,
             "desc": group.description,
             "disc": group.discount_percentage,
-            "effect_type": group.effect_type,
-            "application_scope": group.application_scope,
             "days": group.payment_days,
             "branch_id": group.branch_id,
             "status": group.status
@@ -671,7 +667,24 @@ def approve_purchase_order(
             request=request,
             branch_id=None
         )
-        
+
+        # Notify purchasing team about PO approval
+        try:
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'purchase_order', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE
+                AND u.role IN ('admin', 'superuser')
+            """), {
+                "title": "✅ تم اعتماد أمر شراء",
+                "message": f"تم اعتماد أمر الشراء {po.po_number}" + (f" — المورد: {supplier.name}" if supplier else ""),
+                "link": f"/buying/orders/{id}"
+            })
+            db.commit()
+        except Exception:
+            pass  # Non-blocking
+
         return {
             "message": "تم اعتماد أمر الشراء بنجاح",
             "id": id,
@@ -960,7 +973,9 @@ def list_purchase_invoices(
     current_user: dict = Depends(get_current_user)
 ):
     """عرض فواتير المشتريات"""
+    from utils.permissions import validate_branch_access
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    validated_branch = validate_branch_access(current_user, branch_id)
     db = get_db_connection(company_id)
     try:
         query = """
@@ -977,9 +992,9 @@ def list_purchase_invoices(
             query += " AND i.party_id = :sid"
             params["sid"] = supplier_id
             
-        if branch_id:
+        if validated_branch:
             query += " AND i.branch_id = :bid"
-            params["bid"] = branch_id
+            params["bid"] = validated_branch
 
         query += " ORDER BY i.created_at DESC LIMIT :limit OFFSET :skip"
         
@@ -998,106 +1013,10 @@ def list_purchase_invoices(
         return invoices
     finally:
         db.close()
-@router.get("/suppliers", dependencies=[Depends(require_permission("buying.view"))], response_model=List[dict])
-def list_suppliers(
-    skip: int = 0,
-    limit: int = 100,
-    branch_id: Optional[int] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """عرض قائمة الموردين (من جدول Parties)"""
-    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
-    db = get_db_connection(company_id)
-    try:
-        query = """
-            SELECT
-                id,
-                name as supplier_name,
-                name_en as supplier_name_en,
-                party_code as supplier_code,
-                phone,
-                email,
-                address,
-                tax_number,
-                COALESCE(current_balance, 0) as current_balance,
-                currency,
-                status, created_at
-            FROM parties
-            WHERE is_supplier = TRUE
-        """
-        params = {"limit": limit, "skip": skip}
 
-        query += " ORDER BY created_at DESC LIMIT :limit OFFSET :skip"
-        result = db.execute(text(query), params).fetchall()
-
-        suppliers = []
-        for row in result:
-            suppliers.append({
-                "id": row.id,
-                "name": row.supplier_name,
-                "name_en": row.supplier_name_en,
-                "supplier_code": row.supplier_code,
-                "phone": row.phone,
-                "email": row.email,
-                "address": row.address,
-                "tax_number": row.tax_number,
-                "current_balance": float(row.current_balance or 0),
-                "currency": row.currency,
-                "status": row.status,
-                "created_at": row.created_at
-            })
-        return suppliers
-    finally:
-        db.close()
-
-@router.post("/suppliers", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
-def create_supplier(
-    supplier: SupplierCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    """إنشاء مورد جديد (في جدول Parties)"""
-    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
-    db = get_db_connection(company_id)
-    try:
-        from utils.accounting import generate_sequential_number
-        code = generate_sequential_number(db, "SUP", "parties", "party_code")
-        
-        existing_id = None
-        if supplier.tax_number:
-            existing_id = db.execute(text("SELECT id FROM parties WHERE tax_number = :tax LIMIT 1"), {"tax": supplier.tax_number}).scalar()
-        
-        if existing_id:
-            db.execute(text("UPDATE parties SET is_supplier = TRUE WHERE id = :id"), {"id": existing_id})
-            pid = existing_id
-        else:
-            pid = db.execute(text("""
-                INSERT INTO parties (
-                    party_code, name, name_en, 
-                    phone, email, address, tax_number, branch_id, 
-                    party_group_id, is_supplier, is_customer, status
-                ) VALUES (
-                    :code, :name, :name_en, :phone, :email, :address, :tax, :branch_id, 
-                    :pg, TRUE, FALSE, 'active'
-                ) RETURNING id
-            """), {
-                "code": code,
-                "name": supplier.supplier_name,
-                "name_en": supplier.supplier_name_en,
-                "phone": supplier.phone,
-                "email": supplier.email,
-                "address": supplier.address,
-                "tax": supplier.tax_number,
-                "branch_id": supplier.branch_id,
-                "pg": supplier.supplier_group_id
-            }).scalar()
-        
-        db.commit()
-        return {"id": pid, "message": "تم إضافة المورد بنجاح"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
+# NOTE: Supplier CRUD endpoints consolidated in inventory/suppliers.py
+# The frontend uses inventoryAPI for all supplier operations.
+# Purchase-specific supplier helpers (outstanding invoices, transactions) remain below.
 
 @router.get("/invoices/{id}", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
 def get_purchase_invoice(
@@ -2342,6 +2261,24 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
             request=request,
             branch_id=data.branch_id
         )
+
+        # Notify finance team
+        try:
+            db.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'supplier_payment', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "💳 تم صرف سند لمورد",
+                "message": f"تم صرف {data.amount:,.2f} للمورد {supp_name or ''} — سند {voucher_num}",
+                "link": f"/buying/payments/{voucher_id}",
+                "current_uid": current_user.id
+            })
+            db.commit()
+        except Exception:
+            pass
 
         return {"id": voucher_id, "message": "تم حفظ السند بنجاح"}
 

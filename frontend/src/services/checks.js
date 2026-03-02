@@ -17,6 +17,8 @@ export const checksAPI = {
     payableStats: (params) => api.get('/checks/payable/summary/stats', { params }),
     // Alerts
     getDueAlerts: (params) => api.get('/checks/due-alerts', { params }),
+    // Aging Report
+    getAgingReport: (params) => api.get('/checks/aging', { params }),
 }
 
 export const notesAPI = {
@@ -36,4 +38,8 @@ export const notesAPI = {
     payableStats: (params) => api.get('/notes/payable/summary/stats', { params }),
     // Alerts
     getDueAlerts: (params) => api.get('/notes/due-alerts', { params }),
+
+    // Status Lifecycle Log (B3)
+    getCheckStatusLog: (checkType, checkId) => api.get(`/notes/status-log/${checkType}/${checkId}`),
+    getCheckStatusSummary: () => api.get('/notes/status-log/summary'),
 }

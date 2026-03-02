@@ -20,42 +20,16 @@ from database import (
 )
 from schemas import CompanyCreateRequest, CompanyCreateResponse, CompanyListResponse, CompanyListItem, CompanyUpdateRequest
 from utils.permissions import require_permission
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/companies", tags=["إدارة الشركات"])
 logger = logging.getLogger(__name__)
-
-# Rate limiting for company registration
-_register_attempts = {}  # {ip: {"count": int, "first_attempt": datetime}}
-MAX_REGISTER_PER_HOUR = 3
-
-
-def check_register_rate_limit(request):
-    """Limit company registrations to prevent abuse"""
-    from datetime import timedelta
-    client_ip = request.client.host if request.client else "unknown"
-    # Exclude localhost/internal from rate limiting
-    if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
-        return
-    now = datetime.now(timezone.utc)
-    
-    if client_ip in _register_attempts:
-        info = _register_attempts[client_ip]
-        if now - info["first_attempt"] > timedelta(hours=1):
-            _register_attempts[client_ip] = {"count": 1, "first_attempt": now}
-            return
-        if info["count"] >= MAX_REGISTER_PER_HOUR:
-            raise HTTPException(
-                status_code=429,
-                detail="تم تجاوز الحد الأقصى لتسجيل الشركات. يرجى الانتظار ساعة."
-            )
-        info["count"] += 1
-    else:
-        _register_attempts[client_ip] = {"count": 1, "first_attempt": now}
 
 
 from fastapi import Request
 
 @router.post("/register", response_model=CompanyCreateResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/hour")
 async def register_new_company(request_body: CompanyCreateRequest, request: Request):
     """
     تسجيل شركة جديدة - company_id يُنشأ تلقائياً
@@ -70,9 +44,6 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
     db = get_system_db()
     
     try:
-        # Rate limit check
-        check_register_rate_limit(request)
-        
         # Check if email exists
         existing = db.execute(
             text("SELECT 1 FROM system_companies WHERE email = :email"),
@@ -99,11 +70,18 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
         
         logger.info(f"🆔 Generated company_id: {company_id}")
         
+        # SEC-FIX-007: Validate identifiers before DDL operations
+        from utils.sql_safety import validate_aman_identifier
+        
         # Create database
         success, message, db_name, db_user = create_company_database(company_id, request_body.admin_password)
         
         if not success:
-            raise HTTPException(status_code=500, detail=f"فشل إنشاء قاعدة البيانات: {message}")
+            raise HTTPException(status_code=500, detail="فشل إنشاء قاعدة البيانات")
+        
+        # Validate generated identifiers
+        validate_aman_identifier(db_name, "database name")
+        validate_aman_identifier(db_user, "database user")
         
         try:
             # Create all 91 tables
@@ -194,14 +172,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
             error_details = traceback.format_exc()
             logger.error(f"❌ Error in register_new_company: {str(e)}\nTraceback:\n{error_details}")
             
-            # Write to file for debugging
-            try:
-                with open("last_error.txt", "w") as f:
-                    f.write(f"Error: {str(e)}\n")
-                    f.write(error_details)
-            except Exception as write_err:
-                logger.warning(f"Failed to write error log file: {write_err}")
-                
+            # SEC-FIX-009/010: Don't write errors to file in web root, don't leak details to client
             db.rollback()
             try:
                 db.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
@@ -209,7 +180,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 db.commit()
             except Exception as cleanup_err:
                 logger.error(f"Failed to cleanup after company creation failure: {cleanup_err}")
-            raise HTTPException(status_code=500, detail=f"فشل إنشاء الشركة: {str(e)} | Type: {type(e).__name__}")
+            raise HTTPException(status_code=500, detail="فشل إنشاء الشركة")
 
     
     finally:
@@ -270,33 +241,20 @@ def list_companies(
         db.close()
 
 
-from routers.auth import decode_token, oauth2_scheme
+from routers.auth import get_current_user
+from schemas import UserResponse
 
 @router.get("/{company_id}")
 def get_company(
     company_id: str,
-    token: str = Depends(oauth2_scheme)
+    current_user: UserResponse = Depends(get_current_user)
 ):
     """عرض تفاصيل شركة - متاح للمدير أو للمستخدمين التابعين لنفس الشركة"""
-    # Check permissions manually
-    user = decode_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
     # If user is NOT system admin AND requesting a different company -> Forbidden
-    if user.get("company_id") != company_id:
-        # Check if they have admin permission (for system admins viewing other companies)
-        # Note: We need to re-implement permission check logic here or use simple role check
-        # For now, simplest is: Only System Admin OR User belonging to Company can view.
-        
-        # If user is system admin (role='system_admin'), they can view anything.
-        # But our token structure varies. Let's assume 'system_admin' role exists in token? 
-        # Actually safer: Use existing permission logic if easier, OR just simple:
-        
-        if user.get("role") != "system_admin":
+    if current_user.company_id != company_id:
+        if current_user.role != "system_admin":
              raise HTTPException(status_code=403, detail="Access Denied")
 
-    """عرض تفاصيل شركة"""
     db = get_system_db()
     
     try:
@@ -335,20 +293,15 @@ def get_company(
 def update_company(
     company_id: str,
     request: CompanyUpdateRequest,
-    token: str = Depends(oauth2_scheme)
+    current_user: UserResponse = Depends(get_current_user)
 ):
     """Update company details"""
-    user = decode_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
     # Only System Admin OR Company Admin can update
-    is_sys_admin = user.get("role") == "system_admin"
-    is_own_company = user.get("company_id") == company_id
+    is_sys_admin = current_user.role == "system_admin"
+    is_own_company = current_user.company_id == company_id
     
     # Check if user is an admin within their own company
-    user_role = user.get("role")
-    is_company_admin = user_role in ["company_admin", "admin", "superuser"]
+    is_company_admin = current_user.role in ["company_admin", "admin", "superuser"]
     
     # Allow if System Admin OR (Own Company AND Company Admin)
     allowed = is_sys_admin or (is_own_company and is_company_admin)
@@ -393,13 +346,11 @@ def update_company(
 async def upload_company_logo(
     company_id: str,
     file: UploadFile = File(...),
-    token: str = Depends(oauth2_scheme)
+    current_user: UserResponse = Depends(get_current_user)
 ):
     """رفع شعار الشركة"""
-    from routers.auth import decode_token, oauth2_scheme
     from database import SessionLocal
-    user = decode_token(token)
-    if not user or (user.get("company_id") != company_id and user.get("role") != "system_admin"):
+    if current_user.company_id != company_id and current_user.role != "system_admin":
         raise HTTPException(status_code=403, detail="Forbidden")
 
     # Validate file type
@@ -474,6 +425,49 @@ def get_industry_templates():
     except Exception as e:
         logger.error(f"Error in get_industry_templates: {str(e)}")
         return []
+    finally:
+        db.close()
+
+
+# ===================== B2: Enabled Modules Management =====================
+
+@router.get("/modules")
+def get_enabled_modules(current_user=Depends(get_current_user)):
+    """الحصول على الوحدات المفعّلة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(text(
+            "SELECT enabled_modules FROM company_settings LIMIT 1"
+        )).fetchone()
+        if row and row[0]:
+            import json
+            return json.loads(row[0]) if isinstance(row[0], str) else row[0]
+        return {
+            "accounting": True, "sales": True, "purchases": True, "inventory": True,
+            "hr": True, "manufacturing": False, "pos": False, "projects": False,
+            "crm": False, "assets": False
+        }
+    except Exception as e:
+        logger.error(f"Error getting modules: {e}")
+        return {}
+    finally:
+        db.close()
+
+
+@router.put("/modules")
+def update_enabled_modules(modules: dict, current_user=Depends(get_current_user)):
+    """تحديث الوحدات المفعّلة"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        import json
+        db.execute(text(
+            "UPDATE company_settings SET enabled_modules = :m::jsonb"
+        ), {"m": json.dumps(modules)})
+        db.commit()
+        return {"message": "تم تحديث الوحدات بنجاح", "modules": modules}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

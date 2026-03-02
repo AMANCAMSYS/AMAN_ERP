@@ -126,9 +126,9 @@ const PurchaseAgreements = () => {
                                 </select></div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="form-group"><label className="form-label">{t('buying.agreement_start')}</label>
-                                    <DateInput className="form-input" required value={formatDate(form.start_date)} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
+                                    <DateInput className="form-input" required value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></div>
                                 <div className="form-group"><label className="form-label">{t('buying.agreement_end')}</label>
-                                    <DateInput className="form-input" required value={formatDate(form.end_date)} onChange={e => setForm({ ...form, end_date: e.target.value })} /></div>
+                                    <DateInput className="form-input" required value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} /></div>
                             </div>
                             <div className="d-flex gap-3 pt-3">
                                 <button type="submit" className="btn btn-primary flex-1">{t('buying.create')}</button>

@@ -126,6 +126,11 @@ async def preview_import(
     content = await file.read()
     filename = file.filename.lower()
 
+    # SEC-FIX-013/014: Validate file size and extension
+    from utils.sql_safety import validate_file_size, validate_file_extension, MAX_IMPORT_FILE_SIZE, ALLOWED_IMPORT_EXTENSIONS
+    validate_file_size(content, MAX_IMPORT_FILE_SIZE, "ملف الاستيراد")
+    validate_file_extension(filename, ALLOWED_IMPORT_EXTENSIONS, "ملف الاستيراد")
+
     try:
         rows = _parse_file(content, filename)
     except Exception as e:
@@ -189,6 +194,11 @@ async def execute_import(
     content = await file.read()
     filename = file.filename.lower()
 
+    # SEC-FIX-013/014: Validate file size and extension
+    from utils.sql_safety import validate_file_size, validate_file_extension, MAX_IMPORT_FILE_SIZE, ALLOWED_IMPORT_EXTENSIONS
+    validate_file_size(content, MAX_IMPORT_FILE_SIZE, "ملف الاستيراد")
+    validate_file_extension(filename, ALLOWED_IMPORT_EXTENSIONS, "ملف الاستيراد")
+
     try:
         rows = _parse_file(content, filename)
     except Exception as e:
@@ -218,7 +228,11 @@ async def execute_import(
                         raise HTTPException(400, f"سطر {i + 2}: الحقول المطلوبة ناقصة: {', '.join(missing)}")
 
                 # Build columns/values
+                # SEC-FIX-012: Validate column names are safe SQL identifiers
+                from utils.sql_safety import validate_sql_identifier
                 row_cols = [c for c in all_columns if c in row and row[c] is not None and str(row[c]).strip() != ""]
+                for col in row_cols:
+                    validate_sql_identifier(col, "column name")
                 col_names = ", ".join(row_cols)
                 col_params = ", ".join([f":{c}" for c in row_cols])
                 params = {c: row[c] for c in row_cols}

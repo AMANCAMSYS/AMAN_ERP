@@ -11,4 +11,7 @@ export const companiesAPI = {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
+    // Module Management (B2)
+    getEnabledModules: () => api.get('/companies/modules'),
+    updateEnabledModules: (modules) => api.put('/companies/modules', modules),
 }

@@ -153,6 +153,11 @@ function BuyingHome() {
                                 {i18n.language === 'ar' ? 'تقييم الموردين' : 'Supplier Ratings'}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
+                            <div className="link-item" onClick={() => navigate('/buying/reports/aging')}>
+                                <span className="link-icon">⏳</span>
+                                {i18n.language === 'ar' ? 'تقادم المشتريات' : 'Purchases Aging'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
                         </div>
                     </div>
                 )}

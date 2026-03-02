@@ -5,12 +5,15 @@ from typing import List, Optional, Union, Any
 from routers.roles import DEFAULT_ROLES
 from pydantic import BaseModel
 from datetime import date, datetime
+import logging
 from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
 from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse
 from utils.permissions import require_permission, validate_branch_access, check_permission
 from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.audit import log_activity
 from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/hr", tags=["HR & Employees"])
 
@@ -56,6 +59,8 @@ def get_employees(
                 e.transport_allowance,
                 e.other_allowances,
                 e.hourly_cost,
+                e.currency,
+                e.nationality,
                 u.role,
                 array_agg(ub.branch_id) filter (where ub.branch_id is not null) as allowed_branches
             FROM employees e
@@ -92,7 +97,7 @@ def get_employees(
                 params["bid"] = branch_id
 
         query += """
-            GROUP BY e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone, e.status, e.user_id, e.account_id, e.created_at, p.position_name, d.department_name, e.branch_id, e.salary, e.housing_allowance, e.transport_allowance, e.other_allowances, e.hourly_cost, u.role
+            GROUP BY e.id, e.employee_code, e.first_name, e.last_name, e.email, e.phone, e.status, e.user_id, e.account_id, e.created_at, p.position_name, d.department_name, e.branch_id, e.salary, e.housing_allowance, e.transport_allowance, e.other_allowances, e.hourly_cost, e.currency, e.nationality, u.role
             ORDER BY e.created_at DESC
         """
         
@@ -118,6 +123,8 @@ def get_employees(
                 "transport_allowance": row.transport_allowance or 0,
                 "other_allowances": row.other_allowances or 0,
                 "hourly_cost": row.hourly_cost or 0,
+                "currency": row.currency,
+                "nationality": row.nationality,
                 "allowed_branches": row.allowed_branches or [],
                 "role": row.role or 'user'
             })
@@ -238,18 +245,27 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
                 }).fetchone()
                 new_account_id = res[0]
 
-        # 4. Create Employee Record
+        # 4. Auto-detect currency from branch if not provided
+        emp_currency = employee.currency
+        if not emp_currency and employee.branch_id:
+            branch_row = conn.execute(text("SELECT default_currency FROM branches WHERE id = :bid"), {"bid": employee.branch_id}).fetchone()
+            if branch_row and branch_row.default_currency:
+                emp_currency = branch_row.default_currency
+        if not emp_currency:
+            emp_currency = get_base_currency(conn)
+
+        # 5. Create Employee Record
         conn.execute(text("""
             INSERT INTO employees (
                 employee_code, first_name, last_name, first_name_en, last_name_en,
                 email, phone, department_id, position_id, 
                 salary, housing_allowance, transport_allowance, other_allowances, hourly_cost,
-                hire_date, user_id, account_id, branch_id
+                hire_date, user_id, account_id, branch_id, currency, nationality
             ) VALUES (
                 :code, :fn, :ln, :fne, :lne,
                 :email, :phone, :did, :pid,
                 :salary, :housing, :transport, :other, :hc,
-                :hire, :uid, :aid, :bid
+                :hire, :uid, :aid, :bid, :currency, :nationality
             )
         """), {
             "code": employee.employee_code if employee.employee_code else None,
@@ -269,7 +285,9 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
             "hire": employee.hire_date or date.today(),
             "uid": new_user_id,
             "aid": new_account_id,
-            "bid": employee.branch_id
+            "bid": employee.branch_id,
+            "currency": emp_currency,
+            "nationality": employee.nationality
         })
         
         # 5. Assign Branches
@@ -291,6 +309,24 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
             request=request,
             branch_id=employee.branch_id
         )
+
+        # Notify HR admins about new employee
+        try:
+            conn.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'employee', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                AND u.id != :current_uid
+            """), {
+                "title": "👤 موظف جديد",
+                "message": f"تم إضافة الموظف {employee.first_name} {employee.last_name} — {employee.position_title or ''}",
+                "link": "/hr/employees",
+                "current_uid": current_user.get('id') if isinstance(current_user, dict) else current_user.id
+            })
+            conn.commit()
+        except Exception:
+            pass
 
         return {"message": "Success"}
         
@@ -357,6 +393,13 @@ def update_employee(
         if employee.hourly_cost is not None:
              update_fields.append("hourly_cost = :hc")
              params["hc"] = employee.hourly_cost
+
+        if employee.currency is not None:
+             update_fields.append("currency = :currency")
+             params["currency"] = employee.currency
+        if employee.nationality is not None:
+             update_fields.append("nationality = :nationality")
+             params["nationality"] = employee.nationality
 
         # Update Dept/Pos if changed
         if employee.department_name:
@@ -516,7 +559,11 @@ def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, company
                    e.first_name || ' ' || e.last_name as employee_name,
                    p.position_name as position,
                    pe.basic_salary, pe.housing_allowance, pe.transport_allowance, pe.other_allowances, 
-                   pe.deductions, pe.net_salary
+                   pe.deductions, pe.net_salary,
+                   pe.currency, pe.exchange_rate, pe.net_salary_base,
+                   pe.gosi_employee_share, pe.gosi_employer_share,
+                   pe.overtime_amount, pe.violation_deduction, pe.loan_deduction,
+                   pe.salary_components_earning, pe.salary_components_deduction
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
             LEFT JOIN employee_positions p ON e.position_id = p.id
@@ -543,7 +590,17 @@ def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, company
                 "transport_allowance": row.transport_allowance or 0,
                 "other_allowances": row.other_allowances or 0,
                 "deductions": row.deductions or 0,
-                "net_salary": row.net_salary or 0
+                "net_salary": row.net_salary or 0,
+                "currency": row.currency,
+                "exchange_rate": float(row.exchange_rate) if row.exchange_rate else 1.0,
+                "net_salary_base": float(row.net_salary_base) if row.net_salary_base else None,
+                "gosi_employee_share": float(row.gosi_employee_share or 0),
+                "gosi_employer_share": float(row.gosi_employer_share or 0),
+                "overtime_amount": float(row.overtime_amount or 0),
+                "violation_deduction": float(row.violation_deduction or 0),
+                "loan_deduction": float(row.loan_deduction or 0),
+                "salary_components_earning": float(row.salary_components_earning or 0),
+                "salary_components_deduction": float(row.salary_components_deduction or 0)
             })
         return entries
     finally:
@@ -687,10 +744,13 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
         # Clear existing
         conn.execute(text("DELETE FROM payroll_entries WHERE period_id = :id"), {"id": period_id})
         
-        # Fetch Active Employees
+        # Fetch Active Employees (include currency & branch)
         employees = conn.execute(text("""
-            SELECT id, salary, housing_allowance, transport_allowance, other_allowances 
-            FROM employees WHERE status = 'active'
+            SELECT e.id, e.salary, e.housing_allowance, e.transport_allowance, e.other_allowances,
+                   e.currency, e.branch_id, COALESCE(b.default_currency, 'SAR') as branch_currency
+            FROM employees e
+            LEFT JOIN branches b ON e.branch_id = b.id
+            WHERE e.status = 'active'
         """)).fetchall()
 
         # Fetch GOSI settings (active)
@@ -772,22 +832,38 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
             total_deductions = comp_deduction + gosi_emp_share + violation_deduction + loan_deduction
             net = round(total_earnings - total_deductions, 2)
             
+            # === Currency & Exchange Rate ===
+            emp_currency = getattr(emp, 'currency', None) or getattr(emp, 'branch_currency', None) or base_currency
+            # Get exchange rate for this currency
+            if emp_currency and emp_currency != base_currency:
+                rate_row = conn.execute(text("""
+                    SELECT current_rate FROM currencies WHERE code = :code AND is_active = TRUE
+                """), {"code": emp_currency}).fetchone()
+                exchange_rate = float(rate_row.current_rate) if rate_row and rate_row.current_rate else 1.0
+            else:
+                exchange_rate = 1.0
+            
+            net_base = round(net * exchange_rate, 2)
+            
             conn.execute(text("""
                 INSERT INTO payroll_entries (
                     period_id, employee_id, basic_salary, housing_allowance, transport_allowance, 
                     other_allowances, salary_components_earning, salary_components_deduction,
                     overtime_amount, gosi_employee_share, gosi_employer_share,
-                    violation_deduction, loan_deduction, deductions, net_salary
+                    violation_deduction, loan_deduction, deductions, net_salary,
+                    currency, exchange_rate, net_salary_base
                 )
                 VALUES (:pid, :eid, :basic, :housing, :transport, :other, :comp_earn, :comp_ded,
-                        :overtime, :gosi_emp, :gosi_empr, :viol_ded, :loan_ded, :total_ded, :net)
+                        :overtime, :gosi_emp, :gosi_empr, :viol_ded, :loan_ded, :total_ded, :net,
+                        :currency, :exchange_rate, :net_base)
             """), {
                 "pid": period_id, "eid": emp.id,
                 "basic": basic, "housing": housing, "transport": transport, "other": other,
                 "comp_earn": comp_earning, "comp_ded": comp_deduction,
                 "overtime": overtime_amount, "gosi_emp": gosi_emp_share, "gosi_empr": gosi_empr_share,
                 "viol_ded": violation_deduction, "loan_ded": loan_deduction,
-                "total_ded": total_deductions, "net": net
+                "total_ded": total_deductions, "net": net,
+                "currency": emp_currency, "exchange_rate": exchange_rate, "net_base": net_base
             })
             count += 1
             
@@ -810,27 +886,39 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         if not period or period.status != 'draft':
             raise HTTPException(status_code=400, detail="Invalid period status")
 
-        # 2. Calculate Totals (enhanced with new columns)
+        base_currency = get_base_currency(conn)
+
+        # 2. Calculate Totals in BASE currency (convert foreign currency amounts)
         totals = conn.execute(text("""
             SELECT 
-                SUM(net_salary) as total_net,
-                SUM(basic_salary + housing_allowance + transport_allowance + other_allowances + salary_components_earning + overtime_amount) as total_gross,
-                SUM(gosi_employee_share) as total_gosi_emp,
-                SUM(gosi_employer_share) as total_gosi_empr,
-                SUM(overtime_amount) as total_overtime,
-                SUM(violation_deduction) as total_violations,
-                SUM(loan_deduction) as total_loans,
-                SUM(salary_components_deduction) as total_comp_ded
+                SUM(COALESCE(net_salary_base, net_salary * COALESCE(exchange_rate, 1))) as total_net_base,
+                SUM((basic_salary + housing_allowance + transport_allowance + other_allowances + salary_components_earning + overtime_amount) * COALESCE(exchange_rate, 1)) as total_gross_base,
+                SUM(gosi_employee_share * COALESCE(exchange_rate, 1)) as total_gosi_emp_base,
+                SUM(gosi_employer_share * COALESCE(exchange_rate, 1)) as total_gosi_empr_base,
+                SUM(overtime_amount * COALESCE(exchange_rate, 1)) as total_overtime_base,
+                SUM(violation_deduction * COALESCE(exchange_rate, 1)) as total_violations_base,
+                SUM(loan_deduction * COALESCE(exchange_rate, 1)) as total_loans_base,
+                SUM(salary_components_deduction * COALESCE(exchange_rate, 1)) as total_comp_ded_base
             FROM payroll_entries WHERE period_id = :id
         """), {"id": period_id}).fetchone()
         
-        total_net = float(totals.total_net or 0)
-        totals_gross = float(totals.total_gross or 0)
-        total_gosi_emp = float(totals.total_gosi_emp or 0)
-        total_gosi_empr = float(totals.total_gosi_empr or 0)
-        total_violations = float(totals.total_violations or 0)
-        total_loans = float(totals.total_loans or 0)
-        total_comp_ded = float(totals.total_comp_ded or 0)
+        total_net = float(totals.total_net_base or 0)
+        totals_gross = float(totals.total_gross_base or 0)
+        total_gosi_emp = float(totals.total_gosi_emp_base or 0)
+        total_gosi_empr = float(totals.total_gosi_empr_base or 0)
+        total_violations = float(totals.total_violations_base or 0)
+        total_loans = float(totals.total_loans_base or 0)
+        total_comp_ded = float(totals.total_comp_ded_base or 0)
+        
+        # Get net salary grouped by currency for bank payout lines
+        net_by_currency = conn.execute(text("""
+            SELECT COALESCE(currency, :base) as pay_currency,
+                   SUM(net_salary) as total_net_local,
+                   SUM(COALESCE(net_salary_base, net_salary * COALESCE(exchange_rate, 1))) as total_net_base,
+                   MAX(COALESCE(exchange_rate, 1)) as rate
+            FROM payroll_entries WHERE period_id = :id
+            GROUP BY COALESCE(currency, :base)
+        """), {"id": period_id, "base": base_currency}).fetchall()
         
         if total_net == 0:
             raise HTTPException(status_code=400, detail="No payroll calculated to post")
@@ -880,7 +968,6 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
         branch_id = current_user.get("branch_id") if isinstance(current_user, dict) else (current_user.allowed_branches[0] if current_user.allowed_branches else None)
         
-        base_currency = get_base_currency(conn)
         je_id = conn.execute(text("""
             INSERT INTO journal_entries (
                 entry_number, entry_date, description, status, branch_id, created_by,
@@ -956,18 +1043,70 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                 """), {"je": je_id, "acc": acc_comp_ded, "amount": total_comp_ded, "currency": base_currency})
                 update_account_balance(conn, account_id=acc_comp_ded, debit_base=0, credit_base=total_comp_ded)
 
-        # Line 7: Cr Bank (Net Payout)
+        # Line 7: Cr Bank (Net Payout) — one line per currency for proper tracking
+        # Also update treasury_accounts balance for bank reconciliation
+        total_net_all = 0
         acc_bank = get_mapped_account_id(conn, "acc_map_bank")
         if acc_bank:
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:je, :acc, 0, :amount, 'صافي الرواتب المحولة - Net Salary Payment', :amount, :currency)
-            """), {"je": je_id, "acc": acc_bank, "amount": total_net, "currency": base_currency})
-            update_account_balance(conn, account_id=acc_bank, debit_base=0, credit_base=total_net)
+            for cur_row in net_by_currency:
+                pay_currency = cur_row.pay_currency
+                local_amount = float(cur_row.total_net_local)
+                base_amount = float(cur_row.total_net_base)
+                rate = float(cur_row.rate)
+                
+                if pay_currency == base_currency:
+                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({pay_currency})'
+                else:
+                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({local_amount:,.2f} {pay_currency} × {rate})'
+                
+                conn.execute(text("""
+                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
+                    VALUES (:je, :acc, 0, :amount, :desc, :amt_cur, :currency)
+                """), {
+                    "je": je_id, "acc": acc_bank, "amount": base_amount,
+                    "desc": desc_text, "amt_cur": local_amount, "currency": pay_currency
+                })
+                update_account_balance(conn, account_id=acc_bank, debit_base=0, credit_base=base_amount)
+                total_net_all += base_amount
+
+        # 7a. Update Treasury (bank) balance to keep treasury in sync with GL
+        if total_net_all > 0:
+            try:
+                # Find treasury account linked to the GL bank account
+                treasury = conn.execute(text("""
+                    SELECT id FROM treasury_accounts
+                    WHERE gl_account_id = :gl_id AND is_active = TRUE
+                    LIMIT 1
+                """), {"gl_id": acc_bank}).fetchone() if acc_bank else None
+                if treasury:
+                    conn.execute(text("""
+                        UPDATE treasury_accounts
+                        SET current_balance = current_balance - :amt, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = :tid
+                    """), {"amt": total_net_all, "tid": treasury.id})
+            except Exception as tres_err:
+                logger.warning(f"Treasury balance update for payroll skipped: {tres_err}")
 
         # 7. Update Period Status
         conn.execute(text("UPDATE payroll_periods SET status='posted' WHERE id=:id"), {"id": period_id})
-        
+
+        # 8. Notify HR admins about payroll posting
+        try:
+            emp_count = conn.execute(text("SELECT COUNT(*) FROM payroll_entries WHERE period_id = :id"), {"id": period_id}).scalar() or 0
+            conn.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'payroll', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE
+                AND u.role IN ('admin', 'superuser')
+            """), {
+                "title": "💰 تم ترحيل الرواتب",
+                "message": f"تم ترحيل مسير الرواتب {period.name} بنجاح — {emp_count} موظف — إجمالي {total_net:,.2f} {base_currency}",
+                "link": "/hr/payroll"
+            })
+        except Exception:
+            pass  # Non-blocking
+
         trans.commit()
         return {"message": "Payroll posted successfully", "journal_entry": je_num}
 
@@ -1428,6 +1567,27 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
         except Exception:
             pass  # Non-blocking
         
+        # Notify HR admins/superusers about new leave request
+        try:
+            emp_name_row = conn.execute(text("""
+                SELECT CONCAT(first_name, ' ', last_name) as name FROM employees WHERE id = :eid
+            """), {"eid": employee_id}).fetchone()
+            emp_name = emp_name_row.name if emp_name_row else f"موظف #{employee_id}"
+            conn.execute(text("""
+                INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                SELECT DISTINCT u.id, 'leave_request', :title, :message, :link, FALSE, NOW()
+                FROM company_users u
+                WHERE u.is_active = TRUE
+                AND u.role IN ('admin', 'superuser')
+            """), {
+                "title": "🌴 طلب إجازة جديد",
+                "message": f"{emp_name} طلب إجازة {request.leave_type} من {request.start_date} إلى {request.end_date} ({leave_days} يوم)",
+                "link": "/hr/leaves"
+            })
+            conn.commit()
+        except Exception:
+            pass  # Non-blocking
+
         response = {
             "id": result.id,
             "employee_id": employee_id,
@@ -1508,6 +1668,31 @@ def update_leave_status(leave_id: int, status_in: str, current_user: UserRespons
             WHERE id = :id
         """), {"status": status_in, "uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id, "id": leave_id})
         conn.commit()
+
+        # Notify the employee about their leave update
+        try:
+            emp_info = conn.execute(text("""
+                SELECT e.user_id, CONCAT(e.first_name, ' ', e.last_name) as name,
+                       l.leave_type, l.start_date, l.end_date
+                FROM employees e
+                JOIN leave_requests l ON l.employee_id = e.id
+                WHERE l.id = :lid
+            """), {"lid": leave_id}).fetchone()
+            if emp_info and emp_info.user_id:
+                icon = "✅" if status_in == 'approved' else "❌"
+                status_ar = "اعتُمد" if status_in == 'approved' else "رُفض"
+                conn.execute(text("""
+                    INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                    VALUES (:uid, 'leave_status', :title, :message, '/hr/leaves', FALSE, NOW())
+                """), {
+                    "uid": emp_info.user_id,
+                    "title": f"{icon} طلب إجازتك {status_ar}",
+                    "message": f"تم {status_ar} طلب إجازتك ({emp_info.leave_type}) من {emp_info.start_date} إلى {emp_info.end_date}"
+                })
+                conn.commit()
+        except Exception:
+            pass  # Non-blocking
+
         return {"message": "Status updated"}
     finally:
         conn.close()
@@ -1554,36 +1739,13 @@ def calculate_end_of_service(
         base_salary = float(emp.basic_salary or 0)
         total_salary = base_salary + float(emp.housing_allowance) + float(emp.transport_allowance)
         
-        # Saudi Labor Law End of Service Rules:
-        # First 5 years: half month salary per year
-        # After 5 years: full month salary per year
-        # Resignation adjustments:
-        #   < 2 years: nothing
-        #   2-5 years: 1/3 of total
-        #   5-10 years: 2/3 of total
-        #   > 10 years: full amount
+        # Calculate EOS using shared helper (Saudi Labor Law Art. 84/85)
+        from utils.hr_helpers import calculate_eos_gratuity
+        eos = calculate_eos_gratuity(total_salary, total_years, data.termination_reason)
         
-        gratuity = 0
-        if total_years <= 5:
-            gratuity = (total_salary / 2) * total_years
-        else:
-            first_five = (total_salary / 2) * 5
-            remaining = total_salary * (total_years - 5)
-            gratuity = first_five + remaining
-        
-        # Apply resignation factor
-        resignation_factor = 1.0
-        if data.termination_reason == "resignation":
-            if total_years < 2:
-                resignation_factor = 0
-            elif total_years < 5:
-                resignation_factor = 1/3
-            elif total_years < 10:
-                resignation_factor = 2/3
-            else:
-                resignation_factor = 1.0
-        
-        final_gratuity = round(gratuity * resignation_factor, 2)
+        gratuity = eos["full_gratuity"]
+        resignation_factor = eos["resignation_factor"]
+        final_gratuity = eos["final_gratuity"]
         
         # Calculate unpaid leave deduction days (if any)
         unpaid_days = conn.execute(text("""
@@ -1622,44 +1784,7 @@ def calculate_end_of_service(
 # =====================================================
 
 # ---------- HR-005: Payslip View / Print ----------
-
-@router.get("/payslips/{entry_id}", dependencies=[Depends(require_permission("hr.view"))])
-def get_payslip(entry_id: int, current_user=Depends(get_current_user)):
-    """Get a single payslip entry with full details for printing."""
-    conn = get_db_connection(current_user.company_id)
-    try:
-        entry = conn.execute(text("""
-            SELECT pe.*, e.employee_name, e.employee_code, e.national_id,
-                   d.name as department_name, p.name as position_name,
-                   pp.name as period_name, pp.start_date, pp.end_date
-            FROM payroll_entries pe
-            JOIN employees e ON pe.employee_id = e.id
-            LEFT JOIN departments d ON e.department_id = d.id
-            LEFT JOIN positions p ON e.position_id = p.id
-            JOIN payroll_periods pp ON pe.period_id = pp.id
-            WHERE pe.id = :id
-        """), {"id": entry_id}).fetchone()
-        if not entry:
-            raise HTTPException(status_code=404, detail="Payslip not found")
-        return dict(entry._mapping)
-    finally:
-        conn.close()
-
-
-@router.get("/employees/{emp_id}/payslips", dependencies=[Depends(require_permission("hr.view"))])
-def employee_payslip_history(emp_id: int, current_user=Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
-    try:
-        rows = conn.execute(text("""
-            SELECT pe.*, pp.name as period_name, pp.start_date, pp.end_date
-            FROM payroll_entries pe
-            JOIN payroll_periods pp ON pe.period_id = pp.id
-            WHERE pe.employee_id = :eid
-            ORDER BY pp.end_date DESC
-        """), {"eid": emp_id}).fetchall()
-        return [dict(r._mapping) for r in rows]
-    finally:
-        conn.close()
+# NOTE: Payslip endpoints consolidated below in "Phase 8.15" section
 
 
 # ============================================================

@@ -168,6 +168,11 @@ function SalesHome() {
                                 {t('sales.menu.aging_report')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
+                            <div className="link-item" onClick={() => navigate('/sales/commissions')}>
+                                <span className="link-icon">💵</span>
+                                {t('reports.commissions.title', 'تقرير عمولات المبيعات')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
                         </div>
                     </div>
                 )}

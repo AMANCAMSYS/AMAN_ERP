@@ -44,4 +44,8 @@ export const posAPI = {
     // Products & Warehouses for POS
     getProducts: (params) => api.get('/pos/products', { params }),
     getWarehouses: () => api.get('/pos/warehouses'),
+
+    // PWA Support (B7)
+    getPWAManifest: () => api.get('/pos/pwa/manifest'),
+    getPWAConfig: () => api.get('/pos/pwa/config'),
 }

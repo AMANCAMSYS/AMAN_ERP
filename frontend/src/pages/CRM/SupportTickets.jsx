@@ -4,6 +4,7 @@ import { crmAPI, salesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 
 const statusBadgeStyles = {
@@ -22,6 +23,7 @@ const priorityBadgeStyles = {
 
 function SupportTickets() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
 
     const statusOptions = [
         { value: 'open', label: t('crm.status_open') },
@@ -115,7 +117,7 @@ function SupportTickets() {
             fetchTickets()
         } catch (err) {
             console.error('Failed to create ticket', err)
-            alert(err.response?.data?.detail || t('crm.create_error'))
+            showToast(err.response?.data?.detail || t('crm.create_error', 'error'))
         }
     }
 
@@ -166,7 +168,7 @@ function SupportTickets() {
             setIsInternal(false)
         } catch (err) {
             console.error('Failed to add comment', err)
-            alert(err.response?.data?.detail || t('crm.comment_error'))
+            showToast(err.response?.data?.detail || t('crm.comment_error', 'error'))
         }
     }
 
@@ -367,7 +369,7 @@ function SupportTickets() {
 
             {/* Create Modal */}
             {showModal && (
-                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
                         <div className="modal-header">
                             <h3>{t('crm.new_ticket')}</h3>

@@ -72,3 +72,15 @@ export const salesAPI = {
     updateCreditLimit: (partyId, data) => api.put(`/sales/customers/${partyId}/credit-limit`, data),
     checkCredit: (data) => api.post('/sales/credit-check', data),
 }
+
+// Delivery Orders
+export const deliveryOrdersAPI = {
+    list: (params) => api.get('/sales/delivery-orders', { params }),
+    get: (id) => api.get(`/sales/delivery-orders/${id}`),
+    create: (data) => api.post('/sales/delivery-orders', data),
+    update: (id, data) => api.put(`/sales/delivery-orders/${id}`, data),
+    confirm: (id) => api.post(`/sales/delivery-orders/${id}/confirm`),
+    deliver: (id) => api.post(`/sales/delivery-orders/${id}/deliver`),
+    createInvoice: (id) => api.post(`/sales/delivery-orders/${id}/create-invoice`),
+    cancel: (id) => api.post(`/sales/delivery-orders/${id}/cancel`),
+}

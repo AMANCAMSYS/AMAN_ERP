@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
+import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
@@ -214,7 +215,10 @@ export default function RecurringTemplates() {
         <div className="module-container" dir={i18n.dir()}>
             <div className="module-header">
                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h2>🔄 {t('recurring.title')}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <BackButton />
+                        <h2>🔄 {t('recurring.title')}</h2>
+                    </div>
                     <div className="d-flex gap-2">
                         <select className="form-input" style={{ width: 'auto' }}
                             value={filterActive} onChange={e => setFilterActive(e.target.value)}>
@@ -333,7 +337,7 @@ export default function RecurringTemplates() {
                                 <div className="row g-3 mb-3">
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.start_date') + ' *'}</label>
-                                        <DateInput className="form-input" required value={formatDate(form.start_date)}
+                                        <DateInput className="form-input" required value={form.start_date}
                                             onChange={e => setForm(f => ({
                                                 ...f, start_date: e.target.value,
                                                 next_run_date: f.next_run_date || e.target.value
@@ -341,7 +345,7 @@ export default function RecurringTemplates() {
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label">{t('recurring.end_date')}</label>
-                                        <DateInput className="form-input" value={formatDate(form.end_date)}
+                                        <DateInput className="form-input" value={form.end_date}
                                             onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))} />
                                     </div>
                                     <div className="col-md-3">

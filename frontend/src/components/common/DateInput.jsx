@@ -52,10 +52,17 @@ const DateInput = ({
 
     return (
         <div className="custom-datepicker-container" style={{ position: 'relative', ...style }}>
-            <div
-                className={`absolute z-10 text-gray-400 pointer-events-none`}
-                style={{ top: '50%', transform: 'translateY(-50%)', [isRtl ? 'left' : 'right']: '10px' }}
-            >
+            <div style={{
+                position: 'absolute',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                [isRtl ? 'left' : 'right']: '10px',
+                zIndex: 2,
+                pointerEvents: 'none',
+                color: 'var(--text-muted, #9ca3af)',
+                display: 'flex',
+                alignItems: 'center'
+            }}>
                 <Calendar size={16} />
             </div>
             <DatePicker
@@ -76,6 +83,8 @@ const DateInput = ({
                 showYearDropdown
                 showMonthDropdown
                 dropdownMode="select"
+                portalId="datepicker-portal"
+                popperPlacement="bottom-start"
             />
         </div>
     );

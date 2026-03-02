@@ -54,4 +54,15 @@ export const projectsAPI = {
     // Retainer
     setupRetainer: (projectId, data) => api.put(`/projects/${projectId}/retainer-setup`, data),
     generateRetainerInvoices: (data) => api.post('/projects/retainer/generate-invoices', data),
+
+    // Project Risks (B5)
+    listProjectRisks: (projectId) => api.get(`/projects/${projectId}/risks`),
+    createProjectRisk: (projectId, data) => api.post(`/projects/${projectId}/risks`, data),
+    updateProjectRisk: (riskId, data) => api.put(`/projects/risks/${riskId}`, data),
+    deleteProjectRisk: (riskId) => api.delete(`/projects/risks/${riskId}`),
+
+    // Task Dependencies (B5)
+    listTaskDependencies: (projectId) => api.get(`/projects/${projectId}/task-dependencies`),
+    createTaskDependency: (projectId, data) => api.post(`/projects/${projectId}/task-dependencies`, data),
+    deleteTaskDependency: (depId) => api.delete(`/projects/task-dependencies/${depId}`),
 }

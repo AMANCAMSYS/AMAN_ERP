@@ -165,7 +165,7 @@ export default function ReportBuilder() {
             <div className="row g-4">
                 {/* Configuration Panel */}
                 <div className="col-lg-4">
-                    <div className="card section-card border-0 shadow-sm mb-4">
+                    <div className="card section-card mb-4">
                         <div className="card-body">
                             <h5 className="section-title mb-3"><Database size={16} /> {t('reports.data_source')}</h5>
 
@@ -188,7 +188,7 @@ export default function ReportBuilder() {
                         </div>
                     </div>
 
-                    <div className="card section-card border-0 shadow-sm mb-4">
+                    <div className="card section-card mb-4">
                         <div className="card-body">
                             <h5 className="section-title mb-3"><Columns size={16} /> {t('reports.columns')}</h5>
                             <div className="d-flex flex-wrap gap-2">
@@ -205,7 +205,7 @@ export default function ReportBuilder() {
                         </div>
                     </div>
 
-                    <div className="card section-card border-0 shadow-sm">
+                    <div className="card section-card">
                         <div className="card-body">
                             <h5 className="section-title mb-3">
                                 <div className="d-flex justify-content-between align-items-center w-100">
@@ -244,7 +244,7 @@ export default function ReportBuilder() {
                 {/* Preview Panel */}
                 <div className="col-lg-8">
                     {showSavedList ? (
-                        <div className="card section-card border-0 shadow-sm">
+                        <div className="card section-card">
                             <div className="card-body">
                                 <h5 className="section-title mb-4">{t('reports.saved_reports')}</h5>
                                 {savedReports.length === 0 ? (
@@ -282,7 +282,7 @@ export default function ReportBuilder() {
                             </div>
                         </div>
                     ) : (
-                        <div className="card section-card border-0 shadow-sm h-100">
+                        <div className="card section-card h-100">
                             <div className="card-body">
                                 <div className="d-flex justify-content-between align-items-center mb-4">
                                     <h5 className="section-title mb-0">{t('reports.results')}</h5>

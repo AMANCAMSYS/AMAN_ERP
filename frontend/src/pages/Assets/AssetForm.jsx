@@ -106,8 +106,8 @@ const AssetForm = () => {
                             {/* Single Centered Column */}
                             <div className="col-lg-8 mx-auto">
                                 {/* Basic Info Card */}
-                                <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
-                                    <div className="card-body p-4">
+                                <div className="card mb-4">
+                                    <div >
                                         <div className="d-flex align-items-center mb-4 pb-2 border-bottom">
                                             <div className="bg-primary-subtle p-2 rounded-3 me-3 text-primary d-flex align-items-center justify-content-center" style={{ width: '42px', height: '42px' }}>
                                                 <Building size={22} />
@@ -176,8 +176,8 @@ const AssetForm = () => {
                                 </div>
 
                                 {/* Financial Details Card */}
-                                <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-                                    <div className="card-body p-4">
+                                <div className="card">
+                                    <div >
                                         <div className="d-flex align-items-center mb-4 pb-2 border-bottom">
                                             <div className="bg-success-subtle p-2 rounded-3 me-3 text-success d-flex align-items-center justify-content-center" style={{ width: '42px', height: '42px' }}>
                                                 <DollarSign size={22} />

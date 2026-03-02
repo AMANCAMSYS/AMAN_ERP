@@ -4,6 +4,7 @@ import { servicesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils'
 import BackButton from '../../components/common/BackButton'
+import { useToast } from '../../context/ToastContext'
 
 const accessBadgeStyles = {
     public:     { background: '#22c55e', color: '#fff' },
@@ -14,6 +15,7 @@ const accessBadgeStyles = {
 
 function DocumentManagement() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const fileInputRef = useRef(null)
     const versionFileRef = useRef(null)
 
@@ -85,7 +87,7 @@ function DocumentManagement() {
 
     const handleUpload = async (e) => {
         e.preventDefault()
-        if (!uploadForm.file) return alert(t('documents.select_file'))
+        if (!uploadForm.file) return showToast(t('documents.select_file', 'warning'))
         try {
             const fd = new FormData()
             fd.append('file', uploadForm.file)
@@ -98,7 +100,7 @@ function DocumentManagement() {
             setShowUploadModal(false)
             fetchDocuments()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -123,7 +125,7 @@ function DocumentManagement() {
             fetchDocuments()
             if (expandedId === id) loadDetail(id)
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -134,7 +136,7 @@ function DocumentManagement() {
 
     const handleVersionUpload = async (e) => {
         e.preventDefault()
-        if (!versionForm.file) return alert(t('documents.select_file'))
+        if (!versionForm.file) return showToast(t('documents.select_file', 'warning'))
         try {
             const fd = new FormData()
             fd.append('file', versionForm.file)
@@ -147,7 +149,7 @@ function DocumentManagement() {
                 setDetail(res.data)
             }
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 
@@ -158,7 +160,7 @@ function DocumentManagement() {
             if (expandedId === id) setExpandedId(null)
             fetchDocuments()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error'))
+            showToast(err.response?.data?.detail || t('common.error', 'error'))
         }
     }
 

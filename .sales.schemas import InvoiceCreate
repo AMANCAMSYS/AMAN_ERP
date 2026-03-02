@@ -1,6 +1,0 @@
- id | invoice_number | status |    total    | paid_amount | payment_method | allocations | vouchers 
-----+----------------+--------+-------------+-------------+----------------+-------------+----------
- 10 | INV-2026-00002 | unpaid | 230000.0000 |      0.0000 | bank           |           0 |        0
-  9 | INV-2026-00001 | unpaid |    230.0000 |      0.0000 | cash           |           0 |        0
-(2 rows)
-

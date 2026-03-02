@@ -10,9 +10,11 @@ import Pagination, { usePagination } from '../../components/common/Pagination'
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 function ProductList() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const [products, setProducts] = useState([])
@@ -90,7 +92,7 @@ function ProductList() {
             setProductToDelete(null)
         } catch (err) {
             const errorMsg = err.response?.data?.detail || t('stock.products.validation.error_delete')
-            alert(errorMsg)
+            showToast(errorMsg, 'error')
         }
     }
 

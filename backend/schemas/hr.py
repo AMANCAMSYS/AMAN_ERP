@@ -41,6 +41,8 @@ class EmployeeCreate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     role: Optional[str] = None
+    currency: Optional[str] = None
+    nationality: Optional[str] = None
     create_ledger: bool = False
     branch_id: Optional[int] = None
     allowed_branch_ids: Optional[List[int]] = None
@@ -59,6 +61,8 @@ class EmployeeUpdate(BaseModel):
     transport_allowance: Optional[float] = None
     other_allowances: Optional[float] = None
     hourly_cost: Optional[float] = None
+    currency: Optional[str] = None
+    nationality: Optional[str] = None
     branch_id: Optional[int] = None
     allowed_branch_ids: Optional[List[int]] = None
     role: Optional[str] = None
@@ -123,6 +127,16 @@ class PayrollEntryResponse(BaseModel):
     deductions: float
     net_salary: float
     status: Optional[str] = None
+    currency: Optional[str] = None
+    exchange_rate: Optional[float] = 1.0
+    net_salary_base: Optional[float] = None
+    gosi_employee_share: Optional[float] = 0
+    gosi_employer_share: Optional[float] = 0
+    overtime_amount: Optional[float] = 0
+    violation_deduction: Optional[float] = 0
+    loan_deduction: Optional[float] = 0
+    salary_components_earning: Optional[float] = 0
+    salary_components_deduction: Optional[float] = 0
 
 
 class PayrollPeriodResponse(BaseModel):

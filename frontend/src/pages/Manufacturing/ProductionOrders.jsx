@@ -52,10 +52,11 @@ const ProductionOrders = () => {
             ]);
 
             setOrders(ordersRes.data);
-            setProducts(productsRes.data);
+            const prods = productsRes.data?.products || productsRes.data;
+            setProducts(Array.isArray(prods) ? prods : []);
             setBoms(bomsRes.data);
             setRoutes(routesRes.data);
-            setWarehouses(whRes.data);
+            setWarehouses(whRes.data?.warehouses || whRes.data || []);
             setLoading(false);
         } catch (error) {
             console.error("Error fetching data:", error);

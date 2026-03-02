@@ -12,6 +12,18 @@ export const treasuryAPI = {
     // Treasury Reports
     getBalancesReport: (params) => api.get('/treasury/reports/balances', { params }),
     getCashflowReport: (params) => api.get('/treasury/reports/cashflow', { params }),
+
+    // Bank Import
+    importBankStatement: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/treasury/bank-import', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    listBankImports: () => api.get('/treasury/bank-import/batches'),
+    getBankImportLines: (batchId) => api.get(`/treasury/bank-import/${batchId}/lines`),
+    autoMatchBankImport: (batchId) => api.post(`/treasury/bank-import/${batchId}/auto-match`),
 }
 
 export const reconciliationAPI = {

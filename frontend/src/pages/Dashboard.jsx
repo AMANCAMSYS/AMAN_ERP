@@ -8,6 +8,7 @@ import SalesSummaryWidget from '../components/dashboard/SalesSummaryWidget';
 import LowStockWidget from '../components/dashboard/LowStockWidget';
 import PendingTasksWidget from '../components/dashboard/PendingTasksWidget';
 import CashFlowWidget from '../components/dashboard/CashFlowWidget';
+import Card from '../components/common/Card';
 import {
     RefreshCw, Calendar, Wallet, TrendingUp, Package, Users,
     Building2, FileText, ShieldCheck,
@@ -16,24 +17,6 @@ import { useBranch } from '../context/BranchContext';
 import { getUser } from '../utils/auth';
 import { formatShortDate } from '../utils/dateUtils';
 
-
-/* ── Card wrapper ────────────────────────────────────── */
-const Card = ({ title, children, style = {} }) => (
-    <div style={{
-        background: '#fff', borderRadius: '1rem', border: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0,0,0,.06)', overflow: 'hidden',
-        display: 'flex', flexDirection: 'column', ...style
-    }}>
-        {title && (
-            <div style={{ padding: '0.85rem 1.1rem 0.6rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {title}
-                </span>
-            </div>
-        )}
-        <div style={{ flex: 1, padding: '1rem', overflow: 'auto' }}>{children}</div>
-    </div>
-);
 
 /* ── Dashboard ───────────────────────────────────────── */
 const Dashboard = () => {
@@ -74,9 +57,9 @@ const Dashboard = () => {
 
     const greeting = () => {
         const h = new Date().getHours();
-        if (h < 12) return t('common.good_morning') || (t('.dashboard.good_morning'));
-        if (h < 18) return t('common.good_afternoon') || (t('.dashboard.good_afternoon'));
-        return t('common.good_evening') || (t('.dashboard.good_evening'));
+        if (h < 12) return t('dashboard.good_morning');
+        if (h < 18) return t('dashboard.good_afternoon');
+        return t('dashboard.good_evening');
     };
 
     /* ── System-Admin ───────────────────────────────── */
@@ -122,7 +105,7 @@ const Dashboard = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                     <div>
                         <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {t('nav.dashboard') || (t('.dashboard.dashboard'))}
+                            {t('dashboard.dashboard')}
                             {currentBranch && (
                                 <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '2px 8px' }}>
                                     {currentBranch.branch_name}
@@ -139,7 +122,7 @@ const Dashboard = () => {
                         <button onClick={fetchAll} disabled={loading}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '6px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.6rem', fontSize: '0.8rem', cursor: 'pointer', color: '#475569' }}>
                             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                            {t('common.refresh') || (t('.dashboard.refresh'))}
+                            {t('dashboard.refresh')}
                         </button>
                     </div>
                 </div>
@@ -152,47 +135,47 @@ const Dashboard = () => {
 
             {/* Row 2 — Sales summary × 3 */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.today') || (t('.dashboard.today'))} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.today')} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'today' }} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.this_week') || (t('.dashboard.this_week'))} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.this_week')} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'week' }} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.this_month') || (t('.dashboard.this_month'))} style={{ minHeight: 120 }}>
+                <Card title={t('dashboard.this_month')} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'month' }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 3 — Financial chart + Quick actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.financial_overview') || (t('.dashboard.revenue_expenses'))} style={{ minHeight: 320 }}>
+                <Card title={t('dashboard.financial_overview')} style={{ minHeight: 320 }}>
                     <FinancialChart data={finData} loading={loading} currency={currency} />
                 </Card>
-                <Card title={t('.dashboard.quick_actions')} style={{ minHeight: 320 }}>
+                <Card title={t('dashboard.quick_actions')} style={{ minHeight: 320 }}>
                     <QuickActions t={t} isRTL={isRTL} />
                 </Card>
             </div>
 
             {/* Row 4 — Top products + Low stock */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap, marginBottom: gap }}>
-                <Card title={t('dashboard.top_products') || (t('.dashboard.top_products'))} style={{ minHeight: 280 }}>
+                <Card title={t('dashboard.top_products')} style={{ minHeight: 280 }}>
                     <TopProductsChart data={prodData} loading={loading} currency={currency} />
                 </Card>
-                <Card title={t('dashboard.low_stock') || (t('.dashboard.low_stock'))} style={{ minHeight: 280 }}>
+                <Card title={t('dashboard.low_stock')} style={{ minHeight: 280 }}>
                     <LowStockWidget config={{ limit: 8 }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 5 — Cash flow */}
             <div style={{ marginBottom: gap }}>
-                <Card title={t('.dashboard.cash_flow_last_30_days')} style={{ minHeight: 280 }}>
+                <Card title={t('dashboard.cash_flow_last_30_days')} style={{ minHeight: 280 }}>
                     <CashFlowWidget config={{ days: 30 }} currency={currency} />
                 </Card>
             </div>
 
             {/* Row 6 — Pending tasks */}
             <div style={{ marginBottom: gap }}>
-                <Card title={t('.dashboard.pending_tasks')}>
+                <Card title={t('dashboard.pending_tasks')}>
                     <PendingTasksWidget config={{ limit: 10 }} currency={currency} />
                 </Card>
             </div>
@@ -204,12 +187,13 @@ const Dashboard = () => {
 /* ── AdminCard ───────────────────────────────────────── */
 const AdminCard = ({ icon, title, desc, link }) => (
     <button onClick={() => window.location.href = link}
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 230, width: '100%', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '1.5rem', padding: '1.5rem', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,.06)', transition: 'all .2s' }}
+        className="card"
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 230, width: '100%', cursor: 'pointer', textAlign: 'center' }}
         onMouseEnter={e => { e.currentTarget.style.boxShadow='0 6px 20px rgba(59,130,246,.15)'; e.currentTarget.style.borderColor='#93c5fd'; }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,.06)';     e.currentTarget.style.borderColor='#e2e8f0'; }}>
+        onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.borderColor=''; }}>
         <div style={{ marginBottom: '0.9rem', color: '#3b82f6' }}>{icon}</div>
-        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b', marginBottom: '0.35rem' }}>{title}</div>
-        <div style={{ fontSize: '0.78rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.5 }}>{desc}</div>
+        <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)', marginBottom: '0.35rem' }}>{title}</div>
+        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{desc}</div>
     </button>
 );
 

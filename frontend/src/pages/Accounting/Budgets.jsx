@@ -169,8 +169,8 @@ const Budgets = () => {
 
             {/* Overrun Alerts */}
             {alerts.length > 0 && (
-                <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', borderLeft: '4px solid #dc2626' }}>
-                    <div className="card-body p-3">
+                <div className="card card-compact mb-4" style={{ borderLeft: '4px solid #dc2626' }}>
+                    <div >
                         <h6 className="fw-bold mb-3 d-flex align-items-center gap-2">
                             <AlertTriangle size={18} className="text-danger" />
                             {t('accounting.budgets.overrun_alerts')}
@@ -243,8 +243,8 @@ const Budgets = () => {
                 ) : (
                     budgets.map((budget) => (
                         <div key={budget.id} className="col-md-6 col-lg-4">
-                            <div className="card h-100 shadow-sm border-0" style={{ borderRadius: '12px', transition: 'transform 0.2s' }}>
-                                <div className="card-body p-4">
+                            <div className="card h-100" style={{ transition: 'transform 0.2s' }}>
+                                <div >
                                     <div className="d-flex justify-content-between align-items-start mb-3">
                                         <h5 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{budget.name}</h5>
                                         {getStatusBadge(budget.status)}

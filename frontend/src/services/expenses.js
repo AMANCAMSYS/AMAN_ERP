@@ -12,4 +12,11 @@ export const expensesAPI = {
     getReportByType: (params) => api.get('/expenses/reports/by-type', { params: cleanParams(params) }),
     getReportByCostCenter: (params) => api.get('/expenses/reports/by-cost-center', { params: cleanParams(params) }),
     getReportMonthly: (params) => api.get('/expenses/reports/monthly', { params: cleanParams(params) }),
+
+    // Expense Policies (C1)
+    listPolicies: () => api.get('/expenses/policies'),
+    createPolicy: (data) => api.post('/expenses/policies', data),
+    updatePolicy: (id, data) => api.put(`/expenses/policies/${id}`, data),
+    deletePolicy: (id) => api.delete(`/expenses/policies/${id}`),
+    validatePolicy: (data) => api.post('/expenses/validate-policy', data),
 }

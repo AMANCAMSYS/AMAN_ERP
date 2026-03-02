@@ -4,6 +4,7 @@ import { scheduledReportsAPI, reportSharingAPI } from '../../services/reports';
 import { branchesAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
+import BackButton from '../../components/common/BackButton';
 
 const REPORT_TYPE_KEYS = [
     'profit_loss', 'balance_sheet', 'trial_balance', 'general_ledger',
@@ -193,6 +194,7 @@ const ScheduledReports = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="header-title">
                     <h1 className="workspace-title">⏰ {t('reports.scheduled.title', 'Scheduled Reports')}</h1>
                     <p className="workspace-subtitle">{t('reports.scheduled.subtitle', 'Manage automated report generation and emailing')}</p>

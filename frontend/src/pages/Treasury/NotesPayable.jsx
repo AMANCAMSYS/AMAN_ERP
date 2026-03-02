@@ -96,7 +96,7 @@ const NotesPayable = () => {
     const isOverdue = (note) => note.status === 'issued' && new Date(note.due_date) < new Date();
     const statusBadge = (s) => {
         const map = { issued: 'badge-warning', paid: 'badge-success', protested: 'badge-danger' };
-        const labels = { issued: 'صادرة', paid: 'مسددة', protested: 'مرفوضة' };
+        const labels = { issued: t('notesPayable.issued'), paid: t('notesPayable.paid'), protested: t('notesPayable.protested') };
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>;
     };
 
@@ -107,11 +107,11 @@ const NotesPayable = () => {
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">📜 أوراق الدفع</h1>
-                    <p className="workspace-subtitle">إدارة وتتبع أوراق الدفع (الكمبيالات / السندات لأمر)</p>
+                    <h1 className="workspace-title">📜 {t('notesPayable.title')}</h1>
+                    <p className="workspace-subtitle">{t('notesPayable.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowCreate(true); loadCreateData(); }}>
-                    <Plus size={16} /> إنشاء ورقة دفع
+                    <Plus size={16} /> {t('notesPayable.create')}
                 </button>
             </div>
 
@@ -120,25 +120,25 @@ const NotesPayable = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                     <div className="card p-3 text-center">
                         <Clock size={24} className="text-warning mb-2" />
-                        <div className="small text-muted">صادرة</div>
+                        <div className="small text-muted">{t('notesPayable.issued')}</div>
                         <div className="fw-bold fs-4">{stats.issued.count}</div>
                         <div className="small text-muted">{fmt(stats.issued.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <CheckCircle size={24} className="text-success mb-2" />
-                        <div className="small text-muted">مسددة</div>
+                        <div className="small text-muted">{t('notesPayable.paid')}</div>
                         <div className="fw-bold fs-4 text-success">{stats.paid.count}</div>
                         <div className="small text-muted">{fmt(stats.paid.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <XCircle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مرفوضة</div>
+                        <div className="small text-muted">{t('notesPayable.protested')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.protested.count}</div>
                         <div className="small text-muted">{fmt(stats.protested.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <AlertTriangle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">متأخرة</div>
+                        <div className="small text-muted">{t('notesPayable.overdue')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.overdue.count}</div>
                         <div className="small text-muted">{fmt(stats.overdue.total)} {currency}</div>
                     </div>
@@ -149,12 +149,12 @@ const NotesPayable = () => {
             <div className="card p-3 mb-3">
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <select className="form-input" style={{ maxWidth: '200px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                        <option value="">جميع الحالات</option>
-                        <option value="issued">صادرة</option>
-                        <option value="paid">مسددة</option>
-                        <option value="protested">مرفوضة</option>
+                        <option value="">{t('notesPayable.allStatuses')}</option>
+                        <option value="issued">{t('notesPayable.issued')}</option>
+                        <option value="paid">{t('notesPayable.paid')}</option>
+                        <option value="protested">{t('notesPayable.protested')}</option>
                     </select>
-                    <span className="text-muted small">{notes.length} ورقة</span>
+                    <span className="text-muted small">{notes.length} {t('notesPayable.noteCount')}</span>
                 </div>
             </div>
 
@@ -163,19 +163,19 @@ const NotesPayable = () => {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم الورقة</th>
-                            <th>المستفيد</th>
-                            <th>المورد</th>
-                            <th>البنك</th>
-                            <th className="text-end">المبلغ</th>
-                            <th>تاريخ الاستحقاق</th>
-                            <th>الحالة</th>
-                            <th>إجراءات</th>
+                            <th>{t('notesPayable.noteNumber')}</th>
+                            <th>{t('notesPayable.beneficiary')}</th>
+                            <th>{t('notesPayable.supplier')}</th>
+                            <th>{t('notesPayable.bank')}</th>
+                            <th className="text-end">{t('notesPayable.amount')}</th>
+                            <th>{t('notesPayable.dueDate')}</th>
+                            <th>{t('notesPayable.status')}</th>
+                            <th>{t('notesPayable.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {notes.length === 0 ? (
-                            <tr><td colSpan="8" className="text-center py-4 text-muted">لا توجد أوراق دفع</td></tr>
+                            <tr><td colSpan="8" className="text-center py-4 text-muted">{t('notesPayable.noNotes')}</td></tr>
                         ) : notes.map(note => (
                             <tr key={note.id} style={isOverdue(note) ? { backgroundColor: 'rgba(255,0,0,0.05)' } : {}}>
                                 <td className="fw-bold">{note.note_number}</td>
@@ -185,20 +185,20 @@ const NotesPayable = () => {
                                 <td className="text-end font-monospace fw-bold">{fmt(note.amount)}</td>
                                 <td>
                                     {formatDate(note.due_date)}
-                                    {isOverdue(note) && <span className="badge badge-danger ms-1" style={{ fontSize: '10px' }}>متأخر</span>}
+                                    {isOverdue(note) && <span className="badge badge-danger ms-1" style={{ fontSize: '10px' }}>{t('notesPayable.overdue')}</span>}
                                 </td>
                                 <td>{statusBadge(note.status)}</td>
                                 <td>
                                     <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button className="btn btn-sm btn-light" onClick={() => setShowDetail(note)} title="عرض">
+                                        <button className="btn btn-sm btn-light" onClick={() => setShowDetail(note)} title={t('notesPayable.view')}>
                                             <Eye size={14} />
                                         </button>
                                         {note.status === 'issued' && (
                                             <>
-                                                <button className="btn btn-sm btn-success" onClick={() => { setShowPay(note); loadCreateData(); }} title="سداد">
+                                                <button className="btn btn-sm btn-success" onClick={() => { setShowPay(note); loadCreateData(); }} title={t('notesPayable.pay')}>
                                                     <CheckCircle size={14} />
                                                 </button>
-                                                <button className="btn btn-sm btn-danger" onClick={() => setShowProtest(note)} title="رفض">
+                                                <button className="btn btn-sm btn-danger" onClick={() => setShowProtest(note)} title={t('notesPayable.protest')}>
                                                     <XCircle size={14} />
                                                 </button>
                                             </>
@@ -216,58 +216,58 @@ const NotesPayable = () => {
                 <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h3>إنشاء ورقة دفع</h3>
+                            <h3>{t('notesPayable.create')}</h3>
                             <button className="btn-icon" onClick={() => setShowCreate(false)}>&times;</button>
                         </div>
                         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div className="form-group">
-                                    <label className="form-label">رقم الورقة *</label>
+                                    <label className="form-label">{t('notesPayable.noteNumber')} *</label>
                                     <input className="form-input" value={form.note_number} onChange={e => setForm({ ...form, note_number: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">المبلغ *</label>
+                                    <label className="form-label">{t('notesPayable.amount')} *</label>
                                     <input type="number" step="0.01" className="form-input" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">اسم المستفيد</label>
+                                    <label className="form-label">{t('notesPayable.beneficiaryName')}</label>
                                     <input className="form-input" value={form.beneficiary_name} onChange={e => setForm({ ...form, beneficiary_name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">البنك</label>
+                                    <label className="form-label">{t('notesPayable.bank')}</label>
                                     <input className="form-input" value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ الإصدار</label>
-                                    <DateInput className="form-input" value={formatDate(form.issue_date)} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
+                                    <label className="form-label">{t('notesPayable.issueDate')}</label>
+                                    <DateInput className="form-input" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ الاستحقاق *</label>
-                                    <DateInput className="form-input" value={formatDate(form.due_date)} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                                    <label className="form-label">{t('notesPayable.dueDate')} *</label>
+                                    <DateInput className="form-input" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">المورد</label>
+                                    <label className="form-label">{t('notesPayable.supplier')}</label>
                                     <select className="form-input" value={form.party_id} onChange={e => setForm({ ...form, party_id: e.target.value })}>
-                                        <option value="">-- اختر --</option>
+                                        <option value="">{t('notesPayable.select')}</option>
                                         {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">حساب الخزينة</label>
+                                    <label className="form-label">{t('notesPayable.treasuryAccount')}</label>
                                     <select className="form-input" value={form.treasury_account_id} onChange={e => setForm({ ...form, treasury_account_id: e.target.value })}>
-                                        <option value="">-- اختر --</option>
+                                        <option value="">{t('notesPayable.select')}</option>
                                         {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">ملاحظات</label>
+                                <label className="form-label">{t('notesPayable.notes')}</label>
                                 <textarea className="form-input" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowCreate(false)}>إلغاء</button>
-                            <button className="btn btn-primary" onClick={handleCreate}>إنشاء</button>
+                            <button className="btn btn-light" onClick={() => setShowCreate(false)}>{t('notesPayable.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleCreate}>{t('notesPayable.createBtn')}</button>
                         </div>
                     </div>
                 </div>
@@ -278,31 +278,31 @@ const NotesPayable = () => {
                 <div className="modal-overlay" onClick={() => setShowDetail(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h3>تفاصيل ورقة الدفع</h3>
+                            <h3>{t('notesPayable.noteDetail')}</h3>
                             <button className="btn-icon" onClick={() => setShowDetail(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 {[
-                                    ['رقم الورقة', showDetail.note_number],
-                                    ['المبلغ', fmt(showDetail.amount) + ' ' + (showDetail.currency || '')],
-                                    ['المستفيد', showDetail.beneficiary_name],
-                                    ['البنك', showDetail.bank_name],
-                                    ['المورد', showDetail.party_name],
-                                    ['تاريخ الإصدار', showDetail.issue_date],
-                                    ['تاريخ الاستحقاق', showDetail.due_date],
-                                    ['الحالة', showDetail.status],
-                                    ['تاريخ السداد', showDetail.payment_date],
-                                    ['تاريخ الرفض', showDetail.protest_date],
-                                    ['سبب الرفض', showDetail.protest_reason],
+                                    [t('notesPayable.noteNumber'), showDetail.note_number],
+                                    [t('notesPayable.amount'), fmt(showDetail.amount) + ' ' + (showDetail.currency || '')],
+                                    [t('notesPayable.beneficiary'), showDetail.beneficiary_name],
+                                    [t('notesPayable.bank'), showDetail.bank_name],
+                                    [t('notesPayable.supplier'), showDetail.party_name],
+                                    [t('notesPayable.issueDate'), showDetail.issue_date],
+                                    [t('notesPayable.dueDate'), showDetail.due_date],
+                                    [t('notesPayable.status'), showDetail.status],
+                                    [t('notesPayable.paymentDate'), showDetail.payment_date],
+                                    [t('notesPayable.protestDate'), showDetail.protest_date],
+                                    [t('notesPayable.protestReason'), showDetail.protest_reason],
                                 ].map(([label, val], i) => val ? (
                                     <div key={i}><span className="small text-muted">{label}</span><div className="fw-bold">{val}</div></div>
                                 ) : null)}
                             </div>
-                            {showDetail.notes && <div className="mt-3"><span className="small text-muted">ملاحظات</span><div>{showDetail.notes}</div></div>}
+                            {showDetail.notes && <div className="mt-3"><span className="small text-muted">{t('notesPayable.notes')}</span><div>{showDetail.notes}</div></div>}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowDetail(null)}>إغلاق</button>
+                            <button className="btn btn-light" onClick={() => setShowDetail(null)}>{t('notesPayable.close')}</button>
                         </div>
                     </div>
                 </div>
@@ -313,28 +313,28 @@ const NotesPayable = () => {
                 <div className="modal-overlay" onClick={() => setShowPay(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="modal-header">
-                            <h3>سداد ورقة الدفع</h3>
+                            <h3>{t('notesPayable.pay')}</h3>
                             <button className="btn-icon" onClick={() => setShowPay(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
-                            <p>ورقة رقم <strong>{showPay.note_number}</strong> بمبلغ <strong>{fmt(showPay.amount)}</strong></p>
+                            <p>{t('notesPayable.noteInfo', { number: showPay.note_number, amount: fmt(showPay.amount) })}</p>
                             <div className="form-group mb-3">
-                                <label className="form-label">تاريخ السداد</label>
-                                <DateInput className="form-input" value={formatDate(payForm.payment_date)}
+                                <label className="form-label">{t('notesPayable.paymentDate')}</label>
+                                <DateInput className="form-input" value={payForm.payment_date}
                                     onChange={e => setPayForm({ ...payForm, payment_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">حساب البنك</label>
+                                <label className="form-label">{t('notesPayable.bankAccount')}</label>
                                 <select className="form-input" value={payForm.treasury_account_id}
                                     onChange={e => setPayForm({ ...payForm, treasury_account_id: e.target.value })}>
-                                    <option value="">-- اختر --</option>
+                                    <option value="">{t('notesPayable.select')}</option>
                                     {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                 </select>
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowPay(null)}>إلغاء</button>
-                            <button className="btn btn-success" onClick={handlePay}>تأكيد السداد</button>
+                            <button className="btn btn-light" onClick={() => setShowPay(null)}>{t('notesPayable.cancel')}</button>
+                            <button className="btn btn-success" onClick={handlePay}>{t('notesPayable.confirmPay')}</button>
                         </div>
                     </div>
                 </div>
@@ -345,25 +345,25 @@ const NotesPayable = () => {
                 <div className="modal-overlay" onClick={() => setShowProtest(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="modal-header">
-                            <h3>رفض ورقة الدفع</h3>
+                            <h3>{t('notesPayable.protest')}</h3>
                             <button className="btn-icon" onClick={() => setShowProtest(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
-                            <p>ورقة رقم <strong>{showProtest.note_number}</strong> بمبلغ <strong>{fmt(showProtest.amount)}</strong></p>
+                            <p>{t('notesPayable.noteInfo', { number: showProtest.note_number, amount: fmt(showProtest.amount) })}</p>
                             <div className="form-group mb-3">
-                                <label className="form-label">تاريخ الرفض</label>
+                                <label className="form-label">{t('notesPayable.protestDate')}</label>
                                 <DateInput className="form-input" value={protestForm.protest_date}
                                     onChange={e => setProtestForm({ ...protestForm, protest_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">سبب الرفض</label>
+                                <label className="form-label">{t('notesPayable.protestReason')}</label>
                                 <textarea className="form-input" rows="2" value={protestForm.reason}
                                     onChange={e => setProtestForm({ ...protestForm, reason: e.target.value })} />
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowProtest(null)}>إلغاء</button>
-                            <button className="btn btn-danger" onClick={handleProtest}>تأكيد الرفض</button>
+                            <button className="btn btn-light" onClick={() => setShowProtest(null)}>{t('notesPayable.cancel')}</button>
+                            <button className="btn btn-danger" onClick={handleProtest}>{t('notesPayable.confirmProtest')}</button>
                         </div>
                     </div>
                 </div>

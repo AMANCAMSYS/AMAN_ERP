@@ -10,6 +10,11 @@ def generate_sequential_number(db, prefix: str, table: str, column: str) -> str:
     Uses MAX extraction of trailing digits from existing numbers to determine next.
     table and column are developer-defined constants (not user input).
     """
+    # SEC-003: Validate table/column identifiers to prevent SQL injection
+    from utils.sql_safety import validate_sql_identifier
+    validate_sql_identifier(table, "table")
+    validate_sql_identifier(column, "column")
+    
     result = db.execute(text(f"""
         SELECT MAX(CAST(SUBSTRING({column} FROM '[0-9]+$') AS INTEGER))
         FROM {table} WHERE {column} LIKE :pattern

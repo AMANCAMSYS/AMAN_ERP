@@ -161,6 +161,188 @@ def complete_maintenance(maint_id: int, data: dict = {}, current_user: dict = De
         conn.close()
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ASSET REPORTS (Static routes — MUST come before /{asset_id})
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.get("/reports/register", dependencies=[Depends(require_permission("assets.view"))])
+def asset_register_report(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير سجل الأصول الثابتة"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        params = {}
+        branch_filter = "AND a.branch_id = :branch_id" if branch_id else ""
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        rows = conn.execute(text(f"""
+            SELECT
+                a.id, a.code, a.name, a.type, a.purchase_date,
+                a.cost, a.residual_value, a.life_years,
+                a.depreciation_method, a.status, a.currency,
+                COALESCE(ds.total_depreciation, 0) as accumulated_depreciation,
+                a.cost - COALESCE(ds.total_depreciation, 0) as net_book_value,
+                b.branch_name as branch_name
+            FROM assets a
+            LEFT JOIN branches b ON a.branch_id = b.id
+            LEFT JOIN (
+                SELECT asset_id, SUM(amount) as total_depreciation
+                FROM asset_depreciation_schedule
+                WHERE posted = TRUE
+                GROUP BY asset_id
+            ) ds ON ds.asset_id = a.id
+            WHERE 1=1 {branch_filter}
+            ORDER BY a.code
+        """), params).fetchall()
+
+        items = []
+        for r in rows:
+            items.append({
+                "id": r.id,
+                "code": r.code,
+                "name": r.name,
+                "category": r.type,
+                "purchase_date": str(r.purchase_date) if r.purchase_date else None,
+                "original_cost": float(r.cost or 0),
+                "cost": float(r.cost or 0),
+                "residual_value": float(r.residual_value or 0),
+                "life_years": r.life_years,
+                "depreciation_method": r.depreciation_method,
+                "accumulated_depreciation": float(r.accumulated_depreciation),
+                "net_book_value": float(r.net_book_value),
+                "status": r.status,
+                "currency": r.currency,
+                "branch": r.branch_name,
+            })
+
+        return {"items": items, "count": len(items)}
+    finally:
+        conn.close()
+
+
+@router.get("/reports/depreciation-summary", dependencies=[Depends(require_permission("assets.view"))])
+def asset_depreciation_summary(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """ملخص إهلاك الأصول الثابتة"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        params = {}
+        branch_filter = "AND a.branch_id = :branch_id" if branch_id else ""
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        rows = conn.execute(text(f"""
+            SELECT
+                a.id, a.code, a.name, a.type,
+                a.cost, a.residual_value, a.life_years,
+                a.depreciation_method, a.currency, a.status,
+                COALESCE(ds.total_depreciation, 0) as total_depreciation,
+                COALESCE(ds.periods_posted, 0) as periods_posted,
+                CASE WHEN a.life_years > 0 AND a.cost > a.residual_value
+                     THEN ROUND((a.cost - a.residual_value) / a.life_years, 2)
+                     ELSE 0 END as annual_depreciation
+            FROM assets a
+            LEFT JOIN (
+                SELECT asset_id,
+                       SUM(amount) as total_depreciation,
+                       COUNT(*) as periods_posted
+                FROM asset_depreciation_schedule
+                WHERE posted = TRUE
+                GROUP BY asset_id
+            ) ds ON ds.asset_id = a.id
+            WHERE a.status != 'disposed' {branch_filter}
+            ORDER BY a.code
+        """), params).fetchall()
+
+        items = []
+        for r in rows:
+            cost = float(r.cost or 0)
+            total_depr = float(r.total_depreciation)
+            items.append({
+                "id": r.id,
+                "code": r.code,
+                "name": r.name,
+                "category": r.type,
+                "cost": cost,
+                "residual_value": float(r.residual_value or 0),
+                "life_years": r.life_years,
+                "depreciation_method": r.depreciation_method,
+                "annual_depreciation": float(r.annual_depreciation),
+                "total_depreciation": total_depr,
+                "accumulated_depreciation": total_depr,
+                "net_book_value": cost - total_depr,
+                "nbv": cost - total_depr,
+                "periods_posted": r.periods_posted,
+                "currency": r.currency,
+                "depreciation_pct": round(total_depr / cost * 100, 1) if cost > 0 else 0,
+            })
+
+        return {"items": items, "count": len(items)}
+    finally:
+        conn.close()
+
+
+@router.get("/reports/net-book-value", dependencies=[Depends(require_permission("assets.view"))])
+def asset_net_book_value_report(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير صافي القيمة الدفترية للأصول"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        params = {}
+        branch_filter = "AND a.branch_id = :branch_id" if branch_id else ""
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        rows = conn.execute(text(f"""
+            SELECT
+                a.id, a.code, a.name, a.type,
+                a.cost, a.currency, a.status, a.purchase_date,
+                COALESCE(ds.total_depreciation, 0) as accumulated_depreciation,
+                a.cost - COALESCE(ds.total_depreciation, 0) as net_book_value
+            FROM assets a
+            LEFT JOIN (
+                SELECT asset_id, SUM(amount) as total_depreciation
+                FROM asset_depreciation_schedule
+                WHERE posted = TRUE
+                GROUP BY asset_id
+            ) ds ON ds.asset_id = a.id
+            WHERE a.status != 'disposed' {branch_filter}
+            ORDER BY (a.cost - COALESCE(ds.total_depreciation, 0)) DESC
+        """), params).fetchall()
+
+        items = []
+        for r in rows:
+            cost = float(r.cost or 0)
+            acc_depr = float(r.accumulated_depreciation)
+            nbv = float(r.net_book_value)
+            items.append({
+                "id": r.id,
+                "code": r.code,
+                "name": r.name,
+                "category": r.type,
+                "original_cost": cost,
+                "cost": cost,
+                "accumulated_depreciation": acc_depr,
+                "total_depreciation": acc_depr,
+                "net_book_value": nbv,
+                "nbv": nbv,
+                "status": r.status,
+                "currency": r.currency,
+                "purchase_date": str(r.purchase_date) if r.purchase_date else None,
+            })
+
+        return {"items": items, "count": len(items)}
+    finally:
+        conn.close()
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # PARAMETERIZED ROUTES (/{asset_id}) come BELOW the static routes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -289,6 +471,146 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+
+# ===================== B6: IFRS 16 Lease Contracts =====================
+
+@router.get("/leases", dependencies=[Depends(require_permission("assets.view"))])
+def list_lease_contracts(
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عقود الإيجار IFRS 16"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = """
+            SELECT lc.*, a.name as asset_name, a.code as asset_code
+            FROM lease_contracts lc
+            LEFT JOIN assets a ON a.id = lc.asset_id
+            WHERE 1=1
+        """
+        params = {}
+        if status:
+            q += " AND lc.status = :st"
+            params["st"] = status
+        q += " ORDER BY lc.end_date ASC"
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/leases", dependencies=[Depends(require_permission("assets.create"))])
+def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_user)):
+    """إنشاء عقد إيجار IFRS 16 مع قيد محاسبي الاعتراف الأولي"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        # Calculate right-of-use value using present value of payments
+        monthly = float(lease.get("monthly_payment", 0))
+        total = float(lease.get("total_payments", 0))
+        rate = float(lease.get("discount_rate", 5)) / 100 / 12
+        if rate > 0 and total > 0:
+            rou_value = monthly * (1 - (1 + rate) ** -total) / rate
+        else:
+            rou_value = monthly * total
+        rou_value = round(rou_value, 2)
+
+        result = conn.execute(text("""
+            INSERT INTO lease_contracts (asset_id, description, lessor_name, lease_type,
+                start_date, end_date, monthly_payment, total_payments, discount_rate,
+                right_of_use_value, lease_liability, accumulated_depreciation, status)
+            VALUES (:aid, :desc, :ln, :lt, :sd, :ed, :mp, :tp, :dr, :rou, :ll, 0, :st)
+            RETURNING id
+        """), {
+            "aid": lease.get("asset_id"), "desc": lease.get("description"),
+            "ln": lease.get("lessor_name"), "lt": lease.get("lease_type", "operating"),
+            "sd": lease["start_date"], "ed": lease["end_date"],
+            "mp": monthly, "tp": total, "dr": lease.get("discount_rate", 5),
+            "rou": rou_value, "ll": rou_value, "st": lease.get("status", "active")
+        })
+        lid = result.fetchone()[0]
+
+        # IFRS 16 Initial Recognition Journal Entry:
+        # Dr. Right-of-Use Asset (1600) / Cr. Lease Liability (2300)
+        journal_entry_id = None
+        if rou_value > 0:
+            from utils.accounting import update_account_balance
+            rou_acc = conn.execute(text(
+                "SELECT id FROM accounts WHERE account_code IN ('1600','1610','1500') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+            )).fetchone()
+            liability_acc = conn.execute(text(
+                "SELECT id FROM accounts WHERE account_code IN ('2300','2310','2200') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+            )).fetchone()
+
+            if rou_acc and liability_acc:
+                je = conn.execute(text("""
+                    INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by)
+                    VALUES (
+                        'LEASE-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'LEASE-%')::text, '1'), 6, '0'),
+                        :entry_date, :description, 'posted', 'lease_contract', :user_id
+                    ) RETURNING id
+                """), {
+                    "entry_date": lease["start_date"],
+                    "description": f"اعتراف أولي بعقد إيجار IFRS 16 - {lease.get('description', '')} - {lease.get('lessor_name', '')}",
+                    "user_id": current_user.id,
+                }).fetchone()
+                journal_entry_id = je.id if je else None
+
+                if journal_entry_id:
+                    conn.execute(text("""
+                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                        VALUES (:je_id, :acc_id, :amount, 0, :desc)
+                    """), {"je_id": journal_entry_id, "acc_id": rou_acc.id, "amount": rou_value,
+                           "desc": f"أصل حق الاستخدام - {lease.get('description', '')}"})
+                    conn.execute(text("""
+                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                        VALUES (:je_id, :acc_id, 0, :amount, :desc)
+                    """), {"je_id": journal_entry_id, "acc_id": liability_acc.id, "amount": rou_value,
+                           "desc": f"التزام إيجار - {lease.get('description', '')}"})
+
+                    update_account_balance(conn, account_id=rou_acc.id, debit_base=rou_value, credit_base=0)
+                    update_account_balance(conn, account_id=liability_acc.id, debit_base=0, credit_base=rou_value)
+
+        conn.commit()
+        return {
+            "id": lid, "right_of_use_value": rou_value,
+            "journal_entry_id": journal_entry_id,
+            "message": "تم إنشاء عقد الإيجار بنجاح" + (" مع قيد محاسبي" if journal_entry_id else "")
+        }
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.get("/leases/{lease_id}/schedule", dependencies=[Depends(require_permission("assets.view"))])
+def get_lease_schedule(lease_id: int, current_user: dict = Depends(get_current_user)):
+    """جدول استهلاك عقد الإيجار"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        row = conn.execute(text("SELECT * FROM lease_contracts WHERE id = :id"),
+                           {"id": lease_id}).fetchone()
+        if not row:
+            raise HTTPException(404, "Lease not found")
+        lc = dict(row._mapping)
+        monthly = float(lc.get("monthly_payment", 0))
+        total = int(lc.get("total_payments", 0))
+        rate = float(lc.get("discount_rate", 5)) / 100 / 12
+        balance = float(lc.get("lease_liability", 0))
+        schedule = []
+        for i in range(1, total + 1):
+            interest = round(balance * rate, 2)
+            principal = round(monthly - interest, 2)
+            balance = round(balance - principal, 2)
+            schedule.append({
+                "period": i, "payment": monthly, "interest": interest,
+                "principal": principal, "balance": max(balance, 0)
+            })
+        return {"lease": lc, "schedule": schedule}
+    finally:
+        conn.close()
+
 
 @router.get("/{asset_id}", dependencies=[Depends(require_permission("assets.view"))])
 def get_asset(asset_id: int, current_user: dict = Depends(get_current_user)):
@@ -920,5 +1242,109 @@ def get_asset_qr(asset_id: int, current_user: dict = Depends(get_current_user)):
         if not row:
             raise HTTPException(status_code=404, detail="Asset not found")
         return dict(row._mapping)
+    finally:
+        conn.close()
+
+
+# ===================== B6: IAS 36 Impairment Testing =====================
+
+@router.get("/{asset_id}/impairments", dependencies=[Depends(require_permission("assets.view"))])
+def list_asset_impairments(asset_id: int, current_user: dict = Depends(get_current_user)):
+    """سجل اختبارات الانخفاض"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        rows = conn.execute(text("""
+            SELECT * FROM asset_impairments WHERE asset_id = :aid ORDER BY test_date DESC
+        """), {"aid": asset_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/{asset_id}/impairment-test", dependencies=[Depends(require_permission("assets.create"))])
+def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Depends(get_current_user)):
+    """إجراء اختبار انخفاض القيمة IAS 36 مع قيد محاسبي تلقائي"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": asset_id}).fetchone()
+        if not asset:
+            raise HTTPException(404, "Asset not found")
+        asset = dict(asset._mapping)
+
+        carrying = float(asset.get("current_value") or asset.get("purchase_cost", 0))
+        recoverable = float(test_data.get("recoverable_amount", 0))
+        impairment_loss = max(carrying - recoverable, 0)
+
+        result = conn.execute(text("""
+            INSERT INTO asset_impairments (asset_id, test_date, carrying_amount,
+                recoverable_amount, impairment_loss, reason)
+            VALUES (:aid, :td, :ca, :ra, :il, :r)
+            RETURNING id
+        """), {
+            "aid": asset_id, "td": test_data.get("test_date", str(date.today())),
+            "ca": carrying, "ra": recoverable, "il": impairment_loss,
+            "r": test_data.get("reason") or test_data.get("notes")
+        })
+        imp_id = result.fetchone()[0]
+
+        journal_entry_id = None
+        if impairment_loss > 0:
+            new_value = recoverable
+            conn.execute(text("UPDATE assets SET current_value = :v WHERE id = :id"),
+                         {"v": new_value, "id": asset_id})
+
+            # Create journal entry: Dr. Impairment Loss (6800) / Cr. Accumulated Impairment (1699)
+            from utils.accounting import update_account_balance
+            imp_loss_acc = conn.execute(text(
+                "SELECT id FROM accounts WHERE account_code IN ('6800','6810','5800') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+            )).fetchone()
+            acc_imp_acc = conn.execute(text(
+                "SELECT id FROM accounts WHERE account_code IN ('1699','1690','1680') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+            )).fetchone()
+
+            if imp_loss_acc and acc_imp_acc:
+                je = conn.execute(text("""
+                    INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by)
+                    VALUES (
+                        'IMP-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'IMP-%')::text, '1'), 6, '0'),
+                        :entry_date, :description, 'posted', 'asset_impairment', :user_id
+                    ) RETURNING id
+                """), {
+                    "entry_date": str(date.today()),
+                    "description": f"خسارة انخفاض قيمة الأصل: {asset.get('name', '')} (IAS 36) - مبلغ {impairment_loss:,.2f}",
+                    "user_id": current_user.id,
+                }).fetchone()
+                journal_entry_id = je.id if je else None
+
+                if journal_entry_id:
+                    conn.execute(text("""
+                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                        VALUES (:je_id, :acc_id, :amount, 0, :desc)
+                    """), {"je_id": journal_entry_id, "acc_id": imp_loss_acc.id, "amount": impairment_loss,
+                           "desc": f"خسارة انخفاض قيمة - {asset.get('name', '')}"})
+                    conn.execute(text("""
+                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
+                        VALUES (:je_id, :acc_id, 0, :amount, :desc)
+                    """), {"je_id": journal_entry_id, "acc_id": acc_imp_acc.id, "amount": impairment_loss,
+                           "desc": f"مجمع انخفاض قيمة - {asset.get('name', '')}"})
+
+                    update_account_balance(conn, account_id=imp_loss_acc.id, debit_base=impairment_loss, credit_base=0)
+                    update_account_balance(conn, account_id=acc_imp_acc.id, debit_base=0, credit_base=impairment_loss)
+
+        conn.commit()
+        return {
+            "id": imp_id,
+            "carrying_amount": carrying,
+            "recoverable_amount": recoverable,
+            "impairment_loss": impairment_loss,
+            "impaired": impairment_loss > 0,
+            "journal_entry_id": journal_entry_id,
+            "message": "تم إجراء اختبار الانخفاض" + (" - تم تسجيل خسارة انخفاض وقيد محاسبي" if impairment_loss > 0 else " - لا يوجد انخفاض")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(500, str(e))
     finally:
         conn.close()

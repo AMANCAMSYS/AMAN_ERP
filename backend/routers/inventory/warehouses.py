@@ -51,7 +51,7 @@ def list_warehouses(branch_id: Optional[int] = None, current_user: dict = Depend
         db.close()
 
 
-@warehouses_router.post("/warehouses", response_model=WarehouseResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.adjustment"))])
+@warehouses_router.post("/warehouses", response_model=WarehouseResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
 def create_warehouse(warehouse: WarehouseCreate, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
@@ -81,7 +81,7 @@ def create_warehouse(warehouse: WarehouseCreate, current_user: dict = Depends(ge
         db.close()
 
 
-@warehouses_router.put("/warehouses/{id}", response_model=WarehouseResponse, dependencies=[Depends(require_permission("stock.adjustment"))])
+@warehouses_router.put("/warehouses/{id}", response_model=WarehouseResponse, dependencies=[Depends(require_permission("stock.manage"))])
 def update_warehouse(id: int, warehouse: WarehouseCreate, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
@@ -110,7 +110,7 @@ def update_warehouse(id: int, warehouse: WarehouseCreate, current_user: dict = D
         db.close()
 
 
-@warehouses_router.delete("/warehouses/{id}", dependencies=[Depends(require_permission("stock.adjustment"))])
+@warehouses_router.delete("/warehouses/{id}", dependencies=[Depends(require_permission("stock.manage"))])
 def delete_warehouse(id: int, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:

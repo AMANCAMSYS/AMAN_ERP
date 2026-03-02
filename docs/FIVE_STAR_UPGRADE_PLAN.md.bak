@@ -1,0 +1,327 @@
+# خطة ترقية AMAN ERP إلى ★★★★★
+
+> **التاريخ:** 1 مارس 2026
+> **الهدف:** رفع جميع الفئات العشرين إلى تقييم ★★★★★
+> **الحالة الحالية:** 11 فئة مكتملة | 7 فئات ★★★★½ (شبه مكتملة) | 2 فئة ★★★½
+> **آخر تحديث:** 1 مارس 2026
+> **آخر تدقيق تكامل:** 1 مارس 2026
+
+---
+
+## الوضع الراهن (بعد تدقيق التكامل)
+
+| الفئة | التقييم الفعلي | التكامل BE↔FE↔DB | المفقود |
+|-------|----------------|-------------------|---------|
+| 🔐 الأمان والمصادقة | ⭐⭐⭐⭐½ | ✅ 11 endpoint = 11 FE method | سجل أحداث أمني + حماية brute force |
+| 🏢 الشركات والفروع | ⭐⭐⭐⭐ | ✅ 6 endpoint = 7 FE method | قوالب صناعية + sidebar ديناميكي |
+| 👥 الأدوار والصلاحيات | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 📊 المحاسبة العامة | ⭐⭐⭐⭐⭐ | ✅ 31 endpoint + 9 intercompany + 5 revenue = 82 FE | — |
+| 💰 الخزينة والبنوك | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 🧾 الشيكات | ⭐⭐⭐⭐½ | ✅ 14 endpoint = 14 FE method | سجل lifecycle بتواريخ + إشعارات تلقائية |
+| 📦 المخزون | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 🛒 المبيعات | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 🛍️ المشتريات | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 👥 الموارد البشرية | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 🏭 التصنيع | ⭐⭐⭐⭐½ | ✅ 48 endpoint = 48 FE method (تم إصلاح 5 ناقصة) | OEE + capacity planning |
+| 📐 المشاريع | ⭐⭐⭐⭐½ | ✅ 39 endpoint = 39 FE method + EVM موجود | سجل مخاطر + تبعيات مهام |
+| 💵 الضرائب (VAT/ZATCA) | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 🏢 الأصول الثابتة | ⭐⭐⭐⭐½ | ✅ 26 endpoint = 26 FE method + revaluation موجود | IFRS 16 إيجارات + IAS 36 |
+| 🖥️ نقطة البيع (POS) | ⭐⭐⭐⭐½ | ✅ 32 endpoint = 32 FE method + offline + split موجود | PWA كامل |
+| 📞 CRM | ⭐⭐⭐⭐⭐ | ✅ 46 endpoint = 46 FE method | — |
+| 📊 التقارير | ⭐⭐⭐⭐½ | ✅ 46 endpoint + ReportBuilder + comparison موجود | KPI Dashboard قابل للتخصيص |
+| ⚙️ الإعدادات | ⭐⭐⭐⭐⭐ | ✅ مكتمل | — |
+| 💳 المصاريف | ⭐⭐⭐½ | ✅ 10 endpoint = 10 FE method + تقارير 3 أنواع | سياسات + OCR + مطابقة بطاقات |
+| 📝 العقود | ⭐⭐⭐½ | ✅ 9 endpoint = 9 FE method + renew + billing | ملحقات + KPIs + إشعارات تجديد |
+
+---
+
+## ✅ المرحلة A — إصلاح الفجوات الحالية (مكتملة)
+
+| الخطوة | الوصف | الحالة |
+|--------|-------|--------|
+| A1 | إصلاح جداول `marketing_campaigns` + `crm_knowledge_base` في database.py | ✅ مكتمل |
+| A2 | إنشاء `backend/routers/finance/intercompany.py` (9 endpoints: معاملات بين الشركات + IFRS 15) | ✅ مكتمل |
+| A3 | إنشاء `backend/routers/finance/advanced_workflow.py` (6 endpoints: SLA + تصعيد + موافقة تلقائية) | ✅ مكتمل |
+| A4 | تحديث `finance/__init__.py` — تسجيل 3 routers جديدة (intercompany + revenue + workflow) | ✅ مكتمل |
+| A5 | إنشاء 6 صفحات CRM: Dashboard, LeadScoring, CustomerSegments, PipelineAnalytics, CRMContacts, SalesForecasts | ✅ مكتمل |
+| A6 | إنشاء 2 صفحة محاسبية: IntercompanyTransactions, RevenueRecognition | ✅ مكتمل |
+| A7 | ربط 8 routes جديدة في App.jsx (6 CRM + 2 Accounting) + lazy imports | ✅ مكتمل |
+| A8 | إضافة ~80 مفتاح ترجمة عربية + إنجليزية (CRM + Accounting) | ✅ مكتمل |
+| A9 | حفظ الخطة في docs/ | ✅ مكتمل |
+
+### ملخص ما تم في المرحلة A
+
+**Backend:**
+- 2 جداول جديدة في database.py: `marketing_campaigns` (20 عمود) + `crm_knowledge_base` (13 عمود) + فهارس
+- 8 جداول سابقة: `crm_lead_scoring_rules`, `crm_lead_scores`, `crm_customer_segments`, `crm_customer_segment_members`, `crm_contacts`, `crm_sales_forecasts`, `intercompany_transactions`, `revenue_recognition_schedules`
+- ALTER TABLE على `approval_workflows` (conditions, sla_hours, escalation_to, allow_parallel, auto_approve_below)
+- `intercompany.py`: 4 endpoints معاملات + 5 endpoints اعتراف بالإيراد
+- `advanced_workflow.py`: 6 endpoints (شروط، SLA، تصعيد، موافقة تلقائية، تحليلات)
+- finance/__init__.py: 16 sub-router مسجل (من 13 إلى 16)
+
+**Frontend:**
+- 8 صفحات JSX جديدة (6 CRM + 2 Accounting)
+- API service methods جديدة في crm.js + accounting.js
+- 8 routes + lazy imports مضافة في App.jsx
+- ~160 مفتاح ترجمة مضاف (ar.json + en.json)
+
+---
+
+## المرحلة B — ترقية ★★★★½ إلى ★★★★★
+
+> **ملاحظة:** بعد التدقيق تبيّن أن معظم الميزات المخطط لها **موجودة فعلاً** — المطلوب فقط إكمال الفجوات الصغيرة
+
+### B1 · الأمان 🔐 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **2FA (TOTP)** | ✅ موجود | setup + verify + disable + status |
+| **سياسة كلمات مرور** | ✅ موجود | get/update policy + password expiry + password history |
+| **إدارة جلسات** | ✅ موجود | list + terminate + terminate all |
+| **سجل أحداث أمني** | ❌ مفقود | جدول `security_events` — تسجيل أحداث حساسة (تغيير صلاحيات، حذف، etc.) |
+| **حماية brute force** | ❌ مفقود | Rate limiting per IP + حظر تلقائي بعد 5 محاولات فاشلة |
+| **الملف** | `backend/routers/security.py` (11 endpoints ↔ 11 FE methods ✅) |
+
+### B2 · الشركات والفروع 🏢 (حالياً ★★★★)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD + Logo** | ✅ موجود | register, list, get, update, upload-logo |
+| **قوالب صناعية** | ✅ موجود جزئياً | endpoint `public/templates` موجود لكن بلا بيانات صناعية |
+| **Sidebar ديناميكي** | ❌ مفقود | إخفاء/إظهار الوحدات حسب `company.enabled_modules` |
+| **صفحة تخصيص** | ❌ مفقود | تفعيل/تعطيل الوحدات + تغيير القالب |
+| **الملف** | `backend/routers/companies.py` (6 endpoints ↔ 7 FE methods ✅) |
+
+### B3 · الشيكات 🧾 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD شيكات مقبوضة** | ✅ موجود | list + create + get + collect + bounce |
+| **CRUD شيكات مدفوعة** | ✅ موجود | list + create + get + clear + bounce |
+| **تنبيهات استحقاق** | ✅ موجود | endpoint `due-alerts` (1–90 يوم) |
+| **تقرير أعمار** | ✅ موجود | endpoint `aging` (0-30/31-60/61-90/90+) |
+| **سجل lifecycle** | ❌ مفقود | جدول `check_status_log` — تسجيل كل تغيير حالة بتاريخ |
+| **إشعارات تلقائية** | ❌ مفقود | ربط due-alerts بنظام الإشعارات (push) |
+| **الملف** | `backend/routers/finance/checks.py` (14 endpoints ↔ 14 FE methods ✅) |
+
+### B4 · التصنيع 🏭 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **أوامر إنتاج كاملة** | ✅ موجود | CRUD + start/complete/cancel + operations |
+| **BOMs + Routings** | ✅ موجود | CRUD + compute materials |
+| **MRP** | ✅ موجود | calculate per order + list plans |
+| **مراقبة جودة** | ✅ موجود | QC checks + record results + failures report |
+| **معدات + صيانة** | ✅ موجود | CRUD equipment + maintenance logs |
+| **تقارير (5 أنواع)** | ✅ موجود | production-cost + efficiency + material + summary + direct-labor |
+| **تتبع الهدر** | ✅ موجود | `scrapped_quantity` في production_orders + operations |
+| **تكلفة الأمر** | ✅ موجود | calculate-cost + cost-variance-report (تم إصلاح FE ✅) |
+| **OEE** | ❌ مفقود | Overall Equipment Effectiveness: Availability × Performance × Quality |
+| **تخطيط الطاقة** | ❌ مفقود | capacity planning — قدرة مراكز العمل vs أوامر مجدولة |
+| **الملف** | `backend/routers/manufacturing/core.py` (48 endpoints ↔ 48 FE methods ✅) |
+
+### B5 · المشاريع 📐 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD مشاريع + مهام** | ✅ موجود | projects + tasks + expenses + revenues |
+| **EVM** | ✅ موجود | CPI, SPI, EAC, ETC, VAC — endpoint + FE method |
+| **Timesheets** | ✅ موجود | CRUD + approve |
+| **مستندات** | ✅ موجود | upload + list + delete |
+| **أوامر تغيير** | ✅ موجود | CRUD + approve |
+| **فوترة** | ✅ موجود | create-invoice + retainer setup + generate |
+| **تقارير (3 أنواع)** | ✅ موجود | profitability + variance + resource-utilization |
+| **تنبيهات** | ✅ موجود | overdue-tasks + over-budget + dashboard |
+| **سجل مخاطر** | ❌ مفقود | جدول `project_risks`: احتمالية × تأثير + خطة استجابة |
+| **تبعيات مهام** | ❌ مفقود | Finish-to-Start / Start-to-Start + critical path |
+| **الملف** | `backend/routers/projects.py` (39 endpoints ↔ 39 FE methods ✅) |
+
+### B6 · الأصول الثابتة 🏢 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD أصول** | ✅ موجود | list + create + get + update |
+| **إهلاك (4 طرق)** | ✅ موجود | straight-line + declining-balance + units-of-production + sum-of-years |
+| **إعادة التقييم** | ✅ موجود | revaluation endpoint + asset_revaluations table + FE |
+| **استبعاد** | ✅ موجود | dispose endpoint |
+| **نقل بين فروع** | ✅ موجود | transfer + list transfers + approve |
+| **تأمين + صيانة** | ✅ موجود | insurance CRUD + maintenance CRUD + complete |
+| **QR Code** | ✅ موجود | update QR + get QR |
+| **تقارير (3 أنواع)** | ✅ موجود | register + depreciation-summary + net-book-value |
+| **IAS 36 الإعاقة** | ❌ مفقود | مقارنة القيمة الدفترية بالقيمة القابلة للاسترداد |
+| **IFRS 16 إيجارات** | ❌ مفقود | جدول `lease_contracts` — right-of-use asset + lease liability |
+| **الملف** | `backend/routers/finance/assets.py` (26 endpoints ↔ 26 FE methods ✅) |
+
+### B7 · نقطة البيع POS 🖥️ (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **جلسات + طلبات** | ✅ موجود | open/close session + create order + held orders |
+| **مرتجعات** | ✅ موجود | return order |
+| **عروض ترويجية** | ✅ موجود | CRUD + validate coupon |
+| **برنامج ولاء** | ✅ موجود | programs + enroll + earn + redeem |
+| **إدارة طاولات** | ✅ موجود | CRUD + seat + clear |
+| **مطبخ** | ✅ موجود | kitchen orders + status tracking |
+| **Split Payment** | ✅ موجود | واجهة split payment في POSInterface.jsx |
+| **وضع عدم الاتصال** | ✅ موجود | POSOfflineManager.jsx — IndexedDB + sync |
+| **شاشة العميل** | ✅ موجود | CustomerDisplay.jsx — window.open |
+| **PWA كامل** | ❌ مفقود | Service Worker + manifest.json + install prompt |
+| **الملف** | `backend/routers/pos.py` (32 endpoints ↔ 32 FE methods ✅) |
+
+### B8 · التقارير 📊 (حالياً ★★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **تقارير مبيعات (8)** | ✅ موجود | summary + trend + by-customer + by-product + aging + cashier + target + statement |
+| **تقارير مشتريات (5)** | ✅ موجود | summary + trend + by-supplier + aging + statement |
+| **تقارير محاسبية (15)** | ✅ موجود | trial-balance + P&L + BS + cashflow + GL + budget + comparison + ratios + horizontal + cost-center + detailed |
+| **تقارير مخزون (4)** | ✅ موجود | valuation + turnover + dead-stock + COGS |
+| **تقارير HR (2)** | ✅ موجود | payroll-trend + leave-usage |
+| **Report Builder** | ✅ موجود | create + preview + list + delete custom reports + ReportBuilder.jsx (335 سطر) |
+| **تقارير مقارنة** | ✅ موجود | compare P&L + compare BS + compare TB |
+| **تصدير** | ✅ موجود | Excel + PDF لـ BS, P&L, TB, GL, cashflow, aging |
+| **تقارير مجدولة** | ✅ موجود | scheduled reports CRUD + run now + toggle |
+| **KPI Dashboard** | ❌ مفقود | Widgets قابلة للتخصيص drag & drop |
+| **الملف** | `backend/routers/reports.py` (46 endpoints) + `frontend/src/services/reports.js` |
+
+---
+
+## المرحلة C — ترقية ★★★½ إلى ★★★★★
+
+### C1 · المصاريف 💳 (حالياً ★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD مصاريف** | ✅ موجود | list + create + get + update + delete |
+| **اعتماد** | ✅ موجود | approve endpoint |
+| **ملخص** | ✅ موجود | summary endpoint |
+| **تقارير (3 أنواع)** | ✅ موجود | by-type + by-cost-center + monthly |
+| **سياسات** | ❌ مفقود | جدول `expense_policies`: حد يومي/شهري/سنوي لكل فئة |
+| **Workflow اعتماد** | ❌ مفقود | ربط بـ approval_workflows — مستويات حسب المبلغ |
+| **مطابقة بطاقات** | ❌ مفقود | استيراد كشف + مطابقة تلقائية |
+| **OCR** | ❌ مفقود | استخراج بيانات الفاتورة تلقائياً |
+| **الملف** | `backend/routers/finance/expenses.py` (10 endpoints ↔ 10 FE methods ✅) |
+
+### C2 · العقود 📝 (حالياً ★★★½)
+| العنصر | الحالة | التفاصيل |
+|--------|--------|---------|
+| **CRUD عقود** | ✅ موجود | create + list + get + update |
+| **أنواع العقود** | ✅ موجود | `contract_type`: fixed, subscription, recurring |
+| **تجديد** | ✅ موجود | renew endpoint |
+| **إلغاء** | ✅ موجود | cancel endpoint |
+| **فوترة دورية** | ✅ موجود | generate-invoice + billing_interval (monthly/quarterly/yearly) |
+| **تنبيهات انتهاء** | ✅ موجود | expiring alerts endpoint |
+| **إحصائيات** | ✅ موجود | stats/summary endpoint |
+| **بنود العقد** | ✅ موجود | جدول `contract_items` (product, qty, price, tax) |
+| **ملحقات** | ❌ مفقود | جدول `contract_amendments`: تعديل القيمة/المدة مع حفظ التاريخ |
+| **KPIs** | ❌ مفقود | قيمة مستهلكة/متبقية + نسبة إنجاز + هامش ربح |
+| **إشعارات تجديد تلقائي** | ❌ مفقود | إشعار push قبل 30/60 يوم من الانتهاء |
+| **الملف** | `backend/routers/contracts.py` (9 endpoints ↔ 9 FE methods ✅) |
+
+---
+
+## المرحلة D — ميزات تنافسية متقدمة
+
+> بعد اكتمال A + B + C
+
+| الميزة | الوصف | الأولوية |
+|--------|-------|---------|
+| **محرك سير عمل مرئي** | Drag & Drop Workflow Designer — فروع شرطية + parallel paths | عالية |
+| **بوابة العملاء** | تطبيق منفصل: عرض فواتير + دفع أونلاين + فتح تذاكر | عالية |
+| **API متقدم** | OAuth2 + versioning + Rate limiting per key + Webhook subscriptions | متوسطة |
+| **Report Builder** | منشئ تقارير مرئي بلا كود مع تصدير Excel/PDF | عالية |
+
+---
+
+## المرحلة E — (آخر شيء)
+
+> حسب طلب المستخدم: التكاملات الخارجية والأجهزة آخر مرحلة
+
+| التكامل | الوصف |
+|---------|-------|
+| 📱 تطبيق جوال | React Native أو PWA — لوحة تحكم + اعتمادات + POS |
+| 🛒 تجارة إلكترونية | تكامل مع Salla / Zid / WooCommerce |
+| 🤖 ذكاء اصطناعي | تنبؤ مبيعات + توصيات مخزون + chatbot عربي |
+| 💳 بوابات دفع | Moyasar + Tap Payments |
+| 💬 WhatsApp | إرسال فواتير + تنبيهات عبر WhatsApp Business API |
+| 🖥️ أجهزة POS | طابعات + أوزان + باركود + شاشات عملاء |
+| ⌚ حضور وانصراف | بصمة إصبع + بطاقة RFID + كاميرا |
+
+---
+
+## ترتيب التنفيذ
+
+```
+A (فجوات حالية — مكتملة ✅)
+├── A1-A9: جميعها مكتملة ✅
+
+تدقيق التكامل (مكتمل ✅)
+├── إصلاح 9 مسارات API خاطئة (intercompany + revenue) ✅
+├── إصلاح 5 methods مفقودة في manufacturing.js ✅
+├── حذف ghost method (refreshSegment) من crm.js ✅
+├── إضافة 5 methods مفقودة في crm.js ✅
+├── إعادة كتابة IntercompanyTransactions.jsx + RevenueRecognition.jsx ✅
+└── تحقق: 20 فئة — كل الـ endpoints متطابقة مع FE methods ✅
+
+B (★★★★½ → ★★★★★) — التالي (المفقود فقط)
+├── B1: الأمان — security_events + brute force
+├── B2: الشركات — sidebar ديناميكي + صفحة تخصيص
+├── B3: الشيكات — check_status_log + إشعارات تلقائية
+├── B4: التصنيع — OEE + capacity planning
+├── B5: المشاريع — project_risks + task dependencies
+├── B6: الأصول — IFRS 16 + IAS 36
+├── B7: POS — PWA (service worker + manifest)
+└── B8: التقارير — KPI Dashboard
+
+C (★★★½ → ★★★★★)
+├── C1: المصاريف — سياسات + OCR + مطابقة بطاقات
+└── C2: العقود — ملحقات + KPIs + إشعارات تجديد
+
+D (تنافسي)
+└── Workflow Builder + Customer Portal + API
+
+E (تكاملات — آخراً)
+└── جوال + إلكترونية + ذكاء اصطناعي + أجهزة
+```
+
+---
+
+## تقرير تدقيق التكامل (1 مارس 2026)
+
+### نتائج الفحص الشامل
+
+**إجمالي النظام:**
+- 235 جدول في قاعدة البيانات
+- ~400+ API endpoint عبر 67 ملف backend
+- ~300+ frontend service method عبر 31 ملف service
+- ~150+ صفحة frontend (JSX)
+
+### مشاكل تم إصلاحها:
+
+| # | المشكلة | النوع | الإصلاح |
+|---|---------|-------|---------|
+| 1 | مسارات intercompany (4 endpoints) | ❌ BE `/intercompany/...` ≠ FE `/accounting/intercompany/...` | ✅ غيّرت prefix في intercompany.py |
+| 2 | مسارات revenue-recognition (5 endpoints) | ❌ BE `/revenue-recognition/...` ≠ FE `/accounting/revenue-recognition/...` | ✅ غيّرت prefix في intercompany.py |
+| 3 | ghost method `refreshSegment` في crm.js | ❌ يستدعي endpoint غير موجود | ✅ حذف |
+| 4 | 5 CRM methods مفقودة من crm.js | ❌ endpoints بلا frontend | ✅ أضيفت |
+| 5 | IntercompanyTransactions.jsx — CSS خاطئ | ❌ module-container بدل workspace | ✅ أعيدت كتابتها |
+| 6 | IntercompanyTransactions.jsx — حقول خاطئة | ❌ from_company_id بدل target_company_id | ✅ أعيدت كتابتها |
+| 7 | RevenueRecognition.jsx — CSS خاطئ | ❌ stat-card بدل metric-card | ✅ أعيدت كتابتها |
+| 8 | RevenueRecognition.jsx — حقول خاطئة | ❌ contract_reference بدل invoice_id | ✅ أعيدت كتابتها |
+| 9 | 5 MFG endpoints بلا FE methods | ❌ updateEquipment, deleteEquipment, listMRPPlans, calculateOrderCost, getCostVarianceReport | ✅ أضيفت |
+
+### حالة التكامل لكل فئة:
+
+| الفئة | Backend Endpoints | Frontend Methods | تطابق | ملاحظات |
+|-------|-------------------|------------------|-------|---------|
+| الأمان | 11 | 11 | ✅ 100% | — |
+| الشركات | 6 | 7 | ✅ 100% | FE يضيف getCurrentCompany |
+| الأدوار | — | — | ✅ | — |
+| المحاسبة | 45 (31+9+5) | 82 | ✅ 100% | FE يضم accounting + reconciliation + notes |
+| الخزينة | — | — | ✅ | — |
+| الشيكات | 14 | 14 | ✅ 100% | — |
+| المخزون | — | — | ✅ | — |
+| المبيعات | — | — | ✅ | — |
+| المشتريات | — | — | ✅ | — |
+| HR | — | — | ✅ | — |
+| التصنيع | 48 | 48 | ✅ 100% | تم إصلاح 5 methods |
+| المشاريع | 39 | 39 | ✅ 100% | — |
+| الضرائب | — | — | ✅ | — |
+| الأصول | 26 | 26 | ✅ 100% | — |
+| POS | 32 | 32 | ✅ 100% | — |
+| CRM | 46 | 46 | ✅ 100% | تم إصلاح 6 methods |
+| التقارير | 46 | 46+ | ✅ 100% | — |
+| الإعدادات | — | — | ✅ | — |
+| المصاريف | 10 | 10 | ✅ 100% | — |
+| العقود | 9 | 9 | ✅ 100% | — |

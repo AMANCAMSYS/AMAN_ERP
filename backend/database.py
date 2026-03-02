@@ -13,9 +13,18 @@ from config import settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-engine = create_engine(
+# SEC-007: Separate DDL engine (AUTOCOMMIT, for CREATE DATABASE / CREATE USER)
+# from the regular system engine used for SELECT/INSERT/UPDATE/DELETE.
+_ddl_engine = create_engine(
     settings.DATABASE_URL,
     isolation_level="AUTOCOMMIT",
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
+
+# Regular system engine — no AUTOCOMMIT so transactions are properly managed.
+engine = create_engine(
+    settings.DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=3600,
 )
@@ -95,43 +104,53 @@ def generate_company_id() -> str:
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    try:
+        return pwd_context.hash(password)
+    except Exception:
+        # Fallback for bcrypt 5.x compatibility
+        import bcrypt
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        import bcrypt
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def create_company_database(company_id: str, admin_password: str) -> Tuple[bool, str, str, str]:
     db_name = f"aman_{company_id}"
     db_user = f"company_{company_id}"
     
+    # SEC-FIX-025: Validate identifiers to prevent SQL injection in DDL
+    from utils.sql_safety import validate_aman_identifier
+    validate_aman_identifier(db_name, "database name")
+    validate_aman_identifier(db_user, "database user")
+    
+    # SEC-007: Use _ddl_engine (AUTOCOMMIT) — DDL cannot run inside a transaction.
     try:
-        db = get_system_db()
+        with _ddl_engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
+                {"db_name": db_name}
+            ).fetchone()
+            
+            if result:
+                return False, "قاعدة البيانات موجودة", "", ""
+            
+            conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+            conn.execute(text(f"CREATE USER {db_user} WITH PASSWORD :password"), {"password": admin_password})
+            conn.execute(text(f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO {db_user}'))
+            conn.execute(text(f'ALTER DATABASE "{db_name}" OWNER TO {db_user}'))
         
-        result = db.execute(
-            text("SELECT 1 FROM pg_database WHERE datname = :db_name"),
-            {"db_name": db_name}
-        ).fetchone()
-        
-        if result:
-            return False, "قاعدة البيانات موجودة", "", ""
-        
-        db.execute(text(f'CREATE DATABASE "{db_name}"'))
-        db.execute(text(f"CREATE USER {db_user} WITH PASSWORD :password"), {"password": admin_password})
-        db.execute(text(f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO {db_user}'))
-        db.execute(text(f'ALTER DATABASE "{db_name}" OWNER TO {db_user}'))
-        
-        db.commit()
         logger.info(f"✅ Created database: {db_name}")
         return True, "تم إنشاء قاعدة البيانات", db_name, db_user
         
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
-        db.rollback()
         return False, str(e), "", ""
-    finally:
-        db.close()
 
 
 def get_all_table_sql() -> str:
@@ -1476,6 +1495,9 @@ def get_organization_tables_sql() -> str:
         loan_deduction DECIMAL(18, 4) DEFAULT 0,
         deductions DECIMAL(18, 4) DEFAULT 0,
         net_salary DECIMAL(18, 4) DEFAULT 0,
+        currency VARCHAR(3) DEFAULT NULL,
+        exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
+        net_salary_base DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'draft',
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -1852,7 +1874,7 @@ def get_financial_tables_sql() -> str:
 
     
     CREATE TABLE IF NOT EXISTS asset_disposals (
-        id SERIAL PRIMARY KEY,ل
+        id SERIAL PRIMARY KEY,
         asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
         disposal_date DATE NOT NULL,
         disposal_method VARCHAR(50),
@@ -2990,6 +3012,74 @@ def get_manufacturing_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- ===== SVC-001: SERVICE / MAINTENANCE REQUESTS =====
+    CREATE TABLE IF NOT EXISTS service_requests (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100) DEFAULT 'maintenance',
+        priority VARCHAR(50) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled')),
+        customer_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
+        asset_id INTEGER,
+        assigned_to INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        assigned_at TIMESTAMPTZ,
+        estimated_hours DECIMAL(8, 2),
+        actual_hours DECIMAL(8, 2),
+        estimated_cost DECIMAL(15, 2) DEFAULT 0,
+        actual_cost DECIMAL(15, 2) DEFAULT 0,
+        scheduled_date DATE,
+        completion_date DATE,
+        location TEXT,
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS service_request_costs (
+        id SERIAL PRIMARY KEY,
+        service_request_id INTEGER REFERENCES service_requests(id) ON DELETE CASCADE,
+        cost_type VARCHAR(50) DEFAULT 'other' CHECK (cost_type IN ('labor', 'parts', 'travel', 'other')),
+        description TEXT,
+        quantity DECIMAL(10, 4) DEFAULT 1,
+        unit_cost DECIMAL(15, 2) DEFAULT 0,
+        total_cost DECIMAL(15, 2) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== SVC-002: DOCUMENT MANAGEMENT =====
+    CREATE TABLE IF NOT EXISTS documents (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        category VARCHAR(100) DEFAULT 'general',
+        file_name VARCHAR(255),
+        file_path TEXT,
+        file_size INTEGER,
+        mime_type VARCHAR(100),
+        tags TEXT,
+        access_level VARCHAR(50) DEFAULT 'company',
+        related_module VARCHAR(100),
+        related_id INTEGER,
+        current_version INTEGER DEFAULT 1,
+        created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS document_versions (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+        version_number INTEGER NOT NULL DEFAULT 1,
+        file_name VARCHAR(255),
+        file_path TEXT,
+        file_size INTEGER,
+        change_notes TEXT,
+        uploaded_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
     """
 
 
@@ -3133,7 +3223,8 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 get_manufacturing_tables_sql(),       # 11: Manufacturing (Phase 5)
                 get_approval_tables_sql(),            # 12: Approval Workflows (Phase 7)
                 get_security_tables_sql(),            # 13: Security - 2FA, Passwords, Sessions (Phase 7)
-                get_performance_indexes_sql()         # 14: Performance Indexes (Phase 7.5)
+                get_performance_indexes_sql(),        # 14: Performance Indexes (Phase 7.5)
+                get_system_completion_tables_sql()    # 15: System Completion (Phase 9)
             ]
             
             for index, sql_block in enumerate(sql_blocks):
@@ -3216,7 +3307,8 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 'employee_loans', 'leave_requests', 'projects', 'project_tasks',
                 'contracts', 'sales_orders', 'purchase_orders', 'warehouses',
                 'treasury_accounts', 'tax_rates', 'currencies', 'parties',
-                'sales_quotations', 'expenses', 'pos_sessions'
+                'sales_quotations', 'expenses', 'pos_sessions',
+                'delivery_orders', 'landed_costs', 'print_templates'
             ]
             for table in trigger_tables:
                 try:
@@ -4005,6 +4097,13 @@ def get_approval_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
     CREATE INDEX IF NOT EXISTS idx_approval_requests_doc ON approval_requests(document_type, document_id);
     CREATE INDEX IF NOT EXISTS idx_approval_actions_request ON approval_actions(request_id);
+
+    -- Advanced Workflow columns (auto-approve, escalation, SLA)
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS action_date TIMESTAMPTZ;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS action_notes TEXT;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS current_approver_id INTEGER;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_to INTEGER;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
     """
 
 
@@ -4216,10 +4315,544 @@ def get_security_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    -- ========== Marketing Campaigns ==========
+    CREATE TABLE IF NOT EXISTS marketing_campaigns (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        campaign_type VARCHAR(50) DEFAULT 'email',
+        status VARCHAR(30) DEFAULT 'draft',
+        start_date DATE,
+        end_date DATE,
+        budget DECIMAL(15,2) DEFAULT 0,
+        spent DECIMAL(15,2) DEFAULT 0,
+        target_audience TEXT,
+        description TEXT,
+        sent_count INT DEFAULT 0,
+        open_count INT DEFAULT 0,
+        click_count INT DEFAULT 0,
+        conversion_count INT DEFAULT 0,
+        branch_id INT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ========== CRM Knowledge Base ==========
+    CREATE TABLE IF NOT EXISTS crm_knowledge_base (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(300) NOT NULL,
+        category VARCHAR(50) DEFAULT 'general',
+        content TEXT,
+        tags TEXT,
+        is_published BOOLEAN DEFAULT FALSE,
+        views INT DEFAULT 0,
+        helpful_count INT DEFAULT 0,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
     CREATE INDEX IF NOT EXISTS idx_sales_opp_stage ON sales_opportunities(stage);
     CREATE INDEX IF NOT EXISTS idx_sales_opp_customer ON sales_opportunities(customer_id);
     CREATE INDEX IF NOT EXISTS idx_tickets_status ON support_tickets(status, priority);
     CREATE INDEX IF NOT EXISTS idx_tickets_assigned ON support_tickets(assigned_to);
+    CREATE INDEX IF NOT EXISTS idx_campaigns_status ON marketing_campaigns(status);
+    CREATE INDEX IF NOT EXISTS idx_kb_category ON crm_knowledge_base(category);
+
+    -- ========== CRM Advanced: Lead Scoring ==========
+    CREATE TABLE IF NOT EXISTS crm_lead_scoring_rules (
+        id SERIAL PRIMARY KEY,
+        rule_name VARCHAR(100) NOT NULL,
+        field_name VARCHAR(50) NOT NULL,
+        operator VARCHAR(20) NOT NULL DEFAULT 'equals',
+        field_value VARCHAR(200),
+        score INT NOT NULL DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_lead_scores (
+        id SERIAL PRIMARY KEY,
+        opportunity_id INT REFERENCES sales_opportunities(id) ON DELETE CASCADE,
+        total_score INT DEFAULT 0,
+        grade VARCHAR(1) DEFAULT 'C',
+        scoring_details JSONB DEFAULT '[]',
+        last_scored_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(opportunity_id)
+    );
+
+    -- ========== CRM Advanced: Customer Segmentation ==========
+    CREATE TABLE IF NOT EXISTS crm_customer_segments (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        criteria JSONB DEFAULT '{}',
+        color VARCHAR(20) DEFAULT '#3B82F6',
+        auto_assign BOOLEAN DEFAULT FALSE,
+        customer_count INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_customer_segment_members (
+        id SERIAL PRIMARY KEY,
+        segment_id INT REFERENCES crm_customer_segments(id) ON DELETE CASCADE,
+        customer_id INT REFERENCES parties(id) ON DELETE CASCADE,
+        added_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(segment_id, customer_id)
+    );
+
+    -- ========== CRM Advanced: Contacts Management ==========
+    CREATE TABLE IF NOT EXISTS crm_contacts (
+        id SERIAL PRIMARY KEY,
+        customer_id INT REFERENCES parties(id) ON DELETE CASCADE,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100),
+        job_title VARCHAR(100),
+        email VARCHAR(150),
+        phone VARCHAR(30),
+        mobile VARCHAR(30),
+        department VARCHAR(100),
+        is_primary BOOLEAN DEFAULT FALSE,
+        is_decision_maker BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ========== CRM Advanced: Sales Forecasting ==========
+    CREATE TABLE IF NOT EXISTS crm_sales_forecasts (
+        id SERIAL PRIMARY KEY,
+        period VARCHAR(7) NOT NULL,
+        forecast_type VARCHAR(30) DEFAULT 'revenue',
+        predicted_value DECIMAL(18,2) DEFAULT 0,
+        actual_value DECIMAL(18,2) DEFAULT 0,
+        confidence DECIMAL(5,2) DEFAULT 0,
+        method VARCHAR(30) DEFAULT 'weighted_pipeline',
+        details JSONB DEFAULT '{}',
+        branch_id INT,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_crm_contacts_customer ON crm_contacts(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_crm_lead_scores_opp ON crm_lead_scores(opportunity_id);
+    CREATE INDEX IF NOT EXISTS idx_crm_segment_members ON crm_customer_segment_members(segment_id, customer_id);
+
+    -- ========== Intercompany Transactions ==========
+    CREATE TABLE IF NOT EXISTS intercompany_transactions (
+        id SERIAL PRIMARY KEY,
+        source_company_id UUID NOT NULL,
+        target_company_id UUID NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        reference VARCHAR(50),
+        description TEXT,
+        amount DECIMAL(18,2) NOT NULL,
+        currency VARCHAR(10) DEFAULT 'SAR',
+        source_journal_id INT,
+        target_journal_id INT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        processed_at TIMESTAMPTZ
+    );
+
+    -- ========== Revenue Recognition ==========
+    CREATE TABLE IF NOT EXISTS revenue_recognition_schedules (
+        id SERIAL PRIMARY KEY,
+        invoice_id INT,
+        contract_id INT,
+        total_amount DECIMAL(18,2) NOT NULL,
+        recognized_amount DECIMAL(18,2) DEFAULT 0,
+        deferred_amount DECIMAL(18,2) DEFAULT 0,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        method VARCHAR(30) DEFAULT 'straight_line',
+        status VARCHAR(20) DEFAULT 'active',
+        schedule_lines JSONB DEFAULT '[]',
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ========== Advanced Workflow ==========
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '[]';
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS sla_hours INT DEFAULT 48;
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS escalation_to INT;
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS allow_parallel BOOLEAN DEFAULT FALSE;
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS auto_approve_below DECIMAL(18,2);
+    """
+
+
+def get_system_completion_tables_sql() -> str:
+    """Returns SQL for system completion tables (Phase 9)"""
+    return """
+    -- ===== DELIVERY ORDERS =====
+    CREATE TABLE IF NOT EXISTS delivery_orders (
+        id SERIAL PRIMARY KEY,
+        delivery_number VARCHAR(50) UNIQUE NOT NULL,
+        delivery_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        sales_order_id INTEGER REFERENCES sales_orders(id),
+        invoice_id INTEGER REFERENCES invoices(id),
+        party_id INTEGER REFERENCES parties(id),
+        warehouse_id INTEGER REFERENCES warehouses(id),
+        branch_id INTEGER REFERENCES branches(id),
+        status VARCHAR(30) DEFAULT 'draft',
+        shipping_method VARCHAR(100),
+        tracking_number VARCHAR(100),
+        driver_name VARCHAR(100),
+        driver_phone VARCHAR(50),
+        vehicle_number VARCHAR(50),
+        delivery_address TEXT,
+        notes TEXT,
+        total_items INTEGER DEFAULT 0,
+        total_quantity NUMERIC(15,4) DEFAULT 0,
+        shipped_at TIMESTAMPTZ,
+        delivered_at TIMESTAMPTZ,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS delivery_order_lines (
+        id SERIAL PRIMARY KEY,
+        delivery_order_id INTEGER NOT NULL REFERENCES delivery_orders(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        so_line_id INTEGER,
+        description TEXT,
+        ordered_qty NUMERIC(15,4) DEFAULT 0,
+        delivered_qty NUMERIC(15,4) DEFAULT 0,
+        unit VARCHAR(50),
+        batch_number VARCHAR(100),
+        serial_numbers TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== LANDED COSTS =====
+    CREATE TABLE IF NOT EXISTS landed_costs (
+        id SERIAL PRIMARY KEY,
+        lc_number VARCHAR(50) UNIQUE NOT NULL,
+        lc_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        purchase_order_id INTEGER REFERENCES purchase_orders(id),
+        grn_id INTEGER,
+        reference VARCHAR(100),
+        description TEXT,
+        total_amount NUMERIC(15,4) DEFAULT 0,
+        allocation_method VARCHAR(30) DEFAULT 'by_value',
+        status VARCHAR(20) DEFAULT 'draft',
+        currency VARCHAR(10) DEFAULT 'SAR',
+        notes TEXT,
+        branch_id INTEGER REFERENCES branches(id),
+        created_by INTEGER REFERENCES company_users(id),
+        journal_entry_id INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS landed_cost_items (
+        id SERIAL PRIMARY KEY,
+        landed_cost_id INTEGER NOT NULL REFERENCES landed_costs(id) ON DELETE CASCADE,
+        cost_type VARCHAR(50) NOT NULL,
+        description TEXT,
+        amount NUMERIC(15,4) NOT NULL DEFAULT 0,
+        vendor_id INTEGER REFERENCES parties(id),
+        invoice_ref VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS landed_cost_allocations (
+        id SERIAL PRIMARY KEY,
+        landed_cost_id INTEGER NOT NULL REFERENCES landed_costs(id) ON DELETE CASCADE,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        po_line_id INTEGER,
+        original_cost NUMERIC(15,4) NOT NULL DEFAULT 0,
+        allocated_amount NUMERIC(15,4) NOT NULL DEFAULT 0,
+        new_cost NUMERIC(15,4) NOT NULL DEFAULT 0,
+        allocation_basis NUMERIC(15,6) DEFAULT 0,
+        allocation_share NUMERIC(15,6) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== PRINT TEMPLATES =====
+    CREATE TABLE IF NOT EXISTS print_templates (
+        id SERIAL PRIMARY KEY,
+        template_type VARCHAR(50) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        html_template TEXT NOT NULL,
+        css_styles TEXT,
+        header_html TEXT,
+        footer_html TEXT,
+        paper_size VARCHAR(20) DEFAULT 'A4',
+        orientation VARCHAR(20) DEFAULT 'portrait',
+        is_default BOOLEAN DEFAULT FALSE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== BANK IMPORT =====
+    CREATE TABLE IF NOT EXISTS bank_import_batches (
+        id SERIAL PRIMARY KEY,
+        file_name VARCHAR(300),
+        bank_account_id INTEGER,
+        total_lines INTEGER DEFAULT 0,
+        imported_lines INTEGER DEFAULT 0,
+        matched_lines INTEGER DEFAULT 0,
+        total_debit NUMERIC(15,4) DEFAULT 0,
+        total_credit NUMERIC(15,4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'pending',
+        uploaded_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS bank_import_lines (
+        id SERIAL PRIMARY KEY,
+        batch_id INTEGER NOT NULL REFERENCES bank_import_batches(id) ON DELETE CASCADE,
+        line_number INTEGER DEFAULT 0,
+        transaction_date DATE,
+        description TEXT,
+        reference VARCHAR(200),
+        debit NUMERIC(15,4) DEFAULT 0,
+        credit NUMERIC(15,4) DEFAULT 0,
+        balance NUMERIC(15,4),
+        status VARCHAR(20) DEFAULT 'unmatched',
+        matched_transaction_id INTEGER,
+        account_id INTEGER,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== ZAKAT CALCULATIONS =====
+    CREATE TABLE IF NOT EXISTS zakat_calculations (
+        id SERIAL PRIMARY KEY,
+        fiscal_year INTEGER NOT NULL UNIQUE,
+        method VARCHAR(30) DEFAULT 'net_assets',
+        zakat_base NUMERIC(15,4) DEFAULT 0,
+        zakat_rate NUMERIC(8,4) DEFAULT 2.5,
+        zakat_amount NUMERIC(15,4) DEFAULT 0,
+        details JSONB DEFAULT '{}',
+        status VARCHAR(20) DEFAULT 'calculated',
+        journal_entry_id INTEGER,
+        notes TEXT,
+        calculated_by INTEGER REFERENCES company_users(id),
+        calculated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== FISCAL PERIOD LOCKS =====
+    CREATE TABLE IF NOT EXISTS fiscal_period_locks (
+        id SERIAL PRIMARY KEY,
+        period_name VARCHAR(100) NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        is_locked BOOLEAN DEFAULT FALSE,
+        locked_at TIMESTAMPTZ,
+        locked_by INTEGER REFERENCES company_users(id),
+        unlocked_at TIMESTAMPTZ,
+        unlocked_by INTEGER REFERENCES company_users(id),
+        reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ===== BACKUP HISTORY =====
+    CREATE TABLE IF NOT EXISTS backup_history (
+        id SERIAL PRIMARY KEY,
+        backup_type VARCHAR(20) DEFAULT 'manual',
+        file_name VARCHAR(300),
+        file_size BIGINT DEFAULT 0,
+        file_path TEXT,
+        status VARCHAR(20) DEFAULT 'completed',
+        error_message TEXT,
+        tables_included INTEGER DEFAULT 0,
+        rows_exported BIGINT DEFAULT 0,
+        created_by INTEGER REFERENCES company_users(id),
+        started_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMPTZ
+    );
+
+    -- ===== ADD COLUMNS TO EXISTING TABLES =====
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(5) DEFAULT NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_saudi BOOLEAN DEFAULT FALSE;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS eos_eligible BOOLEAN DEFAULT TRUE;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS eos_amount NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS iqama_number VARCHAR(20);
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS iqama_expiry DATE;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS passport_number VARCHAR(30);
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS sponsor VARCHAR(200);
+    ALTER TABLE payroll_entries ADD COLUMN IF NOT EXISTS currency VARCHAR(3) DEFAULT NULL;
+    ALTER TABLE payroll_entries ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(18,6) DEFAULT 1.0;
+    ALTER TABLE payroll_entries ADD COLUMN IF NOT EXISTS net_salary_base NUMERIC(18,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS actual_material_cost NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS actual_labor_cost NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS actual_overhead_cost NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS actual_total_cost NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS standard_cost NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS variance_amount NUMERIC(15,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS variance_percentage NUMERIC(8,4) DEFAULT 0;
+    ALTER TABLE production_orders ADD COLUMN IF NOT EXISTS costing_status VARCHAR(20) DEFAULT 'pending';
+
+    -- ===== PHASE B: ★★★★½ → ★★★★★ TABLES =====
+
+    -- B1: Security Events
+    CREATE TABLE IF NOT EXISTS security_events (
+        id SERIAL PRIMARY KEY,
+        event_type VARCHAR(50) NOT NULL,
+        severity VARCHAR(20) DEFAULT 'info',
+        user_id INTEGER REFERENCES company_users(id),
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        details JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_sec_events_type ON security_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_sec_events_user ON security_events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sec_events_date ON security_events(created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+        id SERIAL PRIMARY KEY,
+        ip_address VARCHAR(45) NOT NULL,
+        username VARCHAR(100),
+        success BOOLEAN DEFAULT FALSE,
+        attempted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip_address, attempted_at);
+
+    -- B3: Check Lifecycle Log
+    CREATE TABLE IF NOT EXISTS check_status_log (
+        id SERIAL PRIMARY KEY,
+        check_type VARCHAR(20) NOT NULL,
+        check_id INTEGER NOT NULL,
+        old_status VARCHAR(30),
+        new_status VARCHAR(30) NOT NULL,
+        notes TEXT,
+        changed_by INTEGER REFERENCES company_users(id),
+        changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_check_log_check ON check_status_log(check_type, check_id);
+
+    -- B4: Manufacturing Capacity Planning
+    CREATE TABLE IF NOT EXISTS capacity_plans (
+        id SERIAL PRIMARY KEY,
+        work_center_id INTEGER NOT NULL,
+        plan_date DATE NOT NULL,
+        available_hours NUMERIC(8,2) DEFAULT 8,
+        planned_hours NUMERIC(8,2) DEFAULT 0,
+        actual_hours NUMERIC(8,2) DEFAULT 0,
+        efficiency_pct NUMERIC(5,2) DEFAULT 0,
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(work_center_id, plan_date)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cap_plan_wc ON capacity_plans(work_center_id, plan_date);
+
+    -- B5: Project Risks
+    CREATE TABLE IF NOT EXISTS project_risks (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        description TEXT,
+        probability VARCHAR(20) DEFAULT 'medium',
+        impact VARCHAR(20) DEFAULT 'medium',
+        risk_score INTEGER DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'open',
+        mitigation_plan TEXT,
+        owner_id INTEGER REFERENCES company_users(id),
+        due_date DATE,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_proj_risks_project ON project_risks(project_id);
+
+    -- B5: Task Dependencies
+    CREATE TABLE IF NOT EXISTS task_dependencies (
+        id SERIAL PRIMARY KEY,
+        project_id INTEGER NOT NULL,
+        task_id INTEGER NOT NULL,
+        depends_on_task_id INTEGER NOT NULL,
+        dependency_type VARCHAR(20) DEFAULT 'finish_to_start',
+        lag_days INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_deps_task ON task_dependencies(project_id, task_id);
+
+    -- B6: Lease Contracts (IFRS 16)
+    CREATE TABLE IF NOT EXISTS lease_contracts (
+        id SERIAL PRIMARY KEY,
+        asset_id INTEGER,
+        description VARCHAR(300) NOT NULL,
+        lessor_name VARCHAR(200),
+        lease_type VARCHAR(30) DEFAULT 'operating',
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        monthly_payment NUMERIC(15,4) DEFAULT 0,
+        total_payments NUMERIC(15,4) DEFAULT 0,
+        discount_rate NUMERIC(8,4) DEFAULT 5.0,
+        right_of_use_value NUMERIC(15,4) DEFAULT 0,
+        lease_liability NUMERIC(15,4) DEFAULT 0,
+        accumulated_depreciation NUMERIC(15,4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'active',
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_lease_status ON lease_contracts(status);
+
+    -- B6: Asset Impairment (IAS 36)
+    CREATE TABLE IF NOT EXISTS asset_impairments (
+        id SERIAL PRIMARY KEY,
+        asset_id INTEGER NOT NULL,
+        test_date DATE NOT NULL,
+        carrying_amount NUMERIC(15,4) NOT NULL,
+        recoverable_amount NUMERIC(15,4) NOT NULL,
+        impairment_loss NUMERIC(15,4) DEFAULT 0,
+        reason TEXT,
+        journal_entry_id INTEGER,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_impairment_asset ON asset_impairments(asset_id);
+
+    -- C1: Expense Policies
+    CREATE TABLE IF NOT EXISTS expense_policies (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        expense_type VARCHAR(50),
+        department_id INTEGER,
+        daily_limit NUMERIC(15,4) DEFAULT 0,
+        monthly_limit NUMERIC(15,4) DEFAULT 0,
+        annual_limit NUMERIC(15,4) DEFAULT 0,
+        requires_receipt BOOLEAN DEFAULT TRUE,
+        requires_approval BOOLEAN DEFAULT TRUE,
+        auto_approve_below NUMERIC(15,4) DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- C2: Contract Amendments
+    CREATE TABLE IF NOT EXISTS contract_amendments (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,
+        amendment_type VARCHAR(50) DEFAULT 'value_change',
+        old_value TEXT,
+        new_value TEXT,
+        description TEXT,
+        effective_date DATE,
+        approved_by INTEGER REFERENCES company_users(id),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_amendments_contract ON contract_amendments(contract_id);
+
+    -- Add enabled_modules to company_settings for B2
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS enabled_modules JSONB DEFAULT '["accounting","sales","purchases","inventory","hr","manufacturing","projects","pos","crm","treasury","assets","expenses","contracts","reports","taxes"]';
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS industry_template VARCHAR(50) DEFAULT 'general';
     """
 
 

@@ -3,6 +3,7 @@ import { companiesAPI } from '../../utils/api'
 import { Search, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next';
 import { formatShortDate } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 
 function CompanyList() {
@@ -42,6 +43,7 @@ function CompanyList() {
     return (
         <div className="workspace">
             <div className="workspace-header">
+                <BackButton />
                 <div>
                     <h1 className="workspace-title">{t('admin.companies.title')}</h1>
                     <p className="workspace-subtitle">{t('admin.companies.subtitle')}</p>

@@ -33,7 +33,6 @@ const BOMs = () => {
         quantity: 1,
         waste_percentage: 0,
         cost_share_percentage: 0,
-        cost_share_percentage: 0,
         notes: ''
     });
 

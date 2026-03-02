@@ -46,6 +46,19 @@ export const accountingAPI = {
     // Provisions (ACC-008)
     createBadDebtProvision: (data) => api.post('/accounting/provisions/bad-debt', data),
     createLeaveProvision: (data) => api.post('/accounting/provisions/leave', data),
+
+    // Intercompany Transactions (IC-001)
+    listIntercompanyTransactions: (params) => api.get('/accounting/intercompany/transactions', { params }),
+    createIntercompanyTransaction: (data) => api.post('/accounting/intercompany/transactions', data),
+    processIntercompanyTransaction: (id) => api.post(`/accounting/intercompany/transactions/${id}/process`),
+    getIntercompanyEliminationReport: () => api.get('/accounting/intercompany/elimination-report'),
+
+    // Revenue Recognition (REV-001)
+    listRevenueSchedules: (params) => api.get('/accounting/revenue-recognition/schedules', { params }),
+    createRevenueSchedule: (data) => api.post('/accounting/revenue-recognition/schedules', data),
+    getRevenueSchedule: (id) => api.get(`/accounting/revenue-recognition/schedules/${id}`),
+    recognizeRevenue: (id, periodIndex) => api.post(`/accounting/revenue-recognition/schedules/${id}/recognize?period_index=${periodIndex}`),
+    getRevenueSummary: () => api.get('/accounting/revenue-recognition/summary'),
 }
 
 export const costCentersAPI = {
@@ -90,4 +103,30 @@ export const currenciesAPI = {
     addRate: (data) => api.post('/accounting/currencies/rates', data),
     getHistory: (id, limit = 30) => api.get(`/accounting/currencies/${id}/rates`, { params: { limit } }),
     revaluate: (data) => api.post('/accounting/currencies/revaluate', data)
+}
+
+// Zakat Calculator
+export const zakatAPI = {
+    calculate: (data) => api.post('/accounting/zakat/calculate', data),
+    post: (year) => api.post(`/accounting/zakat/${year}/post`),
+}
+
+// Fiscal Period Locks
+export const fiscalLocksAPI = {
+    listPeriods: () => api.get('/accounting/fiscal-periods'),
+    createPeriod: (data) => api.post('/accounting/fiscal-periods', data),
+    lockPeriod: (id) => api.post(`/accounting/fiscal-periods/${id}/lock`),
+    unlockPeriod: (id) => api.post(`/accounting/fiscal-periods/${id}/unlock`),
+}
+
+// Consolidation Reports
+export const consolidationAPI = {
+    getTrialBalance: (params) => api.get('/reports/consolidation/trial-balance', { params }),
+    getIncomeStatement: (params) => api.get('/reports/consolidation/income-statement', { params }),
+    getBalanceSheet: (params) => api.get('/reports/consolidation/balance-sheet', { params }),
+}
+
+// FX Gain/Loss Report
+export const fxReportAPI = {
+    getGainLoss: (params) => api.get('/reports/fx-gain-loss', { params }),
 }

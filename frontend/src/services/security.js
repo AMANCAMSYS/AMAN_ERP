@@ -17,4 +17,10 @@ export const securityAPI = {
     listSessions: () => api.get('/security/sessions'),
     terminateSession: (id) => api.delete(`/security/sessions/${id}`),
     terminateAllSessions: () => api.delete('/security/sessions'),
+
+    // Security Events (B1)
+    listSecurityEvents: (params) => api.get('/security/events', { params }),
+    getSecurityEventsSummary: () => api.get('/security/events/summary'),
+    listLoginAttempts: (params) => api.get('/security/login-attempts', { params }),
+    getBlockedIPs: () => api.get('/security/blocked-ips'),
 }

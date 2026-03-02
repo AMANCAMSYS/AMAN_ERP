@@ -12,7 +12,7 @@ from schemas.parties import PartyResponse
 
 router = APIRouter(prefix="/parties", tags=["الجهات (العملاء والموردين)"])
 
-@router.get("/customers", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
+@router.get("/customers", response_model=dict, dependencies=[Depends(require_permission(["parties.view", "sales.view"]))])
 async def get_customers(
     limit: int = 50,
     offset: int = 0,
@@ -50,7 +50,7 @@ async def get_customers(
     finally:
         db.close()
 
-@router.get("/suppliers", response_model=dict, dependencies=[Depends(require_permission("buying.view"))])
+@router.get("/suppliers", response_model=dict, dependencies=[Depends(require_permission(["parties.view", "buying.view"]))])
 async def get_suppliers(
     limit: int = 50,
     offset: int = 0,

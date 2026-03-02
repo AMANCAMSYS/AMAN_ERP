@@ -543,3 +543,132 @@ def check_password_expiry_on_login(company_conn, user_id: int, policy: dict = No
         return {}
     except Exception:
         return {}
+
+
+# ===================== B1: Security Events =====================
+
+@router.get("/events", dependencies=[Depends(require_permission(["security.view", "settings.view"]))])
+def list_security_events(
+    event_type: Optional[str] = None,
+    severity: Optional[str] = None,
+    limit: int = Query(50, le=200),
+    current_user=Depends(get_current_user)
+):
+    """سجل الأحداث الأمنية"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM security_events WHERE 1=1"
+        params = {}
+        if event_type:
+            q += " AND event_type = :et"
+            params["et"] = event_type
+        if severity:
+            q += " AND severity = :sev"
+            params["sev"] = severity
+        q += " ORDER BY created_at DESC LIMIT :lim"
+        params["lim"] = limit
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/events/summary", dependencies=[Depends(require_permission(["security.view", "settings.view"]))])
+def security_events_summary(current_user=Depends(get_current_user)):
+    """ملخص الأحداث الأمنية"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        total = conn.execute(text("SELECT COUNT(*) FROM security_events")).scalar() or 0
+        by_type = conn.execute(text(
+            "SELECT event_type, COUNT(*) as cnt FROM security_events GROUP BY event_type ORDER BY cnt DESC"
+        )).fetchall()
+        by_severity = conn.execute(text(
+            "SELECT severity, COUNT(*) as cnt FROM security_events GROUP BY severity ORDER BY cnt DESC"
+        )).fetchall()
+        recent = conn.execute(text(
+            "SELECT COUNT(*) FROM security_events WHERE created_at >= NOW() - INTERVAL '24 hours'"
+        )).scalar() or 0
+        return {
+            "total_events": total,
+            "last_24h": recent,
+            "by_type": [dict(r._mapping) for r in by_type],
+            "by_severity": [dict(r._mapping) for r in by_severity]
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/login-attempts", dependencies=[Depends(require_permission(["security.view", "settings.view"]))])
+def list_login_attempts(
+    ip_address: Optional[str] = None,
+    limit: int = Query(50, le=200),
+    current_user=Depends(get_current_user)
+):
+    """سجل محاولات تسجيل الدخول"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        q = "SELECT * FROM login_attempts WHERE 1=1"
+        params = {}
+        if ip_address:
+            q += " AND ip_address = :ip"
+            params["ip"] = ip_address
+        q += " ORDER BY attempted_at DESC LIMIT :lim"
+        params["lim"] = limit
+        rows = conn.execute(text(q), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/blocked-ips", dependencies=[Depends(require_permission(["security.view", "settings.view"]))])
+def get_blocked_ips(current_user=Depends(get_current_user)):
+    """IP addresses blocked due to brute force"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        rows = conn.execute(text("""
+            SELECT ip_address, COUNT(*) as failed_attempts,
+                   MAX(attempted_at) as last_attempt
+            FROM login_attempts
+            WHERE success = FALSE
+              AND attempted_at >= NOW() - INTERVAL '1 hour'
+            GROUP BY ip_address
+            HAVING COUNT(*) >= 5
+            ORDER BY failed_attempts DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        conn.close()
+
+
+def log_security_event(company_id: str, event_type: str, severity: str, user_id: int = None,
+                       ip_address: str = None, user_agent: str = None, details: dict = None):
+    """Utility to log security events from anywhere"""
+    try:
+        conn = get_db_connection(company_id)
+        conn.execute(text("""
+            INSERT INTO security_events (event_type, severity, user_id, ip_address, user_agent, details)
+            VALUES (:et, :sev, :uid, :ip, :ua, :det::jsonb)
+        """), {
+            "et": event_type, "sev": severity, "uid": user_id,
+            "ip": ip_address, "ua": user_agent,
+            "det": __import__('json').dumps(details or {})
+        })
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Failed to log security event: {e}")
+
+
+def check_brute_force(company_id: str, ip_address: str, max_attempts: int = 5, window_minutes: int = 60) -> bool:
+    """Returns True if IP should be blocked"""
+    try:
+        conn = get_db_connection(company_id)
+        count = conn.execute(text("""
+            SELECT COUNT(*) FROM login_attempts
+            WHERE ip_address = :ip AND success = FALSE
+              AND attempted_at >= NOW() - INTERVAL :win
+        """), {"ip": ip_address, "win": f"{window_minutes} minutes"}).scalar() or 0
+        conn.close()
+        return count >= max_attempts
+    except Exception:
+        return False

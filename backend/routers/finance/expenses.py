@@ -229,6 +229,136 @@ async def get_expenses_summary(
         db.close()
 
 
+
+# ===================== C1: Expense Policies =====================
+
+@router.get("/policies")
+def list_expense_policies(current_user=Depends(get_current_user)):
+    """سياسات المصروفات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT ep.*, d.department_name as department_name
+            FROM expense_policies ep
+            LEFT JOIN departments d ON d.id = ep.department_id
+            ORDER BY ep.name
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/policies")
+def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
+    """إنشاء سياسة مصروفات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            INSERT INTO expense_policies (name, expense_type, department_id,
+                daily_limit, monthly_limit, annual_limit, requires_receipt,
+                requires_approval, auto_approve_below, is_active)
+            VALUES (:n, :et, :did, :dl, :ml, :al, :rr, :ra, :aab, :ia)
+            RETURNING id
+        """), {
+            "n": policy["name"], "et": policy.get("expense_type"),
+            "did": policy.get("department_id"), "dl": policy.get("daily_limit"),
+            "ml": policy.get("monthly_limit"), "al": policy.get("annual_limit"),
+            "rr": policy.get("requires_receipt", True),
+            "ra": policy.get("requires_approval", True),
+            "aab": policy.get("auto_approve_below"), "ia": policy.get("is_active", True)
+        })
+        pid = result.fetchone()[0]
+        db.commit()
+        return {"id": pid, "message": "تم إنشاء سياسة المصروفات بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.put("/policies/{policy_id}")
+def update_expense_policy(policy_id: int, policy: dict, current_user=Depends(get_current_user)):
+    """تحديث سياسة مصروفات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("""
+            UPDATE expense_policies SET name = :n, expense_type = :et,
+                department_id = :did, daily_limit = :dl, monthly_limit = :ml,
+                annual_limit = :al, requires_receipt = :rr, requires_approval = :ra,
+                auto_approve_below = :aab, is_active = :ia
+            WHERE id = :id
+        """), {
+            "n": policy["name"], "et": policy.get("expense_type"),
+            "did": policy.get("department_id"), "dl": policy.get("daily_limit"),
+            "ml": policy.get("monthly_limit"), "al": policy.get("annual_limit"),
+            "rr": policy.get("requires_receipt", True),
+            "ra": policy.get("requires_approval", True),
+            "aab": policy.get("auto_approve_below"), "ia": policy.get("is_active", True),
+            "id": policy_id
+        })
+        db.commit()
+        return {"message": "تم تحديث السياسة بنجاح"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/policies/{policy_id}")
+def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)):
+    """حذف سياسة مصروفات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        db.execute(text("DELETE FROM expense_policies WHERE id = :id"), {"id": policy_id})
+        db.commit()
+        return {"message": "تم حذف السياسة"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+@router.post("/validate-policy")
+def validate_expense_against_policy(expense: dict, current_user=Depends(get_current_user)):
+    """التحقق من المصروف ضد السياسات"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        amount = float(expense.get("amount", 0))
+        exp_type = expense.get("expense_type")
+        dept_id = expense.get("department_id")
+
+        policies = db.execute(text("""
+            SELECT * FROM expense_policies
+            WHERE is_active = TRUE
+              AND (expense_type IS NULL OR expense_type = :et)
+              AND (department_id IS NULL OR department_id = :did)
+        """), {"et": exp_type, "did": dept_id}).fetchall()
+
+        violations = []
+        auto_approve = True
+        for p in policies:
+            pol = dict(p._mapping)
+            if pol.get("daily_limit") and amount > float(pol["daily_limit"]):
+                violations.append(f"يتجاوز الحد اليومي ({pol['daily_limit']})")
+            if pol.get("auto_approve_below") and amount >= float(pol["auto_approve_below"]):
+                auto_approve = False
+            if pol.get("requires_receipt"):
+                if not expense.get("has_receipt"):
+                    violations.append("يتطلب إيصال")
+
+        return {
+            "valid": len(violations) == 0,
+            "auto_approve": auto_approve and len(violations) == 0,
+            "violations": violations,
+            "policies_checked": len(policies)
+        }
+    finally:
+        db.close()
+
+
 @router.get("/{expense_id}", dependencies=[Depends(require_permission("expenses.view"))])
 async def get_expense_details(expense_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل مصروف محدد"""
@@ -416,6 +546,26 @@ async def create_expense(
             "approval_status": approval_status,
             "message": "تم إنشاء المصروف بنجاح" if approval_status == "approved" else "تم إنشاء المصروف - في انتظار الاعتماد"
         }
+
+        # Notify about expense submission
+        if approval_status == "pending":
+            try:
+                db.execute(text("""
+                    INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                    SELECT DISTINCT u.id, 'expense', :title, :message, :link, FALSE, NOW()
+                    FROM company_users u
+                    WHERE u.is_active = TRUE AND u.role IN ('admin', 'superuser')
+                    AND u.id != :current_uid
+                """), {
+                    "title": "🧳 طلب مصروف جديد",
+                    "message": f"مصروف {expense_number} — {float(expense.amount):,.2f} — {expense.description or expense.expense_type}",
+                    "link": f"/expenses/{expense_id}",
+                    "current_uid": current_user.id
+                })
+                db.commit()
+            except Exception:
+                pass
+
         if approval_info:
             response["approval"] = approval_info
         return response
@@ -595,6 +745,27 @@ async def approve_expense(
         )
         
         message = "تم اعتماد المصروف بنجاح" if approval.approval_status == "approved" else "تم رفض المصروف"
+
+        # Notify the expense submitter
+        try:
+            submitted_by = db.execute(text("SELECT created_by FROM expenses WHERE id = :id"), {"id": expense_id}).scalar()
+            if submitted_by:
+                icon = "✅" if approval.approval_status == "approved" else "❌"
+                status_ar = "اعتُمد" if approval.approval_status == "approved" else "رُفض"
+                exp_num = expense.get('expense_number', '') if isinstance(expense, dict) else ''
+                db.execute(text("""
+                    INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at)
+                    VALUES (:uid, 'expense_status', :title, :message, :link, FALSE, NOW())
+                """), {
+                    "uid": submitted_by,
+                    "title": f"{icon} مصروفك {status_ar}",
+                    "message": f"تم {status_ar} المصروف {exp_num} بمبلغ {float(expense.get('amount', 0)):,.2f}" if isinstance(expense, dict) else f"تم {status_ar} طلب المصروف",
+                    "link": f"/expenses/{expense_id}"
+                })
+                db.commit()
+        except Exception:
+            pass
+
         return {"success": True, "message": message}
     except HTTPException:
         raise
@@ -772,3 +943,4 @@ async def get_monthly_expenses(
         return [dict(r._mapping) for r in result]
     finally:
         db.close()
+

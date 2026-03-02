@@ -10,8 +10,10 @@ import '../../components/ModuleStyles.css'
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 function PurchaseDebitNotes() {
     const { t, i18n } = useTranslation()
+  const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -109,8 +111,8 @@ function PurchaseDebitNotes() {
     const calcTotal = () => calcSubtotal() + calcTax()
 
     const handleCreate = async () => {
-        if (!form.party_id) return alert(t('buying.debit_notes.supplier_required'))
-        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return alert(t('buying.debit_notes.line_required'))
+        if (!form.party_id) return showToast(t('buying.debit_notes.supplier_required', 'warning'))
+        if (!form.lines.length || form.lines.every(l => l.unit_price === 0)) return showToast(t('buying.debit_notes.line_required', 'warning'))
         try {
             setSaving(true)
             await purchasesAPI.createDebitNote({
@@ -121,7 +123,7 @@ function PurchaseDebitNotes() {
             setShowCreate(false)
             fetchList()
         } catch (err) {
-            alert(err.response?.data?.detail || t('buying.debit_notes.error_occurred'))
+            showToast(err.response?.data?.detail || t('buying.debit_notes.error_occurred', 'error'))
         } finally { setSaving(false) }
     }
 

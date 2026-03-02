@@ -12,6 +12,10 @@ export const reportsAPI = {
     getPurchasesTrend: (days = 30, branch_id = null) => api.get('/reports/purchases/trend', { params: { days, branch_id } }),
     getPurchasesBySupplier: (limit = 5, branch_id = null) => api.get('/reports/purchases/by-supplier', { params: { limit, branch_id } }),
     getSupplierStatement: (supplierId, params) => api.get(`/reports/purchases/supplier-statement/${supplierId}`, { params }),
+    getPurchasesAging: (branch_id = null) => api.get('/reports/purchases/aging', { params: { branch_id } }),
+
+    // Cashflow IAS 7
+    getCashFlowIAS7: (params) => api.get('/reports/accounting/cashflow-ias7', { params }),
 
     // HR Reports
     getPayrollTrend: (months = 12) => api.get('/reports/hr/payroll/trend', { params: { months } }),
@@ -85,4 +89,7 @@ export const reportSharingAPI = {
     listShared: () => api.get('/reports/shared/'),
     getReportShares: (reportType, reportId) => api.get(`/reports/shared/by-report/${reportType}/${reportId}`),
     listUsers: () => api.get('/reports/users/'),
+
+    // KPI Dashboard (B8)
+    getKPIDashboard: () => api.get('/reports/kpi/dashboard'),
 }

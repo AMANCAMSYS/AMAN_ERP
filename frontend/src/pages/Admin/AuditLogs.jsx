@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import api from '../../utils/api';
 import { formatDateTime } from '../../utils/dateUtils';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import BackButton from '../../components/common/BackButton';
 import { useBranch } from '../../context/BranchContext';
 import { getUser } from '../../utils/auth';
 import './AuditLogs.css';
@@ -123,8 +124,13 @@ const AuditLogs = () => {
     return (
         <div className="audit-logs-container">
             <div className="audit-header">
-                <h1>📋 {t('audit.title')}</h1>
-                <p className="subtitle">{t('audit.subtitle')}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <BackButton />
+                    <div>
+                        <h1>📋 {t('audit.title')}</h1>
+                        <p className="subtitle">{t('audit.subtitle')}</p>
+                    </div>
+                </div>
             </div>
 
             {/* Stats Cards */}

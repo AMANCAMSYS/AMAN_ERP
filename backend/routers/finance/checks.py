@@ -1032,3 +1032,149 @@ def get_due_checks_alerts(days_ahead: int = Query(7, ge=1, le=90), branch_id: Op
         raise HTTPException(500, str(e))
     finally:
         db.close()
+
+# ============================================================
+# Checks Aging Report (تقرير أعمار الشيكات)
+# ============================================================
+
+@router.get("/aging", dependencies=[Depends(require_permission("treasury.view"))])
+def checks_aging_report(
+    check_type: Optional[str] = None,  # 'receivable', 'payable', or None for both
+    branch_id: Optional[int] = None,
+    current_user=Depends(get_current_user)
+):
+    """تقرير أعمار الشيكات — تصنيف حسب تاريخ الاستحقاق (0-30, 31-60, 61-90, 90+)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        cond = "AND branch_id = :branch_id" if branch_id else ""
+        params = {}
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        results = []
+
+        if check_type in (None, "receivable"):
+            rows = db.execute(text(f"""
+                SELECT
+                    cr.id, cr.check_number, cr.drawer_name AS party_name,
+                    cr.bank_name, cr.amount, cr.currency,
+                    cr.issue_date, cr.due_date, cr.status,
+                    CURRENT_DATE - COALESCE(cr.due_date, cr.issue_date) AS days_old,
+                    'receivable' AS check_type
+                FROM checks_receivable cr
+                WHERE cr.status IN ('pending', 'under_collection')
+                {cond}
+                ORDER BY days_old DESC
+            """), params).fetchall()
+
+            for r in rows:
+                days = int(r.days_old or 0)
+                if days > 90:
+                    bucket = "90+"
+                elif days > 60:
+                    bucket = "61-90"
+                elif days > 30:
+                    bucket = "31-60"
+                else:
+                    bucket = "0-30"
+                results.append({
+                    "id": r.id, "check_number": r.check_number,
+                    "party_name": r.party_name, "bank_name": r.bank_name,
+                    "amount": float(r.amount), "currency": r.currency or "",
+                    "issue_date": str(r.issue_date) if r.issue_date else None,
+                    "due_date": str(r.due_date) if r.due_date else None,
+                    "status": r.status, "days_old": days, "bucket": bucket,
+                    "check_type": "receivable",
+                })
+
+        if check_type in (None, "payable"):
+            rows = db.execute(text(f"""
+                SELECT
+                    cp.id, cp.check_number, cp.beneficiary_name AS party_name,
+                    cp.bank_name, cp.amount, cp.currency,
+                    cp.issue_date, cp.due_date, cp.status,
+                    CURRENT_DATE - COALESCE(cp.due_date, cp.issue_date) AS days_old,
+                    'payable' AS check_type
+                FROM checks_payable cp
+                WHERE cp.status = 'issued'
+                {cond}
+                ORDER BY days_old DESC
+            """), params).fetchall()
+
+            for r in rows:
+                days = int(r.days_old or 0)
+                if days > 90:
+                    bucket = "90+"
+                elif days > 60:
+                    bucket = "61-90"
+                elif days > 30:
+                    bucket = "31-60"
+                else:
+                    bucket = "0-30"
+                results.append({
+                    "id": r.id, "check_number": r.check_number,
+                    "party_name": r.party_name, "bank_name": r.bank_name,
+                    "amount": float(r.amount), "currency": r.currency or "",
+                    "issue_date": str(r.issue_date) if r.issue_date else None,
+                    "due_date": str(r.due_date) if r.due_date else None,
+                    "status": r.status, "days_old": days, "bucket": bucket,
+                    "check_type": "payable",
+                })
+
+        results.sort(key=lambda x: x["days_old"], reverse=True)
+
+        # Build bucket summary
+        buckets = {"0-30": {"receivable": 0, "payable": 0}, "31-60": {"receivable": 0, "payable": 0},
+                   "61-90": {"receivable": 0, "payable": 0}, "90+": {"receivable": 0, "payable": 0}}
+        for r in results:
+            buckets[r["bucket"]][r["check_type"]] += r["amount"]
+
+        return {
+            "checks": results,
+            "total": len(results),
+            "bucket_summary": buckets,
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
+# ===================== B3: Check Status Lifecycle Log =====================
+
+@router.get("/status-log/{check_type}/{check_id}")
+def get_check_status_log(check_type: str, check_id: int, current_user=Depends(get_current_user)):
+    """سجل دورة حياة الشيك"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        rows = conn.execute(text("""
+            SELECT csl.*, u.full_name as changed_by_name
+            FROM check_status_log csl
+            LEFT JOIN users u ON u.id = csl.changed_by
+            WHERE csl.check_type = :ct AND csl.check_id = :cid
+            ORDER BY csl.changed_at DESC
+        """), {"ct": check_type, "cid": check_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()
+
+
+@router.get("/status-log/summary")
+def check_status_summary(current_user=Depends(get_current_user)):
+    """ملخص تغييرات حالة الشيكات"""
+    conn = get_db_connection(current_user.company_id)
+    try:
+        rows = conn.execute(text("""
+            SELECT check_type, old_status, new_status, COUNT(*) as cnt
+            FROM check_status_log
+            WHERE changed_at >= NOW() - INTERVAL '30 days'
+            GROUP BY check_type, old_status, new_status
+            ORDER BY cnt DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    finally:
+        conn.close()

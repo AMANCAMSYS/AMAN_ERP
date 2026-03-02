@@ -76,6 +76,12 @@ function Login() {
                         />
                     </div>
 
+                    <div className="text-end" style={{ marginBottom: '12px' }}>
+                        <Link to="/forgot-password" className="link" style={{ fontSize: '13px' }}>
+                            {t('forgot_password.title')}
+                        </Link>
+                    </div>
+
                     <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
                         {loading ? <span className="loading"></span> : t('auth.login_btn')}
                     </button>

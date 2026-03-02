@@ -5,6 +5,8 @@ import { formatNumber } from '../../utils/format';
 import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 const typeColors = {
     email: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -22,6 +24,7 @@ const statusColors = {
 
 function MarketingCampaigns() {
     const { t } = useTranslation();
+  const { showToast } = useToast()
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -60,7 +63,7 @@ function MarketingCampaigns() {
             if (isEdit) await crmAPI.updateCampaign(editId, payload);
             else await crmAPI.createCampaign(payload);
             setShowModal(false); fetchData();
-        } catch (err) { alert(err.response?.data?.detail || 'Error'); }
+        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
     };
 
     const handleDelete = async (id) => {
@@ -154,7 +157,7 @@ function MarketingCampaigns() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
                         <div className="modal-header"><h3>{isEdit ? t('crm.edit_campaign', 'تعديل الحملة') : t('crm.new_campaign', 'حملة جديدة')}</h3></div>
                         <div className="modal-body">
@@ -182,11 +185,11 @@ function MarketingCampaigns() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">{t('common.start_date', 'تاريخ البدء')}</label>
-                                        <input type="date" className="form-input" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))} />
+                                        <DateInput className="form-input" value={form.start_date} onChange={e => setForm(p => ({ ...p, start_date: e.target.value }))} />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">{t('common.end_date', 'تاريخ الانتهاء')}</label>
-                                        <input type="date" className="form-input" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))} />
+                                        <DateInput className="form-input" value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))} />
                                     </div>
                                     <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                                         <label className="form-label">{t('crm.target_audience', 'الجمهور المستهدف')}</label>

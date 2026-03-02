@@ -257,7 +257,7 @@ const AssetDetails = () => {
             {/* ========== Revalue Modal ========== */}
             {showRevalueModal && (
                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowRevalueModal(false)}>
-                    <div className="card" style={{ minWidth: 420, maxWidth: 500, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                    <div className="card" style={{ minWidth: 420, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                         <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <RefreshCw size={20} className="text-primary" />
                             {isRTL ? 'إعادة تقييم الأصل' : 'Revalue Asset'}
@@ -287,7 +287,7 @@ const AssetDetails = () => {
             {/* ========== Transfer Modal ========== */}
             {showTransferModal && (
                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowTransferModal(false)}>
-                    <div className="card" style={{ minWidth: 420, maxWidth: 500, padding: 32, borderRadius: 20 }} onClick={e => e.stopPropagation()}>
+                    <div className="card" style={{ minWidth: 420, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                         <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <ArrowRightLeft size={20} className="text-secondary" />
                             {isRTL ? 'نقل الأصل إلى فرع آخر' : 'Transfer Asset to Branch'}

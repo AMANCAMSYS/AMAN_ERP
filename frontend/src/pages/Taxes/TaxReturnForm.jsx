@@ -135,8 +135,8 @@ function TaxReturnForm() {
             ) : (
                 <form onSubmit={handleSubmit}>
                     {/* Period Settings Card */}
-                    <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
+                    <div className="card mt-4">
+                        <div >
                             <div className="d-flex align-items-center gap-2 mb-3">
                                 <div style={{ background: '#eff6ff', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <span style={{ fontSize: '18px' }}>📅</span>

@@ -11,6 +11,7 @@ from database import get_db_connection
 logger = logging.getLogger(__name__)
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
+from utils.cache import cached
 
 router = APIRouter(prefix="/reports", tags=["التقارير"])
 
@@ -470,7 +471,11 @@ def get_aging_report(
         branch_filter = "AND i.branch_id = :branch_id" if branch_id else ""
         if branch_id:
             params["branch_id"] = branch_id
-        # Get all unpaid invoices with days overdue
+        # Get all unpaid invoices + POS credit orders with days overdue
+        # Get base currency for POS
+        from utils.accounting import get_base_currency
+        base_currency = get_base_currency(db)
+
         results = db.execute(text(f"""
             SELECT 
                 p.name as customer_name,
@@ -479,7 +484,7 @@ def get_aging_report(
                 i.due_date,
                 (i.total - COALESCE(i.paid_amount, 0)) as due_amount_fc,
                 (i.total - COALESCE(i.paid_amount, 0)) * COALESCE(i.exchange_rate, 1) as due_amount,
-                CURRENT_DATE - COALESCE(i.due_date, i.invoice_date) as days_old,
+                GREATEST(CURRENT_DATE - COALESCE(i.due_date, i.invoice_date), 0) as days_old,
                 i.currency
             FROM invoices i
             JOIN parties p ON i.party_id = p.id
@@ -487,8 +492,26 @@ def get_aging_report(
             AND i.status NOT IN ('draft', 'cancelled', 'paid')
             AND (i.total - COALESCE(i.paid_amount, 0)) > 0.01
             {branch_filter}
+
+            UNION ALL
+
+            SELECT 
+                COALESCE(p2.name, po.walk_in_customer_name, 'عميل عام') as customer_name,
+                po.order_number as invoice_number,
+                po.order_date::date as invoice_date,
+                po.order_date::date as due_date,
+                (po.total_amount - COALESCE(po.paid_amount, 0)) as due_amount_fc,
+                (po.total_amount - COALESCE(po.paid_amount, 0)) as due_amount,
+                GREATEST(CURRENT_DATE - po.order_date::date, 0) as days_old,
+                :base_currency as currency
+            FROM pos_orders po
+            LEFT JOIN parties p2 ON po.customer_id = p2.id
+            WHERE po.status NOT IN ('cancelled', 'refunded')
+            AND (po.total_amount - COALESCE(po.paid_amount, 0)) > 0.01
+            {branch_filter}
+
             ORDER BY days_old DESC
-        """), params).fetchall()
+        """), {**params, "base_currency": base_currency}).fetchall()
 
         # Group buckets
         report = []
@@ -632,6 +655,70 @@ def get_purchases_by_supplier(
     finally:
         db.close()
 
+
+@router.get("/purchases/aging", response_model=List[Dict[str, Any]], dependencies=[Depends(require_permission(["buying.reports", "reports.view"]))])
+def get_purchases_aging_report(
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير أعمار الذمم الدائنة (مستحقات الموردين)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        params = {}
+        branch_filter = "AND i.branch_id = :branch_id" if branch_id else ""
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        results = db.execute(text(f"""
+            SELECT 
+                p.name as supplier_name,
+                i.invoice_number,
+                i.invoice_date,
+                i.due_date,
+                (i.total - COALESCE(i.paid_amount, 0)) as due_amount_fc,
+                (i.total - COALESCE(i.paid_amount, 0)) * COALESCE(i.exchange_rate, 1) as due_amount,
+                GREATEST(CURRENT_DATE - COALESCE(i.due_date, i.invoice_date), 0) as days_old,
+                i.currency
+            FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE i.invoice_type = 'purchase'
+            AND i.status NOT IN ('draft', 'cancelled', 'paid')
+            AND (i.total - COALESCE(i.paid_amount, 0)) > 0.01
+            {branch_filter}
+            ORDER BY days_old DESC
+        """), params).fetchall()
+
+        report = []
+        totals = {"0-30": 0, "31-60": 0, "61-90": 0, "90+": 0}
+        for row in results:
+            bucket = "0-30"
+            days = row.days_old or 0
+            if days > 90:
+                bucket = "90+"
+            elif days > 60:
+                bucket = "61-90"
+            elif days > 30:
+                bucket = "31-60"
+
+            amount = float(row.due_amount or 0)
+            totals[bucket] += amount
+            report.append({
+                "supplier": row.supplier_name,
+                "invoice": row.invoice_number,
+                "date": row.invoice_date,
+                "due_date": row.due_date,
+                "amount": amount,
+                "amount_fc": float(row.due_amount_fc or 0),
+                "currency": row.currency,
+                "days": days,
+                "bucket": bucket,
+            })
+
+        return report
+    finally:
+        db.close()
+
+
 @router.get("/purchases/supplier-statement/{supplier_id}", response_model=Dict[str, Any], dependencies=[Depends(require_permission(["buying.reports", "reports.view"]))])
 def get_supplier_statement(
     supplier_id: int,
@@ -658,7 +745,7 @@ def get_supplier_statement(
         opening_balance = db.execute(text(f"""
             WITH all_movements AS (
                 SELECT 
-                    0 as debit, total as credit,
+                    0 as debit, (total * COALESCE(exchange_rate, 1.0)) as credit,
                     invoice_date as txn_date,
                     branch_id,
                     party_id
@@ -687,7 +774,7 @@ def get_supplier_statement(
             WITH all_movements AS (
                 SELECT 
                     id, invoice_date as date, invoice_number as ref, 
-                    'invoice' as type, total as credit, 0 as debit,
+                    'invoice' as type, (total * COALESCE(exchange_rate, 1.0)) as credit, 0 as debit,
                     party_id, branch_id
                 FROM invoices
                 WHERE invoice_type = 'purchase' AND status NOT IN ('cancelled', 'draft')
@@ -844,6 +931,7 @@ def get_leave_usage(
     finally:
         db.close()
 @router.get("/accounting/trial-balance", response_model=TrialBalanceResponse, dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+@cached("report_trial_balance", expire=60)
 def get_trial_balance(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -1046,6 +1134,7 @@ def _get_profit_loss_data(db, start_date, end_date, branch_id=None):
     }
 
 @router.get("/accounting/profit-loss", response_model=FinancialStatementResponse, dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+@cached("report_profit_loss", expire=60)
 def get_profit_loss(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
@@ -1159,6 +1248,7 @@ def _get_balance_sheet_data(db, as_of_date, branch_id=None):
     }
 
 @router.get("/accounting/balance-sheet", response_model=FinancialStatementResponse, dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+@cached("report_balance_sheet", expire=60)
 def get_balance_sheet(
     as_of_date: Optional[date] = None,
     branch_id: Optional[int] = None,
@@ -1346,6 +1436,331 @@ def get_cashflow_report(
         db.close()
 
 
+@router.get("/accounting/cashflow-ias7", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+def get_cashflow_ias7(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    قائمة التدفقات النقدية حسب معيار IAS 7
+    Cash Flow Statement — Operating / Investing / Financing
+    """
+    company_id = current_user.company_id if not isinstance(current_user, dict) else current_user.get("company_id")
+    db = get_db_connection(company_id)
+    try:
+        if not start_date:
+            start_date = date.today().replace(day=1)
+        if not end_date:
+            end_date = date.today()
+
+        branch_filter = "AND je.branch_id = :branch_id" if branch_id else ""
+        params = {"start": start_date, "end": end_date}
+        if branch_id:
+            params["branch_id"] = branch_id
+
+        # Get Cash/Bank accounts
+        treasury_gl_ids = [row[0] for row in db.execute(text(
+            "SELECT gl_account_id FROM treasury_accounts WHERE is_active = true"
+        )).fetchall() if row[0]]
+        legacy_gl_ids = [row[0] for row in db.execute(text(
+            "SELECT id FROM accounts WHERE account_code IN ('BOX', 'BNK')"
+        )).fetchall()]
+        cash_ids = list(set(treasury_gl_ids + legacy_gl_ids))
+        if not cash_ids:
+            cash_ids = [row[0] for row in db.execute(text(
+                "SELECT id FROM accounts WHERE account_type IN ('cash', 'bank', 'current_asset') AND (name ILIKE '%نقد%' OR name ILIKE '%بنك%' OR name ILIKE '%صندوق%' OR name_en ILIKE '%cash%' OR name_en ILIKE '%bank%')"
+            )).fetchall()]
+        if not cash_ids:
+            return {"period": {"start": start_date, "end": end_date}, "operating": {}, "investing": {}, "financing": {}, "net_change": 0, "opening_cash": 0, "closing_cash": 0}
+
+        cash_ids_str = ','.join(map(str, cash_ids))
+
+        # IAS 7 classification: based on actual account_type and account name heuristics
+        # Only valid types: asset, liability, equity, revenue, expense
+
+        def classify(account_type, account_name=''):
+            at = (account_type or '').lower()
+            name_lower = (account_name or '').lower()
+
+            # Equity → Financing
+            if at == 'equity':
+                return 'financing'
+
+            # Revenue and Expense → Operating
+            if at in ('revenue', 'expense'):
+                return 'operating'
+
+            # Liability: check name for long-term/loan → Financing, else Operating
+            if at == 'liability':
+                if any(kw in name_lower for kw in ['قرض', 'loan', 'long', 'طويل', 'سند', 'bond']):
+                    return 'financing'
+                return 'operating'
+
+            # Asset: check name for fixed asset/investment → Investing, else Operating
+            if at == 'asset':
+                if any(kw in name_lower for kw in ['أصل ثابت', 'fixed', 'استثمار', 'invest', 'عقار', 'property', 'معدات', 'equipment', 'إهلاك', 'depreciation', 'أراضي', 'land']):
+                    return 'investing'
+                return 'operating'
+
+            return 'operating'
+
+        # Inflows (debit to cash accounts)
+        inflows = db.execute(text(f"""
+            SELECT a_other.account_type, a_other.name as account_name,
+                   SUM(jl_other.credit) as amount
+            FROM journal_lines jl_cash
+            JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
+            JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id AND jl_other.account_id != jl_cash.account_id
+            JOIN accounts a_other ON jl_other.account_id = a_other.id
+            WHERE jl_cash.account_id IN ({cash_ids_str})
+              AND jl_cash.debit > 0
+              AND je.entry_date BETWEEN :start AND :end
+              AND je.status = 'posted'
+              {branch_filter}
+            GROUP BY a_other.account_type, a_other.name
+        """), params).fetchall()
+
+        # Outflows (credit to cash accounts)
+        outflows = db.execute(text(f"""
+            SELECT a_other.account_type, a_other.name as account_name,
+                   SUM(jl_other.debit) as amount
+            FROM journal_lines jl_cash
+            JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
+            JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id AND jl_other.account_id != jl_cash.account_id
+            JOIN accounts a_other ON jl_other.account_id = a_other.id
+            WHERE jl_cash.account_id IN ({cash_ids_str})
+              AND jl_cash.credit > 0
+              AND je.entry_date BETWEEN :start AND :end
+              AND je.status = 'posted'
+              {branch_filter}
+            GROUP BY a_other.account_type, a_other.name
+        """), params).fetchall()
+
+        # Opening cash balance
+        opening_cash = db.execute(text(f"""
+            SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE jl.account_id IN ({cash_ids_str})
+              AND je.entry_date < :start
+              AND je.status = 'posted'
+              {branch_filter}
+        """), params).scalar() or 0
+
+        # Build activities
+        activities = {'operating': [], 'investing': [], 'financing': []}
+        totals = {'operating': 0.0, 'investing': 0.0, 'financing': 0.0}
+
+        for row in inflows:
+            activity = classify(row.account_type, row.account_name)
+            amt = float(row.amount or 0)
+            activities[activity].append({
+                "description": row.account_name,
+                "account_type": row.account_type,
+                "amount": round(amt, 2),
+                "direction": "inflow"
+            })
+            totals[activity] += amt
+
+        for row in outflows:
+            activity = classify(row.account_type, row.account_name)
+            amt = float(row.amount or 0)
+            activities[activity].append({
+                "description": row.account_name,
+                "account_type": row.account_type,
+                "amount": round(-amt, 2),
+                "direction": "outflow"
+            })
+            totals[activity] -= amt
+
+        net_change = totals['operating'] + totals['investing'] + totals['financing']
+
+        return {
+            "period": {"start": start_date, "end": end_date},
+            "operating": {
+                "items": activities['operating'],
+                "total": round(totals['operating'], 2)
+            },
+            "investing": {
+                "items": activities['investing'],
+                "total": round(totals['investing'], 2)
+            },
+            "financing": {
+                "items": activities['financing'],
+                "total": round(totals['financing'], 2)
+            },
+            "net_change": round(net_change, 2),
+            "opening_cash": round(float(opening_cash), 2),
+            "closing_cash": round(float(opening_cash) + net_change, 2),
+        }
+    finally:
+        db.close()
+
+
+@router.get("/accounting/fx-gain-loss", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
+def get_fx_gain_loss_report(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    currency: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير فروق أسعار العملة — الأرباح والخسائر المحققة وغير المحققة"""
+    branch_id = validate_branch_access(current_user, branch_id)
+    db = get_db_connection(current_user.company_id)
+    try:
+        if not start_date:
+            start_date = date.today().replace(day=1)
+        if not end_date:
+            end_date = date.today()
+
+        params: dict = {"start": start_date, "end": end_date}
+        branch_filter = "AND je.branch_id = :branch_id" if branch_id else ""
+        if branch_id:
+            params["branch_id"] = branch_id
+        currency_filter = "AND je.currency = :currency" if currency else ""
+        if currency:
+            params["currency"] = currency
+
+        # Realized FX gain/loss: journal entries tagged as FX revaluation
+        realized = db.execute(text(f"""
+            SELECT
+                je.id,
+                je.entry_date,
+                je.reference,
+                je.currency,
+                je.description,
+                SUM(CASE WHEN a.account_type = 'revenue' THEN jl.credit - jl.debit ELSE 0 END) as fx_gain,
+                SUM(CASE WHEN a.account_type = 'expense' THEN jl.debit - jl.credit ELSE 0 END) as fx_loss
+            FROM journal_entries je
+            JOIN journal_lines jl ON je.id = jl.journal_entry_id
+            JOIN accounts a ON jl.account_id = a.id
+            WHERE je.status = 'posted'
+              AND je.entry_date BETWEEN :start AND :end
+              AND (
+                  LOWER(je.description) LIKE '%%fx%%' OR
+                  LOWER(je.description) LIKE '%%revaluation%%' OR
+                  LOWER(je.description) LIKE '%%فروق عملة%%' OR
+                  LOWER(je.reference) LIKE '%%fx%%' OR
+                  je.source IN ('fx_revaluation', 'fx_adjustment')
+              )
+              {branch_filter}
+            GROUP BY je.id, je.entry_date, je.reference, je.currency, je.description
+            ORDER BY je.entry_date
+        """), params).fetchall()
+
+        # Get base currency
+        base_ccy = db.execute(text(
+            "SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1"
+        )).scalar() or 'SAR'
+
+        # FX amounts from foreign currency invoices difference
+        invoice_fx = db.execute(text(f"""
+            SELECT
+                i.currency,
+                COUNT(*) as invoice_count,
+                SUM(i.total) as fc_total,
+                SUM(i.total * COALESCE(i.exchange_rate, 1.0)) as lc_total,
+                CASE WHEN i.invoice_type = 'sales' THEN 'receivable' ELSE 'payable' END as direction
+            FROM invoices i
+            WHERE i.currency != :base_ccy
+              AND i.status NOT IN ('cancelled', 'draft')
+              AND i.invoice_date BETWEEN :start AND :end
+              AND COALESCE(i.exchange_rate, 1.0) != 1.0
+              {currency_filter}
+            GROUP BY i.currency, i.invoice_type
+            ORDER BY i.currency
+        """), {**params, "base_ccy": base_ccy}).fetchall()
+
+        # Unrealized FX: open foreign currency invoices at current rates
+        rate_rows = db.execute(text(
+            "SELECT code, COALESCE(current_rate, 1.0) as rate FROM currencies WHERE is_active = TRUE"
+        )).fetchall()
+        current_rates = {r.code: float(r.rate) for r in rate_rows}
+
+        open_invoices = db.execute(text(f"""
+            SELECT
+                i.invoice_number, i.invoice_type, i.currency,
+                COALESCE(i.exchange_rate, 1.0) as booked_rate,
+                (i.total - COALESCE(i.paid_amount, 0)) as open_fc_amount,
+                p.name as party_name
+            FROM invoices i
+            LEFT JOIN parties p ON p.id = i.party_id
+            WHERE i.currency != :base_ccy
+              AND i.status NOT IN ('cancelled', 'draft', 'paid')
+              AND (i.total - COALESCE(i.paid_amount, 0)) > 0.01
+              {currency_filter}
+        """), {**params, "base_ccy": base_ccy}).fetchall()
+
+        unrealized_list = []
+        total_unrealized_gain = 0.0
+        total_unrealized_loss = 0.0
+        for inv in open_invoices:
+            booked = float(inv.booked_rate)
+            current = current_rates.get(inv.currency, booked)
+            open_fc = float(inv.open_fc_amount or 0)
+            diff = open_fc * (current - booked)
+            if inv.invoice_type == 'purchase':
+                diff = -diff
+            unrealized_list.append({
+                "invoice_number": inv.invoice_number,
+                "party": inv.party_name,
+                "invoice_type": inv.invoice_type,
+                "currency": inv.currency,
+                "open_fc_amount": round(open_fc, 2),
+                "booked_rate": booked,
+                "current_rate": current,
+                "unrealized_fx": round(diff, 2),
+            })
+            if diff >= 0:
+                total_unrealized_gain += diff
+            else:
+                total_unrealized_loss += abs(diff)
+
+        realized_list = [{
+            "entry_id": r.id,
+            "date": r.entry_date,
+            "reference": r.reference,
+            "currency": r.currency,
+            "notes": r.description,
+            "fx_gain": float(r.fx_gain or 0),
+            "fx_loss": float(r.fx_loss or 0),
+            "net": float((r.fx_gain or 0) - (r.fx_loss or 0)),
+        } for r in realized]
+
+        exposure_list = [{
+            "currency": r.currency,
+            "direction": r.direction,
+            "invoice_count": r.invoice_count,
+            "fc_total": float(r.fc_total or 0),
+            "lc_total": float(r.lc_total or 0),
+        } for r in invoice_fx]
+
+        total_gain = sum(r["fx_gain"] for r in realized_list)
+        total_loss = sum(r["fx_loss"] for r in realized_list)
+
+        return {
+            "period": {"start": start_date, "end": end_date},
+            "realized_entries": realized_list,
+            "currency_exposure": exposure_list,
+            "unrealized": {
+                "invoices": unrealized_list,
+                "total_unrealized_gain": round(total_unrealized_gain, 2),
+                "total_unrealized_loss": round(total_unrealized_loss, 2),
+                "net_unrealized": round(total_unrealized_gain - total_unrealized_loss, 2),
+            },
+            "summary": {
+                "total_fx_gain": round(total_gain + total_unrealized_gain, 2),
+                "total_fx_loss": round(total_loss + total_unrealized_loss, 2),
+                "net_fx": round((total_gain + total_unrealized_gain) - (total_loss + total_unrealized_loss), 2),
+            }
+        }
+    finally:
+        db.close()
+
+
 @router.get("/accounting/general-ledger", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
 def get_general_ledger(
     account_id: int = None,
@@ -1354,7 +1769,7 @@ def get_general_ledger(
     branch_id: Optional[int] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """جلب دفتر الأستاذ العام - حركات حساب محدد"""
+    """جلب دفتر الأستاذ العام - حركات حساب محدد مع كل حساباته الفرعية"""
     if not account_id:
         raise HTTPException(status_code=400, detail="يجب تحديد الحساب")
     
@@ -1365,25 +1780,44 @@ def get_general_ledger(
             start_date = date.today().replace(day=1, month=1)
         if not end_date:
             end_date = date.today()
-            
-        params = {"account_id": account_id, "start": start_date, "end": end_date}
+
+        # ── Recursive CTE: collect selected account + all descendants ──
+        tree_rows = db.execute(text("""
+            WITH RECURSIVE account_tree AS (
+                SELECT id, account_type, name, name_en, account_number, parent_id
+                FROM accounts WHERE id = :account_id
+                UNION ALL
+                SELECT a.id, a.account_type, a.name, a.name_en, a.account_number, a.parent_id
+                FROM accounts a
+                INNER JOIN account_tree at ON a.parent_id = at.id
+            )
+            SELECT id, account_type, name, name_en, account_number FROM account_tree
+        """), {"account_id": account_id}).fetchall()
+
+        account_ids = [row.id for row in tree_rows]
+        account_map = {row.id: f"{row.account_number} - {row.name}" for row in tree_rows}
         
+        # Use the root account's type for sign convention
+        root_row = next((r for r in tree_rows if r.id == account_id), None)
+        acct_type = root_row.account_type if root_row else "asset"
+        is_aggregated = len(account_ids) > 1
+
+        # Build safe IN clause (account_ids are integers from DB — safe)
+        ids_in = ",".join(str(i) for i in account_ids)
+
         branch_filter = ""
+        params: dict = {"start": start_date, "end": end_date}
         if branch_id:
             branch_filter = "AND je.branch_id = :branch_id"
             params["branch_id"] = branch_id
 
-        # Get account info for sign convention
-        acct_info = db.execute(text("SELECT account_type FROM accounts WHERE id = :account_id"), {"account_id": account_id}).fetchone()
-        acct_type = acct_info.account_type if acct_info else "asset"
-
-        # Compute opening balance (all posted entries before start_date)
+        # Compute opening balance across all descendant accounts
         opening_query = f"""
             SELECT COALESCE(SUM(jl.debit), 0) as total_debit,
                    COALESCE(SUM(jl.credit), 0) as total_credit
             FROM journal_lines jl
             JOIN journal_entries je ON jl.journal_entry_id = je.id
-            WHERE jl.account_id = :account_id
+            WHERE jl.account_id IN ({ids_in})
             AND je.entry_date < :start
             AND je.status = 'posted'
             {branch_filter}
@@ -1396,6 +1830,7 @@ def get_general_ledger(
         else:
             opening_balance = opening_credit - opening_debit
 
+        # Fetch journal lines across all descendant accounts
         query = f"""
             SELECT 
                 je.entry_date,
@@ -1404,14 +1839,15 @@ def get_general_ledger(
                 je.reference,
                 jl.debit,
                 jl.credit,
-                jl.description as line_description
+                jl.description as line_description,
+                jl.account_id
             FROM journal_lines jl
             JOIN journal_entries je ON jl.journal_entry_id = je.id
-            WHERE jl.account_id = :account_id
+            WHERE jl.account_id IN ({ids_in})
             AND je.entry_date BETWEEN :start AND :end
             AND je.status = 'posted'
             {branch_filter}
-            ORDER BY je.entry_date ASC, je.id ASC
+            ORDER BY je.entry_date ASC, je.id ASC, jl.id ASC
         """
         
         result = db.execute(text(query), params).fetchall()
@@ -1432,7 +1868,8 @@ def get_general_ledger(
                 "reference": row.reference,
                 "debit": debit,
                 "credit": credit,
-                "running_balance": round(running_balance, 2)
+                "running_balance": round(running_balance, 2),
+                "account_name": account_map.get(row.account_id, "") if is_aggregated else None,
             })
         
         return {
@@ -1440,7 +1877,9 @@ def get_general_ledger(
             "period": {"start": start_date, "end": end_date},
             "opening_balance": round(opening_balance, 2),
             "entries": entries,
-            "closing_balance": round(running_balance, 2)
+            "closing_balance": round(running_balance, 2),
+            "is_aggregated": is_aggregated,
+            "child_accounts_count": len(account_ids) - 1,
         }
     finally:
         db.close()
@@ -2006,9 +2445,15 @@ def horizontal_analysis(
                 if branch_id:
                     params["branch_id"] = branch_id
                 bal = db.execute(text(f"""
-                    SELECT COALESCE(SUM(jl.debit - jl.credit), 0) as net
+                    SELECT COALESCE(SUM(
+                        CASE WHEN a.account_type IN ('liability', 'equity', 'revenue')
+                             THEN jl.credit - jl.debit
+                             ELSE jl.debit - jl.credit
+                        END
+                    ), 0) as net
                     FROM journal_lines jl
                     JOIN journal_entries je ON jl.journal_entry_id = je.id
+                    JOIN accounts a ON jl.account_id = a.id
                     WHERE jl.account_id = :acct AND je.entry_date BETWEEN :start AND :end
                       AND je.status = 'posted' {branch_filter}
                 """), params).scalar()
@@ -2165,7 +2610,7 @@ def cost_center_report(
             params["branch_id"] = branch_id
 
         rows = db.execute(text(f"""
-            SELECT cc.id, cc.name, cc.code,
+            SELECT cc.id, cc.center_name, cc.center_code,
                    COALESCE(SUM(jl.debit), 0) as total_debit,
                    COALESCE(SUM(jl.credit), 0) as total_credit,
                    COALESCE(SUM(jl.debit - jl.credit), 0) as net
@@ -2173,7 +2618,7 @@ def cost_center_report(
             LEFT JOIN journal_lines jl ON cc.id = jl.cost_center_id
             LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
                 AND je.entry_date BETWEEN :start AND :end AND je.status = 'posted' {br}
-            GROUP BY cc.id, cc.name, cc.code
+            GROUP BY cc.id, cc.center_name, cc.center_code
             ORDER BY net DESC
         """), params).fetchall()
 
@@ -2409,15 +2854,26 @@ def sales_by_cashier(
     e = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
     try:
         rows = db.execute(text("""
+            WITH all_sales AS (
+                SELECT created_by, total AS sale_total, paid_amount, invoice_date::date AS sale_date
+                FROM invoices
+                WHERE invoice_type = 'sales' AND status != 'cancelled'
+                  AND invoice_date BETWEEN :start AND :end
+
+                UNION ALL
+
+                SELECT created_by, total_amount AS sale_total, paid_amount, order_date::date AS sale_date
+                FROM pos_orders
+                WHERE status != 'cancelled'
+                  AND order_date::date BETWEEN :start AND :end
+            )
             SELECT u.id, u.full_name,
-                   COUNT(inv.id) as invoice_count,
-                   COALESCE(SUM(inv.total), 0) as total_sales,
-                   COALESCE(SUM(inv.paid_amount), 0) as total_collected,
-                   COALESCE(AVG(inv.total), 0) as avg_invoice
-            FROM invoices inv
-            JOIN company_users u ON inv.created_by = u.id
-            WHERE inv.invoice_type = 'sales' AND inv.status != 'cancelled'
-              AND inv.invoice_date BETWEEN :start AND :end
+                   COUNT(*) as invoice_count,
+                   COALESCE(SUM(s.sale_total), 0) as total_sales,
+                   COALESCE(SUM(s.paid_amount), 0) as total_collected,
+                   COALESCE(AVG(s.sale_total), 0) as avg_invoice
+            FROM all_sales s
+            JOIN company_users u ON s.created_by = u.id
             GROUP BY u.id, u.full_name
             ORDER BY total_sales DESC
         """), {"start": s, "end": e}).fetchall()
@@ -2457,13 +2913,23 @@ def sales_target_vs_actual(
         except Exception:
             pass  # Table may not exist
 
-        # Actual monthly sales
+        # Actual monthly sales (invoices + POS)
         actuals = db.execute(text("""
-            SELECT EXTRACT(MONTH FROM invoice_date)::int as month,
-                   COALESCE(SUM(total), 0) as actual
-            FROM invoices
-            WHERE invoice_type = 'sales' AND status != 'cancelled'
-              AND EXTRACT(YEAR FROM invoice_date) = :y
+            SELECT EXTRACT(MONTH FROM sale_date)::int as month,
+                   COALESCE(SUM(total_amount), 0) as actual
+            FROM (
+                SELECT invoice_date::date AS sale_date, total AS total_amount
+                FROM invoices
+                WHERE invoice_type = 'sales' AND status != 'cancelled'
+                  AND EXTRACT(YEAR FROM invoice_date) = :y
+
+                UNION ALL
+
+                SELECT order_date::date AS sale_date, total_amount
+                FROM pos_orders
+                WHERE status != 'cancelled'
+                  AND EXTRACT(YEAR FROM order_date) = :y
+            ) t
             GROUP BY month
             ORDER BY month
         """), {"y": yr}).fetchall()
@@ -2491,11 +2957,19 @@ def sales_target_vs_actual(
 # ═══════════════════════════════════════════════════════════
 
 class CustomReportConfig(BaseModel):
-    source: str # 'sales', 'purchases', 'inventory', 'projects'
+    source: Optional[str] = None  # 'sales', 'purchases', 'inventory', 'projects'
+    table_name: Optional[str] = None  # alias for source (frontend compatibility)
     columns: List[str]
     filters: Optional[Dict[str, Any]] = {}
     sort_by: Optional[str] = None
     sort_order: Optional[str] = "desc"
+
+    model_config = {"extra": "ignore"}
+
+    @property
+    def resolved_source(self) -> str:
+        """Return source, falling back to table_name"""
+        return self.source or self.table_name or "sales"
 
 class CustomReportCreate(BaseModel):
     report_name: str
@@ -2648,19 +3122,84 @@ def _generate_custom_report_data(db, config: CustomReportConfig, user_id: int):
             "joins": "LEFT JOIN customers c ON p.customer_id = c.id LEFT JOIN employees e ON p.manager_id = e.id",
             "where": "1=1",
             "columns": {
+                "id": "p.id",
                 "code": "p.project_code",
                 "project_name": "p.project_name",
                 "customer": "c.customer_name",
                 "manager": "CONCAT(e.first_name, ' ', e.last_name)",
+                "manager_id": "p.manager_id",
                 "status": "p.status",
-                "progress": "p.progress_percentage"
+                "progress": "p.progress_percentage",
+                "start_date": "p.start_date",
+                "end_date": "p.end_date",
+                "budget": "p.budget"
+            }
+        },
+        "tasks": {
+            "table": "tasks",
+            "alias": "t",
+            "joins": "LEFT JOIN projects p ON t.project_id = p.id",
+            "where": "1=1",
+            "columns": {
+                "id": "t.id",
+                "task_name": "t.task_name",
+                "project_id": "t.project_id",
+                "status": "t.status",
+                "start_date": "t.start_date",
+                "end_date": "t.end_date",
+                "planned_hours": "t.planned_hours",
+                "actual_hours": "t.actual_hours"
+            }
+        },
+        "sales_invoices": {
+            "table": "invoices",
+            "alias": "i",
+            "joins": "LEFT JOIN parties p ON i.party_id = p.id",
+            "where": "i.invoice_type = 'sales' AND i.status != 'cancelled'",
+            "columns": {
+                "id": "i.id",
+                "invoice_number": "i.invoice_number",
+                "invoice_date": "i.invoice_date",
+                "date": "i.invoice_date",
+                "customer_id": "i.party_id",
+                "customer": "p.name",
+                "total_amount": "i.total",
+                "total": "i.total",
+                "status": "i.status"
+            }
+        },
+        "expenses": {
+            "table": "expenses",
+            "alias": "ex",
+            "joins": "",
+            "where": "1=1",
+            "columns": {
+                "id": "ex.id",
+                "expense_date": "ex.expense_date",
+                "amount": "ex.amount",
+                "category": "ex.category",
+                "description": "ex.description",
+                "project_id": "ex.project_id"
+            }
+        },
+        "customers": {
+            "table": "parties",
+            "alias": "p",
+            "joins": "",
+            "where": "p.party_type = 'customer'",
+            "columns": {
+                "id": "p.id",
+                "name": "p.name",
+                "email": "p.email",
+                "phone": "p.phone",
+                "city": "p.city"
             }
         }
     }
     
-    src = source_map.get(config.source)
+    src = source_map.get(config.resolved_source)
     if not src:
-        raise ValueError("Invalid Data Source")
+        raise ValueError(f"Invalid Data Source: {config.resolved_source}")
         
     # 2. Build Query
     select_cols = []
@@ -2997,5 +3536,89 @@ def sales_commission_report(
                 return create_export_response(buffer, f"commissions_{s_date}_{e_date}.pdf", "application/pdf")
 
         return result
+    finally:
+        db.close()
+
+
+# ===================== B8: KPI Dashboard =====================
+
+@router.get("/kpi/dashboard")
+def get_kpi_dashboard(current_user=Depends(get_current_user)):
+    """لوحة مؤشرات الأداء الرئيسية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        kpis = {}
+
+        # Revenue KPI
+        rev = db.execute(text("""
+            SELECT COALESCE(SUM(total_amount), 0) as current_month,
+                   (SELECT COALESCE(SUM(total_amount), 0) FROM invoices
+                    WHERE invoice_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+                      AND invoice_date < date_trunc('month', CURRENT_DATE)) as last_month
+            FROM invoices
+            WHERE invoice_date >= date_trunc('month', CURRENT_DATE)
+        """)).fetchone()
+        if rev:
+            r = dict(rev._mapping)
+            current = float(r.get("current_month", 0))
+            last = float(r.get("last_month", 0))
+            kpis["revenue"] = {
+                "value": current, "previous": last,
+                "change_pct": round((current - last) / last * 100, 2) if last else 0
+            }
+
+        # Expenses KPI
+        exp = db.execute(text("""
+            SELECT COALESCE(SUM(total_amount), 0) as current_month
+            FROM expenses WHERE expense_date >= date_trunc('month', CURRENT_DATE)
+        """)).fetchone()
+        kpis["expenses"] = {"value": float(dict(exp._mapping).get("current_month", 0))} if exp else {"value": 0}
+
+        # Outstanding receivables
+        ar = db.execute(text("""
+            SELECT COALESCE(SUM(balance_due), 0) as total
+            FROM invoices WHERE status != 'paid' AND invoice_type = 'sale'
+        """)).fetchone()
+        kpis["accounts_receivable"] = {"value": float(dict(ar._mapping).get("total", 0))} if ar else {"value": 0}
+
+        # Outstanding payables
+        ap = db.execute(text("""
+            SELECT COALESCE(SUM(balance_due), 0) as total
+            FROM invoices WHERE status != 'paid' AND invoice_type = 'purchase'
+        """)).fetchone()
+        kpis["accounts_payable"] = {"value": float(dict(ap._mapping).get("total", 0))} if ap else {"value": 0}
+
+        # Cash balance
+        cash = db.execute(text("""
+            SELECT COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE -amount END), 0) as balance
+            FROM journal_entries_lines jel
+            JOIN accounts a ON a.id = jel.account_id
+            WHERE a.account_type = 'cash'
+        """)).fetchone()
+        kpis["cash_balance"] = {"value": float(dict(cash._mapping).get("balance", 0))} if cash else {"value": 0}
+
+        # Inventory value
+        inv = db.execute(text("""
+            SELECT COALESCE(SUM(quantity_on_hand * unit_cost), 0) as total_value,
+                   COUNT(*) as total_items
+            FROM products WHERE is_active = TRUE
+        """)).fetchone()
+        if inv:
+            d = dict(inv._mapping)
+            kpis["inventory"] = {"value": float(d.get("total_value", 0)), "items": int(d.get("total_items", 0))}
+
+        # HR headcount
+        hr = db.execute(text("""
+            SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'active' THEN 1 END) as active
+            FROM employees
+        """)).fetchone()
+        if hr:
+            d = dict(hr._mapping)
+            kpis["employees"] = {"total": int(d.get("total", 0)), "active": int(d.get("active", 0))}
+
+        return kpis
+    except Exception as e:
+        logger.error(f"KPI Dashboard error: {e}")
+        return {}
     finally:
         db.close()

@@ -96,7 +96,7 @@ const NotesReceivable = () => {
     const isOverdue = (note) => note.status === 'pending' && new Date(note.due_date) < new Date();
     const statusBadge = (s) => {
         const map = { pending: 'badge-warning', collected: 'badge-success', protested: 'badge-danger' };
-        const labels = { pending: 'معلق', collected: 'محصل', protested: 'مرفوض' };
+        const labels = { pending: t('notesReceivable.pending'), collected: t('notesReceivable.collected'), protested: t('notesReceivable.protested') };
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>;
     };
 
@@ -107,11 +107,11 @@ const NotesReceivable = () => {
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">📜 أوراق القبض</h1>
-                    <p className="workspace-subtitle">إدارة وتتبع أوراق القبض (الكمبيالات / السندات لأمر)</p>
+                    <h1 className="workspace-title">📜 {t('notesReceivable.title')}</h1>
+                    <p className="workspace-subtitle">{t('notesReceivable.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => { setShowCreate(true); loadCreateData(); }}>
-                    <Plus size={16} /> إنشاء ورقة قبض
+                    <Plus size={16} /> {t('notesReceivable.create')}
                 </button>
             </div>
 
@@ -120,25 +120,25 @@ const NotesReceivable = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                     <div className="card p-3 text-center">
                         <Clock size={24} className="text-warning mb-2" />
-                        <div className="small text-muted">معلقة</div>
+                        <div className="small text-muted">{t('notesReceivable.pending')}</div>
                         <div className="fw-bold fs-4">{stats.pending.count}</div>
                         <div className="small text-muted">{fmt(stats.pending.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <CheckCircle size={24} className="text-success mb-2" />
-                        <div className="small text-muted">محصلة</div>
+                        <div className="small text-muted">{t('notesReceivable.collected')}</div>
                         <div className="fw-bold fs-4 text-success">{stats.collected.count}</div>
                         <div className="small text-muted">{fmt(stats.collected.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <XCircle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">مرفوضة</div>
+                        <div className="small text-muted">{t('notesReceivable.protested')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.protested.count}</div>
                         <div className="small text-muted">{fmt(stats.protested.total)} {currency}</div>
                     </div>
                     <div className="card p-3 text-center">
                         <AlertTriangle size={24} className="text-danger mb-2" />
-                        <div className="small text-muted">متأخرة</div>
+                        <div className="small text-muted">{t('notesReceivable.overdue')}</div>
                         <div className="fw-bold fs-4 text-danger">{stats.overdue.count}</div>
                         <div className="small text-muted">{fmt(stats.overdue.total)} {currency}</div>
                     </div>
@@ -149,12 +149,12 @@ const NotesReceivable = () => {
             <div className="card p-3 mb-3">
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <select className="form-input" style={{ maxWidth: '200px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                        <option value="">جميع الحالات</option>
-                        <option value="pending">معلقة</option>
-                        <option value="collected">محصلة</option>
-                        <option value="protested">مرفوضة</option>
+                        <option value="">{t('notesReceivable.allStatuses')}</option>
+                        <option value="pending">{t('notesReceivable.pending')}</option>
+                        <option value="collected">{t('notesReceivable.collected')}</option>
+                        <option value="protested">{t('notesReceivable.protested')}</option>
                     </select>
-                    <span className="text-muted small">{notes.length} ورقة</span>
+                    <span className="text-muted small">{notes.length} {t('notesReceivable.noteCount')}</span>
                 </div>
             </div>
 
@@ -163,19 +163,19 @@ const NotesReceivable = () => {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>رقم الورقة</th>
-                            <th>الساحب</th>
-                            <th>العميل</th>
-                            <th>البنك</th>
-                            <th className="text-end">المبلغ</th>
-                            <th>تاريخ الاستحقاق</th>
-                            <th>الحالة</th>
-                            <th>إجراءات</th>
+                            <th>{t('notesReceivable.noteNumber')}</th>
+                            <th>{t('notesReceivable.drawerName')}</th>
+                            <th>{t('notesReceivable.customer')}</th>
+                            <th>{t('notesReceivable.bank')}</th>
+                            <th className="text-end">{t('notesReceivable.amount')}</th>
+                            <th>{t('notesReceivable.dueDate')}</th>
+                            <th>{t('notesReceivable.status')}</th>
+                            <th>{t('notesReceivable.actions')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {notes.length === 0 ? (
-                            <tr><td colSpan="8" className="text-center py-4 text-muted">لا توجد أوراق قبض</td></tr>
+                            <tr><td colSpan="8" className="text-center py-4 text-muted">{t('notesReceivable.noNotes')}</td></tr>
                         ) : notes.map(note => (
                             <tr key={note.id} style={isOverdue(note) ? { backgroundColor: 'rgba(255,0,0,0.05)' } : {}}>
                                 <td className="fw-bold">{note.note_number}</td>
@@ -185,20 +185,20 @@ const NotesReceivable = () => {
                                 <td className="text-end font-monospace fw-bold">{fmt(note.amount)}</td>
                                 <td>
                                     {formatDate(note.due_date)}
-                                    {isOverdue(note) && <span className="badge badge-danger ms-1" style={{ fontSize: '10px' }}>متأخر</span>}
+                                    {isOverdue(note) && <span className="badge badge-danger ms-1" style={{ fontSize: '10px' }}>{t('notesReceivable.overdue')}</span>}
                                 </td>
                                 <td>{statusBadge(note.status)}</td>
                                 <td>
                                     <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button className="btn btn-sm btn-light" onClick={() => setShowDetail(note)} title="عرض">
+                                        <button className="btn btn-sm btn-light" onClick={() => setShowDetail(note)} title={t('notesReceivable.view')}>
                                             <Eye size={14} />
                                         </button>
                                         {note.status === 'pending' && (
                                             <>
-                                                <button className="btn btn-sm btn-success" onClick={() => { setShowCollect(note); loadCreateData(); }} title="تحصيل">
+                                                <button className="btn btn-sm btn-success" onClick={() => { setShowCollect(note); loadCreateData(); }} title={t('notesReceivable.collect')}>
                                                     <CheckCircle size={14} />
                                                 </button>
-                                                <button className="btn btn-sm btn-danger" onClick={() => setShowProtest(note)} title="رفض">
+                                                <button className="btn btn-sm btn-danger" onClick={() => setShowProtest(note)} title={t('notesReceivable.protest')}>
                                                     <XCircle size={14} />
                                                 </button>
                                             </>
@@ -216,58 +216,58 @@ const NotesReceivable = () => {
                 <div className="modal-overlay" onClick={() => setShowCreate(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
                         <div className="modal-header">
-                            <h3>إنشاء ورقة قبض</h3>
+                            <h3>{t('notesReceivable.create')}</h3>
                             <button className="btn-icon" onClick={() => setShowCreate(false)}>&times;</button>
                         </div>
                         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div className="form-group">
-                                    <label className="form-label">رقم الورقة *</label>
+                                    <label className="form-label">{t('notesReceivable.noteNumber')} *</label>
                                     <input className="form-input" value={form.note_number} onChange={e => setForm({ ...form, note_number: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">المبلغ *</label>
+                                    <label className="form-label">{t('notesReceivable.amount')} *</label>
                                     <input type="number" step="0.01" className="form-input" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">اسم الساحب</label>
+                                    <label className="form-label">{t('notesReceivable.drawerName')}</label>
                                     <input className="form-input" value={form.drawer_name} onChange={e => setForm({ ...form, drawer_name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">البنك</label>
+                                    <label className="form-label">{t('notesReceivable.bank')}</label>
                                     <input className="form-input" value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ الإصدار</label>
-                                    <DateInput className="form-input" value={formatDate(form.issue_date)} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
+                                    <label className="form-label">{t('notesReceivable.issueDate')}</label>
+                                    <DateInput className="form-input" value={form.issue_date} onChange={e => setForm({ ...form, issue_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">تاريخ الاستحقاق *</label>
-                                    <DateInput className="form-input" value={formatDate(form.due_date)} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+                                    <label className="form-label">{t('notesReceivable.dueDate')} *</label>
+                                    <DateInput className="form-input" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">العميل</label>
+                                    <label className="form-label">{t('notesReceivable.customer')}</label>
                                     <select className="form-input" value={form.party_id} onChange={e => setForm({ ...form, party_id: e.target.value })}>
-                                        <option value="">-- اختر --</option>
+                                        <option value="">{t('notesReceivable.select')}</option>
                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">حساب الخزينة</label>
+                                    <label className="form-label">{t('notesReceivable.treasuryAccount')}</label>
                                     <select className="form-input" value={form.treasury_account_id} onChange={e => setForm({ ...form, treasury_account_id: e.target.value })}>
-                                        <option value="">-- اختر --</option>
+                                        <option value="">{t('notesReceivable.select')}</option>
                                         {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">ملاحظات</label>
+                                <label className="form-label">{t('notesReceivable.notes')}</label>
                                 <textarea className="form-input" rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowCreate(false)}>إلغاء</button>
-                            <button className="btn btn-primary" onClick={handleCreate}>إنشاء</button>
+                            <button className="btn btn-light" onClick={() => setShowCreate(false)}>{t('notesReceivable.cancel')}</button>
+                            <button className="btn btn-primary" onClick={handleCreate}>{t('notesReceivable.createBtn')}</button>
                         </div>
                     </div>
                 </div>
@@ -278,31 +278,31 @@ const NotesReceivable = () => {
                 <div className="modal-overlay" onClick={() => setShowDetail(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
-                            <h3>تفاصيل ورقة القبض</h3>
+                            <h3>{t('notesReceivable.noteDetail')}</h3>
                             <button className="btn-icon" onClick={() => setShowDetail(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 {[
-                                    ['رقم الورقة', showDetail.note_number],
-                                    ['المبلغ', fmt(showDetail.amount) + ' ' + (showDetail.currency || '')],
-                                    ['الساحب', showDetail.drawer_name],
-                                    ['البنك', showDetail.bank_name],
-                                    ['العميل', showDetail.party_name],
-                                    ['تاريخ الإصدار', showDetail.issue_date],
-                                    ['تاريخ الاستحقاق', showDetail.due_date],
-                                    ['الحالة', showDetail.status],
-                                    ['تاريخ التحصيل', showDetail.collection_date],
-                                    ['تاريخ الرفض', showDetail.protest_date],
-                                    ['سبب الرفض', showDetail.protest_reason],
+                                    [t('notesReceivable.noteNumber'), showDetail.note_number],
+                                    [t('notesReceivable.amount'), fmt(showDetail.amount) + ' ' + (showDetail.currency || '')],
+                                    [t('notesReceivable.drawerName'), showDetail.drawer_name],
+                                    [t('notesReceivable.bank'), showDetail.bank_name],
+                                    [t('notesReceivable.customer'), showDetail.party_name],
+                                    [t('notesReceivable.issueDate'), showDetail.issue_date],
+                                    [t('notesReceivable.dueDate'), showDetail.due_date],
+                                    [t('notesReceivable.status'), showDetail.status],
+                                    [t('notesReceivable.collectionDate'), showDetail.collection_date],
+                                    [t('notesReceivable.protestDate'), showDetail.protest_date],
+                                    [t('notesReceivable.protestReason'), showDetail.protest_reason],
                                 ].map(([label, val], i) => val ? (
                                     <div key={i}><span className="small text-muted">{label}</span><div className="fw-bold">{val}</div></div>
                                 ) : null)}
                             </div>
-                            {showDetail.notes && <div className="mt-3"><span className="small text-muted">ملاحظات</span><div>{showDetail.notes}</div></div>}
+                            {showDetail.notes && <div className="mt-3"><span className="small text-muted">{t('notesReceivable.notes')}</span><div>{showDetail.notes}</div></div>}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowDetail(null)}>إغلاق</button>
+                            <button className="btn btn-light" onClick={() => setShowDetail(null)}>{t('notesReceivable.close')}</button>
                         </div>
                     </div>
                 </div>
@@ -313,28 +313,28 @@ const NotesReceivable = () => {
                 <div className="modal-overlay" onClick={() => setShowCollect(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="modal-header">
-                            <h3>تحصيل ورقة القبض</h3>
+                            <h3>{t('notesReceivable.collect')}</h3>
                             <button className="btn-icon" onClick={() => setShowCollect(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
-                            <p>ورقة رقم <strong>{showCollect.note_number}</strong> بمبلغ <strong>{fmt(showCollect.amount)}</strong></p>
+                            <p>{t('notesReceivable.noteInfo', { number: showCollect.note_number, amount: fmt(showCollect.amount) })}</p>
                             <div className="form-group mb-3">
-                                <label className="form-label">تاريخ التحصيل</label>
+                                <label className="form-label">{t('notesReceivable.collectionDate')}</label>
                                 <DateInput className="form-input" value={collectForm.collection_date}
                                     onChange={e => setCollectForm({ ...collectForm, collection_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">حساب البنك</label>
+                                <label className="form-label">{t('notesReceivable.bankAccount')}</label>
                                 <select className="form-input" value={collectForm.treasury_account_id}
                                     onChange={e => setCollectForm({ ...collectForm, treasury_account_id: e.target.value })}>
-                                    <option value="">-- اختر --</option>
+                                    <option value="">{t('notesReceivable.select')}</option>
                                     {treasuryAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                                 </select>
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowCollect(null)}>إلغاء</button>
-                            <button className="btn btn-success" onClick={handleCollect}>تأكيد التحصيل</button>
+                            <button className="btn btn-light" onClick={() => setShowCollect(null)}>{t('notesReceivable.cancel')}</button>
+                            <button className="btn btn-success" onClick={handleCollect}>{t('notesReceivable.confirmCollect')}</button>
                         </div>
                     </div>
                 </div>
@@ -345,25 +345,25 @@ const NotesReceivable = () => {
                 <div className="modal-overlay" onClick={() => setShowProtest(null)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
                         <div className="modal-header">
-                            <h3>رفض ورقة القبض</h3>
+                            <h3>{t('notesReceivable.protest')}</h3>
                             <button className="btn-icon" onClick={() => setShowProtest(null)}>&times;</button>
                         </div>
                         <div className="modal-body">
-                            <p>ورقة رقم <strong>{showProtest.note_number}</strong> بمبلغ <strong>{fmt(showProtest.amount)}</strong></p>
+                            <p>{t('notesReceivable.noteInfo', { number: showProtest.note_number, amount: fmt(showProtest.amount) })}</p>
                             <div className="form-group mb-3">
-                                <label className="form-label">تاريخ الرفض</label>
+                                <label className="form-label">{t('notesReceivable.protestDate')}</label>
                                 <DateInput className="form-input" value={protestForm.protest_date}
                                     onChange={e => setProtestForm({ ...protestForm, protest_date: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">سبب الرفض</label>
+                                <label className="form-label">{t('notesReceivable.protestReason')}</label>
                                 <textarea className="form-input" rows="2" value={protestForm.reason}
                                     onChange={e => setProtestForm({ ...protestForm, reason: e.target.value })} />
                             </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-light" onClick={() => setShowProtest(null)}>إلغاء</button>
-                            <button className="btn btn-danger" onClick={handleProtest}>تأكيد الرفض</button>
+                            <button className="btn btn-light" onClick={() => setShowProtest(null)}>{t('notesReceivable.cancel')}</button>
+                            <button className="btn btn-danger" onClick={handleProtest}>{t('notesReceivable.confirmProtest')}</button>
                         </div>
                     </div>
                 </div>

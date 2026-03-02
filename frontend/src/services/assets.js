@@ -31,4 +31,18 @@ export const assetsAPI = {
     // Individual Asset Revalue & Transfer (GL-003/GL-007)
     revalueAsset: (assetId, data) => api.post(`/assets/${assetId}/revalue`, data),
     transferAsset: (assetId, data) => api.post(`/assets/${assetId}/transfer`, data),
+
+    // Reports
+    getRegisterReport: (params) => api.get('/assets/reports/register', { params }),
+    getDepreciationSummary: (params) => api.get('/assets/reports/depreciation-summary', { params }),
+    getNetBookValueReport: (params) => api.get('/assets/reports/net-book-value', { params }),
+
+    // IFRS 16 Lease Contracts (B6)
+    listLeaseContracts: (params) => api.get('/assets/leases', { params }),
+    createLeaseContract: (data) => api.post('/assets/leases', data),
+    getLeaseSchedule: (leaseId) => api.get(`/assets/leases/${leaseId}/schedule`),
+
+    // IAS 36 Impairment (B6)
+    listImpairments: (assetId) => api.get(`/assets/${assetId}/impairments`),
+    runImpairmentTest: (assetId, data) => api.post(`/assets/${assetId}/impairment-test`, data),
 }

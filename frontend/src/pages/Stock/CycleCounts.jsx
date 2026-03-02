@@ -4,10 +4,12 @@ import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext'
 
 
 function CycleCounts() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const [cycleCounts, setCycleCounts] = useState([])
     const [loading, setLoading] = useState(true)
@@ -92,7 +94,7 @@ function CycleCounts() {
             await inventoryAPI.startCycleCount(id)
             fetchCycleCounts()
         } catch (err) {
-            alert(err.response?.data?.detail || t('common.error_occurred'))
+            showToast(err.response?.data?.detail || t('common.error_occurred', 'error'))
         }
     }
 
@@ -109,7 +111,7 @@ function CycleCounts() {
             setItemUpdates(items)
             setShowDetailModal(true)
         } catch (err) {
-            alert(t('stock.cycle.error_loading'))
+            showToast(t('stock.cycle.error_loading', 'error'))
         }
     }
 

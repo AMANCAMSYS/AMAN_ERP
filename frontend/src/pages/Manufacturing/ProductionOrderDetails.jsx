@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, ArrowLeft, Play, CheckCircle, XCircle, Factory, Package, DollarSign, AlertTriangle, Clock } from 'lucide-react'
 import api from '../../utils/api'
-import { formatNumber } from '../../utils/format'
+import { formatNumber, formatCurrency } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
 import SimpleModal from '../../components/common/SimpleModal'
@@ -138,7 +138,7 @@ export default function ProductionOrderDetails() {
                                 {getStatusBadge(order.status)}
                             </h1>
                             <p className="text-muted small mb-0" style={{ marginTop: '4px' }}>
-                                {order.bom_name} — {order.finished_product_name}
+                                {order.bom_name} — {order.product_name}
                             </p>
                         </div>
                     </div>
@@ -186,8 +186,8 @@ export default function ProductionOrderDetails() {
             {/* Summary Cards */}
             <div className="row g-3 mb-4">
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className="card card-compact h-100">
+                        <div className="d-flex align-items-center gap-3">
                             <div style={{ padding: '10px', borderRadius: '12px', background: '#fff8e1' }}>
                                 <Factory size={22} style={{ color: '#f59e0b' }} />
                             </div>
@@ -199,8 +199,8 @@ export default function ProductionOrderDetails() {
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className="card card-compact h-100">
+                        <div className="d-flex align-items-center gap-3">
                             <div style={{ padding: '10px', borderRadius: '12px', background: '#e8f5e9' }}>
                                 <Package size={22} style={{ color: '#2e7d32' }} />
                             </div>
@@ -212,8 +212,8 @@ export default function ProductionOrderDetails() {
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className="card card-compact h-100">
+                        <div className="d-flex align-items-center gap-3">
                             <div style={{ padding: '10px', borderRadius: '12px', background: '#e3f2fd' }}>
                                 <DollarSign size={22} style={{ color: '#1565c0' }} />
                             </div>
@@ -225,8 +225,8 @@ export default function ProductionOrderDetails() {
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-3 d-flex align-items-center gap-3">
+                    <div className="card card-compact h-100">
+                        <div className="d-flex align-items-center gap-3">
                             <div style={{ padding: '10px', borderRadius: '12px', background: '#fce4ec' }}>
                                 <DollarSign size={22} style={{ color: '#c62828' }} />
                             </div>
@@ -242,8 +242,8 @@ export default function ProductionOrderDetails() {
             {/* Order Info + Cost Breakdown */}
             <div className="row g-3 mb-4">
                 <div className="col-md-6">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
+                    <div className="card card-compact h-100">
+                        <div >
                             <h6 className="fw-bold mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 📋 {t('manufacturing.details.order_info')}
                             </h6>
@@ -254,7 +254,7 @@ export default function ProductionOrderDetails() {
                                 </div>
                                 <div>
                                     <div className="text-muted small mb-1">{t('manufacturing.product')}</div>
-                                    <div className="fw-semibold">{order.finished_product_name}</div>
+                                    <div className="fw-semibold">{order.product_name}</div>
                                 </div>
                                 <div>
                                     <div className="text-muted small mb-1">{t('common.start_date')}</div>
@@ -278,8 +278,8 @@ export default function ProductionOrderDetails() {
                 </div>
 
                 <div className="col-md-6">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
+                    <div className="card card-compact h-100">
+                        <div >
                             <h6 className="fw-bold mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 💰 {t('manufacturing.details.cost_breakdown')}
                             </h6>
@@ -319,8 +319,8 @@ export default function ProductionOrderDetails() {
             </div>
 
             {/* Raw Materials Table */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-                <div className="card-body p-4 pb-0">
+            <div className="card card-flush mb-4">
+                <div className="p-4 pb-0">
                     <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         📦 {t('manufacturing.raw_materials')}
                         <span className="badge bg-primary-subtle text-primary rounded-pill">{order.materials.length}</span>
@@ -374,8 +374,8 @@ export default function ProductionOrderDetails() {
             </div>
 
             {/* Operations / Job Cards */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-                <div className="card-body p-4 pb-0 d-flex justify-content-between">
+            <div className="card card-flush mb-4">
+                <div className="p-4 pb-0 d-flex justify-content-between">
                     <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         ⚙️ {t('manufacturing.operations')}
                     </h6>
@@ -434,8 +434,8 @@ export default function ProductionOrderDetails() {
 
             {/* Inventory Transactions */}
             {order.transactions && order.transactions.length > 0 && (
-                <div className="card border-0 shadow-sm" style={{ borderRadius: '12px', overflow: 'hidden' }}>
-                    <div className="card-body p-4 pb-0">
+                <div className="card card-flush">
+                    <div className="p-4 pb-0">
                         <h6 className="fw-bold mb-0" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             📊 {t('manufacturing.details.inventory_movements')}
                         </h6>
@@ -485,7 +485,7 @@ export default function ProductionOrderDetails() {
                         {t('manufacturing.details.complete_confirm')}
                     </p>
                     <div style={{ background: '#f8f9fa', padding: '14px', borderRadius: '10px', marginBottom: '16px' }}>
-                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.product')}:</strong> {order.finished_product_name}</p>
+                        <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.product')}:</strong> {order.product_name}</p>
                         <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.total_output')}:</strong> {formatNumber(order.total_output)} {t('manufacturing.unit')}</p>
                         <p style={{ margin: '4px 0' }}><strong>{t('manufacturing.details.total_cost')}:</strong> {formatNumber(order.total_material_cost)}</p>
                     </div>

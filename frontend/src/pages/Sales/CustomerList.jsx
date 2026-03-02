@@ -139,7 +139,7 @@ function CustomerList() {
                                             direction: 'ltr',
                                             textAlign: 'right'
                                         }}>
-                                            {formatNumber(customer.current_balance)} {currency}
+                                            {formatNumber(customer.current_balance)} {customer.currency || currency}
                                         </div>
                                     </td>
                                     <td>

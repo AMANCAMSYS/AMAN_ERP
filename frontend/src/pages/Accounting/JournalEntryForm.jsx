@@ -150,8 +150,8 @@ const JournalEntryForm = () => {
             </div>
 
             <div className="workspace-content">
-                <div className="card mb-4" style={{ borderRadius: '12px' }}>
-                    <div className="card-body p-4">
+                <div className="card mb-4">
+                    <div >
                         <div className="row">
                             <div className="col-md-2 mb-3">
                                 <CurrencySelector
@@ -202,7 +202,7 @@ const JournalEntryForm = () => {
                     </div>
                 </div>
 
-                <div className="card" style={{ borderRadius: '12px' }}>
+                <div className="card">
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead>

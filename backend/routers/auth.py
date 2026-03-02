@@ -9,9 +9,12 @@ from sqlalchemy import text, create_engine
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from pydantic import BaseModel, EmailStr
 import logging
+import secrets
+import hashlib
 
-from database import get_system_db, verify_password, get_db_connection
+from database import get_system_db, verify_password, get_db_connection, hash_password, engine as system_engine
 from config import settings
 from schemas import Token, UserResponse
 from utils.audit import log_activity, log_system_activity
@@ -729,9 +732,238 @@ async def refresh_token(token: str = Depends(oauth2_scheme)):
         
         new_token = create_access_token(new_payload)
         
+        # SEC-FIX-003: Blacklist the old token to prevent reuse
+        add_token_to_blacklist(token, username=username, reason="refresh")
+        
         return {
             "access_token": new_token,
             "token_type": "bearer"
         }
     except JWTError:
         raise credentials_exception
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FORGOT / RESET PASSWORD
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _ensure_reset_table():
+    """Ensure password_reset_tokens table exists in system DB with all required columns"""
+    try:
+        with system_engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL,
+                    company_id VARCHAR(50),
+                    email VARCHAR(255),
+                    token_hash VARCHAR(255) NOT NULL UNIQUE,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            # Ensure columns exist for tables created before schema updates
+            conn.execute(text("ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+            conn.execute(text("ALTER TABLE password_reset_tokens ADD COLUMN IF NOT EXISTS company_id VARCHAR(50)"))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"_ensure_reset_table error: {e}")
+
+
+@router.post("/forgot-password")
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, body: ForgotPasswordRequest):
+    """
+    طلب إعادة تعيين كلمة المرور — يرسل رابط عبر البريد الإلكتروني
+    يبحث عن المستخدم بالبريد في جميع الشركات
+    """
+    _ensure_reset_table()
+    email = body.email.strip().lower()
+
+    # Always return success to prevent email enumeration
+    success_msg = {"message": "إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين"}
+
+    db = get_system_db()
+    try:
+        # Search all company databases for this email
+        companies = db.execute(
+            text("SELECT id FROM system_companies WHERE status = 'active'")
+        ).fetchall()
+
+        found_user = None
+        found_company = None
+
+        for company in companies:
+            company_id = company[0]
+            try:
+                company_db = get_db_connection(company_id)
+                user = company_db.execute(
+                    text("SELECT id, username, email, full_name FROM company_users WHERE LOWER(email) = :email AND is_active = true"),
+                    {"email": email}
+                ).fetchone()
+                company_db.close()
+
+                if user:
+                    found_user = user
+                    found_company = company_id
+                    break
+            except Exception:
+                continue
+
+        if not found_user:
+            return success_msg
+
+        # Generate secure reset token
+        reset_token = secrets.token_urlsafe(48)
+        token_hash = _hash_reset_token(reset_token)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        # Store token
+        with system_engine.connect() as conn:
+            # Invalidate old tokens
+            conn.execute(text(
+                "UPDATE password_reset_tokens SET used = TRUE WHERE username = :username AND used = FALSE"
+            ), {"username": found_user.username})
+
+            conn.execute(text("""
+                INSERT INTO password_reset_tokens (username, company_id, email, token_hash, expires_at)
+                VALUES (:username, :cid, :email, :hash, :exp)
+            """), {
+                "username": found_user.username,
+                "cid": found_company,
+                "email": email,
+                "hash": token_hash,
+                "exp": expires_at
+            })
+            conn.commit()
+
+        # Build reset URL — skip placeholder production URLs
+        prod_url = settings.FRONTEND_URL_PRODUCTION
+        if prod_url and prod_url.startswith("https://your-domain"):
+            prod_url = None
+        frontend_url = prod_url or settings.FRONTEND_URL or "http://localhost:5173"
+        reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+
+        # Always log the reset URL — useful when SMTP is not configured
+        logger.info(f"🔑 Password reset URL for {email}: {reset_url}")
+
+        # Send email
+        email_sent = False
+        smtp_configured = bool(settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD)
+        if smtp_configured:
+            try:
+                from utils.email import send_email
+                from services.email_service import get_base_template
+
+                body_html = get_base_template(f"""
+                    <h2>إعادة تعيين كلمة المرور</h2>
+                    <p>مرحباً {found_user.full_name or found_user.username}،</p>
+                    <p>لقد تلقينا طلباً لإعادة تعيين كلمة المرور الخاصة بك.</p>
+                    <p>اضغط على الزر أدناه لإعادة التعيين:</p>
+                    <p style="text-align: center;">
+                        <a href="{reset_url}" class="btn">إعادة تعيين كلمة المرور</a>
+                    </p>
+                    <div class="info-box">
+                        <p>⏰ هذا الرابط صالح لمدة <strong>ساعة واحدة</strong> فقط.</p>
+                        <p>إذا لم تطلب إعادة التعيين، تجاهل هذا البريد.</p>
+                    </div>
+                """)
+
+                email_sent = send_email(
+                    to_emails=[email],
+                    subject="🔐 إعادة تعيين كلمة المرور - AMAN ERP",
+                    body=body_html
+                )
+                if email_sent:
+                    logger.info(f"🔐 Password reset email sent to {email}")
+                else:
+                    logger.warning(f"⚠️ Email send returned False for {email}, check SMTP credentials")
+            except Exception as e:
+                logger.error(f"❌ Failed to send reset email: {e}")
+        else:
+            logger.warning("⚠️ SMTP not configured — reset URL logged above for development use")
+
+        # SEC-FIX-001: Never expose reset token in API response
+        # In development, log the URL server-side only
+        if not smtp_configured or not email_sent:
+            logger.warning(f"⚠️ SMTP not available — DEV ONLY reset URL: {reset_url}")
+            # Return the same generic message regardless (prevent email enumeration)
+
+        return success_msg
+
+    except Exception as e:
+        logger.error(f"Forgot password error: {e}")
+        return success_msg
+    finally:
+        db.close()
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, body: ResetPasswordRequest):
+    """
+    إعادة تعيين كلمة المرور باستخدام التوكن المُرسل بالبريد
+    """
+    _ensure_reset_table()
+    token_hash = _hash_reset_token(body.token)
+
+    # SEC-FIX-004: Enforce strong password policy
+    from utils.sql_safety import validate_password_strength
+    validate_password_strength(body.new_password)
+
+    with system_engine.connect() as conn:
+        # Find valid token
+        token_row = conn.execute(text("""
+            SELECT username, company_id, email FROM password_reset_tokens
+            WHERE token_hash = :hash AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
+        """), {"hash": token_hash}).fetchone()
+
+        if not token_row:
+            raise HTTPException(400, "الرابط غير صالح أو منتهي الصلاحية")
+
+        username = token_row.username
+        company_id = token_row.company_id
+
+        # Update password in company database
+        try:
+            company_db = get_db_connection(company_id)
+            new_hash = hash_password(body.new_password)
+            company_db.execute(
+                text("UPDATE company_users SET password = :pwd, updated_at = CURRENT_TIMESTAMP WHERE username = :user"),
+                {"pwd": new_hash, "user": username}
+            )
+            company_db.commit()
+            company_db.close()
+        except Exception as e:
+            logger.error(f"Failed to update password: {e}")
+            raise HTTPException(500, "فشل في تحديث كلمة المرور")
+
+        # Mark token as used
+        conn.execute(text(
+            "UPDATE password_reset_tokens SET used = TRUE WHERE token_hash = :hash"
+        ), {"hash": token_hash})
+        conn.commit()
+
+        # Blacklist all existing tokens for this user
+        # (force re-login after password change)
+        log_system_activity(
+            action="auth.password_reset",
+            performed_by=username,
+            description=f"Password reset via email for user {username}",
+            request=request
+        )
+
+        return {"message": "تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول"}

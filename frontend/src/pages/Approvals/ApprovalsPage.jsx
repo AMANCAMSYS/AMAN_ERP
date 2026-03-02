@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Check, X, RotateCcw, Eye, Settings, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Check, X, RotateCcw, Eye, Settings, Clock, CheckCircle, XCircle, AlertCircle, Zap, ArrowUpCircle, BarChart3 } from 'lucide-react';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
 import { getCurrency, hasPermission } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
@@ -15,19 +16,27 @@ const ApprovalsPage = () => {
     const { showToast } = useToast();
     const currency = getCurrency();
     const isRTL = i18n.language === 'ar';
-    const [activeTab, setActiveTab] = useState('pending'); // pending, requests, workflows
+    const [activeTab, setActiveTab] = useState('pending'); // pending, requests, workflows, advanced
 
     // Permissions
     const canAction = hasPermission('approvals.action');
     const canCreate = hasPermission('approvals.create');
     const canEdit = hasPermission('approvals.edit');
     const canDelete = hasPermission('approvals.delete');
+    const canManage = hasPermission('approvals.manage') || hasPermission('settings.edit');
 
     // State
     const [pendingItems, setPendingItems] = useState([]);
     const [allRequests, setAllRequests] = useState([]);
     const [workflows, setWorkflows] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Advanced Workflow State
+    const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
+    const [slaForm, setSlaForm] = useState({ sla_hours: 24, auto_approve_below: 0, escalation_to: null, allow_parallel: false });
+    const [savingSLA, setSavingSLA] = useState(false);
+    const [workflowAnalytics, setWorkflowAnalytics] = useState(null);
+    const [runningAction, setRunningAction] = useState(null);
 
     // Action Modal State
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -68,6 +77,13 @@ const ApprovalsPage = () => {
             } else if (activeTab === 'workflows') {
                 const response = await api.get('/approvals/workflows');
                 setWorkflows(response.data || []);
+            } else if (activeTab === 'advanced') {
+                const wfRes = await api.get('/approvals/workflows');
+                setWorkflows(wfRes.data || []);
+                try {
+                    const analyticsRes = await api.get('/workflow/analytics');
+                    setWorkflowAnalytics(analyticsRes.data);
+                } catch { setWorkflowAnalytics(null); }
             }
         } catch (error) {
             console.error("Failed to fetch data", error);
@@ -130,6 +146,7 @@ const ApprovalsPage = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                     <div>
                         <h1 className="workspace-title">✅ {t('approvals.title')}</h1>
@@ -181,6 +198,11 @@ const ApprovalsPage = () => {
                 <button className={`tab ${activeTab === 'workflows' ? 'active' : ''}`} onClick={() => setActiveTab('workflows')}>
                     {t('approvals.workflows')}
                 </button>
+                {canManage && (
+                    <button className={`tab ${activeTab === 'advanced' ? 'active' : ''}`} onClick={() => setActiveTab('advanced')}>
+                        ⚡ {t('approvals.advanced_settings', 'إعدادات متقدمة')}
+                    </button>
+                )}
             </div>
 
             {/* Content Container */}
@@ -361,12 +383,180 @@ const ApprovalsPage = () => {
                                 </tbody>
                             </table>
                         )}
+
+                        {/* Tab 4: Advanced SLA & Auto-Approve */}
+                        {activeTab === 'advanced' && (
+                            <div className="p-4 space-y-6">
+                                {/* Quick Actions */}
+                                <div className="flex flex-wrap gap-3">
+                                    <button
+                                        className="btn btn-success btn-sm"
+                                        disabled={runningAction === 'auto-approve'}
+                                        onClick={async () => {
+                                            setRunningAction('auto-approve');
+                                            try {
+                                                const res = await api.post('/workflow/auto-approve');
+                                                showToast(`${res.data.message || t('common.success')}`, 'success');
+                                                fetchData();
+                                            } catch (e) { showToast(t('common.error'), 'error'); }
+                                            finally { setRunningAction(null); }
+                                        }}
+                                    >
+                                        {runningAction === 'auto-approve' ? <span className="loading loading-spinner loading-xs"></span> : <Zap size={14} />}
+                                        {t('approvals.run_auto_approve', 'تشغيل الموافقة التلقائية')}
+                                    </button>
+                                    <button
+                                        className="btn btn-warning btn-sm"
+                                        disabled={runningAction === 'escalation'}
+                                        onClick={async () => {
+                                            setRunningAction('escalation');
+                                            try {
+                                                const res = await api.post('/workflow/check-escalation');
+                                                showToast(`${res.data.message || t('common.success')}`, 'success');
+                                                fetchData();
+                                            } catch (e) { showToast(t('common.error'), 'error'); }
+                                            finally { setRunningAction(null); }
+                                        }}
+                                    >
+                                        {runningAction === 'escalation' ? <span className="loading loading-spinner loading-xs"></span> : <ArrowUpCircle size={14} />}
+                                        {t('approvals.run_escalation', 'تشغيل التصعيد')}
+                                    </button>
+                                </div>
+
+                                {/* Analytics Summary */}
+                                {workflowAnalytics && (
+                                    <div className="bg-base-200/50 p-4 rounded-xl border">
+                                        <h4 className="font-bold mb-3 flex items-center gap-2"><BarChart3 size={16} /> {t('approvals.analytics_title', 'إحصاءات الاعتمادات')}</h4>
+                                        <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+                                            <div className="metric-card">
+                                                <div className="metric-label">{t('approvals.total_requests_stat', 'إجمالي الطلبات')}</div>
+                                                <div className="metric-value">{workflowAnalytics.total_requests || 0}</div>
+                                            </div>
+                                            <div className="metric-card">
+                                                <div className="metric-label">{t('approvals.approval_rate', 'معدل الموافقة')}</div>
+                                                <div className="metric-value text-success">{workflowAnalytics.approval_rate || 0}%</div>
+                                            </div>
+                                            <div className="metric-card">
+                                                <div className="metric-label">{t('approvals.avg_hours', 'متوسط وقت الاعتماد')}</div>
+                                                <div className="metric-value">{workflowAnalytics.avg_approval_hours ? `${Math.round(workflowAnalytics.avg_approval_hours)}h` : '-'}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* SLA Settings per Workflow */}
+                                <div>
+                                    <h4 className="font-bold mb-3">{t('approvals.sla_settings', 'إعدادات SLA والموافقة التلقائية')}</h4>
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>{t('approvals.table.name')}</th>
+                                                <th>{t('approvals.table.document_type')}</th>
+                                                <th>{t('approvals.sla_hours_label', 'SLA (ساعة)')}</th>
+                                                <th>{t('approvals.auto_approve_below_label', 'موافقة تلقائية تحت')}</th>
+                                                <th style={{ width: '100px' }}>{t('approvals.table.actions')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {workflows.length === 0 ? (
+                                                <tr><td colSpan="5" className="text-center py-8 opacity-50">{t('approvals.table.no_workflows')}</td></tr>
+                                            ) : (
+                                                workflows.map(wf => (
+                                                    <tr key={wf.id}>
+                                                        <td className="font-bold">{wf.name}</td>
+                                                        <td>{t(`approvals.document_types.${wf.document_type}`) || wf.document_type}</td>
+                                                        <td>{wf.sla_hours ?? '-'}</td>
+                                                        <td>{wf.auto_approve_below ? `${formatNumber(wf.auto_approve_below)} ${currency}` : '-'}</td>
+                                                        <td>
+                                                            <button
+                                                                className="btn btn-ghost btn-xs text-primary"
+                                                                onClick={async () => {
+                                                                    setSelectedWorkflowId(wf.id);
+                                                                    try {
+                                                                        const res = await api.get(`/workflow/advanced/${wf.id}`);
+                                                                        setSlaForm({
+                                                                            sla_hours: res.data.sla_hours ?? 24,
+                                                                            auto_approve_below: res.data.auto_approve_below ?? 0,
+                                                                            escalation_to: res.data.escalation_to ?? null,
+                                                                            allow_parallel: res.data.allow_parallel ?? false
+                                                                        });
+                                                                    } catch {
+                                                                        setSlaForm({ sla_hours: wf.sla_hours ?? 24, auto_approve_below: wf.auto_approve_below ?? 0, escalation_to: null, allow_parallel: false });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Settings size={16} /> {t('common.edit')}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
             </div>
 
-            {/* Action Modal */}
+            {/* SLA Settings Modal */}
+            <SimpleModal
+                isOpen={selectedWorkflowId !== null}
+                onClose={() => setSelectedWorkflowId(null)}
+                title={t('approvals.sla_settings', 'إعدادات SLA والموافقة التلقائية')}
+            >
+                <div className="p-4 space-y-4">
+                    <div className="form-input">
+                        <label className="label"><span className="label-text font-medium">{t('approvals.sla_hours_label', 'SLA (ساعة)')}</span></label>
+                        <input type="number" className="input input-bordered w-full" min="0" value={slaForm.sla_hours}
+                            onChange={e => setSlaForm(prev => ({ ...prev, sla_hours: parseInt(e.target.value) || 0 }))}
+                        />
+                        <p className="text-xs opacity-60 mt-1">{t('approvals.sla_hours_hint', 'عدد الساعات قبل التصعيد التلقائي. 0 = بلا حد')}</p>
+                    </div>
+                    <div className="form-input">
+                        <label className="label"><span className="label-text font-medium">{t('approvals.auto_approve_below_label', 'موافقة تلقائية تحت')}</span></label>
+                        <input type="number" className="input input-bordered w-full" min="0" step="100" value={slaForm.auto_approve_below}
+                            onChange={e => setSlaForm(prev => ({ ...prev, auto_approve_below: parseFloat(e.target.value) || 0 }))}
+                        />
+                        <p className="text-xs opacity-60 mt-1">{t('approvals.auto_approve_hint', 'المبالغ أقل من هذا الحد تُوافَق تلقائياً عند تشغيل الموافقة التلقائية. 0 = معطّل')}</p>
+                    </div>
+                    <div className="form-input">
+                        <label className="label"><span className="label-text font-medium">{t('approvals.escalation_to_label', 'تصعيد إلى (ID المستخدم)')}</span></label>
+                        <input type="number" className="input input-bordered w-full" min="0" value={slaForm.escalation_to || ''}
+                            onChange={e => setSlaForm(prev => ({ ...prev, escalation_to: parseInt(e.target.value) || null }))}
+                        />
+                        <p className="text-xs opacity-60 mt-1">{t('approvals.escalation_hint', 'المستخدم الذي يتلقى الطلب عند تجاوز SLA')}</p>
+                    </div>
+                    <div className="form-control">
+                        <label className="label cursor-pointer justify-start gap-3">
+                            <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" checked={slaForm.allow_parallel}
+                                onChange={e => setSlaForm(prev => ({ ...prev, allow_parallel: e.target.checked }))}
+                            />
+                            <span className="label-text">{t('approvals.allow_parallel_label', 'السماح بالموافقة المتوازية')}</span>
+                        </label>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <button className="btn btn-ghost" onClick={() => setSelectedWorkflowId(null)}>{t('common.cancel')}</button>
+                        <button className="btn btn-primary min-w-[120px]" disabled={savingSLA}
+                            onClick={async () => {
+                                setSavingSLA(true);
+                                try {
+                                    await api.put(`/workflow/advanced/${selectedWorkflowId}/sla`, slaForm);
+                                    showToast(t('common.saved'), 'success');
+                                    setSelectedWorkflowId(null);
+                                    fetchData();
+                                } catch (e) {
+                                    showToast(e.response?.data?.detail || t('common.error'), 'error');
+                                } finally { setSavingSLA(false); }
+                            }}
+                        >
+                            {savingSLA ? <span className="loading loading-spinner loading-sm"></span> : t('common.save')}
+                        </button>
+                    </div>
+                </div>
+            </SimpleModal>
             <SimpleModal
                 isOpen={!!selectedRequest}
                 onClose={() => setSelectedRequest(null)}

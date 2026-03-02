@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter } from 'lucide-react';
 import { assetsAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
+import BackButton from '../../components/common/BackButton';
 import { formatShortDate } from '../../utils/dateUtils';
 import Pagination, { usePagination } from '../../components/common/Pagination';
 
@@ -35,14 +36,24 @@ const AssetList = () => {
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
+                <BackButton />
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div>
                         <h1 className="workspace-title">{t('assets.title', 'Fixed Assets')}</h1>
                         <p className="workspace-subtitle">{t('assets.subtitle', 'Manage company assets and depreciation')}</p>
                     </div>
-                    <div className="header-actions" style={{ display: 'flex', gap: '8px' }}>
+                    <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline-primary shadow-sm" onClick={() => navigate('/assets/reports')}>
+                            📊 {i18n.language === 'ar' ? 'التقارير' : 'Reports'}
+                        </button>
                         <button className="btn btn-secondary shadow-sm" onClick={() => navigate('/assets/management')}>
                             {i18n.language === 'ar' ? 'النقل والتقييم' : 'Transfers & Reval'}
+                        </button>
+                        <button className="btn btn-outline-secondary shadow-sm" onClick={() => navigate('/assets/leases')}>
+                            📄 {i18n.language === 'ar' ? 'عقود الإيجار' : 'Leases'}
+                        </button>
+                        <button className="btn btn-outline-secondary shadow-sm" onClick={() => navigate('/assets/impairment')}>
+                            🔍 {i18n.language === 'ar' ? 'اختبار الاضمحلال' : 'Impairment'}
                         </button>
                         <button className="btn btn-primary shadow-sm" onClick={() => navigate('/assets/new')}>
                             <Plus size={18} className={t('common.is_rtl') === 'true' ? 'ms-2' : 'me-2'} />
@@ -67,7 +78,7 @@ const AssetList = () => {
                 </div>
             </div>
 
-            <div className="card section-card border-0 shadow-sm">
+            <div className="card section-card">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <div className="d-flex gap-3">
                         <div className="search-box">

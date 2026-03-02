@@ -6,6 +6,8 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import '../../components/ModuleStyles.css'
+import DateInput from '../../components/common/DateInput';
+import { useToast } from '../../context/ToastContext'
 
 // ─── Stage / Status / Priority maps ───────────────────────────────────────────
 const stageBadgeColors = {
@@ -46,6 +48,7 @@ const commentStyle = (isInternal) => ({
 // ══════════════════════════════════════════════════════════════════════════════
 function CRMHome() {
     const { t } = useTranslation()
+  const { showToast } = useToast()
     const currency = getCurrency()
     const [activeTab, setActiveTab] = useState('overview')
 
@@ -163,11 +166,11 @@ function CRMHome() {
             const payload = { ...oppForm, probability: Number(oppForm.probability), expected_value: Number(oppForm.expected_value), customer_id: oppForm.customer_id ? Number(oppForm.customer_id) : null }
             if (isOppEdit) { await crmAPI.updateOpportunity(selectedOppId, payload) } else { await crmAPI.createOpportunity(payload) }
             setShowOppModal(false); fetchOpportunities()
-        } catch (err) { alert(err.response?.data?.detail || t('crm.save_error')) }
+        } catch (err) { showToast(err.response?.data?.detail || t('crm.save_error', 'error')) }
     }
     const handleDeleteOpp = async (id) => {
         try { await crmAPI.deleteOpportunity(id); setDeleteOppConfirm(null); fetchOpportunities() }
-        catch (err) { alert(err.response?.data?.detail || t('crm.delete_error')) }
+        catch (err) { showToast(err.response?.data?.detail || t('crm.delete_error', 'error')) }
     }
     const getStageLabel = (stage) => { const opt = stageOptions.find(s => s.value === stage); return opt ? opt.label : stage }
 
@@ -178,7 +181,7 @@ function CRMHome() {
         try {
             const payload = { ...ticketForm, customer_id: ticketForm.customer_id ? Number(ticketForm.customer_id) : null, sla_hours: Number(ticketForm.sla_hours) }
             await crmAPI.createTicket(payload); setShowTicketModal(false); fetchTickets()
-        } catch (err) { alert(err.response?.data?.detail || t('crm.create_error')) }
+        } catch (err) { showToast(err.response?.data?.detail || t('crm.create_error', 'error')) }
     }
     const toggleExpand = async (ticketId) => {
         if (expandedId === ticketId) { setExpandedId(null); setTicketDetail(null); return }
@@ -195,7 +198,7 @@ function CRMHome() {
         e.preventDefault()
         if (!commentText.trim()) return
         try { await crmAPI.addComment(expandedId, { content: commentText, is_internal: isInternal }); const res = await crmAPI.getTicket(expandedId); setTicketDetail(res.data); setCommentText(''); setIsInternal(false) }
-        catch (err) { alert(err.response?.data?.detail || t('crm.comment_error')) }
+        catch (err) { showToast(err.response?.data?.detail || t('crm.comment_error', 'error')) }
     }
     const getStatusLabel = (status) => { const opt = statusOptions.find(s => s.value === status); return opt ? opt.label : status }
     const getPriorityLabel = (priority) => { const opt = priorityOptions.find(p => p.value === priority); return opt ? opt.label : priority }
@@ -259,6 +262,33 @@ function CRMHome() {
                         <button className="btn btn-primary btn-sm" onClick={openCreateTicket} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                             + {t('crm.new_ticket')}
                         </button>
+                    </div>
+                </div>
+
+                {/* Advanced CRM Tools */}
+                <div className="card">
+                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        🔧 {t('crm.advanced_tools', 'الأدوات المتقدمة')}
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                        <Link to="/crm/dashboard" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            📊 {t('crm.dashboard_title', 'لوحة التحكم')}
+                        </Link>
+                        <Link to="/crm/lead-scoring" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            ⭐ {t('crm.lead_scoring', 'تقييم العملاء')}
+                        </Link>
+                        <Link to="/crm/segments" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            👥 {t('crm.customer_segments', 'شرائح العملاء')}
+                        </Link>
+                        <Link to="/crm/analytics" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            📈 {t('crm.analytics', 'التحليلات')}
+                        </Link>
+                        <Link to="/crm/contacts" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            📇 {t('crm.contacts', 'جهات الاتصال')}
+                        </Link>
+                        <Link to="/crm/forecasts" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
+                            🔮 {t('crm.sales_forecasts', 'التنبؤات')}
+                        </Link>
                     </div>
                 </div>
 
@@ -440,7 +470,7 @@ function CRMHome() {
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.expected_close')}</label>
-                                                    <input type="date" className="form-input" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
+                                                    <DateInput className="form-input" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.source')}</label>

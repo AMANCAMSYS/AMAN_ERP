@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import './POSInterface.css';
 import './components/POSComponents.css';
 import { useNavigate } from 'react-router-dom';
@@ -9,10 +9,11 @@ import { getCurrency, logout } from '../../utils/auth';
 import HeldOrders from './components/HeldOrders';
 import POSReturns from './components/POSReturns';
 import LazyImage from '../../components/common/LazyImage';
+import { savePendingOrder } from './POSOfflineManager';
 import {
     Search, RefreshCcw, Home, LogOut,
     ShoppingCart, Plus, Minus,
-    Store, X,
+    Store, X, Wifi, WifiOff,
     Banknote, CreditCard as CardIcon, Split,
     UserCircle, Printer, Save,
     Clock, LayoutGrid, ArrowRightLeft, Smartphone, Package, RotateCcw
@@ -46,15 +47,39 @@ const POSInterface = () => {
     const [globalDiscount, setGlobalDiscount] = useState(0);
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentAmounts, setPaymentAmounts] = useState({ cash: 0, bank: 0 });
+    const [paymentAmounts, setPaymentAmounts] = useState({ cash: 0, card: 0, mada: 0 });
     const [submitting, setSubmitting] = useState(false);
+
+    // --- Offline Mode (B7) ---
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [offlinePendingCount, setOfflinePendingCount] = useState(0);
+
+    // --- Customer Display Broadcast (B7) ---
+    const broadcastRef = useRef(null);
 
     // --- Effects ---
     useEffect(() => {
         initPOS();
         fetchCustomers();
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
+
+        // Offline detection
+        const goOnline = () => { setIsOnline(true); showToast(t('pos.online_restored', 'تم استعادة الاتصال'), 'success'); };
+        const goOffline = () => { setIsOnline(false); showToast(t('pos.offline_mode', 'وضع عدم الاتصال - سيتم حفظ الطلبات محلياً'), 'warning'); };
+        window.addEventListener('online', goOnline);
+        window.addEventListener('offline', goOffline);
+
+        // BroadcastChannel for Customer Display
+        try {
+            broadcastRef.current = new BroadcastChannel('pos_customer_display');
+        } catch (e) { /* BroadcastChannel not supported */ }
+
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener('online', goOnline);
+            window.removeEventListener('offline', goOffline);
+            if (broadcastRef.current) broadcastRef.current.close();
+        };
     }, []);
 
     useEffect(() => {
@@ -71,6 +96,23 @@ const POSInterface = () => {
             setFilteredProducts(filtered);
         }
     }, [searchQuery, products]);
+
+    // Broadcast cart changes to Customer Display
+    useEffect(() => {
+        if (broadcastRef.current) {
+            broadcastRef.current.postMessage({
+                type: cart.length > 0 ? 'cart_update' : 'idle',
+                items: cart.map(item => ({
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    total: item.price * item.quantity
+                })),
+                totals: cartTotals,
+                currency
+            });
+        }
+    }, [cart, cartTotals]);
 
     // --- Actions ---
     const refreshSession = async () => {
@@ -158,7 +200,7 @@ const POSInterface = () => {
 
     // --- Checkout Logic ---
     const openSplitPayment = () => {
-        setPaymentAmounts({ cash: 0, bank: 0 });
+        setPaymentAmounts({ cash: 0, card: 0, mada: 0 });
         setShowPaymentModal(true);
     }
 
@@ -198,8 +240,20 @@ const POSInterface = () => {
                 status: status
             };
 
-            await api.post('/pos/orders', orderData);
-            showToast(status === 'paid' ? t('pos.order_completed') : t('common.saved'), "success");
+            // Offline fallback: save to IndexedDB when no connection
+            if (!navigator.onLine) {
+                await savePendingOrder({ orderData, total: cartTotals.total });
+                setOfflinePendingCount(prev => prev + 1);
+                showToast(t('pos.order_saved_offline', 'تم حفظ الطلب محلياً - سيتم مزامنته عند عودة الاتصال'), 'warning');
+            } else {
+                await api.post('/pos/orders', orderData);
+                showToast(status === 'paid' ? t('pos.order_completed') : t('common.saved'), "success");
+            }
+
+            // Broadcast "thankYou" state to customer display
+            if (broadcastRef.current) {
+                broadcastRef.current.postMessage({ type: 'thankYou' });
+            }
 
             setCart([]);
             setGlobalDiscount(0);
@@ -219,14 +273,15 @@ const POSInterface = () => {
     }
 
     const handleSplitCheckout = async () => {
-        const totalPaid = Number(paymentAmounts.cash) + Number(paymentAmounts.bank);
-        if (totalPaid < cartTotals.total) {
+        const totalPaid = Number(paymentAmounts.cash) + Number(paymentAmounts.card) + Number(paymentAmounts.mada);
+        if (totalPaid < cartTotals.total - 0.01) {
             showToast(t('pos.paid_amount_less'), "warning");
             return;
         }
         const payments = [];
-        if (paymentAmounts.cash > 0) payments.push({ method: "cash", amount: paymentAmounts.cash });
-        if (paymentAmounts.bank > 0) payments.push({ method: "bank", amount: paymentAmounts.bank });
+        if (Number(paymentAmounts.cash) > 0) payments.push({ method: "cash", amount: Number(paymentAmounts.cash) });
+        if (Number(paymentAmounts.card) > 0) payments.push({ method: "bank", amount: Number(paymentAmounts.card), reference: "card" });
+        if (Number(paymentAmounts.mada) > 0) payments.push({ method: "bank", amount: Number(paymentAmounts.mada), reference: "mada" });
         await processOrder(payments);
     };
 
@@ -343,6 +398,13 @@ const POSInterface = () => {
 
                 {/* Actions */}
                 <div className="pos-header-actions">
+                    {/* Online/Offline Indicator */}
+                    <div className={`pos-connection-badge ${isOnline ? 'online' : 'offline'}`} title={isOnline ? t('pos.online', 'متصل') : t('pos.offline_mode', 'غير متصل')}>
+                        {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+                        <span>{isOnline ? t('pos.online', 'متصل') : t('pos.offline_short', 'غير متصل')}</span>
+                        {offlinePendingCount > 0 && <span className="pending-badge">{offlinePendingCount}</span>}
+                    </div>
+
                     {/* Customer Select */}
                     <div className="pos-customer-select">
                         <UserCircle className="select-icon" size={18} />
@@ -647,10 +709,11 @@ const POSInterface = () => {
                                 <p className="label">{t('pos.remaining_amount')}</p>
                                 <p className="amount">
                                     <span className="currency">{currency}</span>
-                                    {(cartTotals.total - paymentAmounts.cash - paymentAmounts.bank).toLocaleString()}
+                                    {(cartTotals.total - Number(paymentAmounts.cash) - Number(paymentAmounts.card) - Number(paymentAmounts.mada)).toLocaleString()}
                                 </p>
                             </div>
 
+                            {/* Cash */}
                             <div className="modal-input-group">
                                 <label>{t('pos.cash')}</label>
                                 <div className="modal-input-row">
@@ -664,7 +727,7 @@ const POSInterface = () => {
                                         onFocus={e => e.target.select()}
                                     />
                                     <button
-                                        onClick={() => setPaymentAmounts(p => ({ ...p, cash: cartTotals.total - p.bank }))}
+                                        onClick={() => setPaymentAmounts(p => ({ ...p, cash: Math.max(0, cartTotals.total - Number(p.card) - Number(p.mada)) }))}
                                         className="modal-full-btn"
                                     >
                                         {t('pos.full')}
@@ -672,20 +735,21 @@ const POSInterface = () => {
                                 </div>
                             </div>
 
+                            {/* Credit Card */}
                             <div className="modal-input-group">
-                                <label>{t('pos.bank')}</label>
+                                <label>{t('pos.payment_credit_card')}</label>
                                 <div className="modal-input-row">
                                     <div className="modal-input-icon bank">
                                         <CardIcon size={24} />
                                     </div>
                                     <input
                                         type="number"
-                                        value={paymentAmounts.bank}
-                                        onChange={e => setPaymentAmounts({ ...paymentAmounts, bank: e.target.value })}
+                                        value={paymentAmounts.card}
+                                        onChange={e => setPaymentAmounts({ ...paymentAmounts, card: e.target.value })}
                                         onFocus={e => e.target.select()}
                                     />
                                     <button
-                                        onClick={() => setPaymentAmounts(p => ({ ...p, bank: cartTotals.total - p.cash }))}
+                                        onClick={() => setPaymentAmounts(p => ({ ...p, card: Math.max(0, cartTotals.total - Number(p.cash) - Number(p.mada)) }))}
                                         className="modal-full-btn"
                                     >
                                         {t('pos.full')}
@@ -693,8 +757,30 @@ const POSInterface = () => {
                                 </div>
                             </div>
 
-                            <button onClick={handleSplitCheckout} className="modal-confirm-btn">
-                                <span>{t('pos.confirm_payment')}</span>
+                            {/* Mada */}
+                            <div className="modal-input-group">
+                                <label>{t('pos.payment_mada')}</label>
+                                <div className="modal-input-row">
+                                    <div className="modal-input-icon mada">
+                                        <Smartphone size={24} />
+                                    </div>
+                                    <input
+                                        type="number"
+                                        value={paymentAmounts.mada}
+                                        onChange={e => setPaymentAmounts({ ...paymentAmounts, mada: e.target.value })}
+                                        onFocus={e => e.target.select()}
+                                    />
+                                    <button
+                                        onClick={() => setPaymentAmounts(p => ({ ...p, mada: Math.max(0, cartTotals.total - Number(p.cash) - Number(p.card)) }))}
+                                        className="modal-full-btn"
+                                    >
+                                        {t('pos.full')}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onClick={handleSplitCheckout} className="modal-confirm-btn" disabled={submitting}>
+                                <span>{submitting ? '...' : t('pos.confirm_payment')}</span>
                                 <ArrowRightLeft size={20} />
                             </button>
                         </div>

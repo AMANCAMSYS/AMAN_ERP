@@ -121,7 +121,7 @@ function CustomerForm() {
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="form-section-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div className="form-section card">
                             <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
                                 <span style={{ fontSize: '24px' }}>🏢</span> {t('sales.customers.form.basic_info')}
                             </h3>
@@ -222,7 +222,7 @@ function CustomerForm() {
                             </div>
                         </div>
 
-                        <div className="form-section" style={{ background: 'var(--bg-main)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <div className="form-section card">
                             <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
                                 <span style={{ fontSize: '24px' }}>📞</span> {t('sales.customers.form.contact_info')}
                             </h3>

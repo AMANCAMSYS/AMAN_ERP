@@ -123,8 +123,8 @@ def create_supplier(
     """إنشاء مورد جديد"""
     db = get_db_connection(current_user.company_id)
     try:
-        import random
-        code = f"SUP-{random.randint(1000, 9999)}"
+        from utils.accounting import generate_sequential_number
+        code = generate_sequential_number(db, "SUP", "parties", "party_code")
 
         # Merge if tax number exists
         existing_id = None
