@@ -110,12 +110,11 @@ async def lifespan(app: FastAPI):
                     address TEXT,
                     city VARCHAR(100),
                     country VARCHAR(100) DEFAULT 'SA',
-                    logo_url TEXT,
+                    logo_url VARCHAR(255),
                     database_name VARCHAR(255),
                     database_user VARCHAR(255),
                     currency VARCHAR(10) DEFAULT 'SAR',
                     timezone VARCHAR(50) DEFAULT 'Asia/Riyadh',
-                    logo_url VARCHAR(255),
                     status VARCHAR(20) DEFAULT 'active',
                     plan_type VARCHAR(50) DEFAULT 'basic',
                     max_users INTEGER DEFAULT 10,
@@ -126,7 +125,7 @@ async def lifespan(app: FastAPI):
                     activated_at TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-                CREATE INDEX IF NOT EXISTS idx_system_companies_status 
+                CREATE INDEX IF NOT EXISTS idx_system_companies_status
                     ON system_companies(status);
             """))
 
