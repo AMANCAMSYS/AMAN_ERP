@@ -367,7 +367,10 @@ except ImportError:
 
 # Static Files (Logos, attachments)
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(os.path.join(uploads_dir, "logos"), exist_ok=True)
+try:
+    os.makedirs(os.path.join(uploads_dir, "logos"), exist_ok=True)
+except PermissionError as e:
+    logger.warning(f"⚠️  Cannot create uploads/logos: {e} — entrypoint should handle this")
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 # Also mount under /api/uploads for consistency with API-prefixed calls in some components
 app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="api_uploads")

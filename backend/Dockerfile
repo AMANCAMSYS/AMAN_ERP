@@ -28,10 +28,11 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Runtime system deps
+# Runtime system deps + gosu (privilege dropping in entrypoint)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
@@ -40,15 +41,14 @@ COPY --from=builder /install /usr/local
 # Copy application code (excluding .env, __pycache__, venv, etc.)
 COPY . .
 
-# Create uploads directories and non-root user
-# Must create dirs BEFORE USER switch so named-volume gets correct ownership
+# Create non-root user; uploads dirs are created by entrypoint.sh at runtime
+# so they are always on the live volume, not overridden by Docker mount.
 RUN addgroup --system aman && adduser --system --ingroup aman aman \
-    && mkdir -p /app/uploads/documents \
-              /app/uploads/temp \
-              /app/uploads/invoices \
-              /app/uploads/contracts \
     && chown -R aman:aman /app
-USER aman
+
+# Entrypoint: runs as root → creates/chowns /app/uploads → drops to aman → execs CMD
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Expose port
 EXPOSE 8000
