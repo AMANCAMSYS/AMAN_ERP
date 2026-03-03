@@ -349,8 +349,17 @@ app.add_middleware(RequestIDMiddleware)
 
 # SEC-203: HTTPS Enforcement + Security Headers
 # SEC-204: Input Sanitization (XSS/SQLi detection)
+import os as _os
 from utils.security_middleware import HTTPSRedirectMiddleware, InputSanitizationMiddleware
-app.add_middleware(HTTPSRedirectMiddleware)
+# FORCE_HTTPS must be explicitly enabled (e.g. after SSL cert is installed).
+# When running on plain HTTP (IP-only, no domain/cert) keep it off to prevent
+# the 301→HTTPS loop that causes ERR_CONNECTION_REFUSED in the browser.
+if _os.getenv("FORCE_HTTPS", "false").lower() == "true":
+    app.add_middleware(HTTPSRedirectMiddleware)
+else:
+    # Still register the middleware for security headers only (no redirect)
+    from utils.security_middleware import SecurityHeadersOnlyMiddleware
+    app.add_middleware(SecurityHeadersOnlyMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
 
 # ── Prometheus Metrics ─────────────────────────────────────────────────────────

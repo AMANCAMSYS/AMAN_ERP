@@ -80,6 +80,22 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersOnlyMiddleware(BaseHTTPMiddleware):
+    """
+    Sets security headers WITHOUT redirecting HTTP → HTTPS.
+    Use this when SSL terminates at a load-balancer/nginx and the backend
+    communicates over plain HTTP internally (FORCE_HTTPS=false).
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
 # ===================== SEC-204: Input Sanitization =====================
 
 # Patterns that indicate potential XSS attacks
