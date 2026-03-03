@@ -240,24 +240,36 @@ jobs:
             # 3. Write root .env for docker compose variable interpolation
             grep -E '^(POSTGRES_PASSWORD|POSTGRES_USER|POSTGRES_DB|REDIS_PASSWORD|GRAFANA_PASSWORD|GRAFANA_USER|APP_ENV)' backend/.env > .env || true
 
-            # 4. Build and restart services
+            # 4. Build new images
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               build --no-cache backend frontend
 
+            # 5. Start ALL services (ensures db/redis/backend/frontend all on same network)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              up -d --no-deps --remove-orphans backend frontend
+              up -d --remove-orphans
 
-            # 5. Run database migrations
+            # 6. Wait for db to be healthy
+            echo "⏳ Waiting for database..."
+            for i in $(seq 1 30); do
+              if docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+                exec -T db pg_isready -U aman -q 2>/dev/null; then
+                echo "✅ Database ready"
+                break
+              fi
+              sleep 2
+            done
+
+            # 7. Run database migrations
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               exec -T backend alembic upgrade head || echo "⚠️ Alembic skipped (no changes)"
 
-            # 6. Health check
+            # 8. Health check
             sleep 15
             STATUS=$(curl -sf http://localhost:8000/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unreachable")
             echo "🔍 Health: $STATUS"
             if [ "$STATUS" != "healthy" ]; then
               echo "❌ Health check failed!"
-              docker compose logs --tail=50 backend
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 backend
               exit 1
             fi
 
