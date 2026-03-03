@@ -263,7 +263,17 @@ jobs:
               sleep 3
             done
 
-            # 7. Start backend (detached, don't block on health)
+            # 7. Fix upload volume permissions before starting backend
+            # The named volume may have been created by root; ensure aman user can write
+            docker run --rm --user root \
+              -v aman_uploads:/app/uploads \
+              alpine sh -c "
+                mkdir -p /app/uploads/documents /app/uploads/temp /app/uploads/invoices /app/uploads/contracts
+                chmod -R 755 /app/uploads
+                chown -R 1000:1000 /app/uploads 2>/dev/null || chmod -R 777 /app/uploads
+              " 2>/dev/null || echo "⚠️ Volume permission fix skipped (volume may not exist yet)"
+
+            # Start backend (detached, don't block on health)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d backend
 

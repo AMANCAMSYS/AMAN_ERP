@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/services", tags=["Services"], dependencies=[Depends(require_module("services"))])
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads", "documents")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+except PermissionError as e:
+    logger.warning(f"⚠️  Cannot create upload dir {UPLOAD_DIR}: {e} — continuing without it")
 
 
 # ─────────────────────────────────────────────

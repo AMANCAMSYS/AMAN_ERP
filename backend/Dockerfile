@@ -40,8 +40,13 @@ COPY --from=builder /install /usr/local
 # Copy application code (excluding .env, __pycache__, venv, etc.)
 COPY . .
 
-# Create non-root user for security
+# Create uploads directories and non-root user
+# Must create dirs BEFORE USER switch so named-volume gets correct ownership
 RUN addgroup --system aman && adduser --system --ingroup aman aman \
+    && mkdir -p /app/uploads/documents \
+              /app/uploads/temp \
+              /app/uploads/invoices \
+              /app/uploads/contracts \
     && chown -R aman:aman /app
 USER aman
 
