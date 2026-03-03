@@ -243,6 +243,10 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               build --no-cache backend frontend || { echo "❌ Build failed!"; exit 1; }
 
+            # Verify critical packages are installed in the new image
+            echo "🔍 Verifying packages in new backend image..."
+            docker run --rm aman-backend:latest pip list 2>/dev/null | grep -iE "email.validator|pydantic|alembic|fastapi" || true
+
             # 5. Start infrastructure (db + redis) first
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d db redis

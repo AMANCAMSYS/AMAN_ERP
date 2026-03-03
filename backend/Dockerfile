@@ -17,7 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python deps into a prefix so we can copy them cleanly
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt && \
+    # Explicitly ensure email-validator is installed (required by pydantic EmailStr) \
+    pip install --no-cache-dir --prefix=/install "email-validator>=2.0.0" && \
+    ls /install/lib/python*/site-packages/ | grep -q email_validator && echo "✅ email-validator verified"
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────

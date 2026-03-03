@@ -20,7 +20,8 @@ slowapi
 cryptography
 pillow
 pydantic-settings
-email-validator
+pydantic[email]
+email-validator>=2.0.0
 alembic
 python-json-logger
 gunicorn
