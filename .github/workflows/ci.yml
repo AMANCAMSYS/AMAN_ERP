@@ -224,7 +224,6 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            set -e
             echo "🚀 Starting deployment — $(date)"
             cd /opt/aman
 
@@ -242,37 +241,57 @@ jobs:
 
             # 4. Build new images
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              build --no-cache backend frontend
+              build --no-cache backend frontend || { echo "❌ Build failed!"; exit 1; }
 
-            # 5. Start ALL services (ensures db/redis/backend/frontend all on same network)
+            # 5. Start infrastructure (db + redis) first
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              up -d --remove-orphans
+              up -d db redis
 
             # 6. Wait for db to be healthy
             echo "⏳ Waiting for database..."
             for i in $(seq 1 30); do
               if docker compose -f docker-compose.yml -f docker-compose.prod.yml \
                 exec -T db pg_isready -U aman -q 2>/dev/null; then
-                echo "✅ Database ready"
+                echo "✅ Database ready (${i})"
                 break
               fi
-              sleep 2
+              echo "  db not ready yet ($i/30)..."
+              sleep 3
             done
 
-            # 7. Run database migrations
+            # 7. Start backend (detached, don't block on health)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              exec -T backend alembic upgrade head || echo "⚠️ Alembic skipped (no changes)"
+              up -d backend
 
-            # 8. Health check
-            sleep 15
-            STATUS=$(curl -sf http://localhost:8000/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unreachable")
-            echo "🔍 Health: $STATUS"
-            if [ "$STATUS" != "healthy" ]; then
-              echo "❌ Health check failed!"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=50 backend
+            # 8. Wait up to 3 minutes for backend /health to respond
+            echo "⏳ Waiting for backend to become healthy..."
+            HEALTHY=0
+            for i in $(seq 1 36); do
+              HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
+              echo "  attempt $i/36 — HTTP $HTTP"
+              if [ "$HTTP" = "200" ]; then
+                HEALTHY=1
+                echo "✅ Backend is healthy!"
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$HEALTHY" != "1" ]; then
+              echo "❌ Backend failed to become healthy. Logs:"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100 backend
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
               exit 1
             fi
 
-            # 7. Cleanup
+            # 9. Run database migrations
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              exec -T backend alembic upgrade head || echo "⚠️ Alembic skipped"
+
+            # 10. Start remaining services (frontend, prometheus, grafana)
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --remove-orphans
+
+            # 11. Cleanup
             docker system prune -f --volumes=false
             echo "✅ Deployment complete — $(date)"
