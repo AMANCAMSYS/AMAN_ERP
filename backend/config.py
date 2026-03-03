@@ -96,20 +96,27 @@ def setup_pgpass():
     never need PGPASSWORD in the environment.  File is chmod 0600.
     """
     import os, stat
-    pgpass_path = os.path.expanduser("~/.pgpass")
+    home = os.path.expanduser("~")
+    # System users (e.g. Docker non-root) may have home=/nonexistent
+    if not os.path.isdir(home):
+        home = "/tmp"
+    pgpass_path = os.path.join(home, ".pgpass")
     line = f"{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}:*:{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
-    
-    # Read existing content to avoid duplicates
-    existing = ""
-    if os.path.exists(pgpass_path):
-        with open(pgpass_path, "r") as f:
-            existing = f.read()
-    
-    if line not in existing:
-        with open(pgpass_path, "a") as f:
-            f.write(line + "\n")
-    
-    os.chmod(pgpass_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+
+    try:
+        # Read existing content to avoid duplicates
+        existing = ""
+        if os.path.exists(pgpass_path):
+            with open(pgpass_path, "r") as f:
+                existing = f.read()
+
+        if line not in existing:
+            with open(pgpass_path, "a") as f:
+                f.write(line + "\n")
+
+        os.chmod(pgpass_path, stat.S_IRUSR | stat.S_IWUSR)  # 0600
+    except OSError:
+        pass  # pgpass is a convenience feature; don't crash the app if it fails
 
     # Remove PGPASSWORD from environment if set (defense-in-depth)
     os.environ.pop("PGPASSWORD", None)
