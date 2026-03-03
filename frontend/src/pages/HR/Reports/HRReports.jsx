@@ -6,6 +6,7 @@ import PayrollReport from './PayrollReport';
 import LeaveReport from './LeaveReport';
 import '../../../components/ModuleStyles.css';
 import BackButton from '../../../components/common/BackButton';
+import { ModuleKPISection } from '../../../components/kpi';
 
 const HRReports = () => {
     const { t, i18n } = useTranslation();
@@ -31,6 +32,8 @@ const HRReports = () => {
                     </div>
                 </div>
             </div>
+
+            <ModuleKPISection roleKey="hr" color="#7c3aed" defaultOpen={false} />
 
             {/* Reports Navigation (Tabs) */}
             <div className="reports-nav mb-4">

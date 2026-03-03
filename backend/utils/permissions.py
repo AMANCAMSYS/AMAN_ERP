@@ -134,6 +134,109 @@ def require_permission(permission: Union[str, List[str]]):
     return permission_checker
 
 
+# ============ SEC-012: Sensitive-operation re-validation ============
+# For financial operations (journal entries, payroll, invoice deletion, etc.)
+# this dependency re-checks the DB to ensure the user is still active and has
+# the required permission — mitigates JWT-cached permissions after revocation.
+SENSITIVE_PERMISSIONS = {
+    "accounting.manage", "accounting.edit",
+    "treasury.manage", "treasury.edit",
+    "sales.delete", "buying.delete",
+    "hr.payroll", "hr.manage",
+    "admin.users", "settings.manage",
+}
+
+def require_sensitive_permission(permission: Union[str, List[str]]):
+    """Like require_permission but also re-validates against the DB."""
+    async def _checker(current_user: Union[dict, Any] = Depends(get_current_user)):
+        # First do the normal check
+        if isinstance(current_user, dict):
+            user_perms = current_user.get("permissions", [])
+            username = current_user.get("username", "unknown")
+            company_id = current_user.get("company_id")
+            user_id = current_user.get("user_id")
+        else:
+            user_perms = getattr(current_user, 'permissions', []) or []
+            username = getattr(current_user, 'username', 'unknown')
+            company_id = getattr(current_user, 'company_id', None)
+            user_id = getattr(current_user, 'user_id', None)
+
+        required_perms = [permission] if isinstance(permission, str) else permission
+        has_permission = any(check_permission(user_perms, perm) for perm in required_perms)
+        if not has_permission:
+            raise HTTPException(status_code=403, detail=f"ليس لديك صلاحية: {permission}")
+
+        # Re-validate from DB for sensitive ops
+        if company_id and user_id:
+            try:
+                from database import get_db_connection
+                db = get_db_connection(company_id)
+                row = db.execute(
+                    __import__('sqlalchemy').text(
+                        "SELECT is_active FROM company_users WHERE id = :uid"
+                    ), {"uid": user_id}
+                ).fetchone()
+                if row and not row.is_active:
+                    logger.warning(f"🔒 Sensitive op blocked: user {username} is deactivated (DB check)")
+                    raise HTTPException(status_code=403, detail="تم تعطيل حسابك. يرجى التواصل مع المسؤول.")
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"DB re-validation error: {e}")
+                # Fail open — if DB is unreachable, rely on JWT check above
+
+        return current_user
+
+    return _checker
+# URL prefix → module key mapping for the 5 variable modules
+_ROUTE_MODULE_MAP = {
+    "/pos":           "pos",
+    "/inventory":     "stock",
+    "/manufacturing": "manufacturing",
+    "/projects":      "projects",
+    "/services":      "services",
+}
+
+def require_module(module_key: str):
+    """
+    FastAPI dependency that blocks access if the module is disabled for the company.
+    Uses enabled_modules from the UserResponse (already fetched from system_companies).
+
+    Usage:
+        router = APIRouter(prefix="/pos", dependencies=[Depends(require_module("pos"))])
+    Or per-endpoint:
+        @router.get("/...", dependencies=[Depends(require_module("stock"))])
+    """
+    async def module_checker(current_user: Union[dict, Any] = Depends(get_current_user)):
+        # System admins bypass module checks
+        if isinstance(current_user, dict):
+            role = current_user.get("role")
+            enabled = current_user.get("enabled_modules", [])
+            username = current_user.get("username", "unknown")
+        else:
+            role = getattr(current_user, "role", None)
+            enabled = getattr(current_user, "enabled_modules", []) or []
+            username = getattr(current_user, "username", "unknown")
+
+        if role in ("system_admin", "superuser"):
+            return current_user
+
+        # If enabled_modules is empty/null, allow all (pre-setup state)
+        if not enabled:
+            return current_user
+
+        if module_key not in enabled:
+            logger.warning(f"🚫 Module disabled: User {username} tried to access module '{module_key}'")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"هذه الوحدة ({module_key}) غير مفعّلة لشركتك. يمكنك تفعيلها من إعدادات النشاط."
+            )
+
+        return current_user
+
+    return module_checker
+
+
 def validate_branch_access(current_user: dict, requested_branch_id: Union[int, None, str] = None) -> Union[int, None]:
     """
     Enforces branch access scope.

@@ -7,12 +7,12 @@ from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import update_account_balance, get_base_currency
 from datetime import date, datetime
 from typing import Optional
 
-router = APIRouter(prefix="/checks", tags=["checks"])
+router = APIRouter(prefix="/checks", tags=["checks"], dependencies=[Depends(require_module("treasury"))])
 
 
 def _ensure_checks_accounts(db):

@@ -7,7 +7,7 @@ from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel
@@ -15,7 +15,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/approvals", tags=["الاعتمادات"])
+router = APIRouter(prefix="/approvals", tags=["الاعتمادات"], dependencies=[Depends(require_module("approvals"))])
 
 
 # ===================== Schemas =====================

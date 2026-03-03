@@ -5,6 +5,7 @@ import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { ModuleKPISection } from '../../components/kpi';
 
 const ProductionAnalytics = () => {
     const { t } = useTranslation();
@@ -67,6 +68,8 @@ const ProductionAnalytics = () => {
                     <p className="workspace-subtitle">{t('manufacturing.analytics.subtitle', 'مراقبة مخرجات الإنتاج والكفاءة وتكاليف التصنيع')}</p>
                 </div>
             </div>
+
+            <ModuleKPISection roleKey="manufacturing" color="#ea580c" defaultOpen={false} />
 
             {/* Filters */}
             <div className="card" style={{ marginBottom: 16 }}>

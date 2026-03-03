@@ -6,11 +6,11 @@ from sqlalchemy import text
 from database import get_db_connection
 from schemas import UserResponse
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from schemas.budgets import BudgetItemBase, BudgetItemCreate, BudgetItemResponse, BudgetCreate, BudgetResponse, BudgetReportItem
 import logging
 
-router = APIRouter(prefix="/accounting/budgets", tags=["Budgets"])
+router = APIRouter(prefix="/accounting/budgets", tags=["Budgets"], dependencies=[Depends(require_module("budgets"))])
 logger = logging.getLogger(__name__)
 
 # --- Endpoints ---

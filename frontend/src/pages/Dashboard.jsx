@@ -8,6 +8,7 @@ import SalesSummaryWidget from '../components/dashboard/SalesSummaryWidget';
 import LowStockWidget from '../components/dashboard/LowStockWidget';
 import PendingTasksWidget from '../components/dashboard/PendingTasksWidget';
 import CashFlowWidget from '../components/dashboard/CashFlowWidget';
+import IndustryWidgets from '../components/dashboard/IndustryWidgets';
 import Card from '../components/common/Card';
 import {
     RefreshCw, Calendar, Wallet, TrendingUp, Package, Users,
@@ -97,6 +98,10 @@ const Dashboard = () => {
     /* ── Company user ───────────────────────────────── */
     const gap = '1rem';
 
+    // MODULE-001: Check which modules are enabled
+    const enabledModules = user?.enabled_modules || []
+    const isModOn = (m) => !enabledModules.length || enabledModules.includes(m)
+
     return (
         <div className="workspace fade-in">
 
@@ -133,7 +138,11 @@ const Dashboard = () => {
                 <StatsCards stats={stats} loading={loading} currency={currency} />
             </div>
 
+            {/* Industry-specific widgets */}
+            <IndustryWidgets />
+
             {/* Row 2 — Sales summary × 3 */}
+            {isModOn('sales') && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap, marginBottom: gap }}>
                 <Card title={t('dashboard.today')} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'today' }} currency={currency} />
@@ -145,6 +154,7 @@ const Dashboard = () => {
                     <SalesSummaryWidget config={{ period: 'month' }} currency={currency} />
                 </Card>
             </div>
+            )}
 
             {/* Row 3 — Financial chart + Quick actions */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap, marginBottom: gap }}>
@@ -152,11 +162,12 @@ const Dashboard = () => {
                     <FinancialChart data={finData} loading={loading} currency={currency} />
                 </Card>
                 <Card title={t('dashboard.quick_actions')} style={{ minHeight: 320 }}>
-                    <QuickActions t={t} isRTL={isRTL} />
+                    <QuickActions t={t} isRTL={isRTL} enabledModules={enabledModules} />
                 </Card>
             </div>
 
-            {/* Row 4 — Top products + Low stock */}
+            {/* Row 4 — Top products + Low stock (only if stock module enabled) */}
+            {isModOn('stock') && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap, marginBottom: gap }}>
                 <Card title={t('dashboard.top_products')} style={{ minHeight: 280 }}>
                     <TopProductsChart data={prodData} loading={loading} currency={currency} />
@@ -165,6 +176,7 @@ const Dashboard = () => {
                     <LowStockWidget config={{ limit: 8 }} currency={currency} />
                 </Card>
             </div>
+            )}
 
             {/* Row 5 — Cash flow */}
             <div style={{ marginBottom: gap }}>
@@ -199,15 +211,20 @@ const AdminCard = ({ icon, title, desc, link }) => (
 
 /* ── QuickActions ────────────────────────────────────── */
 const ACTIONS = [
-    { icon: <TrendingUp size={20}/>, key: 'nav.sales',       fallbackAR: 'مبيعات',       link: '/sales/invoices/new',            bg: '#dbeafe', fg: '#2563eb' },
-    { icon: <Package    size={20}/>, key: 'nav.inventory',   fallbackAR: 'مخزون',        link: '/stock/products/new',            bg: '#dcfce7', fg: '#16a34a' },
-    { icon: <Wallet     size={20}/>, key: 'nav.accounting',  fallbackAR: 'محاسبة',       link: '/accounting/journal-entries/new',bg: '#fef9c3', fg: '#ca8a04' },
-    { icon: <Users      size={20}/>, key: 'nav.hr',          fallbackAR: 'موارد بشرية',  link: '/hr/employees',                  bg: '#fae8ff', fg: '#9333ea' },
+    { icon: <TrendingUp size={20}/>, key: 'nav.sales',       fallbackAR: 'مبيعات',       link: '/sales/invoices/new',            bg: '#dbeafe', fg: '#2563eb', module: 'sales' },
+    { icon: <Package    size={20}/>, key: 'nav.inventory',   fallbackAR: 'مخزون',        link: '/stock/products/new',            bg: '#dcfce7', fg: '#16a34a', module: 'stock' },
+    { icon: <Wallet     size={20}/>, key: 'nav.accounting',  fallbackAR: 'محاسبة',       link: '/accounting/journal-entries/new',bg: '#fef9c3', fg: '#ca8a04', module: 'accounting' },
+    { icon: <Users      size={20}/>, key: 'nav.hr',          fallbackAR: 'موارد بشرية',  link: '/hr/employees',                  bg: '#fae8ff', fg: '#9333ea', module: 'hr' },
 ];
 
-const QuickActions = ({ t, isRTL }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', height: '100%' }}>
-        {ACTIONS.map(a => (
+const QuickActions = ({ t, isRTL, enabledModules }) => {
+    const filtered = enabledModules?.length
+        ? ACTIONS.filter(a => enabledModules.includes(a.module))
+        : ACTIONS;
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', height: '100%' }}>
+            {filtered.map(a => (
             <button key={a.key} onClick={() => window.location.href = a.link}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.9rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#475569', transition: 'all .15s' }}
                 onMouseEnter={e => { e.currentTarget.style.background=a.bg; e.currentTarget.style.borderColor=a.fg+'66'; e.currentTarget.style.color=a.fg; }}
@@ -219,6 +236,7 @@ const QuickActions = ({ t, isRTL }) => (
             </button>
         ))}
     </div>
-);
+    );
+};
 
 export default Dashboard;

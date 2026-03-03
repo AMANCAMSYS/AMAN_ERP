@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authAPI } from '../utils/api'
 import { setAuth, isAuthenticated } from '../utils/auth'
+import { hasIndustryTypeSet } from '../hooks/useIndustryType'
 import { useTranslation } from 'react-i18next'
 
 function Login() {
@@ -27,7 +28,13 @@ function Login() {
             const { access_token, user, company_id } = response.data
 
             setAuth(access_token, user, company_id)
-            window.location.href = '/dashboard'
+            
+            // توجيه: إذا لم يُحدد نوع النشاط بعد → صفحة الإعداد
+            if (user?.role !== 'system_admin' && !hasIndustryTypeSet()) {
+                window.location.href = '/setup/industry'
+            } else {
+                window.location.href = '/dashboard'
+            }
         } catch (err) {
             setError(err.response?.data?.detail || t('auth.login_failed'))
         } finally {

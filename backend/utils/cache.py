@@ -2,13 +2,27 @@
 import json
 import logging
 from typing import Any, Optional, Union, Callable
-import pickle
 import hashlib
-from datetime import timedelta
+from datetime import date, datetime, timedelta
+from uuid import UUID
+from decimal import Decimal
 from functools import wraps
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _json_default(obj: Any) -> Any:
+    """Custom JSON encoder — handles types not natively JSON-serialisable."""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 class MemoryCache:
     def __init__(self):
@@ -64,9 +78,10 @@ class RedisCache:
         try:
             val = self.redis.get(key)
             if val:
-                return pickle.loads(val)
+                # SEC-FIX: use json instead of pickle to prevent RCE
+                return json.loads(val.decode('utf-8'))
             return None
-        except Exception as e: # Redis failure
+        except Exception as e:  # Redis failure
             logger.error(f"Redis get error: {e}")
             return None
 
@@ -74,7 +89,7 @@ class RedisCache:
         if not self.enabled:
             return self.memory.set(key, value, expire)
         try:
-            self.redis.setex(key, timedelta(seconds=expire), pickle.dumps(value))
+            self.redis.setex(key, timedelta(seconds=expire), json.dumps(value, default=_json_default))
         except Exception as e:
             logger.error(f"Redis set error: {e}")
 

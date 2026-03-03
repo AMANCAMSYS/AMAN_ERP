@@ -96,6 +96,79 @@ def get_accounting_summary(
     finally:
         db.close()
 
+
+# ── MODULE-001: Map account_code to the module it belongs to ──
+# Used to show module tags in COA and for module-based filtering
+_ACCOUNT_MODULE_MAP = {
+    # Manufacturing (legacy codes)
+    "RM-INV":   "manufacturing",
+    "FG-INV":   "manufacturing",
+    "WIP":      "manufacturing",
+    "CGS-MFG":  "manufacturing",
+    "LABOR":    "manufacturing",
+    "MFG-OH":   "manufacturing",
+    # Inventory / Stock (legacy codes)
+    "INV":      "stock",
+    "INV-ADJ":  "stock",
+    # POS (legacy codes)
+    "CASH-OS":  "pos",
+    # Services (legacy codes)
+    "SALE-S":   "services",
+    # HR (legacy codes)
+    "SAL":      "hr",
+    "GOSI-EXP": "hr",
+    "ADV":      "hr",
+}
+
+# Numeric code prefix → module mapping (for SOCPA/IFRS-coded accounts)
+# يغطي كل الحسابات المُزروعة من industry_coa_templates
+_NUMERIC_CODE_MODULE_MAP = {
+    "13":    "stock",           # مخزون — كل حسابات المخزون
+    "130":   "stock",           # فرعيات المخزون
+    "1301":  "stock",           # بضاعة بالطريق / WIP
+    "1302":  "stock",           # مخزون إنتاج تام / بضاعة لدى وكلاء
+    "1303":  "stock",           # قطع غيار / أصول بيولوجية
+    "1304":  "stock",           # أصول بيولوجية فرعية
+    "1305":  "stock",           # أصول بيولوجية أشجار
+    "510":   "stock",           # تكلفة بضاعة فرعية
+    "51010": "stock",           # COGS variants
+    "51020": "stock",           # فروقات جرد / عمولات
+    "51030": "manufacturing",   # تكاليف غير مباشرة
+    "51040": "manufacturing",   # هدر إنتاج
+    "51050": "manufacturing",   # فروقات تكلفة معيارية
+    "16030": "manufacturing",   # معدات صناعية / ثقيلة
+    "16040": "manufacturing",   # خطوط إنتاج / سقالات
+    "18004": "manufacturing",   # إهلاك متراكم — آلات
+    "18005": "manufacturing",   # إهلاك متراكم — خطوط إنتاج
+    "41010": "sales",           # إيرادات فرعية
+    "41020": "sales",           # مردودات / مبيعات فرعية
+    "41030": "sales",           # خصم / إيرادات فرعية
+    "41040": "sales",           # مردودات أدوية / أعلاف
+    "61030": "hr",              # أجور عمال مباشرة
+    "61040": "hr",              # أجور خدمة
+    "15020": "projects",        # تكاليف مشاريع مؤجلة / WIP خدمات
+    "21090": "projects",        # محتجزات موردين
+    "21100": "projects",        # مقاولين من الباطن
+}
+
+def _account_code_to_module(code: str) -> str | None:
+    """Return the module key this account belongs to, or None for core/shared accounts."""
+    if not code:
+        return None
+    # 1) Check exact match (legacy codes)
+    m = _ACCOUNT_MODULE_MAP.get(code)
+    if m:
+        return m
+    # 2) Check numeric prefix (longest prefix first)
+    for prefix_len in (5, 4, 3, 2):
+        if len(code) >= prefix_len:
+            prefix = code[:prefix_len]
+            m = _NUMERIC_CODE_MODULE_MAP.get(prefix)
+            if m:
+                return m
+    return None
+
+
 @router.get("/accounts", dependencies=[Depends(require_permission("accounting.view"))])
 async def get_chart_of_accounts(
     branch_id: Optional[int] = None,
@@ -135,7 +208,7 @@ async def get_chart_of_accounts(
             # We calculate both base balance and currency balance if it matches the account currency
             query = f"""
                 SELECT 
-                    a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type, a.parent_id, a.currency, a.is_active,
+                    a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type, a.parent_id, a.currency, a.is_active, a.is_header,
                     a.balance_currency as total_balance_currency,
                     CASE 
                         WHEN a.account_type IN ('asset', 'expense') THEN 
@@ -159,7 +232,7 @@ async def get_chart_of_accounts(
                 LEFT JOIN journal_lines jl ON jl.account_id = a.id
                 LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
                 WHERE 1=1 {where_extra}
-                GROUP BY a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type, a.parent_id, a.currency, a.is_active, a.balance_currency
+                GROUP BY a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type, a.parent_id, a.currency, a.is_active, a.is_header, a.balance_currency
                 ORDER BY a.account_number ASC
             """
             all_params = {"branch_id": branch_id, **extra_params}
@@ -183,7 +256,7 @@ async def get_chart_of_accounts(
             result = db.execute(text(query), all_params)
         else:
             query = f"""
-                SELECT id, account_number, account_code, name, name_en, account_type, parent_id, balance, balance_currency, currency, is_active
+                SELECT id, account_number, account_code, name, name_en, account_type, parent_id, is_header, balance, balance_currency, currency, is_active
                 FROM accounts a
                 WHERE 1=1 {where_extra}
                 ORDER BY account_number ASC
@@ -202,6 +275,10 @@ async def get_chart_of_accounts(
             result = db.execute(text(query), extra_params)
             
         accounts = [dict(row._mapping) for row in result]
+
+        # ── MODULE-001: Add module_tag to each account based on account_code ──
+        for acc in accounts:
+            acc["module_tag"] = _account_code_to_module(acc.get("account_code", ""))
         
         # Pagination result structure
         if page is not None and page >= 1:
@@ -247,8 +324,8 @@ async def create_account(
                 raise HTTPException(status_code=400, detail="كود الحساب موجود مسبقاً")
 
         db.execute(text("""
-            INSERT INTO accounts (account_number, account_code, name, name_en, account_type, parent_id, currency, balance, is_active)
-            VALUES (:num, :code, :name, :name_en, :type, :parent, :curr, 0, true)
+            INSERT INTO accounts (account_number, account_code, name, name_en, account_type, parent_id, currency, is_header, balance, is_active)
+            VALUES (:num, :code, :name, :name_en, :type, :parent, :curr, :is_header, 0, true)
         """), {
             "num": account.account_number,
             "code": account.account_code,
@@ -256,7 +333,8 @@ async def create_account(
             "name_en": account.name_en,
             "type": account.account_type,
             "parent": account.parent_id,
-            "curr": account.currency
+            "curr": account.currency,
+            "is_header": account.is_header
         })
         db.commit()
 
@@ -368,12 +446,23 @@ async def update_account(
              
         db.execute(text("""
             UPDATE accounts 
-            SET name = :name, name_en = :name_en, account_code = :code
+            SET name = :name, name_en = :name_en, account_code = :code,
+                account_type = COALESCE(:account_type, account_type),
+                parent_id = :parent_id,
+                currency = COALESCE(:currency, currency),
+                is_header = COALESCE(:is_header, is_header),
+                is_active = COALESCE(:is_active, is_active),
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {
             "name": account_data.get("name"),
             "name_en": account_data.get("name_en"),
             "code": new_code,
+            "account_type": account_data.get("account_type"),
+            "parent_id": account_data.get("parent_id"),
+            "currency": account_data.get("currency"),
+            "is_header": account_data.get("is_header"),
+            "is_active": account_data.get("is_active"),
             "id": account_id
         })
         db.commit()
@@ -385,6 +474,8 @@ async def update_account(
             pass
             
         return {"success": True, "message": "تم تحديث الحساب بنجاح"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating account: {str(e)}")

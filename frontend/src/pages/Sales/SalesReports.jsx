@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { ModuleKPISection } from '../../components/kpi';
 
 const SalesReports = () => {
     const { t } = useTranslation();
@@ -208,6 +209,9 @@ const SalesReports = () => {
                     <button onClick={fetchReports} className="btn btn-secondary">🔄 {t('sales.reports.analytics.update')}</button>
                 </div>
             </div>
+
+            {/* KPI Performance Indicators */}
+            <ModuleKPISection roleKey="sales" color="#059669" defaultOpen={false} />
 
             {/* Summary KPI Cards */}
             <div className="metrics-grid mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>

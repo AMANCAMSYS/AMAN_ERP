@@ -11,7 +11,7 @@ from typing import List, Optional
 from datetime import date, datetime, timedelta
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     get_base_currency, update_account_balance
@@ -22,7 +22,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/projects", tags=["المشاريع"])
+router = APIRouter(prefix="/projects", tags=["المشاريع"], dependencies=[Depends(require_module("projects"))])
 from schemas.projects import (
     ProjectCreate, ProjectUpdate, TaskCreate, TaskUpdate,
     ProjectExpenseCreate, ProjectRevenueCreate,

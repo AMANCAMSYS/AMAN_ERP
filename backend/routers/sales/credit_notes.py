@@ -285,6 +285,10 @@ def create_sales_credit_note(
         })
 
         je_num = f"JE-SCN-{inv_num}"
+        # Validate JE lines
+        from utils.accounting import validate_je_lines
+        valid_lines = validate_je_lines(je_lines, source=f"SCN-{inv_num}")
+
         je_id = db.execute(text("""
             INSERT INTO journal_entries (
                 entry_number, entry_date, description, reference, status,
@@ -301,7 +305,7 @@ def create_sales_credit_note(
             "curr": currency, "rate": exchange_rate,
         }).scalar()
 
-        for jl in je_lines:
+        for jl in valid_lines:
             db.execute(text("""
                 INSERT INTO journal_lines (
                     journal_entry_id, account_id, debit, credit, description,
@@ -608,6 +612,9 @@ def create_sales_debit_note(
             })
 
         je_num = f"JE-SDN-{inv_num}"
+        # Validate JE lines
+        valid_dn_lines = validate_je_lines(je_lines, source=f"SDN-{inv_num}")
+
         je_id = db.execute(text("""
             INSERT INTO journal_entries (
                 entry_number, entry_date, description, reference, status,
@@ -624,7 +631,7 @@ def create_sales_debit_note(
             "curr": currency, "rate": exchange_rate,
         }).scalar()
 
-        for jl in je_lines:
+        for jl in valid_dn_lines:
             db.execute(text("""
                 INSERT INTO journal_lines (
                     journal_entry_id, account_id, debit, credit, description,

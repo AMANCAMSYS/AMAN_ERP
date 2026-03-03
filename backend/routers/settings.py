@@ -3,6 +3,7 @@ AMAN ERP - Company Settings Router
 Handles dynamic key-value settings for each company.
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -15,6 +16,7 @@ from utils.permissions import require_permission
 from schemas.settings import SettingsUpdateRequest
 from utils.cache import cache
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["إعدادات الشركة"])
 
@@ -188,29 +190,26 @@ def update_settings_bulk(
     
     db = get_db_connection(company_id)
     try:
-        # Upsert logic
+        # Upsert logic — atomic ON CONFLICT
         for key, value in request.settings.items():
             value_str = str(value) if value is not None else ""
-            
-            # Check if exists
-            exists = db.execute(
-                text("SELECT 1 FROM company_settings WHERE setting_key = :key"),
-                {"key": key}
-            ).fetchone()
-            
-            if exists:
-                db.execute(
-                    text("UPDATE company_settings SET setting_value = :value, updated_at = CURRENT_TIMESTAMP WHERE setting_key = :key"),
-                    {"value": value_str, "key": key}
-                )
-            else:
-                 db.execute(
-                    text("INSERT INTO company_settings (setting_key, setting_value) VALUES (:key, :value)"),
-                    {"key": key, "value": value_str}
-                )
+            db.execute(
+                text("INSERT INTO company_settings (setting_key, setting_value) VALUES (:key, :value) ON CONFLICT (setting_key) DO UPDATE SET setting_value = :value, updated_at = CURRENT_TIMESTAMP"),
+                {"key": key, "value": value_str}
+            )
         
         db.commit()
-        db.commit()
+        
+        # ── إذا تم تغيير نوع النشاط → زرع شجرة الحسابات المتخصصة ──
+        if "industry_type" in request.settings:
+            industry_key = request.settings["industry_type"]
+            try:
+                from services.industry_coa_templates import seed_industry_coa
+                # normalize_industry_key is called inside seed_industry_coa
+                coa_result = seed_industry_coa(db, industry_key, replace_existing=False)
+                logger.info(f"📊 COA seeded for industry '{industry_key}': {coa_result}")
+            except Exception as coa_err:
+                logger.warning(f"⚠️ COA seeding skipped: {coa_err}")
         
         # Invalidate cache
         cache.delete(f"company_settings:{company_id}")

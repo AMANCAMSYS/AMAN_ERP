@@ -76,6 +76,7 @@ function AccountingHome() {
         {
             title: t('accounting.home.sections.reports'),
             items: [
+                { label: i18n.language === 'ar' ? 'مؤشرات الأداء المالي' : 'Financial KPI Dashboard', path: '/accounting/kpi', icon: '📈', permission: 'accounting.view', highlight: true, color: '#2563eb' },
                 { label: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', icon: '📚', permission: 'accounting.view' },
                 { label: t('accounting.home.links.trial_balance'), path: '/accounting/trial-balance', icon: '⚖️', permission: 'accounting.view' },
                 { label: t('accounting.home.links.vat_report'), path: '/accounting/vat-report', icon: '🧾', permission: 'accounting.view' },
@@ -130,9 +131,10 @@ function AccountingHome() {
                                     key={itemIdx}
                                     className="link-item"
                                     onClick={() => item.path !== '#' && navigate(item.path)}
+                                    style={item.highlight ? { background: `linear-gradient(135deg, ${item.color}0F, ${item.color}1F)`, borderRight: i18n.language === 'ar' ? `3px solid ${item.color}` : 'none', borderLeft: i18n.language !== 'ar' ? `3px solid ${item.color}` : 'none' } : undefined}
                                 >
                                     <span className="link-icon">{item.icon}</span>
-                                    <span className="link-label">{item.label}</span>
+                                    <span className="link-label" style={item.highlight ? { fontWeight: 600, color: item.color } : undefined}>{item.label}</span>
                                     <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                                 </div>
                             ))}

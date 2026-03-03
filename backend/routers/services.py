@@ -14,11 +14,11 @@ import shutil
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/services", tags=["Services"])
+router = APIRouter(prefix="/services", tags=["Services"], dependencies=[Depends(require_module("services"))])
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads", "documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)

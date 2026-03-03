@@ -8,7 +8,7 @@ import {
     Settings, Wallet, Palette, ShoppingCart, Truck, Users, Box, FileText,
     Heart, Monitor, Bell, BarChart3, ShieldCheck, Link, Zap, Receipt,
     Briefcase, CheckSquare, Share2, GitBranch, History, Database,
-    ChevronRight, Sparkles, TrendingUp, Key, Globe, Scale, Building2, Upload
+    ChevronRight, Sparkles, TrendingUp, Key, Globe, Scale, Building2, Upload, Layers
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import GeneralSettings from './tabs/GeneralSettings';
@@ -61,33 +61,40 @@ const CompanySettings = () => {
     const [settingsData, setSettingsData] = useState({});
 
     // Define allTabs as a constant array (must be defined before useMemo)
+    const enabledModules = user?.enabled_modules || [];
+    const isModOn = (mod) => !enabledModules.length || enabledModules.includes(mod);
+
     const allTabs = React.useMemo(() => [
         { id: 'general', label: t('settings.tabs.general'), icon: Settings, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', desc: t('settings.tabs_desc.general'), permission: 'settings.manage' },
         { id: 'financial', label: t('settings.tabs.financial'), icon: Wallet, gradient: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', desc: t('settings.tabs_desc.financial'), permission: 'settings.manage' },
-        { id: 'accounting', label: t('settings.tabs.accounting') || '{t("settings.accounting_link")}', icon: Database, gradient: 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)', desc: t('settings.tabs_desc.accounting') || '{t("settings.accounting_link_desc")}', permission: 'accounting.manage' },
+        { id: 'accounting', label: t('settings.tabs.accounting') || '{t("settings.accounting_link")}', icon: Database, gradient: 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)', desc: t('settings.tabs_desc.accounting') || '{t("settings.accounting_link_desc")}', permission: 'accounting.manage', module: 'accounting' },
         { id: 'branding', label: t('settings.tabs.branding'), icon: Palette, gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', desc: t('settings.tabs_desc.branding'), permission: 'settings.manage' },
-        { id: 'sales', label: t('settings.tabs.sales'), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', desc: t('settings.tabs_desc.sales'), permission: ['sales.manage', 'sales.edit', 'settings.manage'] },
-        { id: 'purchases', label: t('settings.tabs.purchases'), icon: Truck, gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', desc: t('settings.tabs_desc.purchases'), permission: ['buying.manage', 'buying.edit', 'settings.manage'] },
-        { id: 'hr', label: t('settings.tabs.hr'), icon: Users, gradient: 'linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%)', desc: t('settings.tabs_desc.hr'), permission: 'hr.manage' },
-        { id: 'inventory', label: t('settings.tabs.inventory'), icon: Box, gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', desc: t('settings.tabs_desc.inventory'), permission: 'stock.manage' },
+        { id: 'sales', label: t('settings.tabs.sales'), icon: ShoppingCart, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', desc: t('settings.tabs_desc.sales'), permission: ['sales.manage', 'sales.edit', 'settings.manage'], module: 'sales' },
+        { id: 'purchases', label: t('settings.tabs.purchases'), icon: Truck, gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', desc: t('settings.tabs_desc.purchases'), permission: ['buying.manage', 'buying.edit', 'settings.manage'], module: 'buying' },
+        { id: 'hr', label: t('settings.tabs.hr'), icon: Users, gradient: 'linear-gradient(135deg, #3a7bd5 0%, #00d2ff 100%)', desc: t('settings.tabs_desc.hr'), permission: 'hr.manage', module: 'hr' },
+        { id: 'inventory', label: t('settings.tabs.inventory'), icon: Box, gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', desc: t('settings.tabs_desc.inventory'), permission: 'stock.manage', module: 'stock' },
         { id: 'invoicing', label: t('settings.tabs.invoicing'), icon: FileText, gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', desc: t('settings.tabs_desc.invoicing'), permission: 'settings.manage' },
-        { id: 'crm', label: t('settings.tabs.crm'), icon: Heart, gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', desc: t('settings.tabs_desc.crm'), permission: 'sales.manage' },
-        { id: 'pos', label: t('settings.tabs.pos'), icon: Monitor, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', desc: t('settings.tabs_desc.pos'), permission: 'settings.manage' },
+        { id: 'crm', label: t('settings.tabs.crm'), icon: Heart, gradient: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)', desc: t('settings.tabs_desc.crm'), permission: 'sales.manage', module: 'crm' },
+        { id: 'pos', label: t('settings.tabs.pos'), icon: Monitor, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', desc: t('settings.tabs_desc.pos'), permission: 'settings.manage', module: 'pos' },
         { id: 'notifications', label: t('settings.tabs.notifications'), icon: Bell, gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', desc: t('settings.tabs_desc.notifications'), permission: 'settings.manage' },
         { id: 'reporting', label: t('settings.tabs.reporting'), icon: BarChart3, gradient: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', desc: t('settings.tabs_desc.reporting'), permission: 'reports.view' },
         { id: 'security', label: t('settings.tabs.security'), icon: ShieldCheck, gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)', desc: t('settings.tabs_desc.security'), permission: 'admin' },
         { id: 'integrations', label: t('settings.tabs.integrations'), icon: Link, gradient: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', desc: t('settings.tabs_desc.integrations'), permission: 'settings.manage' },
         { id: 'performance', label: t('settings.tabs.performance'), icon: Zap, gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', desc: t('settings.tabs_desc.performance'), permission: 'settings.manage' },
-        { id: 'expenses', label: t('settings.tabs.expenses'), icon: Receipt, gradient: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', desc: t('settings.tabs_desc.expenses'), permission: 'treasury.manage' },
-        { id: 'projects', label: t('settings.tabs.projects'), icon: Briefcase, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', desc: t('settings.tabs_desc.projects'), permission: 'settings.manage' },
+        { id: 'expenses', label: t('settings.tabs.expenses'), icon: Receipt, gradient: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', desc: t('settings.tabs_desc.expenses'), permission: 'treasury.manage', module: 'expenses' },
+        { id: 'projects', label: t('settings.tabs.projects'), icon: Briefcase, gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', desc: t('settings.tabs_desc.projects'), permission: 'settings.manage', module: 'projects' },
         { id: 'compliance', label: t('settings.tabs.compliance'), icon: CheckSquare, gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', desc: t('settings.tabs_desc.compliance'), permission: 'settings.manage' },
         { id: 'branches', label: t('settings.tabs.branches'), icon: Share2, gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', desc: t('settings.tabs_desc.branches'), permission: 'branches.view' },
         { id: 'workflow', label: t('settings.tabs.workflow'), icon: GitBranch, gradient: 'linear-gradient(135deg, #d946ef 0%, #c026d3 100%)', desc: t('settings.tabs_desc.workflow'), permission: 'settings.manage' },
-        { id: 'audit', label: t('settings.tabs.audit'), icon: Database, gradient: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)', desc: t('settings.tabs_desc.audit'), permission: 'audit.view' },
+        { id: 'audit', label: t('settings.tabs.audit'), icon: Database, gradient: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)', desc: t('settings.tabs_desc.audit'), permission: 'audit.view', module: 'audit' },
     ], [t]);
 
     const tabs = React.useMemo(() =>
-        allTabs.filter(tab => !tab.permission || hasPermission(tab.permission)),
+        allTabs.filter(tab => {
+            if (tab.permission && !hasPermission(tab.permission)) return false;
+            if (tab.module && !isModOn(tab.module)) return false;
+            return true;
+        }),
         [allTabs]
     );
 
@@ -248,6 +255,7 @@ const CompanySettings = () => {
                                 </h2>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                                     {[
+                                        { icon: Layers, label: t('nav.moduleCustomization') || 'تخصيص الوحدات', desc: t('settings.advanced_tools_desc.modules') || 'تفعيل وتعطيل الوحدات حسب نوع النشاط', path: '/setup/modules' },
                                         { icon: Building2, label: t('nav.branches') || 'الفروع', desc: t('settings.advanced_tools_desc.branches'), path: '/settings/branches', permission: 'branches.view' },
                                         { icon: Scale, label: t('nav.costingPolicy') || 'سياسة التكلفة', desc: t('settings.advanced_tools_desc.costing_policy'), path: '/settings/costing-policy' },
                                         { icon: Upload, label: t('nav.dataImport') || 'استيراد البيانات', desc: t('settings.advanced_tools_desc.data_import'), path: '/data-import' },

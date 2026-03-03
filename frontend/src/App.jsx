@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useToast } from './context/ToastContext'
 import { isAuthenticated, hasPermission, getUser } from './utils/auth'
+import { hasIndustryTypeSet } from './hooks/useIndustryType'
 import { requestManager } from './utils/requestManager'
 import { PageLoading } from './components/common/LoadingStates'
 import Layout from './components/Layout'
@@ -290,6 +291,10 @@ const ServicesHome = React.lazy(() => import('./pages/Services/ServicesHome'))
 const ServiceRequests = React.lazy(() => import('./pages/Services/ServiceRequests'))
 const DocumentManagement = React.lazy(() => import('./pages/Services/DocumentManagement'))
 
+// Setup Wizard
+const IndustrySetup = React.lazy(() => import('./pages/Setup/IndustrySetup'))
+const ModuleCustomization = React.lazy(() => import('./pages/Setup/ModuleCustomization'))
+
 // Common & Settings
 const CompanySettings = React.lazy(() => import('./pages/Settings/CompanySettings'))
 const CompanyProfile = React.lazy(() => import('./pages/Settings/CompanyProfile'))
@@ -305,10 +310,15 @@ const ScheduledReports = React.lazy(() => import('./pages/Reports/ScheduledRepor
 const ReportBuilder = React.lazy(() => import('./pages/Reports/ReportBuilder'))
 const DetailedProfitLoss = React.lazy(() => import('./pages/Reports/DetailedProfitLoss'))
 const SharedReports = React.lazy(() => import('./pages/Reports/SharedReports'))
+const IndustryReport = React.lazy(() => import('./pages/Reports/IndustryReport'))
 
 // Consolidation Reports
 const ConsolidationReports = React.lazy(() => import('./pages/Reports/ConsolidationReports'))
 const KPIDashboard = React.lazy(() => import('./pages/Reports/KPIDashboard'))
+
+// Role-Based KPI Dashboards
+const KPIHub = React.lazy(() => import('./pages/KPI/KPIHub'))
+const RoleDashboard = React.lazy(() => import('./pages/KPI/RoleDashboard'))
 
 // New Report Pages
 const PurchasesAgingReport = React.lazy(() => import('./pages/Buying/PurchasesAgingReport'))
@@ -321,12 +331,17 @@ const PaymentForm = React.lazy(() => import('./pages/Purchases/PaymentForm'))
 const PaymentDetails = React.lazy(() => import('./pages/Purchases/PaymentDetails'))
 
 
-function PrivateRoute({ children, permission, role }) {
+function PrivateRoute({ children, permission, role, skipIndustryCheck = false }) {
     const isAuth = isAuthenticated()
     const user = getUser()
 
     if (!isAuth) {
         return <Navigate to="/login" replace />
+    }
+
+    // توجيه لصفحة إعداد النشاط إذا لم يُختر بعد (مرة واحدة فقط)
+    if (!skipIndustryCheck && user?.role !== 'system_admin' && !hasIndustryTypeSet()) {
+        return <Navigate to="/setup/industry" replace />
     }
 
     if (permission && !hasPermission(permission)) {
@@ -382,7 +397,12 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/setup/industry" element={isAuthenticated() ? <IndustrySetup /> : <Navigate to="/login" />} />
+                <Route path="/setup/modules" element={isAuthenticated() ? <ModuleCustomization /> : <Navigate to="/login" />} />
                 <Route path="/dashboard" element={<PrivateRoute permission="dashboard.view"><Dashboard /></PrivateRoute>} />
+                <Route path="/kpi" element={<PrivateRoute permission="dashboard.view"><KPIHub /></PrivateRoute>} />
+                <Route path="/kpi/:roleKey" element={<PrivateRoute permission="dashboard.view"><RoleDashboard /></PrivateRoute>} />
+                <Route path="/accounting/kpi" element={<PrivateRoute permission="accounting.view"><RoleDashboard fixedRoleKey="financial" backPath="/accounting" /></PrivateRoute>} />
                 <Route path="/accounting" element={<PrivateRoute permission="accounting.view"><AccountingHome /></PrivateRoute>} />
                 <Route path="/accounting/coa" element={<PrivateRoute permission="accounting.view"><ChartOfAccounts /></PrivateRoute>} />
                 <Route path="/accounting/cost-centers" element={<PrivateRoute permission="accounting.view"><CostCenterList /></PrivateRoute>} />
@@ -580,6 +600,7 @@ function App() {
                 <Route path="/reports/kpi" element={<PrivateRoute permission="reports.view"><KPIDashboard /></PrivateRoute>} />
                 <Route path="/reports/fx-gain-loss" element={<PrivateRoute permission="reports.view"><FXGainLossReport /></PrivateRoute>} />
                 <Route path="/reports/cashflow-ias7" element={<PrivateRoute permission="accounting.view"><CashFlowIAS7 /></PrivateRoute>} />
+                <Route path="/reports/industry/:reportType" element={<PrivateRoute permission="reports.view"><IndustryReport /></PrivateRoute>} />
 
                 {/* HR Routes */}
                 <Route path="/hr" element={<PrivateRoute permission="hr.view"><HRHome /></PrivateRoute>} />
@@ -623,6 +644,7 @@ function App() {
                 <Route path="/assets/:id" element={<PrivateRoute permission="assets.view"><AssetDetails /></PrivateRoute>} />
 
                 {/* Projects Routes */}
+                <Route path="/projects/kpi" element={<PrivateRoute permission="projects.view"><RoleDashboard fixedRoleKey="projects" backPath="/projects" /></PrivateRoute>} />
                 <Route path="/projects" element={<PrivateRoute permission="projects.view"><ProjectList /></PrivateRoute>} />
                 <Route path="/projects/resources" element={<PrivateRoute permission="projects.view"><ResourceManagement /></PrivateRoute>} />
                 <Route path="/projects/new" element={<PrivateRoute permission="projects.create"><ProjectForm /></PrivateRoute>} />
@@ -676,6 +698,7 @@ function App() {
                 <Route path="/settings/print-templates" element={<PrivateRoute permission="settings.view"><PrintTemplates /></PrivateRoute>} />
 
                 {/* POS Routes */}
+                <Route path="/pos/kpi" element={<PrivateRoute permission="pos.view"><RoleDashboard fixedRoleKey="pos" backPath="/pos" /></PrivateRoute>} />
                 <Route path="/pos" element={<PrivateRoute permission="pos.view"><POSHome /></PrivateRoute>} />
                 <Route path="/pos/interface" element={isAuthenticated() && hasPermission('pos.sessions') ? <POSInterface /> : (!isAuthenticated() ? <Navigate to="/login" /> : <PermissionDeniedRedirect />)} />
                 <Route path="/pos/promotions" element={<PrivateRoute permission="pos.view"><Promotions /></PrivateRoute>} />

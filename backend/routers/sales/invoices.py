@@ -3,14 +3,21 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 import uuid
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    """Convert any numeric value to Decimal safely."""
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
+from utils.fiscal_lock import check_fiscal_period_open
 from .schemas import InvoiceCreate, InvoiceResponse
 
 invoices_router = APIRouter()
@@ -97,31 +104,35 @@ def create_sales_invoice(
         from utils.accounting import generate_sequential_number
         inv_num = generate_sequential_number(db, f"INV-{datetime.now().year}", "invoices", "invoice_number")
 
-        # --- 2. Calculate Totals ---
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
+        # --- FISCAL-LOCK: Reject if accounting period is closed ---
+        check_fiscal_period_open(db, invoice.invoice_date)
+
+        # --- 2. Calculate Totals (using Decimal for precision) ---
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
+        total_discount = Decimal('0')
         items_to_save = []
 
         for item in invoice.items:
-            line_subtotal = float(item.quantity) * float(item.unit_price)
-            taxable = line_subtotal - float(item.discount)
-            line_tax = taxable * (float(item.tax_rate) / 100)
+            line_subtotal = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+            discount = _dec(item.discount)
+            taxable = (line_subtotal - discount).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             line_total = taxable + line_tax
 
             subtotal += line_subtotal
             total_tax += line_tax
-            total_discount += float(item.discount)
+            total_discount += discount
 
             items_to_save.append({
                 **item.model_dump(),
-                "total": line_total
+                "total": float(line_total)
             })
 
         grand_total = subtotal - total_discount + total_tax
 
         # --- 3. Handle Payment ---
-        paid_amount = float(invoice.paid_amount or 0)
+        paid_amount = _dec(invoice.paid_amount or 0)
 
         # If payment method is immediate (cash / bank / check / card),
         # the invoice is always fully paid — the paid_amount field is hidden
@@ -130,7 +141,7 @@ def create_sales_invoice(
             paid_amount = grand_total
 
         remaining_balance = grand_total - paid_amount
-        inv_status = 'paid' if remaining_balance <= 0.01 else ('partial' if paid_amount > 0 else 'unpaid')
+        inv_status = 'paid' if remaining_balance <= _D2 else ('partial' if paid_amount > 0 else 'unpaid')
 
         # GL amounts in base currency
         gl_subtotal = to_base(subtotal)
@@ -403,7 +414,8 @@ def create_sales_invoice(
 
         # Insert Journal Entry
         if je_lines:
-            valid_lines = [l for l in je_lines if l["account_id"] is not None]
+            from utils.accounting import validate_je_lines
+            valid_lines = validate_je_lines(je_lines, source=f"SALE-{inv_num}")
 
             if valid_lines:
                 je_num = f"JE-SALE-{inv_num}"

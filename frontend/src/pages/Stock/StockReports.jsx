@@ -4,6 +4,7 @@ import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
+import { ModuleKPISection } from '../../components/kpi';
 
 const StockReports = () => {
     const { t } = useTranslation();
@@ -53,6 +54,8 @@ const StockReports = () => {
                     <p className="workspace-subtitle">{t('stock.reports.balance.subtitle')}</p>
                 </div>
             </div>
+
+            <ModuleKPISection roleKey="warehouse" color="#0891b2" defaultOpen={false} />
 
             {/* Filter */}
             <div className="section-card mb-6" style={{ marginBottom: '24px' }}>

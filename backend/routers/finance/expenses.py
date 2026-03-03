@@ -10,7 +10,7 @@ from datetime import date, datetime
 from database import get_db_connection
 from routers.auth import get_current_user
 from sqlalchemy import text
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     get_base_currency, update_account_balance
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 from schemas.expenses import ExpenseCreate, ExpenseUpdate, ExpenseApproval
 
-router = APIRouter(prefix="/expenses", tags=["المصاريف"])
+router = APIRouter(prefix="/expenses", tags=["المصاريف"], dependencies=[Depends(require_module("expenses"))])
 
 
 # ═══════════════════════════════════════════════════════════

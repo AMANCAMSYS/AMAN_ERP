@@ -24,60 +24,121 @@ router = APIRouter(prefix="/auth", tags=["المصادقة"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 logger = logging.getLogger(__name__)
 
-# Login rate limiting - track failed attempts per IP AND per username
-_login_attempts = {}  # {ip: {"count": int, "last_attempt": datetime}}
-_username_attempts = {}  # {username: {"count": int, "last_attempt": datetime}}
+# ============ SEC-FIX: Redis-backed rate limiter ============
+# Persists across restarts and works in multi-worker / multi-instance environments.
 MAX_LOGIN_ATTEMPTS = 5
-MAX_USERNAME_ATTEMPTS = 10  # More lenient per-username (shared IPs)
-LOCKOUT_DURATION = timedelta(minutes=15)
+MAX_USERNAME_ATTEMPTS = 10
+LOCKOUT_SECONDS = 15 * 60  # 15 minutes
+
+_rate_redis = None  # lazy-initialised Redis connection
+
+def _get_rate_redis():
+    """Return a Redis client for rate limiting (lazy init, graceful fallback)."""
+    global _rate_redis
+    if _rate_redis is not None:
+        return _rate_redis
+    try:
+        import redis as _redis_lib
+        if settings.REDIS_URL:
+            _rate_redis = _redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=2, decode_responses=True)
+            _rate_redis.ping()  # verify connectivity
+            return _rate_redis
+    except Exception as e:
+        logger.warning(f"Redis unavailable for rate-limiter, falling back to in-memory: {e}")
+    _rate_redis = None
+    return None
+
+# In-memory fallback (single-worker only, cleared on restart)
+_login_attempts = {}
+_username_attempts = {}
+
+
+def _get_client_ip(request: Request) -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    return xff.split(",")[0].strip() if xff else (request.client.host if request.client else "unknown")
 
 
 def check_rate_limit(request: Request, username: str = None):
-    """Check if IP or username has exceeded login attempt limit"""
-    client_ip = request.client.host if request.client else "unknown"
-    # Exclude localhost/internal IPs from rate limiting (dev environment & Vite proxy)
-    if client_ip in ("127.0.0.1", "::1", "localhost", "testclient"):
+    """Check if IP or username has exceeded login attempt limit."""
+    client_ip = _get_client_ip(request)
+    if client_ip in ("testclient",):
         return
+
+    r = _get_rate_redis()
+    if r is not None:
+        # --- Redis path ---
+        try:
+            ip_key = f"rl:ip:{client_ip}"
+            ip_count = r.get(ip_key)
+            if ip_count and int(ip_count) >= MAX_LOGIN_ATTEMPTS:
+                ttl = r.ttl(ip_key)
+                minutes = max(int(ttl / 60) + 1, 1) if ttl and ttl > 0 else 1
+                raise HTTPException(429, f"تم تجاوز عدد المحاولات المسموح. يرجى الانتظار {minutes} دقيقة")
+
+            if username:
+                user_key = f"rl:user:{username}"
+                user_count = r.get(user_key)
+                if user_count and int(user_count) >= MAX_USERNAME_ATTEMPTS:
+                    ttl = r.ttl(user_key)
+                    minutes = max(int(ttl / 60) + 1, 1) if ttl and ttl > 0 else 1
+                    logger.warning(f"🔒 Username '{username}' locked out - too many attempts")
+                    raise HTTPException(429, f"تم تجاوز عدد المحاولات لهذا المستخدم. يرجى الانتظار {minutes} دقيقة")
+            return
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Redis rate-limit read error: {e}")
+            # Fall through to memory check
+
+    # --- In-memory fallback ---
     now = datetime.now(timezone.utc)
-    
-    # Check IP-based limit
     if client_ip in _login_attempts:
         info = _login_attempts[client_ip]
-        if now - info["last_attempt"] > LOCKOUT_DURATION:
+        if (now - info["last_attempt"]).total_seconds() > LOCKOUT_SECONDS:
             del _login_attempts[client_ip]
         elif info["count"] >= MAX_LOGIN_ATTEMPTS:
-            remaining = LOCKOUT_DURATION - (now - info["last_attempt"])
-            minutes = int(remaining.total_seconds() / 60) + 1
-            raise HTTPException(
-                status_code=429,
-                detail=f"تم تجاوز عدد المحاولات المسموح. يرجى الانتظار {minutes} دقيقة"
-            )
-    
-    # Check username-based limit (prevents brute-force across IPs)
+            remaining = LOCKOUT_SECONDS - (now - info["last_attempt"]).total_seconds()
+            minutes = max(int(remaining / 60) + 1, 1)
+            raise HTTPException(429, f"تم تجاوز عدد المحاولات المسموح. يرجى الانتظار {minutes} دقيقة")
+
     if username and username in _username_attempts:
         info = _username_attempts[username]
-        if now - info["last_attempt"] > LOCKOUT_DURATION:
+        if (now - info["last_attempt"]).total_seconds() > LOCKOUT_SECONDS:
             del _username_attempts[username]
         elif info["count"] >= MAX_USERNAME_ATTEMPTS:
-            remaining = LOCKOUT_DURATION - (now - info["last_attempt"])
-            minutes = int(remaining.total_seconds() / 60) + 1
-            logger.warning(f"🔒 Username '{username}' locked out - too many attempts from multiple IPs")
-            raise HTTPException(
-                status_code=429,
-                detail=f"تم تجاوز عدد المحاولات لهذا المستخدم. يرجى الانتظار {minutes} دقيقة"
-            )
+            remaining = LOCKOUT_SECONDS - (now - info["last_attempt"]).total_seconds()
+            minutes = max(int(remaining / 60) + 1, 1)
+            logger.warning(f"🔒 Username '{username}' locked out - too many attempts")
+            raise HTTPException(429, f"تم تجاوز عدد المحاولات لهذا المستخدم. يرجى الانتظار {minutes} دقيقة")
 
 
 def record_failed_attempt(request: Request, username: str = None):
-    """Record a failed login attempt for both IP and username"""
-    client_ip = request.client.host if request.client else "unknown"
+    """Record a failed login attempt for both IP and username."""
+    client_ip = _get_client_ip(request)
+
+    r = _get_rate_redis()
+    if r is not None:
+        try:
+            ip_key = f"rl:ip:{client_ip}"
+            pipe = r.pipeline()
+            pipe.incr(ip_key)
+            pipe.expire(ip_key, LOCKOUT_SECONDS)
+            if username:
+                user_key = f"rl:user:{username}"
+                pipe.incr(user_key)
+                pipe.expire(user_key, LOCKOUT_SECONDS)
+            pipe.execute()
+            return
+        except Exception as e:
+            logger.error(f"Redis rate-limit write error: {e}")
+
+    # In-memory fallback
     now = datetime.now(timezone.utc)
     if client_ip in _login_attempts:
         _login_attempts[client_ip]["count"] += 1
         _login_attempts[client_ip]["last_attempt"] = now
     else:
         _login_attempts[client_ip] = {"count": 1, "last_attempt": now}
-    
     if username:
         if username in _username_attempts:
             _username_attempts[username]["count"] += 1
@@ -87,12 +148,23 @@ def record_failed_attempt(request: Request, username: str = None):
 
 
 def clear_failed_attempts(request: Request, username: str = None):
-    """Clear failed attempts on successful login"""
-    client_ip = request.client.host if request.client else "unknown"
-    if client_ip in _login_attempts:
-        del _login_attempts[client_ip]
-    if username and username in _username_attempts:
-        del _username_attempts[username]
+    """Clear failed attempts on successful login."""
+    client_ip = _get_client_ip(request)
+
+    r = _get_rate_redis()
+    if r is not None:
+        try:
+            r.delete(f"rl:ip:{client_ip}")
+            if username:
+                r.delete(f"rl:user:{username}")
+            return
+        except Exception:
+            pass
+
+    # In-memory fallback
+    _login_attempts.pop(client_ip, None)
+    if username:
+        _username_attempts.pop(username, None)
 
 
 # ============ SEC-201: Persistent Token Blacklist ============
@@ -455,6 +527,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                             decimal_places = 2
                             company_country = "SY"
                             company_timezone = "Asia/Damascus"
+                            industry_type = None
                             try:
                                 dp_res = company_conn.execute(
                                     text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
@@ -471,6 +544,11 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                                 ).scalar()
                                 if tz_res:
                                     company_timezone = tz_res
+                                it_res = company_conn.execute(
+                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+                                ).scalar()
+                                if it_res:
+                                    industry_type = it_res
                             except Exception as e:
                                 logger.warning(f"Failed to fetch settings: {e}")
 
@@ -489,6 +567,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                                     "role": result[5],
                                     "permissions": final_permissions,
                                     "enabled_modules": enabled_modules,
+                                    "industry_type": industry_type,
                                     "currency": currency,
                                     "country": company_country,
                                     "decimal_places": decimal_places,
@@ -625,6 +704,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                 decimal_places = 2
                 company_country = "SY"
                 company_timezone = "Asia/Damascus"
+                industry_type_me = None
                 try:
                     dp_res = company_conn.execute(
                         text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
@@ -641,6 +721,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                     ).scalar()
                     if tz_res:
                         company_timezone = tz_res
+                    it_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+                    ).scalar()
+                    if it_res:
+                        industry_type_me = it_res
                 except Exception as e:
                     logger.warning(f"Failed to fetch settings in /me: {e}")
 
@@ -674,7 +759,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                     timezone=company_timezone,
                     permissions=final_permissions,
                     allowed_branches=allowed_branches,
-                    enabled_modules=enabled_modules
+                    enabled_modules=enabled_modules,
+                    industry_type=industry_type_me
                 )
 
     finally:

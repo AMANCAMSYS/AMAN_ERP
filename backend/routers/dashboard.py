@@ -968,3 +968,128 @@ def get_available_widgets(current_user=Depends(get_current_user)):
         {"id": "recent_invoices", "type": "table", "title": "آخر الفواتير", "default_w": 2, "default_h": 2},
         {"id": "receivables_aging", "type": "chart", "title": "أعمار الذمم المدينة", "default_w": 2, "default_h": 1},
     ]}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Industry-specific endpoints
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/industry-widgets")
+def get_industry_widgets(current_user = Depends(get_current_user)):
+    """Return industry-specific dashboard widgets based on company's industry type."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        industry_type = db.execute(
+            text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+        ).scalar() or "general"
+        
+        widgets = _get_industry_widgets(industry_type, db)
+        return {"industry_type": industry_type, "widgets": widgets}
+    finally:
+        db.close()
+
+
+def _get_industry_widgets(industry_type: str, db) -> list:
+    """Generate industry-specific widget data."""
+    from services.industry_coa_templates import normalize_industry_key
+    industry_type = normalize_industry_key(industry_type)
+    widgets = []
+    
+    try:
+        if industry_type == "restaurant":
+            # Food cost % — uses journal_lines (debit/credit) + accounts
+            food_cost = db.execute(text("""
+                SELECT COALESCE(
+                    (SELECT SUM(CASE WHEN a.account_number LIKE '510%' THEN jl.debit - jl.credit ELSE 0 END) /
+                     NULLIF(SUM(CASE WHEN a.account_number LIKE '410%' THEN jl.credit - jl.debit ELSE 0 END), 0) * 100
+                     FROM journal_lines jl JOIN accounts a ON jl.account_id = a.id
+                     JOIN journal_entries j ON jl.journal_entry_id = j.id
+                     WHERE j.entry_date >= date_trunc('month', CURRENT_DATE)), 0)
+            """)).scalar() or 0
+            widgets.append({"key": "food_cost_pct", "value": round(float(food_cost), 1), "label_ar": "نسبة تكلفة الطعام", "label_en": "Food Cost %", "icon": "🍽️", "target": 30})
+            
+        elif industry_type == "manufacturing":
+            # WIP value — account 13010
+            wip = db.execute(text("""
+                SELECT COALESCE(SUM(
+                    CASE WHEN a.account_number = '13010' THEN jl.debit - jl.credit ELSE 0 END
+                ), 0) FROM journal_lines jl JOIN accounts a ON jl.account_id = a.id
+            """)).scalar() or 0
+            widgets.append({"key": "wip_value", "value": float(wip), "label_ar": "قيمة الإنتاج تحت التشغيل", "label_en": "WIP Value", "icon": "🏭"})
+            
+        elif industry_type == "construction":
+            # Active projects count
+            projects = db.execute(text(
+                "SELECT COUNT(*) FROM projects WHERE status NOT IN ('completed', 'cancelled', 'on_hold')"
+            )).scalar() or 0
+            widgets.append({"key": "active_projects", "value": projects, "label_ar": "مشاريع نشطة", "label_en": "Active Projects", "icon": "🏗️"})
+            
+        elif industry_type == "pharmacy":
+            # Count products with reorder_level > 0 as a proxy for tracked items
+            tracked = db.execute(text("""
+                SELECT COUNT(*) FROM products 
+                WHERE is_active = true AND reorder_level > 0
+            """)).scalar() or 0
+            widgets.append({"key": "tracked_drugs", "value": tracked, "label_ar": "أصناف تحت المراقبة", "label_en": "Tracked Items", "icon": "💊"})
+            
+        elif industry_type in ("retail", "ecommerce"):
+            # Today's POS sales — uses invoices table
+            today_sales = db.execute(text("""
+                SELECT COALESCE(SUM(total), 0) FROM invoices 
+                WHERE DATE(created_at) = CURRENT_DATE AND invoice_type = 'sale'
+            """)).scalar() or 0
+            widgets.append({"key": "today_sales", "value": float(today_sales), "label_ar": "مبيعات اليوم", "label_en": "Today's Sales", "icon": "🛍️"})
+            
+        elif industry_type == "logistics":
+            # Active shipments — uses delivery_orders
+            try:
+                shipments = db.execute(text("""
+                    SELECT COUNT(*) FROM delivery_orders WHERE status NOT IN ('delivered', 'cancelled')
+                """)).scalar() or 0
+            except Exception:
+                shipments = 0
+            widgets.append({"key": "active_shipments", "value": shipments, "label_ar": "شحنات نشطة", "label_en": "Active Shipments", "icon": "🚛"})
+    except Exception as e:
+        logger.warning(f"Industry widget query failed for '{industry_type}': {e}")
+    
+    return widgets
+
+
+@router.get("/gl-rules")
+def get_company_gl_rules(current_user = Depends(get_current_user)):
+    """Return GL auto-posting rules for the company's industry type."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        industry_type = db.execute(
+            text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+        ).scalar() or "general"
+        
+        from services.industry_gl_rules import get_gl_rules_summary, get_default_accounts
+        from services.industry_coa_templates import normalize_industry_key
+        industry_type = normalize_industry_key(industry_type)
+        return {
+            "industry_type": industry_type,
+            "rules": get_gl_rules_summary(industry_type),
+            "default_accounts": get_default_accounts(industry_type),
+        }
+    finally:
+        db.close()
+
+
+@router.get("/coa-summary")
+def get_company_coa_summary(current_user = Depends(get_current_user)):
+    """Return COA template summary for the company's industry type."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        industry_type = db.execute(
+            text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+        ).scalar() or "general"
+        
+        from services.industry_coa_templates import get_industry_coa_summary, normalize_industry_key
+        industry_type = normalize_industry_key(industry_type)
+        return get_industry_coa_summary(industry_type)
+    finally:
+        db.close()

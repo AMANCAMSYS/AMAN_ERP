@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
+import { getIndustryFeature } from '../../hooks/useIndustryType';
 
 const HRHome = () => {
     const { t, i18n } = useTranslation();
@@ -262,11 +263,13 @@ const HRHome = () => {
                             {isRTL ? 'المخالفات والجزاءات' : 'Violations & Penalties'}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
-                        <div className="link-item" onClick={() => navigate('/hr/custody')}>
-                            <span className="link-icon">📦</span>
-                            {isRTL ? 'إدارة العهد' : 'Custody Management'}
-                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                        </div>
+                        {getIndustryFeature('hr.custody') && (
+                            <div className="link-item" onClick={() => navigate('/hr/custody')}>
+                                <span className="link-icon">📦</span>
+                                {isRTL ? 'إدارة العهد' : 'Custody Management'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                         <div className="link-item" onClick={() => navigate('/hr/payslips')}>
                             <span className="link-icon">🧾</span>
                             {isRTL ? 'كشوف الرواتب' : 'Payslips'}

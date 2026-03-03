@@ -8,6 +8,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import '../../components/ModuleStyles.css'
 import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
+import { getIndustryFeature } from '../../hooks/useIndustryType'
 
 // ─── Stage / Status / Priority maps ───────────────────────────────────────────
 const stageBadgeColors = {
@@ -298,12 +299,16 @@ function CRMHome() {
                         📣 {t('crm.marketing', 'التسويق')}
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-                        <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
-                        </Link>
-                        <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
-                        </Link>
+                        {getIndustryFeature('crm.campaigns') && (
+                            <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
+                            </Link>
+                        )}
+                        {getIndustryFeature('crm.knowledge_base') && (
+                            <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

@@ -20,6 +20,8 @@ slowapi
 cryptography
 pillow
 pydantic-settings
+python-json-logger
+gunicorn
 
 # ── Observability ─────────────────────
 sentry-sdk[fastapi]

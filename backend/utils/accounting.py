@@ -1,5 +1,66 @@
 from sqlalchemy import text
-from typing import Optional
+from typing import Optional, List, Dict
+from fastapi import HTTPException
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def validate_je_lines(je_lines: List[Dict], source: str = "auto") -> List[Dict]:
+    """
+    Validate journal entry lines before insertion.
+    1. Reject lines with None account_id (instead of silently dropping them)
+    2. Verify total debits == total credits
+    3. Reject negative amounts
+    Returns only valid, non-zero lines.
+    Raises HTTPException if validation fails.
+    """
+    # Check for None account IDs
+    missing = [l.get("description", "unknown") for l in je_lines if l.get("account_id") is None]
+    if missing:
+        logger.error(f"JE validation ({source}): Missing account mappings for: {missing}")
+        raise HTTPException(
+            400,
+            f"لا يمكن ترحيل القيد - حسابات غير معرفة: {', '.join(missing)}"
+        )
+
+    # Filter out zero lines
+    valid = [l for l in je_lines if l.get("debit", 0) > 0 or l.get("credit", 0) > 0]
+
+    if len(valid) < 2:
+        raise HTTPException(400, "القيد المحاسبي يحتاج سطرين على الأقل")
+
+    # Check for negatives
+    for l in valid:
+        if l.get("debit", 0) < 0 or l.get("credit", 0) < 0:
+            raise HTTPException(400, f"لا يمكن وجود قيم سالبة في القيد: {l.get('description')}")
+
+    # Balance check
+    total_debit = sum(l.get("debit", 0) for l in valid)
+    total_credit = sum(l.get("credit", 0) for l in valid)
+    diff = abs(total_debit - total_credit)
+
+    if diff > 0.01:
+        # Try to auto-fix small rounding differences (up to 0.05)
+        if diff <= 0.05:
+            # Adjust the largest debit or credit line by the small difference
+            if total_debit > total_credit:
+                # Need more credit - add to largest credit line
+                max_credit_line = max(valid, key=lambda l: l.get("credit", 0))
+                max_credit_line["credit"] = round(max_credit_line["credit"] + diff, 2)
+            else:
+                # Need more debit - add to largest debit line
+                max_debit_line = max(valid, key=lambda l: l.get("debit", 0))
+                max_debit_line["debit"] = round(max_debit_line["debit"] + diff, 2)
+            logger.info(f"JE ({source}): Auto-fixed rounding diff of {diff:.4f}")
+        else:
+            logger.error(f"JE validation ({source}): Unbalanced D={total_debit:.2f} C={total_credit:.2f} diff={diff:.2f}")
+            raise HTTPException(
+                400,
+                f"القيد غير متوازن: مدين={total_debit:.2f} دائن={total_credit:.2f} فرق={diff:.2f}"
+            )
+
+    return valid
 
 
 def generate_sequential_number(db, prefix: str, table: str, column: str) -> str:

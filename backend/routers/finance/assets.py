@@ -7,11 +7,11 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from pydantic import BaseModel
 from datetime import datetime
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import get_mapped_account_id
 from schemas.assets import AssetCreate, AssetUpdate, AssetDisposal
 
-router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"])
+router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"], dependencies=[Depends(require_module("assets"))])
 
 # ============================================================
 # ❗️ IMPORTANT: Static routes MUST come before /{asset_id}

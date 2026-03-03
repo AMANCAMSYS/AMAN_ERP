@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
 import '../../components/ModuleStyles.css'
 import { formatNumber } from '../../utils/format'
+import { getIndustryFeature } from '../../hooks/useIndustryType'
 
 function BuyingHome() {
     const { t, i18n } = useTranslation()
@@ -15,6 +16,9 @@ function BuyingHome() {
     const currency = getCurrency()
     const { currentBranch } = useBranch()
 
+    const showRFQ             = getIndustryFeature('buying.rfq')
+    const showAgreements      = getIndustryFeature('buying.agreements')
+    const showSupplierRatings = getIndustryFeature('buying.supplier_ratings')
     useEffect(() => {
         const fetchStats = async () => {
             if (!hasPermission('buying.reports')) {
@@ -119,16 +123,20 @@ function BuyingHome() {
                             {t('buying.home.links.debit_notes')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
-                        <div className="link-item" onClick={() => navigate('/buying/rfq')}>
-                            <span className="link-icon">📨</span>
-                            {i18n.language === 'ar' ? 'طلبات عروض الأسعار' : 'RFQ'}
-                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                        </div>
-                        <div className="link-item" onClick={() => navigate('/buying/agreements')}>
-                            <span className="link-icon">🤝</span>
-                            {i18n.language === 'ar' ? 'اتفاقيات الشراء' : 'Purchase Agreements'}
-                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                        </div>
+                        {showRFQ && (
+                            <div className="link-item" onClick={() => navigate('/buying/rfq')}>
+                                <span className="link-icon">📨</span>
+                                {i18n.language === 'ar' ? 'طلبات عروض الأسعار' : 'RFQ'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        {showAgreements && (
+                            <div className="link-item" onClick={() => navigate('/buying/agreements')}>
+                                <span className="link-icon">🤝</span>
+                                {i18n.language === 'ar' ? 'اتفاقيات الشراء' : 'Purchase Agreements'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -148,11 +156,13 @@ function BuyingHome() {
                                 {t('buying.home.links.reports_statement')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
-                            <div className="link-item" onClick={() => navigate('/buying/supplier-ratings')}>
-                                <span className="link-icon">⭐</span>
-                                {i18n.language === 'ar' ? 'تقييم الموردين' : 'Supplier Ratings'}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
+                            {showSupplierRatings && (
+                                <div className="link-item" onClick={() => navigate('/buying/supplier-ratings')}>
+                                    <span className="link-icon">⭐</span>
+                                    {i18n.language === 'ar' ? 'تقييم الموردين' : 'Supplier Ratings'}
+                                    <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                </div>
+                            )}
                             <div className="link-item" onClick={() => navigate('/buying/reports/aging')}>
                                 <span className="link-icon">⏳</span>
                                 {i18n.language === 'ar' ? 'تقادم المشتريات' : 'Purchases Aging'}

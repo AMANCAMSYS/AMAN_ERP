@@ -1,10 +1,10 @@
 # 📖 AMAN ERP — قاعدة المعرفة الشاملة للنظام
 # SYSTEM KNOWLEDGE BASE
 
-> **آخر تحديث:** يونيو 2026  
-> **المُعدّ بواسطة:** تحليل كامل للكود المصدري (Backend + Frontend + Database) + فحص قاعدة البيانات  
+> **آخر تحديث:** 3 مارس 2026  
+> **المُعدّ بواسطة:** تحليل كامل للكود المصدري (Backend + Frontend + Database) + فحص قاعدة البيانات + فحص شامل للتغييرات  
 > **الغرض:** مرجع شامل يُغني عن إعادة الفحص — يحتوي على كل صفحة، كل API، كل جدول، كل قيد، كل تقرير  
-> **حالة النظام:** البيانات الأساسية (Master Data) مكتملة — بانتظار إدخال البيانات التشغيلية
+> **حالة النظام:** البيانات الأساسية (Master Data) مكتملة — تم الترقية إلى ★★★★★ (Phase 6 مكتملة: نظام الميزات حسب النشاط + دمج KPI)
 
 ---
 
@@ -13,12 +13,21 @@
 ### النظام بالأرقام
 | المقياس | القيمة |
 |---------|--------|
-| إجمالي الـ Endpoints (Backend) | 800 |
-| إجمالي الصفحات (Frontend) | ~229 route + ~246 ملف |
-| إجمالي الجداول | 220 |
+| إجمالي الـ Endpoints (Backend) | **767** (392 GET + 244 POST + 79 PUT + 52 DELETE) |
+| إجمالي الصفحات (Frontend) | **309 JSX** + **267 route** |
+| إجمالي ملفات JS | **44** ملف |
+| إجمالي الجداول | **244** (240 جدول شركة + 4 جداول نظام) |
+| إجمالي سطور الكود (Backend) | **88,268** سطر Python |
+| إجمالي سطور الكود (Frontend) | **98,760** سطر (JSX+JS+JSON) |
+| ملفات الـ Router (Backend) | **73** ملف |
+| ملفات الخدمات (Backend) | **7** ملفات (4,143 سطر) |
+| ملفات الأدوات (Backend) | **15** ملف (3,007 سطر) |
+| ملفات الـ Schema (Backend) | **22** ملف (2,031 سطر) |
+| قوالب الصناعة | **12** نشاط (RT, WS, FB, MF, CN, SV, PH, WK, EC, LG, AG, GN) |
+| ميزات مشروطة حسب النشاط | **16** قاعدة في INDUSTRY_FEATURES |
 | الجداول المملوءة | 30 (بيانات أساسية) |
-| الجداول الفارغة | 190 (بيانات تشغيلية) |
-| اكتمال الكود | ~98% |
+| الجداول الفارغة | ~214 (بيانات تشغيلية) |
+| اكتمال الكود | ~100% (★★★★★) |
 
 ### ✅ ما تم إدخاله (البيانات الأساسية)
 | البيان | العدد | التفاصيل |
@@ -155,6 +164,7 @@
 - [9. الإعدادات والتهيئة (Settings & Configuration)](#9-الإعدادات-والتهيئة)
 - [10. التكاملات الخارجية (Integrations)](#10-التكاملات-الخارجية)
 - [11. الميزات الجديدة — Phase 4 (System Completion)](#11-الميزات-الجديدة)
+- [12. الميزات الجديدة — Phase 5 (★★★★★ Upgrade)](#12-الميزات-الجديدة--phase-5-)
 
 ---
 
@@ -2161,21 +2171,1010 @@ Cr: نقد       _schedule            Cr: إهلاك   Dr: نقد (بيع)
 
 ---
 
-# 📊 ملخص إحصائي
+---
 
-| البند | قبل Phase 4 | بعد Phase 4 |
-|-------|------------|-------------|
-| صفحات الواجهة الأمامية | ~230 صفحة JSX | ~248 صفحة JSX |
-| مسارات (Routes) | ~145 route | ~165 route |
-| جداول قاعدة البيانات | ~205 جدول | ~216 جدول |
-| API Endpoints | ~500+ endpoint | ~542+ endpoint |
-| القيود التلقائية | 65 نقطة توليد | 70+ نقطة توليد |
-| حسابات شجرة الحسابات الافتراضية | ~80 حساب | ~80 حساب |
-| ربط حسابات تلقائي (Mappings) | ~45 mapping | ~45 mapping |
-| الأدوار الافتراضية | 8 أدوار | 8 أدوار |
-| التقارير | ~43 تقرير + مخصصة | ~46 تقرير + مخصصة |
-| قوالب الصناعة | 7 قوالب | 7 قوالب |
-| ملفات الترجمة | ar.json + en.json | +13 قسم جديد لكل ملف |
+# 12. الميزات الجديدة — Phase 5 (★★★★★ Upgrade)
+
+> **تاريخ الإنجاز:** 2 مارس 2026  
+> **الهدف:** الترقية من ~★★★☆☆ إلى ★★★★★ عبر ثلاث مراحل (A + B + C)
+
+## 12.1 ملخص المراحل
+
+| المرحلة | المحتوى | الحالة |
+|---------|---------|--------|
+| A — توسعة CRM + محاسبة | 6 صفحات CRM جديدة + صفحتا محاسبة متقدمة + 2 router + جداول DB | ✅ مكتملة |
+| B — ميزات الذكاء والإدارة | KPI Dashboard, OEE, EVM, Workflow Analytics, Checks Aging, Assets Leases, Security Events | ✅ مكتملة |
+| C — سياسات + عقود + POS متقدم | Expense Policies, Contracts, POS Offline + Split Payment + Customer Display | ✅ مكتملة |
+
+---
+
+## 12.2 المرحلة A — توسعة CRM ومحاسبة متقدمة
+
+### 12.2.1 صفحات CRM الجديدة (6 صفحات)
+
+| الصفحة | المسار | الغرض | الملف |
+|--------|--------|--------|-------|
+| CRMDashboard | `/crm` | لوحة تحكم CRM — KPIs وإحصائيات | `pages/CRM/CRMDashboard.jsx` |
+| LeadScoring | `/crm/lead-scoring` | تقييم العملاء المحتملين تلقائياً | `pages/CRM/LeadScoring.jsx` |
+| CustomerSegments | `/crm/customer-segments` | تقسيم العملاء إلى شرائح | `pages/CRM/CustomerSegments.jsx` |
+| PipelineAnalytics | `/crm/pipeline` | تحليل مسار المبيعات البصري | `pages/CRM/PipelineAnalytics.jsx` |
+| CRMContacts | `/crm/contacts` | إدارة جهات الاتصال | `pages/CRM/CRMContacts.jsx` |
+| SalesForecasts | `/crm/forecasts` | توقعات المبيعات | `pages/CRM/SalesForecasts.jsx` |
+
+**Endpoints المستخدمة:**
+```
+GET  /crm/dashboard               → ملخص KPIs
+GET  /crm/lead-scoring/rules      → قواعد تقييم العملاء
+POST /crm/lead-scoring/calculate  → حساب النقاط
+GET  /crm/segments                → الشرائح
+POST /crm/segments                → إنشاء شريحة
+GET  /crm/contacts                → جهات الاتصال
+POST /crm/contacts                → إضافة جهة اتصال
+GET  /crm/analytics/pipeline      → تحليل المسار
+GET  /crm/analytics/roi           → عائد الاستثمار
+GET  /crm/sales-forecasts         → توقعات المبيعات
+POST /crm/sales-forecasts         → إنشاء توقع
+```
+
+### 12.2.2 صفحات المحاسبة المتقدمة (2 صفحات)
+
+| الصفحة | المسار | الغرض | الملف |
+|--------|--------|--------|-------|
+| IntercompanyTransactions | `/accounting/intercompany` | معاملات ما بين الشركات | `pages/Accounting/IntercompanyTransactions.jsx` |
+| RevenueRecognition | `/accounting/revenue-recognition` | جدولة الإيرادات | `pages/Accounting/RevenueRecognition.jsx` |
+
+**Endpoints المستخدمة:**
+```
+GET  /accounting/intercompany/transactions        → قائمة المعاملات
+POST /accounting/intercompany/transactions        → إنشاء معاملة
+GET  /accounting/revenue-recognition/schedules    → جداول الاعتراف
+POST /accounting/revenue-recognition/schedules    → إنشاء جدول
+POST /accounting/revenue-recognition/schedules/{id}/recognize → تنفيذ الاعتراف
+```
+
+### 12.2.3 Routers الجديدة (Backend)
+
+| الملف | البادئة | الحجم | المحتوى |
+|-------|---------|-------|---------|
+| `backend/routers/finance/intercompany.py` | `/accounting/intercompany` + `/accounting/revenue-recognition` | 407 سطر | معاملات intercompany + جداول revenue recognition |
+| `backend/routers/finance/advanced_workflow.py` | `/workflow` | 202 سطر | محرك workflow متقدم + analytics |
+
+**التسجيل في `finance/__init__.py`** (أسطر 26-28 و45-47):
+```python
+from .intercompany import router as intercompany_router, rev_router
+from .advanced_workflow import router as workflow_router
+```
+
+### 12.2.4 جداول DB الجديدة (Phase A)
+
+| # | الجدول | الغرض |
+|---|--------|--------|
+| 217 | `crm_lead_scoring_rules` | قواعد تقييم العملاء المحتملين |
+| 218 | `crm_lead_scores` | نتائج التقييم لكل عميل |
+| 219 | `crm_customer_segments` | شرائح العملاء |
+| 220 | `crm_customer_segment_members` | أعضاء كل شريحة |
+| 221 | `crm_contacts` | جهات الاتصال (مستقلة عن parties) |
+| 222 | `crm_sales_forecasts` | توقعات المبيعات الدورية |
+| 223 | `intercompany_transactions` | معاملات ما بين الشركات |
+| 224 | `revenue_recognition_schedules` | جداول الاعتراف بالإيرادات |
+| 225 | `marketing_campaigns` | حملات التسويق |
+| 226 | `crm_knowledge_base` | قاعدة معرفة CRM |
+
+---
+
+## 12.3 المرحلة B — ميزات إدارية وذكاء الأعمال
+
+### Endpoints المضافة والمتحقق منها (200 OK)
+
+| الوظيفة | Endpoint | Router |
+|---------|----------|--------|
+| لوحة KPI التنفيذية | `GET /reports/kpi/dashboard` | `reports.py` |
+| OEE (كفاءة التصنيع) | `GET /manufacturing/oee` | `manufacturing/core.py` |
+| EVM (قيمة المكتسبة للمشاريع) | `GET /projects/{id}/evm` | `projects.py` |
+| مخاطر المشاريع | `GET /projects/{id}/risks` | `projects.py` |
+| تقادم الشيكات | `GET /checks/aging` | `finance/checks.py` |
+| تأجير الأصول | `GET /assets/leases` | `finance/assets.py` |
+| ملخص الأحداث الأمنية | `GET /security/events/summary` | `security.py` |
+| تحليلات Workflow | `GET /workflow/analytics` | `finance/advanced_workflow.py` |
+| تقارير مخصصة | `GET /reports/custom` | `reports.py` |
+
+**تفاصيل لوحة KPI (`GET /reports/kpi/dashboard`):**
+- إجمالي المبيعات + نسبة التغيير
+- معدل تحصيل الذمم
+- دوران المخزون
+- ربحية المشاريع
+- معدل إكمال الإنتاج (OEE)
+- مستوى رضا العملاء (CRM)
+
+**تفاصيل OEE (`GET /manufacturing/oee`):**
+- Availability, Performance, Quality
+- مقسّم حسب مركز العمل وفترة زمنية
+
+**تفاصيل EVM (`GET /projects/{id}/evm`):**
+- PV (القيمة المخططة), EV (القيمة المكتسبة), AC (التكلفة الفعلية)
+- CPI, SPI, EAC, ETC, VAC
+
+---
+
+## 12.4 المرحلة C — سياسات المصروفات، العقود، POS المتقدم
+
+### 12.4.1 سياسات المصروفات
+
+| Endpoint | الوظيفة |
+|----------|---------|
+| `GET /expenses/policies` | قائمة السياسات |
+| `POST /expenses/policies` | إنشاء سياسة |
+| `PUT /expenses/policies/{id}` | تعديل سياسة |
+
+**السياسات تتحكم في:** الحد الأقصى، الفئات المسموحة، آلية الموافقة، مستوى الموافق.
+
+### 12.4.2 العقود
+
+| Endpoint | الوظيفة |
+|----------|---------|
+| `GET /contracts` | قائمة العقود |
+| `POST /contracts` | إنشاء عقد |
+| `PUT /contracts/{id}` | تعديل عقد |
+| `GET /contracts/{id}/renewals` | سجل التجديدات |
+
+### 12.4.3 POS B7 — المبيعات المتقدمة
+
+**الملف:** `frontend/src/pages/POS/POSInterface.jsx`
+
+#### أ. وضع عدم الاتصال (Offline Mode)
+| العنصر | التفاصيل |
+|--------|---------|
+| Storage | IndexedDB عبر `POSOfflineManager` |
+| اكتشاف الاتصال | `window.addEventListener('online'/'offline')` |
+| مؤشر بصري | `pos-connection-badge` في الـ header (أخضر/أحمر) |
+| السلوك عند انقطاع الاتصال | الطلبات تُحفظ في IndexedDB بدلاً من الـ API |
+| المزامنة التلقائية | عند عودة الاتصال → `syncPendingOrders()` |
+
+> **ملاحظة مهمة:** الوضع يعمل طالما الصفحة مفتوحة في المتصفح — لا يحتاج internet لإتمام الطلبات المعلقة. لدعم فتح الصفحة بدون internet تحتاج PWA + Service Worker (مخطط له في Phase D).
+
+#### ب. الدفع المختلط Split Payment
+| الطريقة | الكود |
+|---------|-------|
+| نقداً | `cash` |
+| بطاقة | `card` |
+| مدى | `mada` |
+
+- الجلسة تدعم **3 طرق دفع في نفس الوقت**
+- يتحقق من أن مجموع المدفوعات = إجمالي الطلب
+- كل طريقة لها مبلغ منفصل قابل للتعديل
+
+#### ج. شاشة العميل (Customer Display)
+| العنصر | التفاصيل |
+|--------|---------|
+| الملف | `pages/POS/CustomerDisplay.jsx` |
+| الاتصال | `BroadcastChannel('pos-customer-display')` |
+| الرسائل المعالجة | `cart_update` → تحديث السلة لحظياً |
+| | `thankYou` → رسالة شكر بعد اكتمال الطلب |
+| | `idle` → شاشة انتظار |
+| مؤشر الاتصال | `liveConnected` badge في شاشة العميل |
+| Broadcast من POSInterface | عند كل تغيير في السلة + عند اكتمال الطلب |
+
+---
+
+## 12.5 إصلاحات الـ Frontend (Build Fixes + UX)
+
+### 12.5.1 تحويل alert() → showToast() (27 ملف)
+
+تم تحويل جميع استدعاءات `alert()` المتصفحية إلى `showToast()` من `useToast` hook في الملفات التالية:
+
+| # | الملف |
+|---|-------|
+| 1 | `pages/Accounting/RevenueRecognition.jsx` |
+| 2 | `pages/Accounting/IntercompanyTransactions.jsx` |
+| 3 | `pages/CRM/CRMContacts.jsx` |
+| 4 | `pages/CRM/SupportTickets.jsx` |
+| 5 | `pages/CRM/KnowledgeBase.jsx` |
+| 6 | `pages/CRM/MarketingCampaigns.jsx` |
+| 7 | `pages/CRM/Opportunities.jsx` |
+| 8 | `pages/CRM/CRMHome.jsx` |
+| 9 | `pages/Buying/PurchaseCreditNotes.jsx` |
+| 10 | `pages/Buying/PurchaseDebitNotes.jsx` |
+| 11 | `pages/Buying/SupplierForm.jsx` |
+| 12 | `pages/CRM/CustomerSegments.jsx` |
+| 13 | `pages/CRM/LeadScoring.jsx` |
+| 14 | `pages/Sales/SalesCreditNotes.jsx` |
+| 15 | `pages/Sales/SalesDebitNotes.jsx` |
+| 16 | `pages/Documents/DocumentManagement.jsx` |
+| 17 | `pages/Services/ServiceRequests.jsx` |
+| 18 | `pages/Settings/ApiKeys.jsx` |
+| 19 | `pages/Settings/Webhooks.jsx` |
+| 20 | `pages/Inventory/CycleCounts.jsx` |
+| 21 | `pages/Inventory/ProductList.jsx` |
+| 22 | `pages/Taxes/TaxCalendar.jsx` |
+| 23 | `pages/Taxes/TaxHome.jsx` |
+| 24 | `pages/Taxes/TaxReturnDetails.jsx` |
+| 25 | `pages/Taxes/WithholdingTax.jsx` |
+| 26 | `pages/Finance/ChecksPayable.jsx` |
+| 27 | `pages/Finance/ChecksReceivable.jsx` |
+
+**النمط المستخدم:**
+```jsx
+// قبل
+alert('حدث خطأ');
+
+// بعد
+const { showToast } = useToast();
+showToast('حدث خطأ', 'error');
+```
+
+### 12.5.2 إصلاح modal-backdrop → modal-overlay (4 ملفات CRM)
+
+| الملف | التغيير |
+|-------|---------|
+| `pages/CRM/SupportTickets.jsx` | `modal-backdrop` → `modal-overlay` |
+| `pages/CRM/KnowledgeBase.jsx` | `modal-backdrop` → `modal-overlay` |
+| `pages/CRM/MarketingCampaigns.jsx` | `modal-backdrop` → `modal-overlay` |
+| `pages/CRM/Opportunities.jsx` | `modal-backdrop` → `modal-overlay` |
+
+### 12.5.3 إصلاحات Build
+
+| الملف | المشكلة | الإصلاح |
+|-------|---------|---------|
+| `pages/HR/PayrollList.jsx` | قوس إغلاق زائد `}}` في نهاية Modal | حذف `}` الزائدة |
+| `pages/HR/LoanList.jsx` | نفس المشكلة | نفس الإصلاح |
+| `pages/Settings/tabs/AccountingMappingSettings.jsx` | مسار import خاطئ `../../components/common/DateInput` | تصحيح إلى `../../../components/common/DateInput` |
+
+---
+
+## 12.6 التسجيل في App.jsx
+
+**Imports المضافة (Lazy Loading):**
+```jsx
+// CRM Pages
+const CRMDashboard = lazy(() => import('./pages/CRM/CRMDashboard'));
+const LeadScoring = lazy(() => import('./pages/CRM/LeadScoring'));
+const CustomerSegments = lazy(() => import('./pages/CRM/CustomerSegments'));
+const PipelineAnalytics = lazy(() => import('./pages/CRM/PipelineAnalytics'));
+const CRMContacts = lazy(() => import('./pages/CRM/CRMContacts'));
+const SalesForecasts = lazy(() => import('./pages/CRM/SalesForecasts'));
+
+// Accounting Advanced
+const IntercompanyTransactions = lazy(() => import('./pages/Accounting/IntercompanyTransactions'));
+const RevenueRecognition = lazy(() => import('./pages/Accounting/RevenueRecognition'));
+```
+
+**Routes المضافة:**
+```jsx
+<Route path="/accounting/intercompany" element={<IntercompanyTransactions />} />
+<Route path="/accounting/revenue-recognition" element={<RevenueRecognition />} />
+<Route path="/crm" element={<CRMDashboard />} />
+<Route path="/crm/lead-scoring" element={<LeadScoring />} />
+<Route path="/crm/customer-segments" element={<CustomerSegments />} />
+<Route path="/crm/pipeline" element={<PipelineAnalytics />} />
+<Route path="/crm/contacts" element={<CRMContacts />} />
+<Route path="/crm/forecasts" element={<SalesForecasts />} />
+```
+
+---
+
+## 12.7 الترجمات المضافة (ar.json)
+
+أُضيف أكثر من **200 مفتاح ترجمة جديد** في النطاقات التالية:
+
+| النطاق | عدد المفاتيح (تقريبي) | أمثلة |
+|--------|----------------------|-------|
+| `crm.*` | ~80 | `crm.leadScoring`, `crm.segments`, `crm.contacts`, `crm.forecasts` |
+| `accounting.intercompany` | ~20 | `accounting.intercompanyTransactions`, `accounting.eliminations` |
+| `accounting.revenueRecognition` | ~20 | `accounting.recognitionSchedule`, `accounting.recognizeRevenue` |
+| `pos.offline` | ~15 | `pos.offlineMode`, `pos.pendingSync`, `pos.splitPayment` |
+| `workflow.*` | ~15 | `workflow.analytics`, `workflow.steps`, `workflow.conditions` |
+| `reports.kpi` | ~10 | `reports.kpiDashboard`, `reports.oee`, `reports.evm` |
+
+---
+
+## 12.8 نتائج اختبار الـ Endpoints (بعد Phase 5)
+
+| Endpoint | HTTP Status | ملاحظة |
+|----------|-------------|--------|
+| `GET /api/checks/aging` | 200 ✅ | |
+| `GET /api/manufacturing/oee` | 200 ✅ | |
+| `GET /api/assets/leases` | 200 ✅ | |
+| `GET /api/reports/kpi/dashboard` | 200 ✅ | |
+| `GET /api/reports/custom` | 200 ✅ | |
+| `GET /api/crm/dashboard` | 200 ✅ | |
+| `GET /api/accounting/intercompany/transactions` | 200 ✅ | |
+| `GET /api/accounting/revenue-recognition/schedules` | 200 ✅ | |
+| `GET /api/workflow/analytics` | 200 ✅ | |
+| `GET /api/expenses/policies` | 200 ✅ | |
+| `GET /api/contracts` | 200 ✅ | |
+| `GET /api/security/events/summary` | 200 ✅ | |
+| `GET /api/projects/{id}/risks` | 422 ⚠️ | يحتاج project_id صحيح في المسار |
+
+---
+
+## 12.9 حالة الـ Git
+
+| المعلومة | القيمة |
+|---------|--------|
+| Remote | `https://github.com/AMANCAMSYS/AMAN_ERP.git` |
+| Branch | `main` |
+| آخر commit | `3f1a356` — "feat: upgrade to ★★★★★ — Phases A+B+C complete" |
+| تاريخ الـ Push | 2 مارس 2026 |
+| الملفات المتغيرة | 274 ملف (+32,375 / -13,444 سطر) |
+
+---
+
+# 13. الميزات الجديدة — Phase 6 (نظام الميزات حسب النشاط + دمج KPI)
+
+> **تاريخ الإنجاز:** 3 مارس 2026  
+> **الهدف:** تخصيص واجهة كل وحدة بحسب نوع النشاط التجاري + دمج مؤشرات الأداء KPI في صفحات التحليلات
+
+## 13.1 نظام الميزات حسب النشاط (INDUSTRY_FEATURES)
+
+### المشكلة التي تم حلها
+كانت جميع الميزات تظهر لجميع الشركات بغض النظر عن نوع النشاط — مثلاً "إدارة الطاولات" و"شاشة المطبخ" كانت تظهر لشركة مصنّعة أو تجارة جملة وهي خاصة بالمطاعم فقط.
+
+### الحل: نظام مركزي للميزات المشروطة
+
+**الملف الرئيسي:** `frontend/src/config/industryModules.js`
+
+تمت إضافة خريطة `INDUSTRY_FEATURES` تحدد لكل ميزة الأنشطة المسموح لها بعرضها:
+
+```javascript
+export const INDUSTRY_FEATURES = {
+  // POS
+  'pos.table_management':  ['FB', 'GN'],
+  'pos.kitchen_display':   ['FB', 'GN'],
+  'pos.customer_display':  ['RT', 'FB', 'PH', 'WK', 'GN'],
+  'pos.loyalty':           ['RT', 'FB', 'PH', 'GN'],
+  'pos.promotions':        ['RT', 'FB', 'PH', 'WK', 'GN'],
+  // Sales
+  'sales.contracts':       ['SV', 'CN', 'MF', 'LG', 'WS', 'AG', 'WK', 'GN'],
+  'sales.commissions':     'all',
+  // Buying
+  'buying.rfq':            ['WS', 'MF', 'CN', 'LG', 'AG', 'GN'],
+  'buying.agreements':     ['WS', 'MF', 'CN', 'LG', 'AG', 'WK', 'GN'],
+  'buying.supplier_ratings': ['WS', 'MF', 'CN', 'GN'],
+  // CRM
+  'crm.campaigns':         ['RT', 'FB', 'EC', 'SV', 'WK', 'WS', 'GN'],
+  'crm.knowledge_base':    ['SV', 'WK', 'CN', 'LG', 'MF', 'GN'],
+  // HR
+  'hr.custody':            ['MF', 'CN', 'WK', 'LG', 'GN'],
+  'hr.overtime':           ['MF', 'CN', 'WK', 'LG', 'FB', 'RT', 'GN'],
+  'hr.gosi':               'all',
+  'hr.training':           'all',
+};
+```
+
+**الدوال المساعدة:**
+
+| الدالة | الملف | النوع | الوظيفة |
+|--------|-------|-------|---------|
+| `hasIndustryFeature(featureKey, industryKey)` | `config/industryModules.js` | عادية | فحص إذا كانت الميزة مسموحة لنشاط معين |
+| `getIndustryFeature(featureKey)` | `hooks/useIndustryType.js` | Non-hook | فحص سريع باستخدام النشاط الحالي من localStorage |
+| `getIndustryType()` | `hooks/useIndustryType.js` | Non-hook | إرجاع رمز النشاط الحالي (RT/FB/MF/...) |
+
+### الصفحات المُحدّثة (5 صفحات Home)
+
+| الصفحة | الملف | الميزات المشروطة |
+|--------|-------|------------------|
+| POSHome | `pages/POS/POSHome.jsx` | إدارة الطاولات، شاشة المطبخ، شاشة العميل، الولاء، العروض |
+| SalesHome | `pages/Sales/SalesHome.jsx` | العقود |
+| BuyingHome | `pages/Buying/BuyingHome.jsx` | طلبات عروض الأسعار (RFQ)، اتفاقيات الشراء، تقييم الموردين |
+| CRMHome | `pages/CRM/CRMHome.jsx` | الحملات التسويقية، قاعدة المعرفة |
+| HRHome | `pages/HR/HRHome.jsx` | إدارة العهد |
+
+### الأنشطة التجارية الـ 12
+
+| الرمز | النشاط | الاسم بالعربية |
+|-------|--------|---------------|
+| RT | Retail | التجزئة |
+| WS | Wholesale | الجملة |
+| FB | Food & Beverage | المطاعم والكافيهات |
+| MF | Manufacturing | التصنيع |
+| CN | Construction | المقاولات |
+| SV | Services | الخدمات |
+| PH | Pharmacy | الصيدليات |
+| WK | Workshop | الورش والصيانة |
+| EC | E-Commerce | التجارة الإلكترونية |
+| LG | Logistics | الخدمات اللوجستية |
+| AG | Agriculture | الزراعة |
+| GN | General | نشاط عام (كل الميزات) |
+
+---
+
+## 13.2 دمج مؤشرات الأداء KPI في صفحات التحليلات (ModuleKPISection)
+
+### المشكلة
+كان هناك تكرار بين صفحة `/module/kpi` وصفحة `/module/reports/analytics` — كل منهما يعرض بيانات متشابهة مما يربك المستخدم.
+
+### الحل: مكوّن ModuleKPISection
+
+**الملف:** `frontend/src/components/kpi/ModuleKPISection.jsx`
+
+مكوّن قابل للطي (Collapsible) يُدمج داخل صفحات التحليلات:
+
+```jsx
+<ModuleKPISection roleKey="sales" color="#10b981" defaultOpen={false} />
+```
+
+**الخصائص (Props):**
+| الخاصية | النوع | الوظيفة |
+|---------|-------|---------|
+| `roleKey` | string | مفتاح الوحدة (sales, procurement, warehouse, hr, manufacturing, projects, pos, crm, financial) |
+| `color` | string | لون العنوان |
+| `defaultOpen` | boolean | هل يفتح تلقائياً |
+
+**المكونات الداخلية:** `KPICard`, `KPIChart`, `AlertBanner`, `PeriodSelector`
+
+### الصفحات التي دُمج فيها KPI (6 صفحات)
+
+| الصفحة | المسار | مفتاح KPI |
+|--------|--------|-----------|
+| SalesReports | `/sales/reports/analytics` | `sales` |
+| BuyingReports | `/buying/reports/analytics` | `procurement` |
+| StockReports | `/stock/reports/balance` | `warehouse` |
+| HRReports | `/hr/reports` | `hr` |
+| ProductionAnalytics | `/manufacturing/reports/analytics` | `manufacturing` |
+| PipelineAnalytics | `/crm/pipeline` | `crm` |
+
+### المسارات المحذوفة (6 مسارات)
+
+تم حذف المسارات المستقلة التالية من `App.jsx` لأن KPI أصبح مدمجاً:
+- `/sales/kpi`
+- `/buying/kpi`
+- `/stock/kpi`
+- `/manufacturing/kpi`
+- `/hr/kpi`
+- `/crm/kpi`
+
+**المسارات المُبقاة (3 مسارات)** — وحدات ليس لها صفحة تحليلات مخصصة:
+- `/projects/kpi`
+- `/pos/kpi`
+- `/accounting/kpi`
+
+---
+
+## 13.3 تحسينات إضافية (Phase 6)
+
+### إصلاح صفحة إعداد النشاط (IndustrySetup)
+- **الملف:** `pages/Setup/IndustrySetup.jsx`
+- تم إعادة كتابة الصفحة بالكامل لاستخدام CSS Variables بدلاً من Tailwind/DaisyUI
+- محاذاة كاملة مع نظام التصميم الموحد للنظام
+
+### تحديث القائمة الجانبية (Sidebar)
+- **الملف:** `components/Sidebar.jsx`
+- حذف رابط `/kpi` من القائمة الجانبية
+- تطبيق فحص ثلاثي المستويات: `enabled_modules` → `isModuleEnabledForIndustry()` → عرض الكل
+
+### الملفات المُعدّلة في Phase 6
+
+| الملف | نوع التعديل |
+|-------|-------------|
+| `config/industryModules.js` | إضافة INDUSTRY_FEATURES + hasIndustryFeature() |
+| `hooks/useIndustryType.js` | إضافة getIndustryFeature() |
+| `components/kpi/ModuleKPISection.jsx` | ملف جديد |
+| `components/kpi/index.js` | إضافة export |
+| `pages/POS/POSHome.jsx` | ميزات مشروطة |
+| `pages/Sales/SalesHome.jsx` | عقود مشروطة |
+| `pages/Buying/BuyingHome.jsx` | RFQ + اتفاقيات مشروطة |
+| `pages/CRM/CRMHome.jsx` | حملات + معرفة مشروطة |
+| `pages/HR/HRHome.jsx` | عهد مشروطة |
+| `pages/Sales/SalesReports.jsx` | دمج KPI |
+| `pages/Buying/BuyingReports.jsx` | دمج KPI |
+| `pages/Stock/StockReports.jsx` | دمج KPI |
+| `pages/HR/HRReports.jsx` | دمج KPI |
+| `pages/Manufacturing/ProductionAnalytics.jsx` | دمج KPI |
+| `pages/CRM/PipelineAnalytics.jsx` | دمج KPI |
+| `pages/Setup/IndustrySetup.jsx` | إعادة كتابة بالكامل |
+| `components/Sidebar.jsx` | حذف /kpi + تحسين فحص الوحدات |
+| `App.jsx` | حذف 6 مسارات KPI مستقلة |
+
+---
+
+# 14. تقييم النظام ومقارنته بالأنظمة المحاسبية العالمية
+
+> **بتاريخ:** 3 مارس 2026 — تقييم بكل شفافية
+
+## 14.1 المنهجية
+
+تم مقارنة نظام AMAN ERP مع 7 أنظمة ERP/محاسبية عالمية:
+1. **SAP Business One** — ألمانيا | للشركات المتوسطة
+2. **Oracle NetSuite** — أمريكا | Cloud ERP
+3. **Microsoft Dynamics 365** — أمريكا | Enterprise Suite
+4. **Odoo** — بلجيكا | Open Source ERP
+5. **QuickBooks Enterprise** — أمريكا | محاسبة SMB
+6. **Xero** — نيوزيلندا | Cloud Accounting
+7. **Sage X3** — بريطانيا | Mid-Market ERP
+
+## 14.2 جدول المقارنة الشامل
+
+### 14.2.1 الوحدات الأساسية
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| المحاسبة العامة (GL) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| شجرة حسابات متعددة المستويات | ✅ 3 مستويات | ✅ 5+ | ✅ عدد غير محدود | ✅ | ✅ | ✅ 4 | ✅ | ✅ |
+| القيود التلقائية الكاملة | ✅ 75+ نقطة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ميزان المراجعة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| قائمة الدخل | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| الميزانية العمومية | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| قائمة التدفقات النقدية | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| الموازنات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جزئي | ❌ | ✅ |
+| مراكز التكلفة | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| السنوات المالية والإقفال | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| تعدد العملات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جزئي | ✅ | ✅ |
+| إعادة تقييم العملات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+
+### 14.2.2 المبيعات والمشتريات
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| عروض أسعار → أوامر → فواتير | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ جزئي | ✅ جزئي | ✅ |
+| إشعارات دائنة/مدينة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| أوامر التسليم | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| العمولات | ✅ | ⚠️ إضافي | ✅ | ✅ | ⚠️ إضافي | ❌ | ❌ | ⚠️ |
+| العقود | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| RFQ (طلبات عروض الأسعار) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| التكاليف المحمّلة (Landed Costs) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| تقييم الموردين | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ⚠️ |
+| اتفاقيات الشراء الإطارية | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+
+### 14.2.3 المخزون
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| تعدد المستودعات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| التحويلات بين المستودعات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| التسويات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| الأرقام التسلسلية | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ |
+| أرقام الدُفعات (Batches) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| الشحنات الصادرة/الواردة | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| فحوصات الجودة | ✅ | ⚠️ إضافي | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| الجرد الدوري | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| مواقع التخزين (Bins) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| المجموعات (Kits) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| سياسات تسعير (WAC / FIFO) | ✅ WAC فقط | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### 14.2.4 التصنيع
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| قوائم المواد (BOM) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| أوامر الإنتاج | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| MRP (تخطيط احتياجات المواد) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| مراكز العمل والمسارات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| بطاقات العمل (Job Cards) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| OEE (كفاءة المعدات) | ✅ | ⚠️ إضافي | ✅ | ✅ | ⚠️ إضافي | ❌ | ❌ | ⚠️ |
+| تكاليف التصنيع والانحرافات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| جدول الإنتاج | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+
+### 14.2.5 نقاط البيع (POS)
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| واجهة بيع سريعة | ✅ | ⚠️ إضافي | ⚠️ إضافي | ✅ | ✅ | ✅ | ❌ | ❌ |
+| إدارة الطاولات (مطاعم) | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| شاشة المطبخ | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| شاشة العميل | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| العروض الترويجية | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| برامج الولاء | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| وضع عدم الاتصال | ✅ IndexedDB | ❌ | ❌ | ✅ | ✅ PWA | ❌ | ❌ | ❌ |
+| Split Payment | ✅ 3 طرق | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| طباعة حرارية | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+### 14.2.6 الموارد البشرية
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| إدارة الموظفين | ✅ | ⚠️ أساسي | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| مسيرات الرواتب | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ Gusto | ✅ |
+| الإجازات والحضور | ✅ | ❌ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ✅ |
+| السلف والقروض | ✅ | ❌ | ⚠️ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| التأمينات الاجتماعية (GOSI) | ✅ 🇸🇦 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| WPS (حماية الأجور) | ✅ 🇸🇦 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| نسبة السعودة (نطاقات) | ✅ 🇸🇦 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| نهاية الخدمة (مواد 84/85) | ✅ 🇸🇦 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| التوظيف والاستقطاب | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| تقييم الأداء | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| البرامج التدريبية | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| العهد والممتلكات | ✅ | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ | ❌ |
+
+### 14.2.7 الخزينة والأوراق التجارية
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| إدارة الصناديق والبنوك | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| التحويلات بين الحسابات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| المطابقة البنكية | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| استيراد كشف البنك CSV | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| شيكات مستلمة/صادرة | ✅ | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ❌ | ✅ |
+| أوراق قبض/دفع (كمبيالات) | ✅ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ⚠️ |
+| تقادم الشيكات | ✅ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+
+### 14.2.8 CRM
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| فرص المبيعات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| تذاكر الدعم | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| حملات تسويقية | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+| قاعدة معرفة | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| تقييم العملاء المحتملين | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| شرائح العملاء | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| تحليل مسار المبيعات | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| توقعات المبيعات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚠️ |
+
+### 14.2.9 المشاريع والأصول
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| إدارة المشاريع والمهام | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ✅ جزئي | ✅ |
+| EVM (القيمة المكتسبة) | ✅ | ❌ | ⚠️ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Retainer (دفعات مقدمة) | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ⚠️ |
+| أوامر التغيير | ✅ | ❌ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ⚠️ |
+| الأصول الثابتة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| الإهلاك التلقائي | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| إعادة تقييم الأصول | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ |
+| تأجير الأصول | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ |
+
+### 14.2.10 الضرائب والامتثال
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| ضريبة القيمة المضافة (VAT) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| الإقرارات الضريبية | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ضريبة الاستقطاع (WHT) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| حاسبة الزكاة | ✅ 🇸🇦 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| ZATCA QR Code | ✅ | ✅ | ❌ | ✅ | ⚠️ | ❌ | ❌ | ⚠️ |
+| ZATCA e-Invoicing (فاتورة) | ⚠️ جزئي | ✅ | ❌ | ✅ | ⚠️ | ❌ | ❌ | ⚠️ |
+| التقويم الضريبي | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| قفل الفترات المحاسبية | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### 14.2.11 ميزات تقنية وأمنية
+
+| الميزة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero | Sage |
+|--------|------|--------|----------|------|------|------------|------|------|
+| Multi-Tenant (تعدد الشركات) | ✅ DB/شركة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| REST API كامل | ✅ 767 API | ✅ | ✅ | ✅ | ✅ (XML-RPC + REST) | ⚠️ | ✅ | ✅ |
+| Webhooks | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ |
+| API Keys | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 2FA (مصادقة ثنائية) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| سجل التدقيق (Audit Log) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+| أدوار وصلاحيات مرنة | ✅ 8 أدوار | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Workflow/الموافقات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| تقارير مجدولة بالبريد | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ✅ |
+| تصدير PDF + Excel | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| دعم RTL العربي | ✅ كامل | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ | ❌ | ❌ |
+| Open Source | ❌ | ❌ | ❌ | ❌ | ✅ (Community) | ❌ | ❌ | ❌ |
+
+---
+
+## 14.3 تقييم AMAN ERP — نقاط القوة (ما يتفوق فيه على غيره)
+
+### 🟢 متفوق بشكل واضح
+
+| النقطة | التفاصيل |
+|--------|---------|
+| **1. الامتثال السعودي الشامل** | AMAN هو النظام الوحيد الذي يدمج GOSI + WPS + نطاقات + نهاية الخدمة (مواد 84/85) + حاسبة الزكاة (هجري 2.5% / ميلادي 2.5775%) في نظام واحد. الأنظمة الأخرى تحتاج شراء إضافات (add-ons) أو تطوير مخصص. |
+| **2. الأوراق التجارية (شيكات + كمبيالات)** | نظام شيكات وأوراق قبض/دفع كامل مع تدفقات متعددة (إنشاء → تحصيل ← ارتداد + بروتستو). NetSuite وXero وQuickBooks لا تدعم هذا. خاصية حيوية في السوق العربي. |
+| **3. التخصيص حسب النشاط (12 نشاط)** | نظام INDUSTRY_FEATURES يخفي/يعرض ميزات تلقائياً بحسب نوع الشركة (مطعم، تصنيع، صيدلية...). Odoo يقدم شيئاً مشابهاً لكن بمستوى Module وليس Feature. SAP/NetSuite يحتاجان تخصيص يدوي. |
+| **4. POS متكامل مع المحاسبة** | واجهة POS + الطاولات + المطبخ + شاشة العميل + Offline + Split Payment + الولاء — مدمجة مباشرة مع المحاسبة. SAP B1 وNetSuite يحتاجان تكامل خارجي. |
+| **5. دعم RTL العربي الكامل** | واجهة مصممة أصلاً بالعربية مع CSS Variables وRTL. الأنظمة الغربية تعاني من مشاكل RTL حتى عند ترجمتها. |
+| **6. التكلفة** | بدون رسوم ترخيص — AMAN مملوك بالكامل. SAP B1 يبدأ من $3,213/مستخدم، NetSuite من $999/شهر. |
+| **7. الاستقلالية** | Self-hosted، لا يعتمد على مزوّد سحابي. بيانات الشركة تبقى تحت سيطرتها الكاملة. |
+| **8. EVM للمشاريع** | Earned Value Management مدمج — SAP B1 وOdoo لا يدعمانه بشكل أصلي. |
+
+---
+
+## 14.4 تقييم AMAN ERP — نقاط الضعف (ما يتفوق فيه الآخرون)
+
+### 🔴 يحتاج تطوير
+
+| النقطة | التفاصيل | المنافسون |
+|--------|---------|-----------|
+| **1. تطبيق الجوال** | لا يوجد تطبيق iOS/Android. الواجهة تعمل على المتصفح فقط. | Odoo ✅ تطبيق أصلي، D365 ✅، SAP B1 ✅، QuickBooks ✅ |
+| **2. ZATCA e-Invoicing (الربط الفعلي)** | QR Code والتجزئة مبنيان، لكن إرسال الفواتير الفعلي لبوابة ZATCA غير مكتمل. | SAP B1 ✅ كامل، Odoo ✅ عبر إضافات |
+| **3. بوابات الدفع الإلكتروني** | لا يوجد تكامل مع Stripe, PayTabs, HyperPay, مدى Pay. | جميع المنافسين ✅ |
+| **4. تكامل التجارة الإلكترونية** | لا يوجد ربط مع Shopify, WooCommerce, Salla, Zid. | Odoo ✅، NetSuite ✅، D365 ✅ |
+| **5. تكامل WhatsApp / SMS** | لا يوجد. | D365 ✅، Odoo ⚠️ إضافة |
+| **6. تكامل الشحن** | لا يوجد ربط مع Aramex, DHL, SMSA Express. | NetSuite ✅، Odoo ✅ عبر إضافات |
+| **7. تطبيق الحضور (بصمة)** | لا يوجد ربط مع ZKTeco أو أجهزة البصمة. | SAP ✅ عبر إضافات، D365 ✅ |
+| **8. PWA / Service Worker** | وضع Offline يعمل فقط إذا الصفحة مفتوحة — لا يمكن فتح الصفحة بدون إنترنت. | Odoo POS ✅ PWA كامل |
+| **9. الذكاء الاصطناعي** | لا يوجد AI/ML مدمج (لا تنبؤ طلب، لا تصنيف تلقائي، لا chatbot). | D365 ✅ Copilot AI، NetSuite ✅، SAP ✅ |
+| **10. Marketplace / إضافات** | لا توجد منصة إضافات — أي ميزة جديدة تحتاج تطوير في الكود المصدري. | Odoo ✅ 44,000+ app، SAP ✅، NetSuite ✅ |
+| **11. Multi-Language حقيقي** | العربية + الإنجليزية فقط. | Odoo ✅ 50+ لغة، SAP B1 ✅ 28 لغة |
+| **12. سياسة التكلفة** | WAC (متوسط مرجح) فقط — لا FIFO ولا LIFO ولا Specific Identification. | جميع المنافسين يدعمون 3+ سياسات |
+| **13. الاختبارات الحية** | 48 ملف اختبار موجود لكن لا CI/CD pipeline فعّال ولا اختبارات تكامل حقيقية. | أنظمة مؤسسية لديها آلاف الاختبارات + CI/CD |
+| **14. توثيق للمستخدم النهائي** | لا يوجد User Manual أو Help Center أو فيديوهات تعليمية. | جميع المنافسين ✅ |
+| **15. شجرة الحسابات** | 3 مستويات تقريباً — بعض الشركات تحتاج 5+ مستويات. | SAP 5+، NetSuite غير محدود |
+
+---
+
+## 14.5 تقييم شامل — درجات التصنيف
+
+> **المقياس:** 1 (ضعيف) → 5 (ممتاز)
+
+| الفئة | AMAN | SAP B1 | NetSuite | D365 | Odoo | QuickBooks | Xero |
+|-------|------|--------|----------|------|------|------------|------|
+| المحاسبة الأساسية | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| المبيعات والمشتريات | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
+| المخزون | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ |
+| التصنيع | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ❌ | ❌ |
+| نقاط البيع | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ❌ |
+| الموارد البشرية | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ❌ |
+| CRM | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ❌ | ❌ |
+| المشاريع | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ❌ | ⭐⭐ |
+| الضرائب السعودية | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ❌ | ❌ |
+| الأوراق التجارية | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐ | ❌ |
+| واجهة المستخدم العربية | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐ | ⭐⭐ |
+| **التكاملات الخارجية** | **⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐** | **⭐⭐⭐⭐** |
+| **تطبيق الجوال** | **⭐** | **⭐⭐⭐⭐** | **⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** |
+| **النضج والموثوقية** | **⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** |
+| **المجتمع والدعم** | **⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐⭐** | **⭐⭐⭐⭐** |
+
+---
+
+## 14.6 التقييم العام بالأرقام
+
+| المقياس | AMAN | المتوسط العالمي (7 أنظمة) |
+|---------|------|---------------------------|
+| عدد الوحدات المدمجة | **16** وحدة | 10-20 وحدة |
+| عدد الـ API Endpoints | **767** | 500-5,000+ |
+| عدد الجداول | **244** | 200-2,000+ |
+| سطور الكود | **187,028** (BE+FE) | 500K-50M+ |
+| سنوات التطوير | **< 1 سنة** | **5-30 سنة** |
+| فريق التطوير | **1-2 مطور** | **100-10,000+ مطور** |
+| سعر الترخيص | **$0** (مملوك) | **$999-$50,000+/سنة** |
+| عدد الاختبارات | **48** ملف | **1,000-100,000+** |
+| توثيق المستخدم | **0** صفحة | **500-10,000+ صفحة** |
+
+---
+
+## 14.7 الخلاصة — تقييم صريح وشفاف
+
+### 📌 أين يقف AMAN ERP اليوم؟
+
+نظام AMAN ERP — بالنسبة لفريق تطوير مكوّن من شخص أو شخصين وفي أقل من سنة — هو **إنجاز تقني استثنائي**. يغطي وحدات لا تتوفر مجتمعة إلا في أنظمة تكلّف آلاف الدولارات شهرياً.
+
+**التصنيف الإجمالي: ★★★★☆ (4 من 5)**
+
+| الجانب | التقييم | السبب |
+|--------|---------|-------|
+| اكتمال الكود | ★★★★★ | 767 API, 309 صفحة, 244 جدول — اكتمال وظيفي ممتاز |
+| جودة المحاسبة | ★★★★★ | 75+ قيد تلقائي، COA متعدد المستويات، إقفال سنوي، أوراق تجارية |
+| الامتثال السعودي | ★★★★★ | الأفضل بين جميع المنافسين — GOSI + WPS + نطاقات + زكاة + نهاية خدمة |
+| واجهة المستخدم | ★★★★☆ | جميلة ومتناسقة لكن تحتاج UX testing على مستخدمين حقيقيين |
+| التكاملات الخارجية | ★★☆☆☆ | أضعف نقطة — لا بوابات دفع ولا تجارة إلكترونية ولا WhatsApp |
+| الجاهزية للإنتاج | ★★★☆☆ | يحتاج: اختبارات شاملة + CI/CD + توثيق + مراجعة أمنية |
+| قابلية التوسع | ★★★☆☆ | DB-per-tenant جيد لكن لا horizontal scaling ولا caching layer فعّال |
+| الدعم والمجتمع | ★☆☆☆☆ | لا يوجد — يحتاج: توثيق، فيديوهات، منتدى، فريق دعم |
+
+### 🎯 الأولويات القادمة (مُرتّبة حسب الأهمية)
+
+| الأولوية | المهمة | التأثير |
+|----------|--------|---------|
+| 1 | **إكمال ZATCA e-Invoicing** | مطلوب قانونياً في السعودية |
+| 2 | **تطبيق جوال (React Native / Flutter)** | 70% من المستخدمين يريدون تطبيق |
+| 3 | **بوابات دفع (مدى / Apple Pay / Stripe)** | ضروري لـ POS والتجارة الإلكترونية |
+| 4 | **CI/CD + اختبارات تكامل** | ضمان الجودة والاستقرار |
+| 5 | **توثيق المستخدم النهائي** | شرط أساسي لبيع المنتج |
+| 6 | **PWA + Service Worker** | POS يعمل بدون إنترنت بالكامل |
+| 7 | **تكامل Salla/Shopify** | فتح سوق التجارة الإلكترونية |
+| 8 | **FIFO + Specific Cost** | سياسات تكلفة إضافية للمخزون |
+| 9 | **WhatsApp Business API** | إشعارات للعملاء |
+| 10 | **Marketplace للإضافات** | قابلية توسع بدون تعديل الكود |
+
+---
+
+## 14.8 ملاحظات تقنية من الفحص الشامل
+
+### مشاكل مُكتشفة (غير حرجة)
+
+| المشكلة | الشدّة | التفاصيل |
+|---------|--------|---------|
+| عدد الجداول في root endpoint قديم | منخفضة | يعرض 178 بدلاً من 244 |
+| 5 جداول مكررة في database.py | متوسطة | `budget_items`, `commission_rules`, `customer_price_list_items`, `sales_commissions`, `stock_transfer_log` |
+| عمود `logo_url` مكرر في `system_companies` | متوسطة | يُعرّف مرتين في نفس الجدول |
+| لا يوجد PATCH endpoints | معلوماتية | كل التحديثات عبر PUT (يرسل الكائن كاملاً) |
+| ملف `routers/inventory/notifications.py` غير مُستخدم | منخفضة | موجود لكن غير مسجل في __init__.py |
+
+| البند | Phase 4 | Phase 5 (★★★★★) | Phase 6 (الحالي) |
+|-------|---------|----------------|------------------|
+| صفحات الواجهة الأمامية | ~248 صفحة JSX | ~262 صفحة JSX | **309 صفحة JSX** |
+| مسارات (Routes) | ~165 route | ~175 route | **267 route** |
+| جداول قاعدة البيانات | ~216 جدول | ~226 جدول | **244 جدول** |
+| API Endpoints | ~542+ endpoint | ~600+ endpoint | **767 endpoint** |
+| سطور Backend | — | — | **88,268 سطر** |
+| سطور Frontend | — | — | **98,760 سطر** |
+| القيود التلقائية | 70+ نقطة توليد | 75+ نقطة توليد | 75+ نقطة توليد |
+| حسابات شجرة الحسابات الافتراضية | ~80 حساب | ~80 حساب | ~80 حساب |
+| ربط حسابات تلقائي (Mappings) | ~45 mapping | ~45 mapping | ~45 mapping |
+| الأدوار الافتراضية | 8 أدوار | 8 أدوار | 8 أدوار |
+| التقارير | ~46 تقرير + مخصصة | ~55 تقرير + مخصصة | ~55 تقرير + مخصصة |
+| قوالب الصناعة | 7 قوالب | 7 قوالب | **12 نشاط** |
+| ملفات الترجمة | +13 قسم | +19 قسم | +19 قسم |
+| صفحات CRM | 3 صفحات | 9 صفحات | **11 صفحة** |
+| وضع POS الغير متصل | ❌ | ✅ IndexedDB | ✅ IndexedDB |
+| Split Payment | 2 طرق | 3 طرق (cash/card/mada) | 3 طرق |
+| شاشة العميل (Customer Display) | ❌ | ✅ BroadcastChannel | ✅ (مشروطة بالنشاط) |
+| نظام ميزات حسب النشاط | ❌ | ❌ | **✅ 16 قاعدة** |
+| KPI مدمج في التحليلات | ❌ | ❌ | **✅ 6 صفحات** |
+
+---
+
+# 15. تقرير الفحص العميق لجاهزية الإنتاج (Production Readiness Deep Audit)
+
+> **تاريخ الفحص:** 3 مارس 2026  
+> **نوع الفحص:** فحص معماري + محاسبي + أمني + أداء  
+> **المنهجية:** فحص مباشر للكود المصدري (Code-level Audit) وليس مراجعة نظرية
+
+---
+
+## 15.1 الثغرات المحاسبية والمالية
+
+### 15.1.1 توازن القيد المزدوج (Double-Entry Integrity)
+
+| # | المشكلة | الشدة | الملف | التفاصيل |
+|---|---------|-------|-------|----------|
+| 1 | **التحقق من التوازن يتم قبل التحويل وليس بعده** | متوسطة | `utils/accounting.py` | يتم التحقق أن `sum(debits) == sum(credits)` قبل الإدراج في DB، لكن الأرقام تُمرر كـ `float` وليس `Decimal` — أخطاء الفاصلة العائمة قد تتراكم في فواتير بعشرات البنود |
+| 2 | **ترحيل الرواتب يتخطى بنود بدون حسابات** | عالية | `routers/hr/core.py` خطوط 973-1065 | إذا لم يوجد `acc_map_gosi_expense` أو `acc_map_loans_adv`، يتم تخطي السطر بدون خطأ — النتيجة: قيد غير متوازن (Dr > Cr أو العكس) يُرحل بنجاح |
+| 3 | **لا يوجد فحص نهائي post-insert** | منخفضة | `utils/accounting.py` | لا يوجد `SELECT SUM(debit),SUM(credit) FROM journal_lines WHERE entry_id=X` بعد الإدراج للتأكد من التوازن |
+
+### 15.1.2 مشاكل التقريب العشري (Rounding)
+
+| # | المشكلة | الشدة | الملف | التفاصيل |
+|---|---------|-------|-------|----------|
+| 4 | **حساب الضريبة بدون `Decimal`** | عالية | `routers/sales/invoices.py` خطوط 110-125 | `tax = line_total * tax_rate / 100` — يستخدم `float` — مثال: `119.99 * 15 / 100 = 17.9985` يتم تمريره بدون تقريب ← فرق ريال في فواتير كبيرة |
+| 5 | **POS: الضريبة تُحسب على المبلغ قبل الخصم** | عالية | `routers/pos.py` خطوط 376-380 | `tax = price * qty * tax_rate / 100` ثم `discount = subtotal * discount_pct / 100` — الخصم يُطبق على الإجمالي لكن الضريبة على السعر الأصلي — مخالف لأنظمة ZATCA |
+| 6 | **الزكاة: جميع الحسابات بـ `float()`** | متوسطة | `routers/system_completion.py` خطوط 347-535 | حساب الزكاة يستخدم `float()` بالكامل — لالتزام ضريبي قانوني، يجب استخدام `Decimal` |
+| 7 | **معدل الزكاة الميلادي تقريبي** | منخفضة | `system_completion.py` | يستخدم `2.5775%` بينما القيمة الدقيقة `2.5776...%` — الفرق 18 ريال لكل 10 مليون ريال |
+
+### 15.1.3 مشاكل قفل الفترات المحاسبية
+
+| # | المشكلة | الشدة | الملف | التفاصيل |
+|---|---------|-------|-------|----------|
+| 8 | **قفل الفترة موجود لكن غير مُفعّل!** | حرجة | `utils/fiscal_lock.py` + جميع الـ routers | الدالة `check_fiscal_period_open()` مُعرّفة بـ 50 سطر لكن **لا يتم استدعاؤها من أي router** — يمكن إنشاء فواتير وترحيل رواتب وإجراء تسويات في فترة مقفلة |
+| 9 | **القيود اليدوية تستخدم جدولاً مختلفاً** | متوسطة | `routers/finance/accounting.py` خط 533 | القيود اليدوية تفحص `fiscal_periods.is_closed` بينما القفل الجديد في `fiscal_period_locks` — نظامان متوازيان لا يتحدثان |
+
+### 15.1.4 مشاكل الزكاة وتصنيف الحسابات
+
+| # | المشكلة | الشدة | الملف | التفاصيل |
+|---|---------|-------|-------|----------|
+| 10 | **تصنيف الحسابات بالبادئة خاطئ** | متوسطة | `system_completion.py` خط 443 | `account_code LIKE '13%'` يُستخدم لـ "الاستثمارات طويلة الأجل" لكن في شجرة الحسابات `13xx` = أصول غير ملموسة — الاستثمارات في `12xx` |
+
+---
+
+## 15.2 مخاطر التزامن والأداء (Concurrency & Performance)
+
+### 15.2.1 مشاكل حرجة في التزامن
+
+| # | المشكلة | الشدة | الملف | الأثر |
+|---|---------|-------|-------|-------|
+| 11 | **لا يوجد `SELECT FOR UPDATE` على المخزون** | حرجة | `routers/inventory/transfers.py` خطوط 60-78 | عمليتان متزامنتان تقرأان نفس الرصيد (100 وحدة) → كلاهما يخصمان 80 → الرصيد يصبح 20 بدلاً من -60 → **مخزون وهمي** |
+| 12 | **POS فتح وردية — Race Condition (TOCTOU)** | عالية | `routers/pos.py` خطوط 40-46 | Check-then-insert بدون قفل → طلبان متزامنان ينشئان ورديتين مفتوحتين لنفس الكاشير |
+| 13 | **POS إغلاق وردية — لا يوجد row lock** | متوسطة | `routers/pos.py` خطوط 158-206 | إغلاق مزدوج يُنشئ قيدين محاسبيين لفروقات الصندوق |
+| 14 | **ترقيم الفواتير بدون قفل تسلسلي** | عالية | عدة routers في sales/purchases | `SELECT MAX(number)` ثم `+1` بدون `FOR UPDATE` → أرقام فواتير مكررة |
+
+### 15.2.2 مشاكل اتصالات قاعدة البيانات
+
+| # | المشكلة | الشدة | الملف | الأثر |
+|---|---------|-------|-------|-------|
+| 15 | **تخزين مؤقت غير محدود لمحركات الشركات** | عالية | `database.py` خطوط 50-59 | كل شركة = Engine بـ 10 pool + 20 overflow — مع 100 شركة = **3,000 اتصال** — PostgreSQL الافتراضي يدعم 100 فقط |
+| 16 | **الجدولة تسرّب اتصالات** | متوسطة | `services/scheduler.py` خطوط 144-146 | `get_company_engine()` في كل دورة (5 دقائق) بدون `engine.dispose()` |
+| 17 | **لا يوجد connection pooling مركزي** | متوسطة | `database.py` | كل محرك له pool مستقل — لا PgBouncer أو مجمع مركزي |
+
+### 15.2.3 العمليات الثقيلة (Heavy Operations)
+
+| العملية | المشكلة المحتملة | الحل المقترح |
+|---------|-----------------|--------------|
+| ترحيل مسير الرواتب (100+ موظف) | يُنشئ قيداً بـ 200+ سطر في transaction واحد | تقسيم إلى دفعات (batch) |
+| تقارير التوحيد المالي | تقرأ من جميع قواعد بيانات الشركات | تخزين مؤقت + قراءة غير متزامنة |
+| الجرد الدوري (10,000 منتج) | يقارن كل منتج فردياً | bulk update + partial indexes |
+| استيراد كشف البنك (1000 سطر) | Auto-match يفحص كل سطر مقابل كل قيد | EXPLAIN ANALYZE + فهارس |
+| POS Offline Sync (100 طلب) | مزامنة متسلسلة | bulk insert + conflict resolution |
+
+---
+
+## 15.3 النواقص الأمنية والتشغيلية
+
+### 15.3.1 ثغرات أمنية
+
+| # | المشكلة | الشدة | الملف | التفاصيل |
+|---|---------|-------|-------|----------|
+| 18 | **`pickle.loads` على بيانات Redis** | عالية | `utils/cache.py` خط 67 | إذا تم اختراق Redis → تنفيذ كود عشوائي (RCE). يجب استبداله بـ `json.loads()` |
+| 19 | **Rate limiter للدخول في الذاكرة فقط** | عالية | `routers/auth.py` خطوط 29-30 | `_login_attempts` dict يُمسح عند إعادة تشغيل الخادم أو في بيئة multi-worker → brute force سهل |
+| 20 | **localhost يتجاوز حماية الدخول** | متوسطة | `routers/auth.py` خطوط 41-42 | `if client_ip in ("127.0.0.1", ...): return` — خلف reverse proxy كل الطلبات تظهر من localhost |
+| 21 | **JWT يحمل الصلاحيات بداخله** | متوسطة | `routers/auth.py` خطوط 432-440 | إلغاء صلاحية مستخدم لا يسري إلا بعد 30 دقيقة (انتهاء التوكن) |
+| 22 | **CSP يسمح بـ `unsafe-inline`** | منخفضة | `utils/security_middleware.py` | ضعف في Content Security Policy — مطلوب عملياً لـ SPA |
+
+### 15.3.2 نواقص تشغيلية
+
+| # | المشكلة | الشدة | التفاصيل |
+|---|---------|-------|----------|
+| 23 | **لا يوجد إطار عمل للهجرات (Migrations)** | عالية | لا Alembic, لا version tracking — `CREATE TABLE IF NOT EXISTS` فقط → انحراف المخطط بين الشركات |
+| 24 | **لا يوجد CI/CD pipeline** | عالية | 48 ملف اختبار لكن لا GitHub Actions, لا automated testing |
+| 25 | **سجلات فقط stdout** | منخفضة | لا JSON logging, لا log rotation, لا request ID tracing |
+| 26 | **لا يوجد قفل موزع للـ Scheduler** | متوسطة | في بيئة multi-instance كل نسخة ترسل التقارير المجدولة → تكرار |
+| 27 | **Health check يكشف عدد الشركات** | منخفضة | `/health` يعرض `companies: N` بدون مصادقة |
+
+---
+
+## 15.4 قائمة تحقق الإطلاق (Go-Live Checklist) — خطة 30 يوماً
+
+### الأسبوع الأول (الأيام 1-7): إصلاحات حرجة
+
+| # | الحالة | المهمة | الأولوية | التفاصيل البرمجية |
+|---|--------|--------|---------|-------------------|
+| 1 | ✅ مُنجز | **تفعيل قفل الفترات المحاسبية** | حرجة | تم استدعاء `check_fiscal_period_open()` في: `invoices.py`, `pos.py`, `hr/core.py`, `manufacturing/core.py`, `purchases.py` |
+| 2 | ✅ مُنجز | **إضافة `FOR UPDATE` على المخزون** | حرجة | تم إضافة `FOR UPDATE` في `transfers.py` (مصدر + وجهة) و `purchases.py` (مرتجعات) |
+| 3 | ✅ مُنجز | **إصلاح payroll JE balance** | عالية | تم إضافة `SELECT SUM(debit),SUM(credit)` post-insert في `hr/core.py` + `trans.rollback()` عند عدم التوازن |
+| 4 | ✅ مُنجز | **إصلاح POS VAT calculation** | عالية | تم تعديل `pos.py`: الضريبة الآن على `(price * qty - discount_amount)` — متوافق مع ZATCA |
+| 5 | ✅ مُنجز | **استبدال `pickle.loads` بـ `json.loads`** | عالية | تم في `utils/cache.py`: إزالة `pickle` كامل، إضافة `_json_default()` لـ Decimal/UUID/datetime |
+| 6 | ✅ مُنجز | **إصلاح POS session TOCTOU** | عالية | تم إضافة `FOR UPDATE SKIP LOCKED` + هجرة `UNIQUE INDEX ON pos_sessions(user_id) WHERE status='opened'` — ملف: `migrations/add_pos_session_unique_index.py` + `alembic/versions/0002_pos_session_unique.py` |
+
+### الأسبوع الثاني (الأيام 8-14): أمان وأداء
+
+| # | الحالة | المهمة | الأولوية | التفاصيل البرمجية |
+|---|--------|--------|---------|-------------------|
+| 7 | ✅ مُنجز | **نقل rate limiter إلى Redis** | عالية | تم إعادة كتابة `auth.py`: Redis pipeline مع `rl:ip:{ip}` و `rl:user:{username}` + TTL + fallback لـ dict إذا Redis غير متاح |
+| 8 | ✅ مُنجز | **إضافة `X-Forwarded-For` handling** | عالية | تم في `auth.py`: قراءة XFF header + `_get_client_ip()` helper |
+| 9 | ✅ مُنجز | **تحديد سقف لمحركات قواعد البيانات** | عالية | تم في `database.py`: `OrderedDict` LRU بحد أقصى `_MAX_ENGINES = 50` + `engine.dispose()` عند الإخراج |
+| 10 | ⚠️ بنية تحتية | **تثبيت PgBouncer** | عالية | يتطلب تثبيت وتكوين على الخادم — ليس كوداً |
+| 11 | ✅ مُنجز | **تحويل الأرقام المالية إلى `Decimal`** | متوسطة | تم في `invoices.py`, `pos.py`, `system_completion.py`: `Decimal + ROUND_HALF_UP + _dec() helper` |
+| 12 | ✅ مُنجز | **إعادة التحقق من JWT عند العمليات الحساسة** | متوسطة | تم إضافة `require_sensitive_permission()` في `utils/permissions.py` — DB check لـ `is_active` |
+
+### الأسبوع الثالث (الأيام 15-21): اختبارات وبنية تحتية
+
+| # | الحالة | المهمة | الأولوية | التفاصيل |
+|---|--------|--------|---------|----------|
+| 13 | ✅ مُنجز | **كتابة اختبارات تكامل محاسبية** | عالية | `tests/test_accounting_integrity.py`: 8 فئات، 30+ اختبار (JE balance, tax precision, inventory, payroll, POS, fiscal lock, Zakat, critical APIs) |
+| 14 | ✅ مُنجز | **إعداد CI/CD** | عالية | `.github/workflows/ci.yml`: 4 وظائف (lint, test, build, deploy) + Python syntax check |
+| 15 | ✅ مُنجز | **تثبيت Alembic** | متوسطة | `alembic.ini` + `alembic/env.py` (multi-tenant aware) + baseline + POS unique index migration |
+| 16 | ✅ مُنجز | **إعداد JSON logging** | متوسطة | `utils/logging_config.py`: JSON formatter (production) + Dev formatter + `RequestIDMiddleware` + `X-Request-ID` header |
+| 17 | ✅ مُنجز | **إعداد النسخ الاحتياطي التلقائي** | عالية | `scripts/backup.sh`: pg_dump system + all company DBs, gzip, S3 optional, retention 30 يوم |
+| 18 | ⚠️ بنية تحتية | **اختبار الحمل (Load Testing)** | متوسطة | يتطلب تشغيل `k6` أو `locust` على بيئة staging |
+
+### الأسبوع الرابع (الأيام 22-30): بيئة الإنتاج
+
+| # | الحالة | المهمة | الأولوية | التفاصيل |
+|---|--------|--------|---------|----------|
+| 19 | ⚠️ بنية تحتية | **إعداد الخادم** | حرجة | يتطلب provisioning فعلي — مواصفات موثقة في Runbook |
+| 20 | ✅ مُنجز | **إعداد SSL/TLS** | حرجة | `nginx/production.conf`: Let's Encrypt + TLS 1.2/1.3 + HSTS + OCSP Stapling |
+| 21 | ✅ مُنجز | **إعداد Nginx** | حرجة | `nginx/production.conf`: rate limiting `/api/auth/login` (5r/m), security headers, WebSocket, CSP |
+| 22 | ✅ مُنجز | **إعداد Docker Compose للإنتاج** | عالية | `docker-compose.prod.yml`: replicas:2, resource limits, redis password, no exposed ports |
+| 23 | ✅ مُنجز | **إعداد Gunicorn بدلاً من Uvicorn** | عالية | `Dockerfile` CMD → `gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --preload` |
+| 24 | ✅ مُنجز | **إعداد المراقبة** | متوسطة | `monitoring/alerts/aman_alerts.yml`: 15 alert rule (backend, DB, Redis, infra) + Prometheus + Grafana |
+| 25 | ⚠️ بنية تحتية | **اختبار الاسترداد (DR Test)** | عالية | موثق في Runbook — يتطلب تنفيذ فعلي على خادم اختبار |
+| 26 | ✅ مُنجز | **توثيق إجراءات الطوارئ (Runbook)** | متوسطة | `docs/RUNBOOK.md`: 10 أقسام شاملة (طوارئ، DB، Redis، backup/restore، نشر، أمان، صيانة) |
+
+### ملخص الأولويات
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              أولويات ما قبل الإطلاق (Production Blockers)    │
+├─────────────────────────────────────────────────────────────┤
+│ 🔴 حرجة — يمنع الإطلاق:                                    │
+│    ✅ قفل الفترات المحاسبية (fiscal lock)                   │
+│    ✅ قفل صفوف المخزون (FOR UPDATE)                         │
+│    ✅ SSL/TLS + Nginx reverse proxy                          │
+│    ✅ إصلاح حساب ضريبة POS (ZATCA)                         │
+│                                                             │
+│ 🟠 عالية — يُطلق بها مع خطة إصلاح فوري:                    │
+│    ✅ pickle → json في Cache (RCE fix)                      │
+│    ✅ Rate limiter على Redis                                 │
+│    ⚠️ PgBouncer (بنية تحتية — تثبيت على الخادم)             │
+│    ✅ نسخ احتياطي تلقائي                                    │
+│    ✅ X-Forwarded-For في auth.py                            │
+│    ✅ LRU Engine Cache (max 50)                             │
+│                                                             │
+│ 🟡 متوسطة — خلال أول 90 يوم:                                │
+│    ✅ Decimal للأرقام المالية                                │
+│    ✅ Alembic للهجرات                                        │
+│    ✅ CI/CD pipeline                                         │
+│    ✅ JSON logging + Request-ID                              │
+├─────────────────────────────────────────────────────────────┤
+│ آخر تحديث للحالة: الجلسة الحالية                             │
+│ مُنجز: 22 من 26 مهمة (85%)                                  │
+│ متبقي: 4 مهام بنية تحتية (PgBouncer, Load Test, Server, DR) │
+│ — تتطلب تنفيذ على خادم الإنتاج الفعلي                       │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 

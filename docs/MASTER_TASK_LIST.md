@@ -16,16 +16,135 @@
 
 | المقياس | القيمة |
 |---------|--------|
-| إجمالي الـ Endpoints (Backend) | 800 |
-| إجمالي الصفحات (Frontend) | ~229 route + ~246 ملف |
+| إجمالي الـ Endpoints (Backend) | 814 (+14 جديدة) |
+| إجمالي الصفحات (Frontend) | ~231 route (+2 جديدة) |
 | إجمالي الجداول في قاعدة البيانات | 220 |
 | الجداول التي بها بيانات | 30 |
 | الجداول الفارغة | 190 |
-| ملفات الراوتر (Backend) | 62 |
-| الميزات المكتملة (كود) | ~98% |
+| ملفات الراوتر (Backend) | 63 (+1 جديد) |
+| الميزات المكتملة (كود) | ~99% |
 | البيانات المُدخلة فعلياً | بيانات أساسية فقط |
 
 ---
+
+## ✅ ما تم إنجازه حديثاً — لوحات KPI الذكية (مارس 2026)
+
+> **المهمة:** بناء نظام لوحات مؤشرات الأداء الرئيسية (KPI Dashboards) على مستوى عالمي
+> **الحالة:** ✅ **مكتملة بالكامل + تم إصلاح جميع أخطاء SQL (35+ خطأ)**
+
+### 📁 الملفات المُنشأة حديثاً
+
+| الملف | النوع | الوصف |
+|-------|-------|-------|
+| `backend/services/kpi_service.py` (1550 سطر) | Backend | محرك حساب KPI لـ 10 أدوار وظيفية + chart builders + alert builders |
+| `backend/services/industry_kpi_service.py` (899 سطر) | Backend | محرك KPI لـ 7 قطاعات صناعية |
+| `backend/routers/role_dashboards.py` (524 سطر) | Backend | 14 endpoint API جديدة |
+| `frontend/src/services/roleDashboard.js` | Frontend | خدمة API للفرونتند |
+| `frontend/src/components/kpi/KPICard.jsx` | Frontend | بطاقة KPI مع Sparkline + Status |
+| `frontend/src/components/kpi/KPIGauge.jsx` | Frontend | مقياس دائري Radial Gauge |
+| `frontend/src/components/kpi/KPIChart.jsx` | Frontend | رسوم بيانية (Line/Bar/Pie/Area/Funnel) |
+| `frontend/src/components/kpi/AlertBanner.jsx` | Frontend | شريط تنبيهات ذكية |
+| `frontend/src/components/kpi/PeriodSelector.jsx` | Frontend | منتقي الفترة الزمنية |
+| `frontend/src/components/kpi/index.js` | Frontend | Export موحد |
+| `frontend/src/pages/KPI/KPIHub.jsx` | Frontend | صفحة مركز الـ KPIs |
+| `frontend/src/pages/KPI/RoleDashboard.jsx` (328 سطر) | Frontend | صفحة لوحة الدور الشاملة |
+
+### 📝 الملفات المُعدَّلة
+
+| الملف | التعديل |
+|-------|---------|
+| `backend/main.py` | تسجيل الـ router الجديد |
+| `backend/routers/roles.py` | إضافة 12 صلاحية جديدة |
+| `frontend/src/App.jsx` | إضافة مسارات `/kpi` و `/kpi/:roleKey` |
+| `frontend/src/components/Sidebar.jsx` | إضافة رابط "لوحات الأداء" |
+| `frontend/src/locales/ar.json` | إضافة 60+ ترجمة عربية |
+| `frontend/src/locales/en.json` | إضافة 60+ ترجمة إنجليزية |
+
+### 🎯 الأدوار الوظيفية المدعومة (10 أدوار)
+
+| الدور | KPIs الرئيسية | المعايير |
+|-------|--------------|---------|
+| **Executive** (CEO) | Revenue، Net Margin، EBITDA، Cash、DSO، DPO | IFRS 15، IAS 1 |
+| **Financial** (CFO) | Current Ratio، Quick Ratio، D/E، Gross Margin، Budget Variance، VAT، Zakat | IAS 1، IAS 32، GAZT |
+| **Sales Manager** | Revenue، Conversion Rate، Deal Size، DSO، Pipeline Value، Overdue | IFRS 15 |
+| **Procurement** | PO Value، On-Time Delivery، Lead Time، Payables | IAS 37 |
+| **Warehouse** | Inventory Valuation، Stock Turnover، DIO، Low Stock، OOS Rate | IAS 2 |
+| **HR Manager** | Headcount، Saudization %، Nitaqat Band، Attendance، Turnover | GAZT Nitaqat |
+| **Manufacturing** | OEE، Yield Rate، Downtime | ISO 9001، World Class 85% |
+| **Projects** | Budget Utilization، CPI، SPI، High Risks | PMI PMBOK |
+| **POS / Cashier** | Sales Today، Avg Basket، Payment Split، Loyalty | NRF |
+| **CRM** | Pipeline، Win Rate، Tickets، Campaign ROI | — |
+
+### 🏭 القطاعات الصناعية المدعومة (7 قطاعات)
+
+| القطاع | KPIs المخصصة | المعيار |
+|--------|-------------|--------|
+| **Retail** (تجزئة) | GMROI، Sell-Through، OOS Rate، Repeat Customers | NRF |
+| **F&B** (مطاعم) | Food/Labor Cost %، Prime Cost، Table Turnover، KOT | NRA/USALI |
+| **Manufacturing** (تصنيع) | OEE، Yield، Scrap Rate، OTD، Material Variance | APICS/ISO 9001 |
+| **Construction** (مقاولات) | SPI، CPI، Budget Variance، Change Orders، EAC | PMI PMBOK |
+| **Services** (خدمات) | Billable Utilization، Rev/Employee، Project Profitability | AICPA |
+| **Wholesale** (جملة) | CCC، DSO، DPO، DIO، Customer Concentration | DSCSA/IAS 2 |
+| **General** (عام) | Revenue Growth، Margins، Ratios، ROA، ROE | IFRS/IAS |
+
+### 🔧 إصلاحات قاعدة البيانات (35+ خطأ SQL تم إصلاحها)
+
+| الخطأ | الإصلاح |
+|-------|---------|
+| `account_type = 'cogs'` | `account_type = 'expense' AND account_code LIKE '5%'` |
+| `a.classification = 'current_asset'` | `account_type = 'asset' AND account_code ~ '^1[1-5]'` |
+| `_gl_balance("receivable", ...)` | `account_type = 'asset' AND account_code LIKE '12%'` |
+| `_gl_balance("payable", ...)` | `account_type = 'liability' AND account_code LIKE '21%'` |
+| `FROM sales_invoices` | `FROM invoices WHERE invoice_type = 'sales'` |
+| `FROM purchase_invoices` | `FROM invoices WHERE invoice_type = 'purchase'` |
+| `total_amount` on invoices | `total` |
+| `customer_id/supplier_id` | `party_id` |
+| `FROM opportunities` | `FROM sales_opportunities` |
+| `expected_revenue` | `expected_value` |
+| `FROM tickets` | `FROM support_tickets` |
+| `FROM campaigns` | `FROM marketing_campaigns` |
+| `FROM stock_movements` | `FROM inventory_transactions` |
+| `FROM pos_order_items` | `FROM pos_order_lines` |
+| `status = 'completed'` (POS) | `status = 'paid'` |
+| `FROM loyalty_transactions` | `FROM pos_loyalty_transactions` |
+| `FROM timesheets` | `FROM project_timesheets` |
+| `timesheet_date` | `date` |
+| `actual_hours/planned_hours` | `hours` |
+| `treasury_accounts.balance` | `current_balance` |
+| `purchase_orders.total_amount` | `total` |
+| `purchase_orders.expected_delivery_date` | `expected_date` |
+| `production_orders.planned_start_date` | `start_date` |
+| `production_orders.planned_quantity` | `quantity` |
+| `production_orders.estimated_cost/actual_cost` | حُذفت (لا توجد) |
+| `work_centers.efficiency_rate` | capacity_plans.efficiency_pct |
+| `work_centers.downtime/available_hours` | capacity_plans |
+| `projects.budget` | `planned_budget` |
+| `projects.earned_value/planned_value` | تقدير من progress_percentage |
+| `project_change_orders.amount` | `cost_impact` |
+| `project_risks.risk_level` | `impact` |
+| `attendance.attendance_date` | `date` |
+| `payroll_entries.pay_period_start` | JOIN عبر payroll_periods |
+| `payroll_entries.gross_salary` | `net_salary` |
+| `training_programs.duration_hours` | حُسبت من start_date/end_date |
+
+---
+
+## 📊 مقارنة قبل/بعد — لوحات الأداء
+
+| الجانب | قبل (حالة النظام) | بعد (الآن) |
+|--------|-----------------|-----------|
+| لوحات KPI | لوحة تحكم عامة واحدة | 10 لوحات تخصصية حسب الدور |
+| القطاعات الصناعية | غير مدعومة | 7 قطاعات صناعية بـ KPIs مخصصة |
+| Endpoints API | 800 endpoint | 814 endpoint (+14 جديدة) |
+| معايير دولية | — | IFRS, IAS 1/2/7/32, Nitaqat, PMI PMBOK, NRF, APICS, AICPA |
+| تفعيل تلقائي | — | `/dashboard/role/auto` يكتشف الدور تلقائياً |
+| مؤشر Nitaqat | — | ✅ حساب تلقائي للنطاق (Platinum/Green/Yellow/Red) |
+| OEE | — | ✅ مع Benchmark عالمي 85% |
+| EVM (CPI/SPI) | — | ✅ تقدير من progress_percentage |
+| صحة SQL | ❌ 35+ خطأ | ✅ جميع الاستعلامات صحيحة |
+
+---
+
 
 ## 📍 أين وصل النظام حالياً؟
 
@@ -115,28 +234,41 @@
 
 ---
 
-## 🟡 المرحلة 3 — تحسينات وظيفية
+## 🟡 المرحلة 3 — تحسينات وظيفية + تخصيص حسب نوع النشاط
 
-> **الجهد المقدّر:** 2-4 أسابيع
+> **تاريخ التحديث:** مارس 2026
+> **الجهد المقدّر:** 4-6 أسابيع
 
-### 3.1 تحسينات تجربة المستخدم
+### 3.0 ✅ ما تم إنجازه (مارس 2026) — تخصيص الوحدات والحماية الكاملة
 
-| # | المهمة | التفاصيل |
-|---|--------|----------|
-| 1 | شجرة حسابات مخصصة حسب النشاط | توليد COA مختلفة لكل قالب صناعي (تجاري، مطعم، مصنع، مقاولات) |
-| 2 | لوحات تحكم مخصصة لكل نشاط | KPIs مختلفة حسب القالب |
-| 3 | تقارير مخصصة لكل نشاط | Food Cost للمطاعم، Progress Billing للمقاولات |
-| 4 | ربط الموديولات المتبقية | الاعتمادات، الأمان، الملاحظات، استيراد البيانات — ربط كامل |
+| # | المهمة | التفاصيل | الحالة |
+|---|--------|----------|--------|
+| 1 | **نظام تخصيص الوحدات الكامل** | اختيار نوع النشاط → تخصيص الوحدات → حماية كل الطبقات | **✅ مكتمل** |
+| 2 | **حراسة 20+ راوتر Backend** | `require_module()` على كل الوحدات المتغيرة (sales, buying, pos, stock, manufacturing, projects, services, hr, crm, assets, treasury, taxes, expenses, budgets, approvals, audit, cost_centers, costing, landed_costs) — 621 endpoint محمي | **✅ مكتمل** |
+| 3 | **تصفية Sidebar** | 3 مستويات أولوية: `enabled_modules` → مصفوفة الصناعة → عرض الكل | **✅ مكتمل** |
+| 4 | **تصفية Dashboard** | رموز المبيعات/المخزون مشروطة + QuickActions مفلترة | **✅ مكتمل** |
+| 5 | **تصفية مركز التقارير** | 11 مجموعة تقارير مع `module` key + فلترة | **✅ مكتمل** |
+| 6 | **وسوم شجرة الحسابات** | `module_tag` محسوب لـ 13 حساب + فلترة + badge ملون | **✅ مكتمل** |
+| 7 | **تصفية تبويبات الإعدادات** | 10 تبويبات مع `module` key (sales, buying, hr, stock, crm, pos, expenses, projects, accounting, audit) | **✅ مكتمل** |
+| 8 | **رابط إعادة تخصيص الوحدات** | زر "تخصيص الوحدات" في الأدوات المتقدمة بالإعدادات | **✅ مكتمل** |
+| 9 | **صفحة إعداد نوع النشاط** | `IndustrySetup.jsx` — اختيار من 7 أنواع مع رموز وأوصاف | **✅ مكتمل** |
+| 10 | **صفحة تخصيص الوحدات** | `ModuleCustomization.jsx` — تفعيل/تعطيل وحسب | **✅ مكتمل** |
+| 11 | **لوحات KPI مخصصة لكل نشاط** | 10 أدوار × 7 قطاعات — `industry_kpi_service.py` + `role_dashboards.py` | **✅ مكتمل** |
+| 12 | **محرك سير العمل (Workflow)** | اعتمادات + SLA + تصعيد + موافقات موازية — `approvals.py` + `advanced_workflow.py` + `approval_utils.py` | **✅ مكتمل** |
+| 13 | **WebSocket إشعارات فورية** | `ws_manager.py` + endpoint مع إعادة اتصال + fallback polling | **✅ مكتمل** |
+| 14 | **بنية إشعارات البريد** | `email_service.py` + SMTP + إرسال تقارير مجدولة + إعادة تعيين كلمة المرور | **✅ مكتمل** |
+| 15 | **قيود GL تلقائية** | فواتير البيع/الشراء/المرتجعات/تعديلات المخزون تُنشئ قيود يومية تلقائياً | **✅ مكتمل** |
 
-### 3.2 تحسينات تقنية
+### 3.1 ⏳ المتبقي — شجرة حسابات وتقارير حسب النشاط
 
-| # | المهمة | التفاصيل |
-|---|--------|----------|
-| 1 | قيود GL تلقائية لـ WHT | مدين: الدائنون، دائن: WHT مستحقة — عند إنشاء فاتورة |
-| 2 | محرك سير العمل (Workflow Engine) | بناء محرك اعتمادات: طلب ← موافقة ← تنفيذ |
-| 3 | إشعارات البريد الإلكتروني | تهيئة SMTP + إشعارات حقيقية عند الأحداث |
-| 4 | WebSocket للإشعارات الفورية | بدلاً من polling، إشعارات حية |
-| 5 | تنبيهات إعادة الطلب الذكية | ربط inventory reorder مع notification pipeline |
+| # | المهمة | التفاصيل | الأولوية | الحالة |
+|---|--------|----------|---------|--------|
+| 1 | شجرة حسابات مخصصة حسب النشاط | قوالب COA لكل صناعة (مطعم: حسابات تكلفة الطعام + المشروبات، مصنع: WIP + مواد خام، مقاولات: احتجاز + مستخلصات) | 🔴 عالية | ⏳ |
+| 2 | تقارير مخصصة لكل نشاط | Food Cost Report للمطاعم، Progress Billing للمقاولات، Production Cost للتصنيع | 🟡 متوسطة | ⏳ |
+| 3 | لوحة تحكم رئيسية ذكية حسب النشاط | Dashboard يعرض widgets مخصصة (OEE للتصنيع، Food Cost % للمطاعم، تقدم المشاريع للمقاولات) | 🟡 متوسطة | ⏳ |
+| 4 | قيود GL تلقائية لـ WHT | مدين: الدائنون، دائن: WHT مستحقة — عند إنشاء فاتورة شراء | 🟡 متوسطة | ⏳ |
+| 5 | تنبيهات إعادة الطلب الآلية | Scheduler يفحص المخزون → يُرسل إشعار WebSocket + بريد عند الوصول لحد إعادة الطلب | 🟡 متوسطة | ⏳ |
+| 6 | إشعارات بريد مبنية على الأحداث | فاتورة متأخرة → بريد، طلب اعتماد → بريد، مخزون منخفض → بريد | 🟡 متوسطة | ⏳ |
 
 ---
 

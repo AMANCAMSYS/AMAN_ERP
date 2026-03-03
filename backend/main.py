@@ -57,14 +57,16 @@ from routers import projects, reports, scheduled_reports, dashboard
 # ── Commerce & External ────────────────────────────────────────────────────────
 from routers import pos, contracts, crm, external, services
 
+# ── Role-Based KPI Dashboards ──────────────────────────────────────────────────
+from routers import role_dashboards
+
 # ── System Completion (Phase 100%) ─────────────────────────────────────────────
 from routers import delivery_orders, landed_costs, hr_wps_compliance
 from routers import system_completion
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# OPS-001: Structured logging — JSON in production, human-readable in dev
+from utils.logging_config import setup_logging, RequestIDMiddleware
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -144,23 +146,29 @@ async def lifespan(app: FastAPI):
 
             """))
             
-            # Seed Industry Templates
+            # Seed Industry Templates (12 types)
             conn.execute(text("""
                 INSERT INTO industry_templates (key, name, name_ar, description, description_ar, icon, enabled_modules)
                 VALUES 
-                ('retail', 'Retail', 'التجزئة', 'Retail and direct sales', 'البيع المباشر والقطاعي', 'RT', '["accounting", "sales", "buying", "stock", "pos", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('restaurant', 'F&B', 'المطاعم والكافيهات', 'Restaurants and cafes', 'المطاعم والخدمات الغذائية', 'FB', '["accounting", "sales", "stock", "pos", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('manufacturing', 'Manufacturing', 'التصنيع', 'Factories and production', 'المصانع والإنتاج', 'MF', '["accounting", "sales", "buying", "stock", "manufacturing", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('construction', 'Construction', 'المقاولات', 'Construction and engineering', 'شركات المقاولات والهندسة', 'CN', '["accounting", "buying", "stock", "projects", "assets", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('services', 'Services', 'الخدمات', 'Professional and service firms', 'الشركات المهنية والخدمية', 'SV', '["accounting", "sales", "projects", "crm", "services", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('wholesale', 'Wholesale', 'الجملة', 'Wholesalers and distributors', 'تجار الجملة والموزعين', 'WS', '["accounting", "sales", "buying", "stock", "crm", "treasury", "taxes", "hr", "audit", "approvals", "data_import"]'),
-                ('general', 'Multi-Activity', 'نشاط عام', 'Comprehensive system with all modules', 'نظام شامل لجميع الأنشطة', 'GN', '["accounting", "assets", "treasury", "sales", "pos", "buying", "stock", "manufacturing", "projects", "crm", "services", "expenses", "taxes", "approvals", "hr", "reports", "audit", "data_import"]')
+                ('retail', 'Retail', 'تجارة التجزئة', 'Grocery, clothing, electronics, gifts', 'بقالات، ملابس، إلكترونيات، عطور، هدايا', '🛍️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('wholesale', 'Wholesale & Distribution', 'الجملة والتوزيع', 'Distributors, wholesale warehouses, agents, importers', 'موزعين، مستودعات جملة، وكلاء بيع، مستوردين', '📦', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('restaurant', 'Food & Beverage', 'المطاعم والمقاهي', 'Restaurants, cafes, cloud kitchens, food trucks, bakeries', 'مطاعم، كافيهات، مطابخ سحابية، فود ترك، مخابز', '🍽️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('manufacturing', 'Manufacturing', 'التصنيع والإنتاج', 'Factories, production workshops, packaging', 'مصانع، ورش إنتاج، تعبئة وتغليف', '🏭', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('construction', 'Construction', 'المقاولات والمشاريع', 'General contracting, finishing, plumbing, electrical', 'مقاولات عامة، تشطيب، سباكة، كهرباء، طرق', '🏗️', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('services', 'Professional Services', 'الخدمات المهنية', 'Accounting, law, consulting, training, marketing', 'محاسبة، محاماة، استشارات، تدريب، تسويق', '💼', '["dashboard","kpi","accounting","assets","treasury","sales","buying","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('pharmacy', 'Pharmacy & Medical', 'الصيدليات والمستلزمات الطبية', 'Pharmacies, medical supplies, labs, small clinics', 'صيدليات، مستلزمات طبية، مختبرات، عيادات', '💊', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('workshop', 'Workshops & Repair', 'الورش والصيانة', 'Auto mechanics, electrical repair, device repair', 'ميكانيك، كهرباء سيارات، صيانة أجهزة', '🔧', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('ecommerce', 'E-Commerce', 'التجارة الإلكترونية', 'Online stores, social media selling, marketplaces', 'متاجر أونلاين، بيع عبر منصات التواصل', '🛒', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('logistics', 'Logistics & Transport', 'النقل والخدمات اللوجستية', 'Freight, delivery, warehousing, cargo transport', 'شحن، توصيل، مستودعات، نقل بضائع', '🚛', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('agriculture', 'Agriculture', 'الزراعة والتجارة الزراعية', 'Farms, crop traders, feed, poultry', 'مزارع، تجار محاصيل، أعلاف، دواجن', '🌾', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+                ('general', 'Multi-Activity', 'نشاط عام', 'Comprehensive system with all modules', 'نظام شامل لجميع الأنشطة', '🌐', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]')
                 ON CONFLICT (key) DO UPDATE SET 
                     name = EXCLUDED.name,
                     name_ar = EXCLUDED.name_ar,
                     description = EXCLUDED.description,
                     description_ar = EXCLUDED.description_ar,
-                    icon = EXCLUDED.icon;
+                    icon = EXCLUDED.icon,
+                    enabled_modules = EXCLUDED.enabled_modules;
             """))
 
 
@@ -336,6 +344,9 @@ from slowapi.errors import RateLimitExceeded
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# OPS-001: Request-ID middleware — adds X-Request-ID to every request/response
+app.add_middleware(RequestIDMiddleware)
+
 # SEC-203: HTTPS Enforcement + Security Headers
 # SEC-204: Input Sanitization (XSS/SQLi detection)
 from utils.security_middleware import HTTPSRedirectMiddleware, InputSanitizationMiddleware
@@ -430,7 +441,8 @@ app.include_router(contracts.router, prefix="/api")
 app.include_router(crm.router, prefix="/api")
 app.include_router(external.router, prefix="/api")
 app.include_router(services.router, prefix="/api")
-
+# ── Role-Based KPI Dashboards ────────────────────────────────────────────
+app.include_router(role_dashboards.router, prefix="/api")
 # ── System Completion (New modules) ──────────────────────────────
 app.include_router(delivery_orders.router, prefix="/api")
 app.include_router(landed_costs.router, prefix="/api")

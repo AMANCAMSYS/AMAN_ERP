@@ -111,12 +111,20 @@ export function setAuth(token, user, companyId) {
     if (companyId) {
         localStorage.setItem('company_id', companyId)
     }
+    // حفظ نوع النشاط التجاري أو مسحه (يضمن إعادة التوجيه للمعالج عند الشركات الجديدة)
+    if (user?.industry_type) {
+        localStorage.setItem('industry_type', user.industry_type)
+    } else {
+        // clear any stale value from a previous company login
+        localStorage.removeItem('industry_type')
+    }
 }
 
 export function clearAuth() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('company_id')
+    localStorage.removeItem('industry_type')
 }
 
 export function logout() {

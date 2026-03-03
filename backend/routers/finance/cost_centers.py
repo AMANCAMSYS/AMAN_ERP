@@ -5,10 +5,10 @@ from typing import List, Optional
 from pydantic import BaseModel
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from schemas.cost_centers import CostCenterCreate, CostCenterUpdate, CostCenterResponse
 
-router = APIRouter(prefix="/cost-centers", tags=["مراكز التكلفة"])
+router = APIRouter(prefix="/cost-centers", tags=["مراكز التكلفة"], dependencies=[Depends(require_module("cost_centers"))])
 
 # --- Endpoints ---
 

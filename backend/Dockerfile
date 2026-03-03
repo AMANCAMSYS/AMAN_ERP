@@ -49,7 +49,14 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Start server (no --reload in production)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--workers", "4", "--log-level", "info", \
-     "--access-log", "--no-use-colors"]
+# Start server — Gunicorn with Uvicorn workers for production
+CMD ["gunicorn", "main:app", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--keep-alive", "5", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

@@ -375,6 +375,9 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
             je_lines.append({"account_id": acc_cogs, "debit": 0, "credit": total_cost_reversal, "description": f"COGS Reduction - {header.return_number}"})
 
         # Insert Journal Entry
+        from utils.accounting import validate_je_lines
+        valid_lines = validate_je_lines(je_lines, source=f"RET-{header.return_number}")
+
         je_num = f"JE-RET-{header.return_number}"
         je_id = db.execute(text("""
             INSERT INTO journal_entries (
@@ -389,35 +392,34 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
         }).scalar()
 
         from utils.accounting import update_account_balance as uab_return
-        for line in je_lines:
-            if line["account_id"]:
-                amt_curr = round((line["debit"] + line["credit"]) / exchange_rate, 2) if exchange_rate else 0
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                """), {
-                    "jid": je_id,
-                    "aid": line["account_id"],
-                    "deb": line["debit"],
-                    "cred": line["credit"],
-                    "desc": line["description"],
-                    "amt_curr": amt_curr,
-                    "curr": header.currency
-                })
-
-                # Update balance using proper utility (handles base + currency)
-                uab_return(
-                    db,
-                    account_id=line["account_id"],
-                    debit_base=line["debit"],
-                    credit_base=line["credit"],
-                    debit_curr=amt_curr if line["debit"] > 0 else 0,
-                    credit_curr=amt_curr if line["credit"] > 0 else 0,
-                    currency=header.currency
+        for line in valid_lines:
+            amt_curr = round((line["debit"] + line["credit"]) / exchange_rate, 2) if exchange_rate else 0
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
                 )
+                VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
+            """), {
+                "jid": je_id,
+                "aid": line["account_id"],
+                "deb": line["debit"],
+                "cred": line["credit"],
+                "desc": line["description"],
+                "amt_curr": amt_curr,
+                "curr": header.currency
+            })
+
+            # Update balance using proper utility (handles base + currency)
+            uab_return(
+                db,
+                account_id=line["account_id"],
+                debit_base=line["debit"],
+                credit_base=line["credit"],
+                debit_curr=amt_curr if line["debit"] > 0 else 0,
+                credit_curr=amt_curr if line["credit"] > 0 else 0,
+                currency=header.currency
+            )
 
         db.commit()
 

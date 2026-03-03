@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number,
@@ -19,7 +19,7 @@ from utils.accounting import (
 )
 import logging
 
-router = APIRouter(prefix="/taxes", tags=["الضرائب"])
+router = APIRouter(prefix="/taxes", tags=["الضرائب"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
 from schemas.taxes import TaxRateCreate, TaxRateUpdate, TaxGroupCreate, TaxReturnCreate, TaxPaymentCreate
 

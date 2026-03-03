@@ -1,10 +1,13 @@
 import { NavLink } from 'react-router-dom'
 import { logout, getUser, hasPermission } from '../utils/auth'
 import { useTranslation } from 'react-i18next'
+import { getIndustryType } from '../hooks/useIndustryType'
+import { isModuleEnabledForIndustry } from '../config/industryModules'
 
 function Sidebar() {
     const { t } = useTranslation()
     const user = getUser()
+    const industryType = getIndustryType()
     const navItems = [
         { path: '/dashboard', label: t('nav.workspace'), icon: '🏠' },
     ]
@@ -16,10 +19,21 @@ function Sidebar() {
         const isSystemAdmin = user?.role === 'system_admin'
 
         // Helper to check if module is enabled
+        // أولوية 1: enabled_modules المخزنة في الباك إند (القائمة المخصصة)
+        // أولوية 2: مصفوفة النشاط التجاري (الافتراضي)
+        // أولوية 3: إذا لم يُحدد شيء → إظهار الكل
         const isModuleEnabled = (moduleKey) => {
             if (isSystemAdmin) return true
-            if (!enabledModules || enabledModules.length === 0) return true // Fallback if not set
-            return enabledModules.includes(moduleKey)
+            // الأولوية للقائمة المخصصة من enabled_modules
+            if (enabledModules && enabledModules.length > 0) {
+                return enabledModules.includes(moduleKey)
+            }
+            // مصفوفة النشاط التجاري (fallback)
+            if (industryType) {
+                return isModuleEnabledForIndustry(industryType, moduleKey)
+            }
+            // لم يُعدّ شيء بعد → إظهار الكل
+            return true
         }
 
         if (hasPermission('accounting.view') && isModuleEnabled('accounting')) {

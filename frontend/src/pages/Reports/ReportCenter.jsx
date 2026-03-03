@@ -1,7 +1,106 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { hasPermission } from '../../utils/auth';
+import { hasPermission, getUser } from '../../utils/auth';
+import { INDUSTRY_TYPES, resolveIndustryCode } from '../../config/industryModules';
 import BackButton from '../../components/common/BackButton';
+
+// Industry-specific report groups mapping
+const INDUSTRY_REPORTS_MAP = {
+    restaurant: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🍽️',
+        color: '#EF4444',
+        reports: [
+            { name: t('industry_reports.food_cost'), path: '/reports/industry/food-cost', desc: t('industry_reports.food_cost_desc') },
+        ]
+    }),
+    manufacturing: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🏭',
+        color: '#6366f1',
+        reports: [
+            { name: t('industry_reports.production_cost'), path: '/reports/industry/production-cost', desc: t('industry_reports.production_cost_desc') },
+        ]
+    }),
+    construction: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🏗️',
+        color: '#F59E0B',
+        reports: [
+            { name: t('industry_reports.progress_billing'), path: '/reports/industry/progress-billing', desc: t('industry_reports.progress_billing_desc') },
+        ]
+    }),
+    services: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '💼',
+        color: '#8B5CF6',
+        reports: [
+            { name: t('industry_reports.utilization'), path: '/reports/industry/utilization', desc: t('industry_reports.utilization_desc') },
+        ]
+    }),
+    pharmacy: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '💊',
+        color: '#10B981',
+        reports: [
+            { name: t('industry_reports.drug_expiry'), path: '/reports/industry/drug-expiry', desc: t('industry_reports.drug_expiry_desc') },
+        ]
+    }),
+    workshop: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🔧',
+        color: '#6B7280',
+        reports: [
+            { name: t('industry_reports.workshop_revenue'), path: '/reports/industry/workshop-revenue', desc: t('industry_reports.workshop_revenue_desc') },
+        ]
+    }),
+    ecommerce: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🛒',
+        color: '#3B82F6',
+        reports: [
+            { name: t('industry_reports.ecom_returns'), path: '/reports/industry/ecom-returns', desc: t('industry_reports.ecom_returns_desc') },
+        ]
+    }),
+    wholesale: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '📦',
+        color: '#0EA5E9',
+        reports: [
+            { name: t('industry_reports.agent_performance'), path: '/reports/industry/agent-performance', desc: t('industry_reports.agent_performance_desc') },
+        ]
+    }),
+    logistics: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🚛',
+        color: '#14B8A6',
+        reports: [
+            { name: t('industry_reports.fleet_tracking'), path: '/reports/industry/fleet-tracking', desc: t('industry_reports.fleet_tracking_desc') },
+        ]
+    }),
+    agriculture: (t) => ({
+        title: t('industry_reports.title'),
+        icon: '🌾',
+        color: '#65A30D',
+        reports: [
+            { name: t('industry_reports.crop_yield'), path: '/reports/industry/crop-yield', desc: t('industry_reports.crop_yield_desc') },
+        ]
+    }),
+}
+
+function _getIndustryReportGroup(t, user) {
+    // user.industry_type may be key (RT/FB) or code (retail/restaurant) — normalize to code
+    const industryCode = resolveIndustryCode(user?.industry_type)
+    if (!industryCode || industryCode === 'general' || !INDUSTRY_REPORTS_MAP[industryCode]) return []
+    
+    const builder = INDUSTRY_REPORTS_MAP[industryCode]
+    const group = builder(t)
+    return [{
+        ...group,
+        permission: 'reports.view',
+        module: 'reports',
+    }]
+}
 
 const ReportCenter = () => {
     const { t, i18n } = useTranslation();
@@ -13,6 +112,7 @@ const ReportCenter = () => {
             icon: '📊',
             color: '#10B981',
             permission: 'sales.reports',
+            module: 'sales',
             reports: [
                 { name: t('reports_center.reports.sales_analytics'), path: '/sales/reports/analytics', desc: t('reports_center.reports.sales_analytics_desc') },
                 { name: t('reports_center.reports.customer_statement'), path: '/sales/reports/customer-statement', desc: t('reports_center.reports.customer_statement_desc') },
@@ -25,6 +125,7 @@ const ReportCenter = () => {
             icon: '🛒',
             color: '#3B82F6',
             permission: 'buying.reports',
+            module: 'buying',
             reports: [
                 { name: t('reports_center.reports.buying_analytics'), path: '/buying/reports/analytics', desc: t('reports_center.reports.buying_analytics_desc') },
                 { name: t('reports_center.reports.supplier_statement'), path: '/buying/reports/supplier-statement', desc: t('reports_center.reports.supplier_statement_desc') },
@@ -36,6 +137,7 @@ const ReportCenter = () => {
             icon: '📦',
             color: '#F59E0B',
             permission: 'stock.reports',
+            module: 'stock',
             reports: [
                 { name: t('reports_center.reports.stock_balance'), path: '/stock/reports', desc: t('reports_center.reports.stock_balance_desc') },
                 { name: t('reports_center.reports.stock_movements'), path: '/stock/reports/movements', desc: t('reports_center.reports.stock_movements_desc') }
@@ -46,6 +148,7 @@ const ReportCenter = () => {
             icon: '📒',
             color: '#8B5CF6',
             permission: 'accounting.view',
+            module: 'accounting',
             reports: [
                 { name: t('reports_center.reports.trial_balance'), path: '/accounting/trial-balance', desc: t('reports_center.reports.trial_balance_desc') },
                 { name: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', desc: t('accounting.general_ledger.subtitle') },
@@ -63,6 +166,7 @@ const ReportCenter = () => {
             icon: '🏦',
             color: '#06B6D4',
             permission: 'treasury.view',
+            module: 'treasury',
             reports: [
                 { name: t('reports_center.reports.treasury_balances'), path: '/treasury/reports/balances', desc: t('reports_center.reports.treasury_balances_desc') },
                 { name: t('reports_center.reports.treasury_cashflow'), path: '/treasury/reports/cashflow', desc: t('reports_center.reports.treasury_cashflow_desc') },
@@ -74,6 +178,7 @@ const ReportCenter = () => {
             icon: '🏭',
             color: '#6366f1',
             permission: 'manufacturing.view',
+            module: 'manufacturing',
             reports: [
                 { name: t('reports_center.reports.production_analytics', 'Production Analytics'), path: '/manufacturing/reports/analytics', desc: t('reports_center.reports.production_analytics_desc', 'Monitor production output and efficiency') },
                 { name: t('reports_center.reports.work_order_status', 'Work Order Status'), path: '/manufacturing/reports/work-orders', desc: t('reports_center.reports.work_order_status_desc', 'Track status and progress of work orders') }
@@ -84,6 +189,7 @@ const ReportCenter = () => {
             icon: '🏗️',
             color: '#D97706',
             permission: 'assets.view',
+            module: 'assets',
             reports: [
                 { name: t('asset_reports.title'), path: '/assets/reports', desc: t('asset_reports.subtitle') }
             ]
@@ -93,6 +199,7 @@ const ReportCenter = () => {
             icon: '🏗️',
             color: '#8b5cf6',
             permission: 'projects.view',
+            module: 'projects',
             reports: [
                 { name: t('reports_center.reports.project_financials', 'Project Financials'), path: '/projects/reports/financials', desc: t('reports_center.reports.project_financials_desc', 'Profitability and cost analysis per project') },
                 { name: t('reports_center.reports.resource_utilization', 'Resource Utilization'), path: '/projects/reports/resources', desc: t('reports_center.reports.resource_utilization_desc', 'Track employee allocation and workload') }
@@ -103,6 +210,7 @@ const ReportCenter = () => {
             icon: '👥',
             color: '#EC4899',
             permission: 'hr.view',
+            module: 'hr',
             reports: [
                 { name: t('reports_center.reports.payroll_trend'), path: '/hr/reports', desc: t('reports_center.reports.payroll_trend_desc') },
                 { name: t('reports_center.reports.leave_usage'), path: '/hr/reports', desc: t('reports_center.reports.leave_usage_desc') }
@@ -113,6 +221,7 @@ const ReportCenter = () => {
             icon: '🧾',
             color: '#F97316',
             permission: 'accounting.view',
+            module: 'taxes',
             reports: [
                 { name: t('reports_center.reports.vat_report'), path: '/taxes', desc: t('reports_center.reports.vat_report_desc') },
                 { name: t('reports_center.reports.tax_audit'), path: '/taxes', desc: t('reports_center.reports.tax_audit_desc') }
@@ -123,13 +232,26 @@ const ReportCenter = () => {
             icon: '✨',
             color: '#DB2777',
             permission: 'reports.create',
+            module: 'reports',
             reports: [
                 { name: t('reports_center.reports.builder', 'Report Builder'), path: '/reports/builder', desc: t('reports_center.reports.builder_desc', 'Create and save custom reports') },
                 { name: t('reports.scheduled.title', 'Scheduled Reports'), path: '/reports/scheduled', desc: t('reports_center.reports.scheduled_desc', 'Automate report delivery via email') },
                 { name: t('reports.sharing.shared_with_me', 'Shared With Me'), path: '/reports/shared', desc: t('reports_center.reports.shared_desc', 'Reports that colleagues have shared with you') }
             ]
+        },
+        // ── Industry-specific reports — dynamic ──
+        ..._getIndustryReportGroup(t, getUser()),
+    ].filter(g => {
+        // Permission check
+        if (!hasPermission(g.permission || 'reports.view')) return false
+        // MODULE-001: Module check — hide report groups for disabled modules
+        const user = getUser()
+        const enabledModules = user?.enabled_modules || []
+        if (enabledModules.length > 0 && g.module) {
+            return enabledModules.includes(g.module)
         }
-    ].filter(g => hasPermission(g.permission || 'reports.view'));
+        return true
+    });
 
     const totalReports = reportGroups.reduce((sum, g) => sum + g.reports.length, 0);
 

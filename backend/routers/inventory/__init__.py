@@ -3,9 +3,10 @@ AMAN ERP - Inventory Module (Split Package)
 Originally routers/inventory.py (2,755 lines) → split into sub-modules
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from utils.permissions import require_module
 
-router = APIRouter(prefix="/inventory", tags=["المخزون"])
+router = APIRouter(prefix="/inventory", tags=["المخزون"], dependencies=[Depends(require_module("stock"))])
 
 # Import and include all sub-routers
 from .products import products_router

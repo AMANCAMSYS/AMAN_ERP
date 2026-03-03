@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
 import '../../components/ModuleStyles.css'
 import { formatNumber } from '../../utils/format'
+import { getIndustryFeature } from '../../hooks/useIndustryType'
 
 function SalesHome() {
     const { t, i18n } = useTranslation()
@@ -15,6 +16,7 @@ function SalesHome() {
     const currency = getCurrency()
     const { currentBranch } = useBranch()
 
+    const showContracts = getIndustryFeature('sales.contracts')
     useEffect(() => {
         const fetchStats = async () => {
             if (!hasPermission('sales.reports')) {
@@ -124,11 +126,13 @@ function SalesHome() {
                             {t('sales.menu.vouchers')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
-                        <div className="link-item" onClick={() => navigate('/sales/contracts')}>
-                            <span className="link-icon">📄</span>
-                            {t('sales.menu.contracts')}
-                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                        </div>
+                        {showContracts && (
+                            <div className="link-item" onClick={() => navigate('/sales/contracts')}>
+                                <span className="link-icon">📄</span>
+                                {t('sales.menu.contracts')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                         <div className="link-item" onClick={() => navigate('/sales/credit-notes')}>
                             <span className="link-icon">📋</span>
                             {t('sales.menu.credit_notes')}

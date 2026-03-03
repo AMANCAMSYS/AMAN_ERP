@@ -7,10 +7,10 @@ from pydantic import BaseModel
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import get_base_currency
 
-router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"])
+router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"], dependencies=[Depends(require_module("treasury"))])
 
 
 # ─── Schemas ───

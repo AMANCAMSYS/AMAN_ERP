@@ -2,21 +2,22 @@
 AMAN ERP - Companies Router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import os
 import shutil
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from database import (
     get_system_db, 
     generate_company_id,
     create_company_database,
     create_company_tables,
-    initialize_company_default_data
+    initialize_company_default_data,
+    get_db_connection
 )
 from schemas import CompanyCreateRequest, CompanyCreateResponse, CompanyListResponse, CompanyListItem, CompanyUpdateRequest
 from utils.permissions import require_permission
@@ -109,19 +110,21 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
             
             # Fetch template modules
             enabled_modules = None
+            industry_key = 'general'  # default
             if request_body.template_id:
                 tpl = db.execute(
-                    text("SELECT enabled_modules FROM industry_templates WHERE id = :id"),
+                    text("SELECT enabled_modules, key FROM industry_templates WHERE id = :id"),
                     {"id": request_body.template_id}
                 ).fetchone()
                 if tpl:
                     enabled_modules = tpl[0]
+                    industry_key = tpl[1]
             
-            # If no template_id or template not found, default to 'general'
             if not enabled_modules:
                 tpl = db.execute(text("SELECT enabled_modules FROM industry_templates WHERE key = 'general'")).fetchone()
                 if tpl:
                     enabled_modules = tpl[0]
+                industry_key = 'general'
 
             import json
             enabled_modules_json = json.dumps(enabled_modules) if enabled_modules else None
@@ -155,6 +158,23 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
 
             
             db.commit()
+            
+            # ── زرع شجرة الحسابات المتخصصة حسب نوع النشاط ──
+            try:
+                from services.industry_coa_templates import seed_industry_coa
+                company_db = get_db_connection(company_id)
+                try:
+                    coa_result = seed_industry_coa(company_db, industry_key, replace_existing=False)
+                    logger.info(f"📊 COA seeded for '{industry_key}': core={coa_result['core']}, industry={coa_result['industry']}")
+                    # NOTE: industry_type is intentionally NOT saved here.
+                    # It will be set when the user completes the IndustrySetup wizard
+                    # (via POST /settings/bulk), ensuring new companies always go through the wizard.
+                    company_db.commit()
+                finally:
+                    company_db.close()
+            except Exception as coa_err:
+                logger.warning(f"⚠️ COA seeding during company creation skipped: {coa_err}")
+            
             logger.info(f"✅ Created company: {request_body.company_name} (ID: {company_id})")
             
             return CompanyCreateResponse(
@@ -243,6 +263,108 @@ def list_companies(
 
 from routers.auth import get_current_user
 from schemas import UserResponse
+
+
+# ===================== Public Templates (MUST be before /{company_id}) =====================
+
+@router.get("/public/templates")
+def get_industry_templates():
+    """عرض قوالب الأنشطة المتاحة للجمهور"""
+    from database import get_system_db
+    db = get_system_db()
+    try:
+        result = db.execute(text(
+            "SELECT id, key, name, name_ar, icon, description, description_ar, enabled_modules "
+            "FROM industry_templates ORDER BY id"
+        )).fetchall()
+        return [
+            {
+                "id": row[0],
+                "key": row[1],
+                "name": row[2],
+                "name_ar": row[3],
+                "icon": row[4],
+                "description": row[5],
+                "description_ar": row[6],
+                "enabled_modules": row[7] if row[7] else []
+            }
+            for row in result
+        ]
+    except Exception as e:
+        logger.error(f"Error in get_industry_templates: {str(e)}")
+        return []
+    finally:
+        db.close()
+
+
+# ===================== Enabled Modules Management (MUST be before /{company_id}) =====================
+
+@router.get("/modules")
+def get_enabled_modules(current_user=Depends(get_current_user)):
+    """الحصول على الوحدات المفعّلة"""
+    # Read from system_companies (source of truth, same as login)
+    db = get_system_db()
+    try:
+        row = db.execute(text(
+            "SELECT enabled_modules FROM system_companies WHERE id = :cid"
+        ), {"cid": current_user.company_id}).fetchone()
+        if row and row[0]:
+            import json
+            modules = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+            return modules
+        return []
+    except Exception as e:
+        logger.error(f"Error getting modules: {e}")
+        return []
+    finally:
+        db.close()
+
+
+@router.put("/modules")
+def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_current_user)):
+    """تحديث الوحدات المفعّلة — يقبل list أو dict"""
+    import json
+    
+    modules_json = json.dumps(modules)
+    
+    # 1. تحديث في system_companies (المصدر الرئيسي — يقرأها Login و GET /modules)
+    sys_db = get_system_db()
+    try:
+        sys_db.execute(text(
+            "UPDATE system_companies SET enabled_modules = CAST(:m AS jsonb) WHERE id = :cid"
+        ), {"m": modules_json, "cid": current_user.company_id})
+        sys_db.commit()
+    except Exception as e:
+        sys_db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        sys_db.close()
+    
+    # 2. نسخة احتياطية في company_settings (key-value)
+    db = get_db_connection(current_user.company_id)
+    try:
+        exists = db.execute(text(
+            "SELECT 1 FROM company_settings WHERE setting_key = 'enabled_modules'"
+        )).fetchone()
+        if exists:
+            db.execute(text(
+                "UPDATE company_settings SET setting_value = :m WHERE setting_key = 'enabled_modules'"
+            ), {"m": modules_json})
+        else:
+            db.execute(text(
+                "INSERT INTO company_settings (setting_key, setting_value) VALUES ('enabled_modules', :m)"
+            ), {"m": modules_json})
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to update company_settings.enabled_modules: {e}")
+        db.rollback()
+    finally:
+        db.close()
+    
+    return {"message": "تم تحديث الوحدات بنجاح", "modules": modules}
+
+
+# ===================== Company Details (catch-all path param) =====================
 
 @router.get("/{company_id}")
 def get_company(
@@ -401,73 +523,4 @@ async def upload_company_logo(
     except Exception as e:
         logger.error(f"Error uploading logo: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to upload: {str(e)}")
-
-@router.get("/public/templates")
-def get_industry_templates():
-    """عرض قوالب الأنشطة المتاحة للجمهور"""
-    from database import get_system_db
-    db = get_system_db()
-    try:
-        result = db.execute(text("SELECT id, key, name, name_ar, icon, description, description_ar FROM industry_templates ORDER BY id")).fetchall()
-        return [
-            {
-                "id": row[0],
-                "key": row[1],
-                "name": row[2],
-                "name_ar": row[3],
-                "icon": row[4],
-                "description": row[5],
-                "description_ar": row[6]
-            }
-            for row in result
-        ]
-
-    except Exception as e:
-        logger.error(f"Error in get_industry_templates: {str(e)}")
-        return []
-    finally:
-        db.close()
-
-
-# ===================== B2: Enabled Modules Management =====================
-
-@router.get("/modules")
-def get_enabled_modules(current_user=Depends(get_current_user)):
-    """الحصول على الوحدات المفعّلة"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        row = db.execute(text(
-            "SELECT enabled_modules FROM company_settings LIMIT 1"
-        )).fetchone()
-        if row and row[0]:
-            import json
-            return json.loads(row[0]) if isinstance(row[0], str) else row[0]
-        return {
-            "accounting": True, "sales": True, "purchases": True, "inventory": True,
-            "hr": True, "manufacturing": False, "pos": False, "projects": False,
-            "crm": False, "assets": False
-        }
-    except Exception as e:
-        logger.error(f"Error getting modules: {e}")
-        return {}
-    finally:
-        db.close()
-
-
-@router.put("/modules")
-def update_enabled_modules(modules: dict, current_user=Depends(get_current_user)):
-    """تحديث الوحدات المفعّلة"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        import json
-        db.execute(text(
-            "UPDATE company_settings SET enabled_modules = :m::jsonb"
-        ), {"m": json.dumps(modules)})
-        db.commit()
-        return {"message": "تم تحديث الوحدات بنجاح", "modules": modules}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 

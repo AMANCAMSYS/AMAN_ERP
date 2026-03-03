@@ -162,6 +162,9 @@ export default function ProjectList() {
                         <BarChart3 size={18} style={{ color: 'var(--success)' }} /> {t('common.reports', 'التقارير')}
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
+                        <Link to="/projects/kpi" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px', background: 'linear-gradient(135deg, rgba(79,70,229,0.06), rgba(79,70,229,0.12))', borderColor: '#4f46e5', color: '#4f46e5', fontWeight: 600 }}>
+                            📈 {t('kpi.projects_dashboard', 'مؤشرات أداء المشاريع')}
+                        </Link>
                         <Link to="/projects/reports/financials" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                             <DollarSign size={14} /> {t('projects.reports.financials', 'التقرير المالي للمشاريع')}
                         </Link>

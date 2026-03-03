@@ -13,13 +13,13 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from utils.audit import log_activity
 from utils.accounting import update_account_balance
 from fastapi import Request
 from schemas.treasury import TreasuryAccountCreate, TreasuryAccountResponse, TransactionCreate, TransactionResponse
 
-router = APIRouter(prefix="/treasury", tags=["الخزينة والمصروفات"])
+router = APIRouter(prefix="/treasury", tags=["الخزينة والمصروفات"], dependencies=[Depends(require_module("treasury"))])
 logger = logging.getLogger(__name__)
 
 # --- Endpoints ---

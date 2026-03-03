@@ -8,14 +8,14 @@ from datetime import date, datetime
 import logging
 from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
 from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse
-from utils.permissions import require_permission, validate_branch_access, check_permission
+from utils.permissions import require_permission, validate_branch_access, check_permission, require_module
 from utils.accounting import get_mapped_account_id, get_base_currency
-from utils.audit import log_activity
+from utils.fiscal_lock import check_fiscal_period_open
 from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/hr", tags=["HR & Employees"])
+router = APIRouter(prefix="/hr", tags=["HR & Employees"], dependencies=[Depends(require_module("hr"))])
 
 # --- Helpers ---
 
@@ -886,6 +886,9 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         if not period or period.status != 'draft':
             raise HTTPException(status_code=400, detail="Invalid period status")
 
+        # FISCAL-LOCK: Prevent posting payroll into a closed accounting period
+        check_fiscal_period_open(conn, period.end_date)
+
         base_currency = get_base_currency(conn)
 
         # 2. Calculate Totals in BASE currency (convert foreign currency amounts)
@@ -1106,6 +1109,33 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             })
         except Exception:
             pass  # Non-blocking
+
+        # ACCT-FIX: Post-insert balance verification — prevent unbalanced JE from reaching DB
+        # This catches missing account mappings that silently skip Credit lines.
+        balance_check = conn.execute(text("""
+            SELECT
+                COALESCE(SUM(debit), 0)  AS total_debit,
+                COALESCE(SUM(credit), 0) AS total_credit
+            FROM journal_lines
+            WHERE journal_entry_id = :je_id
+        """), {"je_id": je_id}).fetchone()
+        if balance_check:
+            diff = abs(float(balance_check.total_debit) - float(balance_check.total_credit))
+            if diff > 0.01:
+                trans.rollback()
+                logger.error(
+                    f"Payroll JE {je_id} is unbalanced — "
+                    f"Dr={balance_check.total_debit}, Cr={balance_check.total_credit}, diff={diff:.4f}. "
+                    "Check account mappings for GOSI, loans, violations, bank."
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "فشل ترحيل الرواتب: القيد المحاسبي غير متوازن. "
+                        f"المدين={balance_check.total_debit:.2f}, الدائن={balance_check.total_credit:.2f}. "
+                        "يرجى التحقق من إعدادات ربط الحسابات (الرواتب، التأمينات، السلف، البنك)."
+                    )
+                )
 
         trans.commit()
         return {"message": "Payroll posted successfully", "journal_entry": je_num}

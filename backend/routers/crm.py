@@ -14,10 +14,10 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from utils.accounting import generate_sequential_number
 
-router = APIRouter(prefix="/crm", tags=["إدارة العلاقات CRM"])
+router = APIRouter(prefix="/crm", tags=["إدارة العلاقات CRM"], dependencies=[Depends(require_module("crm"))])
 logger = logging.getLogger(__name__)
 
 

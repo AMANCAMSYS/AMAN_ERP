@@ -12,9 +12,9 @@ import logging
 
 from database import get_db_connection, get_system_db, engine
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 
-router = APIRouter(prefix="/audit", tags=["سجلات المراقبة"])
+router = APIRouter(prefix="/audit", tags=["سجلات المراقبة"], dependencies=[Depends(require_module("audit"))])
 logger = logging.getLogger(__name__)
 
 

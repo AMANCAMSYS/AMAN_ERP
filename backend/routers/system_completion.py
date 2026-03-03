@@ -8,6 +8,7 @@ from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
 from pydantic import BaseModel
+from decimal import Decimal, ROUND_HALF_UP
 from decimal import Decimal
 import io, csv, json, logging, subprocess, os
 
@@ -381,8 +382,8 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
     user_id = _u(current_user, "user_id")
     db = get_db_connection(company_id)
     try:
-        # Determine rate
-        rate = 2.5775 if body.use_gregorian_rate else body.zakat_rate
+        # Determine rate (Decimal for legal tax precision)
+        rate = Decimal('2.57764') if body.use_gregorian_rate else Decimal(str(body.zakat_rate))
 
         if body.method == "net_assets":
             # ── Detailed Zakat Base Calculation (GAZT Method) ──
@@ -417,10 +418,10 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 SELECT COALESCE(SUM(CASE WHEN a.account_type IN ('expense', 'cogs') 
                     THEN a.balance ELSE 0 END), 0) FROM accounts a
             """)).scalar() or 0
-            net_profit = float(revenue) - float(expenses)
+            net_profit = Decimal(str(revenue)) - Decimal(str(expenses))
 
             # ADDITIONS to Zakat Base
-            additions = float(equity) + float(lt_liabilities) + float(provisions)
+            additions = Decimal(str(equity)) + Decimal(str(lt_liabilities)) + Decimal(str(provisions))
             if net_profit > 0:
                 additions += net_profit
 
@@ -442,7 +443,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                      OR a.account_code LIKE '13%')
             """)).scalar() or 0
 
-            deductions = float(fixed_assets) + float(lt_investments)
+            deductions = Decimal(str(fixed_assets)) + Decimal(str(lt_investments))
 
             zakat_base = additions - deductions
 
@@ -461,29 +462,29 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 AND a.account_code LIKE '21%'
             """)).scalar() or 0
 
-            simplified_base = float(ca) - float(cl)
+            simplified_base = Decimal(str(ca)) - Decimal(str(cl))
 
-            zakat_amount = round(max(0, zakat_base * rate / 100), 2)
+            zakat_amount = max(Decimal('0'), (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP))
 
             details = {
                 "method_name_ar": "طريقة صافي الأصول (الوعاء الزكوي)",
                 "method_name_en": "Net Assets Method (Zakat Base)",
                 "additions": {
-                    "equity": round(float(equity), 2),
-                    "long_term_liabilities": round(float(lt_liabilities), 2),
-                    "provisions": round(float(provisions), 2),
-                    "net_profit": round(net_profit, 2) if net_profit > 0 else 0,
-                    "total_additions": round(additions, 2)
+                    "equity": float(Decimal(str(equity)).quantize(Decimal('0.01'))),
+                    "long_term_liabilities": float(Decimal(str(lt_liabilities)).quantize(Decimal('0.01'))),
+                    "provisions": float(Decimal(str(provisions)).quantize(Decimal('0.01'))),
+                    "net_profit": float(net_profit.quantize(Decimal('0.01'))) if net_profit > 0 else 0,
+                    "total_additions": float(additions.quantize(Decimal('0.01')))
                 },
                 "deductions": {
-                    "fixed_assets": round(float(fixed_assets), 2),
-                    "long_term_investments": round(float(lt_investments), 2),
-                    "total_deductions": round(deductions, 2)
+                    "fixed_assets": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01'))),
+                    "long_term_investments": float(Decimal(str(lt_investments)).quantize(Decimal('0.01'))),
+                    "total_deductions": float(deductions.quantize(Decimal('0.01')))
                 },
-                "zakat_base": round(zakat_base, 2),
-                "simplified_working_capital": round(simplified_base, 2),
+                "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
+                "simplified_working_capital": float(simplified_base.quantize(Decimal('0.01'))),
                 "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
-                "applied_rate": rate
+                "applied_rate": float(rate)
             }
 
         else:  # adjusted_profit
@@ -499,7 +500,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 FROM accounts a WHERE a.account_type IN ('expense', 'cogs', 'other_expense')
             """)).scalar() or 0
 
-            net_profit = float(revenue) - float(expenses)
+            net_profit = Decimal(str(revenue)) - Decimal(str(expenses))
 
             # Add-backs: Non-deductible items
             depreciation = db.execute(text("""
@@ -522,28 +523,28 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                      OR a.name_en LIKE '%penalty%' OR a.name_en LIKE '%fine%')
             """)).scalar() or 0
 
-            total_add_backs = float(depreciation) + float(provision_expense) + float(penalties)
+            total_add_backs = Decimal(str(depreciation)) + Decimal(str(provision_expense)) + Decimal(str(penalties))
             adjusted_profit = net_profit + total_add_backs
 
-            zakat_base = max(0, adjusted_profit)
-            zakat_amount = round(zakat_base * rate / 100, 2)
+            zakat_base = max(Decimal('0'), adjusted_profit)
+            zakat_amount = (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP)
 
             details = {
                 "method_name_ar": "طريقة الربح المُعدَّل",
                 "method_name_en": "Adjusted Profit Method",
-                "revenue": round(float(revenue), 2),
-                "expenses": round(float(expenses), 2),
-                "net_profit": round(net_profit, 2),
+                "revenue": float(Decimal(str(revenue)).quantize(Decimal('0.01'))),
+                "expenses": float(Decimal(str(expenses)).quantize(Decimal('0.01'))),
+                "net_profit": float(net_profit.quantize(Decimal('0.01'))),
                 "add_backs": {
-                    "depreciation": round(float(depreciation), 2),
-                    "provisions": round(float(provision_expense), 2),
-                    "penalties_fines": round(float(penalties), 2),
-                    "total_add_backs": round(total_add_backs, 2)
+                    "depreciation": float(Decimal(str(depreciation)).quantize(Decimal('0.01'))),
+                    "provisions": float(Decimal(str(provision_expense)).quantize(Decimal('0.01'))),
+                    "penalties_fines": float(Decimal(str(penalties)).quantize(Decimal('0.01'))),
+                    "total_add_backs": float(total_add_backs.quantize(Decimal('0.01')))
                 },
-                "adjusted_profit": round(adjusted_profit, 2),
-                "zakat_base": round(zakat_base, 2),
+                "adjusted_profit": float(adjusted_profit.quantize(Decimal('0.01'))),
+                "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
                 "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
-                "applied_rate": rate
+                "applied_rate": float(rate)
             }
 
         # Save calculation

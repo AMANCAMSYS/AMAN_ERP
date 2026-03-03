@@ -79,6 +79,7 @@ class UserResponse(BaseModel):
     permissions: List[str] = []
     allowed_branches: List[int] = []
     enabled_modules: List[str] = []
+    industry_type: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

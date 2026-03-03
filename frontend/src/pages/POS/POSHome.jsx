@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
 import { Layout, Store, Calculator, Info, ArrowLeft, Play, Wallet } from 'lucide-react';
+import { getIndustryType, getIndustryFeature } from '../../hooks/useIndustryType';
 
 const POSHome = () => {
     const { t, i18n } = useTranslation();
@@ -19,6 +20,11 @@ const POSHome = () => {
     const [treasuryAccounts, setTreasuryAccounts] = useState([]);
     const [selectedTreasury, setSelectedTreasury] = useState('');
     const [notes, setNotes] = useState('');
+
+    const isRestaurant        = getIndustryFeature('pos.table_management');
+    const showCustomerDisplay = getIndustryFeature('pos.customer_display');
+    const showLoyalty         = getIndustryFeature('pos.loyalty');
+    const showPromotions      = getIndustryFeature('pos.promotions');
 
     useEffect(() => {
         const init = async () => {
@@ -228,26 +234,34 @@ const POSHome = () => {
                 <div className="card section-card">
                     <h3 className="section-title">{t('pos.home.pos_features')}</h3>
                     <div className="links-list">
-                        <div className="link-item" onClick={() => navigate('/pos/promotions')}>
-                            <span className="link-icon">🎁</span>
-                            {t('pos.home.promotions_discounts')}
-                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
-                        </div>
-                        <div className="link-item" onClick={() => navigate('/pos/loyalty')}>
-                            <span className="link-icon">⭐</span>
-                            {t('pos.home.loyalty_programs')}
-                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
-                        </div>
-                        <div className="link-item" onClick={() => navigate('/pos/tables')}>
-                            <span className="link-icon">🪑</span>
-                            {t('pos.home.table_management')}
-                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
-                        </div>
-                        <div className="link-item" onClick={() => navigate('/pos/kitchen')}>
-                            <span className="link-icon">👨‍🍳</span>
-                            {t('pos.home.kitchen_display')}
-                            <span className="link-arrow">{isRTL ? '←' : '→'}</span>
-                        </div>
+                        {showPromotions && (
+                            <div className="link-item" onClick={() => navigate('/pos/promotions')}>
+                                <span className="link-icon">🎁</span>
+                                {t('pos.home.promotions_discounts')}
+                                <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        {showLoyalty && (
+                            <div className="link-item" onClick={() => navigate('/pos/loyalty')}>
+                                <span className="link-icon">⭐</span>
+                                {t('pos.home.loyalty_programs')}
+                                <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        {isRestaurant && (
+                            <div className="link-item" onClick={() => navigate('/pos/tables')}>
+                                <span className="link-icon">🪑</span>
+                                {t('pos.home.table_management')}
+                                <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        {isRestaurant && (
+                            <div className="link-item" onClick={() => navigate('/pos/kitchen')}>
+                                <span className="link-icon">👨‍🍳</span>
+                                {t('pos.home.kitchen_display')}
+                                <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                            </div>
+                        )}
                         <div className="link-item" onClick={() => navigate('/pos/offline')}>
                             <span className="link-icon">📴</span>
                             {t('pos.home.offline_mode', 'وضع عدم الاتصال')}
@@ -258,9 +272,16 @@ const POSHome = () => {
                             {t('pos.home.thermal_print', 'إعدادات الطباعة الحرارية')}
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
-                        <div className="link-item" onClick={() => navigate('/pos/customer-display')}>
-                            <span className="link-icon">🖥️</span>
-                            {t('pos.home.customer_display', 'شاشة العميل')}
+                        {showCustomerDisplay && (
+                            <div className="link-item" onClick={() => navigate('/pos/customer-display')}>
+                                <span className="link-icon">🖥️</span>
+                                {t('pos.home.customer_display', 'شاشة العميل')}
+                                <span className="link-arrow">{isRTL ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        <div className="link-item" onClick={() => navigate('/pos/kpi')} style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.06), rgba(13,148,136,0.12))', borderRight: isRTL ? '3px solid #0d9488' : 'none', borderLeft: !isRTL ? '3px solid #0d9488' : 'none' }}>
+                            <span className="link-icon">📈</span>
+                            <span style={{ fontWeight: 600, color: '#0d9488' }}>{isRTL ? 'مؤشرات أداء نقاط البيع' : 'POS KPI Dashboard'}</span>
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                     </div>

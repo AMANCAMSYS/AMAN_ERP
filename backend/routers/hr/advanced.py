@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from utils.exports import generate_excel, generate_pdf, create_export_response
 
 from schemas.hr_advanced import (
@@ -27,7 +27,7 @@ from schemas.hr_advanced import (
     CustodyCreate, CustodyUpdate, CustodyResponse,
 )
 
-router = APIRouter(prefix="/hr-advanced", tags=["HR Advanced - الموارد البشرية المتقدمة"])
+router = APIRouter(prefix="/hr-advanced", tags=["HR Advanced - الموارد البشرية المتقدمة"], dependencies=[Depends(require_module("hr"))])
 
 
 # =============================================

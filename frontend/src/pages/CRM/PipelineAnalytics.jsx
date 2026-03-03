@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
+import { ModuleKPISection } from '../../components/kpi'
 
 function PipelineAnalytics() {
     const { t } = useTranslation()
@@ -53,6 +54,8 @@ function PipelineAnalytics() {
                     <p className="workspace-subtitle">{t('crm.analytics_desc', 'تحليل الأداء ومعدلات التحويل والعائد على الاستثمار')}</p>
                 </div>
             </div>
+
+            <ModuleKPISection roleKey="crm" color="#e11d48" defaultOpen={false} />
 
             <div className="tabs" style={{ marginBottom: 16 }}>
                 <button className={`tab ${tab === 'pipeline' ? 'active' : ''}`} onClick={() => setTab('pipeline')}>

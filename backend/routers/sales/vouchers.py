@@ -305,12 +305,10 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
             """), {"amt": data.amount, "cid": data.customer_id})
 
         # 3. Create GL Entry
-        def get_acc_id(code):
-            return db.execute(text("SELECT id FROM accounts WHERE account_code = :code"), {"code": code}).scalar()
-
-        acc_ar = get_acc_id("AR")   # Accounts Receivable
-        acc_cash = get_acc_id("BOX")  # Cash
-        acc_bank = get_acc_id("BNK")  # Bank
+        from utils.accounting import get_mapped_account_id, validate_je_lines
+        acc_ar = get_mapped_account_id(db, "acc_map_ar")
+        acc_cash = get_mapped_account_id(db, "acc_map_cash")
+        acc_bank = get_mapped_account_id(db, "acc_map_bank") or get_mapped_account_id(db, "acc_map_cash")
 
         je_num = f"JE-PAY-{voucher_num}"
         je_id = db.execute(text("""
@@ -340,35 +338,37 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         elif data.payment_method in ["bank", "check"]:
             je_lines.append({"account_id": acc_bank, "debit": 0, "credit": amount_base, "description": f"Bank Payment - {voucher_num}"})
 
-        for line in je_lines:
-            if line["account_id"]:
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                """), {
-                    "jid": je_id,
-                    "aid": line["account_id"],
-                    "deb": line["debit"],
-                    "cred": line["credit"],
-                    "desc": line["description"],
-                    "amt_curr": data.amount,
-                    "curr": currency
-                })
+        # Validate before insert
+        valid_lines = validate_je_lines(je_lines, source=f"REFUND-{voucher_num}")
 
-                # Update account balance (base + currency)
-                from utils.accounting import update_account_balance as uab_payment
-                uab_payment(
-                    db,
-                    account_id=line["account_id"],
-                    debit_base=line["debit"],
-                    credit_base=line["credit"],
-                    debit_curr=data.amount if line["debit"] > 0 else 0,
-                    credit_curr=data.amount if line["credit"] > 0 else 0,
-                    currency=currency
+        for line in valid_lines:
+            db.execute(text("""
+                INSERT INTO journal_lines (
+                    journal_entry_id, account_id, debit, credit, description,
+                    amount_currency, currency
                 )
+                VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
+            """), {
+                "jid": je_id,
+                "aid": line["account_id"],
+                "deb": line["debit"],
+                "cred": line["credit"],
+                "desc": line["description"],
+                "amt_curr": data.amount,
+                "curr": currency
+            })
+
+            # Update account balance (base + currency)
+            from utils.accounting import update_account_balance as uab_payment
+            uab_payment(
+                db,
+                account_id=line["account_id"],
+                debit_base=line["debit"],
+                credit_base=line["credit"],
+                debit_curr=data.amount if line["debit"] > 0 else 0,
+                credit_curr=data.amount if line["credit"] > 0 else 0,
+                currency=currency
+            )
 
         db.commit()
 

@@ -13,12 +13,12 @@ from datetime import date, datetime, timezone
 from pydantic import BaseModel, Field
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.audit import log_activity
 import logging
 import json
 
-router = APIRouter(prefix="/tax-compliance", tags=["الامتثال الضريبي"])
+router = APIRouter(prefix="/tax-compliance", tags=["الامتثال الضريبي"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════════

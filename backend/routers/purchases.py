@@ -10,11 +10,12 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from fastapi import Request
 from utils.audit import log_activity
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from utils.accounting import get_mapped_account_id, generate_sequential_number, update_account_balance, get_base_currency
+from utils.fiscal_lock import check_fiscal_period_open
 from schemas.purchases import PurchaseLineItem, PurchaseCreate, SupplierGroupCreate, POCreate, ReceiveItem, POReceiveRequest, SupplierCreate, PaymentAllocationSchema, SupplierPaymentCreate
 
-router = APIRouter(prefix="/buying", tags=["المشتريات"])
+router = APIRouter(prefix="/buying", tags=["المشتريات"], dependencies=[Depends(require_module("buying"))])
 logger = logging.getLogger(__name__)
 
 
@@ -1139,7 +1140,10 @@ async def create_purchase_invoice(
         # 1. Generate Sequential Invoice Number
         from utils.accounting import generate_sequential_number
         inv_num = generate_sequential_number(db, f"PINV-{datetime.now().year}", "invoices", "invoice_number")
-        
+
+        # FISCAL-LOCK: Reject if accounting period is closed
+        check_fiscal_period_open(db, invoice.invoice_date)
+
         # 2. Preparation (Warehouse)
         wh_id = invoice.warehouse_id
         if not wh_id:
@@ -1503,8 +1507,9 @@ async def create_purchase_invoice(
         
         # Insert Journal Entry
         if je_lines:
-            # Filter out None accounts
-            valid_lines = [l for l in je_lines if l["account_id"] is not None]
+            # Validate JE lines (balancing, None accounts, negatives)
+            from utils.accounting import validate_je_lines
+            valid_lines = validate_je_lines(je_lines, source=f"PURCH-{inv_num}")
             
             if valid_lines:
                 import uuid
@@ -1752,8 +1757,9 @@ def create_purchase_return(
             branch_id = db.execute(text("SELECT branch_id FROM invoices WHERE id = :id"), {"id": invoice.original_invoice_id}).scalar()
 
         for item in invoice.items:
-            current_stock = db.execute(text("SELECT quantity FROM inventory WHERE product_id = :pid AND warehouse_id = :wh"), 
-                                     {"pid": item.product_id, "wh": wh_id}).scalar() or 0
+            current_stock = db.execute(text(
+                "SELECT quantity FROM inventory WHERE product_id = :pid AND warehouse_id = :wh FOR UPDATE"
+            ), {"pid": item.product_id, "wh": wh_id}).scalar() or 0
             # For returns, we check if we have the items? 
             # Actually, standard logic: You can't return what you don't have? 
             # Yes, we check stock availability to remove it.
@@ -1859,6 +1865,13 @@ def create_purchase_return(
         vat_acc = get_mapped_account_id(db, "acc_map_vat_in")
 
         if inventory_acc and ap_acc:
+            # Validate rounding: ensure debit (gl_total) matches credits (gl_subtotal + gl_tax)
+            credit_sum = gl_subtotal + (gl_tax if gl_tax > 0 and vat_acc else 0)
+            rounding_diff = abs(gl_total - credit_sum)
+            if rounding_diff > 0 and rounding_diff <= 0.05:
+                # Fix small rounding difference by adjusting inventory credit
+                gl_subtotal = gl_total - (gl_tax if gl_tax > 0 and vat_acc else 0)
+
             entry_id = db.execute(text("""
                 INSERT INTO journal_entries (
                     entry_date, reference, description, status, created_by, branch_id,

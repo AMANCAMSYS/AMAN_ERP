@@ -26,6 +26,17 @@ logger = logging.getLogger(__name__)
 AVAILABLE_PERMISSIONS = [
     # ═══════════════════════ Dashboard ═══════════════════════
     {"key": "dashboard.view", "section": "dashboard", "label_ar": "عرض لوحة المعلومات", "label_en": "View Dashboard"},
+    {"key": "dashboard.executive", "section": "dashboard", "label_ar": "لوحة المدير التنفيذي", "label_en": "Executive Dashboard"},
+    {"key": "dashboard.financial", "section": "dashboard", "label_ar": "لوحة المدير المالي", "label_en": "Financial Dashboard"},
+    {"key": "dashboard.sales", "section": "dashboard", "label_ar": "لوحة المبيعات", "label_en": "Sales Dashboard"},
+    {"key": "dashboard.procurement", "section": "dashboard", "label_ar": "لوحة المشتريات", "label_en": "Procurement Dashboard"},
+    {"key": "dashboard.warehouse", "section": "dashboard", "label_ar": "لوحة المخازن", "label_en": "Warehouse Dashboard"},
+    {"key": "dashboard.hr", "section": "dashboard", "label_ar": "لوحة الموارد البشرية", "label_en": "HR Dashboard"},
+    {"key": "dashboard.manufacturing", "section": "dashboard", "label_ar": "لوحة التصنيع", "label_en": "Manufacturing Dashboard"},
+    {"key": "dashboard.projects", "section": "dashboard", "label_ar": "لوحة المشاريع", "label_en": "Projects Dashboard"},
+    {"key": "dashboard.pos", "section": "dashboard", "label_ar": "لوحة نقاط البيع", "label_en": "POS Dashboard"},
+    {"key": "dashboard.crm", "section": "dashboard", "label_ar": "لوحة إدارة العلاقات", "label_en": "CRM Dashboard"},
+    {"key": "dashboard.industry", "section": "dashboard", "label_ar": "مؤشرات القطاع", "label_en": "Industry KPIs"},
 
     # ═══════════════════════ Sales ═══════════════════════
     {"key": "sales.view", "section": "sales", "label_ar": "عرض المبيعات والفواتير", "label_en": "View Sales & Invoices"},

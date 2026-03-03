@@ -10,10 +10,10 @@ import re
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from schemas.reconciliation import ReconciliationCreate, StatementLineCreate, MatchRequest, UnmatchRequest
 
-router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"])
+router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"], dependencies=[Depends(require_module("accounting"))])
 
 # --- Endpoints ---
 

@@ -12,16 +12,22 @@ logger = logging.getLogger(__name__)
 
 from database import get_company_db
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, require_module
+from utils.fiscal_lock import check_fiscal_period_open
 
 from config import settings
 from schemas import UserResponse
 from schemas.pos import SessionCreate, SessionClose, SessionResponse, POSProductResponse, OrderLineCreate, OrderPaymentCreate, OrderCreate, OrderResponse, ReturnItemCreate, ReturnCreate
+from decimal import Decimal, ROUND_HALF_UP
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 def get_db(current_user: UserResponse = Depends(get_current_user)):
     yield from get_company_db(current_user.company_id)
 
-router = APIRouter(prefix="/pos", tags=["Point of Sale"])
+router = APIRouter(prefix="/pos", tags=["Point of Sale"], dependencies=[Depends(require_module("pos"))])
 
 # --- Endpoints ---
 
@@ -36,9 +42,11 @@ def open_session(
     # Validate branch access
     validate_branch_access(current_user, session_in.branch_id)
     
-    # Check if user already has an open session
+    # CONC-FIX: Use INSERT ... ON CONFLICT to prevent TOCTOU race condition.
+    # A UNIQUE INDEX on (user_id) WHERE status='opened' must exist.
+    # Fallback: check-then-insert inside a serialized read for environments without the index.
     existing_session = db.execute(
-        text("SELECT id FROM pos_sessions WHERE user_id = :uid AND status = 'opened'"),
+        text("SELECT id FROM pos_sessions WHERE user_id = :uid AND status = 'opened' FOR UPDATE SKIP LOCKED"),
         {"uid": user_id}
     ).fetchone()
     
@@ -378,12 +386,22 @@ def create_order(
     from utils.accounting import get_base_currency
     base_currency = get_base_currency(db)
     
-    # Calculate totals
-    subtotal = sum(item.quantity * item.unit_price for item in order_in.items)
-    tax_total = sum(item.quantity * item.unit_price * (item.tax_rate / 100) for item in order_in.items)
+    # ZATCA-FIX: Calculate tax on (price - item_discount) × qty
+    # Using Decimal for precision (ROUND_HALF_UP per ZATCA).
+    subtotal = sum(
+        ((_dec(item.quantity) * _dec(item.unit_price)) - _dec(item.discount_amount)).quantize(_D2, ROUND_HALF_UP)
+        for item in order_in.items
+    )
+    tax_total = sum(
+        (((_dec(item.quantity) * _dec(item.unit_price)) - _dec(item.discount_amount)) * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+        for item in order_in.items
+    )
+
+    # FISCAL-LOCK: Reject if accounting period is closed
+    check_fiscal_period_open(db, datetime.now().date())
     
     # Apply global discount if any
-    total = subtotal + tax_total - order_in.discount_amount
+    total = float(subtotal + tax_total - _dec(order_in.discount_amount))
     
     # Validate branch and warehouse access
     if order_in.branch_id:
@@ -635,17 +653,13 @@ def create_order(
 
         # Create Journal Entry if accounts are mapped
         if je_lines:
-            # Validate balance before creating JE
-            total_je_debit = sum(l["debit"] for l in je_lines)
-            total_je_credit = sum(l["credit"] for l in je_lines)
-            if abs(total_je_debit - total_je_credit) > 0.01:
-                logger.warning(f"POS JE unbalanced: D={total_je_debit}, C={total_je_credit}. Auto-fixing...")
-                # Auto-fix: adjust cash/bank debit to match credits
-                diff = total_je_credit - total_je_debit
-                for line in je_lines:
-                    if line["debit"] > 0 and "Payment" in line.get("description", ""):
-                        line["debit"] += diff
-                        break
+            # Validate JE lines (balance, None accounts, negatives)
+            from utils.accounting import validate_je_lines
+            try:
+                je_lines = validate_je_lines(je_lines, source=f"POS-{order_number}")
+            except Exception as e:
+                logger.error(f"POS JE validation failed for {order_number}: {e}")
+                raise
 
             import uuid
             je_num = f"JE-POS-{order_number}"

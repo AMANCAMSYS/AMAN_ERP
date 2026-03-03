@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from database import get_db_connection
 from utils.accounting import update_account_balance, get_base_currency
+from utils.fiscal_lock import check_fiscal_period_open
 from utils.exports import generate_excel, generate_pdf, create_export_response
 from utils.audit import log_activity
 from schemas import UserResponse
@@ -22,7 +23,8 @@ from schemas.manufacturing_advanced import (
 
 router = APIRouter(
     prefix="/manufacturing",
-    tags=["Manufacturing (Phase 5)"]
+    tags=["Manufacturing (Phase 5)"],
+    dependencies=[Depends(require_module("manufacturing"))]
 )
 
 # ==========================================

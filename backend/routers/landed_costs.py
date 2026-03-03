@@ -12,14 +12,14 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     update_account_balance, get_base_currency
 )
 
-router = APIRouter(prefix="/purchases/landed-costs", tags=["التكاليف المُضافة"])
+router = APIRouter(prefix="/purchases/landed-costs", tags=["التكاليف المُضافة"], dependencies=[Depends(require_module("landed_costs"))])
 logger = logging.getLogger(__name__)
 
 

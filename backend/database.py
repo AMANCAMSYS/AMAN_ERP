@@ -42,21 +42,38 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-_engines = {}
+from collections import OrderedDict
+
+# PERF-FIX: Bounded LRU engine cache — prevents connection exhaustion in
+# environments with many companies (each unbounded engine = up to 30 pool conns).
+# Max 50 engines × 30 conns = 1,500 connections max (vs. unlimited before).
+_MAX_ENGINES = 50
+_engines: OrderedDict = OrderedDict()
 
 def _get_engine(company_id: str):
-    """Internal helper to get or create a cached engine"""
+    """Internal helper to get or create a cached engine (LRU eviction)."""
     if not company_id:
         raise ValueError("company_id is required")
-    if company_id not in _engines:
-        db_url = settings.get_company_database_url(company_id)
-        _engines[company_id] = create_engine(
-            db_url,
-            pool_pre_ping=True,
-            pool_recycle=300,
-            pool_size=10,
-            max_overflow=20
-        )
+    if company_id in _engines:
+        # Move to end to mark as recently used
+        _engines.move_to_end(company_id)
+        return _engines[company_id]
+    # Evict least-recently-used engine when cap is exceeded
+    if len(_engines) >= _MAX_ENGINES:
+        _lru_id, _lru_engine = _engines.popitem(last=False)
+        try:
+            _lru_engine.dispose()
+            logger.info(f"🔌 Engine evicted (LRU): company {_lru_id}")
+        except Exception:
+            pass
+    db_url = settings.get_company_database_url(company_id)
+    _engines[company_id] = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=5,
+        max_overflow=10
+    )
     return _engines[company_id]
 
 def get_db_connection(company_id: str):
@@ -285,6 +302,7 @@ def get_all_table_sql() -> str:
         name_en VARCHAR(255),
         account_type VARCHAR(50) NOT NULL CHECK (account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
         parent_id INTEGER REFERENCES accounts(id),
+        is_header BOOLEAN DEFAULT FALSE,
         balance DECIMAL(18, 4) DEFAULT 0,
         balance_currency DECIMAL(18, 4) DEFAULT 0,
         currency VARCHAR(3) DEFAULT NULL,
@@ -3300,6 +3318,12 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 $$ language 'plpgsql';
             """))
 
+            # ── Migrations for existing databases ──
+            # Add is_header column to accounts if it doesn't exist
+            conn.execute(text("""
+                ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_header BOOLEAN DEFAULT FALSE;
+            """))
+            
             # Apply updated_at trigger to tables that have the column
             trigger_tables = [
                 'company_users', 'accounts', 'customers', 'suppliers', 'products',

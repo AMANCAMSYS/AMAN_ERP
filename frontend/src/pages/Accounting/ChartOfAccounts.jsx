@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { accountingAPI, companiesAPI } from '../../utils/api'
-import { hasPermission } from '../../utils/auth'
+import { hasPermission, getUser } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { Plus, Edit2, Trash2, ChevronRight, ChevronDown, Folder, FileText, AlertCircle, Save, X } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
@@ -9,8 +9,19 @@ import CurrencySelector from '../../components/common/CurrencySelector'
 import { toastEmitter } from '../../utils/toastEmitter'
 import BackButton from '../../components/common/BackButton';
 
+// MODULE-001: Module tag labels for COA display
+const MODULE_TAG_LABELS = {
+    manufacturing: { ar: 'تصنيع', en: 'MFG', color: '#8b5cf6' },
+    stock:         { ar: 'مخزون', en: 'INV', color: '#f59e0b' },
+    pos:           { ar: 'POS',   en: 'POS', color: '#06b6d4' },
+    services:      { ar: 'خدمات', en: 'SVC', color: '#10b981' },
+    hr:            { ar: 'HR',    en: 'HR',  color: '#ec4899' },
+    sales:         { ar: 'مبيعات', en: 'SALES', color: '#3b82f6' },
+    projects:      { ar: 'مشاريع', en: 'PRJ', color: '#f97316' },
+}
+
 function ChartOfAccounts() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const { currentBranch, loading: branchLoading } = useBranch()
     const [accounts, setAccounts] = useState([])
     const [loading, setLoading] = useState(true)
@@ -161,7 +172,7 @@ function ChartOfAccounts() {
 
     const AccountNode = ({ node, level = 0 }) => {
         const [expanded, setExpanded] = useState(true)
-        const hasChildren = node.children && node.children.length > 0
+        const hasChildren = node.is_header || (node.children && node.children.length > 0)
 
         return (
             <div className="account-node-wrapper">
@@ -176,6 +187,21 @@ function ChartOfAccounts() {
                         </span>
                         <span className="node-number">{node.account_number}</span>
                         <span className="node-name">{node.name}</span>
+                        {node.module_tag && MODULE_TAG_LABELS[node.module_tag] && (
+                            <span style={{
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                background: MODULE_TAG_LABELS[node.module_tag].color + '20',
+                                color: MODULE_TAG_LABELS[node.module_tag].color,
+                                border: `1px solid ${MODULE_TAG_LABELS[node.module_tag].color}40`,
+                                marginInlineStart: '6px',
+                                whiteSpace: 'nowrap',
+                            }}>
+                                {isRTL ? MODULE_TAG_LABELS[node.module_tag].ar : MODULE_TAG_LABELS[node.module_tag].en}
+                            </span>
+                        )}
                     </div>
 
                     <div className="row-type">
@@ -226,7 +252,22 @@ function ChartOfAccounts() {
 
     if (loading && accounts.length === 0) return <div className="page-center"><span className="loading"></span></div>
 
-    const accountTree = buildTree(accounts)
+    // MODULE-001: Filter out accounts belonging to disabled modules
+    const user = getUser()
+    const enabledModules = user?.enabled_modules || []
+    const isRTL = i18n?.language === 'ar' || i18n?.dir?.() === 'rtl'
+
+    const filteredAccounts = enabledModules.length > 0
+        ? accounts.filter(acc => {
+            const tag = acc.module_tag
+            // Core accounts (no tag) are always shown
+            if (!tag) return true
+            // Module-specific accounts only shown if module is enabled
+            return enabledModules.includes(tag)
+          })
+        : accounts
+
+    const accountTree = buildTree(filteredAccounts)
 
     return (
         <div className="workspace fade-in">

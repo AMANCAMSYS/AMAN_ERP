@@ -5,6 +5,7 @@ Uses the seeded database (aman_7b4e2b6b) from reset_and_reseed.py.
 import pytest
 import sys
 import os
+import psycopg2
 from datetime import date, timedelta
 from decimal import Decimal
 

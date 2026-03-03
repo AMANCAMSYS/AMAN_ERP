@@ -8,7 +8,7 @@ from datetime import datetime
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_module
 
 
 from services.costing_service import CostingService
@@ -16,7 +16,7 @@ import json
 
 from schemas.costing_policies import CostingPolicySet, CostingPolicyHistoryResponse
 
-router = APIRouter(prefix="/costing-policies", tags=["Costing Policies"])
+router = APIRouter(prefix="/costing-policies", tags=["Costing Policies"], dependencies=[Depends(require_module("costing"))])
 
 @router.get("/current", dependencies=[Depends(require_permission("settings.view"))])
 def get_current_policy(current_user: dict = Depends(get_current_user)):

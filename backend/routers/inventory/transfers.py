@@ -54,10 +54,11 @@ def create_stock_transfer(
         if not product:
             raise HTTPException(status_code=404, detail="المنتج غير موجود")
 
-        # 4. Check available stock in source
+        # 4. Check available stock in source — lock row to prevent phantom stock
         source_inv = db.execute(text("""
             SELECT quantity, average_cost FROM inventory 
             WHERE product_id = :pid AND warehouse_id = :wh
+            FOR UPDATE
         """), {"pid": transfer.product_id, "wh": transfer.source_warehouse_id}).fetchone()
 
         source_qty = float(source_inv.quantity) if source_inv else 0
@@ -69,10 +70,11 @@ def create_stock_transfer(
                 detail=f"الكمية المتوفرة ({source_qty}) أقل من المطلوب ({transfer.quantity})"
             )
 
-        # 5. Get destination current state
+        # 5. Get destination current state — lock row to ensure consistent WAC
         dest_inv = db.execute(text("""
             SELECT quantity, average_cost FROM inventory 
             WHERE product_id = :pid AND warehouse_id = :wh
+            FOR UPDATE
         """), {"pid": transfer.product_id, "wh": transfer.destination_warehouse_id}).fetchone()
 
         dest_qty_before = float(dest_inv.quantity) if dest_inv else 0

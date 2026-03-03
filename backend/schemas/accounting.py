@@ -12,6 +12,7 @@ class AccountCreate(BaseModel):
     account_type: str
     parent_id: Optional[int] = None
     currency: str = ""
+    is_header: bool = False
 
 
 # --- Fiscal Year / Year-End Closing ---
