@@ -21,6 +21,7 @@ cryptography
 pillow
 pydantic-settings
 email-validator
+alembic
 python-json-logger
 gunicorn
 
