@@ -35,7 +35,7 @@ function IndustrySetup() {
     setError('')
     const success = await setIndustryType(selected)
     if (success) {
-      window.location.href = '/dashboard'
+      window.location.href = '/setup/modules'
     } else {
       setError(isRTL ? 'حدث خطأ أثناء الحفظ، حاول مرة أخرى' : 'Failed to save, please try again')
     }
