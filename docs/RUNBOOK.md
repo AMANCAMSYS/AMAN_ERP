@@ -345,6 +345,54 @@ recovery_target_time = '2025-01-15 14:30:00'" > recovery.conf
 
 ## 8. النشر والترقيات
 
+### ⚠️ تحذير مهم جداً — منع فقدان البيانات
+
+```
+❌ لا تستخدم هذه الأوامر أبداً (تحذف قاعدة البيانات كاملاً):
+   docker compose down -v
+   docker volume rm aman_db_data
+   docker system prune -a --volumes
+
+✅ استخدم دائماً:
+   docker compose stop        # يوقف الحاويات ويحفظ البيانات
+   docker compose start       # يعيد تشغيل الخدمات المتوقفة
+   docker compose up -d       # يشغّل الخدمات مع إنشاء أي غير موجودة
+```
+
+### إيقاف السيرفر بأمان (قبل Power Off من DigitalOcean)
+
+```bash
+# الطريقة الآمنة — تأخذ نسخة احتياطية قبل الإيقاف
+bash /opt/aman/safe-stop.sh
+
+# أو يدوياً:
+bash /opt/aman/scripts/backup.sh          # نسخة احتياطية أولاً
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop   # إيقاف آمن
+```
+
+### إعادة تشغيل السيرفر بعد Power On
+
+```bash
+# بعد إعادة التشغيل من DigitalOcean، Docker يبدأ الحاويات تلقائياً
+# إذا لم تبدأ تلقائياً:
+bash /opt/aman/safe-start.sh
+
+# أو يدوياً:
+cd /opt/aman && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+sleep 30
+curl -s http://localhost:8000/health | python3 -m json.tool
+```
+
+### النسخ الاحتياطي اليدوي
+
+```bash
+bash /opt/aman/scripts/backup.sh
+# النسخ تُحفظ في: /opt/aman/backups/
+# النسخ التلقائية: كل يوم الساعة 02:00 صباحاً
+# لعرض آخر النسخ:
+ls -lh /opt/aman/backups/ | tail -10
+```
+
 ### النشر العادي (Zero-downtime)
 
 ```bash
