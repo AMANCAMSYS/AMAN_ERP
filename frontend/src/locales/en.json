@@ -8902,5 +8902,30 @@
     "bucket": "Period",
     "amount": "Amount",
     "no_data": "No outstanding invoices"
+  },
+  "module_setup": {
+    "title": "Customize Modules",
+    "subtitle": "Core modules are always enabled and locked. Toggle variable modules based on your needs.",
+    "step1_label": "Select Industry",
+    "step2_label": "Customize Modules",
+    "back_btn": "Change Business Type",
+    "selected_type": "Selected Business Type",
+    "enabled_of_total": "of {{total}} modules enabled",
+    "fixed_plus_variable": "{{fixed}} fixed + {{variable}} variable",
+    "variable_group_title": "🔄 Industry Modules",
+    "variable_group_desc": "Toggle based on your business needs",
+    "fixed_group_desc": "Always enabled — cannot be disabled",
+    "cat_core": "Core Modules",
+    "cat_finance": "Finance",
+    "cat_sales": "Sales & CRM",
+    "cat_hr": "Human Resources",
+    "cat_variable": "Industry Modules",
+    "fixed_badge": "{{count}} 🔒",
+    "modules_enabled": "{{count}}/{{total}} enabled",
+    "fixed_label": "fixed",
+    "save_error": "Save failed, please try again",
+    "skip_btn": "Skip — Use Defaults",
+    "saving": "⏳ Saving...",
+    "save_btn": "✓ Save Settings ({{count}} modules) & Start"
   }
 }
