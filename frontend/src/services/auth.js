@@ -1,10 +1,13 @@
 import api from './apiClient'
 
 export const authAPI = {
-    login: (username, password) => {
+    login: (username, password, companyCode) => {
         const formData = new URLSearchParams()
         formData.append('username', username)
         formData.append('password', password)
+        if (companyCode) {
+            formData.append('company_code', companyCode.trim())
+        }
         return api.post('/auth/login', formData, {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         })

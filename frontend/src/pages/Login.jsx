@@ -14,7 +14,8 @@ function Login() {
             navigate('/dashboard');
         }
     }, [navigate]);
-    const [formData, setFormData] = useState({ username: '', password: '' })
+
+    const [formData, setFormData] = useState({ company_code: '', username: '', password: '' })
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
@@ -23,13 +24,25 @@ function Login() {
         setLoading(true)
         setError('')
 
+        // مستخدم النظام (admin) لا يحتاج رمز شركة
+        const isSystemAdmin = formData.username.trim() === 'admin'
+
+        if (!isSystemAdmin && !formData.company_code.trim()) {
+            setError(t('auth.company_code_required', 'رمز الشركة مطلوب'))
+            setLoading(false)
+            return
+        }
+
         try {
-            const response = await authAPI.login(formData.username, formData.password)
+            const response = await authAPI.login(
+                formData.username,
+                formData.password,
+                isSystemAdmin ? null : formData.company_code
+            )
             const { access_token, user, company_id } = response.data
 
             setAuth(access_token, user, company_id)
-            
-            // توجيه: إذا لم يُحدد نوع النشاط بعد → صفحة الإعداد
+
             if (user?.role !== 'system_admin' && !hasIndustryTypeSet()) {
                 window.location.href = '/setup/industry'
             } else {
@@ -53,6 +66,30 @@ function Login() {
                 {error && <div className="alert alert-error">{error}</div>}
 
                 <form onSubmit={handleSubmit}>
+                    {/* رمز الشركة — يُخفى تلقائياً إذا كان المستخدم "admin" */}
+                    {formData.username.trim() !== 'admin' && (
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="company_code">
+                                {t('auth.company_code', 'رمز الشركة')}
+                            </label>
+                            <input
+                                type="text"
+                                id="company_code"
+                                name="company_code"
+                                className="form-input"
+                                placeholder={t('auth.company_code_placeholder', 'أدخل رمز الشركة')}
+                                value={formData.company_code}
+                                onChange={(e) => setFormData({ ...formData, company_code: e.target.value })}
+                                autoComplete="organization"
+                                autoCapitalize="none"
+                                spellCheck={false}
+                            />
+                            <small className="text-muted" style={{ fontSize: '12px', color: '#888' }}>
+                                {t('auth.company_code_hint', 'يمكن الحصول عليه من مسؤول الشركة')}
+                            </small>
+                        </div>
+                    )}
+
                     <div className="form-group">
                         <label className="form-label" htmlFor="username">{t('auth.username')}</label>
                         <input

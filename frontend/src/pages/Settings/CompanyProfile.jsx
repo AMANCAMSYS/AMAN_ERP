@@ -4,7 +4,7 @@ import { companiesAPI } from '../../utils/api';
 import { getCompanyId } from '../../utils/auth';
 import {
     Building2, Mail, Phone, MapPin, Hash, Globe,
-    Calendar, ShieldCheck, CreditCard, Camera
+    Calendar, ShieldCheck, CreditCard, Camera, Copy, CheckCheck
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 
@@ -14,6 +14,16 @@ const CompanyProfile = () => {
     const [loading, setLoading] = useState(true);
     const companyId = getCompanyId();
     const isRTL = i18n.dir() === 'rtl';
+    const [copied, setCopied] = useState(false);
+
+    const copyCode = () => {
+        if (company?.id) {
+            navigator.clipboard.writeText(company.id).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            });
+        }
+    };
 
     useEffect(() => {
         const fetchCompany = async () => {
@@ -56,6 +66,29 @@ const CompanyProfile = () => {
                         <p className="workspace-subtitle">{t('settings.company.subtitle')}</p>
                     </div>
                 </div>
+            </div>
+
+            {/* ── رمز الشركة — مطلوب لتسجيل الدخول ── */}
+            <div className="alert d-flex align-items-center justify-content-between gap-3 mb-4"
+                 style={{ background: '#f0f7ff', border: '1.5px solid #3b82f6', borderRadius: '12px', padding: '16px 20px' }}>
+                <div>
+                    <div className="fw-bold mb-1" style={{ fontSize: '13px', color: '#3b82f6' }}>
+                        🔑 {t('auth.company_code', 'رمز الشركة')} <span style={{ fontWeight: 400, color: '#555' }}>— يحتاجه الموظفون لتسجيل الدخول</span>
+                    </div>
+                    <code style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '2px', color: '#1e293b' }}>
+                        {company?.id}
+                    </code>
+                </div>
+                <button
+                    className="btn btn-sm"
+                    style={{ minWidth: '90px', background: copied ? '#10b981' : '#3b82f6', color: '#fff', border: 'none' }}
+                    onClick={copyCode}
+                >
+                    {copied
+                        ? <><CheckCheck size={15} style={{ marginLeft: '4px' }} /> {t('common.copied', 'تم النسخ')}</>
+                        : <><Copy size={15} style={{ marginLeft: '4px' }} /> {t('common.copy', 'نسخ')}</>
+                    }
+                </button>
             </div>
 
             <div className="row g-4">

@@ -2,7 +2,7 @@
 AMAN ERP - Authentication Router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
@@ -297,8 +297,17 @@ def decode_token(token: str) -> dict:
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10/minute")
-async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
-    """تسجيل الدخول - يبحث تلقائياً في جميع الشركات"""
+async def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    company_code: Optional[str] = Form(None),  # رمز الشركة — إلزامي لمستخدمي الشركات
+):
+    """
+    تسجيل الدخول.
+    - مستخدم النظام (admin): username + password فقط.
+    - موظف شركة: company_code + username + password.
+      الـ company_code يُحدد الشركة بشكل حصري — لا يوجد أي بحث في شركات أخرى.
+    """
     # Rate limit check (IP + username)
     check_rate_limit(request, form_data.username)
     
@@ -358,240 +367,225 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
                 user={"username": form_data.username, "role": "system_admin", "company_id": None, "permissions": ["*"]}
             )
         
-        # DB-015: Fast lookup using central user index
-        indexed_companies = db.execute(
-            text("SELECT DISTINCT company_id FROM system_user_index WHERE username = :username AND is_active = true"),
-            {"username": form_data.username}
-        ).fetchall()
+        # ── تسجيل دخول موظف الشركة ──────────────────────────────────────────
+        # company_code إلزامي — بدونه لا نبحث في أي شركة
+        if not company_code:
+            record_failed_attempt(request, form_data.username)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="رمز الشركة مطلوب. يمكنك الحصول عليه من مسؤول الشركة.",
+            )
 
-        # If found in index, only check those companies
-        if indexed_companies:
-            companies = []
-            for ic in indexed_companies:
-                comp = db.execute(
-                    text("SELECT id, database_name, status FROM system_companies WHERE id = :id AND status = 'active'"),
-                    {"id": ic[0]}
+        # التحقق من أن الشركة موجودة ونشطة
+        company = db.execute(
+            text("SELECT id, database_name, status FROM system_companies WHERE id = :code AND status = 'active'"),
+            {"code": company_code.strip()}
+        ).fetchone()
+
+        if not company:
+            record_failed_attempt(request, form_data.username)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="رمز الشركة غير صحيح أو الشركة غير نشطة",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+
+        company_id, db_name, company_status = company
+        conn_url = settings.get_company_database_url(company_id)
+        if not conn_url:
+            raise HTTPException(status_code=500, detail="خطأ في الاتصال بقاعدة البيانات")
+
+        try:
+            company_engine = create_engine(conn_url, pool_pre_ping=True)
+            with company_engine.connect() as company_conn:
+                result = company_conn.execute(
+                    text("""
+                        SELECT id, username, password, email, full_name, role, permissions, is_active
+                        FROM company_users WHERE username = :username AND is_active = true
+                    """),
+                    {"username": form_data.username}
                 ).fetchone()
-                if comp:
-                    companies.append(comp)
-        else:
-            # Fallback: search all companies (first login or missing index)
-            companies = db.execute(
-                text("SELECT id, database_name, status FROM system_companies WHERE status = 'active'")
-            ).fetchall()
-        
-        for company in companies:
-            company_id, db_name, company_status = company
-            conn_url = settings.get_company_database_url(company_id)
-            
-            try:
-                # Debug logging
-                # print(f"DEBUG: Checking company {company_id} ({db_name}) for user {form_data.username}")
-                
-                # Check for existing connection errors first
-                if not conn_url:
-                    print(f"ERROR: No connection URL for company {company_id}")
-                    continue
 
-                company_engine = create_engine(conn_url, pool_pre_ping=True)
-                with company_engine.connect() as company_conn:
-                    result = company_conn.execute(
-                        text("""
-                            SELECT id, username, password, email, full_name, role, permissions, is_active
-                            FROM company_users WHERE username = :username AND is_active = true
-                        """),
-                        {"username": form_data.username}
+                if not result or not verify_password(form_data.password, result[2]):
+                    company_engine.dispose()
+                    record_failed_attempt(request, form_data.username)
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="اسم المستخدم أو كلمة المرور غير صحيحة",
+                        headers={"WWW-Authenticate": "Bearer"}
+                    )
+
+                # ── تسجيل الدخول ناجح ──────────────────────────────────────
+                company_conn.execute(
+                    text("UPDATE company_users SET last_login = :now WHERE id = :user_id"),
+                    {"now": datetime.now(timezone.utc), "user_id": result[0]}
+                )
+
+                allowed_branches_rows = company_conn.execute(
+                    text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
+                    {"uid": result[0]}
+                ).fetchall()
+                allowed_branches = [r[0] for r in allowed_branches_rows] if allowed_branches_rows else []
+
+                login_branch_id = allowed_branches[0] if allowed_branches else None
+                if not login_branch_id:
+                    default_branch = company_conn.execute(
+                        text("SELECT id FROM branches WHERE is_default = true LIMIT 1")
                     ).fetchone()
-                    
-                    if result:
-                        # print(f"DEBUG: Found user {form_data.username} in company {company_id}")
-                        if verify_password(form_data.password, result[2]):
-                            # Update last login
-                            company_conn.execute(
-                                text("UPDATE company_users SET last_login = :now WHERE id = :user_id"),
-                                {"now": datetime.now(timezone.utc), "user_id": result[0]}
-                            )
-                            
-                            # Fetch Allowed Branches
-                            allowed_branches_rows = company_conn.execute(
-                                text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
-                                {"uid": result[0]}
-                            ).fetchall() # Use fetchall then process
-                            allowed_branches = [r[0] for r in allowed_branches_rows] if allowed_branches_rows else []
-                            
-                            # LOG LOGIN ACTIVITY
-                            # Determine a representative branch for the log (Primary or first allowed)
-                            login_branch_id = allowed_branches[0] if allowed_branches else None
-                            if not login_branch_id:
-                                # Fallback to company default branch if no specific branch assigned
-                                default_branch = company_conn.execute(text("SELECT id FROM branches WHERE is_default = true LIMIT 1")).fetchone()
-                                login_branch_id = default_branch[0] if default_branch else None
+                    login_branch_id = default_branch[0] if default_branch else None
 
-                            try:
-                                log_activity(
-                                    company_conn,
-                                    user_id=result[0],
-                                    username=result[1],
-                                    action="auth.login",
-                                    resource_type="user",
-                                    resource_id=str(result[0]),
-                                    details={"method": "password", "name": result[1]},
-                                    request=request,
-                                    branch_id=login_branch_id
-                                )
+                try:
+                    log_activity(
+                        company_conn,
+                        user_id=result[0],
+                        username=result[1],
+                        action="auth.login",
+                        resource_type="user",
+                        resource_id=str(result[0]),
+                        details={"method": "password", "company_code": company_code},
+                        request=request,
+                        branch_id=login_branch_id
+                    )
+                    log_system_activity(
+                        action="auth.login",
+                        company_id=company_id,
+                        performed_by=result[1],
+                        description=f"User logged in via company_code",
+                        request=request
+                    )
+                except Exception as log_err:
+                    logger.warning(f"Logging failed: {log_err}")
 
-                                # LOG TO SYSTEM LOG AS WELL
-                                log_system_activity(
-                                    action="auth.login",
-                                    company_id=company_id,
-                                    performed_by=result[1],
-                                    description=f"User logged in to company {company_id}",
-                                    request=request
-                                )
-                            except Exception as log_err:
-                                print(f"WARNING: Logging failed: {log_err}")
-                            
-                            company_conn.commit()
+                company_conn.commit()
 
-                            # DB-015: Update central user index for fast future lookups
-                            try:
-                                db.execute(
-                                    text("""
-                                        INSERT INTO system_user_index (username, company_id, is_active)
-                                        VALUES (:username, :company_id, true)
-                                        ON CONFLICT (username, company_id) DO UPDATE SET is_active = true, updated_at = CURRENT_TIMESTAMP
-                                    """),
-                                    {"username": form_data.username, "company_id": company_id}
-                                )
-                                db.commit()
-                            except Exception:
-                                pass  # Non-critical, don't block login
-                            
-                            # Fetch Role Permissions
-                            role_permissions = []
-                            if result[5]: # role
-                                try:
-                                    role_res = company_conn.execute(
-                                        text("SELECT permissions FROM roles WHERE role_name = :r"),
-                                        {"r": result[5]}
-                                    ).scalar()
-                                    if role_res:
-                                        role_permissions = role_res
-                                except Exception as e:
-                                    logger.warning(f"Could not fetch roles for user {result[1]}: {e}")
+                # تحديث فهرس المستخدمين المركزي
+                try:
+                    db.execute(
+                        text("""
+                            INSERT INTO system_user_index (username, company_id, is_active)
+                            VALUES (:username, :company_id, true)
+                            ON CONFLICT (username, company_id) DO UPDATE
+                            SET is_active = true, updated_at = CURRENT_TIMESTAMP
+                        """),
+                        {"username": form_data.username, "company_id": company_id}
+                    )
+                    db.commit()
+                except Exception:
+                    pass
 
-                            # Merge Permissions (User overrides Role)
-                            user_permissions = result[6]
-                            
-                            # Handle Legacy Format {'all': True}
-                            if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
-                                user_permissions = ["*"]
-                            elif not isinstance(user_permissions, list):
-                                user_permissions = []
+                # الصلاحيات
+                role_permissions = []
+                if result[5]:
+                    try:
+                        role_res = company_conn.execute(
+                            text("SELECT permissions FROM roles WHERE role_name = :r"),
+                            {"r": result[5]}
+                        ).scalar()
+                        if role_res:
+                            role_permissions = role_res
+                    except Exception as e:
+                        logger.warning(f"Could not fetch roles: {e}")
 
-                            final_permissions = list(set((role_permissions or []) + user_permissions))
+                user_permissions = result[6]
+                if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
+                    user_permissions = ["*"]
+                elif not isinstance(user_permissions, list):
+                    user_permissions = []
 
-                            # CRITICAL: Force Admin Access
-                            if result[5] in ['admin', 'system_admin', 'superuser'] or result[1] == 'admin':
-                                final_permissions = ["*"]
-                            elif "*" in final_permissions:
-                                 final_permissions = ["*"]
-                            
-                            # Fetch company info (modules, currency)
-                            company_info = db.execute(
-                                text("SELECT currency, enabled_modules FROM system_companies WHERE id = :id"),
-                                {"id": company_id}
-                            ).fetchone()
-                            
-                            currency = company_info[0] if company_info else "SAR"
-                            enabled_modules = company_info[1] if company_info and company_info[1] else []
-                            
-                            if isinstance(enabled_modules, str):
-                                import json
-                                try:
-                                    enabled_modules = json.loads(enabled_modules)
-                                except:
-                                    enabled_modules = []
+                final_permissions = list(set((role_permissions or []) + user_permissions))
+                if result[5] in ['admin', 'system_admin', 'superuser'] or result[1] == 'admin':
+                    final_permissions = ["*"]
+                elif "*" in final_permissions:
+                    final_permissions = ["*"]
 
-                            access_token = create_access_token({
-                                "sub": result[1],
-                                "user_id": result[0],
-                                "company_id": company_id,
-                                "role": result[5],
-                                "permissions": final_permissions,
-                                "enabled_modules": enabled_modules,
-                                "allowed_branches": allowed_branches,
-                                "type": "company_user"
-                            })
-                            
-                            decimal_places = 2
-                            company_country = "SY"
-                            company_timezone = "Asia/Damascus"
-                            industry_type = None
-                            try:
-                                dp_res = company_conn.execute(
-                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
-                                ).scalar()
-                                if dp_res:
-                                    decimal_places = int(dp_res)
-                                cc_res = company_conn.execute(
-                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
-                                ).scalar()
-                                if cc_res:
-                                    company_country = cc_res
-                                tz_res = company_conn.execute(
-                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
-                                ).scalar()
-                                if tz_res:
-                                    company_timezone = tz_res
-                                it_res = company_conn.execute(
-                                    text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
-                                ).scalar()
-                                if it_res:
-                                    industry_type = it_res
-                            except Exception as e:
-                                logger.warning(f"Failed to fetch settings: {e}")
+                # معلومات الشركة
+                company_info = db.execute(
+                    text("SELECT currency, enabled_modules, company_name FROM system_companies WHERE id = :id"),
+                    {"id": company_id}
+                ).fetchone()
 
-                            company_engine.dispose()
-                            logger.info(f"✅ Login: {result[1]} -> {company_id}")
-                            
-                            clear_failed_attempts(request, form_data.username)
-                            return Token(
-                                access_token=access_token,
-                                token_type="bearer",
-                                user={
-                                    "id": result[0],
-                                    "username": result[1],
-                                    "email": result[3],
-                                    "full_name": result[4],
-                                    "role": result[5],
-                                    "permissions": final_permissions,
-                                    "enabled_modules": enabled_modules,
-                                    "industry_type": industry_type,
-                                    "currency": currency,
-                                    "country": company_country,
-                                    "decimal_places": decimal_places,
-                                    "timezone": company_timezone,
-                                    "allowed_branches": allowed_branches
-                                },
-                                company_id=company_id
-                            )
+                currency = company_info[0] if company_info else "SAR"
+                enabled_modules = company_info[1] if company_info and company_info[1] else []
 
-                
+                if isinstance(enabled_modules, str):
+                    import json
+                    try:
+                        enabled_modules = json.loads(enabled_modules)
+                    except Exception:
+                        enabled_modules = []
+
+                access_token = create_access_token({
+                    "sub": result[1],
+                    "user_id": result[0],
+                    "company_id": company_id,
+                    "role": result[5],
+                    "permissions": final_permissions,
+                    "enabled_modules": enabled_modules,
+                    "allowed_branches": allowed_branches,
+                    "type": "company_user"
+                })
+
+                decimal_places = 2
+                company_country = "SA"
+                company_timezone = "Asia/Riyadh"
+                industry_type = None
+                try:
+                    dp_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
+                    ).scalar()
+                    if dp_res:
+                        decimal_places = int(dp_res)
+                    cc_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
+                    ).scalar()
+                    if cc_res:
+                        company_country = cc_res
+                    tz_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
+                    ).scalar()
+                    if tz_res:
+                        company_timezone = tz_res
+                    it_res = company_conn.execute(
+                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+                    ).scalar()
+                    if it_res:
+                        industry_type = it_res
+                except Exception as e:
+                    logger.warning(f"Failed to fetch settings: {e}")
+
                 company_engine.dispose()
-            except Exception as e:
-                logger.error(f"Error searching company {company_id}: {str(e)}")
-                # print(f"CRITICAL ERROR in company {company_id}: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                continue
-        
-        record_failed_attempt(request, form_data.username)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="اسم المستخدم أو كلمة المرور غير صحيحة",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+                clear_failed_attempts(request, form_data.username)
+                logger.info(f"✅ Login: {result[1]} -> company:{company_id}")
+
+                return Token(
+                    access_token=access_token,
+                    token_type="bearer",
+                    user={
+                        "id": result[0],
+                        "username": result[1],
+                        "email": result[3],
+                        "full_name": result[4],
+                        "role": result[5],
+                        "permissions": final_permissions,
+                        "enabled_modules": enabled_modules,
+                        "industry_type": industry_type,
+                        "currency": currency,
+                        "country": company_country,
+                        "decimal_places": decimal_places,
+                        "timezone": company_timezone,
+                        "allowed_branches": allowed_branches
+                    },
+                    company_id=company_id
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Login error for company {company_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail="خطأ في الخادم أثناء تسجيل الدخول")
+
     finally:
         db.close()
 
