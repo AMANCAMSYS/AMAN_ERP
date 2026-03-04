@@ -30,6 +30,7 @@ services:
           memory: 512m
 
   backend:
+    restart: unless-stopped
     ports: []                        # Exposed through nginx reverse proxy only
     environment:
       APP_ENV: production
@@ -50,9 +51,6 @@ services:
       resources:
         limits:
           memory: 1g
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
 
   frontend:
     deploy:
