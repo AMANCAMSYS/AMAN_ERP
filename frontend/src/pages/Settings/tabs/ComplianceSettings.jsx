@@ -1,13 +1,49 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, FileKey, Globe, Loader } from 'lucide-react';
+import { ShieldCheck, FileKey, Globe, Loader, Clock } from 'lucide-react';
 import api from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
+import { getCountry } from '../../../utils/auth';
+
+// Countries with full ZATCA / Zakat compliance support
+const ZATCA_SUPPORTED_COUNTRIES = ['SA'];
+
+const COUNTRY_FLAGS = {
+    SA: '🇸🇦', SY: '🇸🇾', AE: '🇦🇪', EG: '🇪🇬', JO: '🇯🇴',
+    KW: '🇰🇼', BH: '🇧🇭', OM: '🇴🇲', QA: '🇶🇦', IQ: '🇮🇶',
+    LB: '🇱🇧', TR: '🇹🇷'
+};
+
+const ComingSoonCard = ({ icon, title }) => {
+    const { t } = useTranslation();
+    const country = getCountry();
+    const flag = COUNTRY_FLAGS[country] || '🌍';
+    return (
+        <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                {icon}
+                {title}
+            </h3>
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-4">
+                <div style={{ fontSize: '48px' }}>{flag}</div>
+                <div className="flex items-center gap-2 text-muted">
+                    <Clock size={20} />
+                    <span className="text-xl font-semibold">{t('coming_soon.title', 'قريباً')}</span>
+                </div>
+                <p className="text-muted max-w-md">
+                    {t('settings.compliance.coming_soon_country', 'خيار الزكاة والامتثال الضريبي غير مدعوم بعد لدولتك. سيتم تفعيله في التحديثات القادمة.')}
+                </p>
+            </div>
+        </div>
+    );
+};
 
 const ComplianceSettings = ({ settings, handleSettingChange }) => {
     const { t } = useTranslation();
     const { showToast } = useToast();
     const [generating, setGenerating] = useState(false);
+    const country = getCountry();
+    const isSupported = ZATCA_SUPPORTED_COUNTRIES.includes(country);
 
     const generateCSID = async () => {
         setGenerating(true);
@@ -32,6 +68,12 @@ const ComplianceSettings = ({ settings, handleSettingChange }) => {
     return (
         <div className="space-y-8">
             {/* ZATCA Phase 2 */}
+            {!isSupported ? (
+                <ComingSoonCard
+                    icon={<ShieldCheck size={20} className="text-primary" />}
+                    title={t('settings.compliance.zatca_title')}
+                />
+            ) : (
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <ShieldCheck size={20} className="text-primary" />
@@ -88,8 +130,15 @@ const ComplianceSettings = ({ settings, handleSettingChange }) => {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Environment */}
+            {!isSupported ? (
+                <ComingSoonCard
+                    icon={<Globe size={20} className="text-primary" />}
+                    title={t('settings.compliance.env_title')}
+                />
+            ) : (
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Globe size={20} className="text-primary" />
@@ -118,6 +167,7 @@ const ComplianceSettings = ({ settings, handleSettingChange }) => {
                     </label>
                 </div>
             </div>
+            )}
         </div>
     );
 };

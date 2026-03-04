@@ -1,15 +1,27 @@
 import { useState } from 'react'
 import { zakatAPI } from '../../utils/api'
-import { getCurrency } from '../../utils/auth'
+import { getCurrency, getCountry } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
+import { Clock } from 'lucide-react'
+
+// Countries with full Zakat calculation support
+const ZAKAT_SUPPORTED_COUNTRIES = ['SA']
+
+const COUNTRY_FLAGS = {
+    SA: '🇸🇦', SY: '🇸🇾', AE: '🇦🇪', EG: '🇪🇬', JO: '🇯🇴',
+    KW: '🇰🇼', BH: '🇧🇭', OM: '🇴🇲', QA: '🇶🇦', IQ: '🇮🇶',
+    LB: '🇱🇧', TR: '🇹🇷'
+}
 
 function ZakatCalculator() {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const currency = getCurrency()
+    const country = getCountry()
+    const isSupported = ZAKAT_SUPPORTED_COUNTRIES.includes(country)
     const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear())
     const [method, setMethod] = useState('net_assets')
     const [useGregorian, setUseGregorian] = useState(false)
@@ -37,6 +49,35 @@ function ZakatCalculator() {
         } catch (err) {
             showToast(err.response?.data?.detail || t('common.error'), 'error')
         } finally { setPosting(false) }
+    }
+
+    // Show Coming Soon for unsupported countries
+    if (!isSupported) {
+        const flag = COUNTRY_FLAGS[country] || '🌍'
+        return (
+            <div className="workspace fade-in">
+                <div className="workspace-header">
+                    <BackButton />
+                    <div className="header-title">
+                        <h1 className="workspace-title">🕌 {t('zakat.title')}</h1>
+                        <p className="workspace-subtitle">{t('zakat.subtitle')}</p>
+                    </div>
+                </div>
+
+                <div className="card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '64px', marginBottom: '16px' }}>{flag}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' }}>
+                        <Clock size={28} style={{ color: 'var(--text-muted)' }} />
+                        <h2 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                            {t('coming_soon.title', 'قريباً')}
+                        </h2>
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', maxWidth: '480px', margin: '0 auto', lineHeight: 1.7 }}>
+                        {t('zakat.coming_soon_country', 'حاسبة الزكاة غير متوفرة حالياً لدولتك. يعمل الفريق على دعم المزيد من الدول في التحديثات القادمة.')}
+                    </p>
+                </div>
+            </div>
+        )
     }
 
     return (

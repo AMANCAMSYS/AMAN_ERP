@@ -5492,7 +5492,8 @@
       "generate_csid": "Request CSID",
       "env_title": "Environment",
       "env_sandbox": "Sandbox",
-      "env_production": "Production"
+      "env_production": "Production",
+      "coming_soon_country": "ZATCA / E-Invoicing compliance is not yet available for your country. It will be enabled in upcoming updates."
     },
     "branches": {
       "main_title": "Branch Settings",
@@ -8545,7 +8546,8 @@
     "rate": "Rate",
     "zakat_amount": "Zakat Amount",
     "post_journal_entry": "Post Zakat Journal Entry",
-    "posted_success": "Zakat journal entry posted successfully"
+    "posted_success": "Zakat journal entry posted successfully",
+    "coming_soon_country": "The Zakat calculator is not yet available for your country. The team is working on supporting more countries in upcoming updates."
   },
   "fiscal_locks": {
     "title": "Fiscal Period Locks",
