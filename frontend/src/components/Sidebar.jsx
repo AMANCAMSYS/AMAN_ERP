@@ -3,9 +3,11 @@ import { logout, getUser, hasPermission } from '../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { getIndustryType } from '../hooks/useIndustryType'
 import { isModuleEnabledForIndustry } from '../config/industryModules'
+import { useTheme } from '../context/ThemeContext'
 
 function Sidebar({ isOpen, isMobile, onClose }) {
     const { t } = useTranslation()
+    const { darkMode, toggleDarkMode } = useTheme()
     const user = getUser()
     const industryType = getIndustryType()
     const navItems = [
@@ -139,13 +141,26 @@ function Sidebar({ isOpen, isMobile, onClose }) {
                         to={item.path}
                         end={item.path === '/treasury' || item.path === '/settings'}
                         className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
-                        onClick={onClose}
+                        onClick={isMobile ? onClose : undefined}
                     >
-                        <span className="nav-icon">{item.icon}</span>
+                        <div className="nav-icon-container">
+                            <span className="nav-icon">{item.icon}</span>
+                        </div>
                         <span className="nav-label">{item.label}</span>
                     </NavLink>
                 ))}
             </nav>
+
+            {/* Sidebar Footer / Menu Card */}
+            <div className="sidebar-footer">
+                <button
+                    className="sidebar-theme-toggle"
+                    onClick={toggleDarkMode}
+                    aria-label={darkMode ? 'الوضع الفاتح' : 'الوضع الداكن'}
+                >
+                    {darkMode ? '☀️ الوضع الفاتح' : '🌙 الوضع الداكن'}
+                </button>
+            </div>
         </aside>
     )
 }
