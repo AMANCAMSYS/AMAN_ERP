@@ -6,6 +6,7 @@ import { getUser } from '../utils/auth'
 
 function Layout({ children }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
 
     useEffect(() => {
         const user = getUser();
@@ -20,12 +21,12 @@ function Layout({ children }) {
         if (user) syncUser();
     }, [])
 
-    // Close sidebar on resize to desktop
+    // Track screen size
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth >= 1024) {
-                setSidebarOpen(false)
-            }
+            const mobile = window.innerWidth < 1024
+            setIsMobile(mobile)
+            if (!mobile) setSidebarOpen(false)
         }
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
@@ -36,16 +37,17 @@ function Layout({ children }) {
 
     return (
         <div className="app-layout">
-            {/* Overlay for mobile/tablet */}
-            {sidebarOpen && (
+            {/* Dark overlay — only on mobile when sidebar is open */}
+            {isMobile && sidebarOpen && (
                 <div
                     className="sidebar-overlay"
                     onClick={closeSidebar}
                     aria-hidden="true"
+                    style={{ display: 'block' }}
                 />
             )}
-            <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-            <div className={`main-container${sidebarOpen ? ' sidebar-is-open' : ''}`}>
+            <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} />
+            <div className="main-container" style={{ marginRight: isMobile ? 0 : 'var(--sidebar-width)' }}>
                 <Topbar onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
                 <main className="content-area">
                     {children}

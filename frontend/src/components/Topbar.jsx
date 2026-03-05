@@ -128,6 +128,11 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
 
     return (
         <header className="topbar">
+            {/* Brand — always visible */}
+            <div className="topbar-brand">
+                AMAN ERP
+            </div>
+
             {/* Sidebar toggle button — visible only on mobile/tablet */}
             <button
                 className="sidebar-toggle"

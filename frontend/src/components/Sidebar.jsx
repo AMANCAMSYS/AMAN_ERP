@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getIndustryType } from '../hooks/useIndustryType'
 import { isModuleEnabledForIndustry } from '../config/industryModules'
 
-function Sidebar({ isOpen, onClose }) {
+function Sidebar({ isOpen, isMobile, onClose }) {
     const { t } = useTranslation()
     const user = getUser()
     const industryType = getIndustryType()
@@ -115,16 +115,19 @@ function Sidebar({ isOpen, onClose }) {
 
 
     return (
-        <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
+        <aside className={`sidebar${isMobile && !isOpen ? ' sidebar-mobile-hidden' : ''}${isOpen ? ' sidebar-open' : ''}`}>
+            {/* Close button visible only on mobile/tablet, inside sidebar top */}
             <div className="sidebar-brand">
-                <span>AMAN ERP</span>
-                {/* Close button visible on mobile/tablet */}
                 <button
                     className="sidebar-close-btn"
                     onClick={onClose}
                     aria-label="إغلاق القائمة"
                 >
-                    ✕
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M9 3v18" />
+                    </svg>
                 </button>
             </div>
             <nav className="sidebar-nav">
