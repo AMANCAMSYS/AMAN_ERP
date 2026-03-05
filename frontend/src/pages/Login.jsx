@@ -4,6 +4,7 @@ import { authAPI } from '../utils/api'
 import { setAuth, isAuthenticated } from '../utils/auth'
 import { hasIndustryTypeSet } from '../hooks/useIndustryType'
 import { useTranslation } from 'react-i18next'
+import BackButton from '../components/common/BackButton'
 
 function Login() {
     const { t } = useTranslation()
@@ -57,6 +58,9 @@ function Login() {
 
     return (
         <div className="auth-layout">
+            <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
+                <BackButton />
+            </div>
             <div className="auth-card">
                 <div className="auth-header">
                     <h1>{t('auth.login_title')}</h1>

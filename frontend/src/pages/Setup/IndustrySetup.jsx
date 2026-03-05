@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useIndustryType } from '../../hooks/useIndustryType'
 import { getIndustryTypesList, getEnabledModulesForIndustry, ALWAYS_ENABLED_MODULES, VARIABLE_MODULES } from '../../config/industryModules'
+import { useNavigate } from 'react-router-dom'
+import BackButton from '../../components/common/BackButton'
 
 function IndustrySetup() {
   const { t, i18n } = useTranslation()
@@ -9,6 +11,7 @@ function IndustrySetup() {
   const [selected, setSelected] = useState(null)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
+  const navigate = useNavigate()
 
   const isRTL = i18n.language === 'ar'
   const industries = getIndustryTypesList()
@@ -397,6 +400,9 @@ function IndustrySetup() {
                   : `Modules enabled for "${selectedIndustry?.nameEn}"`)
               }
             </p>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <BackButton onClick={step === 2 ? handleBack : () => navigate(-1)} />
           </div>
 
           {/* Stepper */}

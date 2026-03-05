@@ -345,35 +345,6 @@ body {
   color: white;
 }
 
-.sidebar-footer {
-  padding: 20px;
-  border-top: 1px solid var(--border-color);
-  background: var(--bg-sidebar);
-}
-
-.sidebar-theme-toggle {
-  width: 100%;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-main);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s ease;
-}
-
-.sidebar-theme-toggle:hover {
-  background: var(--bg-hover);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
 /* Topbar Styling */
 .topbar {
   height: var(--topbar-height);

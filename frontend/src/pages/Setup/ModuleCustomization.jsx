@@ -5,6 +5,7 @@ import { ALWAYS_ENABLED_MODULES, VARIABLE_MODULES, INDUSTRY_TYPES, getEnabledMod
 import { getIndustryType } from '../../hooks/useIndustryType'
 import { getUser, updateUser } from '../../utils/auth'
 import api from '../../services/apiClient'
+import BackButton from '../../components/common/BackButton'
 
 const MODULE_LABELS = {
   dashboard:   { ar: 'مساحة العمل',         en: 'Dashboard',       icon: '🏠', category: 'core' },
@@ -286,9 +287,9 @@ function ModuleCustomization() {
           </div>
 
           {/* Back */}
-          <button className="mc2-back-btn" onClick={() => navigate('/setup/industry')}>
-            {isRTL ? '→' : '←'} {t('module_setup.back_btn')}
-          </button>
+          <div style={{ marginBottom: '12px' }}>
+            <BackButton onClick={() => navigate('/setup/industry')} />
+          </div>
 
           {/* Industry badge */}
           {industry && (

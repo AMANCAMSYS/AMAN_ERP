@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { passwordResetAPI } from '../utils/api'
 import { useTranslation } from 'react-i18next'
+import BackButton from '../components/common/BackButton'
 
 function ResetPassword() {
     const { t } = useTranslation()
@@ -43,6 +44,9 @@ function ResetPassword() {
     return (
         <div className="login-container">
             <div className="login-card">
+                <div style={{ marginBottom: '12px' }}>
+                    <BackButton />
+                </div>
                 <div className="text-center mb-4">
                     <h1 className="text-2xl font-bold">🔐 {t('reset_password.title')}</h1>
                 </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { companiesAPI } from '../utils/api'
 import { useTranslation } from 'react-i18next'
+import BackButton from '../components/common/BackButton'
 
 function Register() {
     const { t, i18n } = useTranslation()
@@ -72,6 +73,9 @@ function Register() {
     if (success) {
         return (
             <div className="auth-layout" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', minHeight: '100vh' }}>
+                <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
+                    <BackButton />
+                </div>
                 <div style={{
                     background: 'white',
                     borderRadius: '20px',
@@ -197,6 +201,9 @@ function Register() {
 
     return (
         <div className="auth-layout" style={{ padding: '40px 20px' }}>
+            <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
+                <BackButton />
+            </div>
             <div className="card" style={{ maxWidth: '800px', width: '100%', padding: '40px' }}>
                 <div className="auth-header">
                     <h1>{t('auth.register_title')}</h1>

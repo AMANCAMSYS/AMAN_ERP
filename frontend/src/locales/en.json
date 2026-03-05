@@ -569,6 +569,7 @@
     "assets": "Fixed Assets",
     "branches": "Branches",
     "settings": "Settings",
+    "moduleCustomization": "Module Customization",
     "auditLogs": "Audit Logs",
     "contracts": "Contracts",
     "expenses": "Expenses",
@@ -5207,7 +5208,8 @@
       "api_keys": "Manage API access keys",
       "webhooks": "Manage external webhook endpoints",
       "branches": "Manage company branches and locations",
-      "data_import": "Import customers, products, and accounts from Excel"
+      "data_import": "Import customers, products, and accounts from Excel",
+      "modules": "Enable or disable modules based on business type"
     },
     "company": {
       "title": "Company Settings",
