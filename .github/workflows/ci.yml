@@ -294,10 +294,14 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               exec -T backend alembic upgrade head || echo "⚠️ Alembic skipped"
 
-            # 10. Start remaining services (frontend, prometheus, grafana)
+            # 10. Force-recreate frontend to ensure new assets are served
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --force-recreate frontend
+
+            # 11. Start remaining services (prometheus, grafana)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --remove-orphans
 
-            # 11. Cleanup
+            # 12. Cleanup
             docker system prune -f --volumes=false
             echo "✅ Deployment complete — $(date)"
