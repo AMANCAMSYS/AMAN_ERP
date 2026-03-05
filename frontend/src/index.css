@@ -77,7 +77,6 @@ body {
   flex-direction: column;
   z-index: 1000;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(0);
 }
 
 /* Mobile: sidebar hidden by default, shown when open */
@@ -1963,39 +1962,43 @@ input {
         display: block;
     }
 
-    /* Sidebar close btn: visible on mobile */
-    .sidebar-close-btn {
-        display: flex !important;
-    }
-
-    /* Sidebar positioned correctly but hidden via class */
+    /* Sidebar: hidden off-screen — force with !important to beat inline styles */
     .sidebar {
-        transform: translateX(110%);
+        transform: translateX(110%) !important;
         z-index: 1001;
         box-shadow: none;
     }
 
+    /* Sidebar open: slide in */
     .sidebar.sidebar-open {
-        transform: translateX(0);
+        transform: translateX(0) !important;
         box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
     }
 
+    /* LTR support */
     [dir="ltr"] .sidebar {
         right: auto;
         left: 0;
-        transform: translateX(-110%);
+        transform: translateX(-110%) !important;
         border-left: none;
         border-right: 1px solid var(--border-color);
     }
 
     [dir="ltr"] .sidebar.sidebar-open {
-        transform: translateX(0);
+        transform: translateX(0) !important;
     }
 
-    /* Main content fills full width */
+    /* Main content fills full width — !important beats inline style from old code */
     .main-container {
         margin-right: 0 !important;
+        margin-left: 0 !important;
+        margin-inline-start: 0 !important;
         margin-inline-end: 0 !important;
+    }
+
+    /* Dashboard 2-column row: stack on mobile */
+    .dashboard-row-2col {
+        grid-template-columns: 1fr !important;
     }
 
     /* Content area padding */

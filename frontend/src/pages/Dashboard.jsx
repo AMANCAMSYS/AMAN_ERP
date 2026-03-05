@@ -157,7 +157,7 @@ const Dashboard = () => {
             )}
 
             {/* Row 3 — Financial chart + Quick actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap, marginBottom: gap }}>
+            <div className="dashboard-row-2col" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap, marginBottom: gap }}>
                 <Card title={t('dashboard.financial_overview')} style={{ minHeight: 320 }}>
                     <FinancialChart data={finData} loading={loading} currency={currency} />
                 </Card>
@@ -223,7 +223,7 @@ const QuickActions = ({ t, isRTL, enabledModules }) => {
         : ACTIONS;
 
     return (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', height: '100%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.7rem', height: '100%' }}>
             {filtered.map(a => (
             <button key={a.key} onClick={() => window.location.href = a.link}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.9rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '0.75rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#475569', transition: 'all .15s' }}
