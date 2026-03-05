@@ -148,7 +148,7 @@ function ZakatCalculator() {
                             <h3 className="card-title text-success mb-3">
                                 ➕ {t('zakat.additions')}
                             </h3>
-                            {result.additions && result.additions.map((a, i) => (
+                            {result.additions && result.additions.filter(a => a.amount !== 0 || a.is_subtotal).map((a, i) => (
                                 <div key={i} className="flex justify-between py-1 border-bottom" style={a.is_subtotal ? { fontWeight: 'bold', borderTop: '2px solid var(--border)', paddingTop: '8px' } : {}}>
                                     <span>{a.label_ar || a.label}</span>
                                     <span className="font-medium" style={a.amount < 0 ? { color: 'var(--danger)' } : {}}>{formatNumber(a.amount)} {currency}</span>
@@ -163,7 +163,7 @@ function ZakatCalculator() {
                             <h3 className="card-title text-danger mb-3">
                                 ➖ {t('zakat.deductions')}
                             </h3>
-                            {result.deductions && result.deductions.length > 0 ? result.deductions.map((d, i) => (
+                            {result.deductions && result.deductions.filter(d => d.amount !== 0).length > 0 ? result.deductions.filter(d => d.amount !== 0).map((d, i) => (
                                 <div key={i} className="flex justify-between py-1 border-bottom">
                                     <span style={{ color: 'var(--text-muted)' }}>{d.label_ar || d.label}</span>
                                     <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{formatNumber(d.amount)} {currency}</span>

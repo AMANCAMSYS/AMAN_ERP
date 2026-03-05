@@ -718,13 +718,17 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             lt_investments = db.execute(text(zatca_inv_sql), zatca_inv_params).scalar() or 0
 
             # 7. Intangible assets (شهرة، براءات، علامات تجارية — non-zakatable per ZATCA)
+            # NOTE: account_code LIKE '13%%' is NOT used broadly because 13001 is inventory (مخزون بضاعة).
+            #       Instead we use specific sub-codes 1301-1305 and name-based matching.
             zatca_intang_filter = """
                     a.name LIKE '%%شهرة%%' OR a.name LIKE '%%براءة%%'
                     OR a.name LIKE '%%علامة تجارية%%' OR a.name LIKE '%%رخصة%%'
                     OR a.name LIKE '%%غير ملموس%%' OR a.name LIKE '%%أصول معنوية%%'
                     OR a.name_en LIKE '%%intangible%%' OR a.name_en LIKE '%%goodwill%%'
                     OR a.name_en LIKE '%%patent%%' OR a.name_en LIKE '%%trademark%%'
-                    OR a.account_code LIKE '13%%' OR a.account_code LIKE '18%%'
+                    OR a.account_code LIKE '1301%%' OR a.account_code LIKE '1302%%'
+                    OR a.account_code LIKE '1303%%' OR a.account_code LIKE '1304%%'
+                    OR a.account_code LIKE '1305%%' OR a.account_code LIKE '18%%'
             """
             zatca_intang_sql, zatca_intang_params = _zakat_balance_query(zatca_intang_filter, ['asset'], branch_id)
             intangible_assets = db.execute(text(zatca_intang_sql), zatca_intang_params).scalar() or 0
