@@ -234,7 +234,7 @@ function CRMHome() {
             </div>
 
             {/* Grouped Navigation Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '16px' }}>
+            <div className="modules-grid" style={{ gap: '16px', marginTop: '16px' }}>
 
                 {/* Sales Activities */}
                 <div className="card">

@@ -164,9 +164,10 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
 
             <GlobalSearch isOpen={showSearch} onClose={() => setShowSearch(false)} />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className="topbar-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 {/* Language Switcher */}
                 <button
+                    className="topbar-lang-btn"
                     onClick={() => {
                         const newLang = i18n.language === 'ar' ? 'en' : 'ar';
                         i18n.changeLanguage(newLang);
@@ -182,13 +183,14 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                         fontWeight: '600'
                     }}
                 >
-                    {i18n.language === 'ar' ? 'English' : 'العربية'}
+                    {i18n.language === 'ar' ? 'EN' : 'ع'}
                 </button>
 
                 {/* Branch Selector */}
                 {branches.length > 0 && (
                     <div ref={branchRef} style={{ position: 'relative' }}>
                         <button
+                            className="topbar-branch-btn"
                             onClick={() => setShowBranchMenu(!showBranchMenu)}
                             style={{
                                 background: 'white',
@@ -201,12 +203,11 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                minWidth: '140px',
                                 justifyContent: 'space-between'
                             }}
                         >
                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                🏢 {currentBranch ? currentBranch.branch_name : t('branches.all_branches') || 'كل الفروع'}
+                                🏢 <span className="topbar-branch-label">{currentBranch ? currentBranch.branch_name : t('branches.all_branches') || 'كل الفروع'}</span>
                             </span>
                             <span style={{ fontSize: '10px' }}>▼</span>
                         </button>
@@ -300,11 +301,12 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                     </button>
 
                     {showNotifications && (
-                        <div className="dropdown-menu fade-in" style={{
+                        <div className="dropdown-menu fade-in topbar-notif-dropdown" style={{
                             position: 'absolute',
                             top: '45px',
                             left: '0',
                             width: '320px',
+                            maxWidth: 'calc(100vw - 32px)',
                             maxHeight: '400px',
                             overflowY: 'auto',
                             background: 'white',
@@ -395,7 +397,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                         onClick={() => setShowMenu(!showMenu)}
                         style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '12px' }}
                     >
-                        <div style={{ textAlign: 'left' }}>
+                        <div className="user-info-text" style={{ textAlign: 'left' }}>
                             <div style={{ fontSize: '14px', fontWeight: '600' }}>{user?.full_name}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {companyId}</div>
                         </div>

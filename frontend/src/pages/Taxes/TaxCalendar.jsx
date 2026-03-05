@@ -135,7 +135,7 @@ function TaxCalendar() {
             </div>
 
             {/* Summary Cards */}
-            <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', marginBottom: 16 }}>
+            <div className="metrics-grid" style={{ marginBottom: 16 }}>
                 <div className="metric-card">
                     <div className="metric-value">{summary.total || 0}</div>
                     <div className="metric-label">{t('tax_calendar.total', 'إجمالي المواعيد')}</div>

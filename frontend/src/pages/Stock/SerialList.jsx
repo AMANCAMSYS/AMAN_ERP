@@ -184,7 +184,7 @@ function SerialList() {
                             {lookupResult.error ? (
                                 <p style={{ color: 'var(--danger)' }}>{lookupResult.error}</p>
                             ) : (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                                <div className="modules-grid" style={{ gap: '12px' }}>
                                     <div><strong>{t('stock.serial.number_label')}</strong> {lookupResult.serial_number}</div>
                                     <div><strong>{t('stock.serial.product_label')}</strong> {lookupResult.product_name}</div>
                                     <div><strong>{t('stock.serial.warehouse_label')}</strong> {lookupResult.warehouse_name}</div>

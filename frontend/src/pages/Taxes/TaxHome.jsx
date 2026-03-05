@@ -203,7 +203,7 @@ function TaxHome() {
             {activeTab === 'overview' && (
                 <div className="mt-4">
                     {/* Grouped Navigation Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                    <div className="modules-grid" style={{ gap: '16px', marginBottom: '20px' }}>
 
                         {/* Tax Returns */}
                         <div className="card">

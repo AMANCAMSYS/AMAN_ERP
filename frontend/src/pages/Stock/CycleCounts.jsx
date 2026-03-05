@@ -382,7 +382,7 @@ function CycleCounts() {
                             <button className="modal-close" onClick={() => setShowDetailModal(false)}>✕</button>
                         </div>
 
-                        <div style={{ marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                        <div className="modules-grid" style={{ marginBottom: '16px', gap: '12px' }}>
                             <div><strong>{t('stock.cycle.warehouse')}:</strong> {countDetail.warehouse_name}</div>
                             <div><strong>{t('stock.cycle.type')}:</strong> {getCountTypeName(countDetail.count_type)}</div>
                             <div><strong>{t('common.status')}:</strong> {getStatusBadge(countDetail.status)}</div>

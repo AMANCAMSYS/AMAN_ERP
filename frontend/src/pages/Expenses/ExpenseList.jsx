@@ -160,7 +160,7 @@ export default function ExpenseList() {
       </div>
 
       {/* Quick Navigation Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+      <div className="modules-grid" style={{ gap: '16px', marginBottom: '16px' }}>
 
         {/* Quick Actions */}
         <div className="card">

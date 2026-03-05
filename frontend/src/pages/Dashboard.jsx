@@ -143,7 +143,7 @@ const Dashboard = () => {
 
             {/* Row 2 — Sales summary × 3 */}
             {isModOn('sales') && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap, marginBottom: gap }}>
+            <div className="modules-grid" style={{ gap, marginBottom: gap }}>
                 <Card title={t('dashboard.today')} style={{ minHeight: 120 }}>
                     <SalesSummaryWidget config={{ period: 'today' }} currency={currency} />
                 </Card>

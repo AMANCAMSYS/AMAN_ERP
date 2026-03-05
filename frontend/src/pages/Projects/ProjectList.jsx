@@ -133,7 +133,7 @@ export default function ProjectList() {
             </div>
 
             {/* Quick Navigation Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+            <div className="modules-grid" style={{ gap: '16px', marginBottom: '16px' }}>
 
                 {/* Project Management */}
                 <div className="card">

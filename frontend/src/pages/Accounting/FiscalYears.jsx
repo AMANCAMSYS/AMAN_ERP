@@ -293,7 +293,7 @@ function FiscalYears() {
                         </div>
                         <div className="modal-body">
                             {/* Summary Cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                            <div className="modules-grid" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="card" style={{ padding: '1rem', textAlign: 'center', background: 'var(--success-bg, #d4edda)' }}>
                                     <div style={{ fontSize: '0.85rem', color: '#666' }}>
                                         {t('accounting.fiscal_years.total_revenue')}

@@ -1958,8 +1958,21 @@ input {
     .sidebar {
         transform: translateX(100%);
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
+        z-index: 1001;
         box-shadow: none;
+        width: var(--sidebar-width);
+    }
+
+    [dir="ltr"] .sidebar {
+        right: auto;
+        left: 0;
+        transform: translateX(-100%);
+        border-left: none;
+        border-right: 1px solid var(--border-color);
+    }
+
+    [dir="ltr"] .sidebar.sidebar-open {
+        transform: translateX(0);
     }
 
     /* Sidebar: slide in when open */
@@ -1970,8 +1983,8 @@ input {
 
     /* Main content fills full width */
     .main-container {
-        margin-right: 0;
-        margin-inline-end: 0;
+        margin-right: 0 !important;
+        margin-inline-end: 0 !important;
     }
 
     /* Content area padding */
@@ -1981,6 +1994,21 @@ input {
 
     .workspace {
         padding: 16px;
+    }
+
+    /* Topbar responsive */
+    .topbar {
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    .topbar-actions {
+        gap: 8px;
+    }
+
+    /* User info compact */
+    .user-menu-trigger .user-info-text {
+        display: none;
     }
 }
 
@@ -1994,8 +2022,9 @@ input {
 
     /* Topbar: compact layout */
     .topbar {
-        padding: 0 12px;
-        gap: 8px;
+        padding: 0 10px;
+        gap: 6px;
+        height: 52px;
     }
 
     /* Hide search bar text on very small screens, keep icon */
@@ -2005,8 +2034,12 @@ input {
     }
 
     .topbar-search .search-input {
-        padding: 8px 10px;
+        padding: 6px 10px;
         font-size: 13px;
+    }
+
+    .topbar-search .search-input kbd {
+        display: none;
     }
 
     /* Hide branch selector text on mobile */
@@ -2024,20 +2057,24 @@ input {
     }
 
     .workspace-title {
-        font-size: 20px;
+        font-size: 18px;
+    }
+
+    .workspace-subtitle {
+        font-size: 13px;
     }
 
     /* Grid: single column on mobile */
     .modules-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
     }
 
     .metrics-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr !important;
     }
 
     .apps-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
 
     /* Modal: full-width on mobile */
@@ -2049,10 +2086,15 @@ input {
     }
 
     /* Tables: horizontal scroll */
+    .data-table-container,
     .data-table-wrapper,
     .table-responsive {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table {
+        min-width: 600px;
     }
 
     /* Form rows: stack on mobile */
@@ -2060,15 +2102,59 @@ input {
         flex-direction: column;
     }
 
-    /* Workspace header buttons stack */
+    .form-row > * {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    /* Workspace header: stack vertically */
     .workspace-header {
+        gap: 12px;
+    }
+
+    .workspace-header > div {
+        flex-wrap: wrap;
+    }
+
+    .workspace-header > div[style*="justify-content: space-between"],
+    .workspace-header > div[style*="justifyContent"] {
+        flex-direction: column;
         gap: 12px;
     }
 
     /* Buttons smaller on mobile */
     .btn {
         padding: 8px 14px;
-        font-size: 14px;
+        font-size: 13px;
+    }
+
+    /* Cards adjust */
+    .card {
+        padding: 16px;
+    }
+
+    .section-card {
+        padding: 16px;
+    }
+
+    .metric-card {
+        padding: 14px 16px;
+        min-height: 80px;
+    }
+
+    .metric-value {
+        font-size: 22px;
+    }
+
+    /* Navigation grid inside cards — force responsive */
+    .card > div[style*="grid-template-columns: repeat(3"],
+    .card > div[style*="gridTemplateColumns"] {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* Topbar right side actions compact */
+    .topbar > div:last-child {
+        gap: 8px !important;
     }
 }
 
@@ -2077,20 +2163,126 @@ input {
    ═══════════════════════════════════════ */
 @media (max-width: 480px) {
     .metrics-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
     }
 
     .topbar-search {
         display: none;
     }
 
-    /* Show only icon actions */
     .content-area {
         padding: 12px 8px;
     }
 
     .workspace {
         padding: 10px 8px;
+    }
+
+    .workspace-title {
+        font-size: 16px;
+    }
+
+    /* All inline grids become single column */
+    [style*="grid-template-columns: repeat(3"],
+    [style*="gridTemplateColumns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    .card > div[style*="gridTemplateColumns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    .apps-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* Stack action buttons */
+    .btn {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    /* Small mobile: topbar branch btn compact */
+    .topbar-branch-btn {
+        padding: 4px 6px !important;
+    }
+
+    /* Notification dropdown - full width on small screens */
+    .topbar-notif-dropdown {
+        left: auto !important;
+        right: -60px !important;
+        width: calc(100vw - 20px) !important;
+        max-width: 320px !important;
+    }
+}
+
+/* ═══════════════════════════════════════
+   TOPBAR RESPONSIVE (all breakpoints)
+   ═══════════════════════════════════════ */
+@media (max-width: 1024px) {
+    .topbar-actions-row {
+        gap: 10px !important;
+    }
+
+    .user-info-text {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .topbar-actions-row {
+        gap: 6px !important;
+    }
+
+    .topbar-branch-btn {
+        min-width: auto !important;
+        padding: 4px 8px !important;
+    }
+
+    .topbar-lang-btn {
+        padding: 4px 6px !important;
+        font-size: 12px !important;
+    }
+
+    .topbar-notif-dropdown {
+        left: auto !important;
+        right: -40px !important;
+        width: calc(100vw - 24px) !important;
+        max-width: 320px !important;
+    }
+
+    /* Dropdowns: make sure they don't overflow screen */
+    .dropdown-menu {
+        max-width: calc(100vw - 24px);
+    }
+}
+
+/* ═══════════════════════════════════════
+   GLOBAL INLINE GRID OVERRIDE
+   Forces responsive behavior on all inline-styled grids
+   ═══════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* Override inline grid-template-columns with repeat(3+) */
+    div[style*="grid-template-columns: repeat(3"],
+    div[style*="grid-template-columns: repeat(4"],
+    div[style*="grid-template-columns: repeat(5"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Override inline 2-column grids to stack on small mobile */
+    div[style*="grid-template-columns: 2fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* All workspace-header type flex containers: wrap and stack */
+    div[style*="justify-content: space-between"] {
+        flex-wrap: wrap !important;
+    }
+}
+
+@media (max-width: 480px) {
+    div[style*="grid-template-columns: 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
     }
 }
 

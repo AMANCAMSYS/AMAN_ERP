@@ -589,3 +589,73 @@
     text-align: center;
     color: var(--text-muted);
 }
+
+/* ═══════════════════════════════════════
+   MODULE STYLES RESPONSIVE
+   ═══════════════════════════════════════ */
+@media (max-width: 768px) {
+    .modules-grid {
+        grid-template-columns: 1fr !important;
+        gap: 14px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px;
+    }
+
+    .section-card {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .metric-card {
+        padding: 14px 16px;
+        min-height: 80px;
+    }
+
+    .metric-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .data-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+    }
+
+    .data-table {
+        min-width: 500px;
+    }
+
+    .workspace-header {
+        flex-direction: column !important;
+        gap: 12px !important;
+        align-items: stretch !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .modules-grid {
+        gap: 10px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px;
+    }
+
+    .metric-card {
+        padding: 12px;
+        min-height: auto;
+    }
+
+    .metric-value {
+        font-size: 20px;
+    }
+
+    .section-card {
+        padding: 12px;
+    }
+}
