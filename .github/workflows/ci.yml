@@ -211,8 +211,8 @@ jobs:
   deploy-production:
     name: Deploy to Production (DigitalOcean)
     runs-on: ubuntu-22.04
-    needs: docker-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: frontend-tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.frontend-tests.result == 'success'
     environment: production
 
     steps:
