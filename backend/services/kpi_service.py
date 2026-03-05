@@ -415,7 +415,7 @@ def get_financial_kpis(db, start_date: date, end_date: date,
     try:
         bv = db.execute(text("""
             SELECT
-                COALESCE(SUM(bi.amount), 0) as budgeted,
+                COALESCE(SUM(bi.planned_amount), 0) as budgeted,
                 COALESCE(SUM(bi.actual_amount), 0) as actual
             FROM budget_items bi
             JOIN budgets b ON bi.budget_id = b.id
@@ -455,6 +455,10 @@ def get_financial_kpis(db, start_date: date, end_date: date,
     # Zakat estimate (ZATCA method: equity minus fixed assets and intangibles × 2.5%)
     zakat_estimate = 0
     try:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         branch_sql_z, bp_z = build_branch_filter(branch_id)
         # Fixed assets (property/plant/equipment — non-zakatable)
         fa_bal = db.execute(text(f"""
@@ -497,8 +501,7 @@ def get_financial_kpis(db, start_date: date, end_date: date,
 
         zakat_base = max(0.0, equity - fixed_assets_bal - intangibles_bal)
         zakat_estimate = zakat_base * 0.025
-    except Exception as e:
-        logger.warning(f"zakat_estimate failed: {e}")
+    except Exception:
         pass
 
     prev_current_ratio = 0  # Would need prev period balance — simplified
