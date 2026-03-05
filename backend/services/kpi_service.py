@@ -452,10 +452,50 @@ def get_financial_kpis(db, start_date: date, end_date: date,
         pass
     vat_position = vat_output - vat_input
 
-    # Zakat estimate (simplified: 2.5% of zakatable base)
+    # Zakat estimate (ZATCA method: equity minus fixed assets and intangibles × 2.5%)
     zakat_estimate = 0
     try:
-        zakat_base = equity + total_debt  # simplified
+        branch_sql_z, bp_z = build_branch_filter(branch_id)
+        # Fixed assets (property/plant/equipment — non-zakatable)
+        fa_bal = db.execute(text(f"""
+            SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            JOIN accounts a ON jl.account_id = a.id
+            WHERE a.account_type = 'asset'
+              AND (
+                a.account_code LIKE '12%%' OR a.account_code LIKE '15%%' OR a.account_code LIKE '16%%'
+                OR a.name LIKE '%%أصول ثابتة%%' OR a.name LIKE '%%معدات%%' OR a.name LIKE '%%آلات%%'
+                OR a.name LIKE '%%مباني%%' OR a.name LIKE '%%سيارات%%' OR a.name LIKE '%%أثاث%%'
+                OR a.name_en ILIKE '%%fixed asset%%' OR a.name_en ILIKE '%%equipment%%'
+                OR a.name_en ILIKE '%%building%%' OR a.name_en ILIKE '%%vehicle%%'
+                OR a.name_en ILIKE '%%furniture%%' OR a.name_en ILIKE '%%depreciation%%'
+              )
+              AND je.entry_date <= :end_dt AND je.status = 'posted'
+              {branch_sql_z}
+        """), {"end_dt": end_date, **bp_z}).scalar()
+        fixed_assets_bal = float(fa_bal or 0)
+
+        # Intangible assets (goodwill/IP — non-zakatable)
+        intang_bal = db.execute(text(f"""
+            SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            JOIN accounts a ON jl.account_id = a.id
+            WHERE a.account_type = 'asset'
+              AND (
+                a.account_code LIKE '18%%'
+                OR a.name LIKE '%%شهرة%%' OR a.name LIKE '%%براءة%%'
+                OR a.name LIKE '%%رخصة%%' OR a.name LIKE '%%غير ملموس%%'
+                OR a.name_en ILIKE '%%goodwill%%' OR a.name_en ILIKE '%%intangible%%'
+                OR a.name_en ILIKE '%%patent%%' OR a.name_en ILIKE '%%trademark%%'
+              )
+              AND je.entry_date <= :end_dt AND je.status = 'posted'
+              {branch_sql_z}
+        """), {"end_dt": end_date, **bp_z}).scalar()
+        intangibles_bal = float(intang_bal or 0)
+
+        zakat_base = max(0.0, equity - fixed_assets_bal - intangibles_bal)
         zakat_estimate = zakat_base * 0.025
     except Exception:
         pass
