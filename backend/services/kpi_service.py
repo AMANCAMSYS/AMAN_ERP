@@ -497,7 +497,8 @@ def get_financial_kpis(db, start_date: date, end_date: date,
 
         zakat_base = max(0.0, equity - fixed_assets_bal - intangibles_bal)
         zakat_estimate = zakat_base * 0.025
-    except Exception:
+    except Exception as e:
+        logger.warning(f"zakat_estimate failed: {e}")
         pass
 
     prev_current_ratio = 0  # Would need prev period balance — simplified
