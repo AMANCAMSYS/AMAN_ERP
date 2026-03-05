@@ -339,15 +339,22 @@ def auto_match_bank_lines(batch_id: int, current_user: dict = Depends(get_curren
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  2. ZAKAT CALCULATOR
-#     حاسبة الزكاة — طريقة صافي الأصول والوعاء الزكوي
+#     حاسبة الزكاة — حساب الزكاة الشرعي للشركات
 #     ⚠️ Islamic Zakat — applies to Muslim-majority countries (SA, AE, etc.)
 #     Non-Islamic countries may ignore this module.
 #     Frontend should show/hide based on company settings.
+#
+#     الطرق المدعومة:
+#     1. صافي الملكية (ZATCA) — المعتمدة نظامياً في السعودية (الافتراضية)
+#     2. صافي الأصول المتداولة — النقد + عروض التجارة + المدينون المرجوون - الديون الحالة
+#     3. الربح المعدل — للتقدير
+#
+#     المراجع: ZATCA، AAOIFI، بيت الزكاة الكويتي
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class ZakatCalculateRequest(BaseModel):
     fiscal_year: int
-    method: str = "net_assets"  # net_assets or adjusted_profit
+    method: str = "net_assets"  # net_assets (ZATCA, default), net_current_assets, adjusted_profit
     zakat_rate: float = 2.5  # standard Hijri rate (2.5%)
     use_gregorian_rate: bool = False  # If True, uses 2.5775% for Gregorian year
     notes: Optional[str] = None
@@ -359,24 +366,24 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
     """
     حساب الزكاة الشرعية — Sharia-compliant Zakat Calculation
 
-    Two methods are supported:
+    Three methods are supported:
 
-    ═══ METHOD 1: Net Assets (صافي الأصول / الوعاء الزكوي) ═══
-    Based on GAZT (هيئة الزكاة والضريبة والجمارك) guidelines:
-    
-    Zakat Base = Capital + Reserves + Retained Earnings + Provisions
-                 + Long-term Loans + Net Profit
-                 - Fixed Assets - Long-term Investments
-                 - Pre-operating Losses
-    
-    OR simplified: Current Assets - Current Liabilities (Working Capital)
-    
-    ═══ METHOD 2: Adjusted Profit (الربح المُعدَّل) ═══
-    Zakat Base = Net Profit + Non-deductible Expenses (depreciation, provisions,
-                 penalties, donations, entertainment beyond limit)
-                 - Non-taxable Income
+    ═══ METHOD 1: صافي الملكية — ZATCA (Net Equity — DEFAULT) ═══
+    الطريقة المعتمدة نظامياً من هيئة الزكاة والضريبة والجمارك:
+    الوعاء = حقوق الملكية + التزامات طويلة + مخصصات + ربح - أصول ثابتة - استثمارات طويلة
+    هذه الطريقة ملزمة للشركات السعودية التي تمسك حسابات نظامية.
+
+    ═══ METHOD 2: صافي الأصول المتداولة (Net Current Assets) ═══
+    طريقة الموجودات الزكوية وفقاً لمعايير AAOIFI وجمهور الفقهاء:
+    الوعاء = النقد + عروض التجارة + المدينون المرجوون + استثمارات المضاربة
+             - الالتزامات المتداولة (الديون الحالة قصيرة الأجل)
+    يستبعد: الأصول الثابتة، المعنوية، تحت الإنشاء، استثمارات طويلة الأجل
+
+    ═══ METHOD 3: الربح المُعدَّل (Adjusted Profit) ═══
+    الوعاء = صافي الربح + مصروفات غير محسومة
 
     Rate: 2.5% for Hijri year, 2.5775% for Gregorian year (354/365 adjustment)
+    المراجع: ZATCA، AAOIFI، الشيخ عبدالسلام الشويعر، بيت الزكاة الكويتي
     """
     company_id = _u(current_user, "company_id")
     user_id = _u(current_user, "user_id")
@@ -385,16 +392,241 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
         # Determine rate (Decimal for legal tax precision)
         rate = Decimal('2.57764') if body.use_gregorian_rate else Decimal(str(body.zakat_rate))
 
-        if body.method == "net_assets":
-            # ── Detailed Zakat Base Calculation (GAZT Method) ──
+        if body.method == "net_current_assets":
+            # ══════════════════════════════════════════════════════════════
+            # طريقة صافي الأصول المتداولة — Net Current Assets Method
+            # وفقاً لمعايير AAOIFI وجمهور الفقهاء
+            # الوعاء = النقد + عروض التجارة + المدينون المرجوون
+            #        + استثمارات المضاربة - الالتزامات المتداولة
+            # ══════════════════════════════════════════════════════════════
 
-            # 1. Equity components (رأس المال + الاحتياطيات + الأرباح المبقاة)
+            # ── النقد (أصل الأصول المالية في الزكاة بالإجماع) ──
+            # يشمل: الصندوق، البنك، النقد بجميع العملات
+            cash = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '1101%'
+                    OR a.account_code LIKE '11001%'
+                    OR a.account_code LIKE '11010%'
+                    OR a.account_code LIKE '11020%'
+                    OR a.name LIKE '%نقد%' OR a.name LIKE '%صندوق%'
+                    OR a.name LIKE '%بنك%' OR a.name LIKE '%كاش%'
+                    OR a.name_en LIKE '%cash%' OR a.name_en LIKE '%bank%'
+                )
+                AND a.name NOT LIKE '%مجمع%'
+                AND a.name NOT LIKE '%استثمار%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%invest%')
+            """)).scalar() or 0
+
+            # ── تصفية النقد — استبعاد شبه النقد والودائع الاستثمارية ──
+            quasi_cash = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.name LIKE '%نقد معادل%' OR a.name LIKE '%شبه نقد%'
+                    OR a.name LIKE '%وديعة استثمار%' OR a.name LIKE '%سندات خزانة%'
+                    OR a.name_en LIKE '%cash equivalent%' OR a.name_en LIKE '%treasury bill%'
+                    OR a.name_en LIKE '%money market%'
+                )
+            """)).scalar() or 0
+
+            net_cash = Decimal(str(cash)) - Decimal(str(quasi_cash))
+
+            # ── عروض التجارة (كل مال أُعِد للبيع في سوقه خلال السنة) ──
+            # الدليل: (أمرنا رسول الله أن نخرج الصدقة مما نعده للبيع)
+            trade_goods = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '1103%'
+                    OR a.account_code LIKE '13001%'
+                    OR a.account_code LIKE '13010%'
+                    OR a.name LIKE '%مخزون%' OR a.name LIKE '%بضاع%'
+                    OR a.name LIKE '%عروض%تجار%'
+                    OR a.name_en LIKE '%inventory%' OR a.name_en LIKE '%stock%'
+                    OR a.name_en LIKE '%goods%'
+                )
+                AND a.name NOT LIKE '%تحت التصنيع%'
+                AND a.name NOT LIKE '%مواد خام%'
+                AND a.name NOT LIKE '%قطع غيار%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%raw material%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%work in progress%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%spare part%')
+            """)).scalar() or 0
+
+            # ── تصفية عروض التجارة — استبعاد البضاعة الكاسدة ──
+            stale_inventory = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.name LIKE '%كاسد%' OR a.name LIKE '%راكد%'
+                    OR a.name LIKE '%تالف%' OR a.name LIKE '%منتهي الصلاحية%'
+                    OR a.name_en LIKE '%obsolete%' OR a.name_en LIKE '%stale%'
+                    OR a.name_en LIKE '%expired%' OR a.name_en LIKE '%damaged%'
+                )
+            """)).scalar() or 0
+
+            net_trade_goods = Decimal(str(trade_goods)) - Decimal(str(stale_inventory))
+
+            # ── المدينون المرجوون (ديون للشركة على الغير — مرجوة التحصيل) ──
+            # تُدرج في الوعاء الزكوي وفقاً لجمهور الفقهاء ومعايير AAOIFI
+            # الشرط: أن يكون المدين قادراً على السداد وغير مماطل
+            receivables = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '1102%' OR a.account_code LIKE '1108%'
+                    OR a.account_code LIKE '1109%'
+                    OR a.account_code LIKE '12001%' OR a.account_code LIKE '12010%'
+                    OR a.account_code LIKE '12020%'
+                    OR a.name LIKE '%عملاء%' OR a.name LIKE '%مدين%'
+                    OR a.name_en LIKE '%receivable%'
+                )
+                AND a.name NOT LIKE '%مشكوك%'
+                AND a.name NOT LIKE '%معدوم%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%doubtful%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%bad debt%')
+            """)).scalar() or 0
+
+            # استثمارات المضاربة (قصيرة الأجل — معدة للبيع والشراء) ←→ عروض تجارة
+            # تُزكى بقيمتها السوقية. أما الاستثمارات طويلة الأجل فتُستبعد.
+            trading_investments = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.name LIKE '%أسهم%متاجر%' OR a.name LIKE '%محفظة%مضارب%'
+                    OR a.name LIKE '%استثمار%قصير%'
+                    OR a.name_en LIKE '%trading%invest%'
+                    OR a.name_en LIKE '%short%term%invest%'
+                )
+            """)).scalar() or 0
+
+            # ── الالتزامات المتداولة (الديون الحالة — تُخصم من الوعاء) ──
+            # وفقاً لجمهور الفقهاء ومعايير AAOIFI: تُخصم الديون الحالة قصيرة الأجل
+            # لأنها تنقص من الملك التام للأصول الزكوية
+            current_liabilities = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type IN ('liability', 'current_liability')
+                AND (
+                    a.account_code LIKE '21%'
+                    OR a.name LIKE '%دائن%' OR a.name LIKE '%مورد%'
+                    OR a.name LIKE '%مستحق%' OR a.name LIKE '%مصروف%مستحق%'
+                    OR a.name LIKE '%قرض%قصير%'
+                    OR a.name_en LIKE '%payable%' OR a.name_en LIKE '%accrued%'
+                    OR a.name_en LIKE '%supplier%' OR a.name_en LIKE '%short%term%loan%'
+                    OR a.name_en LIKE '%current%liabilit%'
+                )
+            """)).scalar() or 0
+
+            # ── الأصول المستبعدة (للعرض فقط — لا تدخل الحساب) ──
+            # الأصول الثابتة — استهلاكية (ليست نقوداً وليست عروض تجارة)
+            fixed_assets = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '12%' OR a.account_code LIKE '15%'
+                    OR a.account_code LIKE '16%'
+                    OR a.name LIKE '%أصول ثابتة%' OR a.name LIKE '%معدات%'
+                    OR a.name LIKE '%مباني%' OR a.name LIKE '%سيارات%'
+                    OR a.name LIKE '%أثاث%' OR a.name LIKE '%أراضي%'
+                    OR a.name LIKE '%مجمع%'
+                    OR a.name_en LIKE '%fixed asset%' OR a.name_en LIKE '%equipment%'
+                    OR a.name_en LIKE '%building%' OR a.name_en LIKE '%vehicle%'
+                    OR a.name_en LIKE '%furniture%' OR a.name_en LIKE '%depreciation%'
+                )
+            """)).scalar() or 0
+
+            # الأصول المعنوية — ليست نقوداً وليست عروض تجارة
+            intangible_assets = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '13%' OR a.account_code LIKE '18%'
+                    OR a.name LIKE '%شهرة%' OR a.name LIKE '%براءة%'
+                    OR a.name LIKE '%علامة تجارية%' OR a.name LIKE '%رخصة%'
+                    OR a.name LIKE '%غير ملموس%'
+                    OR a.name_en LIKE '%intangible%' OR a.name_en LIKE '%goodwill%'
+                    OR a.name_en LIKE '%patent%' OR a.name_en LIKE '%trademark%'
+                )
+            """)).scalar() or 0
+
+            # مشاريع تحت الإنشاء / تحت التصنيع — مال تحويلي لم يكتمل
+            wip = db.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0)
+                FROM accounts a WHERE a.account_type = 'asset'
+                AND (
+                    a.account_code LIKE '1110%'
+                    OR a.name LIKE '%تحت الإنشاء%' OR a.name LIKE '%تحت التصنيع%'
+                    OR a.name LIKE '%مواد خام%' OR a.name LIKE '%قطع غيار%'
+                    OR a.name_en LIKE '%work in progress%' OR a.name_en LIKE '%under construction%'
+                    OR a.name_en LIKE '%raw material%' OR a.name_en LIKE '%spare part%'
+                )
+            """)).scalar() or 0
+
+            # ── حساب الوعاء الزكوي ──
+            # الوعاء = النقد + عروض التجارة + المدينون المرجوون + استثمارات المضاربة
+            #        - الالتزامات المتداولة (الديون الحالة)
+            gross_zakatable = net_cash + net_trade_goods + Decimal(str(receivables)) + Decimal(str(trading_investments))
+            cl_decimal = Decimal(str(current_liabilities))
+            zakat_base = max(Decimal('0'), gross_zakatable - cl_decimal)
+
+            zakat_amount = (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP)
+
+            additions = [
+                {"label": "Cash & Bank Balances", "label_ar": "النقد والأرصدة البنكية", "amount": float(Decimal(str(cash)).quantize(Decimal('0.01')))},
+            ]
+            if quasi_cash:
+                additions.append({"label": "Less: Quasi-Cash / Investment Deposits", "label_ar": "(-) النقد المعادل / ودائع استثمارية", "amount": float(Decimal(str(-quasi_cash)).quantize(Decimal('0.01')))})
+            additions.append({"label": "Net Cash", "label_ar": "صافي النقد", "amount": float(net_cash.quantize(Decimal('0.01'))), "is_subtotal": True})
+
+            additions.append({"label": "Trade Goods (Inventory for Sale)", "label_ar": "عروض التجارة (المخزون المعد للبيع)", "amount": float(Decimal(str(trade_goods)).quantize(Decimal('0.01')))})
+            if stale_inventory:
+                additions.append({"label": "Less: Stale/Obsolete Inventory", "label_ar": "(-) بضاعة كاسدة / راكدة", "amount": float(Decimal(str(-stale_inventory)).quantize(Decimal('0.01')))})
+            additions.append({"label": "Net Trade Goods", "label_ar": "صافي عروض التجارة", "amount": float(net_trade_goods.quantize(Decimal('0.01'))), "is_subtotal": True})
+
+            if receivables:
+                additions.append({"label": "Collectible Receivables", "label_ar": "المدينون المرجوون (مرجو تحصيلهم)", "amount": float(Decimal(str(receivables)).quantize(Decimal('0.01')))})
+            if trading_investments:
+                additions.append({"label": "Trading Investments (Short-term)", "label_ar": "استثمارات المضاربة (قصيرة الأجل)", "amount": float(Decimal(str(trading_investments)).quantize(Decimal('0.01')))})
+
+            total_additions = float(gross_zakatable.quantize(Decimal('0.01')))
+
+            deductions = []
+            if current_liabilities:
+                deductions.append({"label": "Current Liabilities (Short-term Debts)", "label_ar": "الالتزامات المتداولة (الديون الحالة قصيرة الأجل)", "amount": float(cl_decimal.quantize(Decimal('0.01')))})
+            total_deductions = float(cl_decimal.quantize(Decimal('0.01')))
+
+            # الأصول المستبعدة (للعرض فقط — informational)
+            excluded_info = []
+            if fixed_assets:
+                excluded_info.append({"label": "Fixed Assets (non-zakatable)", "label_ar": "الأصول الثابتة (قنية — لا تُزكّى)", "amount": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01')))})
+            if intangible_assets:
+                excluded_info.append({"label": "Intangible Assets", "label_ar": "الأصول المعنوية (غير ملموسة)", "amount": float(Decimal(str(intangible_assets)).quantize(Decimal('0.01')))})
+            if wip:
+                excluded_info.append({"label": "Work In Progress / Raw Materials", "label_ar": "تحت الإنشاء / مواد خام", "amount": float(Decimal(str(wip)).quantize(Decimal('0.01')))})
+
+            details = {
+                "method_name_ar": "طريقة صافي الأصول المتداولة",
+                "method_name_en": "Net Current Assets Method (AAOIFI)",
+                "sharia_basis": "النقد + عروض التجارة + المدينون المرجوون - الديون الحالة (وفقاً لجمهور الفقهاء ومعايير AAOIFI)",
+                "excluded_assets": excluded_info,
+                "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
+                "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
+                "applied_rate": float(rate)
+            }
+
+        elif body.method == "net_assets":
+            # ── طريقة صافي الملكية — ZATCA (المعتمدة نظامياً في السعودية) ──
+            # الطريقة الملزمة للشركات السعودية التي تمسك حسابات نظامية
+
+            # 1. Equity components
             equity = db.execute(text("""
                 SELECT COALESCE(SUM(a.balance), 0)
                 FROM accounts a WHERE a.account_type = 'equity'
             """)).scalar() or 0
 
-            # 2. Long-term liabilities (الالتزامات طويلة الأجل)
+            # 2. Long-term liabilities
             lt_liabilities = db.execute(text("""
                 SELECT COALESCE(SUM(a.balance), 0)
                 FROM accounts a WHERE a.account_type IN ('long_term_liability', 'liability')
@@ -402,14 +634,14 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                      OR a.account_code LIKE '22%')
             """)).scalar() or 0
 
-            # 3. Provisions (المخصصات)
+            # 3. Provisions
             provisions = db.execute(text("""
                 SELECT COALESCE(SUM(a.balance), 0)
                 FROM accounts a WHERE a.account_type IN ('liability', 'equity')
                 AND (a.name LIKE '%مخصص%' OR a.name_en LIKE '%provision%')
             """)).scalar() or 0
 
-            # 4. Net profit for the year
+            # 4. Net profit
             revenue = db.execute(text("""
                 SELECT COALESCE(SUM(CASE WHEN a.account_type IN ('revenue', 'income') 
                     THEN a.balance ELSE 0 END), 0) FROM accounts a
@@ -420,12 +652,11 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             """)).scalar() or 0
             net_profit = Decimal(str(revenue)) - Decimal(str(expenses))
 
-            # ADDITIONS to Zakat Base
-            additions = Decimal(str(equity)) + Decimal(str(lt_liabilities)) + Decimal(str(provisions))
+            total_add = Decimal(str(equity)) + Decimal(str(lt_liabilities)) + Decimal(str(provisions))
             if net_profit > 0:
-                additions += net_profit
+                total_add += net_profit
 
-            # 5. DEDUCTIONS — Fixed assets (الأصول الثابتة)
+            # 5. Fixed assets
             fixed_assets = db.execute(text("""
                 SELECT COALESCE(SUM(a.balance), 0)
                 FROM accounts a WHERE a.account_type = 'asset'
@@ -434,7 +665,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                      OR a.account_code LIKE '12%' OR a.account_code LIKE '15%')
             """)).scalar() or 0
 
-            # 6. Long-term investments (الاستثمارات طويلة الأجل)
+            # 6. Long-term investments
             lt_investments = db.execute(text("""
                 SELECT COALESCE(SUM(a.balance), 0)
                 FROM accounts a WHERE a.account_type = 'asset'
@@ -443,46 +674,29 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                      OR a.account_code LIKE '13%')
             """)).scalar() or 0
 
-            deductions = Decimal(str(fixed_assets)) + Decimal(str(lt_investments))
+            total_ded = Decimal(str(fixed_assets)) + Decimal(str(lt_investments))
+            zakat_base = max(Decimal('0'), total_add - total_ded)
+            zakat_amount = (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP)
 
-            zakat_base = additions - deductions
+            additions = [
+                {"label": "Equity (Capital + Reserves + RE)", "label_ar": "حقوق الملكية (رأس المال + احتياطيات + أرباح مبقاة)", "amount": float(Decimal(str(equity)).quantize(Decimal('0.01')))},
+                {"label": "Long-term Liabilities", "label_ar": "الالتزامات طويلة الأجل", "amount": float(Decimal(str(lt_liabilities)).quantize(Decimal('0.01')))},
+                {"label": "Provisions", "label_ar": "المخصصات", "amount": float(Decimal(str(provisions)).quantize(Decimal('0.01')))},
+                {"label": "Net Profit", "label_ar": "صافي الربح", "amount": float(net_profit.quantize(Decimal('0.01'))) if net_profit > 0 else 0},
+            ]
+            total_additions = float(total_add.quantize(Decimal('0.01')))
 
-            # Also calculate simplified method for comparison
-            ca = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND a.account_code LIKE '1%'
-                AND a.account_code NOT LIKE '12%' AND a.account_code NOT LIKE '13%'
-                AND a.account_code NOT LIKE '15%'
-            """)).scalar() or 0
-
-            cl = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('liability', 'current_liability')
-                AND a.account_code LIKE '21%'
-            """)).scalar() or 0
-
-            simplified_base = Decimal(str(ca)) - Decimal(str(cl))
-
-            zakat_amount = max(Decimal('0'), (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP))
+            deductions = [
+                {"label": "Fixed Assets", "label_ar": "الأصول الثابتة", "amount": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01')))},
+                {"label": "Long-term Investments", "label_ar": "الاستثمارات طويلة الأجل", "amount": float(Decimal(str(lt_investments)).quantize(Decimal('0.01')))},
+            ]
+            total_deductions = float(total_ded.quantize(Decimal('0.01')))
 
             details = {
-                "method_name_ar": "طريقة صافي الأصول (الوعاء الزكوي)",
-                "method_name_en": "Net Assets Method (Zakat Base)",
-                "additions": {
-                    "equity": float(Decimal(str(equity)).quantize(Decimal('0.01'))),
-                    "long_term_liabilities": float(Decimal(str(lt_liabilities)).quantize(Decimal('0.01'))),
-                    "provisions": float(Decimal(str(provisions)).quantize(Decimal('0.01'))),
-                    "net_profit": float(net_profit.quantize(Decimal('0.01'))) if net_profit > 0 else 0,
-                    "total_additions": float(additions.quantize(Decimal('0.01')))
-                },
-                "deductions": {
-                    "fixed_assets": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01'))),
-                    "long_term_investments": float(Decimal(str(lt_investments)).quantize(Decimal('0.01'))),
-                    "total_deductions": float(deductions.quantize(Decimal('0.01')))
-                },
+                "method_name_ar": "طريقة صافي الملكية — ZATCA (المعتمدة نظامياً)",
+                "method_name_en": "Net Equity Method — ZATCA (Regulatory)",
+                "note": "الطريقة المعتمدة نظامياً من هيئة الزكاة والضريبة والجمارك للشركات السعودية",
                 "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
-                "simplified_working_capital": float(simplified_base.quantize(Decimal('0.01'))),
                 "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
                 "applied_rate": float(rate)
             }
@@ -529,23 +743,31 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             zakat_base = max(Decimal('0'), adjusted_profit)
             zakat_amount = (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP)
 
+            additions = [
+                {"label": "Revenue", "label_ar": "الإيرادات", "amount": float(Decimal(str(revenue)).quantize(Decimal('0.01')))},
+                {"label": "Less: Expenses", "label_ar": "(-) المصروفات", "amount": float(Decimal(str(-expenses)).quantize(Decimal('0.01'))) if expenses else 0},
+                {"label": "Net Profit", "label_ar": "صافي الربح", "amount": float(net_profit.quantize(Decimal('0.01'))), "is_subtotal": True},
+                {"label": "Add: Depreciation", "label_ar": "(+) الاستهلاك/الإهلاك", "amount": float(Decimal(str(depreciation)).quantize(Decimal('0.01')))},
+                {"label": "Add: Provisions", "label_ar": "(+) المخصصات", "amount": float(Decimal(str(provision_expense)).quantize(Decimal('0.01')))},
+                {"label": "Add: Penalties & Fines", "label_ar": "(+) الغرامات والجزاءات", "amount": float(Decimal(str(penalties)).quantize(Decimal('0.01')))},
+            ]
+            total_additions = float(adjusted_profit.quantize(Decimal('0.01')))
+            deductions = []
+            total_deductions = 0
+
             details = {
                 "method_name_ar": "طريقة الربح المُعدَّل",
                 "method_name_en": "Adjusted Profit Method",
-                "revenue": float(Decimal(str(revenue)).quantize(Decimal('0.01'))),
-                "expenses": float(Decimal(str(expenses)).quantize(Decimal('0.01'))),
-                "net_profit": float(net_profit.quantize(Decimal('0.01'))),
-                "add_backs": {
-                    "depreciation": float(Decimal(str(depreciation)).quantize(Decimal('0.01'))),
-                    "provisions": float(Decimal(str(provision_expense)).quantize(Decimal('0.01'))),
-                    "penalties_fines": float(Decimal(str(penalties)).quantize(Decimal('0.01'))),
-                    "total_add_backs": float(total_add_backs.quantize(Decimal('0.01')))
-                },
-                "adjusted_profit": float(adjusted_profit.quantize(Decimal('0.01'))),
                 "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
                 "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
                 "applied_rate": float(rate)
             }
+
+        method_names = {
+            "net_assets": "صافي الملكية — ZATCA",
+            "net_current_assets": "صافي الأصول المتداولة",
+            "adjusted_profit": "الربح المُعدَّل"
+        }
 
         # Save calculation
         db.execute(text("""
@@ -569,11 +791,16 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
         return {
             "fiscal_year": body.fiscal_year,
             "method": body.method,
-            "method_ar": "صافي الأصول" if body.method == "net_assets" else "الربح المُعدَّل",
+            "method_ar": method_names.get(body.method, body.method),
             "details": details,
-            "zakat_base": zakat_base,
-            "zakat_rate": body.zakat_rate,
-            "zakat_amount": zakat_amount,
+            "additions": additions,
+            "total_additions": total_additions,
+            "deductions": deductions,
+            "total_deductions": total_deductions,
+            "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
+            "zakat_rate": float(rate),
+            "rate_display": f"{float(rate)}%" if body.use_gregorian_rate else f"{body.zakat_rate}%",
+            "zakat_amount": float(zakat_amount),
             "message": f"الزكاة المستحقة: {zakat_amount:,.2f}"
         }
     except HTTPException:

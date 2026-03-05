@@ -103,7 +103,8 @@ function ZakatCalculator() {
                     <div className="form-group">
                         <label>{t('zakat.method')}</label>
                         <select className="form-select" value={method} onChange={e => setMethod(e.target.value)}>
-                            <option value="net_assets">{t('zakat.net_assets_method')}</option>
+                            <option value="net_assets">{t('zakat.net_assets_method', 'صافي الملكية — ZATCA')}</option>
+                            <option value="net_current_assets">{t('zakat.net_current_assets_method', 'صافي الأصول المتداولة (AAOIFI)')}</option>
                             <option value="adjusted_profit">{t('zakat.adjusted_profit_method')}</option>
                         </select>
                     </div>
@@ -122,35 +123,68 @@ function ZakatCalculator() {
                 </div>
             </div>
 
+            {/* Method description */}
+            {method === 'net_assets' && (
+                <div className="alert alert-info mt-3" style={{ fontSize: '13px', lineHeight: 1.8 }}>
+                    🏛️ <strong>{t('zakat.zatca_note_title', 'الطريقة النظامية — ZATCA:')}</strong>{' '}
+                    {t('zakat.zatca_note_desc', 'الطريقة المعتمدة نظامياً من هيئة الزكاة والضريبة والجمارك. الوعاء = حقوق الملكية + الالتزامات طويلة الأجل + المخصصات + الربح - الأصول الثابتة - الاستثمارات طويلة الأجل.')}
+                </div>
+            )}
+            {method === 'net_current_assets' && (
+                <div className="alert alert-success mt-3" style={{ fontSize: '13px', lineHeight: 1.8 }}>
+                    📖 <strong>{t('zakat.aaoifi_note_title', 'طريقة صافي الأصول المتداولة — AAOIFI:')}</strong>{' '}
+                    {t('zakat.aaoifi_note_desc', 'وفقاً لمعايير AAOIFI وجمهور الفقهاء: الوعاء = النقد + عروض التجارة + المدينون المرجوون + استثمارات المضاربة - الالتزامات المتداولة (الديون الحالة). يستبعد: الأصول الثابتة والمعنوية والمشاريع تحت الإنشاء.')}
+                </div>
+            )}
+
             {result && (
                 <>
                     {/* Zakat Base Details */}
                     <div className="grid grid-2 mt-4" style={{ gap: 16 }}>
                         <div className="card p-4">
-                            <h3 className="card-title text-success mb-3">➕ {t('zakat.additions')}</h3>
+                            <h3 className="card-title text-success mb-3">
+                                ➕ {t('zakat.additions')}
+                            </h3>
                             {result.additions && result.additions.map((a, i) => (
-                                <div key={i} className="flex justify-between py-1 border-bottom">
+                                <div key={i} className="flex justify-between py-1 border-bottom" style={a.is_subtotal ? { fontWeight: 'bold', borderTop: '2px solid var(--border)', paddingTop: '8px' } : {}}>
                                     <span>{a.label_ar || a.label}</span>
-                                    <span className="font-medium">{formatNumber(a.amount)} {currency}</span>
+                                    <span className="font-medium" style={a.amount < 0 ? { color: 'var(--danger)' } : {}}>{formatNumber(a.amount)} {currency}</span>
                                 </div>
                             ))}
-                            <div className="flex justify-between py-2 font-bold mt-2">
+                            <div className="flex justify-between py-2 font-bold mt-2" style={{ borderTop: '3px double var(--border)', paddingTop: '10px' }}>
                                 <span>{t('zakat.total_additions')}</span>
                                 <span className="text-success">{formatNumber(result.total_additions || 0)} {currency}</span>
                             </div>
                         </div>
                         <div className="card p-4">
-                            <h3 className="card-title text-danger mb-3">➖ {t('zakat.deductions')}</h3>
-                            {result.deductions && result.deductions.map((d, i) => (
+                            <h3 className="card-title text-danger mb-3">
+                                ➖ {t('zakat.deductions')}
+                            </h3>
+                            {result.deductions && result.deductions.length > 0 ? result.deductions.map((d, i) => (
                                 <div key={i} className="flex justify-between py-1 border-bottom">
-                                    <span>{d.label_ar || d.label}</span>
-                                    <span className="font-medium">{formatNumber(d.amount)} {currency}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>{d.label_ar || d.label}</span>
+                                    <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{formatNumber(d.amount)} {currency}</span>
                                 </div>
-                            ))}
-                            <div className="flex justify-between py-2 font-bold mt-2">
-                                <span>{t('zakat.total_deductions')}</span>
-                                <span className="text-danger">{formatNumber(result.total_deductions || 0)} {currency}</span>
-                            </div>
+                            )) : (
+                                <div className="text-muted py-2">{t('zakat.no_deductions', 'لا توجد حسميات')}</div>
+                            )}
+                            {result.deductions && result.deductions.length > 0 && (
+                                <div className="flex justify-between py-2 font-bold mt-2" style={{ borderTop: '3px double var(--border)', paddingTop: '10px' }}>
+                                    <span>{t('zakat.total_deductions')}</span>
+                                    <span className="text-danger">{formatNumber(result.total_deductions || 0)} {currency}</span>
+                                </div>
+                            )}
+                            {result.details?.excluded_assets && result.details.excluded_assets.length > 0 && (
+                                <div className="mt-3 p-2" style={{ background: 'var(--bg-secondary)', borderRadius: 8, fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+                                    📌 <strong>{t('zakat.excluded_info_title', 'للعلم — أصول غير زكوية:')}</strong>
+                                    {result.details.excluded_assets.map((ea, i) => (
+                                        <div key={i} className="flex justify-between mt-1">
+                                            <span>{ea.label_ar || ea.label}</span>
+                                            <span>{formatNumber(ea.amount)} {currency}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -163,7 +197,7 @@ function ZakatCalculator() {
                             </div>
                             <div>
                                 <div className="text-muted">{t('zakat.rate')}</div>
-                                <div className="text-xl font-bold">{result.rate || (useGregorian ? '2.5775%' : '2.5%')}</div>
+                                <div className="text-xl font-bold">{result.rate_display || (useGregorian ? '2.5775%' : '2.5%')}</div>
                             </div>
                             <div>
                                 <div className="text-muted">{t('zakat.zakat_amount')}</div>
