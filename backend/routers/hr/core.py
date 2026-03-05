@@ -11,6 +11,7 @@ from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResp
 from utils.permissions import require_permission, validate_branch_access, check_permission, require_module
 from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
+from utils.audit import log_activity
 from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
 
 logger = logging.getLogger(__name__)
