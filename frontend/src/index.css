@@ -195,10 +195,24 @@ body {
 
 .main-container {
   flex: 1;
-  margin-right: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  transition: margin 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-right: var(--sidebar-width);
+}
+
+.main-container.sidebar-closed {
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+}
+
+[dir="ltr"] .main-container {
+  margin-right: 0;
+  margin-left: var(--sidebar-width);
+}
+
+[dir="ltr"] .main-container.sidebar-closed {
+  margin-left: 0 !important;
 }
 
 /* Sidebar Styling */
@@ -213,16 +227,18 @@ body {
   display: flex;
   flex-direction: column;
   z-index: 1000;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
 }
 
-/* Mobile: sidebar hidden by default, shown when open */
-.sidebar.sidebar-mobile-hidden {
-  transform: translateX(110%);
+/* On Desktop, when it's closed, we just use translateY or standard hidden */
+.sidebar:not(.sidebar-open) {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
-.sidebar.sidebar-mobile-hidden.sidebar-open {
-  transform: translateX(0);
+[dir="ltr"] .sidebar:not(.sidebar-open) {
+  transform: translateX(-100%);
 }
 
 .sidebar-brand {
@@ -2095,7 +2111,7 @@ input {
 
 /* ── Sidebar Toggle Button (hidden on desktop, shown on mobile) ── */
 .sidebar-toggle {
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     width: 36px;

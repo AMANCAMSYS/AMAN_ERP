@@ -5,8 +5,8 @@ import { authAPI } from '../utils/api'
 import { getUser } from '../utils/auth'
 
 function Layout({ children }) {
-    const [sidebarOpen, setSidebarOpen] = useState(false)
-    const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
+    const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 1024)
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 1024)
 
     useEffect(() => {
         const user = getUser();
@@ -24,9 +24,10 @@ function Layout({ children }) {
     // Track screen size
     useEffect(() => {
         const handleResize = () => {
-            const mobile = window.innerWidth < 1024
+            const mobile = window.innerWidth <= 1024
             setIsMobile(mobile)
-            if (!mobile) setSidebarOpen(false)
+            if (mobile) setSidebarOpen(false)
+            else setSidebarOpen(true)
         }
         window.addEventListener('resize', handleResize)
         return () => window.removeEventListener('resize', handleResize)
@@ -47,7 +48,7 @@ function Layout({ children }) {
                 />
             )}
             <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} />
-            <div className="main-container" style={{ marginRight: isMobile ? 0 : 'var(--sidebar-width)' }}>
+            <div className={`main-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
                 <Topbar onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
                 <main className="content-area">
                     {children}
