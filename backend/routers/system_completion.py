@@ -14,7 +14,7 @@ import io, csv, json, logging, subprocess, os
 
 from database import get_db_connection, engine as system_engine
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
@@ -357,7 +357,77 @@ class ZakatCalculateRequest(BaseModel):
     method: str = "net_assets"  # net_assets (ZATCA, default), net_current_assets, adjusted_profit
     zakat_rate: float = 2.5  # standard Hijri rate (2.5%)
     use_gregorian_rate: bool = False  # If True, uses 2.5775% for Gregorian year
+    branch_id: Optional[int] = None  # Filter by branch (None = all branches)
     notes: Optional[str] = None
+
+
+def _zakat_balance_query(account_filter: str, account_types: list, branch_id=None, sign="debit"):
+    """
+    Build a balance query that supports branch filtering.
+    When branch_id is None: use accounts.balance (fast, all branches).
+    When branch_id is set: compute from journal_lines (branch-specific).
+    sign='debit' means debit-normal (assets/expenses), 'credit' means credit-normal (liabilities/equity/revenue).
+    Returns (sql_string, params_dict).
+    """
+    type_list = "','".join(account_types)
+    if branch_id:
+        if sign == "debit":
+            agg = "SUM(jl.debit - jl.credit)"
+        else:
+            agg = "SUM(jl.credit - jl.debit)"
+        sql = f"""
+            SELECT COALESCE({agg}, 0)
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id AND je.status = 'posted'
+            JOIN accounts a ON jl.account_id = a.id
+            WHERE je.branch_id = :branch_id
+            AND a.account_type IN ('{type_list}')
+            AND ({account_filter})
+        """
+        return sql, {"branch_id": branch_id}
+    else:
+        sql = f"""
+            SELECT COALESCE(SUM(a.balance), 0)
+            FROM accounts a WHERE a.account_type IN ('{type_list}')
+            AND ({account_filter})
+        """
+        return sql, {}
+
+
+def _zakat_account_breakdown(db, account_filter: str, account_types: list, branch_id=None, sign="debit"):
+    """
+    Return list of individual accounts that matched the filter, with their balances.
+    Used for debugging/audit to show which accounts contributed.
+    """
+    type_list = "','".join(account_types)
+    if branch_id:
+        if sign == "debit":
+            agg = "SUM(jl.debit - jl.credit)"
+        else:
+            agg = "SUM(jl.credit - jl.debit)"
+        sql = f"""
+            SELECT a.account_code, a.name, a.name_en, {agg} as balance
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id AND je.status = 'posted'
+            JOIN accounts a ON jl.account_id = a.id
+            WHERE je.branch_id = :branch_id
+            AND a.account_type IN ('{type_list}')
+            AND ({account_filter})
+            GROUP BY a.id, a.account_code, a.name, a.name_en
+            HAVING {agg} != 0
+            ORDER BY a.account_code
+        """
+        rows = db.execute(text(sql), {"branch_id": branch_id}).fetchall()
+    else:
+        sql = f"""
+            SELECT a.account_code, a.name, a.name_en, a.balance
+            FROM accounts a WHERE a.account_type IN ('{type_list}')
+            AND ({account_filter})
+            AND a.balance != 0
+            ORDER BY a.account_code
+        """
+        rows = db.execute(text(sql)).fetchall()
+    return [{"code": r.account_code, "name": r.name, "name_en": r.name_en, "balance": float(r.balance)} for r in rows]
 
 
 @router.post("/accounting/zakat/calculate", dependencies=[Depends(require_permission("accounting.manage"))],
@@ -365,30 +435,15 @@ class ZakatCalculateRequest(BaseModel):
 def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(get_current_user)):
     """
     حساب الزكاة الشرعية — Sharia-compliant Zakat Calculation
-
-    Three methods are supported:
-
-    ═══ METHOD 1: صافي الملكية — ZATCA (Net Equity — DEFAULT) ═══
-    الطريقة المعتمدة نظامياً من هيئة الزكاة والضريبة والجمارك:
-    الوعاء = حقوق الملكية + التزامات طويلة + مخصصات + ربح - أصول ثابتة - استثمارات طويلة
-    هذه الطريقة ملزمة للشركات السعودية التي تمسك حسابات نظامية.
-
-    ═══ METHOD 2: صافي الأصول المتداولة (Net Current Assets) ═══
-    طريقة الموجودات الزكوية وفقاً لمعايير AAOIFI وجمهور الفقهاء:
-    الوعاء = النقد + عروض التجارة + المدينون المرجوون + استثمارات المضاربة
-             - الالتزامات المتداولة (الديون الحالة قصيرة الأجل)
-    يستبعد: الأصول الثابتة، المعنوية، تحت الإنشاء، استثمارات طويلة الأجل
-
-    ═══ METHOD 3: الربح المُعدَّل (Adjusted Profit) ═══
-    الوعاء = صافي الربح + مصروفات غير محسومة
-
-    Rate: 2.5% for Hijri year, 2.5775% for Gregorian year (354/365 adjustment)
-    المراجع: ZATCA، AAOIFI، الشيخ عبدالسلام الشويعر، بيت الزكاة الكويتي
+    Supports branch filtering via branch_id parameter.
     """
     company_id = _u(current_user, "company_id")
     user_id = _u(current_user, "user_id")
     db = get_db_connection(company_id)
     try:
+        # Validate branch access
+        branch_id = validate_branch_access(current_user, body.branch_id) if body.branch_id else None
+
         # Determine rate (Decimal for legal tax precision)
         rate = Decimal('2.57764') if body.use_gregorian_rate else Decimal(str(body.zakat_rate))
 
@@ -401,168 +456,151 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             # ══════════════════════════════════════════════════════════════
 
             # ── النقد (أصل الأصول المالية في الزكاة بالإجماع) ──
-            # يشمل: الصندوق، البنك، النقد بجميع العملات
-            cash = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '1101%'
-                    OR a.account_code LIKE '11001%'
-                    OR a.account_code LIKE '11010%'
-                    OR a.account_code LIKE '11020%'
-                    OR a.name LIKE '%نقد%' OR a.name LIKE '%صندوق%'
-                    OR a.name LIKE '%بنك%' OR a.name LIKE '%كاش%'
-                    OR a.name_en LIKE '%cash%' OR a.name_en LIKE '%bank%'
-                )
-                AND a.name NOT LIKE '%مجمع%'
-                AND a.name NOT LIKE '%استثمار%'
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%invest%')
-            """)).scalar() or 0
+            cash_filter = """
+                    a.account_code LIKE '1101%%'
+                    OR a.account_code LIKE '11001%%'
+                    OR a.account_code LIKE '11010%%'
+                    OR a.account_code LIKE '11020%%'
+                    OR a.name LIKE '%%نقد%%' OR a.name LIKE '%%صندوق%%'
+                    OR a.name LIKE '%%بنك%%' OR a.name LIKE '%%كاش%%'
+                    OR a.name_en LIKE '%%cash%%' OR a.name_en LIKE '%%bank%%'
+            """
+            cash_exclude = """
+                AND a.name NOT LIKE '%%مجمع%%'
+                AND a.name NOT LIKE '%%استثمار%%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%invest%%')
+            """
+            cash_full_filter = f"({cash_filter}) {cash_exclude}"
+            cash_sql, cash_params = _zakat_balance_query(cash_full_filter, ['asset'], branch_id)
+            cash = db.execute(text(cash_sql), cash_params).scalar() or 0
+            cash_accounts = _zakat_account_breakdown(db, cash_full_filter, ['asset'], branch_id)
 
             # ── تصفية النقد — استبعاد شبه النقد والودائع الاستثمارية ──
-            quasi_cash = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.name LIKE '%نقد معادل%' OR a.name LIKE '%شبه نقد%'
-                    OR a.name LIKE '%وديعة استثمار%' OR a.name LIKE '%سندات خزانة%'
-                    OR a.name_en LIKE '%cash equivalent%' OR a.name_en LIKE '%treasury bill%'
-                    OR a.name_en LIKE '%money market%'
-                )
-            """)).scalar() or 0
+            quasi_filter = """
+                    a.name LIKE '%%نقد معادل%%' OR a.name LIKE '%%شبه نقد%%'
+                    OR a.name LIKE '%%وديعة استثمار%%' OR a.name LIKE '%%سندات خزانة%%'
+                    OR a.name_en LIKE '%%cash equivalent%%' OR a.name_en LIKE '%%treasury bill%%'
+                    OR a.name_en LIKE '%%money market%%'
+            """
+            quasi_sql, quasi_params = _zakat_balance_query(quasi_filter, ['asset'], branch_id)
+            quasi_cash = db.execute(text(quasi_sql), quasi_params).scalar() or 0
 
             net_cash = Decimal(str(cash)) - Decimal(str(quasi_cash))
 
             # ── عروض التجارة (كل مال أُعِد للبيع في سوقه خلال السنة) ──
-            # الدليل: (أمرنا رسول الله أن نخرج الصدقة مما نعده للبيع)
-            trade_goods = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '1103%'
-                    OR a.account_code LIKE '13001%'
-                    OR a.account_code LIKE '13010%'
-                    OR a.name LIKE '%مخزون%' OR a.name LIKE '%بضاع%'
-                    OR a.name LIKE '%عروض%تجار%'
-                    OR a.name_en LIKE '%inventory%' OR a.name_en LIKE '%stock%'
-                    OR a.name_en LIKE '%goods%'
-                )
-                AND a.name NOT LIKE '%تحت التصنيع%'
-                AND a.name NOT LIKE '%مواد خام%'
-                AND a.name NOT LIKE '%قطع غيار%'
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%raw material%')
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%work in progress%')
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%spare part%')
-            """)).scalar() or 0
+            trade_filter = """
+                    a.account_code LIKE '1103%%'
+                    OR a.account_code LIKE '13001%%'
+                    OR a.account_code LIKE '13010%%'
+                    OR a.name LIKE '%%مخزون%%' OR a.name LIKE '%%بضاع%%'
+                    OR a.name LIKE '%%عروض%%تجار%%'
+                    OR a.name_en LIKE '%%inventory%%' OR a.name_en LIKE '%%stock%%'
+                    OR a.name_en LIKE '%%goods%%'
+            """
+            trade_exclude = """
+                AND a.name NOT LIKE '%%تحت التصنيع%%'
+                AND a.name NOT LIKE '%%مواد خام%%'
+                AND a.name NOT LIKE '%%قطع غيار%%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%raw material%%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%work in progress%%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%spare part%%')
+            """
+            trade_full_filter = f"({trade_filter}) {trade_exclude}"
+            trade_sql, trade_params = _zakat_balance_query(trade_full_filter, ['asset'], branch_id)
+            trade_goods = db.execute(text(trade_sql), trade_params).scalar() or 0
+            trade_accounts = _zakat_account_breakdown(db, trade_full_filter, ['asset'], branch_id)
 
             # ── تصفية عروض التجارة — استبعاد البضاعة الكاسدة ──
-            stale_inventory = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.name LIKE '%كاسد%' OR a.name LIKE '%راكد%'
-                    OR a.name LIKE '%تالف%' OR a.name LIKE '%منتهي الصلاحية%'
-                    OR a.name_en LIKE '%obsolete%' OR a.name_en LIKE '%stale%'
-                    OR a.name_en LIKE '%expired%' OR a.name_en LIKE '%damaged%'
-                )
-            """)).scalar() or 0
+            stale_filter = """
+                    a.name LIKE '%%كاسد%%' OR a.name LIKE '%%راكد%%'
+                    OR a.name LIKE '%%تالف%%' OR a.name LIKE '%%منتهي الصلاحية%%'
+                    OR a.name_en LIKE '%%obsolete%%' OR a.name_en LIKE '%%stale%%'
+                    OR a.name_en LIKE '%%expired%%' OR a.name_en LIKE '%%damaged%%'
+            """
+            stale_sql, stale_params = _zakat_balance_query(stale_filter, ['asset'], branch_id)
+            stale_inventory = db.execute(text(stale_sql), stale_params).scalar() or 0
 
             net_trade_goods = Decimal(str(trade_goods)) - Decimal(str(stale_inventory))
 
-            # ── المدينون المرجوون (ديون للشركة على الغير — مرجوة التحصيل) ──
-            # تُدرج في الوعاء الزكوي وفقاً لجمهور الفقهاء ومعايير AAOIFI
-            # الشرط: أن يكون المدين قادراً على السداد وغير مماطل
-            receivables = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '1102%' OR a.account_code LIKE '1108%'
-                    OR a.account_code LIKE '1109%'
-                    OR a.account_code LIKE '12001%' OR a.account_code LIKE '12010%'
-                    OR a.account_code LIKE '12020%'
-                    OR a.name LIKE '%عملاء%' OR a.name LIKE '%مدين%'
-                    OR a.name_en LIKE '%receivable%'
-                )
-                AND a.name NOT LIKE '%مشكوك%'
-                AND a.name NOT LIKE '%معدوم%'
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%doubtful%')
-                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%bad debt%')
-            """)).scalar() or 0
+            # ── المدينون المرجوون ──
+            recv_filter = """
+                    a.account_code LIKE '1102%%' OR a.account_code LIKE '1108%%'
+                    OR a.account_code LIKE '1109%%'
+                    OR a.account_code LIKE '12001%%' OR a.account_code LIKE '12010%%'
+                    OR a.account_code LIKE '12020%%'
+                    OR a.name LIKE '%%عملاء%%' OR a.name LIKE '%%مدين%%'
+                    OR a.name_en LIKE '%%receivable%%'
+            """
+            recv_exclude = """
+                AND a.name NOT LIKE '%%مشكوك%%'
+                AND a.name NOT LIKE '%%معدوم%%'
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%doubtful%%')
+                AND (a.name_en IS NULL OR a.name_en NOT LIKE '%%bad debt%%')
+            """
+            recv_full_filter = f"({recv_filter}) {recv_exclude}"
+            recv_sql, recv_params = _zakat_balance_query(recv_full_filter, ['asset'], branch_id)
+            receivables = db.execute(text(recv_sql), recv_params).scalar() or 0
+            recv_accounts = _zakat_account_breakdown(db, recv_full_filter, ['asset'], branch_id)
 
-            # استثمارات المضاربة (قصيرة الأجل — معدة للبيع والشراء) ←→ عروض تجارة
-            # تُزكى بقيمتها السوقية. أما الاستثمارات طويلة الأجل فتُستبعد.
-            trading_investments = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.name LIKE '%أسهم%متاجر%' OR a.name LIKE '%محفظة%مضارب%'
-                    OR a.name LIKE '%استثمار%قصير%'
-                    OR a.name_en LIKE '%trading%invest%'
-                    OR a.name_en LIKE '%short%term%invest%'
-                )
-            """)).scalar() or 0
+            # ── استثمارات المضاربة (قصيرة الأجل) ──
+            tinv_filter = """
+                    a.name LIKE '%%أسهم%%متاجر%%' OR a.name LIKE '%%محفظة%%مضارب%%'
+                    OR a.name LIKE '%%استثمار%%قصير%%'
+                    OR a.name_en LIKE '%%trading%%invest%%'
+                    OR a.name_en LIKE '%%short%%term%%invest%%'
+            """
+            tinv_sql, tinv_params = _zakat_balance_query(tinv_filter, ['asset'], branch_id)
+            trading_investments = db.execute(text(tinv_sql), tinv_params).scalar() or 0
 
-            # ── الالتزامات المتداولة (الديون الحالة — تُخصم من الوعاء) ──
-            # وفقاً لجمهور الفقهاء ومعايير AAOIFI: تُخصم الديون الحالة قصيرة الأجل
-            # لأنها تنقص من الملك التام للأصول الزكوية
-            current_liabilities = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('liability', 'current_liability')
-                AND (
-                    a.account_code LIKE '21%'
-                    OR a.name LIKE '%دائن%' OR a.name LIKE '%مورد%'
-                    OR a.name LIKE '%مستحق%' OR a.name LIKE '%مصروف%مستحق%'
-                    OR a.name LIKE '%قرض%قصير%'
-                    OR a.name_en LIKE '%payable%' OR a.name_en LIKE '%accrued%'
-                    OR a.name_en LIKE '%supplier%' OR a.name_en LIKE '%short%term%loan%'
-                    OR a.name_en LIKE '%current%liabilit%'
-                )
-            """)).scalar() or 0
+            # ── الالتزامات المتداولة (تُخصم من الوعاء) ──
+            cl_filter = """
+                    a.account_code LIKE '21%%'
+                    OR a.name LIKE '%%دائن%%' OR a.name LIKE '%%مورد%%'
+                    OR a.name LIKE '%%مستحق%%' OR a.name LIKE '%%مصروف%%مستحق%%'
+                    OR a.name LIKE '%%قرض%%قصير%%'
+                    OR a.name_en LIKE '%%payable%%' OR a.name_en LIKE '%%accrued%%'
+                    OR a.name_en LIKE '%%supplier%%' OR a.name_en LIKE '%%short%%term%%loan%%'
+                    OR a.name_en LIKE '%%current%%liabilit%%'
+            """
+            cl_sql, cl_params = _zakat_balance_query(cl_filter, ['liability', 'current_liability'], branch_id, sign="credit")
+            current_liabilities = db.execute(text(cl_sql), cl_params).scalar() or 0
+            cl_accounts = _zakat_account_breakdown(db, cl_filter, ['liability', 'current_liability'], branch_id, sign="credit")
 
-            # ── الأصول المستبعدة (للعرض فقط — لا تدخل الحساب) ──
-            # الأصول الثابتة — استهلاكية (ليست نقوداً وليست عروض تجارة)
-            fixed_assets = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '12%' OR a.account_code LIKE '15%'
-                    OR a.account_code LIKE '16%'
-                    OR a.name LIKE '%أصول ثابتة%' OR a.name LIKE '%معدات%'
-                    OR a.name LIKE '%مباني%' OR a.name LIKE '%سيارات%'
-                    OR a.name LIKE '%أثاث%' OR a.name LIKE '%أراضي%'
-                    OR a.name LIKE '%مجمع%'
-                    OR a.name_en LIKE '%fixed asset%' OR a.name_en LIKE '%equipment%'
-                    OR a.name_en LIKE '%building%' OR a.name_en LIKE '%vehicle%'
-                    OR a.name_en LIKE '%furniture%' OR a.name_en LIKE '%depreciation%'
-                )
-            """)).scalar() or 0
+            # ── الأصول المستبعدة (للعرض فقط) ──
+            fa_filter = """
+                    a.account_code LIKE '12%%' OR a.account_code LIKE '15%%'
+                    OR a.account_code LIKE '16%%'
+                    OR a.name LIKE '%%أصول ثابتة%%' OR a.name LIKE '%%معدات%%'
+                    OR a.name LIKE '%%مباني%%' OR a.name LIKE '%%سيارات%%'
+                    OR a.name LIKE '%%أثاث%%' OR a.name LIKE '%%أراضي%%'
+                    OR a.name LIKE '%%مجمع%%'
+                    OR a.name_en LIKE '%%fixed asset%%' OR a.name_en LIKE '%%equipment%%'
+                    OR a.name_en LIKE '%%building%%' OR a.name_en LIKE '%%vehicle%%'
+                    OR a.name_en LIKE '%%furniture%%' OR a.name_en LIKE '%%depreciation%%'
+            """
+            fa_sql, fa_params = _zakat_balance_query(fa_filter, ['asset'], branch_id)
+            fixed_assets = db.execute(text(fa_sql), fa_params).scalar() or 0
 
-            # الأصول المعنوية — ليست نقوداً وليست عروض تجارة
-            intangible_assets = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '13%' OR a.account_code LIKE '18%'
-                    OR a.name LIKE '%شهرة%' OR a.name LIKE '%براءة%'
-                    OR a.name LIKE '%علامة تجارية%' OR a.name LIKE '%رخصة%'
-                    OR a.name LIKE '%غير ملموس%'
-                    OR a.name_en LIKE '%intangible%' OR a.name_en LIKE '%goodwill%'
-                    OR a.name_en LIKE '%patent%' OR a.name_en LIKE '%trademark%'
-                )
-            """)).scalar() or 0
+            intang_filter = """
+                    a.account_code LIKE '13%%' OR a.account_code LIKE '18%%'
+                    OR a.name LIKE '%%شهرة%%' OR a.name LIKE '%%براءة%%'
+                    OR a.name LIKE '%%علامة تجارية%%' OR a.name LIKE '%%رخصة%%'
+                    OR a.name LIKE '%%غير ملموس%%'
+                    OR a.name_en LIKE '%%intangible%%' OR a.name_en LIKE '%%goodwill%%'
+                    OR a.name_en LIKE '%%patent%%' OR a.name_en LIKE '%%trademark%%'
+            """
+            intang_sql, intang_params = _zakat_balance_query(intang_filter, ['asset'], branch_id)
+            intangible_assets = db.execute(text(intang_sql), intang_params).scalar() or 0
 
-            # مشاريع تحت الإنشاء / تحت التصنيع — مال تحويلي لم يكتمل
-            wip = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (
-                    a.account_code LIKE '1110%'
-                    OR a.name LIKE '%تحت الإنشاء%' OR a.name LIKE '%تحت التصنيع%'
-                    OR a.name LIKE '%مواد خام%' OR a.name LIKE '%قطع غيار%'
-                    OR a.name_en LIKE '%work in progress%' OR a.name_en LIKE '%under construction%'
-                    OR a.name_en LIKE '%raw material%' OR a.name_en LIKE '%spare part%'
-                )
-            """)).scalar() or 0
+            wip_filter = """
+                    a.account_code LIKE '1110%%'
+                    OR a.name LIKE '%%تحت الإنشاء%%' OR a.name LIKE '%%تحت التصنيع%%'
+                    OR a.name LIKE '%%مواد خام%%' OR a.name LIKE '%%قطع غيار%%'
+                    OR a.name_en LIKE '%%work in progress%%' OR a.name_en LIKE '%%under construction%%'
+                    OR a.name_en LIKE '%%raw material%%' OR a.name_en LIKE '%%spare part%%'
+            """
+            wip_sql, wip_params = _zakat_balance_query(wip_filter, ['asset'], branch_id)
+            wip = db.execute(text(wip_sql), wip_params).scalar() or 0
 
             # ── حساب الوعاء الزكوي ──
             # الوعاء = النقد + عروض التجارة + المدينون المرجوون + استثمارات المضاربة
@@ -613,7 +651,13 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 "excluded_assets": excluded_info,
                 "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
                 "rate_type": "gregorian" if body.use_gregorian_rate else "hijri",
-                "applied_rate": float(rate)
+                "applied_rate": float(rate),
+                "account_breakdown": {
+                    "cash": cash_accounts,
+                    "trade_goods": trade_accounts,
+                    "receivables": recv_accounts,
+                    "current_liabilities": cl_accounts
+                }
             }
 
         elif body.method == "net_assets":
@@ -621,58 +665,56 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             # الطريقة الملزمة للشركات السعودية التي تمسك حسابات نظامية
 
             # 1. Equity components
-            equity = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'equity'
-            """)).scalar() or 0
+            eq_sql, eq_params = _zakat_balance_query("1=1", ['equity'], branch_id, sign="credit")
+            equity = db.execute(text(eq_sql), eq_params).scalar() or 0
 
             # 2. Long-term liabilities
-            lt_liabilities = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('long_term_liability', 'liability')
-                AND (a.name LIKE '%طويل%' OR a.name_en LIKE '%long%term%'
-                     OR a.account_code LIKE '22%')
-            """)).scalar() or 0
+            lt_filter = """
+                    a.name LIKE '%%طويل%%' OR a.name_en LIKE '%%long%%term%%'
+                    OR a.account_code LIKE '22%%'
+            """
+            lt_sql, lt_params = _zakat_balance_query(lt_filter, ['long_term_liability', 'liability'], branch_id, sign="credit")
+            lt_liabilities = db.execute(text(lt_sql), lt_params).scalar() or 0
 
             # 3. Provisions
-            provisions = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('liability', 'equity')
-                AND (a.name LIKE '%مخصص%' OR a.name_en LIKE '%provision%')
-            """)).scalar() or 0
+            prov_filter = "a.name LIKE '%%مخصص%%' OR a.name_en LIKE '%%provision%%'"
+            prov_sql, prov_params = _zakat_balance_query(prov_filter, ['liability', 'equity'], branch_id, sign="credit")
+            provisions = db.execute(text(prov_sql), prov_params).scalar() or 0
 
             # 4. Net profit
-            revenue = db.execute(text("""
-                SELECT COALESCE(SUM(CASE WHEN a.account_type IN ('revenue', 'income') 
-                    THEN a.balance ELSE 0 END), 0) FROM accounts a
-            """)).scalar() or 0
-            expenses = db.execute(text("""
-                SELECT COALESCE(SUM(CASE WHEN a.account_type IN ('expense', 'cogs') 
-                    THEN a.balance ELSE 0 END), 0) FROM accounts a
-            """)).scalar() or 0
+            rev_sql, rev_params = _zakat_balance_query("1=1", ['revenue', 'income'], branch_id, sign="credit")
+            revenue = db.execute(text(rev_sql), rev_params).scalar() or 0
+            exp_sql, exp_params = _zakat_balance_query("1=1", ['expense', 'cogs'], branch_id, sign="debit")
+            expenses = db.execute(text(exp_sql), exp_params).scalar() or 0
             net_profit = Decimal(str(revenue)) - Decimal(str(expenses))
 
             total_add = Decimal(str(equity)) + Decimal(str(lt_liabilities)) + Decimal(str(provisions))
             if net_profit > 0:
                 total_add += net_profit
 
-            # 5. Fixed assets
-            fixed_assets = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (a.name LIKE '%أصول ثابتة%' OR a.name LIKE '%أصل%'
-                     OR a.name_en LIKE '%fixed%asset%'
-                     OR a.account_code LIKE '12%' OR a.account_code LIKE '15%')
-            """)).scalar() or 0
+            # 5. Fixed assets (fixed: removed overly-broad '%أصل%' pattern)
+            zatca_fa_filter = """
+                    a.name LIKE '%%أصول ثابتة%%' OR a.name LIKE '%%معدات%%'
+                    OR a.name LIKE '%%مباني%%' OR a.name LIKE '%%سيارات%%'
+                    OR a.name LIKE '%%أثاث%%' OR a.name LIKE '%%أراضي%%'
+                    OR a.name LIKE '%%مجمع%%'
+                    OR a.name_en LIKE '%%fixed%%asset%%' OR a.name_en LIKE '%%equipment%%'
+                    OR a.name_en LIKE '%%building%%' OR a.name_en LIKE '%%vehicle%%'
+                    OR a.name_en LIKE '%%furniture%%' OR a.name_en LIKE '%%depreciation%%'
+                    OR a.account_code LIKE '12%%' OR a.account_code LIKE '15%%'
+                    OR a.account_code LIKE '16%%'
+            """
+            zatca_fa_sql, zatca_fa_params = _zakat_balance_query(zatca_fa_filter, ['asset'], branch_id)
+            fixed_assets = db.execute(text(zatca_fa_sql), zatca_fa_params).scalar() or 0
 
-            # 6. Long-term investments
-            lt_investments = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'asset'
-                AND (a.name LIKE '%استثمار%طويل%' OR a.name LIKE '%استثمار%'
-                     OR a.name_en LIKE '%long%invest%'
-                     OR a.account_code LIKE '13%')
-            """)).scalar() or 0
+            # 6. Long-term investments (fixed: removed overly-broad '%استثمار%' pattern)
+            zatca_inv_filter = """
+                    a.name LIKE '%%استثمار%%طويل%%'
+                    OR a.name_en LIKE '%%long%%invest%%'
+                    OR a.account_code LIKE '14%%'
+            """
+            zatca_inv_sql, zatca_inv_params = _zakat_balance_query(zatca_inv_filter, ['asset'], branch_id)
+            lt_investments = db.execute(text(zatca_inv_sql), zatca_inv_params).scalar() or 0
 
             total_ded = Decimal(str(fixed_assets)) + Decimal(str(lt_investments))
             zakat_base = max(Decimal('0'), total_add - total_ded)
@@ -703,39 +745,27 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
 
         else:  # adjusted_profit
             # Revenue
-            revenue = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('revenue', 'income', 'other_income')
-            """)).scalar() or 0
+            ap_rev_sql, ap_rev_params = _zakat_balance_query("1=1", ['revenue', 'income', 'other_income'], branch_id, sign="credit")
+            revenue = db.execute(text(ap_rev_sql), ap_rev_params).scalar() or 0
 
             # Expenses
-            expenses = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type IN ('expense', 'cogs', 'other_expense')
-            """)).scalar() or 0
+            ap_exp_sql, ap_exp_params = _zakat_balance_query("1=1", ['expense', 'cogs', 'other_expense'], branch_id, sign="debit")
+            expenses = db.execute(text(ap_exp_sql), ap_exp_params).scalar() or 0
 
             net_profit = Decimal(str(revenue)) - Decimal(str(expenses))
 
             # Add-backs: Non-deductible items
-            depreciation = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'expense'
-                AND (a.name LIKE '%استهلاك%' OR a.name LIKE '%إهلاك%'
-                     OR a.name_en LIKE '%depreciation%' OR a.name_en LIKE '%amortization%')
-            """)).scalar() or 0
+            dep_filter = "a.name LIKE '%%استهلاك%%' OR a.name LIKE '%%إهلاك%%' OR a.name_en LIKE '%%depreciation%%' OR a.name_en LIKE '%%amortization%%'"
+            dep_sql, dep_params = _zakat_balance_query(dep_filter, ['expense'], branch_id, sign="debit")
+            depreciation = db.execute(text(dep_sql), dep_params).scalar() or 0
 
-            provision_expense = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'expense'
-                AND (a.name LIKE '%مخصص%' OR a.name_en LIKE '%provision%')
-            """)).scalar() or 0
+            provexp_filter = "a.name LIKE '%%مخصص%%' OR a.name_en LIKE '%%provision%%'"
+            provexp_sql, provexp_params = _zakat_balance_query(provexp_filter, ['expense'], branch_id, sign="debit")
+            provision_expense = db.execute(text(provexp_sql), provexp_params).scalar() or 0
 
-            penalties = db.execute(text("""
-                SELECT COALESCE(SUM(a.balance), 0)
-                FROM accounts a WHERE a.account_type = 'expense'
-                AND (a.name LIKE '%غرام%' OR a.name LIKE '%جزاء%'
-                     OR a.name_en LIKE '%penalty%' OR a.name_en LIKE '%fine%')
-            """)).scalar() or 0
+            pen_filter = "a.name LIKE '%%غرام%%' OR a.name LIKE '%%جزاء%%' OR a.name_en LIKE '%%penalty%%' OR a.name_en LIKE '%%fine%%'"
+            pen_sql, pen_params = _zakat_balance_query(pen_filter, ['expense'], branch_id, sign="debit")
+            penalties = db.execute(text(pen_sql), pen_params).scalar() or 0
 
             total_add_backs = Decimal(str(depreciation)) + Decimal(str(provision_expense)) + Decimal(str(penalties))
             adjusted_profit = net_profit + total_add_backs
@@ -801,6 +831,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             "zakat_rate": float(rate),
             "rate_display": f"{float(rate)}%" if body.use_gregorian_rate else f"{body.zakat_rate}%",
             "zakat_amount": float(zakat_amount),
+            "branch_id": branch_id,
             "message": f"الزكاة المستحقة: {zakat_amount:,.2f}"
         }
     except HTTPException:

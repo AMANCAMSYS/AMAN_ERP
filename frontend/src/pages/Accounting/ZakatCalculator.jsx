@@ -3,6 +3,7 @@ import { zakatAPI } from '../../utils/api'
 import { getCurrency, getCountry } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
+import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
 import { Clock } from 'lucide-react'
@@ -19,6 +20,7 @@ const COUNTRY_FLAGS = {
 function ZakatCalculator() {
     const { t } = useTranslation()
     const { showToast } = useToast()
+    const { currentBranch } = useBranch()
     const currency = getCurrency()
     const country = getCountry()
     const isSupported = ZAKAT_SUPPORTED_COUNTRIES.includes(country)
@@ -33,7 +35,8 @@ function ZakatCalculator() {
         setLoading(true)
         try {
             const res = await zakatAPI.calculate({
-                fiscal_year: fiscalYear, method, use_gregorian_rate: useGregorian
+                fiscal_year: fiscalYear, method, use_gregorian_rate: useGregorian,
+                branch_id: currentBranch?.id || null
             })
             setResult(res.data)
         } catch (err) {
