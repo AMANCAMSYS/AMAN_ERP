@@ -182,15 +182,11 @@ async def get_chart_of_accounts(
     branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     
-    # Cache key for full COA structure (no filters)
-    cache_key = f"chart_of_accounts:{current_user.company_id}"
-    use_cache = not branch_id and not search and not account_type and page is None
+    # Balances are computed live from journal_lines — no caching
+    # (accounts/treasury/journal entries can change at any time)
+    use_cache = False
 
     try:
-        if use_cache:
-            cached_coa = cache.get(cache_key)
-            if cached_coa:
-                return cached_coa
 
         # Build WHERE clauses for search and type filter
         where_extra = ""
@@ -255,25 +251,26 @@ async def get_chart_of_accounts(
                 
             result = db.execute(text(query), all_params)
         else:
-            # FIX: Compute balance from journal_lines aggregation (all branches)
-            # to stay consistent with the branch-specific view and avoid stale cached balance column
+            # Compute balance from journal_lines aggregation (all branches)
+            # Consistent with branch-specific view — always live from journal_lines
             query = f"""
-                SELECT
+                SELECT 
                     a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type,
-                    a.parent_id, a.is_header, a.currency, a.is_active,
-                    CASE
-                        WHEN a.account_type IN ('asset', 'expense') THEN
+                    a.parent_id, a.currency, a.is_active, a.is_header,
+                    a.balance_currency as total_balance_currency,
+                    CASE 
+                        WHEN a.account_type IN ('asset', 'expense') THEN 
                             COALESCE(SUM(jl.debit - jl.credit), 0)
-                        ELSE
+                        ELSE 
                             COALESCE(SUM(jl.credit - jl.debit), 0)
                     END as balance,
-                    CASE
+                    CASE 
                         WHEN a.currency IS NOT NULL AND a.currency != '' THEN
-                            CASE
-                                WHEN a.account_type IN ('asset', 'expense') THEN
+                            CASE 
+                                WHEN a.account_type IN ('asset', 'expense') THEN 
                                     COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.debit > 0 THEN jl.amount_currency ELSE 0 END), 0)
                                   - COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.credit > 0 THEN jl.amount_currency ELSE 0 END), 0)
-                                ELSE
+                                ELSE 
                                     COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.credit > 0 THEN jl.amount_currency ELSE 0 END), 0)
                                   - COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.debit > 0 THEN jl.amount_currency ELSE 0 END), 0)
                             END
@@ -281,13 +278,12 @@ async def get_chart_of_accounts(
                     END as balance_currency
                 FROM accounts a
                 LEFT JOIN journal_lines jl ON jl.account_id = a.id
+                LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id
                 WHERE 1=1 {where_extra}
                 GROUP BY a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type,
-                         a.parent_id, a.is_header, a.currency, a.is_active
+                         a.parent_id, a.currency, a.is_active, a.is_header, a.balance_currency
                 ORDER BY a.account_number ASC
             """
-            # Disable cache since we now compute live from journal_lines
-            use_cache = False
 
             # Count total (standard case)
             count_query = f"SELECT COUNT(*) FROM accounts a WHERE 1=1 {where_extra}"
@@ -317,9 +313,6 @@ async def get_chart_of_accounts(
                 "total_pages": (total_count + page_size - 1) // page_size
             }
         
-        if use_cache:
-            cache.set(cache_key, accounts, expire=3600)
-            
         return accounts
     except Exception as e:
         logger.error(f"Error fetching accounts: {str(e)}")

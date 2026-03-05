@@ -16,6 +16,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.audit import log_activity
 from utils.accounting import update_account_balance
+from utils.cache import cache
 from fastapi import Request
 from schemas.treasury import TreasuryAccountCreate, TreasuryAccountResponse, TransactionCreate, TransactionResponse
 
@@ -163,6 +164,18 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
             "curr": account.currency
         }).scalar()
         
+        # Invalidate chart of accounts cache (new GL account added)
+        try:
+            cache.delete(f"chart_of_accounts:{current_user.company_id}")
+        except Exception:
+            pass
+
+        # Invalidate chart of accounts cache (new GL account added)
+        try:
+            cache.delete(f"chart_of_accounts:{current_user.company_id}")
+        except Exception:
+            pass
+
         # 4. Create Treasury Account
         treasury_query = text("""
             INSERT INTO treasury_accounts (name, name_en, account_type, currency, bank_name, account_number, iban, gl_account_id, branch_id)
