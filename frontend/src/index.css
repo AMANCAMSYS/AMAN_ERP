@@ -535,17 +535,46 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f5f9;
+  background: var(--bg-main);
   padding: 20px;
 }
 
 .auth-card {
-  background: white;
+  background: var(--bg-card);
   padding: 40px;
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 440px;
+}
+
+.floating-theme-toggle {
+  position: fixed;
+  top: 18px;
+  inset-inline-end: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  z-index: 1300;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.floating-theme-toggle:hover {
+  transform: translateY(-1px);
+  background: var(--bg-hover);
+}
+
+.floating-theme-toggle-icon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .auth-header {
@@ -603,6 +632,13 @@ select,
 textarea {
   color: #1e293b !important;
   /* Force dark text */
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  color: var(--text-main) !important;
+  background: var(--bg-card) !important;
 }
 
 .form-input:focus {

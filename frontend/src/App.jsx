@@ -7,6 +7,7 @@ import { hasIndustryTypeSet } from './hooks/useIndustryType'
 import { requestManager } from './utils/requestManager'
 import { PageLoading } from './components/common/LoadingStates'
 import Layout from './components/Layout'
+import FloatingThemeToggle from './components/common/FloatingThemeToggle'
 
 // Suspense fallback uses unified PageLoading
 const PageLoader = () => <PageLoading text="Loading..." />
@@ -377,6 +378,13 @@ function PermissionDeniedRedirect() {
 function App() {
     const { i18n } = useTranslation();
     const location = useLocation();
+    const showFloatingThemeToggle = (
+        location.pathname === '/login' ||
+        location.pathname === '/register' ||
+        location.pathname === '/forgot-password' ||
+        location.pathname === '/reset-password' ||
+        location.pathname.startsWith('/setup/')
+    )
 
     useEffect(() => {
         document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
@@ -392,6 +400,7 @@ function App() {
 
     return (
         <Suspense fallback={<PageLoader />}>
+            {showFloatingThemeToggle && <FloatingThemeToggle />}
             <Routes>
                 <Route path="/login" element={isAuthenticated() ? <Navigate to="/dashboard" /> : <Login />} />
                 <Route path="/register" element={<Register />} />
