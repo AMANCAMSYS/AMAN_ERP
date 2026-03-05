@@ -1,30 +1,52 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { authAPI } from '../utils/api'
 import { getUser } from '../utils/auth'
 
 function Layout({ children }) {
+    const [sidebarOpen, setSidebarOpen] = useState(false)
+
     useEffect(() => {
         const user = getUser();
         const syncUser = async () => {
-            // System admin might have different auth flow or shouldn't sync per-tenant
             try {
                 const response = await authAPI.me()
                 localStorage.setItem('user', JSON.stringify(response.data))
             } catch (err) {
                 console.error("Session sync failed", err)
-                // If it's a 403/401, the interceptor will handle it, but we don't want to crash.
             }
         }
         if (user) syncUser();
     }, [])
 
+    // Close sidebar on resize to desktop
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 1024) {
+                setSidebarOpen(false)
+            }
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), [])
+    const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
     return (
         <div className="app-layout">
-            <Sidebar />
-            <div className="main-container">
-                <Topbar />
+            {/* Overlay for mobile/tablet */}
+            {sidebarOpen && (
+                <div
+                    className="sidebar-overlay"
+                    onClick={closeSidebar}
+                    aria-hidden="true"
+                />
+            )}
+            <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+            <div className={`main-container${sidebarOpen ? ' sidebar-is-open' : ''}`}>
+                <Topbar onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
                 <main className="content-area">
                     {children}
                 </main>

@@ -1,10 +1,10 @@
 # 📖 AMAN ERP — قاعدة المعرفة الشاملة للنظام
 # SYSTEM KNOWLEDGE BASE
 
-> **آخر تحديث:** 3 مارس 2026  
+> **آخر تحديث:** 5 مارس 2026  
 > **المُعدّ بواسطة:** تحليل كامل للكود المصدري (Backend + Frontend + Database) + فحص قاعدة البيانات + فحص شامل للتغييرات  
 > **الغرض:** مرجع شامل يُغني عن إعادة الفحص — يحتوي على كل صفحة، كل API، كل جدول، كل قيد، كل تقرير  
-> **حالة النظام:** البيانات الأساسية (Master Data) مكتملة — تم الترقية إلى ★★★★★ (Phase 6 مكتملة: نظام الميزات حسب النشاط + دمج KPI)
+> **حالة النظام:** البيانات الأساسية (Master Data) مكتملة — تم الترقية إلى ★★★★★ (Phase 7 مكتملة: إصلاحات الزكاة ZATCA + Responsive Design متكامل + Docker Production)
 
 ---
 
@@ -14,7 +14,7 @@
 | المقياس | القيمة |
 |---------|--------|
 | إجمالي الـ Endpoints (Backend) | **767** (392 GET + 244 POST + 79 PUT + 52 DELETE) |
-| إجمالي الصفحات (Frontend) | **309 JSX** + **267 route** |
+| إجمالي الصفحات (Frontend) | **277 JSX** + ~270 route |
 | إجمالي ملفات JS | **44** ملف |
 | إجمالي الجداول | **244** (240 جدول شركة + 4 جداول نظام) |
 | إجمالي سطور الكود (Backend) | **88,268** سطر Python |
@@ -165,6 +165,7 @@
 - [10. التكاملات الخارجية (Integrations)](#10-التكاملات-الخارجية)
 - [11. الميزات الجديدة — Phase 4 (System Completion)](#11-الميزات-الجديدة)
 - [12. الميزات الجديدة — Phase 5 (★★★★★ Upgrade)](#12-الميزات-الجديدة--phase-5-)
+- [13. الميزات الجديدة — Phase 7 (Responsive + Zakat + DevOps)](#13-الميزات-الجديدة--phase-7-5-مارس-2026)
 
 ---
 
@@ -3257,4 +3258,144 @@ FRONTEND_URL_PRODUCTION=http://64.225.49.118
 GRAFANA_USER=admin
 GRAFANA_PASSWORD=AmanGrafana2026!
 root@ubuntu-s-2vcpu-4gb-nyc3-01:/opt/aman# 
+
+---
+
+# 13. الميزات الجديدة — Phase 7 (5 مارس 2026)
+
+> **تاريخ الإنجاز:** 5 مارس 2026  
+> **الهدف:** إصلاحات حرجة في حساب الزكاة + تطبيق Responsive Design كامل + تحسينات التشغيل
+
+## 13.1 إصلاحات حاسبة الزكاة (ZATCA Compliant)
+
+### التغييرات في `backend/routers/finance/accounting.py`
+
+| الإصلاح | التفاصيل |
+|---------|---------|
+| صيغة ZATCA الصحيحة | وعاء الزكاة = حقوق الملكية – الأصول الثابتة – الأصول غير الملموسة |
+| خصم WIP | خصم العمل قيد التنفيذ من الوعاء |
+| تصفية الصفوف الفارغة | إزالة الحسابات ذات الرصيد = 0 من العرض |
+| فلترة الفروع | دعم تصفية حسابات الزكاة حسب الفرع |
+| مناطق بدون SA | عرض "قريباً" لشركات غير سعودية بدلاً من الحساب |
+
+**Endpoint:** `POST /accounting/zakat/calculate`  
+**الجداول:** `zakat_calculations`, `journal_entries`, `journal_lines`
+
+### التحقق من الصحة (اختبارات ناجحة)
+```
+curl POST /api/accounting/zakat/calculate
+  { "fiscal_year": 2027, "method": "net_assets", "use_gregorian_rate": false }
+→ 200 OK | وعاء = equity - fixed_assets - intangibles
+```
+
+---
+
+## 13.2 Responsive Design — واجهة متجاوبة كاملة
+
+> **التغيير الأكبر:** تحويل كل صفحات النظام لتعمل بشكل صحيح على الهاتف، التابلت، الكمبيوتر
+
+### 13.2.1 الملفات المُعدَّلة
+
+| الملف | التغيير |
+|-------|---------|
+| `frontend/src/components/Layout.jsx` | إضافة `sidebarOpen` state + overlay + resize listener |
+| `frontend/src/components/Sidebar.jsx` | دعم `isOpen` prop + زر إغلاق + `onClick` لكل رابط |
+| `frontend/src/components/Topbar.jsx` | إضافة زر hamburger مع أنيميشن X |
+| `frontend/src/index.css` | إضافة 180+ سطر CSS متجاوب |
+
+### 13.2.2 سلوك الـ Sidebar حسب الجهاز
+
+| الجهاز | العرض | سلوك الـ Sidebar |
+|--------|-------|-----------------|
+| **كمبيوتر** | ≥ 1024px | ظاهر دائماً — ثابت على اليمين |
+| **تابلت** | 768–1023px | مخفي — يظهر بزر hamburger مع overlay |
+| **هاتف** | < 768px | مخفي — يظهر بزر hamburger مع overlay كامل |
+| **هاتف صغير** | < 480px | شريط البحث مخفي لتوفير المساحة |
+
+### 13.2.3 مكونات Responsive المُضافة
+
+```css
+/* الزر الجديد في Topbar */
+.sidebar-hamburger          /* مخفي على desktop ≥1024px */
+.hamburger-line             /* 3 خطوط + أنيميشن X عند الفتح */
+
+/* Overlay خلف Sidebar */
+.sidebar-overlay            /* backdrop مع blur عند فتح القائمة */
+
+/* زر الإغلاق داخل Sidebar */
+.sidebar-close-btn          /* X button مخفي على desktop */
+
+/* Sidebar transitions */
+.sidebar                    /* transform: translateX(100%) على mobile */
+.sidebar.sidebar-open       /* transform: translateX(0) عند الفتح */
+```
+
+### 13.2.4 تحسينات CSS العامة على الأجهزة الصغيرة
+
+| العنصر | التحسين |
+|--------|---------|
+| `.content-area` | padding تكيّفي: 32px → 20px → 16px → 12px |
+| `.workspace` | padding تكيّفي: 24px → 16px → 12px |
+| `.modules-grid` | عمود واحد على ≤768px |
+| `.metrics-grid` | عمودان على ≤768px، عمود واحد على ≤480px |
+| `.modal-content` | عرض 96%، `max-height: 95vh` |
+| `.form-row` | `flex-direction: column` على ≤768px |
+| `.data-table-*` | `overflow-x: auto` للتمرير الأفقي |
+| `@media print` | إخفاء Sidebar + Topbar عند الطباعة |
+
+---
+
+## 13.3 تحسينات DevOps والإنتاج
+
+### 13.3.1 Docker
+| التغيير | التفاصيل |
+|---------|---------|
+| `restart: unless-stopped` | تشغيل تلقائي عند إعادة تشغيل الخادم |
+| `safe-start.sh` / `safe-stop.sh` | تشغيل/إيقاف Docker آمن |
+| `backup.sh` (Docker-aware) | نسخ احتياطية تعمل داخل وخارج Docker |
+| `cron` يومي | نسخ احتياطي تلقائي كل يوم |
+
+### 13.3.2 إصلاحات أمنية (Phase 7)
+| الثغرة | الإصلاح |
+|--------|---------|
+| Multi-company login vulnerability | تحقق صارم من `company_id` عند تسجيل الدخول |
+| HTTPS redirect on IP-only server | تعطيل middleware إعادة التوجيه |
+| Uploads permissions | استخدام `gosu` في entrypoint لضمان صلاحيات المجلد |
+
+### 13.3.3 إصلاحات Backend (Phase 7)
+| الملف | الإصلاح |
+|-------|---------|
+| `hr/core.py` | إضافة `log_activity` import المفقود |
+| `finance/accounting.py` | إصلاح cache الحسابات + حساب الأرصدة لجميع الفروع |
+| `budget_items` | إصلاح اسم العمود (`planned_amount`) |
+| `system_companies` | إزالة عمود `logo_url` المكرر |
+
+---
+
+## 13.4 ملخص الصفحات الجديدة (مقارنة بـ Phase 5)
+
+| الوحدة | الصفحات الجديدة | المسارات |
+|--------|----------------|---------|
+| المحاسبة | `IntercompanyTransactions`, `RevenueRecognition`, `ZakatCalculator` | `/accounting/intercompany`, `/accounting/revenue-recognition`, `/accounting/zakat` |
+| POS | `POSOfflineManager`, `CustomerDisplay`, `KitchenDisplay`, `LoyaltyPrograms`, `TableManagement`, `ThermalPrintSettings` | `/pos/offline`, `/pos/customer-display`, `/pos/kitchen`, `/pos/loyalty`, `/pos/tables`, `/pos/thermal-settings` |
+| CRM | `LeadScoring`, `CustomerSegments`, `PipelineAnalytics`, `CRMContacts`, `SalesForecasts`, `CRMDashboard` | `/crm/lead-scoring`, `/crm/customer-segments`, `/crm/pipeline`, `/crm/contacts`, `/crm/forecasts` |
+| Assets | `ImpairmentTest`, `LeaseContracts` | `/assets/impairment`, `/assets/leases` |
+| المشاريع | `GanttChart`, `ProjectRisks`, `ResourceManagement`, `ResourceUtilizationReport` | `/projects/:id/gantt`, `/projects/:id/risks`, `/projects/resources`, `/projects/utilization` |
+| التصنيع | `ProductionSchedule`, `ManufacturingCosting`, `DirectLaborReport`, `WorkOrderStatusReport` | `/manufacturing/schedule`, `/manufacturing/costing`, `/manufacturing/labor`, `/manufacturing/status` |
+| الموارد البشرية | `SaudizationDashboard`, `WPSExport`, `EOSSettlement`, `CustodyManagement`, `LeaveCarryover`, `Violations`, `TrainingPrograms` | `/hr/saudization`, `/hr/wps`, `/hr/eos`, `/hr/custody`, `/hr/leave-carryover`, `/hr/violations`, `/hr/training` |
+| الإعدادات | `ApiKeys`, `CostingPolicy`, `PrintTemplates`, `Webhooks`, `SecuritySettings`, +20 تبويب إعدادات | `/settings/api-keys`, `/settings/costing`, `/settings/templates`, `/settings/webhooks` |
+| الإدارة | `BackupManagement`, `SecurityEvents` | `/admin/backups`, `/admin/security-events` |
+| الإعداد | `IndustrySetup`, `ModuleCustomization` | `/setup/industry`, `/setup/modules` |
+
+---
+
+## 13.5 إجمالي الأرقام المحدّثة (5 مارس 2026)
+
+| المقياس | القيمة القديمة | القيمة الجديدة |
+|---------|--------------|--------------|
+| صفحات JSX | 309 | **277** (بعد حذف الملفات المتبقية من أرشيف) |
+| آخر Commit | Phase 6 | **Phase 7 — 8dec57f** |
+| الزكاة ZATCA | صيغة جزئية | **صيغة ZATCA كاملة** |
+| Responsive Design | غير موجود | **✅ متكامل — هاتف + تابلت + كمبيوتر** |
+| Docker Production | يدوي | **✅ restart تلقائي + backup يومي** |
 

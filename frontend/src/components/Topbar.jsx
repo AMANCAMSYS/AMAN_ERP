@@ -9,7 +9,7 @@ import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import GlobalSearch from './GlobalSearch'
 import './GlobalSearch.css'
 
-function Topbar() {
+function Topbar({ onToggleSidebar, sidebarOpen }) {
     const { t, i18n } = useTranslation()
     const user = getUser()
     const companyId = getCompanyId()
@@ -128,6 +128,18 @@ function Topbar() {
 
     return (
         <header className="topbar">
+            {/* Hamburger button — visible only on mobile/tablet */}
+            <button
+                className="sidebar-hamburger"
+                onClick={onToggleSidebar}
+                aria-label={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+                aria-expanded={sidebarOpen}
+            >
+                <span className={`hamburger-line${sidebarOpen ? ' open' : ''}`}></span>
+                <span className={`hamburger-line${sidebarOpen ? ' open' : ''}`}></span>
+                <span className={`hamburger-line${sidebarOpen ? ' open' : ''}`}></span>
+            </button>
+
             <div className="topbar-search" onClick={() => setShowSearch(true)} style={{ cursor: 'pointer' }}>
                 <div className="search-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted, #94a3b8)', userSelect: 'none' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

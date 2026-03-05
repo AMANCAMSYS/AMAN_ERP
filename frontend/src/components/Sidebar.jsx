@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getIndustryType } from '../hooks/useIndustryType'
 import { isModuleEnabledForIndustry } from '../config/industryModules'
 
-function Sidebar() {
+function Sidebar({ isOpen, onClose }) {
     const { t } = useTranslation()
     const user = getUser()
     const industryType = getIndustryType()
@@ -115,9 +115,17 @@ function Sidebar() {
 
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
             <div className="sidebar-brand">
-                AMAN ERP
+                <span>AMAN ERP</span>
+                {/* Close button visible on mobile/tablet */}
+                <button
+                    className="sidebar-close-btn"
+                    onClick={onClose}
+                    aria-label="إغلاق القائمة"
+                >
+                    ✕
+                </button>
             </div>
             <nav className="sidebar-nav">
                 {navItems.map((item) => (
@@ -126,6 +134,7 @@ function Sidebar() {
                         to={item.path}
                         end={item.path === '/treasury' || item.path === '/settings'}
                         className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
+                        onClick={onClose}
                     >
                         <span className="nav-icon">{item.icon}</span>
                         <span className="nav-label">{item.label}</span>
