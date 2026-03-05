@@ -36,6 +36,143 @@
   --topbar-height: 60px;
 }
 
+/* ═══════════════════════════════════
+   DARK MODE
+   ═══════════════════════════════════ */
+[data-theme="dark"] {
+  --bg-main: #0f172a;
+  --bg-sidebar: #1e293b;
+  --bg-topbar: #1e293b;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+
+  --text-main: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-on-primary: #ffffff;
+
+  --border-color: #334155;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+
+  --accent: #e2e8f0;
+}
+
+/* Dark mode overrides for elements with hardcoded colors */
+[data-theme="dark"] body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .metric-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .card-header {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .dropdown-menu {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .data-table th {
+  background: var(--bg-hover);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .data-table td {
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .data-table tr:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--bg-main);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: var(--primary);
+}
+
+[data-theme="dark"] .nav-item.active {
+  background-color: rgba(37, 99, 235, 0.15);
+}
+
+[data-theme="dark"] .nav-item:hover {
+  background-color: var(--bg-hover);
+}
+
+[data-theme="dark"] .topbar-search .search-input {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .topbar-search .search-input kbd {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .metric-value,
+[data-theme="dark"] .metric-label {
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .form-label {
+  color: var(--text-main);
+}
+
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] button[style*="background: rgb(248, 250, 252)"],
+[data-theme="dark"] button[style*="background: white"],
+[data-theme="dark"] button[style*="background: #fff"] {
+  background: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .topbar-branch-btn {
+  background: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .status-badge,
+[data-theme="dark"] .badge {
+  opacity: 0.9;
+}
+
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .toast {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -1890,7 +2027,7 @@ input {
 
 /* =====================================================
    RESPONSIVE DESIGN — Sidebar + Layout
-   Mobile: < 1024px  |  Desktop: ≥ 1024px
+   Mobile: < 1024px  |  Desktop: >= 1024px
    ===================================================== */
 
 /* ── Sidebar Toggle Button (hidden on desktop, shown on mobile) ── */
@@ -1898,20 +2035,40 @@ input {
     display: none;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     background: none;
-    border: none;
-    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
     cursor: pointer;
     flex-shrink: 0;
-    margin-inline-end: 8px;
     color: var(--text-secondary);
     transition: background 0.15s;
 }
 
 .sidebar-toggle:hover {
     background: var(--bg-hover);
+}
+
+/* ── Dark Mode Toggle Button ── */
+.topbar-theme-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.topbar-theme-btn:hover {
+    background: var(--bg-hover);
+    color: var(--primary);
 }
 
 /* ── Sidebar Close Button (hidden on desktop) ── */
@@ -1946,60 +2103,54 @@ input {
 
 /* ═══════════════════════════════════════
    TABLET + MOBILE  (<= 1024px)
+   BULLETPROOF: display:none on sidebar
    ═══════════════════════════════════════ */
 @media (max-width: 1024px) {
-    /* Topbar: show brand on mobile, toggle button visible */
+    /* Topbar: show toggle button */
     .sidebar-toggle {
         display: flex !important;
     }
 
     /* Topbar brand visible on mobile */
     .topbar-brand {
-        display: block;
+        display: block !important;
     }
 
-    /* Sidebar brand text: hidden on mobile (topbar-brand shows it instead) */
+    /* Sidebar brand text: hidden on mobile */
     .sidebar-brand-text {
-        display: none;
+        display: none !important;
     }
 
-    /* Show close button inside sidebar */
+    /* Close button inside sidebar */
     .sidebar-close-btn {
-        display: block;
+        display: block !important;
     }
 
-    /* Show overlay when sidebar is open */
-    .sidebar-overlay {
-        display: block;
-    }
-
-    /* Sidebar: hidden off-screen — force with !important to beat inline styles */
+    /* BULLETPROOF: Hide sidebar completely on mobile via display:none */
     .sidebar {
-        transform: translateX(110%) !important;
+        display: none !important;
         z-index: 1001;
-        box-shadow: none;
     }
 
-    /* Sidebar open: slide in */
+    /* Show sidebar ONLY when it has the sidebar-open class */
     .sidebar.sidebar-open {
-        transform: translateX(0) !important;
+        display: flex !important;
+        position: fixed !important;
+        right: 0 !important;
+        top: 0 !important;
+        width: var(--sidebar-width) !important;
+        height: 100vh !important;
         box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
-    }
-
-    /* LTR support */
-    [dir="ltr"] .sidebar {
-        right: auto;
-        left: 0;
-        transform: translateX(-110%) !important;
-        border-left: none;
-        border-right: 1px solid var(--border-color);
+        animation: slideInRight 0.25s ease-out;
     }
 
     [dir="ltr"] .sidebar.sidebar-open {
-        transform: translateX(0) !important;
+        right: auto !important;
+        left: 0 !important;
+        animation: slideInLeft 0.25s ease-out;
     }
 
-    /* Main content fills full width — !important beats inline style from old code */
+    /* Main content fills full width */
     .main-container {
         margin-right: 0 !important;
         margin-left: 0 !important;
@@ -2035,6 +2186,17 @@ input {
     .user-menu-trigger .user-info-text {
         display: none;
     }
+}
+
+/* Animations */
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
 }
 
 /* ═══════════════════════════════════════

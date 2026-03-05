@@ -115,7 +115,7 @@ function Sidebar({ isOpen, isMobile, onClose }) {
 
 
     return (
-        <aside className={`sidebar${isMobile && !isOpen ? ' sidebar-mobile-hidden' : ''}${isOpen ? ' sidebar-open' : ''}`}>
+        <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
             <div className="sidebar-brand">
                 {/* Brand text — hidden on mobile since it's in topbar */}
                 <span className="sidebar-brand-text">AMAN ERP</span>
