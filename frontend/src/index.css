@@ -263,6 +263,13 @@ body {
   display: none;
 }
 
+/* On desktop, show brand in topbar only when sidebar is collapsed */
+@media (min-width: 1025px) {
+  .main-container.sidebar-closed .topbar-brand {
+    display: block;
+  }
+}
+
 /* Sidebar brand text — shown on desktop, hidden on mobile */
 .sidebar-brand-text {
   font-size: 20px;
