@@ -76,6 +76,8 @@ body {
   display: flex;
   flex-direction: column;
   z-index: 1000;
+  /* Always transition so mobile slide works */
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-brand {
@@ -1867,43 +1869,26 @@ input {
    Mobile: < 1024px  |  Desktop: ≥ 1024px
    ===================================================== */
 
-/* ── Hamburger Button (hidden on desktop) ── */
-.sidebar-hamburger {
+/* ── Sidebar Toggle Button (hidden on desktop, shown on mobile) ── */
+.sidebar-toggle {
     display: none;
-    flex-direction: column;
-    justify-content: center;
     align-items: center;
-    gap: 5px;
-    width: 40px;
-    height: 40px;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
     background: none;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: none;
+    border-radius: 6px;
     cursor: pointer;
     flex-shrink: 0;
-    padding: 6px;
-    margin-inline-end: 12px;
-    transition: background 0.2s;
+    margin-inline-end: 8px;
+    color: var(--text-secondary);
+    transition: background 0.15s;
 }
 
-.sidebar-hamburger:hover {
+.sidebar-toggle:hover {
     background: var(--bg-hover);
 }
-
-.hamburger-line {
-    display: block;
-    width: 20px;
-    height: 2px;
-    background-color: var(--text-secondary);
-    border-radius: 2px;
-    transition: transform 0.25s ease, opacity 0.25s ease;
-    transform-origin: center;
-}
-
-/* X animation when open */
-.hamburger-line:nth-child(1).open { transform: translateY(7px) rotate(45deg); }
-.hamburger-line:nth-child(2).open { opacity: 0; transform: scaleX(0); }
-.hamburger-line:nth-child(3).open { transform: translateY(-7px) rotate(-45deg); }
 
 /* ── Sidebar Close Button (hidden on desktop) ── */
 .sidebar-close-btn {
@@ -1939,8 +1924,8 @@ input {
    TABLET + MOBILE  (<= 1024px)
    ═══════════════════════════════════════ */
 @media (max-width: 1024px) {
-    /* Show hamburger */
-    .sidebar-hamburger {
+    /* Show sidebar toggle button */
+    .sidebar-toggle {
         display: flex;
     }
 
@@ -1956,8 +1941,7 @@ input {
 
     /* Sidebar: hidden off-screen by default */
     .sidebar {
-        transform: translateX(100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateX(110%);
         z-index: 1001;
         box-shadow: none;
         width: var(--sidebar-width);
@@ -2292,7 +2276,7 @@ input {
 @media print {
     .sidebar,
     .topbar,
-    .sidebar-hamburger,
+    .sidebar-toggle,
     .sidebar-overlay {
         display: none !important;
     }
