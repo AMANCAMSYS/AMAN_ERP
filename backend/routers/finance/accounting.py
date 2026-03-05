@@ -255,23 +255,50 @@ async def get_chart_of_accounts(
                 
             result = db.execute(text(query), all_params)
         else:
+            # FIX: Compute balance from journal_lines aggregation (all branches)
+            # to stay consistent with the branch-specific view and avoid stale cached balance column
             query = f"""
-                SELECT id, account_number, account_code, name, name_en, account_type, parent_id, is_header, balance, balance_currency, currency, is_active
+                SELECT
+                    a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type,
+                    a.parent_id, a.is_header, a.currency, a.is_active,
+                    CASE
+                        WHEN a.account_type IN ('asset', 'expense') THEN
+                            COALESCE(SUM(jl.debit - jl.credit), 0)
+                        ELSE
+                            COALESCE(SUM(jl.credit - jl.debit), 0)
+                    END as balance,
+                    CASE
+                        WHEN a.currency IS NOT NULL AND a.currency != '' THEN
+                            CASE
+                                WHEN a.account_type IN ('asset', 'expense') THEN
+                                    COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.debit > 0 THEN jl.amount_currency ELSE 0 END), 0)
+                                  - COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.credit > 0 THEN jl.amount_currency ELSE 0 END), 0)
+                                ELSE
+                                    COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.credit > 0 THEN jl.amount_currency ELSE 0 END), 0)
+                                  - COALESCE(SUM(CASE WHEN jl.currency = a.currency AND jl.debit > 0 THEN jl.amount_currency ELSE 0 END), 0)
+                            END
+                        ELSE 0
+                    END as balance_currency
                 FROM accounts a
+                LEFT JOIN journal_lines jl ON jl.account_id = a.id
                 WHERE 1=1 {where_extra}
-                ORDER BY account_number ASC
+                GROUP BY a.id, a.account_number, a.account_code, a.name, a.name_en, a.account_type,
+                         a.parent_id, a.is_header, a.currency, a.is_active
+                ORDER BY a.account_number ASC
             """
-            
+            # Disable cache since we now compute live from journal_lines
+            use_cache = False
+
             # Count total (standard case)
             count_query = f"SELECT COUNT(*) FROM accounts a WHERE 1=1 {where_extra}"
             total_count = db.execute(text(count_query), extra_params).scalar() or 0
-            
+
             # Add pagination
             if page is not None and page >= 1:
                 query += " LIMIT :limit OFFSET :offset"
                 extra_params["limit"] = page_size
                 extra_params["offset"] = (page - 1) * page_size
-                
+
             result = db.execute(text(query), extra_params)
             
         accounts = [dict(row._mapping) for row in result]
