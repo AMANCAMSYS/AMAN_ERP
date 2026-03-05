@@ -695,12 +695,13 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             # 5. Fixed assets (fixed: removed overly-broad '%أصل%' pattern)
             zatca_fa_filter = """
                     a.name LIKE '%%أصول ثابتة%%' OR a.name LIKE '%%معدات%%'
-                    OR a.name LIKE '%%مباني%%' OR a.name LIKE '%%سيارات%%'
-                    OR a.name LIKE '%%أثاث%%' OR a.name LIKE '%%أراضي%%'
-                    OR a.name LIKE '%%مجمع%%'
+                    OR a.name LIKE '%%آلات%%' OR a.name LIKE '%%مباني%%'
+                    OR a.name LIKE '%%سيارات%%' OR a.name LIKE '%%أثاث%%'
+                    OR a.name LIKE '%%أراضي%%' OR a.name LIKE '%%مجمع%%'
                     OR a.name_en LIKE '%%fixed%%asset%%' OR a.name_en LIKE '%%equipment%%'
-                    OR a.name_en LIKE '%%building%%' OR a.name_en LIKE '%%vehicle%%'
-                    OR a.name_en LIKE '%%furniture%%' OR a.name_en LIKE '%%depreciation%%'
+                    OR a.name_en LIKE '%%machine%%' OR a.name_en LIKE '%%building%%'
+                    OR a.name_en LIKE '%%vehicle%%' OR a.name_en LIKE '%%furniture%%'
+                    OR a.name_en LIKE '%%depreciation%%'
                     OR a.account_code LIKE '12%%' OR a.account_code LIKE '15%%'
                     OR a.account_code LIKE '16%%'
             """
@@ -716,7 +717,29 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             zatca_inv_sql, zatca_inv_params = _zakat_balance_query(zatca_inv_filter, ['asset'], branch_id)
             lt_investments = db.execute(text(zatca_inv_sql), zatca_inv_params).scalar() or 0
 
-            total_ded = Decimal(str(fixed_assets)) + Decimal(str(lt_investments))
+            # 7. Intangible assets (شهرة، براءات، علامات تجارية — non-zakatable per ZATCA)
+            zatca_intang_filter = """
+                    a.name LIKE '%%شهرة%%' OR a.name LIKE '%%براءة%%'
+                    OR a.name LIKE '%%علامة تجارية%%' OR a.name LIKE '%%رخصة%%'
+                    OR a.name LIKE '%%غير ملموس%%' OR a.name LIKE '%%أصول معنوية%%'
+                    OR a.name_en LIKE '%%intangible%%' OR a.name_en LIKE '%%goodwill%%'
+                    OR a.name_en LIKE '%%patent%%' OR a.name_en LIKE '%%trademark%%'
+                    OR a.account_code LIKE '13%%' OR a.account_code LIKE '18%%'
+            """
+            zatca_intang_sql, zatca_intang_params = _zakat_balance_query(zatca_intang_filter, ['asset'], branch_id)
+            intangible_assets = db.execute(text(zatca_intang_sql), zatca_intang_params).scalar() or 0
+
+            # 8. Work in progress / under construction (non-zakatable)
+            zatca_wip_filter = """
+                    a.name LIKE '%%تحت الإنشاء%%' OR a.name LIKE '%%تحت التنفيذ%%'
+                    OR a.name LIKE '%%مشروعات تحت%%'
+                    OR a.name_en LIKE '%%under construction%%' OR a.name_en LIKE '%%work in progress%%'
+                    OR a.account_code LIKE '17%%'
+            """
+            zatca_wip_sql, zatca_wip_params = _zakat_balance_query(zatca_wip_filter, ['asset'], branch_id)
+            wip = db.execute(text(zatca_wip_sql), zatca_wip_params).scalar() or 0
+
+            total_ded = Decimal(str(fixed_assets)) + Decimal(str(lt_investments)) + Decimal(str(intangible_assets)) + Decimal(str(wip))
             zakat_base = max(Decimal('0'), total_add - total_ded)
             zakat_amount = (zakat_base * rate / Decimal('100')).quantize(Decimal('0.01'), ROUND_HALF_UP)
 
@@ -729,9 +752,12 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             total_additions = float(total_add.quantize(Decimal('0.01')))
 
             deductions = [
-                {"label": "Fixed Assets", "label_ar": "الأصول الثابتة", "amount": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01')))},
+                {"label": "Fixed Assets & Equipment", "label_ar": "الأصول الثابتة والمعدات", "amount": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01')))},
+                {"label": "Intangible Assets (Goodwill, Patents)", "label_ar": "الأصول المعنوية (شهرة، براءات)", "amount": float(Decimal(str(intangible_assets)).quantize(Decimal('0.01')))},
                 {"label": "Long-term Investments", "label_ar": "الاستثمارات طويلة الأجل", "amount": float(Decimal(str(lt_investments)).quantize(Decimal('0.01')))},
             ]
+            if wip:
+                deductions.append({"label": "Work in Progress / Under Construction", "label_ar": "مشروعات تحت التنفيذ", "amount": float(Decimal(str(wip)).quantize(Decimal('0.01')))})
             total_deductions = float(total_ded.quantize(Decimal('0.01')))
 
             details = {
