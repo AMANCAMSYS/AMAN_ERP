@@ -279,7 +279,7 @@ body {
 }
 
 .main-container.sidebar-closed {
-  margin-right: 0;
+  margin-right: var(--sidebar-width);
   margin-left: 0;
 }
 
