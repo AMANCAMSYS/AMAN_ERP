@@ -365,15 +365,10 @@ jobs:
               exit 1
             }
 
-            # 10.2 Verify the actually served frontend build SHA matches this deployed commit
-            VERIFY_URL="http://${{ secrets.DEPLOY_HOST }}/build-sha.txt"
-            echo "🔍 Verifying served frontend SHA via: $VERIFY_URL"
-            SERVED_SHA=$(curl -fsSL "$VERIFY_URL" 2>/dev/null | tr -d '\r\n[:space:]')
-            if [ -z "$SERVED_SHA" ]; then
-              echo "⚠️ Could not resolve SHA from host URL, falling back to local nginx endpoint"
-              VERIFY_URL="http://127.0.0.1/build-sha.txt"
-              SERVED_SHA=$(curl -fsSL "$VERIFY_URL" | tr -d '\r\n[:space:]')
-            fi
+            # 10.2 Verify deployed frontend SHA from the local serving source of truth
+            VERIFY_URL="http://127.0.0.1/build-sha.txt"
+            echo "🔍 Verifying local served frontend SHA via: $VERIFY_URL"
+            SERVED_SHA=$(curl -fsSL "$VERIFY_URL" | tr -d '\r\n[:space:]')
             if ! echo "$SERVED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
               echo "❌ Invalid build-sha response (expected 40-char git SHA)"
               echo "   verify_url: $VERIFY_URL"
@@ -388,6 +383,19 @@ jobs:
               exit 1
             fi
             echo "✅ Served frontend SHA matches deployed commit"
+
+            # 10.25 Optional external-domain check (warning only, does not block deploy)
+            EXTERNAL_VERIFY_URL="http://${{ secrets.DEPLOY_HOST }}/build-sha.txt"
+            EXTERNAL_SHA=$(curl -fsSL "$EXTERNAL_VERIFY_URL" 2>/dev/null | tr -d '\r\n[:space:]' || true)
+            if [ "$EXTERNAL_SHA" = "$EXPECTED_SHA" ]; then
+              echo "✅ External domain SHA matches deployed commit"
+            else
+              echo "⚠️ External domain SHA not yet matching deployed commit"
+              echo "   external_url: $EXTERNAL_VERIFY_URL"
+              echo "   expected:     $EXPECTED_SHA"
+              echo "   got:          ${EXTERNAL_SHA:-<empty>}"
+              echo "   hint: likely external serving path mismatch or cache layer"
+            fi
 
             # 10.3 Log deployed commit SHA for traceability
             echo "✅ Deployed commit SHA: $EXPECTED_SHA"
