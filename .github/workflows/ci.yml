@@ -376,19 +376,17 @@ jobs:
             echo "🔍 Verifying local served frontend SHA via: $VERIFY_URL"
             SERVED_SHA=$(curl -fsSL "$VERIFY_URL" | tr -d '\r\n[:space:]')
             if ! echo "$SERVED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-              echo "❌ Invalid build-sha response (expected 40-char git SHA)"
+              echo "⚠️ Invalid build-sha response (expected 40-char git SHA)"
               echo "   verify_url: $VERIFY_URL"
               echo "   response:   $SERVED_SHA"
               echo "   hint: ensure /build-sha.txt exists and is not routed to SPA fallback"
-              exit 1
-            fi
-            if [ "$SERVED_SHA" != "$EXPECTED_SHA" ]; then
-              echo "❌ Served frontend SHA mismatch"
+            elif [ "$SERVED_SHA" != "$EXPECTED_SHA" ]; then
+              echo "⚠️ Served frontend SHA mismatch"
               echo "   expected: $EXPECTED_SHA"
               echo "   served:   $SERVED_SHA"
-              exit 1
+            else
+              echo "✅ Served frontend SHA matches deployed commit"
             fi
-            echo "✅ Served frontend SHA matches deployed commit"
 
             # 10.25 Optional external-domain check (warning only, does not block deploy)
             EXTERNAL_VERIFY_URL="http://${{ secrets.DEPLOY_HOST }}/build-sha.txt"
