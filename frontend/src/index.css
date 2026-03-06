@@ -2414,6 +2414,19 @@ input {
 
 .topbar-sidebar-toggle {
   display: none !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--bg-card) !important;
+  color: var(--text-secondary) !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.topbar-sidebar-toggle:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-main) !important;
 }
 
 /* ── Dark Mode Toggle Button ── */
