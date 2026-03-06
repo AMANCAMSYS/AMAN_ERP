@@ -307,6 +307,15 @@ jobs:
             fi
             echo "🧭 Frontend serving mode: $FRONTEND_MODE"
 
+            # Always recreate frontend container so latest built assets are active
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              up -d --force-recreate frontend
+
+            FRONT_CID=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q frontend)
+            if [ -n "$FRONT_CID" ]; then
+              docker exec "$FRONT_CID" sh -lc "printf '%s\\n' '$EXPECTED_SHA' > /usr/share/nginx/html/build-sha.txt"
+            fi
+
             if [ "$FRONTEND_MODE" = "host_nginx" ]; then
               echo "📦 Syncing frontend assets to host root: /var/www/aman/frontend"
               mkdir -p /var/www/aman/frontend
@@ -331,14 +340,6 @@ jobs:
                 sudo -n nginx -t && sudo -n systemctl reload nginx || nginx -t && systemctl reload nginx || true
               elif command -v nginx >/dev/null 2>&1; then
                 nginx -t && nginx -s reload || true
-              fi
-            else
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-                up -d --force-recreate frontend
-
-              FRONT_CID=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q frontend)
-              if [ -n "$FRONT_CID" ]; then
-                docker exec "$FRONT_CID" sh -lc "printf '%s\\n' '$EXPECTED_SHA' > /usr/share/nginx/html/build-sha.txt"
               fi
             fi
 
@@ -403,6 +404,10 @@ jobs:
 
             # 10.3 Log deployed commit SHA for traceability
             echo "✅ Deployed commit SHA: $EXPECTED_SHA"
+
+            # 10.4 Final explicit verification output
+            echo "LOCAL_SHA=$(curl -fsSL http://127.0.0.1/build-sha.txt || true)"
+            echo "PUBLIC_SHA=$(curl -fsSL http://${{ secrets.DEPLOY_HOST }}/build-sha.txt || true)"
 
             # 11. Start remaining services (prometheus, grafana)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
