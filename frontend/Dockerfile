@@ -21,7 +21,12 @@ COPY . .
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
+# Embed commit SHA for post-deploy verification
+ARG BUILD_SHA=dev
+ENV VITE_BUILD_SHA=$BUILD_SHA
+
 RUN npm run build
+RUN printf '%s\n' "$BUILD_SHA" > /app/dist/build-sha.txt
 
 
 # ── Stage 3: Serve with nginx ──────────────────────────────────────────────────
