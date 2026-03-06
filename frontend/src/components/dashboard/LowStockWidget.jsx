@@ -23,7 +23,7 @@ const LowStockWidget = ({ config = {} }) => {
     );
 
     if (!data.length) return (
-        <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+        <div className="flex flex-col items-center justify-center h-full py-8" style={{ color: 'var(--text-secondary)' }}>
             <Package size={32} className="mb-2" />
             <span className="text-sm">{t('dashboard.no_low_stock') || 'لا يوجد منتجات منخفضة'}</span>
         </div>
@@ -39,13 +39,13 @@ const LowStockWidget = ({ config = {} }) => {
                     <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-sm ${isZero ? 'bg-red-50' : isCritical ? 'bg-amber-50' : 'bg-slate-50'}`}>
                         <div className="flex items-center gap-2 min-w-0">
                             <AlertTriangle size={14} className={isZero ? 'text-red-500' : isCritical ? 'text-amber-500' : 'text-slate-400'} />
-                            <span className="truncate font-medium text-slate-700">{item.product_name}</span>
+                            <span className="truncate font-medium" style={{ color: 'var(--text-main)' }}>{item.product_name}</span>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`font-bold ${isZero ? 'text-red-600' : isCritical ? 'text-amber-600' : 'text-slate-600'}`}>
                                 {Math.floor(item.current_stock)}
                             </span>
-                            <span className="text-xs text-slate-400">/ {Math.floor(item.reorder_level)}</span>
+                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>/ {Math.floor(item.reorder_level)}</span>
                         </div>
                     </div>
                 );

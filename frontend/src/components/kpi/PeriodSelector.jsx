@@ -56,10 +56,10 @@ const PeriodSelector = ({
                             display: 'flex', alignItems: 'center', gap: '4px',
                             padding: '5px 12px',
                             fontSize: '0.78rem', fontWeight: active ? 700 : 500,
-                            border: `1px solid ${active ? p.color + '66' : '#e2e8f0'}`,
+                            border: `1px solid ${active ? p.color + '66' : 'var(--border-color)'}`,
                             borderRadius: '8px',
-                            background: active ? p.color + '12' : '#fff',
-                            color: active ? p.color : '#64748b',
+                            background: active ? p.color + '12' : 'var(--bg-card)',
+                            color: active ? p.color : 'var(--text-secondary)',
                             cursor: 'pointer',
                             transition: 'all .15s',
                         }}
@@ -78,10 +78,10 @@ const PeriodSelector = ({
                             display: 'flex', alignItems: 'center', gap: '4px',
                             padding: '5px 12px',
                             fontSize: '0.78rem', fontWeight: value === 'custom' ? 700 : 500,
-                            border: `1px solid ${value === 'custom' ? '#f97316' + '66' : '#e2e8f0'}`,
+                            border: `1px solid ${value === 'custom' ? '#f97316' + '66' : 'var(--border-color)'}`,
                             borderRadius: '8px',
-                            background: value === 'custom' ? '#f9731612' : '#fff',
-                            color: value === 'custom' ? '#f97316' : '#64748b',
+                            background: value === 'custom' ? '#f9731612' : 'var(--bg-card)',
+                            color: value === 'custom' ? '#f97316' : 'var(--text-secondary)',
                             cursor: 'pointer',
                         }}
                     >
@@ -97,7 +97,8 @@ const PeriodSelector = ({
                                 onChange={e => onChange('custom', e.target.value, endDate)}
                                 style={{
                                     padding: '4px 8px', borderRadius: '6px',
-                                    border: '1px solid #e2e8f0', fontSize: '0.78rem',
+                                    border: '1px solid var(--border-color)', fontSize: '0.78rem',
+                                    background: 'var(--bg-card)', color: 'var(--text-main)',
                                 }}
                             />
                             <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>→</span>
@@ -107,7 +108,8 @@ const PeriodSelector = ({
                                 onChange={e => onChange('custom', startDate, e.target.value)}
                                 style={{
                                     padding: '4px 8px', borderRadius: '6px',
-                                    border: '1px solid #e2e8f0', fontSize: '0.78rem',
+                                    border: '1px solid var(--border-color)', fontSize: '0.78rem',
+                                    background: 'var(--bg-card)', color: 'var(--text-main)',
                                 }}
                             />
                         </div>

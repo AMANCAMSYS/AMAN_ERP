@@ -32,17 +32,17 @@ const SalesSummaryWidget = ({ config = {}, currency = '' }) => {
     return (
         <div className="h-full flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <span className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
                     {periodLabels[period] || period}
                 </span>
-                <ShoppingCart size={16} className="text-blue-500" />
+                <ShoppingCart size={16} style={{ color: 'var(--primary)' }} />
             </div>
-            <div className="text-2xl font-bold text-slate-800">
-                {formatNumber(data?.total || 0)} <small className="text-sm text-slate-400">{currency}</small>
+            <div className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                {formatNumber(data?.total || 0)} <small className="text-sm" style={{ color: 'var(--text-secondary)' }}>{currency}</small>
             </div>
             <div className="flex items-center gap-1 mt-2">
-                <span className="text-xs text-slate-500">{data?.count || 0} {t('dashboard.invoices') || 'فاتورة'}</span>
-                <span className="mx-1 text-slate-300">•</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{data?.count || 0} {t('dashboard.invoices') || 'فاتورة'}</span>
+                <span className="mx-1" style={{ color: 'var(--text-muted)' }}>•</span>
                 <span className={`text-xs font-semibold flex items-center gap-0.5 ${isPositive ? 'text-emerald-600' : 'text-red-500'}`}>
                     {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                     {data?.change_percent > 0 ? '+' : ''}{data?.change_percent || 0}%

@@ -4,19 +4,23 @@
 }
 
 .timesheet-table input:focus {
-    background-color: #fff3cd;
+    background-color: var(--bg-hover);
     box-shadow: none;
 }
 
 .timesheet-container {
-    background: white;
+    background: var(--bg-card);
     padding: 1rem;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color);
 }
 
 .bg-light-success {
-    background-color: #f0fff4 !important;
+    background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+.timesheet-total-cell {
+    background: var(--table-footer-bg);
 }
 
 .selection-overlay {
@@ -35,7 +39,7 @@
     position: absolute;
     bottom: 2px;
     right: 2px;
-    color: #28a745;
+    color: var(--success);
 }
 
 .timesheet-table td:hover .selection-overlay {

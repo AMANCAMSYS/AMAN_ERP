@@ -131,7 +131,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                             <span>{config.icon}</span>
                             {title}
                             {currentBranch && (
-                                <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#64748b', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '0.4rem', padding: '2px 8px' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 400, color: 'var(--text-secondary)', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', borderRadius: '0.4rem', padding: '2px 8px' }}>
                                     {currentBranch.branch_name}
                                 </span>
                             )}
@@ -150,8 +150,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                                 onClick={() => navigate(backPath)}
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0',
-                                    borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#475569',
+                                    padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                    borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)',
                                 }}
                             >
                                 {isRTL ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
@@ -166,8 +166,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                                 onClick={() => setShowMenu(!showMenu)}
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: '4px',
-                                    padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0',
-                                    borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#475569',
+                                    padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                    borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)',
                                 }}
                             >
                                 <BarChart3 size={14} />
@@ -177,8 +177,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                             {showMenu && (
                                 <div style={{
                                     position: 'absolute', top: '100%', [isRTL ? 'right' : 'left']: 0,
-                                    marginTop: 4, background: '#fff', border: '1px solid #e2e8f0',
-                                    borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,.1)',
+                                    marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                    borderRadius: '10px', boxShadow: 'var(--shadow-md)',
                                     zIndex: 50, minWidth: 200, padding: '6px',
                                     maxHeight: 300, overflowY: 'auto',
                                 }}>
@@ -191,9 +191,9 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                                             }}
                                             style={{
                                                 display: 'block', width: '100%', textAlign: isRTL ? 'right' : 'left',
-                                                padding: '8px 12px', border: 'none', background: d.key === key ? '#f1f5f9' : 'transparent',
+                                                padding: '8px 12px', border: 'none', background: d.key === key ? 'var(--bg-hover)' : 'transparent',
                                                 borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer',
-                                                color: d.key === key ? config.color : '#475569',
+                                                color: d.key === key ? config.color : 'var(--text-secondary)',
                                                 fontWeight: d.key === key ? 700 : 500,
                                             }}
                                         >
@@ -208,8 +208,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                         <button onClick={fetchData} disabled={loading}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '4px',
-                                padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0',
-                                borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: '#475569',
+                                padding: '6px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                borderRadius: '8px', fontSize: '0.8rem', cursor: 'pointer', color: 'var(--text-secondary)',
                             }}
                         >
                             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
@@ -264,10 +264,10 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                 <div key={cat} style={{ marginBottom: '1.5rem' }}>
                     {categories.length > 1 && (
                         <h3 style={{
-                            fontSize: '0.82rem', fontWeight: 700, color: '#475569',
+                            fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)',
                             textTransform: 'uppercase', letterSpacing: '0.06em',
                             marginBottom: '0.6rem', paddingBottom: '0.4rem',
-                            borderBottom: '1px solid #f1f5f9',
+                            borderBottom: '1px solid var(--border-color)',
                         }}>
                             {cat}
                         </h3>
@@ -304,14 +304,14 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
             {data?.industry_kpis && data.industry_kpis.length > 0 && (
                 <div style={{ marginTop: '2rem' }}>
                     <h2 style={{
-                        fontSize: '0.9rem', fontWeight: 700, color: '#475569',
+                        fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)',
                         textTransform: 'uppercase', letterSpacing: '0.05em',
                         marginBottom: '1rem', paddingBottom: '0.5rem',
-                        borderBottom: '2px solid #e2e8f0',
+                        borderBottom: '2px solid var(--border-color)',
                         display: 'flex', alignItems: 'center', gap: '0.4rem',
                     }}>
                         🏢 {isRTL ? 'مؤشرات القطاع' : 'Industry KPIs'}
-                        {data.industry && <span style={{ fontWeight: 400, color: '#94a3b8' }}>— {data.industry}</span>}
+                        {data.industry && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— {data.industry}</span>}
                     </h2>
                     <div style={{
                         display: 'grid',

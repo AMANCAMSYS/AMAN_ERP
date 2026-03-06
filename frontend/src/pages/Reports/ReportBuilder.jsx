@@ -251,7 +251,7 @@ export default function ReportBuilder() {
                                     <p className="text-muted text-center">{t('common.no_data')}</p>
                                 ) : (
                                     <div className="table-responsive">
-                                        <table className="table">
+                                        <table className="data-table">
                                             <thead>
                                                 <tr>
                                                     <th>{t('common.name')}</th>

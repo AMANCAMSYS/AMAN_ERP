@@ -175,8 +175,8 @@ export default function Timesheets({ projectId, tasks = [] }) {
 
             {/* Grid */}
             <div className="table-responsive">
-                <table className="table table-bordered timesheet-table">
-                    <thead className="table-light">
+                <table className="data-table timesheet-table">
+                    <thead>
                         <tr>
                             <th style={{ width: '25%' }}>{t('projects.task')}</th>
                             {weekDays.map(day => (
@@ -223,7 +223,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
                                         </td>
                                     );
                                 })}
-                                <td className="text-center align-middle fw-bold bg-light">
+                                <td className="text-center align-middle fw-bold timesheet-total-cell">
                                     {/* Calculated Total for Row */}
                                     {weekDays.reduce((acc, day) => acc + (parseFloat(getHours(task.id, day)) || 0), 0)}
                                 </td>

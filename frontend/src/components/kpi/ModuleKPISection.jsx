@@ -129,7 +129,7 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                     </h3>
                     {alerts.length > 0 && (
                         <span style={{
-                            background: '#fef2f2', color: '#dc2626',
+                            background: 'rgba(239, 68, 68, 0.12)', color: 'var(--danger)',
                             fontSize: '0.7rem', fontWeight: 600,
                             padding: '2px 8px', borderRadius: '10px',
                         }}>
@@ -144,8 +144,8 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                             disabled={loading}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '4px',
-                                padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0',
-                                borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', color: '#475569',
+                                padding: '4px 10px', background: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                                borderRadius: '6px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-secondary)',
                             }}
                         >
                             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
@@ -162,7 +162,7 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                     borderTop: 'none',
                     borderRadius: '0 0 12px 12px',
                     padding: '16px',
-                    background: '#fff',
+                    background: 'var(--bg-card)',
                 }}>
                     {/* Period selector */}
                     <div style={{ marginBottom: '1rem' }}>
@@ -208,10 +208,10 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                         <div key={cat} style={{ marginBottom: '1rem' }}>
                             {categories.length > 1 && (
                                 <h4 style={{
-                                    fontSize: '0.78rem', fontWeight: 700, color: '#475569',
+                                    fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)',
                                     textTransform: 'uppercase', letterSpacing: '0.05em',
                                     marginBottom: '0.5rem', paddingBottom: '0.3rem',
-                                    borderBottom: '1px solid #f1f5f9',
+                                    borderBottom: '1px solid var(--border-color)',
                                 }}>
                                     {cat}
                                 </h4>
@@ -248,10 +248,10 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                     {data?.industry_kpis && data.industry_kpis.length > 0 && (
                         <div style={{ marginTop: '1rem' }}>
                             <h4 style={{
-                                fontSize: '0.78rem', fontWeight: 700, color: '#475569',
+                                fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)',
                                 textTransform: 'uppercase', letterSpacing: '0.05em',
                                 marginBottom: '0.5rem', paddingBottom: '0.3rem',
-                                borderBottom: '1px solid #f1f5f9',
+                                borderBottom: '1px solid var(--border-color)',
                                 display: 'flex', alignItems: 'center', gap: '0.3rem',
                             }}>
                                 🏢 {isRTL ? 'مؤشرات القطاع' : 'Industry KPIs'}

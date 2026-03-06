@@ -312,39 +312,39 @@ const Payslips = () => {
                                     <div style={{ fontWeight: 600, color: '#1e40af', fontSize: 14, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
                                         {t('hr.payslip_earnings')}
                                     </div>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, color: 'var(--text-main)' }}>
                                         <thead>
-                                            <tr style={{ background: '#f1f5f9' }}>
+                                            <tr style={{ background: 'var(--table-header-bg)' }}>
                                                 <th style={{ padding: '8px 12px', textAlign: isRTL ? 'right' : 'left', fontSize: 13 }}>{t('hr.payslip_item')}</th>
                                                 <th style={{ padding: '8px 12px', textAlign: isRTL ? 'left' : 'right', fontSize: 13 }}>{t('hr.payslip_amount')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.col_basic_salary')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.basic_salary || 0)} {currency}</td></tr>
-                                            {(selectedPayslip.housing_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_housing')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.housing_allowance)} {currency}</td></tr>}
-                                            {(selectedPayslip.transport_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_transport')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.transport_allowance)} {currency}</td></tr>}
-                                            {(selectedPayslip.other_allowances > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_other_allowances')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.other_allowances)} {currency}</td></tr>}
-                                            {(selectedPayslip.salary_components_earning > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_comp_earning')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.salary_components_earning)} {currency}</td></tr>}
-                                            {(selectedPayslip.overtime_amount > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>{t('hr.payslip_overtime')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.overtime_amount)} {currency}</td></tr>}
+                                            <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.col_basic_salary')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.basic_salary || 0)} {currency}</td></tr>
+                                            {(selectedPayslip.housing_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_housing')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.housing_allowance)} {currency}</td></tr>}
+                                            {(selectedPayslip.transport_allowance > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_transport')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.transport_allowance)} {currency}</td></tr>}
+                                            {(selectedPayslip.other_allowances > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_other_allowances')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.other_allowances)} {currency}</td></tr>}
+                                            {(selectedPayslip.salary_components_earning > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_comp_earning')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.salary_components_earning)} {currency}</td></tr>}
+                                            {(selectedPayslip.overtime_amount > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_overtime')}</td><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>{formatNumber(selectedPayslip.overtime_amount)} {currency}</td></tr>}
                                         </tbody>
                                     </table>
 
                                     {/* Deductions Table */}
-                                    <div style={{ fontWeight: 600, color: '#dc2626', fontSize: 14, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
+                                    <div style={{ fontWeight: 600, color: '#dc2626', fontSize: 14, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid var(--border-color)' }}>
                                         {t('hr.payslip_deductions')}
                                     </div>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16, color: 'var(--text-main)' }}>
                                         <thead>
-                                            <tr style={{ background: '#fef2f2' }}>
+                                            <tr style={{ background: 'rgba(239, 68, 68, 0.08)' }}>
                                                 <th style={{ padding: '8px 12px', textAlign: isRTL ? 'right' : 'left', fontSize: 13 }}>{t('hr.payslip_item')}</th>
                                                 <th style={{ padding: '8px 12px', textAlign: isRTL ? 'left' : 'right', fontSize: 13 }}>{t('hr.payslip_amount')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(selectedPayslip.gosi_employee_share > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_gosi_employee')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.gosi_employee_share)} {currency}</td></tr>}
-                                            {(selectedPayslip.violation_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_violations')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.violation_deduction)} {currency}</td></tr>}
-                                            {(selectedPayslip.loan_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_loan')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.loan_deduction)} {currency}</td></tr>}
-                                            {(selectedPayslip.salary_components_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2' }}>{t('hr.payslip_comp_deduction')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid #fef2f2', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.salary_components_deduction)} {currency}</td></tr>}
+                                            {(selectedPayslip.gosi_employee_share > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_gosi_employee')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.gosi_employee_share)} {currency}</td></tr>}
+                                            {(selectedPayslip.violation_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_violations')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.violation_deduction)} {currency}</td></tr>}
+                                            {(selectedPayslip.loan_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_loan')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.loan_deduction)} {currency}</td></tr>}
+                                            {(selectedPayslip.salary_components_deduction > 0) && <tr><td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)' }}>{t('hr.payslip_comp_deduction')}</td><td className="text-danger" style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', textAlign: isRTL ? 'left' : 'right' }}>-{formatNumber(selectedPayslip.salary_components_deduction)} {currency}</td></tr>}
                                         </tbody>
                                     </table>
 

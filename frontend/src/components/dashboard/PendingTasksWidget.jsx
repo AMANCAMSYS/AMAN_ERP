@@ -30,7 +30,7 @@ const PendingTasksWidget = ({ config = {} }) => {
     );
 
     if (!tasks.length) return (
-        <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+        <div className="flex flex-col items-center justify-center h-full py-8" style={{ color: 'var(--text-secondary)' }}>
             <ClipboardList size={32} className="mb-2" />
             <span className="text-sm">{t('dashboard.no_pending_tasks') || 'لا توجد مهام معلقة'}</span>
         </div>
@@ -46,10 +46,10 @@ const PendingTasksWidget = ({ config = {} }) => {
                 >
                     <div className="flex items-center gap-2">
                         {TASK_ICONS[task.type] || <ClipboardList size={14} className="text-slate-400" />}
-                        <span className="font-medium text-slate-700 group-hover:text-primary transition-colors">{task.label}</span>
+                        <span className="font-medium group-hover:text-primary transition-colors" style={{ color: 'var(--text-main)' }}>{task.label}</span>
                     </div>
                     {task.value && (
-                        <span className="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ color: 'var(--text-secondary)', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
                             {typeof task.value === 'number' ? task.value.toLocaleString() : task.value}
                         </span>
                     )}

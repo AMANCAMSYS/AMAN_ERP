@@ -155,7 +155,7 @@ function CashFlowReport() {
                                 <h3 className="card-title">{t('reports.cash_flow.outflow_details')}</h3>
                             </div>
                             <div className="table-responsive">
-                                <table className="table">
+                                <table className="data-table">
                                     <thead>
                                         <tr>
                                             <th>{t('reports.cash_flow.category')}</th>

@@ -191,7 +191,7 @@ function TreasuryCashflowReport() {
                             <h3 className="card-title">🏦 {t('treasury_reports.cashflow.by_account')}</h3>
                         </div>
                         <div className="table-responsive">
-                            <table className="table">
+                            <table className="data-table">
                                 <thead>
                                     <tr>
                                         <th>{t('treasury_reports.balances.account_name')}</th>
@@ -232,7 +232,7 @@ function TreasuryCashflowReport() {
                                 <h3 className="card-title">📊 {t('treasury_reports.cashflow.daily_trend')}</h3>
                             </div>
                             <div className="table-responsive">
-                                <table className="table">
+                                <table className="data-table">
                                     <thead>
                                         <tr>
                                             <th>{t('common.date')}</th>
