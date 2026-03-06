@@ -233,7 +233,7 @@ const Employees = () => {
                             <th>{t("hr.employees.employee")}</th>
                             <th>{t("hr.employees.position_dept")}</th>
                             <th>{t("hr.employees.contact_info")}</th>
-                            <th>{t("common.status")}</th>
+                            <th>{t("common.status_title")}</th>
                             <th>{t("hr.employees.system_link")}</th>
                             <th>{t("hr.employees.financial_link")}</th>
                             <th>{t('employee.total_salary', 'Total Salary')}</th>

@@ -192,7 +192,7 @@ function TaxCalendar() {
                                 <th>{t('tax_calendar.due_date', 'تاريخ الاستحقاق')}</th>
                                 <th>{t('tax_calendar.days_left', 'الأيام المتبقية')}</th>
                                 <th>{t('tax_calendar.recurring', 'متكرر')}</th>
-                                <th>{t('common.status', 'الحالة')}</th>
+                                <th>{t('common.status_title', 'الحالة')}</th>
                                 <th>{t('common.actions', 'الإجراءات')}</th>
                             </tr>
                         </thead>

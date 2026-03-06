@@ -22,7 +22,10 @@ i18n
             caches: ['localStorage'],
             lookupLocalStorage: 'i18nextLng'
         },
+        fallbackLng: ['ar', 'en'],
         lng: localStorage.getItem('i18nextLng') || 'ar', // Force Arabic if no stored preference
+        returnNull: false,
+        returnEmptyString: false,
     });
 
 export default i18n;

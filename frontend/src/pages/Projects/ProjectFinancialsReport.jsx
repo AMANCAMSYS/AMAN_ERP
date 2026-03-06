@@ -51,7 +51,7 @@ const ProjectFinancialsReport = () => {
             <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                     <div className="form-group" style={{ flex: 1, minWidth: 180 }}>
-                        <label className="form-label">{t('common.status', 'الحالة')}</label>
+                        <label className="form-label">{t('common.status_title', 'الحالة')}</label>
                         <select className="form-input" value={statusFilter}
                             onChange={e => setStatusFilter(e.target.value)}>
                             <option value="">{t('common.all', 'الكل')}</option>
@@ -104,7 +104,7 @@ const ProjectFinancialsReport = () => {
                                         <tr>
                                             <th>{t('projects.fields.code', 'الرمز')}</th>
                                             <th>{t('projects.fields.name', 'اسم المشروع')}</th>
-                                            <th>{t('common.status', 'الحالة')}</th>
+                                            <th>{t('common.status_title', 'الحالة')}</th>
                                             <th>{t('projects.fields.budget', 'الميزانية')}</th>
                                             <th>{t('projects.reports.revenue', 'الإيرادات')}</th>
                                             <th>{t('projects.reports.expenses', 'المصاريف')}</th>

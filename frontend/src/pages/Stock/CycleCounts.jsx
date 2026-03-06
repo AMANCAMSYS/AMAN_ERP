@@ -249,7 +249,7 @@ function CycleCounts() {
                                 <th style={{ width: '12%' }}>{t('stock.cycle.type')}</th>
                                 <th style={{ width: '10%' }}>{t('stock.cycle.items_count')}</th>
                                 <th style={{ width: '10%' }}>{t('stock.cycle.variances')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
                                 <th style={{ width: '15%' }}>{t('stock.cycle.date')}</th>
                                 <th style={{ width: '16%' }}>{t('common.actions')}</th>
                             </tr>
@@ -385,7 +385,7 @@ function CycleCounts() {
                         <div className="modules-grid" style={{ marginBottom: '16px', gap: '12px' }}>
                             <div><strong>{t('stock.cycle.warehouse')}:</strong> {countDetail.warehouse_name}</div>
                             <div><strong>{t('stock.cycle.type')}:</strong> {getCountTypeName(countDetail.count_type)}</div>
-                            <div><strong>{t('common.status')}:</strong> {getStatusBadge(countDetail.status)}</div>
+                            <div><strong>{t('common.status_title')}:</strong> {getStatusBadge(countDetail.status)}</div>
                         </div>
 
                         {error && <div className="alert alert-error mb-4">{error}</div>}

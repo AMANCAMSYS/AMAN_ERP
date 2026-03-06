@@ -158,7 +158,7 @@ const ProductionSchedule = () => {
                         </select>
                     </div>
                     <div className="form-group mb-0">
-                        <label className="form-label text-xs uppercase tracking-wider text-gray-400">{t('common.status')}</label>
+                        <label className="form-label text-xs uppercase tracking-wider text-gray-400">{t('common.status_title')}</label>
                         <select className="form-select-sm w-full" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                             <option value="">{t('common.all')}</option>
                             <option value="pending">{t('status.pending', 'Pending')}</option>
@@ -186,7 +186,7 @@ const ProductionSchedule = () => {
                                         <th>{t('manufacturing.operation')}</th>
                                         <th>{t('manufacturing.work_center')}</th>
                                         <th>{t('common.start_date')}</th>
-                                        <th>{t('common.status')}</th>
+                                        <th>{t('common.status_title')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -71,7 +71,7 @@ function DeliveryOrders() {
                             <th>{t('common.date')}</th>
                             <th>{t('delivery_orders.shipping_date')}</th>
                             <th>{t('common.total')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th>{t('common.actions')}</th>
                         </tr>
                     </thead>

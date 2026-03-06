@@ -121,7 +121,7 @@ function MarketingCampaigns() {
                         <thead><tr>
                             <th>{t('crm.campaign_name', 'اسم الحملة')}</th>
                             <th>{t('crm.type', 'النوع')}</th>
-                            <th>{t('common.status', 'الحالة')}</th>
+                            <th>{t('common.status_title', 'الحالة')}</th>
                             <th>{t('crm.period', 'الفترة')}</th>
                             <th>{t('crm.budget', 'الميزانية')}</th>
                             <th>{t('crm.sent', 'مرسل')}</th>
@@ -174,7 +174,7 @@ function MarketingCampaigns() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">{t('common.status', 'الحالة')}</label>
+                                        <label className="form-label">{t('common.status_title', 'الحالة')}</label>
                                         <select className="form-input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
                                             {['draft', 'active', 'paused', 'completed'].map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
                                         </select>

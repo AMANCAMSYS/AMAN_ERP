@@ -279,7 +279,7 @@ function SerialList() {
                                 <th style={{ width: '15%' }}>{t('stock.serial.warehouse')}</th>
                                 <th style={{ width: '12%' }}>{t('stock.serial.batch_number')}</th>
                                 <th style={{ width: '12%' }}>{t('stock.serial.expiry_date')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
                                 <th style={{ width: '16%' }}>{t('stock.serial.created_date')}</th>
                             </tr>
                         </thead>

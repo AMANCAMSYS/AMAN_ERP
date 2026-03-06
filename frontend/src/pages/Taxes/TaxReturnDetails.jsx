@@ -221,7 +221,7 @@ function TaxReturnDetails() {
                                     <th style={{ textAlign: 'left' }}>{t('taxes.amount')}</th>
                                     <th>{t('taxes.payment_method')}</th>
                                     <th>{t('taxes.reference')}</th>
-                                    <th>{t('common.status')}</th>
+                                    <th>{t('common.status_title')}</th>
                                 </tr>
                             </thead>
                             <tbody>

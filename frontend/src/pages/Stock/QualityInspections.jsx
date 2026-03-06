@@ -264,7 +264,7 @@ function QualityInspections() {
                                 <th style={{ width: '12%' }}>{t('stock.quality.warehouse')}</th>
                                 <th style={{ width: '10%' }}>{t('stock.quality.type')}</th>
                                 <th style={{ width: '10%' }}>{t('stock.quality.sample_size')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
                                 <th style={{ width: '10%' }}>{t('stock.quality.result')}</th>
                                 <th style={{ width: '12%' }}>{t('stock.quality.date')}</th>
                                 <th style={{ width: '8%' }}>{t('common.actions')}</th>

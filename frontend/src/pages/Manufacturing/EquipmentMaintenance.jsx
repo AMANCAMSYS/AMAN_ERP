@@ -152,7 +152,7 @@ const EquipmentMaintenance = () => {
                                     <tr>
                                         <th>{t('common.name')}</th>
                                         <th>{t('common.code')}</th>
-                                        <th>{t('common.status')}</th>
+                                        <th>{t('common.status_title')}</th>
                                         <th>{t('manufacturing.last_maintenance')}</th>
                                         <th>{t('manufacturing.next_due')}</th>
                                         <th>{t('common.actions')}</th>
@@ -206,7 +206,7 @@ const EquipmentMaintenance = () => {
                                         <th>{t('common.type')}</th>
                                         <th>{t('common.description')}</th>
                                         <th>{t('common.cost')}</th>
-                                        <th>{t('common.status')}</th>
+                                        <th>{t('common.status_title')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -256,7 +256,7 @@ const EquipmentMaintenance = () => {
                                         value={equipForm.code} onChange={e => setEquipForm({ ...equipForm, code: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">{t('common.status')}</label>
+                                    <label className="form-label">{t('common.status_title')}</label>
                                     <select className="form-select-sm w-full" value={equipForm.status} onChange={e => setEquipForm({ ...equipForm, status: e.target.value })}>
                                         <option value="active">Active</option>
                                         <option value="maintenance">Maintenance</option>

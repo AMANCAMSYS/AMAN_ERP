@@ -96,7 +96,7 @@ function FiscalPeriodLocks() {
                             <th>{t('common.name')}</th>
                             <th>{t('common.start_date')}</th>
                             <th>{t('common.end_date')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th>{t('common.actions')}</th>
                         </tr>
                     </thead>

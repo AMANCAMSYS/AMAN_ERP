@@ -175,7 +175,7 @@ function IntercompanyTransactions() {
                                         <th>{t('accounting.target_company', 'الشركة المستهدفة')}</th>
                                         <th>{t('accounting.transaction_type', 'النوع')}</th>
                                         <th>{t('common.amount', 'المبلغ')}</th>
-                                        <th>{t('common.status', 'الحالة')}</th>
+                                        <th>{t('common.status_title', 'الحالة')}</th>
                                         <th>{t('common.date', 'التاريخ')}</th>
                                         <th>{t('common.actions', 'إجراءات')}</th>
                                     </tr>

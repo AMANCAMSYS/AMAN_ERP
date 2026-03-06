@@ -13,6 +13,7 @@ export const authAPI = {
         })
     },
     me: () => api.get('/auth/me'),
+    updateMe: (data) => api.put('/auth/me', data),
     logout: () => api.post('/auth/logout'),
     refresh: () => api.post('/auth/refresh'),
 }

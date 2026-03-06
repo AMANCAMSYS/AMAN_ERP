@@ -17,6 +17,7 @@ function Login() {
     }, [navigate]);
 
     const [formData, setFormData] = useState({ company_code: '', username: '', password: '' })
+    const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
@@ -111,17 +112,27 @@ function Login() {
 
                     <div className="form-group">
                         <label className="form-label" htmlFor="password">{t('auth.password')}</label>
-                        <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            className="form-input"
-                            placeholder="••••••••"
-                            value={formData.password}
-                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            required
-                            autoComplete="current-password"
-                        />
+                        <div className="input-group">
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                id="password"
+                                name="password"
+                                className="form-input"
+                                placeholder="••••••••"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                required
+                                autoComplete="current-password"
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-light"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                aria-label={showPassword ? t('common.hide', 'إخفاء كلمة المرور') : t('common.show', 'إظهار كلمة المرور')}
+                            >
+                                {showPassword ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="text-end" style={{ marginBottom: '12px' }}>

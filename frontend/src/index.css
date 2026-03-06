@@ -279,7 +279,7 @@ body {
 }
 
 .main-container.sidebar-closed {
-  margin-right: var(--sidebar-width);
+  margin-right: 0;
   margin-left: 0;
 }
 
@@ -2413,7 +2413,7 @@ input {
 }
 
 .topbar-sidebar-toggle {
-  display: none !important;
+  display: flex !important;
   width: 40px !important;
   height: 40px !important;
   border-radius: 10px !important;

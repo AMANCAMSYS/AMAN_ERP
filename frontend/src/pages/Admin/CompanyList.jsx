@@ -73,7 +73,7 @@ function CompanyList() {
                                 <th style={{ padding: '12px' }}>{t('admin.companies.name')}</th>
                                 <th style={{ padding: '12px' }}>{t('admin.companies.database')}</th>
                                 <th style={{ padding: '12px' }}>{t('admin.companies.email')}</th>
-                                <th style={{ padding: '12px' }}>{t('common.status')}</th>
+                                <th style={{ padding: '12px' }}>{t('common.status_title')}</th>
                                 <th style={{ padding: '12px' }}>{t('admin.companies.plan')}</th>
                                 <th style={{ padding: '12px' }}>{t('admin.companies.reg_date')}</th>
                             </tr>

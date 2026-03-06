@@ -380,7 +380,7 @@ function PipelineAnalytics() {
                                     <tr>
                                         <th>{t('common.name', 'الاسم')}</th>
                                         <th>{t('common.type', 'النوع')}</th>
-                                        <th>{t('common.status', 'الحالة')}</th>
+                                        <th>{t('common.status_title', 'الحالة')}</th>
                                         <th>{t('crm.budget', 'الميزانية')}</th>
                                         <th>{t('crm.sent', 'أُرسل')}</th>
                                         <th>{t('crm.open_rate', 'معدل الفتح')}</th>

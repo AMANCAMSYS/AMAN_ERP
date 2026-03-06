@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getIndustryType } from '../hooks/useIndustryType'
 import { isModuleEnabledForIndustry } from '../config/industryModules'
 
-function Sidebar({ isOpen, isMobile, onClose }) {
+function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
     const { t } = useTranslation()
     const user = getUser()
     const industryType = getIndustryType()
@@ -114,16 +114,24 @@ function Sidebar({ isOpen, isMobile, onClose }) {
     }
 
 
+    const handleToggleClick = (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (typeof onToggle === 'function') {
+            onToggle()
+        }
+    }
+
     return (
-        <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`}>
+        <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`} dir="rtl">
             <div className="sidebar-brand">
-                {/* Brand text — hidden on mobile since it's in topbar */}
                 <span className="sidebar-brand-text">AMAN ERP</span>
-                {/* Close button — visible only on mobile */}
                 <button
-                    className="sidebar-close-btn"
-                    onClick={onClose}
-                    aria-label="إغلاق القائمة"
+                    className="sidebar-toggle"
+                    onClick={handleToggleClick}
+                    aria-label={isOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+                    aria-expanded={isOpen}
+                    type="button"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

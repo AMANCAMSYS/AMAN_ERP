@@ -190,7 +190,7 @@ const PayrollDetails = () => {
                     </div>
                 </div>
                 <div className="metric-card">
-                    <div className="metric-label">{t('common.status')}</div>
+                    <div className="metric-label">{t('common.status_title')}</div>
                     <div className={`metric-value ${isDraft ? 'text-warning' : 'text-success'} fs-4`}>{isDraft ? t('status.draft') : t('status.posted')}</div>
                 </div>
             </div>

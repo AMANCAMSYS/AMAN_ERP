@@ -121,7 +121,7 @@ function LandedCosts() {
                             <th>{t('landed_costs.lc_number')}</th>
                             <th>{t('common.date')}</th>
                             <th>{t('landed_costs.total_cost')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th>{t('common.actions')}</th>
                         </tr>
                     </thead>

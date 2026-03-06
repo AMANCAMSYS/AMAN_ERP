@@ -136,7 +136,7 @@ const WorkCenters = () => {
                             <th>{t('manufacturing.cost_per_hour')}</th>
                             <th>{t('manufacturing.daily_capacity')}</th>
                             <th>{t('manufacturing.accounting_integration')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th>{t('common.actions')}</th>
                         </tr>
                     </thead>
@@ -287,7 +287,7 @@ const WorkCenters = () => {
                                     </div>
 
                                     <div className="col-md-6 form-group">
-                                        <label className="form-label">{t('common.status')}</label>
+                                        <label className="form-label">{t('common.status_title')}</label>
                                         <select
                                             className="form-input"
                                             value={formData.status}

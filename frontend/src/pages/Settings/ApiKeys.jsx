@@ -155,7 +155,7 @@ export default function ApiKeys() {
               <th>{t('settings.api_keys.expiry_date')}</th>
               <th>{t('settings.api_keys.last_used')}</th>
               <th>{t('settings.api_keys.usage_count')}</th>
-              <th>{t('common.status')}</th>
+              <th>{t('common.status_title')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>

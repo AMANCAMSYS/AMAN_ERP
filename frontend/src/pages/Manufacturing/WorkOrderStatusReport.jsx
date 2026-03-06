@@ -91,7 +91,7 @@ const WorkOrderStatusReport = () => {
                             onChange={e => setFilters(p => ({ ...p, end_date: e.target.value }))} />
                     </div>
                     <div className="form-group" style={{ flex: 1, minWidth: 150 }}>
-                        <label className="form-label">{t('common.status', 'الحالة')}</label>
+                        <label className="form-label">{t('common.status_title', 'الحالة')}</label>
                         <select className="form-input" value={filters.status}
                             onChange={e => setFilters(p => ({ ...p, status: e.target.value }))}>
                             <option value="">{t('common.all', 'الكل')}</option>
@@ -159,7 +159,7 @@ const WorkOrderStatusReport = () => {
                                         <tr>
                                             <th>{t('manufacturing.order_number', 'رقم الأمر')}</th>
                                             <th>{t('manufacturing.product', 'المنتج')}</th>
-                                            <th>{t('common.status', 'الحالة')}</th>
+                                            <th>{t('common.status_title', 'الحالة')}</th>
                                             <th>{t('manufacturing.work_orders_report.progress', 'التقدم')}</th>
                                             <th>{t('common.quantity', 'الكمية')}</th>
                                             <th>{t('manufacturing.work_orders_report.produced', 'المنتج')}</th>

@@ -11,6 +11,8 @@ function ResetPassword() {
     const token = searchParams.get('token') || ''
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState(false)
@@ -68,11 +70,34 @@ function ResetPassword() {
                         {error && <div className="alert alert-danger mb-3">{error}</div>}
                         <div className="form-group">
                             <label>{t('reset_password.new_password')}</label>
-                            <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} />
+                            <div className="input-group">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    value={password}
+                                    onChange={e => setPassword(e.target.value)}
+                                    required
+                                    minLength={8}
+                                />
+                                <button type="button" className="btn btn-light" onClick={() => setShowPassword(prev => !prev)}>
+                                    {showPassword ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                </button>
+                            </div>
                         </div>
                         <div className="form-group mt-3">
                             <label>{t('reset_password.confirm_password')}</label>
-                            <input type="password" className="form-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
+                            <div className="input-group">
+                                <input
+                                    type={showConfirmPassword ? 'text' : 'password'}
+                                    className="form-input"
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    required
+                                />
+                                <button type="button" className="btn btn-light" onClick={() => setShowConfirmPassword(prev => !prev)}>
+                                    {showConfirmPassword ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                </button>
+                            </div>
                         </div>
                         <button type="submit" className="btn btn-primary w-full mt-3" disabled={loading}>
                             {loading ? t('common.saving') : t('reset_password.reset_button')}

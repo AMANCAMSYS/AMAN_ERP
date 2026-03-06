@@ -250,7 +250,7 @@ function RevenueRecognition() {
                                         <th>#</th>
                                         <th>{t('common.period', 'الفترة')}</th>
                                         <th>{t('common.amount', 'المبلغ')}</th>
-                                        <th>{t('common.status', 'الحالة')}</th>
+                                        <th>{t('common.status_title', 'الحالة')}</th>
                                         <th>{t('common.actions', 'إجراءات')}</th>
                                     </tr>
                                 </thead>
@@ -311,7 +311,7 @@ function RevenueRecognition() {
                                         <th>{t('accounting.method', 'الطريقة')}</th>
                                         <th>{t('common.amount', 'المبلغ')}</th>
                                         <th>{t('accounting.recognized_amount', 'معترف به')}</th>
-                                        <th>{t('common.status', 'الحالة')}</th>
+                                        <th>{t('common.status_title', 'الحالة')}</th>
                                         <th>{t('accounting.progress', 'التقدم')}</th>
                                         <th>{t('common.period', 'الفترة')}</th>
                                         <th>{t('common.actions', 'إجراءات')}</th>

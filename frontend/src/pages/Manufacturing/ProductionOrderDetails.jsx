@@ -390,7 +390,7 @@ export default function ProductionOrderDetails() {
                                 <th style={{ paddingRight: '16px', paddingLeft: '16px' }}>{t('common.sequence')}</th>
                                 <th>{t('manufacturing.operation')}</th>
                                 <th>{t('manufacturing.work_center')}</th>
-                                <th>{t('common.status')}</th>
+                                <th>{t('common.status_title')}</th>
                                 <th className="text-center">{t('common.actions')}</th>
                             </tr>
                         </thead>

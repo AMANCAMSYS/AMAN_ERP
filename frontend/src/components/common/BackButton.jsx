@@ -28,7 +28,7 @@ export default function BackButton({ onClick, label }) {
                 height: '36px',
                 borderRadius: '10px',
                 border: '1px solid var(--border-color, #e5e7eb)',
-                background: 'var(--bg-primary, #fff)',
+                background: 'var(--bg-card, #ffffff)',
                 cursor: 'pointer',
                 color: 'var(--text-secondary, #6b7280)',
                 transition: 'all 0.2s ease',
@@ -36,11 +36,11 @@ export default function BackButton({ onClick, label }) {
             }}
             onMouseEnter={e => {
                 e.currentTarget.style.background = 'var(--primary, #4f46e5)';
-                e.currentTarget.style.color = '#fff';
+                e.currentTarget.style.color = 'var(--text-on-primary, #ffffff)';
                 e.currentTarget.style.borderColor = 'var(--primary, #4f46e5)';
             }}
             onMouseLeave={e => {
-                e.currentTarget.style.background = 'var(--bg-primary, #fff)';
+                e.currentTarget.style.background = 'var(--bg-card, #ffffff)';
                 e.currentTarget.style.color = 'var(--text-secondary, #6b7280)';
                 e.currentTarget.style.borderColor = 'var(--border-color, #e5e7eb)';
             }}

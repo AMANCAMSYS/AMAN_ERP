@@ -529,7 +529,7 @@ function CRMHome() {
                                         <th>{t('crm.ticket_number')}</th>
                                         <th>{t('crm.subject')}</th>
                                         <th>{t('common.customer')}</th>
-                                        <th>{t('common.status')}</th>
+                                        <th>{t('common.status_title')}</th>
                                         <th>{t('crm.priority')}</th>
                                         <th>{t('crm.responsible')}</th>
                                         <th>{t('crm.created_date')}</th>

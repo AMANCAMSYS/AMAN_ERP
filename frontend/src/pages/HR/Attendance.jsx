@@ -187,7 +187,7 @@ const Attendance = () => {
                                     <th>{t('common.date')}</th>
                                     <th>{t('hr.attendance.check_in')}</th>
                                     <th>{t('hr.attendance.check_out')}</th>
-                                    <th>{t('common.status')}</th>
+                                    <th>{t('common.status_title')}</th>
                                     <th>{t('common.notes')}</th>
                                 </tr>
                             </thead>

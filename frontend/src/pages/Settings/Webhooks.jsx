@@ -192,7 +192,7 @@ export default function Webhooks() {
               <th>{t('settings.webhooks.events')}</th>
               <th>{t('settings.webhooks.retries')}</th>
               <th>{t('settings.webhooks.timeout')}</th>
-              <th>{t('common.status')}</th>
+              <th>{t('common.status_title')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>

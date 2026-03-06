@@ -61,7 +61,7 @@ export default function MRPView() {
                                 <th className="text-center">{t('manufacturing.mrp.on_hand')}</th>
                                 <th className="text-center">{t('manufacturing.mrp.shortage')}</th>
                                 <th className="text-center">{t('manufacturing.mrp.action')}</th>
-                                <th className="text-center">{t('common.status')}</th>
+                                <th className="text-center">{t('common.status_title')}</th>
                             </tr>
                         </thead>
                         <tbody>

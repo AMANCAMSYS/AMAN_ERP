@@ -176,7 +176,7 @@ function SalesDebitNotes() {
                             <th>{t('common.date')}</th>
                             <th>{t('sales.debit_notes.related_invoice')}</th>
                             <th>{t('common.amount')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -311,7 +311,7 @@ function SalesDebitNotes() {
                                 <div className="metric-card"><div className="metric-label">{t('common.customer')}</div><div className="metric-value" style={{ fontSize: 16 }}>{detailItem.party_name}</div></div>
                                 <div className="metric-card"><div className="metric-label">{t('common.date')}</div><div className="metric-value" style={{ fontSize: 16 }}>{formatShortDate(detailItem.invoice_date)}</div></div>
                                 <div className="metric-card"><div className="metric-label">{t('common.total')}</div><div className="metric-value text-primary" style={{ fontSize: 18 }}>{formatNumber(detailItem.total)} {currency}</div></div>
-                                <div className="metric-card"><div className="metric-label">{t('common.status')}</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
+                                <div className="metric-card"><div className="metric-label">{t('common.status_title')}</div><div className="metric-value" style={{ fontSize: 16 }}>{statusBadge(detailItem.status)}</div></div>
                             </div>
                             {detailItem.related_invoice_number && <p style={{ marginBottom: 12 }}>🔗 {t('sales.debit_notes.linked_to_invoice')}: <strong>{detailItem.related_invoice_number}</strong></p>}
                             {detailItem.notes && <p style={{ marginBottom: 16, color: '#666' }}>📝 {detailItem.notes}</p>}

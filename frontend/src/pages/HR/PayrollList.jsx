@@ -81,7 +81,7 @@ const PayrollList = () => {
                             <th>{t("hr.payroll.period_name")}</th>
                             <th>{t("hr.payroll.start_date")}</th>
                             <th>{t("hr.payroll.end_date")}</th>
-                            <th>{t("common.status")}</th>
+                            <th>{t("common.status_title")}</th>
                             <th>{t("hr.payroll.total_salaries")}</th>
                             <th>{t("common.actions")}</th>
                         </tr>

@@ -189,7 +189,7 @@ const LeaveList = () => {
                             <th style={{ width: '20%' }}>{t('hr.leaves.period')}</th>
                             <th className="text-center" style={{ width: '10%' }}>{t('hr.leaves.duration')}</th>
                             <th style={{ width: '20%' }}>{t('hr.leaves.reason')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th style={{ width: '10%' }}>{t('common.created_at')}</th>
                             {canManageLeaves && <th className="text-end">{t('common.actions')}</th>}
                         </tr>

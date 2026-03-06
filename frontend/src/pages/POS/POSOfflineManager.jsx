@@ -211,7 +211,7 @@ function POSOfflineManager() {
                     <h3 className="section-title">{t('pos.offline.sync_log', 'سجل المزامنة')}</h3>
                     <div className="table-responsive">
                         <table className="data-table">
-                            <thead><tr><th>{t('pos.offline.time', 'الوقت')}</th><th>ID</th><th>{t('common.status', 'الحالة')}</th><th>{t('pos.offline.details', 'التفاصيل')}</th></tr></thead>
+                            <thead><tr><th>{t('pos.offline.time', 'الوقت')}</th><th>ID</th><th>{t('common.status_title', 'الحالة')}</th><th>{t('pos.offline.details', 'التفاصيل')}</th></tr></thead>
                             <tbody>
                                 {syncLog.map((log, i) => (
                                     <tr key={i}>

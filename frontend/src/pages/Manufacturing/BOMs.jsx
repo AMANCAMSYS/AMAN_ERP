@@ -339,7 +339,7 @@ const BOMs = () => {
                                             />
                                         </div>
                                         <div className="col-md-4 form-group">
-                                            <label className="form-label">{t('common.status')}</label>
+                                            <label className="form-label">{t('common.status_title')}</label>
                                             <select
                                                 className="form-input"
                                                 value={formData.is_active}

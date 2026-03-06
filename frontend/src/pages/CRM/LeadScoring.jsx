@@ -202,7 +202,7 @@ function LeadScoring() {
                                         <th>{t('crm.operator', 'المعامل')}</th>
                                         <th>{t('crm.field_value', 'القيمة')}</th>
                                         <th>{t('crm.score', 'النقاط')}</th>
-                                        <th>{t('common.status', 'الحالة')}</th>
+                                        <th>{t('common.status_title', 'الحالة')}</th>
                                         <th>{t('common.actions', 'إجراءات')}</th>
                                     </tr>
                                 </thead>

@@ -763,6 +763,95 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="المستخدم غير موجود")
 
 
+class SelfProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_current_user_profile(
+    data: SelfProfileUpdateRequest,
+    token: str = Depends(oauth2_scheme)
+):
+    """Update currently logged-in user profile fields."""
+    current_user = await get_current_user(token)
+    company_id = getattr(current_user, "company_id", None)
+
+    if not company_id:
+        raise HTTPException(status_code=400, detail="غير متاح لمسؤولي النظام")
+
+    updates = {}
+
+    if data.full_name is not None:
+        full_name = data.full_name.strip()
+        if not full_name:
+            raise HTTPException(status_code=400, detail="الاسم الكامل لا يمكن أن يكون فارغا")
+        updates["full_name"] = full_name
+
+    if data.email is not None:
+        updates["email"] = str(data.email).strip().lower()
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+
+    db = get_db_connection(company_id)
+    try:
+        if "email" in updates:
+            existing_email = db.execute(
+                text("""
+                    SELECT id FROM company_users
+                    WHERE lower(email) = :email AND id != :uid
+                    LIMIT 1
+                """),
+                {"email": updates["email"], "uid": current_user.id}
+            ).fetchone()
+            if existing_email:
+                raise HTTPException(status_code=400, detail="البريد الإلكتروني مستخدم من قبل مستخدم آخر")
+
+        set_parts = []
+        params = {"uid": current_user.id}
+
+        if "full_name" in updates:
+            set_parts.append("full_name = :full_name")
+            params["full_name"] = updates["full_name"]
+        if "email" in updates:
+            set_parts.append("email = :email")
+            params["email"] = updates["email"]
+
+        set_parts.append("updated_at = CURRENT_TIMESTAMP")
+
+        db.execute(
+            text(f"UPDATE company_users SET {', '.join(set_parts)} WHERE id = :uid"),
+            params
+        )
+        db.commit()
+
+        try:
+            log_activity(
+                db,
+                current_user.id,
+                current_user.username,
+                "update_profile",
+                "company_users",
+                str(current_user.id),
+                {"updated_fields": list(updates.keys())}
+            )
+        except Exception:
+            pass
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update self profile: {e}")
+        raise HTTPException(status_code=500, detail="فشل تحديث بيانات الحساب")
+    finally:
+        db.close()
+
+    return await get_current_user(token)
+
+
 @router.post("/logout")
 async def logout(token: str = Depends(oauth2_scheme)):
     """تسجيل الخروج - يتم إضافة التوكن إلى القائمة السوداء"""

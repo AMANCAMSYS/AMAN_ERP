@@ -46,7 +46,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                         style={{
                             padding: '4px 8px', borderRadius: '6px',
                             border: '1px solid var(--border-color, #d1d5db)',
-                            background: 'var(--bg-primary, #fff)', fontSize: '13px',
+                            background: 'var(--bg-card, #ffffff)', fontSize: '13px',
                             cursor: 'pointer'
                         }}
                     >
@@ -87,7 +87,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                             minWidth: '32px',
                             ...(page === currentPage ? {
                                 background: 'var(--primary-color, #3b82f6)',
-                                color: '#fff',
+                                color: 'var(--text-on-primary, #ffffff)',
                                 borderColor: 'var(--primary-color, #3b82f6)'
                             } : {})
                         }}
@@ -125,11 +125,11 @@ function btnStyle(disabled) {
         borderWidth: '1px',
         borderStyle: 'solid',
         borderColor: 'var(--border-color, #d1d5db)',
-        background: disabled ? 'var(--bg-secondary, #f3f4f6)' : 'var(--bg-primary, #fff)',
+        background: disabled ? 'var(--bg-hover, #f3f4f6)' : 'var(--bg-card, #ffffff)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--text-primary, #374151)', fontSize: '13px',
+        color: 'var(--text-main, #374151)', fontSize: '13px',
         transition: 'all 0.15s ease'
     };
 }

@@ -81,7 +81,7 @@ export default function MRPPlanning() {
                                 <th>{t('products.product')}</th>
                                 <th>{t('manufacturing.bom')}</th>
                                 <th className="text-center">{t('common.quantity')}</th>
-                                <th className="text-center">{t('common.status')}</th>
+                                <th className="text-center">{t('common.status_title')}</th>
                                 <th className="text-center">{t('common.actions')}</th>
                             </tr>
                         </thead>

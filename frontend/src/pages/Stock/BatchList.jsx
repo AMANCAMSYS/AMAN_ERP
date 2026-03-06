@@ -202,7 +202,7 @@ function BatchList() {
                                 <th style={{ width: '12%' }}>{t('stock.batch.manufacturing_date')}</th>
                                 <th style={{ width: '12%' }}>{t('stock.batch.expiry_date')}</th>
                                 <th style={{ width: '12%' }}>{t('stock.batch.remaining')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status')}</th>
+                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
                             </tr>
                         </thead>
                         <tbody>

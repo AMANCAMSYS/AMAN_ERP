@@ -172,7 +172,7 @@ const ProductionOrders = () => {
                             <th>{t('products.product')}</th>
                             <th>{t('manufacturing.bom')}</th>
                             <th>{t('common.quantity')}</th>
-                            <th>{t('common.status')}</th>
+                            <th>{t('common.status_title')}</th>
                             <th>{t('common.due_date')}</th>
                             <th>{t('common.actions')}</th>
                         </tr>

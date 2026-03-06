@@ -270,7 +270,7 @@ function TaxHome() {
                                             <th>{t('taxes.return_number')}</th>
                                             <th>{t('taxes.period')}</th>
                                             <th style={{ textAlign: 'left' }}>{t('taxes.amount')}</th>
-                                            <th>{t('common.status')}</th>
+                                            <th>{t('common.status_title')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -314,7 +314,7 @@ function TaxHome() {
                                     <th>{t('taxes.country_code')}</th>
                                     <th>{t('taxes.effective_from')}</th>
                                     <th>{t('taxes.effective_to')}</th>
-                                    <th>{t('common.status')}</th>
+                                    <th>{t('common.status_title')}</th>
                                     <th>{t('common.actions')}</th>
                                 </tr>
                             </thead>
@@ -379,7 +379,7 @@ function TaxHome() {
                                     <th style={{ textAlign: 'left' }}>{t('taxes.total_amount')}</th>
                                     <th style={{ textAlign: 'left' }}>{t('taxes.paid_amount')}</th>
                                     <th>{t('taxes.due_date')}</th>
-                                    <th>{t('common.status')}</th>
+                                    <th>{t('common.status_title')}</th>
                                     <th>{t('common.actions')}</th>
                                 </tr>
                             </thead>
