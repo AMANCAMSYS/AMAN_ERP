@@ -254,6 +254,8 @@
     "alert": "Alert",
     "safe": "Optimal",
     "save": "Save",
+    "show": "Show",
+    "hide": "Hide",
     "cancel": "Cancel",
     "exchange_rate": "Exchange Rate",
     "base_currency": "Base Currency",

@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
+import { useTheme } from '../../context/ThemeContext';
 
 /**
  * KPICard — displays a single KPI metric with trend, status, and optional sparkline.
@@ -19,21 +20,30 @@ import { formatNumber } from '../../utils/format';
  *   kpi.category — grouping label
  */
 
-const STATUS_COLORS = {
+const STATUS_COLORS_LIGHT = {
     good:    { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d', dot: '#22c55e' },
     warning: { bg: '#fffbeb', border: '#fde68a', text: '#a16207', dot: '#f59e0b' },
     danger:  { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c', dot: '#ef4444' },
     neutral: { bg: '#f8fafc', border: '#e2e8f0', text: '#475569', dot: '#94a3b8' },
 };
 
+const STATUS_COLORS_DARK = {
+    good:    { bg: '#132a1f', border: '#1f6b4a', text: '#86efac', dot: '#22c55e' },
+    warning: { bg: '#2f2413', border: '#7c5c1a', text: '#fcd34d', dot: '#f59e0b' },
+    danger:  { bg: '#32191c', border: '#8a2e39', text: '#fca5a5', dot: '#ef4444' },
+    neutral: { bg: '#1b2a41', border: '#334155', text: '#cbd5e1', dot: '#94a3b8' },
+};
+
 const KPICard = ({ kpi, currency = '', compact = false }) => {
     const { i18n } = useTranslation();
+    const { darkMode } = useTheme();
     const isRTL = i18n.dir() === 'rtl';
 
     if (!kpi) return null;
 
     const status = kpi.status || 'neutral';
-    const colors = STATUS_COLORS[status] || STATUS_COLORS.neutral;
+    const palette = darkMode ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT;
+    const colors = palette[status] || palette.neutral;
     const label = isRTL ? (kpi.label_ar || kpi.label) : (kpi.label || kpi.label_ar);
     const displayValue = kpi.formatted || formatNumber(kpi.value ?? 0);
     const unit = kpi.unit === 'currency' ? currency : (kpi.unit || '');
@@ -103,7 +113,7 @@ const KPICard = ({ kpi, currency = '', compact = false }) => {
                 gap: '0.3rem',
             }}>
                 <span>{displayValue}</span>
-                {unit && <small style={{ fontSize: '0.65em', fontWeight: 500, color: '#64748b' }}>{unit}</small>}
+                {unit && <small style={{ fontSize: '0.65em', fontWeight: 500, color: 'var(--text-secondary, #64748b)' }}>{unit}</small>}
             </div>
 
             {/* Trend */}
@@ -126,13 +136,13 @@ const KPICard = ({ kpi, currency = '', compact = false }) => {
                 <div style={{ marginTop: 8 }}>
                     <div style={{
                         display: 'flex', justifyContent: 'space-between',
-                        fontSize: '0.65rem', color: '#94a3b8', marginBottom: 3,
+                        fontSize: '0.65rem', color: 'var(--text-muted, #94a3b8)', marginBottom: 3,
                     }}>
                         <span>{isRTL ? 'المستهدف' : 'Target'}</span>
                         <span>{formatNumber(kpi.target)} {unit}</span>
                     </div>
                     <div style={{
-                        height: 4, background: '#e2e8f0', borderRadius: 2, overflow: 'hidden',
+                        height: 4, background: darkMode ? '#334155' : '#e2e8f0', borderRadius: 2, overflow: 'hidden',
                     }}>
                         <div style={{
                             height: '100%',
