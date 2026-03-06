@@ -329,12 +329,13 @@ body {
   height: var(--topbar-height);
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 0 16px;
   font-size: 20px;
   font-weight: 800;
   color: var(--primary);
   border-bottom: 1px solid var(--border-color);
-  justify-content: space-between;
+  justify-content: flex-start;
   direction: ltr;
 }
 
@@ -2409,11 +2410,10 @@ input {
 
 .sidebar-brand .sidebar-toggle {
   display: flex;
-  margin-inline-start: auto;
 }
 
 .topbar-sidebar-toggle {
-  display: flex !important;
+  display: none !important;
   width: 40px !important;
   height: 40px !important;
   border-radius: 10px !important;
@@ -2467,7 +2467,7 @@ input {
    ═══════════════════════════════════════ */
 @media (max-width: 1024px) {
   .topbar-sidebar-toggle {
-    display: flex !important;
+    display: none !important;
   }
 
   .sidebar-brand .sidebar-toggle {
@@ -2478,9 +2478,13 @@ input {
     display: block !important;
   }
 
-    /* BULLETPROOF: Hide sidebar completely on mobile via display:none */
+    /* Keep sidebar brand visible so the same internal button can always reopen nav */
     .sidebar {
-        display: none !important;
+      display: flex !important;
+      width: var(--sidebar-width) !important;
+      height: var(--topbar-height) !important;
+      overflow: hidden !important;
+      box-shadow: none !important;
         z-index: 1001;
     }
 

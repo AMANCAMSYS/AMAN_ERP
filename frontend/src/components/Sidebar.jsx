@@ -125,7 +125,6 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
     return (
         <aside className={`sidebar${isOpen ? ' sidebar-open' : ''}`} dir="rtl">
             <div className="sidebar-brand">
-                <span className="sidebar-brand-text">AMAN ERP</span>
                 <button
                     className="sidebar-toggle"
                     onClick={handleToggleClick}
@@ -139,6 +138,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
                         <path d="M9 3v18" />
                     </svg>
                 </button>
+                <span className="sidebar-brand-text">AMAN ERP</span>
             </div>
             <nav className="sidebar-nav">
                 {navItems.map((item) => (
