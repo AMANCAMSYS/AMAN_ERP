@@ -110,6 +110,11 @@ const CompanySettings = () => {
         }
     }, [loading, activeTabData, showDashboard, tabs, setSearchParams]);
 
+    // Keep Settings page pinned to top when opening page or switching tabs.
+    React.useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [showDashboard, activeTab]);
+
     // Fetch Data
     useEffect(() => {
         const fetchData = async () => {
@@ -223,6 +228,7 @@ const CompanySettings = () => {
                                     <button
                                         key={tab.id}
                                         onClick={() => handleTabSelect(tab.id)}
+                                        data-nav-target={`/settings?tab=${tab.id}`}
                                         className="card bg-base-100 shadow-sm hover:shadow-md transition-all duration-300 border border-base-200 group text-center flex flex-col items-center justify-center p-6 rounded-[2rem]"
                                         style={{
                                             height: '260px',
@@ -267,6 +273,7 @@ const CompanySettings = () => {
                                             <button
                                                 key={item.path}
                                                 onClick={() => navigate(item.path)}
+                                                data-nav-target={item.path}
                                                 className="card bg-base-100 shadow-sm hover:shadow-md transition-all duration-300 border border-base-200 group text-center flex flex-col items-center justify-center p-6 rounded-[2rem]"
                                                 style={{ height: '200px', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
                                             >

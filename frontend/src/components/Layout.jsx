@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -7,6 +8,7 @@ import { getUser } from '../utils/auth'
 
 function Layout({ children }) {
     const { i18n } = useTranslation()
+    const location = useLocation()
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 1024)
     const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 1024)
 
@@ -37,6 +39,37 @@ function Layout({ children }) {
 
     const toggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), [])
     const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+    useEffect(() => {
+        const rawTarget = sessionStorage.getItem('aman:return-target')
+        if (!rawTarget) return
+
+        const fullTarget = rawTarget
+        const pathTarget = rawTarget.split('?')[0]
+
+        const selector = [
+            `[data-nav-target="${fullTarget}"]`,
+            `[data-nav-target="${pathTarget}"]`,
+            `a[href="${fullTarget}"]`,
+            `a[href="${pathTarget}"]`,
+        ].join(', ')
+
+        // Wait one frame to ensure destination page UI is mounted.
+        const raf = requestAnimationFrame(() => {
+            const el = document.querySelector(selector)
+            if (!el) {
+                return
+            }
+
+            el.classList.add('nav-return-flash')
+            setTimeout(() => {
+                el.classList.remove('nav-return-flash')
+            }, 1200)
+            sessionStorage.removeItem('aman:return-target')
+        })
+
+        return () => cancelAnimationFrame(raf)
+    }, [location.pathname, location.search])
 
     return (
         <div className="app-layout">

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 
@@ -12,12 +12,23 @@ import { ArrowLeft } from 'lucide-react';
  */
 export default function BackButton({ onClick, label }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const { i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
 
+    const handleBack = () => {
+        const currentTarget = `${location.pathname}${location.search || ''}`;
+        sessionStorage.setItem('aman:return-target', currentTarget);
+        if (onClick) {
+            onClick();
+            return;
+        }
+        navigate(-1);
+    };
+
     return (
         <button
-            onClick={() => onClick ? onClick() : navigate(-1)}
+            onClick={handleBack}
             title={label || (isRTL ? 'رجوع' : 'Back')}
             className="back-button"
             style={{

@@ -145,6 +145,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
                     <NavLink
                         key={item.path}
                         to={item.path}
+                        data-nav-target={item.path}
                         end={item.path === '/treasury' || item.path === '/settings'}
                         className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
                         onClick={isMobile ? onClose : undefined}
