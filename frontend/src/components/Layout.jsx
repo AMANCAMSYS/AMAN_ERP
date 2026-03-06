@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import { authAPI } from '../utils/api'
 import { getUser } from '../utils/auth'
 
 function Layout({ children }) {
+    const { i18n } = useTranslation()
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 1024)
     const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 1024)
 
@@ -47,10 +49,10 @@ function Layout({ children }) {
                     style={{ display: 'block' }}
                 />
             )}
-            <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} />
+            <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} onToggle={toggleSidebar} />
             <div className={`main-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
                 <Topbar onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
-                <main className="content-area">
+                <main className="content-area" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
                     {children}
                 </main>
             </div>

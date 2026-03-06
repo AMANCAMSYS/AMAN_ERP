@@ -298,6 +298,25 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --force-recreate frontend
 
+            # 10.1 If host Nginx serves /var/www/aman/frontend, sync fresh assets there too
+            if [ -d /var/www/aman/frontend ]; then
+              echo "📦 Detected host frontend root (/var/www/aman/frontend). Syncing latest built assets..."
+              FRONT_CID=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q frontend)
+              if [ -n "$FRONT_CID" ]; then
+                TMP_DIR=$(mktemp -d)
+                docker cp "$FRONT_CID:/usr/share/nginx/html/." "$TMP_DIR/"
+                rsync -a --delete "$TMP_DIR/" /var/www/aman/frontend/
+                rm -rf "$TMP_DIR"
+                echo "✅ Host frontend root synced"
+
+                if command -v systemctl >/dev/null 2>&1; then
+                  sudo -n nginx -t && sudo -n systemctl reload nginx || nginx -t && systemctl reload nginx || true
+                fi
+              else
+                echo "⚠️ Could not resolve frontend container ID for asset sync"
+              fi
+            fi
+
             # 11. Start remaining services (prometheus, grafana)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --remove-orphans

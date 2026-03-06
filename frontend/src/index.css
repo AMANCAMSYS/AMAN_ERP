@@ -2412,6 +2412,10 @@ input {
   margin-inline-start: auto;
 }
 
+.topbar-sidebar-toggle {
+  display: none !important;
+}
+
 /* ── Dark Mode Toggle Button ── */
 .topbar-theme-btn {
     display: flex;
@@ -2449,6 +2453,10 @@ input {
    BULLETPROOF: display:none on sidebar
    ═══════════════════════════════════════ */
 @media (max-width: 1024px) {
+  .topbar-sidebar-toggle {
+    display: flex !important;
+  }
+
   .sidebar-brand .sidebar-toggle {
     display: flex !important;
   }

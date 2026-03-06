@@ -26,6 +26,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
     const branchRef = useRef(null)
     const [showBranchMenu, setShowBranchMenu] = useState(false)
     const { branches, currentBranch, setBranch } = useBranch()
+    const userMenuDockStyle = { marginInlineStart: 'auto' }
 
     // Global Ctrl+K / Cmd+K shortcut
     useEffect(() => {
@@ -129,18 +130,13 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
     };
 
     return (
-        <header className="topbar">
-            {/* Brand — always visible */}
-            <div className="topbar-brand">
-                AMAN ERP
-            </div>
-
-            {/* Sidebar toggle button — visible only on mobile/tablet */}
+        <header className="topbar" dir="rtl">
             <button
-                className="sidebar-toggle"
+                className="sidebar-toggle topbar-sidebar-toggle"
                 onClick={onToggleSidebar}
                 aria-label={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
                 aria-expanded={sidebarOpen}
+                type="button"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,7 +158,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                         fontSize: '11px',
                         fontWeight: 600,
                         padding: '2px 6px',
-                        background: 'white',
+                        background: 'var(--bg-card)',
                         border: '1px solid var(--border-color)',
                         borderRadius: '4px',
                         color: 'var(--text-muted)',
@@ -180,7 +176,6 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                     onClick={() => {
                         const newLang = i18n.language === 'ar' ? 'en' : 'ar';
                         i18n.changeLanguage(newLang);
-                        window.location.reload(); // To force direction change properly if not reactive
                     }}
                     style={{
                         background: 'none',
@@ -220,7 +215,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                             className="topbar-branch-btn"
                             onClick={() => setShowBranchMenu(!showBranchMenu)}
                             style={{
-                                background: 'white',
+                                background: 'var(--bg-card)',
                                 border: '1px solid var(--border-color)',
                                 borderRadius: '6px',
                                 padding: '4px 12px',
@@ -245,7 +240,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                                 top: '35px',
                                 left: '0',
                                 width: '220px',
-                                background: 'white',
+                                background: 'var(--bg-card)',
                                 borderRadius: '8px',
                                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                                 border: '1px solid var(--border-color)',
@@ -261,7 +256,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                                         padding: '8px 12px',
                                         cursor: 'pointer',
                                         fontSize: '13px',
-                                        background: !currentBranch ? '#f0f9ff' : 'transparent',
+                                        background: !currentBranch ? 'var(--bg-hover)' : 'transparent',
                                         color: !currentBranch ? 'var(--primary)' : 'inherit'
                                     }}
                                 >
@@ -277,14 +272,14 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                                             padding: '8px 12px',
                                             cursor: 'pointer',
                                             fontSize: '13px',
-                                            background: currentBranch?.id === branch.id ? '#f0f9ff' : 'transparent',
+                                            background: currentBranch?.id === branch.id ? 'var(--bg-hover)' : 'transparent',
                                             color: currentBranch?.id === branch.id ? 'var(--primary)' : 'inherit',
                                             display: 'flex',
                                             justifyContent: 'space-between'
                                         }}
                                     >
                                         <span>{branch.branch_name}</span>
-                                        {branch.is_default && <span style={{ fontSize: '10px', background: '#e0e7ff', padding: '2px 4px', borderRadius: '4px' }}>Default</span>}
+                                        {branch.is_default && <span style={{ fontSize: '10px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>Default</span>}
                                     </div>
                                 ))}
                             </div>
@@ -336,7 +331,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                             maxWidth: 'calc(100vw - 32px)',
                             maxHeight: '400px',
                             overflowY: 'auto',
-                            background: 'white',
+                            background: 'var(--bg-card)',
                             borderRadius: '12px',
                             boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                             border: '1px solid var(--border-color)',
@@ -380,11 +375,11 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                                             padding: '12px 16px',
                                             borderBottom: '1px solid var(--border-color)',
                                             cursor: 'pointer',
-                                            background: notif.is_read ? 'white' : '#F0F9FF',
+                                            background: notif.is_read ? 'var(--bg-card)' : 'var(--bg-hover)',
                                             transition: 'background 0.2s'
                                         }}
-                                        onMouseEnter={e => e.target.style.background = '#f1f5f9'}
-                                        onMouseLeave={e => e.target.style.background = notif.is_read ? 'white' : '#F0F9FF'}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = notif.is_read ? 'var(--bg-card)' : 'var(--bg-hover)'}
                                     >
                                         <div style={{ fontWeight: notif.is_read ? '400' : '600', fontSize: '13px', marginBottom: '4px' }}>
                                             {notif.title}
@@ -418,7 +413,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                 </div>
 
                 {/* User Menu */}
-                <div className="topbar-actions" ref={menuRef}>
+                <div className="topbar-actions" ref={menuRef} style={userMenuDockStyle}>
                     <div
                         className="user-menu-trigger"
                         onClick={() => setShowMenu(!showMenu)}
@@ -450,7 +445,7 @@ function Topbar({ onToggleSidebar, sidebarOpen }) {
                             top: '60px',
                             left: '24px',
                             width: '200px',
-                            background: 'white',
+                            background: 'var(--bg-card)',
                             borderRadius: '8px',
                             boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
                             border: '1px solid var(--border-color)',
