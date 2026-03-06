@@ -374,6 +374,13 @@ jobs:
               VERIFY_URL="http://127.0.0.1/build-sha.txt"
               SERVED_SHA=$(curl -fsSL "$VERIFY_URL" | tr -d '\r\n[:space:]')
             fi
+            if ! echo "$SERVED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "❌ Invalid build-sha response (expected 40-char git SHA)"
+              echo "   verify_url: $VERIFY_URL"
+              echo "   response:   $SERVED_SHA"
+              echo "   hint: ensure /build-sha.txt exists and is not routed to SPA fallback"
+              exit 1
+            fi
             if [ "$SERVED_SHA" != "$EXPECTED_SHA" ]; then
               echo "❌ Served frontend SHA mismatch"
               echo "   expected: $EXPECTED_SHA"
