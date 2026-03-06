@@ -298,6 +298,26 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --force-recreate frontend
 
+            # 10.05 Wait for frontend endpoint to respond
+            echo "⏳ Waiting for frontend to become ready..."
+            FRONT_READY=0
+            for i in $(seq 1 24); do
+              HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/index.html 2>/dev/null || echo "000")
+              echo "  attempt $i/24 — frontend index HTTP $HTTP"
+              if [ "$HTTP" = "200" ]; then
+                FRONT_READY=1
+                echo "✅ Frontend is reachable"
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$FRONT_READY" != "1" ]; then
+              echo "❌ Frontend did not become reachable"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=120 frontend || true
+              exit 1
+            fi
+
             # 10.1 If host Nginx serves /var/www/aman/frontend, sync fresh assets there too
             if [ -d /var/www/aman/frontend ]; then
               echo "📦 Detected host frontend root (/var/www/aman/frontend). Syncing latest built assets..."
@@ -316,6 +336,18 @@ jobs:
                 echo "⚠️ Could not resolve frontend container ID for asset sync"
               fi
             fi
+
+            # 10.2 Verify no-cache headers for index.html (prevents stale UI after deployments)
+            echo "🔍 Verifying index.html cache headers..."
+            INDEX_HEADERS=$(curl -sI http://127.0.0.1/index.html | tr -d '\r')
+            echo "$INDEX_HEADERS" | grep -iE 'cache-control|pragma|expires' || true
+            echo "$INDEX_HEADERS" | grep -qi 'cache-control: .*no-store' || {
+              echo "❌ Missing no-store cache policy on index.html"
+              exit 1
+            }
+
+            # 10.3 Log deployed commit SHA for traceability
+            echo "✅ Deployed commit SHA: $(git rev-parse HEAD)"
 
             # 11. Start remaining services (prometheus, grafana)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
