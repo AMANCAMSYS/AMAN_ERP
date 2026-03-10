@@ -84,7 +84,7 @@ function Layout({ children }) {
             )}
             <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} onToggle={toggleSidebar} />
             <div className={`main-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-                <Topbar />
+                <Topbar sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
                 <main className="content-area" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
                     {children}
                 </main>

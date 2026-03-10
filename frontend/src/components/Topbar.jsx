@@ -10,7 +10,7 @@ import { useNotificationSocket } from '../hooks/useNotificationSocket'
 import GlobalSearch from './GlobalSearch'
 import './GlobalSearch.css'
 
-function Topbar() {
+function Topbar({ sidebarOpen = false, onToggleSidebar }) {
     const { t, i18n } = useTranslation()
     const { darkMode, toggleDarkMode } = useTheme()
     const user = getUser()
@@ -131,6 +131,20 @@ function Topbar() {
 
     return (
         <header className="topbar" dir="rtl">
+            <button
+                className="topbar-sidebar-toggle"
+                onClick={onToggleSidebar}
+                aria-label={sidebarOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+                aria-expanded={sidebarOpen}
+                type="button"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="18" height="18" x="3" y="3" rx="2" />
+                    <path d="M3 9h18" />
+                </svg>
+            </button>
+
             <div className="topbar-search" onClick={() => setShowSearch(true)} style={{ cursor: 'pointer' }}>
                 <div className="search-input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted, #94a3b8)', userSelect: 'none' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
