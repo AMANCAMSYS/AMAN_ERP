@@ -7,6 +7,11 @@ import BackButton from '../components/common/BackButton'
 function Register() {
     const { t, i18n } = useTranslation()
 
+    const toggleLanguage = () => {
+        const nextLang = i18n.language === 'ar' ? 'en' : 'ar'
+        i18n.changeLanguage(nextLang)
+    }
+
     const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
@@ -75,6 +80,18 @@ function Register() {
             <div className="auth-layout" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', minHeight: '100vh' }}>
                 <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
                     <BackButton />
+                </div>
+                <div style={{ position: 'fixed', top: '16px', insetInlineEnd: '16px', zIndex: 30 }}>
+                    <button
+                        type="button"
+                        className="btn btn-light"
+                        onClick={toggleLanguage}
+                        aria-label={t('common.language', 'Language')}
+                        title={t('common.language', 'Language')}
+                        style={{ minWidth: '52px', fontWeight: 700 }}
+                    >
+                        {i18n.language === 'ar' ? 'EN' : 'AR'}
+                    </button>
                 </div>
                 <div style={{
                     background: 'white',
@@ -203,6 +220,18 @@ function Register() {
         <div className="auth-layout" style={{ padding: '40px 20px' }}>
             <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
                 <BackButton />
+            </div>
+            <div style={{ position: 'fixed', top: '16px', insetInlineEnd: '16px', zIndex: 30 }}>
+                <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={toggleLanguage}
+                    aria-label={t('common.language', 'Language')}
+                    title={t('common.language', 'Language')}
+                    style={{ minWidth: '52px', fontWeight: 700 }}
+                >
+                    {i18n.language === 'ar' ? 'EN' : 'AR'}
+                </button>
             </div>
             <div className="card" style={{ maxWidth: '800px', width: '100%', padding: '40px' }}>
                 <div className="auth-header">

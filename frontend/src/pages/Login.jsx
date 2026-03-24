@@ -7,8 +7,13 @@ import { useTranslation } from 'react-i18next'
 import BackButton from '../components/common/BackButton'
 
 function Login() {
-    const { t } = useTranslation()
+    const { t, i18n } = useTranslation()
     const navigate = useNavigate()
+
+    const toggleLanguage = () => {
+        const nextLang = i18n.language === 'ar' ? 'en' : 'ar'
+        i18n.changeLanguage(nextLang)
+    }
 
     useEffect(() => {
         if (isAuthenticated()) {
@@ -61,6 +66,18 @@ function Login() {
         <div className="auth-layout">
             <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
                 <BackButton />
+            </div>
+            <div style={{ position: 'fixed', top: '16px', insetInlineEnd: '16px', zIndex: 30 }}>
+                <button
+                    type="button"
+                    className="btn btn-light"
+                    onClick={toggleLanguage}
+                    aria-label={t('common.language', 'Language')}
+                    title={t('common.language', 'Language')}
+                    style={{ minWidth: '52px', fontWeight: 700 }}
+                >
+                    {i18n.language === 'ar' ? 'EN' : 'AR'}
+                </button>
             </div>
             <div className="auth-card">
                 <div className="auth-header">
