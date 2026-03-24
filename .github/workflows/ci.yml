@@ -244,12 +244,21 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
+            set -euo pipefail
             echo "🚀 Starting deployment — $(date)"
             cd /opt/aman
 
             # 1. Pull latest code
-            git fetch origin main
-            git reset --hard origin/main
+            TRIGGER_SHA='${{ github.sha }}'
+            git fetch --prune origin main
+            REMOTE_MAIN_SHA=$(git rev-parse origin/main)
+            if [ "$REMOTE_MAIN_SHA" != "$TRIGGER_SHA" ]; then
+              echo "❌ origin/main SHA does not match triggering commit"
+              echo "   trigger: $TRIGGER_SHA"
+              echo "   origin:  $REMOTE_MAIN_SHA"
+              exit 1
+            fi
+            git reset --hard "$REMOTE_MAIN_SHA"
             echo "✅ Code updated to: $(git log -1 --oneline)"
 
             # 2. Write backend .env from GitHub secret
@@ -261,6 +270,12 @@ jobs:
 
             EXPECTED_SHA=$(git rev-parse HEAD)
             echo "🎯 Expected deploy SHA: $EXPECTED_SHA"
+            if [ "$EXPECTED_SHA" != "$TRIGGER_SHA" ]; then
+              echo "❌ Deployed working tree SHA mismatch"
+              echo "   trigger: $TRIGGER_SHA"
+              echo "   head:    $EXPECTED_SHA"
+              exit 1
+            fi
 
             # 4. Build new images
             docker compose -f docker-compose.yml -f docker-compose.prod.yml \
