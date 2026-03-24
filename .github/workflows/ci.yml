@@ -291,6 +291,11 @@ jobs:
                 exit 1
               fi
 
+              # Try to ensure deployment user can write project files before rsync fallback
+              if command -v sudo >/dev/null 2>&1; then
+                sudo -n chown -R "$(id -u):$(id -g)" /opt/aman || true
+              fi
+
               TMP_REPO=$(mktemp -d)
               git clone --depth=1 --branch main "$ORIGIN_URL" "$TMP_REPO"
               REMOTE_MAIN_SHA=$(git -C "$TMP_REPO" rev-parse HEAD)
@@ -301,12 +306,13 @@ jobs:
                 exit 1
               fi
 
-              rsync -a --delete \
+              rsync -rltD --delete --omit-dir-times --no-perms --no-owner --no-group \
                 --exclude '.git' \
                 --exclude 'backend/.env' \
                 --exclude '.env' \
                 --exclude 'backend/uploads/' \
                 --exclude 'uploads/' \
+                --exclude 'backups/' \
                 "$TMP_REPO/" /opt/aman/
               rm -rf "$TMP_REPO"
               cd /opt/aman
