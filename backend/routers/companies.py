@@ -475,14 +475,18 @@ async def upload_company_logo(
     if current_user.company_id != company_id and current_user.role != "system_admin":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # Validate file type
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="يجب رفع صورة")
+    from utils.sql_safety import (
+        validate_file_size,
+        validate_file_extension,
+        validate_file_mime_and_signature,
+        MAX_LOGO_SIZE,
+        ALLOWED_IMAGE_EXTENSIONS,
+    )
 
-    # Save path
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-        raise HTTPException(status_code=400, detail="نوع الملف غير مدعوم")
+    content = await file.read()
+    validate_file_extension(file.filename, ALLOWED_IMAGE_EXTENSIONS, "الشعار")
+    validate_file_size(content, MAX_LOGO_SIZE, "الشعار")
+    file_ext = validate_file_mime_and_signature(file.filename, file.content_type, content, "الشعار")
         
     filename = f"logo_{company_id}{file_ext}"
     uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads", "logos")
@@ -491,7 +495,7 @@ async def upload_company_logo(
 
     try:
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(content)
         
         # Save to company_settings
         from database import get_db_connection

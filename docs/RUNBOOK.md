@@ -18,6 +18,7 @@
 8. [النشر والترقيات](#8-النشر-والترقيات)
 9. [الأمان — الاستجابة للحوادث](#9-الأمان--الاستجابة-للحوادث)
 10. [الصيانة الدورية](#10-الصيانة-الدورية)
+11. [تدوير الأسرار + Smoke Regression](#11-تدوير-الأسرار--smoke-regression)
 
 ---
 
@@ -556,6 +557,51 @@ docker compose up -d
 ```
 
 ---
+
+## 11. تدوير الأسرار + Smoke Regression
+
+### 11.1 تدوير الأسرار (تشغيلي)
+
+استخدم سكربت المساعدة التالي للتحقق من الجاهزية وطباعة القيم المقترحة:
+
+```bash
+cd /opt/aman
+./scripts/ops/rotate_secrets_checklist.sh
+```
+
+مخرجات السكربت:
+1. يتحقق من المفاتيح الأساسية في `backend/.env`.
+2. يتحقق من وجود `SECRET_KEY` ضعيف/افتراضي.
+3. يطبع قيم قوية مقترحة لتدوير `SECRET_KEY` وكلمات المرور.
+4. يوضح أهداف التدوير (GitHub Secrets + server env + providers).
+5. يطبع أوامر تحقق ما بعد التدوير.
+
+### 11.2 Smoke Regression لمسارات `O2C/P2P`
+
+بعد التدوير أو أي تعديل حساس، نفذ:
+
+```bash
+cd /opt/aman
+export AMAN_BASE_URL=http://localhost:8000
+export AMAN_TOKEN=<fresh_bearer_token>
+export AMAN_CUSTOMER_ID=1
+export AMAN_SUPPLIER_ID=1
+export AMAN_PRODUCT_ID=1
+/home/omar/Desktop/aman/.venv/bin/python backend/scripts/smoke_o2c_p2p.py
+```
+
+نتيجة النجاح المتوقعة:
+1. نجاح `auth/me`.
+2. نجاح إنشاء order + sales invoice في `O2C`.
+3. نجاح إنشاء purchase invoice في `P2P`.
+4. رفض محاولة overpayment في `P2P` (كود `400/422`).
+
+### 11.3 قرار الاستعداد
+
+لا يتم اعتماد الجاهزية النهائية إلا بعد:
+1. تنفيذ تدوير الأسرار فعليا.
+2. نجاح smoke regression بدون أعطال حرجة.
+3. تثبيت أن CI يمر عبر secret-scan gate.
 
 ## ملحق: أوامر مفيدة
 

@@ -1,9 +1,20 @@
 from sqlalchemy import text
 from typing import Optional, List, Dict
 from fastapi import HTTPException
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+def _to_decimal(v) -> Decimal:
+    """Convert any numeric value to Decimal safely."""
+    if v is None:
+        return Decimal('0')
+    if isinstance(v, Decimal):
+        return v
+    return Decimal(str(v))
 
 
 def validate_je_lines(je_lines: List[Dict], source: str = "auto") -> List[Dict]:
@@ -118,10 +129,17 @@ def get_base_currency(db) -> str:
         row = db.execute(text("SELECT setting_value AS code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
     return row[0] if row else "SYP"
 
-def update_account_balance(db, account_id: int, debit_base: float, credit_base: float, debit_curr: float = 0, credit_curr: float = 0, currency: str = None):
+def update_account_balance(db, account_id: int, debit_base, credit_base, debit_curr=0, credit_curr=0, currency: str = None):
     """
     Updates both the base balance and the foreign currency balance of an account.
+    Accepts float or Decimal values — internally uses Decimal for precision.
     """
+    # Convert all inputs to Decimal for precision
+    debit_base = _to_decimal(debit_base)
+    credit_base = _to_decimal(credit_base)
+    debit_curr = _to_decimal(debit_curr)
+    credit_curr = _to_decimal(credit_curr)
+
     # 1. Get account type and currency
     acct_data = db.execute(text("SELECT account_type, currency FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
     if not acct_data:
@@ -130,21 +148,24 @@ def update_account_balance(db, account_id: int, debit_base: float, credit_base: 
     acct_type = acct_data.account_type
     acct_currency = acct_data.currency
     
-    # 2. Calculate balance changes
+    # 2. Calculate balance changes using Decimal
     if acct_type in ['asset', 'expense']:
-        change_base = debit_base - credit_base
-        change_curr = (debit_curr - credit_curr) if (currency and currency == acct_currency) else 0
+        change_base = (debit_base - credit_base).quantize(_D2, ROUND_HALF_UP)
+        change_curr = ((debit_curr - credit_curr).quantize(_D2, ROUND_HALF_UP)
+                       if (currency and currency == acct_currency) else Decimal('0'))
     else:
-        change_base = credit_base - debit_base
-        change_curr = (credit_curr - debit_curr) if (currency and currency == acct_currency) else 0
+        change_base = (credit_base - debit_base).quantize(_D2, ROUND_HALF_UP)
+        change_curr = ((credit_curr - debit_curr).quantize(_D2, ROUND_HALF_UP)
+                       if (currency and currency == acct_currency) else Decimal('0'))
         
     # 3. Always update base balance
     db.execute(text("""
         UPDATE accounts SET balance = balance + :change WHERE id = :id
-    """), {"change": change_base, "id": account_id})
+    """), {"change": float(change_base), "id": account_id})
     
     # 4. Update foreign balance only if currency matches
     if acct_currency and change_curr != 0:
         db.execute(text("""
             UPDATE accounts SET balance_currency = balance_currency + :change WHERE id = :id
-        """), {"change": change_curr, "id": account_id})
+        """), {"change": float(change_curr), "id": account_id})
+

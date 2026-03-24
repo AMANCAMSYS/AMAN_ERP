@@ -27,6 +27,12 @@ from . import (
     dashboard, pos, contracts, crm, external,
 )
 
+# ── Additional modules ──────────────────────────────────────────────
+from . import (
+    services, role_dashboards, delivery_orders,
+    landed_costs, hr_wps_compliance, system_completion,
+)
+
 __all__ = [
     # Core & Admin
     "auth", "companies", "roles", "branches", "settings",
@@ -36,4 +42,7 @@ __all__ = [
     # Remaining top-level
     "purchases", "parties", "projects", "reports", "scheduled_reports",
     "dashboard", "pos", "contracts", "crm", "external",
+    # Additional modules
+    "services", "role_dashboards", "delivery_orders",
+    "landed_costs", "hr_wps_compliance", "system_completion",
 ]

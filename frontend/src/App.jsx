@@ -22,6 +22,9 @@ const UserProfile = React.lazy(() => import('./pages/UserProfile'))
 const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'))
 
+// 404 Page
+const NotFound = React.lazy(() => import('./pages/NotFound'))
+
 // POS
 const POSHome = React.lazy(() => import('./pages/POS/POSHome'))
 const POSInterface = React.lazy(() => import('./pages/POS/POSInterface'))
@@ -720,7 +723,7 @@ function App() {
 
 
                 <Route path="/" element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={isAuthenticated() ? <PrivateRoute><NotFound /></PrivateRoute> : <Navigate to="/login" replace />} />
             </Routes>
         </Suspense>
     )

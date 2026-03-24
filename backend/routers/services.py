@@ -405,7 +405,8 @@ async def upload_document(
         # SEC-FIX-016/017: Validate file size and type
         from utils.sql_safety import (
             validate_file_size, validate_file_extension,
-            MAX_DOCUMENT_SIZE, ALLOWED_DOCUMENT_EXTENSIONS, BLOCKED_FILE_EXTENSIONS
+            validate_file_mime_and_signature,
+            MAX_DOCUMENT_SIZE, ALLOWED_DOCUMENT_EXTENSIONS
         )
         validate_file_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS, "المستند")
         
@@ -418,6 +419,7 @@ async def upload_document(
 
         content = await file.read()
         validate_file_size(content, MAX_DOCUMENT_SIZE, "المستند")
+        validate_file_mime_and_signature(file.filename, file.content_type, content, "المستند")
         
         with open(file_path, "wb") as f:
             f.write(content)
@@ -516,8 +518,19 @@ async def upload_new_version(
         os.makedirs(company_dir, exist_ok=True)
         file_path = os.path.join(company_dir, unique_name)
 
+        from utils.sql_safety import (
+            validate_file_size,
+            validate_file_extension,
+            validate_file_mime_and_signature,
+            MAX_DOCUMENT_SIZE,
+            ALLOWED_DOCUMENT_EXTENSIONS,
+        )
+        content = await file.read()
+        validate_file_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS, "المستند")
+        validate_file_size(content, MAX_DOCUMENT_SIZE, "المستند")
+        validate_file_mime_and_signature(file.filename, file.content_type, content, "المستند")
+
         with open(file_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         file_size = len(content)
 

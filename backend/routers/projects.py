@@ -1247,12 +1247,24 @@ async def create_project_document(
     upload_folder = "uploads/projects"
     os.makedirs(upload_folder, exist_ok=True)
     
-    file_ext = os.path.splitext(file.filename)[1]
+    from utils.sql_safety import (
+        validate_file_extension,
+        validate_file_size,
+        validate_file_mime_and_signature,
+        MAX_DOCUMENT_SIZE,
+        ALLOWED_DOCUMENT_EXTENSIONS,
+    )
+
+    content = await file.read()
+    validate_file_extension(file.filename, ALLOWED_DOCUMENT_EXTENSIONS, "المستند")
+    validate_file_size(content, MAX_DOCUMENT_SIZE, "المستند")
+    file_ext = validate_file_mime_and_signature(file.filename, file.content_type, content, "المستند")
+
     unique_filename = f"{project_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}{file_ext}"
     file_path = os.path.join(upload_folder, unique_filename)
     
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(content)
         
     file_url = f"/uploads/projects/{unique_filename}"
     

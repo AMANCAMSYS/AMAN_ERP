@@ -59,14 +59,14 @@ def get_accounting_summary(
             
             cash_balance = 0
             if all_cash_ids:
-                 cash_balance = db.execute(text(f"""
+                 cash_balance = db.execute(text("""
                     SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
                     FROM journal_lines jl
                     JOIN journal_entries je ON jl.journal_entry_id = je.id
                     JOIN accounts a ON jl.account_id = a.id
-                    WHERE a.id IN ({','.join(map(str, all_cash_ids))})
+                    WHERE a.id = ANY(:cash_ids)
                     AND je.branch_id = :branch_id
-                """), {"branch_id": branch_id}).scalar() or 0
+                """), {"cash_ids": all_cash_ids, "branch_id": branch_id}).scalar() or 0
         else:
             # 1. Total Income (Revenue accounts balance)
             total_income = db.execute(text("SELECT COALESCE(SUM(balance), 0) FROM accounts WHERE account_type = 'revenue'")).scalar() or 0
@@ -82,10 +82,10 @@ def get_accounting_summary(
             
             cash_balance = 0
             if all_cash_ids:
-                cash_balance = db.execute(text(f"""
+                cash_balance = db.execute(text("""
                     SELECT COALESCE(SUM(balance), 0) FROM accounts 
-                    WHERE id IN ({','.join(map(str, all_cash_ids))})
-                """)).scalar() or 0
+                    WHERE id = ANY(:cash_ids)
+                """), {"cash_ids": all_cash_ids}).scalar() or 0
         
         return {
             "total_income": float(total_income),
@@ -600,6 +600,9 @@ async def create_journal_entry(
             input_debit = float(line.get("debit", 0))
             input_credit = float(line.get("credit", 0))
             
+            # Exchange rate convention: 1 unit of foreign currency = exchange_rate units of base currency
+            # e.g. 1 USD = 13000 SYP → exchange_rate = 13000
+            # Input amounts are in foreign currency, multiply by rate to get base currency
             debit_base = input_debit * exchange_rate
             credit_base = input_credit * exchange_rate
             

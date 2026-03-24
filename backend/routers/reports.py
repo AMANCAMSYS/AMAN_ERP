@@ -1377,8 +1377,8 @@ def get_cashflow_report(
                 "inflows": [], "outflows": [], "total_inflow": 0, "total_outflow": 0, "net_cash_flow": 0
             }
 
-        # Build safe IN clause using f-string (IDs are from DB, not user input)
-        cash_ids_str = ','.join(map(str, all_cash_ids))
+        # Use parameterized query for safety
+        params["cash_ids"] = all_cash_ids
 
         # Inflows (Debit Cash/Bank)
         inflow_query = f"""
@@ -1391,7 +1391,7 @@ def get_cashflow_report(
             JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
             JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
             JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE a_cash.id IN ({cash_ids_str})
+            WHERE a_cash.id = ANY(:cash_ids)
               AND jl_cash.debit > 0
               AND a_other.id != a_cash.id
               AND je.entry_date BETWEEN :start AND :end
@@ -1413,7 +1413,7 @@ def get_cashflow_report(
             JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
             JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
             JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE a_cash.id IN ({cash_ids_str})
+            WHERE a_cash.id = ANY(:cash_ids)
               AND jl_cash.credit > 0
               AND a_other.id != a_cash.id
               AND je.entry_date BETWEEN :start AND :end
@@ -1475,7 +1475,7 @@ def get_cashflow_ias7(
         if not cash_ids:
             return {"period": {"start": start_date, "end": end_date}, "operating": {}, "investing": {}, "financing": {}, "net_change": 0, "opening_cash": 0, "closing_cash": 0}
 
-        cash_ids_str = ','.join(map(str, cash_ids))
+        params["cash_ids"] = cash_ids
 
         # IAS 7 classification: based on actual account_type and account name heuristics
         # Only valid types: asset, liability, equity, revenue, expense
@@ -1514,7 +1514,7 @@ def get_cashflow_ias7(
             JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
             JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id AND jl_other.account_id != jl_cash.account_id
             JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE jl_cash.account_id IN ({cash_ids_str})
+            WHERE jl_cash.account_id = ANY(:cash_ids)
               AND jl_cash.debit > 0
               AND je.entry_date BETWEEN :start AND :end
               AND je.status = 'posted'
@@ -1530,7 +1530,7 @@ def get_cashflow_ias7(
             JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
             JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id AND jl_other.account_id != jl_cash.account_id
             JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE jl_cash.account_id IN ({cash_ids_str})
+            WHERE jl_cash.account_id = ANY(:cash_ids)
               AND jl_cash.credit > 0
               AND je.entry_date BETWEEN :start AND :end
               AND je.status = 'posted'
@@ -1543,7 +1543,7 @@ def get_cashflow_ias7(
             SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
             FROM journal_lines jl
             JOIN journal_entries je ON jl.journal_entry_id = je.id
-            WHERE jl.account_id IN ({cash_ids_str})
+            WHERE jl.account_id = ANY(:cash_ids)
               AND je.entry_date < :start
               AND je.status = 'posted'
               {branch_filter}

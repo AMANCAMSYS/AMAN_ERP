@@ -12,11 +12,30 @@ env:
 
 jobs:
   # ══════════════════════════════════════════════════════════════════════════════
+  # 0. Secret Scan Gate
+  # ══════════════════════════════════════════════════════════════════════════════
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ══════════════════════════════════════════════════════════════════════════════
   # 1. Backend Tests
   # ══════════════════════════════════════════════════════════════════════════════
   backend-tests:
     name: Backend Tests (Python)
     runs-on: ubuntu-22.04
+    needs: [secret-scan]
 
     services:
       postgres:
@@ -108,6 +127,7 @@ jobs:
   frontend-tests:
     name: Frontend Tests (Node)
     runs-on: ubuntu-22.04
+    needs: [secret-scan]
 
     steps:
       - name: Checkout
@@ -211,8 +231,8 @@ jobs:
   deploy-production:
     name: Deploy to Production (DigitalOcean)
     runs-on: ubuntu-22.04
-    needs: frontend-tests
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.frontend-tests.result == 'success'
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.backend-tests.result == 'success' && needs.frontend-tests.result == 'success'
     environment: production
 
     steps:
@@ -377,29 +397,41 @@ jobs:
             echo "🔍 Verifying local served frontend SHA via: $VERIFY_URL"
             SERVED_SHA=$(curl -fsSL "$VERIFY_URL" | tr -d '\r\n[:space:]')
             if ! echo "$SERVED_SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-              echo "⚠️ Invalid build-sha response (expected 40-char git SHA)"
+              echo "❌ Invalid build-sha response (expected 40-char git SHA)"
               echo "   verify_url: $VERIFY_URL"
               echo "   response:   $SERVED_SHA"
               echo "   hint: ensure /build-sha.txt exists and is not routed to SPA fallback"
+              exit 1
             elif [ "$SERVED_SHA" != "$EXPECTED_SHA" ]; then
-              echo "⚠️ Served frontend SHA mismatch"
+              echo "❌ Served frontend SHA mismatch"
               echo "   expected: $EXPECTED_SHA"
               echo "   served:   $SERVED_SHA"
+              exit 1
             else
               echo "✅ Served frontend SHA matches deployed commit"
             fi
 
-            # 10.25 Optional external-domain check (warning only, does not block deploy)
+            # 10.25 External-domain check (must match to confirm users get fresh build)
             EXTERNAL_VERIFY_URL="http://${{ secrets.DEPLOY_HOST }}/build-sha.txt"
-            EXTERNAL_SHA=$(curl -fsSL "$EXTERNAL_VERIFY_URL" 2>/dev/null | tr -d '\r\n[:space:]' || true)
-            if [ "$EXTERNAL_SHA" = "$EXPECTED_SHA" ]; then
-              echo "✅ External domain SHA matches deployed commit"
-            else
-              echo "⚠️ External domain SHA not yet matching deployed commit"
+            EXTERNAL_SHA=""
+            echo "⏳ Verifying external domain SHA via: $EXTERNAL_VERIFY_URL"
+            for i in $(seq 1 24); do
+              EXTERNAL_SHA=$(curl -fsSL "$EXTERNAL_VERIFY_URL" 2>/dev/null | tr -d '\r\n[:space:]' || true)
+              if [ "$EXTERNAL_SHA" = "$EXPECTED_SHA" ]; then
+                echo "✅ External domain SHA matches deployed commit (attempt $i/24)"
+                break
+              fi
+              echo "  attempt $i/24 — external SHA: ${EXTERNAL_SHA:-<empty>}"
+              sleep 5
+            done
+
+            if [ "$EXTERNAL_SHA" != "$EXPECTED_SHA" ]; then
+              echo "❌ External domain SHA mismatch after wait window"
               echo "   external_url: $EXTERNAL_VERIFY_URL"
               echo "   expected:     $EXPECTED_SHA"
               echo "   got:          ${EXTERNAL_SHA:-<empty>}"
-              echo "   hint: likely external serving path mismatch or cache layer"
+              echo "   hint: external serving path mismatch or cache/proxy layer"
+              exit 1
             fi
 
             # 10.3 Log deployed commit SHA for traceability

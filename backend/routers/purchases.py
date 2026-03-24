@@ -2073,35 +2073,66 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         
         # 2. Process Allocations
         voucher_rate = float(data.exchange_rate or 1.0)
+        total_allocated = 0.0
         for alloc in data.allocations:
+            if alloc.allocated_amount is None or alloc.allocated_amount <= 0:
+                raise HTTPException(status_code=400, detail="قيمة التخصيص يجب أن تكون أكبر من صفر")
+
+            inv_row = db.execute(text("""
+                SELECT id, party_id, invoice_type, total, COALESCE(paid_amount, 0) AS paid_amount,
+                       currency, exchange_rate
+                FROM invoices
+                WHERE id = :id
+            """), {"id": alloc.invoice_id}).fetchone()
+            if not inv_row:
+                raise HTTPException(status_code=404, detail=f"الفاتورة {alloc.invoice_id} غير موجودة")
+            if int(inv_row.party_id) != int(data.supplier_id):
+                raise HTTPException(status_code=400, detail=f"الفاتورة {alloc.invoice_id} لا تتبع المورد المحدد")
+            if inv_row.invoice_type != 'purchase':
+                raise HTTPException(status_code=400, detail=f"التخصيص مسموح لفواتير الشراء فقط. الفاتورة {alloc.invoice_id} نوعها {inv_row.invoice_type}")
+
+            total_allocated = round(total_allocated + float(alloc.allocated_amount), 4)
+
             db.execute(text("""
                 INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
                 VALUES (:vid, :iid, :amt)
             """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc.allocated_amount})
             
-            # Fetch invoice details for currency conversion
-            invoice = db.execute(text("SELECT currency, exchange_rate FROM invoices WHERE id = :id"), {"id": alloc.invoice_id}).fetchone()
-            if invoice:
-                inv_curr = invoice.currency or base_currency
-                inv_rate = float(invoice.exchange_rate or 1.0)
-                
-                # Conversion logic:
-                # if voucher is SYP (rate 1) and invoice is USD (rate 3.75)
-                # allocated 375 SYP -> debt reduction = 375 / 3.75 = 100 USD
-                # reduction = allocated * (voucher_rate / inv_rate)
-                reduction = round(alloc.allocated_amount * (voucher_rate / inv_rate), 4)
+            inv_curr = inv_row.currency or base_currency
+            inv_rate = float(inv_row.exchange_rate or 1.0)
 
-                # Update invoice paid_amount
-                db.execute(text("""
-                    UPDATE invoices
-                    SET paid_amount = COALESCE(paid_amount, 0) + :amt,
-                        status = CASE
-                            WHEN (COALESCE(paid_amount, 0) + :amt) >= total - 0.01 THEN 'paid'
-                            WHEN (COALESCE(paid_amount, 0) + :amt) > 0.1 THEN 'partial'
-                            ELSE status
-                        END
-                    WHERE id = :iid
-                """), {"amt": reduction, "iid": alloc.invoice_id})
+            # if voucher is SYP (rate 1) and invoice is USD (rate 3.75)
+            # allocated 375 SYP -> debt reduction = 375 / 3.75 = 100 USD
+            reduction = round(float(alloc.allocated_amount) * (voucher_rate / inv_rate), 4)
+
+            remaining = round(float(inv_row.total or 0) - float(inv_row.paid_amount or 0), 4)
+            if reduction > remaining + 0.01:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"قيمة التخصيص للفواتير تتجاوز المتبقي في الفاتورة {alloc.invoice_id}. "
+                        f"المتبقي: {remaining}, المطلوب تخصيصه: {reduction}"
+                    )
+                )
+
+            db.execute(text("""
+                UPDATE invoices
+                SET paid_amount = LEAST(total, COALESCE(paid_amount, 0) + :amt),
+                    status = CASE
+                        WHEN LEAST(total, COALESCE(paid_amount, 0) + :amt) >= total - 0.01 THEN 'paid'
+                        WHEN LEAST(total, COALESCE(paid_amount, 0) + :amt) > 0.1 THEN 'partial'
+                        ELSE status
+                    END
+                WHERE id = :iid
+            """), {"amt": reduction, "iid": alloc.invoice_id})
+
+        if total_allocated > float(data.amount) + 0.01:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"إجمالي التخصيصات ({total_allocated}) أكبر من مبلغ السند ({data.amount})."
+                )
+            )
         
         # 3. Update Supplier Balance (Base + Currency)
         amount_base = round(data.amount * (data.exchange_rate or 1.0), 2)

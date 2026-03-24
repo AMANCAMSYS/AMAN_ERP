@@ -19,7 +19,6 @@ from config import settings
 from database import engine
 
 # ── Observability ──────────────────────────────────────────────────────────────
-import os
 _SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if _SENTRY_DSN:
     try:
@@ -33,8 +32,7 @@ if _SENTRY_DSN:
             environment=os.environ.get("APP_ENV", "production"),
             release=f"aman-erp@2.0.0",
         )
-        logger_sentry = logging.getLogger(__name__)
-        logger_sentry.info("✅ Sentry initialized")
+        logging.getLogger(__name__).info("✅ Sentry initialized")
     except ImportError:
         pass  # sentry-sdk not installed — skip silently
 
@@ -80,146 +78,142 @@ async def lifespan(app: FastAPI):
         logger.critical("🔴 SECURITY WARNING: SECRET_KEY is weak or default! Change it in .env immediately!")
         logger.critical("   Generate a strong key: python3 -c \"import secrets; print(secrets.token_hex(32))\"")
     
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            # DB-015: Create central user index table for O(1) login lookup
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS system_user_index (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(100) NOT NULL,
-                    company_id VARCHAR(100) NOT NULL,
-                    is_active BOOLEAN DEFAULT TRUE,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(username, company_id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_system_user_index_username 
-                    ON system_user_index(username);
-            """))
-            
-            # Create system_companies table for company registry
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS system_companies (
-                    id VARCHAR(100) PRIMARY KEY,
-                    company_name VARCHAR(255) NOT NULL,
-                    company_name_en VARCHAR(255),
-                    commercial_registry VARCHAR(100),
-                    tax_number VARCHAR(100),
-                    phone VARCHAR(50),
-                    email VARCHAR(255),
-                    address TEXT,
-                    city VARCHAR(100),
-                    country VARCHAR(100) DEFAULT 'SA',
-                    logo_url VARCHAR(255),
-                    database_name VARCHAR(255),
-                    database_user VARCHAR(255),
-                    currency VARCHAR(10) DEFAULT 'SAR',
-                    timezone VARCHAR(50) DEFAULT 'Asia/Riyadh',
-                    status VARCHAR(20) DEFAULT 'active',
-                    plan_type VARCHAR(50) DEFAULT 'basic',
-                    max_users INTEGER DEFAULT 10,
-                    subscription_end DATE,
-                    template_id INTEGER,
-                    enabled_modules JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    activated_at TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE INDEX IF NOT EXISTS idx_system_companies_status
-                    ON system_companies(status);
-            """))
-
-            # Industry Templates Table
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS industry_templates (
-                    id SERIAL PRIMARY KEY,
-                    key VARCHAR(50) UNIQUE NOT NULL,
-                    name VARCHAR(100) NOT NULL,
-                    name_ar VARCHAR(100) NOT NULL,
-                    description TEXT,
-                    description_ar TEXT,
-                    icon VARCHAR(10),
-                    enabled_modules JSONB NOT NULL,
-                    default_settings JSONB
-                );
-
-            """))
-            
-            # Seed Industry Templates (12 types)
-            conn.execute(text("""
-                INSERT INTO industry_templates (key, name, name_ar, description, description_ar, icon, enabled_modules)
-                VALUES 
-                ('retail', 'Retail', 'تجارة التجزئة', 'Grocery, clothing, electronics, gifts', 'بقالات، ملابس، إلكترونيات، عطور، هدايا', '🛍️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('wholesale', 'Wholesale & Distribution', 'الجملة والتوزيع', 'Distributors, wholesale warehouses, agents, importers', 'موزعين، مستودعات جملة، وكلاء بيع، مستوردين', '📦', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('restaurant', 'Food & Beverage', 'المطاعم والمقاهي', 'Restaurants, cafes, cloud kitchens, food trucks, bakeries', 'مطاعم، كافيهات، مطابخ سحابية، فود ترك، مخابز', '🍽️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('manufacturing', 'Manufacturing', 'التصنيع والإنتاج', 'Factories, production workshops, packaging', 'مصانع، ورش إنتاج، تعبئة وتغليف', '🏭', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('construction', 'Construction', 'المقاولات والمشاريع', 'General contracting, finishing, plumbing, electrical', 'مقاولات عامة، تشطيب، سباكة، كهرباء، طرق', '🏗️', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('services', 'Professional Services', 'الخدمات المهنية', 'Accounting, law, consulting, training, marketing', 'محاسبة، محاماة، استشارات، تدريب، تسويق', '💼', '["dashboard","kpi","accounting","assets","treasury","sales","buying","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('pharmacy', 'Pharmacy & Medical', 'الصيدليات والمستلزمات الطبية', 'Pharmacies, medical supplies, labs, small clinics', 'صيدليات، مستلزمات طبية، مختبرات، عيادات', '💊', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('workshop', 'Workshops & Repair', 'الورش والصيانة', 'Auto mechanics, electrical repair, device repair', 'ميكانيك، كهرباء سيارات، صيانة أجهزة', '🔧', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('ecommerce', 'E-Commerce', 'التجارة الإلكترونية', 'Online stores, social media selling, marketplaces', 'متاجر أونلاين، بيع عبر منصات التواصل', '🛒', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('logistics', 'Logistics & Transport', 'النقل والخدمات اللوجستية', 'Freight, delivery, warehousing, cargo transport', 'شحن، توصيل، مستودعات، نقل بضائع', '🚛', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('agriculture', 'Agriculture', 'الزراعة والتجارة الزراعية', 'Farms, crop traders, feed, poultry', 'مزارع، تجار محاصيل، أعلاف، دواجن', '🌾', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
-                ('general', 'Multi-Activity', 'نشاط عام', 'Comprehensive system with all modules', 'نظام شامل لجميع الأنشطة', '🌐', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]')
-                ON CONFLICT (key) DO UPDATE SET 
-                    name = EXCLUDED.name,
-                    name_ar = EXCLUDED.name_ar,
-                    description = EXCLUDED.description,
-                    description_ar = EXCLUDED.description_ar,
-                    icon = EXCLUDED.icon,
-                    enabled_modules = EXCLUDED.enabled_modules;
-            """))
-
-
-            # Create system_activity_log table for global audit trail
-
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS system_activity_log (
-                    id SERIAL PRIMARY KEY,
-                    company_id VARCHAR(100),
-                    action_type VARCHAR(100) NOT NULL,
-                    action_description TEXT,
-                    performed_by VARCHAR(255),
-                    ip_address VARCHAR(50),
-                    user_agent TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-                CREATE INDEX IF NOT EXISTS idx_system_activity_log_action 
-                    ON system_activity_log(action_type);
-                CREATE INDEX IF NOT EXISTS idx_system_activity_log_date 
-                    ON system_activity_log(created_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_system_activity_log_company 
-                    ON system_activity_log(company_id);
-            """))
-            
-            conn.commit()
-        logger.info("✅ Database connected")
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+        # DB-015: Create central user index table for O(1) login lookup
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_user_index (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) NOT NULL,
+                company_id VARCHAR(100) NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(username, company_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_system_user_index_username 
+                ON system_user_index(username);
+        """))
         
-        # Start Background Stats Worker
-        from routers.dashboard import update_system_stats_task
-        import asyncio
-        asyncio.create_task(update_system_stats_task())
-        logger.info("📡 System Stats Background Worker Started")
+        # Create system_companies table for company registry
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_companies (
+                id VARCHAR(100) PRIMARY KEY,
+                company_name VARCHAR(255) NOT NULL,
+                company_name_en VARCHAR(255),
+                commercial_registry VARCHAR(100),
+                tax_number VARCHAR(100),
+                phone VARCHAR(50),
+                email VARCHAR(255),
+                address TEXT,
+                city VARCHAR(100),
+                country VARCHAR(100) DEFAULT 'SA',
+                logo_url VARCHAR(255),
+                database_name VARCHAR(255),
+                database_user VARCHAR(255),
+                currency VARCHAR(10) DEFAULT 'SAR',
+                timezone VARCHAR(50) DEFAULT 'Asia/Riyadh',
+                status VARCHAR(20) DEFAULT 'active',
+                plan_type VARCHAR(50) DEFAULT 'basic',
+                max_users INTEGER DEFAULT 10,
+                subscription_end DATE,
+                template_id INTEGER,
+                enabled_modules JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                activated_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_system_companies_status
+                ON system_companies(status);
+        """))
+
+        # Industry Templates Table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS industry_templates (
+                id SERIAL PRIMARY KEY,
+                key VARCHAR(50) UNIQUE NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                name_ar VARCHAR(100) NOT NULL,
+                description TEXT,
+                description_ar TEXT,
+                icon VARCHAR(10),
+                enabled_modules JSONB NOT NULL,
+                default_settings JSONB
+            );
+
+        """))
         
-        # SEC-201: Start token blacklist cleanup task
-        async def _blacklist_cleanup_loop():
-            from routers.auth import cleanup_expired_blacklist
-            while True:
-                try:
-                    cleanup_expired_blacklist()
-                except Exception:
-                    pass
-                await asyncio.sleep(3600)  # Every hour
-        asyncio.create_task(_blacklist_cleanup_loop())
-        logger.info("🧹 Token Blacklist Cleanup Worker Started")
+        # Seed Industry Templates (12 types)
+        conn.execute(text("""
+            INSERT INTO industry_templates (key, name, name_ar, description, description_ar, icon, enabled_modules)
+            VALUES 
+            ('retail', 'Retail', 'تجارة التجزئة', 'Grocery, clothing, electronics, gifts', 'بقالات، ملابس، إلكترونيات، عطور، هدايا', '🛍️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('wholesale', 'Wholesale & Distribution', 'الجملة والتوزيع', 'Distributors, wholesale warehouses, agents, importers', 'موزعين، مستودعات جملة، وكلاء بيع، مستوردين', '📦', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('restaurant', 'Food & Beverage', 'المطاعم والمقاهي', 'Restaurants, cafes, cloud kitchens, food trucks, bakeries', 'مطاعم، كافيهات، مطابخ سحابية، فود ترك، مخابز', '🍽️', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('manufacturing', 'Manufacturing', 'التصنيع والإنتاج', 'Factories, production workshops, packaging', 'مصانع، ورش إنتاج، تعبئة وتغليف', '🏭', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('construction', 'Construction', 'المقاولات والمشاريع', 'General contracting, finishing, plumbing, electrical', 'مقاولات عامة، تشطيب، سباكة، كهرباء، طرق', '🏗️', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('services', 'Professional Services', 'الخدمات المهنية', 'Accounting, law, consulting, training, marketing', 'محاسبة، محاماة، استشارات، تدريب، تسويق', '💼', '["dashboard","kpi","accounting","assets","treasury","sales","buying","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('pharmacy', 'Pharmacy & Medical', 'الصيدليات والمستلزمات الطبية', 'Pharmacies, medical supplies, labs, small clinics', 'صيدليات، مستلزمات طبية، مختبرات، عيادات', '💊', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('workshop', 'Workshops & Repair', 'الورش والصيانة', 'Auto mechanics, electrical repair, device repair', 'ميكانيك، كهرباء سيارات، صيانة أجهزة', '🔧', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('ecommerce', 'E-Commerce', 'التجارة الإلكترونية', 'Online stores, social media selling, marketplaces', 'متاجر أونلاين، بيع عبر منصات التواصل', '🛒', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('logistics', 'Logistics & Transport', 'النقل والخدمات اللوجستية', 'Freight, delivery, warehousing, cargo transport', 'شحن، توصيل، مستودعات، نقل بضائع', '🚛', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('agriculture', 'Agriculture', 'الزراعة والتجارة الزراعية', 'Farms, crop traders, feed, poultry', 'مزارع، تجار محاصيل، أعلاف، دواجن', '🌾', '["dashboard","kpi","accounting","assets","treasury","sales","buying","stock","crm","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]'),
+            ('general', 'Multi-Activity', 'نشاط عام', 'Comprehensive system with all modules', 'نظام شامل لجميع الأنشطة', '🌐', '["dashboard","kpi","accounting","assets","treasury","sales","pos","buying","stock","manufacturing","projects","crm","services","expenses","taxes","approvals","reports","hr","audit","roles","settings","data_import"]')
+            ON CONFLICT (key) DO UPDATE SET 
+                name = EXCLUDED.name,
+                name_ar = EXCLUDED.name_ar,
+                description = EXCLUDED.description,
+                description_ar = EXCLUDED.description_ar,
+                icon = EXCLUDED.icon,
+                enabled_modules = EXCLUDED.enabled_modules;
+        """))
+
+
+        # Create system_activity_log table for global audit trail
+
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_activity_log (
+                id SERIAL PRIMARY KEY,
+                company_id VARCHAR(100),
+                action_type VARCHAR(100) NOT NULL,
+                action_description TEXT,
+                performed_by VARCHAR(255),
+                ip_address VARCHAR(50),
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_system_activity_log_action 
+                ON system_activity_log(action_type);
+            CREATE INDEX IF NOT EXISTS idx_system_activity_log_date 
+                ON system_activity_log(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_system_activity_log_company 
+                ON system_activity_log(company_id);
+        """))
         
-        # Start Report Scheduler
-        from services.scheduler import start_scheduler
-        start_scheduler()
-        logger.info("⏰ Report Scheduler Started")
-        
-    except Exception as e:
-        logger.error(f"❌ Database connection failed: {str(e)}")
+        conn.commit()
+    logger.info("✅ Database connected")
+    
+    # Start Background Stats Worker
+    from routers.dashboard import update_system_stats_task
+    import asyncio
+    asyncio.create_task(update_system_stats_task())
+    logger.info("📡 System Stats Background Worker Started")
+    
+    # SEC-201: Start token blacklist cleanup task
+    async def _blacklist_cleanup_loop():
+        from routers.auth import cleanup_expired_blacklist
+        while True:
+            try:
+                cleanup_expired_blacklist()
+            except Exception:
+                pass
+            await asyncio.sleep(3600)  # Every hour
+    asyncio.create_task(_blacklist_cleanup_loop())
+    logger.info("🧹 Token Blacklist Cleanup Worker Started")
+    
+    # Start Report Scheduler
+    from services.scheduler import start_scheduler
+    start_scheduler()
+    logger.info("⏰ Report Scheduler Started")
     
     yield
     
@@ -348,12 +342,11 @@ app.add_middleware(RequestIDMiddleware)
 
 # SEC-203: HTTPS Enforcement + Security Headers
 # SEC-204: Input Sanitization (XSS/SQLi detection)
-import os as _os
 from utils.security_middleware import HTTPSRedirectMiddleware, InputSanitizationMiddleware
 # FORCE_HTTPS must be explicitly enabled (e.g. after SSL cert is installed).
 # When running on plain HTTP (IP-only, no domain/cert) keep it off to prevent
 # the 301→HTTPS loop that causes ERR_CONNECTION_REFUSED in the browser.
-if _os.getenv("FORCE_HTTPS", "false").lower() == "true":
+if os.getenv("FORCE_HTTPS", "false").lower() == "true":
     app.add_middleware(HTTPSRedirectMiddleware)
 else:
     # Still register the middleware for security headers only (no redirect)

@@ -121,6 +121,46 @@ ALLOWED_DOCUMENT_EXTENSIONS = {
     '.zip', '.rar', '.7z'
 }
 
+_ALLOWED_MIME_BY_EXT = {
+    ".pdf": {"application/pdf"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".png": {"image/png"},
+    ".gif": {"image/gif"},
+    ".webp": {"image/webp"},
+    ".bmp": {"image/bmp", "image/x-ms-bmp"},
+    ".svg": {"image/svg+xml", "text/xml", "application/xml"},
+    ".csv": {"text/csv", "application/csv", "application/vnd.ms-excel", "text/plain"},
+    ".txt": {"text/plain"},
+    ".zip": {"application/zip", "application/x-zip-compressed", "application/octet-stream"},
+    ".rar": {"application/vnd.rar", "application/x-rar-compressed", "application/octet-stream"},
+    ".7z": {"application/x-7z-compressed", "application/octet-stream"},
+    ".doc": {"application/msword", "application/octet-stream"},
+    ".xls": {"application/vnd.ms-excel", "application/octet-stream"},
+    ".ppt": {"application/vnd.ms-powerpoint", "application/octet-stream"},
+    ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip", "application/octet-stream"},
+    ".xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip", "application/octet-stream"},
+    ".pptx": {"application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/zip", "application/octet-stream"},
+}
+
+_SIGNATURES_BY_EXT = {
+    ".pdf": [b"%PDF-"],
+    ".png": [b"\x89PNG\r\n\x1a\n"],
+    ".jpg": [b"\xff\xd8\xff"],
+    ".jpeg": [b"\xff\xd8\xff"],
+    ".gif": [b"GIF87a", b"GIF89a"],
+    ".bmp": [b"BM"],
+    ".zip": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    ".docx": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    ".xlsx": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    ".pptx": [b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"],
+    ".rar": [b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00"],
+    ".7z": [b"\x37\x7a\xbc\xaf\x27\x1c"],
+    ".doc": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+    ".xls": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+    ".ppt": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+}
+
 
 def validate_file_size(content: bytes, max_size: int, label: str = "الملف") -> None:
     """Validate uploaded file doesn't exceed maximum size"""
@@ -172,3 +212,49 @@ def validate_file_path_safety(file_path: str, base_dir: str) -> bool:
     abs_path = os.path.abspath(file_path)
     abs_base = os.path.abspath(base_dir)
     return abs_path.startswith(abs_base + os.sep) or abs_path == abs_base
+
+
+def validate_file_mime_and_signature(
+    filename: str,
+    content_type: str,
+    content: bytes,
+    label: str = "الملف"
+) -> str:
+    """
+    Validate uploaded file MIME type and binary signature (magic bytes).
+    Returns validated extension.
+    """
+    from fastapi import HTTPException
+    import os
+
+    if not content:
+        raise HTTPException(400, f"{label} فارغ")
+
+    ext = os.path.splitext(filename or "")[1].lower()
+    if not ext:
+        raise HTTPException(400, f"امتداد {label} غير واضح")
+
+    # MIME validation (if provided by client/proxy).
+    normalized_ct = (content_type or "").split(";")[0].strip().lower()
+    allowed_mimes = _ALLOWED_MIME_BY_EXT.get(ext)
+    if normalized_ct and allowed_mimes and normalized_ct not in allowed_mimes:
+        raise HTTPException(
+            400,
+            f"MIME غير مطابق لامتداد {label}: ({normalized_ct}) مع ({ext})"
+        )
+
+    # Signature validation for binary formats we can confidently detect.
+    if ext == ".webp":
+        if not (len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"):
+            raise HTTPException(400, f"توقيع {label} غير صالح لملف WEBP")
+        return ext
+
+    signatures = _SIGNATURES_BY_EXT.get(ext, [])
+    if signatures and not any(content.startswith(sig) for sig in signatures):
+        raise HTTPException(400, f"توقيع {label} لا يطابق الامتداد ({ext})")
+
+    # Text formats: block NUL-bytes to reduce disguised binaries.
+    if ext in {".txt", ".csv", ".svg"} and b"\x00" in content:
+        raise HTTPException(400, f"محتوى {label} غير صالح كملف نصي")
+
+    return ext

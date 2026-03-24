@@ -24,38 +24,66 @@ invoices_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@invoices_router.get("/invoices", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
+@invoices_router.get("/invoices", dependencies=[Depends(require_permission("sales.view"))])
 def list_invoices(
     branch_id: Optional[int] = None,
     status_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 50,
     current_user: dict = Depends(get_current_user)
 ):
-    """عرض قائمة فواتير المبيعات"""
+    """عرض قائمة فواتير المبيعات مع ترقيم الصفحات"""
     from utils.permissions import validate_branch_access
     # Enforce branch access
     branch_id = validate_branch_access(current_user, branch_id)
     
     db = get_db_connection(current_user.company_id)
     try:
-        query_str = """
+        where_clauses = ["i.invoice_type = 'sales'"]
+        params = {}
+
+        if branch_id:
+            where_clauses.append("i.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+        if status_filter:
+            where_clauses.append("i.status = :status")
+            params["status"] = status_filter
+        if search:
+            where_clauses.append("(i.invoice_number ILIKE :search OR p.name ILIKE :search)")
+            params["search"] = f"%{search}%"
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Count total
+        total = db.execute(text(f"""
+            SELECT COUNT(*) FROM invoices i
+            JOIN parties p ON i.party_id = p.id
+            WHERE {where_sql}
+        """), params).scalar() or 0
+
+        # Fetch page
+        params["limit"] = limit
+        params["offset"] = (page - 1) * limit
+
+        result = db.execute(text(f"""
             SELECT i.id, i.invoice_number, i.invoice_date, i.due_date, 
                    i.total, i.paid_amount, i.status, p.name as customer_name,
                    i.currency, i.exchange_rate
             FROM invoices i
             JOIN parties p ON i.party_id = p.id
-            WHERE i.invoice_type = 'sales'
-        """
-        params = {}
-        if branch_id:
-            query_str += " AND i.branch_id = :branch_id"
-            params["branch_id"] = branch_id
-        if status_filter:
-            query_str += " AND i.status = :status"
-            params["status"] = status_filter
+            WHERE {where_sql}
+            ORDER BY i.created_at DESC
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
 
-        query_str += " ORDER BY i.created_at DESC"
-        result = db.execute(text(query_str), params).fetchall()
-        return [dict(row._mapping) for row in result]
+        return {
+            "items": [dict(row._mapping) for row in result],
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": (total + limit - 1) // limit
+        }
     finally:
         db.close()
 
@@ -162,32 +190,68 @@ def create_sales_invoice(
                     detail=f"تجاوز الحد الائتماني. الحد: {customer.credit_limit}, الرصيد الحالي: {customer.current_balance}, المطلوب: {remaining_gl}"
                 )
 
-        # --- 5. Save Invoice Header ---
-        invoice_id = db.execute(text("""
-            INSERT INTO invoices (
-                invoice_number, party_id, invoice_type, invoice_date, due_date,
-                subtotal, tax_amount, discount, total, paid_amount, status, notes,
-                payment_method, created_by, branch_id, warehouse_id,
-                currency, exchange_rate, cost_center_id, sales_order_id,
-                effect_type, effect_percentage, markup_amount
-            ) VALUES (
-                :num, :cust, 'sales', :inv_date, :due_date,
-                :sub, :tax, :disc, :total, :paid, :status, :notes,
-                :pay_method, :user, :branch, :wh,
-                :currency, :exchange_rate, :cc_id, :so_id,
-                :effect_type, :effect_perc, :markup_amt
-            ) RETURNING id
-        """), {
-            "num": inv_num, "cust": invoice.customer_id, "inv_date": invoice.invoice_date,
-            "due_date": invoice.due_date, "sub": subtotal, "tax": total_tax,
-            "disc": total_discount, "total": grand_total, "paid": paid_amount,
-            "status": inv_status, "notes": invoice.notes, "pay_method": invoice.payment_method,
-            "user": current_user.id, "branch": invoice.branch_id, "wh": invoice.warehouse_id,
-            "currency": inv_currency, "exchange_rate": exchange_rate,
-            "cc_id": invoice.cost_center_id, "so_id": invoice.sales_order_id,
-            "effect_type": invoice.effect_type, "effect_perc": invoice.effect_percentage,
-            "markup_amt": invoice.markup_amount
-        }).scalar()
+        # --- 5. Save Invoice Header (schema-drift tolerant) ---
+        invoice_cols = {
+            row.column_name
+            for row in db.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'invoices'
+            """)).fetchall()
+        }
+
+        header_cols = [
+            "invoice_number", "party_id", "invoice_type", "invoice_date", "due_date",
+            "subtotal", "tax_amount", "discount", "total", "paid_amount", "status", "notes",
+            "created_by", "branch_id", "warehouse_id"
+        ]
+        header_vals = [
+            ":num", ":cust", "'sales'", ":inv_date", ":due_date",
+            ":sub", ":tax", ":disc", ":total", ":paid", ":status", ":notes",
+            ":user", ":branch", ":wh"
+        ]
+
+        header_params = {
+            "num": inv_num,
+            "cust": invoice.customer_id,
+            "inv_date": invoice.invoice_date,
+            "due_date": invoice.due_date,
+            "sub": subtotal,
+            "tax": total_tax,
+            "disc": total_discount,
+            "total": grand_total,
+            "paid": paid_amount,
+            "status": inv_status,
+            "notes": invoice.notes,
+            "user": current_user.id,
+            "branch": invoice.branch_id,
+            "wh": invoice.warehouse_id,
+        }
+
+        optional_header_map = {
+            "payment_method": ("pay_method", invoice.payment_method),
+            "currency": ("currency", inv_currency),
+            "exchange_rate": ("exchange_rate", exchange_rate),
+            "cost_center_id": ("cc_id", invoice.cost_center_id),
+            "sales_order_id": ("so_id", invoice.sales_order_id),
+            "effect_type": ("effect_type", invoice.effect_type),
+            "effect_percentage": ("effect_perc", invoice.effect_percentage),
+            "markup_amount": ("markup_amt", invoice.markup_amount),
+        }
+
+        for col_name, (param_name, value) in optional_header_map.items():
+            if col_name in invoice_cols:
+                header_cols.append(col_name)
+                header_vals.append(f":{param_name}")
+                header_params[param_name] = value
+
+        insert_sql = f"""
+            INSERT INTO invoices ({', '.join(header_cols)})
+            VALUES ({', '.join(header_vals)})
+            RETURNING id
+        """
+
+        invoice_id = db.execute(text(insert_sql), header_params).scalar()
 
         # Update Sales Order status if linked
         if invoice.sales_order_id:
@@ -202,14 +266,35 @@ def create_sales_invoice(
         from services.costing_service import CostingService
         costing_service = CostingService
 
+        invoice_line_cols = {
+            row.column_name
+            for row in db.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'invoice_lines'
+            """)).fetchall()
+        }
+        has_line_markup_col = "markup" in invoice_line_cols
+
         for item in items_to_save:
-            db.execute(text("""
-                INSERT INTO invoice_lines (
-                    invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, markup, total
-                ) VALUES (
-                    :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :markup, :total
-                )
-            """), {
+            if has_line_markup_col:
+                line_sql = """
+                    INSERT INTO invoice_lines (
+                        invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, markup, total
+                    ) VALUES (
+                        :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :markup, :total
+                    )
+                """
+            else:
+                line_sql = """
+                    INSERT INTO invoice_lines (
+                        invoice_id, product_id, description, quantity, unit_price, tax_rate, discount, total
+                    ) VALUES (
+                        :inv_id, :pid, :desc, :qty, :price, :tax_rate, :disc, :total
+                    )
+                """
+
+            db.execute(text(line_sql), {
                 "inv_id": invoice_id, "pid": item["product_id"], "desc": item["description"],
                 "qty": item["quantity"], "price": item["unit_price"], "tax_rate": item["tax_rate"],
                 "disc": item["discount"], "markup": item.get("markup", 0), "total": item["total"]
@@ -279,71 +364,45 @@ def create_sales_invoice(
             """), {"amt": remaining_balance, "id": invoice.customer_id})
 
         # --- 6.7 Payment Voucher (if paid on creation) ---
-        if paid_amount > 0 and invoice.payment_method and invoice.payment_method != 'credit':
-            # For cash/bank/check: actual method = payment_method
-            # For credit + down-payment: actual method = down_payment_method
-            actual_method = invoice.payment_method
-            if invoice.payment_method == 'credit':
+        if paid_amount > 0:
+            # Determine the actual payment method
+            if invoice.payment_method and invoice.payment_method != 'credit':
+                actual_method = invoice.payment_method
+            elif invoice.payment_method == 'credit':
+                # credit + down payment: use down_payment_method
                 actual_method = getattr(invoice, 'down_payment_method', None) or 'cash'
+            else:
+                actual_method = None
 
-            from utils.accounting import generate_sequential_number as gen_seq
-            pv_num = gen_seq(db, f"PV-{datetime.now().year}", "payment_vouchers", "voucher_number")
+            if actual_method:
+                from utils.accounting import generate_sequential_number as gen_seq
+                pv_num = gen_seq(db, f"PV-{datetime.now().year}", "payment_vouchers", "voucher_number")
 
-            pv_id = db.execute(text("""
-                INSERT INTO payment_vouchers (
-                    voucher_number, voucher_type, voucher_date, party_type, party_id,
-                    amount, payment_method, treasury_account_id, reference, status, created_by, branch_id,
-                    currency, exchange_rate
-                ) VALUES (
-                    :vnum, 'receipt', :vdate, 'customer', :cust,
-                    :amt, :method, :treasury_id, :ref, 'posted', :user, :branch,
-                    :currency, :rate
-                ) RETURNING id
-            """), {
-                "vnum": pv_num, "vdate": invoice.invoice_date, "cust": invoice.customer_id,
-                "amt": paid_amount, "method": actual_method,
-                "treasury_id": invoice.treasury_id,
-                "ref": inv_num,
-                "user": current_user.id, "branch": invoice.branch_id,
-                "currency": inv_currency, "rate": exchange_rate
-            }).scalar()
+                pv_id = db.execute(text("""
+                    INSERT INTO payment_vouchers (
+                        voucher_number, voucher_type, voucher_date, party_type, party_id,
+                        amount, payment_method, treasury_account_id, reference, status, created_by, branch_id,
+                        currency, exchange_rate
+                    ) VALUES (
+                        :vnum, 'receipt', :vdate, 'customer', :cust,
+                        :amt, :method, :treasury_id, :ref, 'posted', :user, :branch,
+                        :currency, :rate
+                    ) RETURNING id
+                """), {
+                    "vnum": pv_num, "vdate": invoice.invoice_date, "cust": invoice.customer_id,
+                    "amt": paid_amount, "method": actual_method,
+                    "treasury_id": invoice.treasury_id,
+                    "ref": inv_num,
+                    "user": current_user.id, "branch": invoice.branch_id,
+                    "currency": inv_currency, "rate": exchange_rate
+                }).scalar()
 
-            # Link payment allocation to invoice
-            db.execute(text("""
-                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
-                VALUES (:vid, :iid, :amt)
-            """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
+                # Link payment allocation to invoice
+                db.execute(text("""
+                    INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                    VALUES (:vid, :iid, :amt)
+                """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
 
-        elif paid_amount > 0 and invoice.payment_method == 'credit':
-            # credit + down payment: create voucher with down_payment_method
-            actual_method = getattr(invoice, 'down_payment_method', None) or 'cash'
-            from utils.accounting import generate_sequential_number as gen_seq
-            pv_num = gen_seq(db, f"PV-{datetime.now().year}", "payment_vouchers", "voucher_number")
-
-            pv_id = db.execute(text("""
-                INSERT INTO payment_vouchers (
-                    voucher_number, voucher_type, voucher_date, party_type, party_id,
-                    amount, payment_method, treasury_account_id, reference, status, created_by, branch_id,
-                    currency, exchange_rate
-                ) VALUES (
-                    :vnum, 'receipt', :vdate, 'customer', :cust,
-                    :amt, :method, :treasury_id, :ref, 'posted', :user, :branch,
-                    :currency, :rate
-                ) RETURNING id
-            """), {
-                "vnum": pv_num, "vdate": invoice.invoice_date, "cust": invoice.customer_id,
-                "amt": paid_amount, "method": actual_method,
-                "treasury_id": invoice.treasury_id,
-                "ref": inv_num,
-                "user": current_user.id, "branch": invoice.branch_id,
-                "currency": inv_currency, "rate": exchange_rate
-            }).scalar()
-
-            # Link payment allocation to invoice
-            db.execute(text("""
-                INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
-                VALUES (:vid, :iid, :amt)
-            """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
 
         # --- 7. GL Entry ---
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
