@@ -67,14 +67,13 @@ function Login() {
             <div style={{ position: 'fixed', top: '16px', insetInlineStart: '16px', zIndex: 30 }}>
                 <BackButton />
             </div>
-            <div style={{ position: 'fixed', top: '16px', insetInlineEnd: '16px', zIndex: 30 }}>
+            <div className="floating-language-toggle">
                 <button
                     type="button"
                     className="btn btn-light"
                     onClick={toggleLanguage}
                     aria-label={t('common.language', 'Language')}
                     title={t('common.language', 'Language')}
-                    style={{ minWidth: '52px', fontWeight: 700 }}
                 >
                     {i18n.language === 'ar' ? 'EN' : 'AR'}
                 </button>
