@@ -651,8 +651,8 @@ body {
 
 .floating-language-toggle {
   position: fixed;
-  top: 68px;
-  inset-inline-end: 18px;
+  top: 18px;
+  inset-inline-end: 68px;
   min-width: 52px;
   font-weight: 700;
   z-index: 1299;
