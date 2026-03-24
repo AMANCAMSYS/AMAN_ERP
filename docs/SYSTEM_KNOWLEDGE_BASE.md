@@ -3184,80 +3184,14 @@ export const INDUSTRY_FEATURES = {
 
 
 
-كلمة سر الدروبلت 
-aman123321.Erp
-
-ubuntu-s-2vcpu-4gb-nyc3-01
-in  AMAN_ERP / 4 GB Memory / 80 GB Disk / NYC3 - Ubuntu 24.04 (LTS) x64
-ipv4: 64.225.49.118 Copy
-ipv6:  Enable now
-Private IP:  10.108.0.2 Copy
-Reserved IP:  Enable now
-
-
-Last login: Tue Mar  3 15:24:06 2026 from 88.236.74.45
-root@ubuntu-s-2vcpu-4gb-nyc3-01:~# cat /home/deploy/.ssh/github_actions
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACAq2sYOL5JsdBgieF43EWlN3HcXpc1caqzLZp4bRs3+yAAAAJinshX4p7IV
-+AAAAAtzc2gtZWQyNTUxOQAAACAq2sYOL5JsdBgieF43EWlN3HcXpc1caqzLZp4bRs3+yA
-AAAECc6OkqBvdiBW+nZH2mYgOVP63fsrOQuCUBknALxv4TVSraxg4vkmx0GCJ4XjcRaU3c
-dxelzVxqrMtmnhtGzf7IAAAADmdpdGh1Yi1hY3Rpb25zAQIDBAUGBw==
------END OPENSSH PRIVATE KEY-----
-root@ubuntu-s-2vcpu-4gb-nyc3-01:~# 
-
-
-github.com/AMANCAMSYS/AMAN_ERP.git .
-chown -R deploy:deploy /opt/aman
-
-# توليد SECRET_KEY قوي
-SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-echo "SECRET_KEY المولد: $SECRET"
-
-# إنشاء .env
-cat > /opt/aman/backend/.env << EOF
-POSTGRES_SERVER=db
-POSTGRES_PORT=5432
-POSTGRES_USER=aman
-POSTGRES_PASSWORD=AmanDB$(date +%Y)Secure!
-POSTGRES_DB=postgres
-
-REDIS_PASSWORD=AmanRedis$(date +%Y)Pass!
-REDIS_URL=redis://:AmanRedis$(date +%Y)Pass!@redis:6379/0
-
-SECRET_KEY=$SECRET
-
-APP_ENV=production
-cat /opt/aman/backend/.envd/.envte +%Y)!.118
-Cloning into '.'...
-remote: Enumerating objects: 2294, done.
-remote: Counting objects: 100% (2294/2294), done.
-remote: Compressing objects: 100% (1266/1266), done.
-remote: Total 2294 (delta 1538), reused 1764 (delta 1008), pack-reused 0 (from 0)
-Receiving objects: 100% (2294/2294), 2.88 MiB | 16.20 MiB/s, done.
-Resolving deltas: 100% (1538/1538), done.
-SECRET_KEY المولد: b4e6e84cf9a8c11fb71788fb49fd1683a8b5d67b97f9e0ad2d27dc04a7950f27
-✅ .env created
-POSTGRES_SERVER=db
-POSTGRES_PORT=5432
-POSTGRES_USER=aman
-POSTGRES_PASSWORD=AmanDB2026Secure!
-POSTGRES_DB=postgres
-
-REDIS_PASSWORD=AmanRedis2026Pass!
-REDIS_URL=redis://:AmanRedis2026Pass!@redis:6379/0
-
-SECRET_KEY=b4e6e84cf9a8c11fb71788fb49fd1683a8b5d67b97f9e0ad2d27dc04a7950f27
-
-APP_ENV=production
-ALLOWED_ORIGINS=http://64.225.49.118
-
-FRONTEND_URL=http://64.225.49.118
-FRONTEND_URL_PRODUCTION=http://64.225.49.118
-
-GRAFANA_USER=admin
-GRAFANA_PASSWORD=AmanGrafana2026!
-root@ubuntu-s-2vcpu-4gb-nyc3-01:/opt/aman# 
+ملاحظة أمنية مهمة:
+1. تم حذف أي أسرار تشغيلية حساسة (مفاتيح خاصة، كلمات مرور، وقيم `.env` الحقيقية) من هذا المستند.
+2. القاعدة: هذا الملف يوثق الإجراءات فقط، وليس القيم الفعلية.
+3. يجب تخزين الأسرار في Secret Manager/Environment Variables فقط.
+4. عند الحاجة لأمثلة، استخدم placeholders مثل:
+  - `POSTGRES_PASSWORD=<set-in-secret-manager>`
+  - `REDIS_PASSWORD=<set-in-secret-manager>`
+  - `JWT_SECRET_KEY=<set-in-secret-manager>`
 
 ---
 
