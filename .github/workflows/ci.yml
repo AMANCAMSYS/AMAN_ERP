@@ -246,7 +246,17 @@ jobs:
           script: |
             set -euo pipefail
             echo "🚀 Starting deployment — $(date)"
-            cd /opt/aman
+            DEPLOY_ROOT="/opt/aman"
+            TMP_REPO=""
+
+            cleanup() {
+              if [ -n "$TMP_REPO" ] && [ -d "$TMP_REPO" ]; then
+                rm -rf "$TMP_REPO" || true
+              fi
+            }
+            trap cleanup EXIT
+
+            cd "$DEPLOY_ROOT"
 
             # 0. Self-heal broken git ownership/locks (common after manual root operations)
             if [ -f .git/index.lock ] || [ -f .git/packed-refs.lock ] || [ -f .git/shallow.lock ]; then
@@ -284,7 +294,7 @@ jobs:
               EXPECTED_SHA=$(git rev-parse HEAD)
               echo "✅ Code updated to: $(git log -1 --oneline)"
             else
-              echo "⚠️ git fetch failed in /opt/aman; falling back to fresh clone sync"
+              echo "⚠️ git fetch failed in /opt/aman; falling back to temp-clone deployment root"
               ORIGIN_URL=$(git config --get remote.origin.url || true)
               if [ -z "$ORIGIN_URL" ]; then
                 echo "❌ Cannot determine origin URL for fallback clone"
@@ -306,18 +316,10 @@ jobs:
                 exit 1
               fi
 
-              rsync -rltD --omit-dir-times --no-perms --no-owner --no-group \
-                --exclude '.git' \
-                --exclude 'backend/.env' \
-                --exclude '.env' \
-                --exclude 'backend/uploads/' \
-                --exclude 'uploads/' \
-                --exclude 'backups/' \
-                "$TMP_REPO/" /opt/aman/
-              rm -rf "$TMP_REPO"
-              cd /opt/aman
+              DEPLOY_ROOT="$TMP_REPO"
+              cd "$DEPLOY_ROOT"
               EXPECTED_SHA="$TRIGGER_SHA"
-              echo "✅ Fallback clone sync complete: $EXPECTED_SHA"
+              echo "✅ Fallback temp deploy root ready: $DEPLOY_ROOT ($EXPECTED_SHA)"
             fi
 
             # 2. Write backend .env from GitHub secret
@@ -337,10 +339,10 @@ jobs:
             fi
 
             # 4. Build new images
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               build --no-cache backend || { echo "❌ Backend build failed!"; exit 1; }
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               build --no-cache --build-arg BUILD_SHA="$EXPECTED_SHA" frontend || { echo "❌ Frontend build failed!"; exit 1; }
 
             # Verify critical packages are installed in the new image
@@ -348,13 +350,13 @@ jobs:
             docker run --rm aman-backend:latest pip list 2>/dev/null | grep -iE "email.validator|pydantic|alembic|fastapi" || true
 
             # 5. Start infrastructure (db + redis) first
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               up -d db redis
 
             # 6. Wait for db to be healthy
             echo "⏳ Waiting for database..."
             for i in $(seq 1 30); do
-              if docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+              if docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
                 exec -T db pg_isready -U aman -q 2>/dev/null; then
                 echo "✅ Database ready (${i})"
                 break
@@ -366,7 +368,7 @@ jobs:
             # 7. Start backend (detached, don't block on health)
             # Note: entrypoint.sh in the image runs as root, creates /app/uploads/* dirs,
             # chowns them to aman, then drops privileges — no pre-seeding needed.
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               up -d backend
 
             # 8. Wait up to 3 minutes for backend /health to respond
@@ -385,13 +387,13 @@ jobs:
 
             if [ "$HEALTHY" != "1" ]; then
               echo "❌ Backend failed to become healthy. Logs:"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100 backend
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+              docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml logs --tail=100 backend
+              docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml ps
               exit 1
             fi
 
             # 9. Run database migrations
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               exec -T backend alembic upgrade head || echo "⚠️ Alembic skipped"
 
             # 10. Choose a single frontend serving mode to avoid split-source stale deploys
@@ -402,10 +404,10 @@ jobs:
             echo "🧭 Frontend serving mode: $FRONTEND_MODE"
 
             # Always recreate frontend container so latest built assets are active
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --force-recreate frontend
 
-            FRONT_CID=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q frontend)
+            FRONT_CID=$(docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml ps -q frontend)
             if [ -n "$FRONT_CID" ]; then
               docker exec "$FRONT_CID" sh -lc "printf '%s\\n' '$EXPECTED_SHA' > /usr/share/nginx/html/build-sha.txt"
             fi
@@ -414,7 +416,7 @@ jobs:
               echo "📦 Syncing frontend assets to host root: /var/www/aman/frontend"
               mkdir -p /var/www/aman/frontend
 
-              FRONT_IMG=$(docker compose -f docker-compose.yml -f docker-compose.prod.yml images -q frontend)
+              FRONT_IMG=$(docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml images -q frontend)
               if [ -z "$FRONT_IMG" ]; then
                 echo "❌ Could not resolve frontend image ID"
                 exit 1
@@ -453,7 +455,7 @@ jobs:
 
             if [ "$FRONT_READY" != "1" ]; then
               echo "❌ Frontend did not become reachable"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=120 frontend || true
+              docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml logs --tail=120 frontend || true
               exit 1
             fi
 
@@ -516,7 +518,7 @@ jobs:
             echo "PUBLIC_SHA=$(curl -fsSL http://${{ secrets.DEPLOY_HOST }}/build-sha.txt || true)"
 
             # 11. Start remaining services (prometheus, grafana)
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            docker compose -p aman -f docker-compose.yml -f docker-compose.prod.yml \
               up -d --remove-orphans
 
             # 12. Cleanup
