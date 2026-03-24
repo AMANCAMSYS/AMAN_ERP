@@ -306,7 +306,7 @@ jobs:
                 exit 1
               fi
 
-              rsync -rltD --delete --omit-dir-times --no-perms --no-owner --no-group \
+              rsync -rltD --omit-dir-times --no-perms --no-owner --no-group \
                 --exclude '.git' \
                 --exclude 'backend/.env' \
                 --exclude '.env' \
