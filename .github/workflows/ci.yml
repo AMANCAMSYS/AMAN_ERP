@@ -258,31 +258,61 @@ jobs:
               echo "⚠️ Repository permissions are not writable for deploy user; attempting repair"
               if command -v sudo >/dev/null 2>&1; then
                 sudo -n chown -R "$(id -u):$(id -g)" /opt/aman/.git || {
-                  echo "❌ Failed to repair /opt/aman/.git ownership with sudo"
+                  echo "⚠️ Failed to repair /opt/aman/.git ownership with sudo"
                   ls -ld .git .git/objects || true
-                  exit 1
                 }
               else
                 chown -R "$(id -u):$(id -g)" /opt/aman/.git || {
-                  echo "❌ Failed to repair /opt/aman/.git ownership"
+                  echo "⚠️ Failed to repair /opt/aman/.git ownership"
                   ls -ld .git .git/objects || true
-                  exit 1
                 }
               fi
             fi
 
             # 1. Pull latest code
             TRIGGER_SHA='${{ github.sha }}'
-            git fetch --prune origin main
-            REMOTE_MAIN_SHA=$(git rev-parse origin/main)
-            if [ "$REMOTE_MAIN_SHA" != "$TRIGGER_SHA" ]; then
-              echo "❌ origin/main SHA does not match triggering commit"
-              echo "   trigger: $TRIGGER_SHA"
-              echo "   origin:  $REMOTE_MAIN_SHA"
-              exit 1
+            EXPECTED_SHA=""
+            if git fetch --prune origin main; then
+              REMOTE_MAIN_SHA=$(git rev-parse origin/main)
+              if [ "$REMOTE_MAIN_SHA" != "$TRIGGER_SHA" ]; then
+                echo "❌ origin/main SHA does not match triggering commit"
+                echo "   trigger: $TRIGGER_SHA"
+                echo "   origin:  $REMOTE_MAIN_SHA"
+                exit 1
+              fi
+              git reset --hard "$REMOTE_MAIN_SHA"
+              EXPECTED_SHA=$(git rev-parse HEAD)
+              echo "✅ Code updated to: $(git log -1 --oneline)"
+            else
+              echo "⚠️ git fetch failed in /opt/aman; falling back to fresh clone sync"
+              ORIGIN_URL=$(git config --get remote.origin.url || true)
+              if [ -z "$ORIGIN_URL" ]; then
+                echo "❌ Cannot determine origin URL for fallback clone"
+                exit 1
+              fi
+
+              TMP_REPO=$(mktemp -d)
+              git clone --depth=1 --branch main "$ORIGIN_URL" "$TMP_REPO"
+              REMOTE_MAIN_SHA=$(git -C "$TMP_REPO" rev-parse HEAD)
+              if [ "$REMOTE_MAIN_SHA" != "$TRIGGER_SHA" ]; then
+                echo "❌ fallback clone SHA does not match triggering commit"
+                echo "   trigger: $TRIGGER_SHA"
+                echo "   clone:   $REMOTE_MAIN_SHA"
+                exit 1
+              fi
+
+              rsync -a --delete \
+                --exclude '.git' \
+                --exclude 'backend/.env' \
+                --exclude '.env' \
+                --exclude 'backend/uploads/' \
+                --exclude 'uploads/' \
+                "$TMP_REPO/" /opt/aman/
+              rm -rf "$TMP_REPO"
+              cd /opt/aman
+              EXPECTED_SHA="$TRIGGER_SHA"
+              echo "✅ Fallback clone sync complete: $EXPECTED_SHA"
             fi
-            git reset --hard "$REMOTE_MAIN_SHA"
-            echo "✅ Code updated to: $(git log -1 --oneline)"
 
             # 2. Write backend .env from GitHub secret
             printf '%s' '${{ secrets.PROD_ENV_FILE }}' > backend/.env
@@ -291,7 +321,7 @@ jobs:
             # 3. Write root .env for docker compose variable interpolation
             grep -E '^(POSTGRES_PASSWORD|POSTGRES_USER|POSTGRES_DB|REDIS_PASSWORD|GRAFANA_PASSWORD|GRAFANA_USER|APP_ENV)' backend/.env > .env || true
 
-            EXPECTED_SHA=$(git rev-parse HEAD)
+            EXPECTED_SHA=${EXPECTED_SHA:-$(git rev-parse HEAD)}
             echo "🎯 Expected deploy SHA: $EXPECTED_SHA"
             if [ "$EXPECTED_SHA" != "$TRIGGER_SHA" ]; then
               echo "❌ Deployed working tree SHA mismatch"
