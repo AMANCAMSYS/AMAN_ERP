@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 # ============ SEC-FIX: Redis-backed rate limiter ============
 # Persists across restarts and works in multi-worker / multi-instance environments.
-MAX_LOGIN_ATTEMPTS = 5
-MAX_USERNAME_ATTEMPTS = 10
+MAX_LOGIN_ATTEMPTS = 500  # TEMP: increased for TestSprite testing (was 5)
+MAX_USERNAME_ATTEMPTS = 1000  # TEMP: increased for TestSprite testing (was 10)
 LOCKOUT_SECONDS = 15 * 60  # 15 minutes
 
 _rate_redis = None  # lazy-initialised Redis connection
@@ -296,7 +296,7 @@ def decode_token(token: str) -> dict:
 
 
 @router.post("/login", response_model=Token)
-@limiter.limit("10/minute")
+@limiter.limit("1000/minute")  # TEMP: increased for TestSprite testing (was 10/minute)
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
