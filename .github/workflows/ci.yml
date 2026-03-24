@@ -248,6 +248,29 @@ jobs:
             echo "🚀 Starting deployment — $(date)"
             cd /opt/aman
 
+            # 0. Self-heal broken git ownership/locks (common after manual root operations)
+            if [ -f .git/index.lock ] || [ -f .git/packed-refs.lock ] || [ -f .git/shallow.lock ]; then
+              echo "⚠️ Removing stale git lock files"
+              rm -f .git/index.lock .git/packed-refs.lock .git/shallow.lock || true
+            fi
+
+            if [ ! -w .git ] || [ ! -w .git/objects ]; then
+              echo "⚠️ Repository permissions are not writable for deploy user; attempting repair"
+              if command -v sudo >/dev/null 2>&1; then
+                sudo -n chown -R "$(id -u):$(id -g)" /opt/aman/.git || {
+                  echo "❌ Failed to repair /opt/aman/.git ownership with sudo"
+                  ls -ld .git .git/objects || true
+                  exit 1
+                }
+              else
+                chown -R "$(id -u):$(id -g)" /opt/aman/.git || {
+                  echo "❌ Failed to repair /opt/aman/.git ownership"
+                  ls -ld .git .git/objects || true
+                  exit 1
+                }
+              fi
+            fi
+
             # 1. Pull latest code
             TRIGGER_SHA='${{ github.sha }}'
             git fetch --prune origin main
