@@ -1215,6 +1215,10 @@
   "auth": {
     "login_title": "Login",
     "login_subtitle": "AMAN ERP System",
+    "company_code": "Company Code",
+    "company_code_placeholder": "Enter company code",
+    "company_code_hint": "You can get it from your company administrator",
+    "company_code_required": "Company code is required",
     "username": "Username",
     "password": "Password",
     "login_btn": "Login",

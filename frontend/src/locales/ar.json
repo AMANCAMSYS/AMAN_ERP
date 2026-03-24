@@ -1054,6 +1054,10 @@
   "auth": {
     "login_title": "تسجيل الدخول",
     "login_subtitle": "نظام أمان لإدارة الموارد المؤسسية",
+    "company_code": "رمز الشركة",
+    "company_code_placeholder": "أدخل رمز الشركة",
+    "company_code_hint": "يمكن الحصول عليه من مسؤول الشركة",
+    "company_code_required": "رمز الشركة مطلوب",
     "username": "اسم المستخدم",
     "password": "كلمة المرور",
     "login_btn": "دخـــول",
