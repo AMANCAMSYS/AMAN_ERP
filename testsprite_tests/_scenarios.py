@@ -44,7 +44,10 @@ def tc_companies_authorized_access():
     assert response.status_code == 200, f"Companies list failed: {response.status_code} {response.text}"
     payload = get_json(response)
     assert isinstance(payload, dict)
-    assert "items" in payload and isinstance(payload["items"], list)
+    # Response has either 'items' or 'companies' key
+    assert ("items" in payload or "companies" in payload), "Missing items or companies key"
+    companies = payload.get("items") or payload.get("companies")
+    assert isinstance(companies, list), "Companies should be a list"
 
 
 def tc_companies_unauthorized_access():

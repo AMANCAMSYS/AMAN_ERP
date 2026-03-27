@@ -14,7 +14,7 @@
       "API_KEY": "sk-user-C7FBrSCkOkBr70UiH7iH4MfHmzVurQ7rSNOb0yleL-NiB8LUnDOIUIRETB5kkWHakRTl4oeFykPkDw3ER0E5srIrBPYveiBhScXX9mXHpFm96coRpbKrEqf7KwJJo5AfMtQ"
     }
   },
-  "serverPort": 39735,
-  "proxy": "http://f580b3e9-69fe-4056-8e8a-2b0d853ae2ff:LDZdbgVk71SRs6XlmpH7U7BNjNAMtE6i@tun.testsprite.com:8080",
+  "serverPort": 33871,
+  "proxy": "http://9079feff-76bb-4248-b46e-f0235a40f75e:Y27Ea6bbqAx2d6tILWpMkHf7kFWFldvo@tun.testsprite.com:8080",
   "backendCredential": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ6enp6IiwidXNlcl9pZCI6MSwiY29tcGFueV9pZCI6ImFlNGU5NjRhIiwicm9sZSI6InN1cGVydXNlciIsInBlcm1pc3Npb25zIjpbIioiXSwiZW5hYmxlZF9tb2R1bGVzIjpbImRhc2hib2FyZCIsImtwaSIsImFjY291bnRpbmciLCJhc3NldHMiLCJ0cmVhc3VyeSIsInNhbGVzIiwiYnV5aW5nIiwiY3JtIiwiZXhwZW5zZXMiLCJ0YXhlcyIsImFwcHJvdmFscyIsInJlcG9ydHMiLCJociIsImF1ZGl0Iiwicm9sZXMiLCJzZXR0aW5ncyIsImRhdGFfaW1wb3J0IiwicG9zIiwic3RvY2siLCJtYW51ZmFjdHVyaW5nIiwicHJvamVjdHMiLCJzZXJ2aWNlcyJdLCJhbGxvd2VkX2JyYW5jaGVzIjpbMV0sInR5cGUiOiJjb21wYW55X3VzZXIiLCJleHAiOjE3NzQ2MzkwNjMsImlhdCI6MTc3NDYzNzI2M30.r2Ewgt6G-K7oypEt_rbzpJ8VhktrEF6qBGpAt8AdvL4"
 }

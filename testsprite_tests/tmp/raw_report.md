@@ -14,7 +14,7 @@
 
 #### Test TC001 post api auth login success
 - **Test Code:** [TC001_post_api_auth_login_success.py](./TC001_post_api_auth_login_success.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/c331594e-b4ac-487a-8473-0d372cdef995
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/c243be32-d4a8-4c45-a5ec-2b42fb050876
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -24,11 +24,11 @@
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 50, in <module>
-  File "<string>", line 39, in test_post_api_auth_2fa_verify_success
-AssertionError: 2FA verify failed with status 404
+  File "<string>", line 43, in <module>
+  File "<string>", line 33, in test_post_api_auth_2fa_verify_success
+AssertionError: 2FA verify failed: {"detail":"Not Found"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/52214fa4-503a-4f73-8463-872af37ba6e5
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/2fb3994f-1114-4cea-9799-9049d0d76db6
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -36,26 +36,20 @@ AssertionError: 2FA verify failed with status 404
 #### Test TC003 get api companies authorized access
 - **Test Code:** [TC003_get_api_companies_authorized_access.py](./TC003_get_api_companies_authorized_access.py)
 - **Test Error:** Traceback (most recent call last):
-  File "<string>", line 34, in test_get_api_companies_authorized_access
-AssertionError: Companies API responded with status 404
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 67, in <module>
-  File "<string>", line 65, in test_get_api_companies_authorized_access
-AssertionError: Companies request failed or invalid response: Companies API responded with status 404
+  File "<string>", line 81, in <module>
+  File "<string>", line 38, in test_get_api_companies_authorized_access
+AssertionError: Companies retrieval failed: {"detail":"Not Found"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/192894a4-f3c0-4044-9d2b-f6354b537e17
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/86169c4b-c04e-4230-bba6-817fb7ba75a6
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC004 post api roles create role with permissions
 - **Test Code:** [TC004_post_api_roles_create_role_with_permissions.py](./TC004_post_api_roles_create_role_with_permissions.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/b20ec5ef-2763-4fc9-b1a5-162d808c3685
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/e035a1ae-9d3a-453d-af97-6e40d8b4d7b0
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -65,11 +59,11 @@ AssertionError: Companies request failed or invalid response: Companies API resp
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 82, in <module>
-  File "<string>", line 43, in test_get_api_accounting_journal_entries_list
-AssertionError: Expected 200 but got 404
+  File "<string>", line 89, in <module>
+  File "<string>", line 38, in test_get_api_finance_accounting_entries_list
+AssertionError: Expected 200 OK but got 404: {"detail":"Not Found"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/88c224f0-0ac3-4e26-85c7-a6a5c4a61c35
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/baeb84ef-6ac8-4c31-8891-ee2a112a8bb2
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -79,18 +73,18 @@ AssertionError: Expected 200 but got 404
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 90, in <module>
-  File "<string>", line 49, in test_post_api_finance_treasury_transactions_create
-AssertionError: Expected 201 Created, got 404
+  File "<string>", line 88, in <module>
+  File "<string>", line 53, in test_post_api_finance_treasury_transactions_create
+AssertionError: Expected 201 Created, got 404, response: {"detail":"Not Found"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/93ed849e-1d01-4dde-8751-207bdaabe09c
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/5d1648ef-b175-453a-a115-3c0f98d616b5
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC007 get api sales orders list
 - **Test Code:** [TC007_get_api_sales_orders_list.py](./TC007_get_api_sales_orders_list.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/7cc01126-1284-4c51-a72c-75563c57ca9f
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/39304354-a04a-446c-b522-af3fd8eda24c
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -100,11 +94,11 @@ AssertionError: Expected 201 Created, got 404
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 62, in <module>
-  File "<string>", line 51, in test_create_purchase_order
-AssertionError: Expected 201 Created, got 404
+  File "<string>", line 81, in <module>
+  File "<string>", line 60, in test_post_api_purchases_orders_create
+AssertionError: Expected 201 Created, got 404: {"detail":"Not Found"}
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/8ab1b83f-e3cb-4318-a9d5-a1f9daed87f5
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/841fbe10-7658-4b09-847c-06c7370d005e
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
@@ -114,18 +108,18 @@ AssertionError: Expected 201 Created, got 404
 - **Test Error:** Traceback (most recent call last):
   File "/var/task/handler.py", line 258, in run_with_retry
     exec(code, exec_env)
-  File "<string>", line 22, in <module>
-  File "<string>", line 13, in test_get_root_serve_frontend_application_shell
-AssertionError
+  File "<string>", line 18, in <module>
+  File "<string>", line 12, in test_get_root_serve_frontend_application_shell
+AssertionError: Expected 'text/html' in Content-Type, got application/json
 
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/4203ae74-4e2d-48dd-8a92-3d66d13f95e2
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/87c0d2e1-85de-40d6-bfa0-fb82b8af7076
 - **Status:** ❌ Failed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
 
 #### Test TC010 get api docs access swagger documentation
 - **Test Code:** [TC010_get_api_docs_access_swagger_documentation.py](./TC010_get_api_docs_access_swagger_documentation.py)
-- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/295092be-69ef-430a-bfac-22a0503256be/6541722e-f568-4eb9-9aa3-b02776fe86fc
+- **Test Visualization and Result:** https://www.testsprite.com/dashboard/mcp/tests/16eb4eba-cd19-49d2-9df1-c824f3c729b3/b28a2216-05b0-460a-aee9-a89a6cbd59c5
 - **Status:** ✅ Passed
 - **Analysis / Findings:** {{TODO:AI_ANALYSIS}}.
 ---
