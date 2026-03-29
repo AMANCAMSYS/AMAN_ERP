@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { currenciesAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
-import { Plus, Search, Edit2, Trash2, History, RefreshCw, DollarSign, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, History, RefreshCw, DollarSign, X } from 'lucide-react'
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
+
 export default function CurrencyList() {
     const { t } = useTranslation()
     const { showToast } = useToast()
@@ -143,10 +146,93 @@ export default function CurrencyList() {
         }
     }
 
-    const filteredCurrencies = currencies.filter(c =>
-        c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.code?.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredCurrencies = useMemo(() =>
+        currencies.filter(c =>
+            c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.code?.toLowerCase().includes(searchQuery.toLowerCase())
+        ), [currencies, searchQuery]
     )
+
+    const columns = useMemo(() => [
+        {
+            key: 'code',
+            label: t('accounting.currencies.table.code'),
+            render: (val) => (
+                <span className="badge rounded-pill bg-light text-dark border px-3 font-mono">{val}</span>
+            ),
+        },
+        {
+            key: 'name',
+            label: t('accounting.currencies.table.name'),
+            render: (val, row) => (
+                <span className="fw-semibold text-dark">{val} {row.name_en ? `(${row.name_en})` : ''}</span>
+            ),
+        },
+        {
+            key: 'symbol',
+            label: t('accounting.currencies.table.symbol'),
+            style: { textAlign: 'center' },
+            headerStyle: { textAlign: 'center' },
+            render: (val) => <span className="fw-bold">{val}</span>,
+        },
+        {
+            key: 'is_base',
+            label: t('accounting.currencies.table.is_base'),
+            style: { textAlign: 'center' },
+            headerStyle: { textAlign: 'center' },
+            render: (val) => val ? (
+                <span className="badge bg-success-subtle text-success border px-3">Base</span>
+            ) : (
+                <span className="text-muted small">Secondary</span>
+            ),
+        },
+        {
+            key: 'current_rate',
+            label: t('accounting.currencies.table.rate'),
+            style: { textAlign: 'end' },
+            headerStyle: { textAlign: 'end' },
+            render: (val, row) => (
+                <span className="font-mono">
+                    {parseFloat(val).toFixed(4)}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); openRateModal(row); }}
+                        className="btn-icon ms-2"
+                        style={{ width: '28px', height: '28px' }}
+                        title={t('accounting.currencies.update_rate')}
+                    >
+                        <History size={14} />
+                    </button>
+                </span>
+            ),
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '120px',
+            style: { textAlign: 'center' },
+            headerStyle: { textAlign: 'center' },
+            render: (_, row) => (
+                <div className="d-flex justify-content-center gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); openModal(row); }}
+                        className="btn-icon"
+                        style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                    {!row.is_base && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}
+                            className="btn-icon"
+                            style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    )}
+                </div>
+            ),
+        },
+    ], [t])
 
     return (
         <div className="workspace fade-in">
@@ -180,88 +266,21 @@ export default function CurrencyList() {
                 </div>
             </div>
 
-            <div className="card section-card">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div className="search-box">
-                        <Search size={16} />
-                        <input
-                            type="text"
-                            placeholder={t('common.search')}
-                            className="form-input form-input-sm"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
+            <SearchFilter
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder={t('common.search')}
+            />
 
-                <div className="data-table-container border-0 bg-transparent">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th className="bg-transparent">{t('accounting.currencies.table.code')}</th>
-                                <th className="bg-transparent">{t('accounting.currencies.table.name')}</th>
-                                <th className="bg-transparent text-center">{t('accounting.currencies.table.symbol')}</th>
-                                <th className="bg-transparent text-center">{t('accounting.currencies.table.is_base')}</th>
-                                <th className="bg-transparent text-end">{t('accounting.currencies.table.rate')}</th>
-                                <th className="bg-transparent text-center" style={{ width: '120px' }}>{t('common.actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="6" className="text-center py-5"><span className="loading"></span></td></tr>
-                            ) : filteredCurrencies.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center py-5 text-muted">{t('common.no_data')}</td></tr>
-                            ) : (
-                                filteredCurrencies.map(curr => (
-                                    <tr key={curr.id} className="align-middle hover-row">
-                                        <td><span className="badge rounded-pill bg-light text-dark border px-3 font-mono">{curr.code}</span></td>
-                                        <td className="fw-semibold text-dark">{curr.name} {curr.name_en ? `(${curr.name_en})` : ''}</td>
-                                        <td className="text-center"><span className="fw-bold">{curr.symbol}</span></td>
-                                        <td className="text-center">
-                                            {curr.is_base ? (
-                                                <span className="badge bg-success-subtle text-success border px-3">Base</span>
-                                            ) : (
-                                                <span className="text-muted small">Secondary</span>
-                                            )}
-                                        </td>
-                                        <td className="text-end font-mono">
-                                            {parseFloat(curr.current_rate).toFixed(4)}
-                                            <button
-                                                onClick={() => openRateModal(curr)}
-                                                className="btn-icon ms-2"
-                                                style={{ width: '28px', height: '28px' }}
-                                                title={t('accounting.currencies.update_rate')}
-                                            >
-                                                <History size={14} />
-                                            </button>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="d-flex justify-content-center gap-2">
-                                                <button
-                                                    onClick={() => openModal(curr)}
-                                                    className="btn-icon"
-                                                    style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
-                                                >
-                                                    <Edit2 size={14} />
-                                                </button>
-                                                {!curr.is_base && (
-                                                    <button
-                                                        onClick={() => handleDelete(curr.id)}
-                                                        className="btn-icon"
-                                                        style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredCurrencies}
+                loading={loading}
+                emptyIcon={<DollarSign size={40} />}
+                emptyTitle={t('common.no_data')}
+                rowKey="id"
+                paginate={true}
+            />
 
             {/* Edit/Create Modal */}
             {showModal && (
@@ -402,7 +421,7 @@ export default function CurrencyList() {
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">{t('accounting.currencies.rate.date')}</label>
                                         <input
-                                           
+
                                             className="form-input w-100"
                                             value={rateData.rate_date}
                                             onChange={(e) => setRateData({ ...rateData, rate_date: e.target.value })}

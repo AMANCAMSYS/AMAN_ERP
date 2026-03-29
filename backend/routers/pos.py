@@ -18,6 +18,7 @@ from utils.fiscal_lock import check_fiscal_period_open
 from config import settings
 from schemas import UserResponse
 from schemas.pos import SessionCreate, SessionClose, SessionResponse, POSProductResponse, OrderLineCreate, OrderPaymentCreate, OrderCreate, OrderResponse, ReturnItemCreate, ReturnCreate
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 from decimal import Decimal, ROUND_HALF_UP
 
 _D2 = Decimal('0.01')
@@ -151,11 +152,11 @@ def _get_populated_session(db: Session, session_id: int, current_user_id: int):
         SELECT COUNT(*) FROM pos_orders WHERE session_id = :sid
     """), {"sid": session_id}).scalar() or 0
     
-    session_data['total_sales'] = float(sales)
-    session_data['total_cash'] = float(cash)
-    session_data['total_bank'] = float(bank)
-    session_data['total_returns'] = float(returns)
-    session_data['total_returns_cash'] = float(returns_cash)
+    session_data['total_sales'] = float(_dec(sales).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_cash'] = float(_dec(cash).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_bank'] = float(_dec(bank).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_returns'] = float(_dec(returns).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_returns_cash'] = float(_dec(returns_cash).quantize(_D2, ROUND_HALF_UP))
     session_data['order_count'] = int(order_count)
     
     return session_data
@@ -181,7 +182,7 @@ def close_session(
         raise HTTPException(status_code=400, detail="Session is not open")
         
     # Recalculate difference using actual data with safety for None values
-    opening_bal = float(sess.opening_balance or 0.0)
+    opening_bal = _dec(sess.opening_balance)
     sales_cash = db.execute(text("SELECT COALESCE(SUM(amount), 0) FROM pos_payments WHERE session_id = :id AND payment_method = 'cash'"), {"id": session_id}).scalar() or 0
     try:
         returns_cash = db.execute(text("SELECT COALESCE(SUM(refund_amount), 0) FROM pos_returns WHERE session_id = :id AND refund_method = 'cash'"), {"id": session_id}).scalar() or 0
@@ -190,8 +191,8 @@ def close_session(
         returns_cash = 0
         # Re-fetch session after rollback
         sess = db.execute(text("SELECT * FROM pos_sessions WHERE id = :id"), {"id": session_id}).fetchone()
-    
-    difference = float(close_in.cash_register_balance) - (opening_bal + float(sales_cash) - float(returns_cash)) 
+
+    difference = (_dec(close_in.cash_register_balance) - (opening_bal + _dec(sales_cash) - _dec(returns_cash))).quantize(_D2, ROUND_HALF_UP)
     
     # Build total_returns subquery safely (pos_returns may not exist)
     total_returns_sql = "0"
@@ -213,15 +214,15 @@ def close_session(
             total_returns = {total_returns_sql}
         WHERE id = :id
     """), {
-        "close_bal": float(close_in.closing_balance or 0.0),
-        "reg_bal": float(close_in.cash_register_balance or 0.0),
+        "close_bal": float(_dec(close_in.closing_balance).quantize(_D2, ROUND_HALF_UP)),
+        "reg_bal": float(_dec(close_in.cash_register_balance).quantize(_D2, ROUND_HALF_UP)),
         "diff": float(difference),
         "notes": close_in.notes or "",
         "id": session_id
     })
     
     # Create Cash Over/Short GL Entry if there's a difference
-    if abs(float(difference)) > 0.01:
+    if abs(difference) > _D2:
         from utils.accounting import get_mapped_account_id, update_account_balance
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
         acc_over_short = get_mapped_account_id(db, "acc_map_cash_over_short") or get_mapped_account_id(db, "acc_map_expense_other")
@@ -235,38 +236,28 @@ def close_session(
                 WHERE s.id = :id
             """), {"id": session_id}).scalar()
             
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, description, reference, status, 
-                    created_by, branch_id, currency, exchange_rate
-                ) VALUES (:num, NOW(), :desc, :ref, 'posted', :uid, :bid, :base_curr, 1.0)
-                RETURNING id
-            """), {
-                "num": je_num,
-                "desc": f"فرق إغلاق جلسة POS رقم {session_id}",
-                "ref": f"POS-SESSION-{session_id}",
-                "uid": current_user.id,
-                "bid": branch_id,
-                "base_curr": base_currency
-            }).scalar()
-            
-            diff_abs = abs(float(difference))
-            if float(difference) > 0:
-                # Cash over: Debit Cash, Credit Over/Short (income)
-                db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, 'فائض صندوق')"),
-                          {"jid": je_id, "aid": acc_cash, "amt": diff_abs})
-                db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, 'فائض صندوق POS')"),
-                          {"jid": je_id, "aid": acc_over_short, "amt": diff_abs})
-                update_account_balance(db, acc_cash, debit_base=diff_abs, credit_base=0)
-                update_account_balance(db, acc_over_short, debit_base=0, credit_base=diff_abs)
+            diff_abs = float(abs(difference).quantize(_D2, ROUND_HALF_UP))
+            lines_data = []
+            if difference > 0:
+                lines_data.append({"account_id": acc_cash, "debit": diff_abs, "credit": 0, "description": 'فائض صندوق'})
+                lines_data.append({"account_id": acc_over_short, "debit": 0, "credit": diff_abs, "description": 'فائض صندوق POS'})
             else:
-                # Cash short: Debit Over/Short (expense), Credit Cash
-                db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, 'عجز صندوق POS')"),
-                          {"jid": je_id, "aid": acc_over_short, "amt": diff_abs})
-                db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, 'عجز صندوق')"),
-                          {"jid": je_id, "aid": acc_cash, "amt": diff_abs})
-                update_account_balance(db, acc_over_short, debit_base=diff_abs, credit_base=0)
-                update_account_balance(db, acc_cash, debit_base=0, credit_base=diff_abs)
+                lines_data.append({"account_id": acc_over_short, "debit": diff_abs, "credit": 0, "description": 'عجز صندوق POS'})
+                lines_data.append({"account_id": acc_cash, "debit": 0, "credit": diff_abs, "description": 'عجز صندوق'})
+            
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=datetime.now().date(),
+                description=f"فرق إغلاق جلسة POS رقم {session_id}",
+                lines=lines_data,
+                user_id=current_user.id,
+                branch_id=branch_id,
+                reference=f"POS-SESSION-{session_id}",
+                currency=base_currency,
+                source="POS-Close",
+                source_id=session_id
+            )
     
     db.commit()
     return _get_populated_session(db, session_id, current_user.id)
@@ -386,6 +377,11 @@ def create_order(
     from utils.accounting import get_base_currency
     base_currency = get_base_currency(db)
     
+    # UOM Validation: Discrete units must have integer quantities
+    from utils.quantity_validation import validate_quantity_for_product
+    for item in order_in.items:
+        validate_quantity_for_product(db, item.product_id, item.quantity)
+
     # ZATCA-FIX: Calculate tax on (price - item_discount) × qty
     # Using Decimal for precision (ROUND_HALF_UP per ZATCA).
     subtotal = sum(
@@ -401,7 +397,7 @@ def create_order(
     check_fiscal_period_open(db, datetime.now().date())
     
     # Apply global discount if any
-    total = float(subtotal + tax_total - _dec(order_in.discount_amount))
+    total = (subtotal + tax_total - _dec(order_in.discount_amount)).quantize(_D2, ROUND_HALF_UP)
     
     # Validate branch and warehouse access
     if order_in.branch_id:
@@ -414,13 +410,13 @@ def create_order(
 
     # Validate payments cover total for paid orders
     if order_in.status == 'paid':
-        total_payments = sum(p.amount for p in order_in.payments)
+        total_payments = sum(_dec(p.amount) for p in order_in.payments)
         if total_payments < total:
-            if len(order_in.payments) == 1 and abs(total_payments - total) < 0.01:
+            if len(order_in.payments) == 1 and abs(total_payments - total) < _D2:
                 # Auto-adjust only for rounding differences
-                order_in.payments[0].amount = total
+                order_in.payments[0].amount = float(total)
             elif total_payments < total:
-                raise HTTPException(status_code=400, detail=f"المبلغ المدفوع ({total_payments:.2f}) أقل من إجمالي الطلب ({total:.2f})")
+                raise HTTPException(status_code=400, detail=f"المبلغ المدفوع ({float(total_payments):.2f}) أقل من إجمالي الطلب ({float(total):.2f})")
 
     # Fetch session info for branch_id if not provided
     pos_session = db.execute(text("SELECT branch_id, warehouse_id, treasury_account_id FROM pos_sessions WHERE id = :id"), {"id": order_in.session_id}).fetchone()
@@ -432,7 +428,7 @@ def create_order(
     order_number = f"POS-{uuid.uuid4().hex[:8].upper()}"
     
     # 1. Create Order
-    total_cogs = 0
+    total_cogs = Decimal('0')
     result = db.execute(text("""
         INSERT INTO pos_orders (
             order_number, session_id, customer_id, walk_in_customer_name, 
@@ -450,11 +446,11 @@ def create_order(
         "wh": warehouse_id,
         "branch": branch_id,
         "status": order_in.status,
-        "subtotal": subtotal,
-        "tax": tax_total,
-        "disc": order_in.discount_amount,
-        "total": total,
-        "paid": order_in.paid_amount,
+        "subtotal": float(subtotal),
+        "tax": float(tax_total),
+        "disc": float(_dec(order_in.discount_amount).quantize(_D2, ROUND_HALF_UP)),
+        "total": float(total),
+        "paid": float(_dec(order_in.paid_amount).quantize(_D2, ROUND_HALF_UP)),
         "note": order_in.note,
         "uid": current_user.id
     }).fetchone()
@@ -466,19 +462,19 @@ def create_order(
         # Fetch product details for the record
         prod_info = db.execute(text("SELECT product_name, product_code, barcode FROM products WHERE id = :id"), {"id": item.product_id}).fetchone()
         
-        item_subtotal = item.quantity * item.unit_price
-        tax_amount = item_subtotal * (item.tax_rate / 100)
-        item_total = item_subtotal + tax_amount
-        
+        item_subtotal = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+        tax_amount = (item_subtotal * (_dec(item.tax_rate) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
+        item_total = (item_subtotal + tax_amount).quantize(_D2, ROUND_HALF_UP)
+
         db.execute(text("""
             INSERT INTO pos_order_lines (
                 order_id, product_id, description,
-                quantity, original_price, unit_price, 
+                quantity, original_price, unit_price,
                 tax_rate, tax_amount, subtotal, total,
                 warehouse_id
             ) VALUES (
                 :oid, :pid, :desc,
-                :qty, :orig, :price, 
+                :qty, :orig, :price,
                 :tax_r, :tax_a, :sub, :tot,
                 :wh
             )
@@ -487,30 +483,31 @@ def create_order(
             "pid": item.product_id,
             "desc": f"{prod_info[0]} ({prod_info[1]})" if prod_info else "Unknown",
             "qty": item.quantity,
-            "orig": item.unit_price, # Assuming original = price if no special pricing logic here
-            "price": item.unit_price,
-            "tax_r": item.tax_rate,
-            "tax_a": tax_amount,
-            "sub": item_subtotal,
-            "tot": item_total,
+            "orig": float(_dec(item.unit_price).quantize(_D2, ROUND_HALF_UP)),
+            "price": float(_dec(item.unit_price).quantize(_D2, ROUND_HALF_UP)),
+            "tax_r": float(_dec(item.tax_rate)),
+            "tax_a": float(tax_amount),
+            "sub": float(item_subtotal),
+            "tot": float(item_total),
             "wh": warehouse_id
         })
         
         # 3. Update Inventory if Paid
         if order_in.status == 'paid':
-            # Check stock availability first
+            # CONC-FIX: Lock inventory row to prevent overselling under concurrent POS load
             current_stock = db.execute(text("""
-                SELECT COALESCE(quantity, 0) as qty FROM inventory 
+                SELECT COALESCE(quantity, 0) as qty FROM inventory
                 WHERE product_id = :pid AND warehouse_id = :wh
+                FOR UPDATE
             """), {"pid": item.product_id, "wh": warehouse_id}).fetchone()
-            avail_qty = float(current_stock.qty) if current_stock else 0
-            if avail_qty < float(item.quantity):
+            avail_qty = _dec(current_stock.qty) if current_stock else Decimal('0')
+            if avail_qty < _dec(item.quantity):
                 prod_name = prod_info[0] if prod_info else str(item.product_id)
-                raise HTTPException(status_code=400, detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {avail_qty:.0f}, المطلوب: {item.quantity}")
+                raise HTTPException(status_code=400, detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {float(avail_qty):.0f}, المطلوب: {item.quantity}")
 
             # Fetch cost price for COGS
-            cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": item.product_id}).scalar() or 0
-            total_cogs += float(cost_price) * float(item.quantity)
+            cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": item.product_id}).scalar() or 0)
+            total_cogs += (cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)
 
             db.execute(text("""
                 UPDATE inventory 
@@ -538,8 +535,8 @@ def create_order(
                 "order_id": order_id,
                 "order_num": order_number,
                 "qty": -item.quantity,
-                "cost": cost_price,
-                "total_cost": float(cost_price) * float(item.quantity),
+                "cost": float(cost_price),
+                "total_cost": float((cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)),
                 "user": current_user.id
             })
             
@@ -560,32 +557,34 @@ def create_order(
     if order_in.status == 'paid':
         # Update gross sales
         db.execute(text("""
-            UPDATE pos_sessions 
-            SET total_sales = total_sales + :amount 
+            UPDATE pos_sessions
+            SET total_sales = total_sales + :amount
             WHERE id = :id
         """), {
-            "amount": total,
+            "amount": float(total),
             "id": order_in.session_id
         })
 
         # --- Automated Accounting (GL Entries) ---
+        # GL-FIX: Use configured account mappings with fallback to account_code lookup
+        from utils.accounting import get_mapped_account_id
+
         def get_acc_id(code):
              return db.execute(text("SELECT id FROM accounts WHERE account_code = :code"), {"code": code}).scalar()
 
-        acc_sales = get_acc_id("SALE-G")
-        acc_vat_out = get_acc_id("VAT-OUT")
-        
+        acc_sales = get_mapped_account_id(db, "acc_map_sales") or get_acc_id("SALE-G")
+        acc_vat_out = get_mapped_account_id(db, "acc_map_vat_output") or get_acc_id("VAT-OUT")
+
         # DYNAMIC TREASURY MAPPING
         acc_cash = None
         if treasury_id:
-             # Get GL ID for the treasury account
              acc_cash = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": treasury_id}).scalar()
-        else:
-             acc_cash = get_acc_id("BOX") # Fallback
-             
-        acc_bank = get_acc_id("BNK")
-        acc_cogs = get_acc_id("CGS")
-        acc_inventory = get_acc_id("INV")
+        if not acc_cash:
+             acc_cash = get_mapped_account_id(db, "acc_map_cash_main") or get_acc_id("BOX")
+
+        acc_bank = get_mapped_account_id(db, "acc_map_bank_main") or get_acc_id("BNK")
+        acc_cogs = get_mapped_account_id(db, "acc_map_cogs") or get_acc_id("CGS")
+        acc_inventory = get_mapped_account_id(db, "acc_map_inventory") or get_acc_id("INV")
 
         je_lines = []
         # A. Debit: Payments (Cash/Bank)
@@ -593,61 +592,62 @@ def create_order(
             acc_id = acc_cash if pmt.method == 'cash' else acc_bank
             if acc_id:
                 je_lines.append({
-                    "account_id": acc_id, 
-                    "debit": float(pmt.amount), 
-                    "credit": 0, 
+                    "account_id": acc_id,
+                    "debit": float(_dec(pmt.amount).quantize(_D2, ROUND_HALF_UP)),
+                    "credit": 0,
                     "description": f"POS Payment ({pmt.method}) - {order_number}"
                 })
-        
+
         # B. Credit: Sales Revenue (Gross Subtotal) & Debit: Sales Discount (if any)
-        discount_amount = float(order_in.discount_amount) if order_in.discount_amount else 0
-        if acc_sales and float(subtotal) > 0:
+        discount_dec = _dec(order_in.discount_amount).quantize(_D2, ROUND_HALF_UP)
+        if acc_sales and subtotal > 0:
             je_lines.append({
-                "account_id": acc_sales, 
-                "debit": 0, 
-                "credit": float(subtotal), 
+                "account_id": acc_sales,
+                "debit": 0,
+                "credit": float(subtotal),
                 "description": f"POS Gross Sales - {order_number}"
             })
-        
+
         # Sales Discount (separate account for proper reporting)
-        if discount_amount > 0:
+        if discount_dec > 0:
             acc_discount = get_acc_id("DISC-SALE") or get_acc_id("SALE-DISC")
             if acc_discount:
                 je_lines.append({
-                    "account_id": acc_discount, 
-                    "debit": discount_amount, 
-                    "credit": 0, 
+                    "account_id": acc_discount,
+                    "debit": float(discount_dec),
+                    "credit": 0,
                     "description": f"POS Discount - {order_number}"
                 })
             else:
                 # Fallback: If no discount account, net into sales (legacy behavior)
                 # Adjust the sales credit we just added
                 if je_lines and je_lines[-1]["account_id"] == acc_sales:
-                    je_lines[-1]["credit"] = float(subtotal) - discount_amount
-            
+                    je_lines[-1]["credit"] = float((subtotal - discount_dec).quantize(_D2, ROUND_HALF_UP))
+
         # C. Credit: VAT
         if acc_vat_out and tax_total > 0:
             je_lines.append({
-                "account_id": acc_vat_out, 
-                "debit": 0, 
-                "credit": float(tax_total), 
+                "account_id": acc_vat_out,
+                "debit": 0,
+                "credit": float(tax_total),
                 "description": f"POS Tax - {order_number}"
             })
-            
+
         # D. Perpetual Inventory: COGS & Inventory Reduction
         if total_cogs > 0:
+            cogs_float = float(total_cogs.quantize(_D2, ROUND_HALF_UP))
             if acc_cogs:
                 je_lines.append({
-                    "account_id": acc_cogs, 
-                    "debit": float(total_cogs), 
-                    "credit": 0, 
+                    "account_id": acc_cogs,
+                    "debit": cogs_float,
+                    "credit": 0,
                     "description": f"POS COGS - {order_number}"
                 })
             if acc_inventory:
                 je_lines.append({
-                    "account_id": acc_inventory, 
-                    "debit": 0, 
-                    "credit": float(total_cogs), 
+                    "account_id": acc_inventory,
+                    "debit": 0,
+                    "credit": cogs_float,
                     "description": f"POS Inventory Deduct - {order_number}"
                 })
 
@@ -667,52 +667,19 @@ def create_order(
             treasury_info = db.execute(text("SELECT currency FROM treasury_accounts WHERE id = :id"), {"id": treasury_id}).fetchone() if treasury_id else None
             pos_currency = treasury_info[0] if treasury_info else base_currency
 
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, description, reference, status, created_by, branch_id,
-                    currency, exchange_rate
-                )
-                VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :base_curr, 1.0) RETURNING id
-            """), {
-                "num": je_num, 
-                "date": datetime.now().date(), 
-                "desc": f"POS Order {order_number} ({pos_currency})", 
-                "ref": order_number,
-                "user": current_user.id,
-                "branch": branch_id,
-                "base_curr": pos_currency,
-                "curr": pos_currency,
-                "rate": 1.0
-            }).scalar()
-            
-            for line in je_lines:
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                """), {
-                    "jid": je_id, 
-                    "aid": line["account_id"], 
-                    "deb": line["debit"], 
-                    "cred": line["credit"], 
-                    "desc": line["description"],
-                    "amt_curr": line["debit"] + line["credit"],
-                    "curr": pos_currency
-                })
-                
-                # Update Account Balance
-                from utils.accounting import update_account_balance
-                update_account_balance(
-                    db,
-                    account_id=line["account_id"],
-                    debit_base=line["debit"],
-                    credit_base=line["credit"],
-                    debit_curr=line["debit"] if line["debit"] > 0 else 0, # In POS, base = foreign for now
-                    credit_curr=line["credit"] if line["credit"] > 0 else 0,
-                    currency=pos_currency
-                )
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=datetime.now().date(),
+                description=f"POS Order {order_number} ({pos_currency})",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=branch_id,
+                reference=order_number,
+                currency=pos_currency,
+                source="POS-Order",
+                source_id=order_id
+            )
         
         # Update individual payment method totals if you have columns for them
         # For now, we assume total_sales covers it all, but you might want 
@@ -720,21 +687,21 @@ def create_order(
         
         # 6. Update Treasury Balance (Only for Cash payments linked to session treasury)
         if treasury_id:
-            cash_amount = sum(p.amount for p in order_in.payments if p.method == 'cash')
+            cash_amount = sum(_dec(p.amount) for p in order_in.payments if p.method == 'cash')
             if cash_amount > 0:
-                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), 
-                           {"amt": cash_amount, "id": treasury_id})
+                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"),
+                           {"amt": float(cash_amount.quantize(_D2, ROUND_HALF_UP)), "id": treasury_id})
 
         # 7. Update Customer Balance (if customer-linked POS sale)
         if order_in.customer_id and order_in.status == 'paid':
             try:
-                credit_payments = sum(p.amount for p in order_in.payments if p.method in ('credit', 'on_account'))
+                credit_payments = sum(_dec(p.amount) for p in order_in.payments if p.method in ('credit', 'on_account'))
                 if credit_payments > 0:
                     db.execute(text("""
                         UPDATE parties
                         SET current_balance = current_balance + :amt, updated_at = CURRENT_TIMESTAMP
                         WHERE id = :pid
-                    """), {"amt": credit_payments, "pid": order_in.customer_id})
+                    """), {"amt": float(credit_payments.quantize(_D2, ROUND_HALF_UP)), "pid": order_in.customer_id})
             except Exception:
                 pass  # Non-blocking — POS must not fail for party update
 
@@ -743,7 +710,7 @@ def create_order(
     return OrderResponse(
         id=order_id,
         order_number=order_number,
-        total_amount=total,
+        total_amount=float(total),
         status=order_in.status,
         created_at=datetime.now()
     )
@@ -857,17 +824,17 @@ def create_return(
     if order.branch_id:
         validate_branch_access(current_user, order.branch_id)
     
-    total_refund = 0
-    
+    total_refund = Decimal('0')
+
     # Pre-calculate total refund to check cash sufficiency
     for item in return_in.items:
         orig_item_pre = db.execute(text("""
-            SELECT product_id, unit_price, quantity 
+            SELECT product_id, unit_price, quantity
             FROM pos_order_lines WHERE id = :id AND order_id = :order_id
         """), {"id": item.item_id, "order_id": order_id}).fetchone()
         if orig_item_pre:
-            total_refund += item.quantity * orig_item_pre.unit_price
-    
+            total_refund += (_dec(item.quantity) * _dec(orig_item_pre.unit_price)).quantize(_D2, ROUND_HALF_UP)
+
     # Check cash sufficiency for cash refunds
     if return_in.refund_method == 'cash' and total_refund > 0:
         session_info = db.execute(text("""
@@ -876,11 +843,11 @@ def create_return(
             LEFT JOIN treasury_accounts ta ON s.treasury_account_id = ta.id
             WHERE s.id = :sid
         """), {"sid": order.session_id}).fetchone()
-        if session_info and session_info.cash_balance < total_refund:
-            raise HTTPException(status_code=400, detail=f"رصيد الصندوق غير كافٍ للمرتجع. الرصيد الحالي: {session_info.cash_balance:.2f}, المطلوب: {total_refund:.2f}")
-    
-    total_refund = 0  # Reset for actual calculation
-    total_refund_tax = 0  # Track VAT on returns
+        if session_info and _dec(session_info.cash_balance) < total_refund:
+            raise HTTPException(status_code=400, detail=f"رصيد الصندوق غير كافٍ للمرتجع. الرصيد الحالي: {float(_dec(session_info.cash_balance)):.2f}, المطلوب: {float(total_refund):.2f}")
+
+    total_refund = Decimal('0')  # Reset for actual calculation
+    total_refund_tax = Decimal('0')  # Track VAT on returns
     
     for item in return_in.items:
         # Get original item details
@@ -895,8 +862,8 @@ def create_return(
         if item.quantity > orig_item.quantity:
             raise HTTPException(status_code=400, detail=f"Return quantity exceeds original quantity")
         
-        refund_amount = item.quantity * orig_item.unit_price
-        refund_tax = refund_amount * (float(orig_item.tax_rate or 0) / 100)
+        refund_amount = (_dec(item.quantity) * _dec(orig_item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+        refund_tax = (refund_amount * (_dec(orig_item.tax_rate) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
         total_refund += refund_amount
         total_refund_tax += refund_tax
         
@@ -913,7 +880,7 @@ def create_return(
             })
             
             # Log inventory transaction for return
-            cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": orig_item.product_id}).scalar() or 0
+            cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": orig_item.product_id}).scalar() or 0)
             db.execute(text("""
                 INSERT INTO inventory_transactions (
                     product_id, warehouse_id, transaction_type,
@@ -930,7 +897,7 @@ def create_return(
                 "qty": item.quantity,
                 "order_id": order_id,
                 "cost": float(cost_price),
-                "total_cost": float(cost_price) * float(item.quantity),
+                "total_cost": float((cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)),
                 "uid": current_user.id
             })
     
@@ -948,7 +915,7 @@ def create_return(
         "order_id": order_id,
         "user_id": current_user.id,
         "sess_id": curr_session_id,
-        "amount": total_refund,
+        "amount": float(total_refund),
         "method": return_in.refund_method,
         "notes": return_in.notes
     }).scalar()
@@ -970,103 +937,85 @@ def create_return(
         UPDATE pos_sessions 
         SET total_returns = COALESCE(total_returns, 0) + :amount 
         WHERE id = :id
-    """), {"amount": total_refund, "id": order.session_id})
+    """), {"amount": float(total_refund), "id": order.session_id})
     
     # --- Create GL Journal Entries for Return ---
+    # GL-FIX: Use configured account mappings with fallback to account_code lookup
+    from utils.accounting import get_mapped_account_id
+
     def get_acc_id(code):
         return db.execute(text("SELECT id FROM accounts WHERE account_code = :code"), {"code": code}).scalar()
-    
-    acc_sales = get_acc_id("SALE-G")
-    acc_cash = get_acc_id("BOX")
-    acc_cogs = get_acc_id("CGS")
-    acc_inventory = get_acc_id("INV")
-    acc_vat_out = get_acc_id("VAT-OUT")
+
+    acc_sales = get_mapped_account_id(db, "acc_map_sales") or get_acc_id("SALE-G")
+    acc_cash = get_mapped_account_id(db, "acc_map_cash_main") or get_acc_id("BOX")
+    acc_cogs = get_mapped_account_id(db, "acc_map_cogs") or get_acc_id("CGS")
+    acc_inventory = get_mapped_account_id(db, "acc_map_inventory") or get_acc_id("INV")
+    acc_vat_out = get_mapped_account_id(db, "acc_map_vat_output") or get_acc_id("VAT-OUT")
     
     # Get treasury for session
     session_treasury = db.execute(text("SELECT treasury_account_id FROM pos_sessions WHERE id = :id"), {"id": order.session_id}).fetchone()
     if session_treasury and session_treasury.treasury_account_id:
         acc_cash = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": session_treasury.treasury_account_id}).scalar() or acc_cash
     
-    total_refund_with_tax = total_refund + total_refund_tax
-    
+    total_refund_with_tax = (total_refund + total_refund_tax).quantize(_D2, ROUND_HALF_UP)
+
     if acc_sales and acc_cash:
-        import uuid
-        je_num = f"JE-POS-RTN-{return_id}"
-        
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status, created_by, branch_id,
-                currency, exchange_rate
-            )
-            VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :base_curr, 1.0) RETURNING id
-        """), {
-            "num": je_num,
-            "date": datetime.now().date(),
-            "desc": f"POS Return for Order {order.order_number}",
-            "ref": f"RTN-{order.order_number}",
-            "user": current_user.id,
-            "branch": None,
-            "base_curr": base_currency
-        }).scalar()
-        
+        je_lines = []
         # Reverse: Debit Sales Revenue (net subtotal)
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-            VALUES (:jid, :aid, :amt, 0, :desc)
-        """), {"jid": je_id, "aid": acc_sales, "amt": total_refund, "desc": f"POS Return Revenue Reversal"})
-        
+        je_lines.append({
+            "account_id": acc_sales, "debit": float(total_refund), "credit": 0, "description": "POS Return Revenue Reversal"
+        })
         # Reverse: Debit VAT Output (tax portion)
         if total_refund_tax > 0 and acc_vat_out:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, :amt, 0, :desc)
-            """), {"jid": je_id, "aid": acc_vat_out, "amt": total_refund_tax, "desc": f"POS Return VAT Reversal"})
-        
+            je_lines.append({
+                "account_id": acc_vat_out, "debit": float(total_refund_tax), "credit": 0, "description": "POS Return VAT Reversal"
+            })
         # Credit: Cash/Bank (total including tax)
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-            VALUES (:jid, :aid, 0, :amt, :desc)
-        """), {"jid": je_id, "aid": acc_cash, "amt": total_refund_with_tax, "desc": f"POS Return Cash Refund"})
-        
+        je_lines.append({
+            "account_id": acc_cash, "debit": 0, "credit": float(total_refund_with_tax), "description": "POS Return Cash Refund"
+        })
+
         # Reverse COGS if applicable
-        total_cogs_return = 0
+        total_cogs_return = Decimal('0')
         for item in return_in.items:
             orig_item = db.execute(text("SELECT product_id FROM pos_order_lines WHERE id = :id"), {"id": item.item_id}).fetchone()
             if orig_item:
-                cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": orig_item.product_id}).scalar() or 0
-                total_cogs_return += float(cost_price) * float(item.quantity)
-        
+                cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": orig_item.product_id}).scalar() or 0)
+                total_cogs_return += (cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)
+
         if total_cogs_return > 0 and acc_cogs and acc_inventory:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, :amt, 0, :desc)
-            """), {"jid": je_id, "aid": acc_inventory, "amt": total_cogs_return, "desc": "POS Return Inventory Restore"})
-            
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, 0, :amt, :desc)
-            """), {"jid": je_id, "aid": acc_cogs, "amt": total_cogs_return, "desc": "POS Return COGS Reversal"})
-        
-        # Update account balances
-        from utils.accounting import update_account_balance
-        update_account_balance(db, account_id=acc_sales, debit_base=total_refund, credit_base=0)
-        update_account_balance(db, account_id=acc_cash, debit_base=0, credit_base=total_refund_with_tax)
-        if total_refund_tax > 0 and acc_vat_out:
-            update_account_balance(db, account_id=acc_vat_out, debit_base=total_refund_tax, credit_base=0)
-        if total_cogs_return > 0 and acc_cogs and acc_inventory:
-            update_account_balance(db, account_id=acc_inventory, debit_base=total_cogs_return, credit_base=0)
-            update_account_balance(db, account_id=acc_cogs, debit_base=0, credit_base=total_cogs_return)
+            cogs_ret_float = float(total_cogs_return.quantize(_D2, ROUND_HALF_UP))
+            je_lines.append({
+                "account_id": acc_inventory, "debit": cogs_ret_float, "credit": 0, "description": "POS Return Inventory Restore"
+            })
+            je_lines.append({
+                "account_id": acc_cogs, "debit": 0, "credit": cogs_ret_float, "description": "POS Return COGS Reversal"
+            })
+
+        gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=datetime.now().date(),
+            description=f"POS Return for Order {order.order_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=None,
+            reference=f"RTN-{order.order_number}",
+            currency=base_currency,
+            source="POS-Return",
+            source_id=return_id
+        )
 
         # Update treasury balance only for cash refunds
         if return_in.refund_method == 'cash' and session_treasury and session_treasury.treasury_account_id:
             db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"),
-                       {"amt": total_refund_with_tax, "id": session_treasury.treasury_account_id})
+                       {"amt": float(total_refund_with_tax), "id": session_treasury.treasury_account_id})
     
     db.commit()
     
     return {
         "return_id": return_id,
-        "refund_amount": total_refund,
+        "refund_amount": float(total_refund),
         "message": "Return processed successfully"
     }
 
@@ -1275,17 +1224,17 @@ def earn_points(data: dict, current_user: UserResponse = Depends(get_current_use
     if not loyalty:
         raise HTTPException(status_code=404, detail="Customer not enrolled in loyalty")
     program = db.execute(text("SELECT * FROM pos_loyalty_programs WHERE id = :id"), {"id": loyalty.program_id}).fetchone()
-    points = float(data.get("amount", 0)) * float(program.points_per_unit)
+    points = (_dec(data.get("amount", 0)) * _dec(program.points_per_unit)).quantize(_D2, ROUND_HALF_UP)
     db.execute(text("""
         UPDATE pos_loyalty_points SET points_earned = points_earned + :pts, balance = balance + :pts,
             last_activity_at = NOW() WHERE id = :id
-    """), {"pts": points, "id": loyalty.id})
+    """), {"pts": float(points), "id": loyalty.id})
     db.execute(text("""
         INSERT INTO pos_loyalty_transactions (loyalty_id, order_id, txn_type, points, description)
         VALUES (:lid, :oid, 'earn', :pts, :desc)
-    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": points, "desc": f"Earned from order"})
+    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": float(points), "desc": f"Earned from order"})
     db.commit()
-    return {"points_earned": points, "new_balance": float(loyalty.balance) + points}
+    return {"points_earned": float(points), "new_balance": float((_dec(loyalty.balance) + points).quantize(_D2, ROUND_HALF_UP))}
 
 
 @router.post("/loyalty/redeem", dependencies=[Depends(require_permission("pos.create"))])
@@ -1294,23 +1243,23 @@ def redeem_points(data: dict, current_user: UserResponse = Depends(get_current_u
     loyalty = db.execute(text("SELECT * FROM pos_loyalty_points WHERE party_id = :pid"), {"pid": data["party_id"]}).fetchone()
     if not loyalty:
         raise HTTPException(status_code=404, detail="Customer not enrolled")
-    points = float(data.get("points", 0))
-    if points > float(loyalty.balance):
+    points = _dec(data.get("points", 0))
+    if points > _dec(loyalty.balance):
         raise HTTPException(status_code=400, detail="Insufficient points")
     program = db.execute(text("SELECT * FROM pos_loyalty_programs WHERE id = :id"), {"id": loyalty.program_id}).fetchone()
-    if points < int(program.min_points_redeem):
+    if points < _dec(program.min_points_redeem):
         raise HTTPException(status_code=400, detail=f"Minimum {program.min_points_redeem} points to redeem")
-    discount_value = points * float(program.currency_per_point)
+    discount_value = (points * _dec(program.currency_per_point)).quantize(_D2, ROUND_HALF_UP)
     db.execute(text("""
         UPDATE pos_loyalty_points SET points_redeemed = points_redeemed + :pts, balance = balance - :pts,
             last_activity_at = NOW() WHERE id = :id
-    """), {"pts": points, "id": loyalty.id})
+    """), {"pts": float(points), "id": loyalty.id})
     db.execute(text("""
         INSERT INTO pos_loyalty_transactions (loyalty_id, order_id, txn_type, points, description)
         VALUES (:lid, :oid, 'redeem', :pts, :desc)
-    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": -points, "desc": f"Redeemed for discount"})
+    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": float(-points), "desc": f"Redeemed for discount"})
     db.commit()
-    return {"points_redeemed": points, "discount_value": discount_value, "new_balance": float(loyalty.balance) - points}
+    return {"points_redeemed": float(points), "discount_value": float(discount_value), "new_balance": float((_dec(loyalty.balance) - points).quantize(_D2, ROUND_HALF_UP))}
 
 
 # ---------- POS-006: Session Reports (Enhanced) ----------

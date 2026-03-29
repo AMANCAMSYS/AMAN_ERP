@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { costCentersAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import { useNavigate } from 'react-router-dom';
 import BackButton from '../../../components/common/BackButton';
+import DataTable from '../../../components/common/DataTable';
+import SearchFilter from '../../../components/common/SearchFilter';
 
 const CostCenterList = () => {
     const { t } = useTranslation();
@@ -15,6 +17,7 @@ const CostCenterList = () => {
     const [showModal, setShowModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [editingId, setEditingId] = useState(null);
+    const [filterValues, setFilterValues] = useState({});
 
     const [formData, setFormData] = useState({
         center_code: '',
@@ -89,10 +92,83 @@ const CostCenterList = () => {
         });
     };
 
-    const filteredCenters = costCenters.filter(c =>
-        c.center_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.center_code && c.center_code.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filteredCenters = useMemo(() => {
+        let result = costCenters.filter(c =>
+            c.center_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (c.center_code && c.center_code.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+        if (filterValues.status === 'active') {
+            result = result.filter(c => c.is_active);
+        } else if (filterValues.status === 'inactive') {
+            result = result.filter(c => !c.is_active);
+        }
+        return result;
+    }, [costCenters, searchTerm, filterValues]);
+
+    const columns = useMemo(() => [
+        {
+            key: 'center_code',
+            label: t('cost_centers.code'),
+            width: '20%',
+            render: (val) => <span className="fw-medium">{val || '-'}</span>,
+        },
+        {
+            key: 'center_name',
+            label: t('cost_centers.name'),
+            width: '40%',
+            render: (val, row) => (
+                <div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{val}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{row.center_name_en}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'is_active',
+            label: t('cost_centers.status'),
+            width: '20%',
+            render: (val) => (
+                <span className={`badge ${val ? 'badge-success' : 'badge-danger'}`}>
+                    {val ? t('common.active') : t('common.inactive')}
+                </span>
+            ),
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '20%',
+            render: (_, row) => (
+                <div className="d-flex gap-2">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleEdit(row); }}
+                        className="table-action-btn"
+                        title={t('common.edit')}
+                    >
+                        <Edit2 size={16} />
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}
+                        className="table-action-btn"
+                        style={{ color: 'var(--danger)' }}
+                        title={t('common.delete')}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            ),
+        },
+    ], [t]);
+
+    const filters = useMemo(() => [
+        {
+            key: 'status',
+            label: t('cost_centers.status'),
+            options: [
+                { value: 'active', label: t('common.active') },
+                { value: 'inactive', label: t('common.inactive') },
+            ],
+        },
+    ], [t]);
 
     return (
         <div className="workspace fade-in">
@@ -115,74 +191,23 @@ const CostCenterList = () => {
                 </div>
             </div>
 
-            <div className="mb-4" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="search-box">
-                    <Search size={16} />
-                    <input
-                        type="text"
-                        name="search"
-                        id="search"
-                        placeholder={t('common.search')}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        autoComplete="off"
-                    />
-                </div>
-            </div>
+            <SearchFilter
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder={t('common.search')}
+                filters={filters}
+                filterValues={filterValues}
+                onFilterChange={(key, value) => setFilterValues(prev => ({ ...prev, [key]: value }))}
+            />
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '20%' }}>{t('cost_centers.code')}</th>
-                            <th style={{ width: '40%' }}>{t('cost_centers.name')}</th>
-                            <th style={{ width: '20%' }}>{t('cost_centers.status')}</th>
-                            <th style={{ width: '20%' }}>{t('common.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr><td colSpan="4" className="text-center py-4">{t('common.loading')}</td></tr>
-                        ) : filteredCenters.length === 0 ? (
-                            <tr><td colSpan="4" className="text-center py-4 text-muted">{t('common.no_data')}</td></tr>
-                        ) : (
-                            filteredCenters.map((center) => (
-                                <tr key={center.id}>
-                                    <td className="fw-medium">{center.center_code || '-'}</td>
-                                    <td>
-                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{center.center_name}</div>
-                                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{center.center_name_en}</div>
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${center.is_active ? 'badge-success' : 'badge-danger'}`}>
-                                            {center.is_active ? t('common.active') : t('common.inactive')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="d-flex gap-2">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleEdit(center); }}
-                                                className="table-action-btn"
-                                                title={t('common.edit')}
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDelete(center.id); }}
-                                                className="table-action-btn"
-                                                style={{ color: 'var(--danger)' }}
-                                                title={t('common.delete')}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredCenters}
+                loading={loading}
+                emptyTitle={t('common.no_data')}
+                rowKey="id"
+                paginate={true}
+            />
 
             {showModal && (
                 <div className="modal-overlay">

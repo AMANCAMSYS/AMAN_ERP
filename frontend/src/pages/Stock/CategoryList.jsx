@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
-import { Edit2, Trash2, Plus, X, Search, Layers } from 'lucide-react'
+import { Edit2, Trash2, Plus, X, Layers } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
-import BackButton from '../../components/common/BackButton';
+import BackButton from '../../components/common/BackButton'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 
 function CategoryList() {
     const { t } = useTranslation()
@@ -15,6 +17,7 @@ function CategoryList() {
     const [showModal, setShowModal] = useState(false)
     const [editingItem, setEditingItem] = useState(null)
     const [formData, setFormData] = useState({ name: '', code: '' })
+    const [search, setSearch] = useState('')
 
     const fetchCategories = useCallback(async () => {
         try {
@@ -36,11 +39,8 @@ function CategoryList() {
         e.preventDefault()
         try {
             if (editingItem) {
-                // Update: Do not send branch_id to keep it global or as is. 
-                // Using { ...formData } without branch_id
                 await inventoryAPI.updateCategory(editingItem.id, { ...formData })
             } else {
-                // Create: Do not send branch_id to make it global
                 await inventoryAPI.createCategory({ ...formData })
             }
             setShowModal(false)
@@ -77,13 +77,63 @@ function CategoryList() {
                 setFormData(prev => ({ ...prev, code: res.data.next_code }))
             } catch (err) {
                 console.error("Failed to fetch next code", err)
-                // Fallback or leave empty for manual input
                 setFormData(prev => ({ ...prev, code: '' }))
             }
         }
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const filteredCategories = useMemo(() => {
+        if (!search) return categories
+        const q = search.toLowerCase()
+        return categories.filter(cat =>
+            (cat.name || '').toLowerCase().includes(q) ||
+            (cat.code || '').toLowerCase().includes(q)
+        )
+    }, [categories, search])
+
+    const columns = [
+        {
+            key: 'code',
+            label: t('stock.categories.table.code'),
+            render: (val) => <span className="font-medium text-primary">{val}</span>,
+        },
+        {
+            key: 'name',
+            label: t('stock.categories.table.name'),
+            render: (val) => <span style={{ fontWeight: 600 }}>{val}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('stock.categories.table.actions'),
+            width: '100px',
+            render: (_, row) => (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            openModal(row)
+                        }}
+                        className="btn-icon"
+                        style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                        title={t('common.edit')}
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(row.id)
+                        }}
+                        className="btn-icon"
+                        style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
+                        title={t('common.delete')}
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -102,53 +152,19 @@ function CategoryList() {
                 </button>
             </div>
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('stock.categories.table.code')}</th>
-                            <th>{t('stock.categories.table.name')}</th>
-                            <th style={{ width: '100px' }}>{t('stock.categories.table.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {categories.map(cat => (
-                            <tr key={cat.id} className="hover-row">
-                                <td className="font-medium text-primary">{cat.code}</td>
-                                <td style={{ fontWeight: 600 }}>{cat.name}</td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button
-                                            onClick={() => openModal(cat)}
-                                            className="btn-icon"
-                                            style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
-                                            title={t('common.edit')}
-                                        >
-                                            <Edit2 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(cat.id)}
-                                            className="btn-icon"
-                                            style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
-                                            title={t('common.delete')}
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {categories.length === 0 && (
-                            <tr>
-                                <td colSpan="3" className="text-center" style={{ padding: '60px' }}>
-                                    <Layers size={48} style={{ color: 'var(--border)', marginBottom: '16px' }} />
-                                    <p style={{ color: 'var(--text-secondary)' }}>{t('stock.categories.empty')}</p>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('stock.categories.search_placeholder', 'بحث بالاسم أو الكود...')}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredCategories}
+                loading={loading}
+                emptyIcon="📂"
+                emptyTitle={t('stock.categories.empty')}
+            />
 
             {/* Modal */}
             {showModal && (

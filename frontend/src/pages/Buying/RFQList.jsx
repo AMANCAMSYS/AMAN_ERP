@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { purchasesAPI, inventoryAPI } from '../../utils/api';
@@ -9,6 +9,9 @@ import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
+
 const RFQList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -23,6 +26,8 @@ const RFQList = () => {
     const [supplierDropOpen, setSupplierDropOpen] = useState(false);
     const [supplierSearch, setSupplierSearch] = useState('');
     const supplierDropRef = useRef(null);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -81,6 +86,59 @@ const RFQList = () => {
         return <span className={`badge ${map[s] || 'bg-gray-100'}`}>{labels[s] || s}</span>;
     };
 
+    const filteredRFQs = useMemo(() => {
+        let result = rfqs;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(rfq =>
+                (rfq.title || '').toLowerCase().includes(q) ||
+                String(rfq.id).includes(q)
+            );
+        }
+        if (statusFilter) {
+            result = result.filter(rfq => rfq.status === statusFilter);
+        }
+        return result;
+    }, [rfqs, search, statusFilter]);
+
+    const columns = [
+        {
+            key: 'id',
+            label: '#',
+        },
+        {
+            key: 'title',
+            label: t('buying.rfq_col_title'),
+            style: { fontWeight: 600 },
+        },
+        {
+            key: 'status',
+            label: t('buying.rfq_col_status'),
+            render: (val) => statusBadge(val),
+        },
+        {
+            key: 'deadline',
+            label: t('buying.rfq_col_deadline'),
+            render: (val) => val || '—',
+        },
+        {
+            key: 'response_count',
+            label: t('buying.rfq_col_responses'),
+            render: (val) => val || 0,
+        },
+        {
+            key: '_actions',
+            label: t('buying.rfq_col_actions'),
+            render: (_, row) => (
+                <div className="d-flex gap-2">
+                    {row.status === 'draft' && <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); handleSend(row.id); }} title={t('buying.send')}><Send size={14} /></button>}
+                    {(row.status === 'received' || row.status === 'sent') && <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); handleCompare(row.id); }} title={t('buying.compare')}><GitCompare size={14} /></button>}
+                    {row.status === 'compared' && <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleConvert(row.id); }} title={t('buying.convert_to_po')}><ArrowRightCircle size={14} /></button>}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
@@ -94,41 +152,32 @@ const RFQList = () => {
                 </div>
             </div>
 
-            <div className="card section-card">
-                {loading ? <div className="text-center p-4">...</div> : (
-                    <div className="data-table-container">
-                        <table className="data-table">
-                            <thead><tr>
-                                <th>#</th>
-                                <th>{t('buying.rfq_col_title')}</th>
-                                <th>{t('buying.rfq_col_status')}</th>
-                                <th>{t('buying.rfq_col_deadline')}</th>
-                                <th>{t('buying.rfq_col_responses')}</th>
-                                <th>{t('buying.rfq_col_actions')}</th>
-                            </tr></thead>
-                            <tbody>
-                                {rfqs.map(rfq => (
-                                    <tr key={rfq.id}>
-                                        <td>{rfq.id}</td>
-                                        <td className="font-semibold">{rfq.title}</td>
-                                        <td>{statusBadge(rfq.status)}</td>
-                                        <td>{rfq.deadline || '—'}</td>
-                                        <td>{rfq.response_count || 0}</td>
-                                        <td>
-                                            <div className="d-flex gap-2">
-                                                {rfq.status === 'draft' && <button className="btn btn-sm btn-primary" onClick={() => handleSend(rfq.id)} title={t('buying.send')}><Send size={14} /></button>}
-                                                {(rfq.status === 'received' || rfq.status === 'sent') && <button className="btn btn-sm btn-warning" onClick={() => handleCompare(rfq.id)} title={t('buying.compare')}><GitCompare size={14} /></button>}
-                                                {rfq.status === 'compared' && <button className="btn btn-sm btn-success" onClick={() => handleConvert(rfq.id)} title={t('buying.convert_to_po')}><ArrowRightCircle size={14} /></button>}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {rfqs.length === 0 && <tr><td colSpan="6" className="text-center text-muted p-4">{t('buying.no_rfqs')}</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[{
+                    key: 'status',
+                    label: t('buying.rfq_col_status'),
+                    options: [
+                        { value: 'draft', label: t('buying.rfq_status_draft') },
+                        { value: 'sent', label: t('buying.rfq_status_sent') },
+                        { value: 'received', label: t('buying.rfq_status_received') },
+                        { value: 'compared', label: t('buying.rfq_status_compared') },
+                        { value: 'converted', label: t('buying.rfq_status_converted') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredRFQs}
+                loading={loading}
+                emptyTitle={t('buying.no_rfqs')}
+                emptyIcon="📄"
+            />
 
             {showModal && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>

@@ -384,8 +384,8 @@ def create_tax_return(
         # Output VAT (sales)
         output = db.execute(text(f"""
             SELECT
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable,
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable,
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'sales' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date >= :start AND i.invoice_date < :end {branch_filter}
@@ -394,8 +394,8 @@ def create_tax_return(
         # Sales returns
         output_returns = db.execute(text(f"""
             SELECT
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable,
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable,
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'sales_return' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date >= :start AND i.invoice_date < :end {branch_filter}
@@ -404,8 +404,8 @@ def create_tax_return(
         # Input VAT (purchases)
         input_vat = db.execute(text(f"""
             SELECT
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable,
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable,
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'purchase' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date >= :start AND i.invoice_date < :end {branch_filter}
@@ -414,8 +414,8 @@ def create_tax_return(
         # Purchase returns
         input_returns = db.execute(text(f"""
             SELECT
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable,
-                COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable,
+                COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'purchase_return' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date >= :start AND i.invoice_date < :end {branch_filter}
@@ -661,34 +661,33 @@ def create_tax_payment(
 
         if vat_account_id and bank_account_id:
             base_currency = get_base_currency(db)
-            entry_number = generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, reference,
-                                             status, created_by, currency, exchange_rate)
-                VALUES (:num, :date, :desc, :ref, 'posted', :user, :curr, 1)
-                RETURNING id
-            """), {
-                "num": entry_number, "date": data.payment_date,
-                "desc": f"دفع ضريبة — إقرار {tr.return_number} — فترة {tr.tax_period}",
-                "ref": payment_number, "user": current_user.id, "curr": base_currency
-            }).scalar()
-
-            # Debit VAT Payable (reduce liability)
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
-                VALUES (:jid, :aid, :amount, 0, :desc, :curr, :amount)
-            """), {"jid": je_id, "aid": vat_account_id, "amount": data.amount,
-                   "desc": f"دفع ضريبة — {tr.tax_period}", "curr": base_currency})
-            update_account_balance(db, vat_account_id, debit_base=data.amount, credit_base=0)
-
-            # Credit Bank
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
-                VALUES (:jid, :aid, 0, :amount, :desc, :curr, :amount)
-            """), {"jid": je_id, "aid": bank_account_id, "amount": data.amount,
-                   "desc": f"دفع ضريبة — {tr.tax_period}", "curr": base_currency})
-            update_account_balance(db, bank_account_id, debit_base=0, credit_base=data.amount)
+            
+            je_lines = [
+                {
+                    "account_id": vat_account_id, "debit": float(data.amount), "credit": 0,
+                    "description": f"دفع ضريبة — {tr.tax_period}"
+                },
+                {
+                    "account_id": bank_account_id, "debit": 0, "credit": float(data.amount),
+                    "description": f"دفع ضريبة — {tr.tax_period}"
+                }
+            ]
+            
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            je_id, entry_number = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=data.payment_date,
+                description=f"دفع ضريبة — إقرار {tr.return_number} — فترة {tr.tax_period}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=tr.branch_id,
+                reference=payment_number,
+                currency=base_currency,
+                exchange_rate=1.0,
+                source="tax_payment",
+                source_id=new_id
+            )
 
         # Update return status if fully paid
         new_paid = float(paid) + data.amount
@@ -739,32 +738,32 @@ def get_vat_report(
             params["branch_id"] = branch_id
 
         output_vat = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable_amount,
-                   COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable_amount,
+                   COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'sales' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).fetchone()
 
         input_vat = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable_amount,
-                   COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable_amount,
+                   COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'purchase' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).fetchone()
 
         output_vat_returns = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable_amount,
-                   COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable_amount,
+                   COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'sales_return' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).fetchone()
 
         input_vat_returns = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate), 0) as taxable_amount,
-                   COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate), 0) as taxable_amount,
+                   COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat_amount
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'purchase_return' AND i.status NOT IN ('draft', 'cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
@@ -811,8 +810,8 @@ def get_tax_audit(
         results = db.execute(text(f"""
             SELECT i.id, i.invoice_number, i.invoice_date, i.invoice_type,
                 p.name as party_name, p.tax_number,
-                SUM(il.quantity * il.unit_price * i.exchange_rate) as taxable_amount,
-                SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)) as vat_amount
+                SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate) as taxable_amount,
+                SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)) as vat_amount
             FROM invoices i
             JOIN invoice_lines il ON i.id = il.invoice_id
             LEFT JOIN parties p ON i.party_id = p.id
@@ -888,8 +887,8 @@ def get_tax_summary(
 
         current_vat = db.execute(text(f"""
             SELECT
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales' THEN il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as output_vat,
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase' THEN il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as input_vat
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales' THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as output_vat,
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase' THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as input_vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_date >= :start AND i.invoice_date <= :end
             AND i.status NOT IN ('draft', 'cancelled') AND il.tax_rate > 0
@@ -970,14 +969,14 @@ def create_tax_settlement(
             params["branch_id"] = branch_id
 
         output = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'sales' AND i.status NOT IN ('draft','cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).scalar() or 0
 
         input_v = db.execute(text(f"""
-            SELECT COALESCE(SUM(il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
+            SELECT COALESCE(SUM((il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100)), 0) as vat
             FROM invoice_lines il JOIN invoices i ON il.invoice_id = i.id
             WHERE i.invoice_type = 'purchase' AND i.status NOT IN ('draft','cancelled')
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
@@ -992,36 +991,35 @@ def create_tax_settlement(
             raise HTTPException(status_code=400, detail="حسابات ضريبة المدخلات/المخرجات غير معينة في الإعدادات")
 
         base_currency = get_base_currency(db)
-        entry_number = generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, reference,
-                                         status, branch_id, created_by, currency, exchange_rate)
-            VALUES (:num, CURRENT_DATE, :desc, :ref, 'posted', :bid, :user, :curr, 1)
-            RETURNING id
-        """), {
-            "num": entry_number, "desc": f"تسوية ضريبية — الفترة {start} إلى {end}",
-            "ref": f"TAX-SETTLE-{start}-{end}",
-            "bid": branch_id, "user": current_user.id, "curr": base_currency
-        }).scalar()
-
         settle_amount = min(float(output), float(input_v))
+        
+        entry_number = None
         if settle_amount > 0:
-            # Debit Output VAT (reduce liability)
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
-                VALUES (:jid, :aid, :amt, 0, :desc, :curr, :amt)
-            """), {"jid": je_id, "aid": vat_out_id, "amt": settle_amount,
-                   "desc": "تسوية ضريبة المخرجات", "curr": base_currency})
-            update_account_balance(db, vat_out_id, debit_base=settle_amount, credit_base=0)
-
-            # Credit Input VAT (reduce asset)
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, amount_currency)
-                VALUES (:jid, :aid, 0, :amt, :desc, :curr, :amt)
-            """), {"jid": je_id, "aid": vat_in_id, "amt": settle_amount,
-                   "desc": "تسوية ضريبة المدخلات مع المخرجات", "curr": base_currency})
-            update_account_balance(db, vat_in_id, debit_base=0, credit_base=settle_amount)
+            je_lines = [
+                {
+                    "account_id": vat_out_id, "debit": settle_amount, "credit": 0,
+                    "description": "تسوية ضريبة المخرجات"
+                },
+                {
+                    "account_id": vat_in_id, "debit": 0, "credit": settle_amount,
+                    "description": "تسوية ضريبة المدخلات مع المخرجات"
+                }
+            ]
+            
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            je_id, entry_number = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=date.today().isoformat(),
+                description=f"تسوية ضريبية — الفترة {start} إلى {end}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=branch_id,
+                reference=f"TAX-SETTLE-{start}-{end}",
+                currency=base_currency,
+                exchange_rate=1.0,
+                source="tax_settlement"
+            )
 
         db.commit()
 
@@ -1079,14 +1077,14 @@ def get_branch_tax_analysis(
             SELECT 
                 b.id as branch_id, b.branch_name, b.branch_name_en,
                 b.country_code as jurisdiction,
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales' 
-                    THEN il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as output_vat,
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase' 
-                    THEN il.quantity * il.unit_price * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as input_vat,
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales' 
-                    THEN il.quantity * il.unit_price * i.exchange_rate ELSE 0 END), 0) as taxable_sales,
-                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase' 
-                    THEN il.quantity * il.unit_price * i.exchange_rate ELSE 0 END), 0) as taxable_purchases,
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales'
+                    THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as output_vat,
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase'
+                    THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate * (il.tax_rate / 100) ELSE 0 END), 0) as input_vat,
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'sales'
+                    THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate ELSE 0 END), 0) as taxable_sales,
+                COALESCE(SUM(CASE WHEN i.invoice_type = 'purchase'
+                    THEN (il.quantity * il.unit_price - COALESCE(il.discount, 0)) * i.exchange_rate ELSE 0 END), 0) as taxable_purchases,
                 COUNT(DISTINCT i.id) as invoice_count
             FROM invoices i
             JOIN invoice_lines il ON i.id = il.invoice_id

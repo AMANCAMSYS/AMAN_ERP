@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'
-import Pagination, { usePagination } from '../../components/common/Pagination'
 import { formatShortDate } from '../../utils/dateUtils';
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 import BackButton from '../../components/common/BackButton';
 
 
@@ -18,6 +19,8 @@ function CustomerList() {
     const [currency] = useState(getCurrency())
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
 
     useEffect(() => {
         const fetchCustomers = async () => {
@@ -35,9 +38,113 @@ function CustomerList() {
         fetchCustomers()
     }, [currentBranch, t])
 
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(customers)
+    const filteredCustomers = useMemo(() => {
+        let result = customers;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(c =>
+                (c.name || '').toLowerCase().includes(q) ||
+                (c.name_en || '').toLowerCase().includes(q) ||
+                (c.phone || '').includes(q) ||
+                (c.party_code || '').toLowerCase().includes(q)
+            );
+        }
+        if (statusFilter) {
+            result = result.filter(c => c.status === statusFilter);
+        }
+        return result;
+    }, [customers, search, statusFilter]);
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const columns = [
+        {
+            key: 'party_code',
+            label: t('sales.customers.table.code'),
+            width: '12%',
+            render: (val) => (
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)', fontSize: '13px', background: 'rgba(37,99,235,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                    {val || '\u2014'}
+                </span>
+            ),
+        },
+        {
+            key: 'name',
+            label: t('sales.customers.table.name'),
+            width: '25%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-hover)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+                    }}>
+                        {'\uD83D\uDC64'}
+                    </div>
+                    <div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{val}</div>
+                        {row.name_en && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{row.name_en}</div>}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            key: 'phone',
+            label: t('sales.customers.table.contact'),
+            width: '20%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {val && <div style={{ fontSize: '13px', direction: 'ltr' }}>{val}</div>}
+                    {row.email && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{row.email}</div>}
+                    {!val && !row.email && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                </div>
+            ),
+        },
+        {
+            key: 'current_balance',
+            label: t('sales.customers.table.balance'),
+            width: '15%',
+            render: (val, row) => (
+                <div style={{
+                    fontWeight: '600', fontSize: '15px',
+                    color: val > 0 ? 'var(--error)' : 'var(--text-primary)',
+                    direction: 'ltr', textAlign: 'right',
+                }}>
+                    {formatNumber(val)} {row.currency || currency}
+                </div>
+            ),
+        },
+        {
+            key: 'status',
+            label: t('sales.customers.table.status'),
+            width: '10%',
+            render: (val) => (
+                <span className={`badge ${val === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                    {val === 'active' ? t('sales.customers.status.active') : t('sales.customers.status.inactive')}
+                </span>
+            ),
+        },
+        {
+            key: 'created_at',
+            label: t('sales.customers.table.added_date'),
+            width: '10%',
+            render: (val) => <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{formatShortDate(val)}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '8%',
+            headerStyle: { textAlign: 'center' },
+            style: { textAlign: 'center' },
+            render: (_, row) => (
+                <button
+                    className="btn btn-icon"
+                    title={t('common.edit', 'Edit')}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/sales/customers/${row.id}/edit`); }}
+                    style={{ padding: '4px', color: 'var(--primary)' }}
+                >
+                    {'\u270F\uFE0F'}
+                </button>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -57,116 +164,32 @@ function CustomerList() {
 
             {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '12%' }}>{t('sales.customers.table.code')}</th>
-                            <th style={{ width: '25%' }}>{t('sales.customers.table.name')}</th>
-                            <th style={{ width: '20%' }}>{t('sales.customers.table.contact')}</th>
-                            <th style={{ width: '15%' }}>{t('sales.customers.table.balance')}</th>
-                            <th style={{ width: '10%' }}>{t('sales.customers.table.status')}</th>
-                            <th style={{ width: '10%' }}>{t('sales.customers.table.added_date')}</th>
-                            <th style={{ width: '8%', textAlign: 'center' }}>{t('common.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {customers.length === 0 ? (
-                            <tr>
-                                <td colSpan="7" className="start-guide">
-                                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-                                        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('sales.customers.no_customers')}</h3>
-                                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                                            {t('sales.customers.empty_state_desc')}
-                                        </p>
-                                        <button className="btn btn-primary" onClick={() => navigate('/sales/customers/new')}>
-                                            {t('sales.customers.add_first')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map(customer => (
-                                <tr key={customer.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/sales/customers/${customer.id}`)}>
-                                    <td>
-                                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)', fontSize: '13px', background: 'rgba(37,99,235,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
-                                            {customer.party_code || '—'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{
-                                                width: '36px', height: '36px',
-                                                borderRadius: '50%', background: 'var(--bg-hover)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontSize: '18px'
-                                            }}>
-                                                👤
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{customer.name}</div>
-                                                {customer.name_en && (
-                                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                        {customer.name_en}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                            {customer.phone && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                                                    <span>📞</span>
-                                                    <span style={{ direction: 'ltr' }}>{customer.phone}</span>
-                                                </div>
-                                            )}
-                                            {customer.email && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                    <span>✉️</span>
-                                                    <span>{customer.email}</span>
-                                                </div>
-                                            )}
-                                            {!customer.phone && !customer.email && <span style={{ color: 'var(--text-muted)' }}>-</span>}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{
-                                            fontWeight: '600',
-                                            fontSize: '15px',
-                                            color: customer.current_balance > 0 ? 'var(--error)' : 'var(--text-primary)',
-                                            direction: 'ltr',
-                                            textAlign: 'right'
-                                        }}>
-                                            {formatNumber(customer.current_balance)} {customer.currency || currency}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${customer.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                                            {customer.status === 'active' ? t('sales.customers.status.active') : t('sales.customers.status.inactive')}
-                                        </span>
-                                    </td>
-                                    <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                        {formatShortDate(customer.created_at)}
-                                    </td>
-                                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                            className="btn btn-icon"
-                                            title={t('common.edit', 'Edit')}
-                                            onClick={() => navigate(`/sales/customers/${customer.id}/edit`)}
-                                            style={{ padding: '4px', color: 'var(--primary)' }}
-                                        >
-                                            ✏️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('sales.customers.search_placeholder', 'بحث بالاسم أو الكود أو الهاتف...')}
+                filters={[{
+                    key: 'status',
+                    label: t('sales.customers.table.status'),
+                    options: [
+                        { value: 'active', label: t('sales.customers.status.active') },
+                        { value: 'inactive', label: t('sales.customers.status.inactive') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredCustomers}
+                loading={loading}
+                onRowClick={(row) => navigate(`/sales/customers/${row.id}`)}
+                emptyIcon={'\uD83D\uDC65'}
+                emptyTitle={t('sales.customers.no_customers')}
+                emptyDesc={t('sales.customers.empty_state_desc')}
+                emptyAction={{ label: t('sales.customers.add_first'), onClick: () => navigate('/sales/customers/new') }}
+            />
         </div>
     )
 }

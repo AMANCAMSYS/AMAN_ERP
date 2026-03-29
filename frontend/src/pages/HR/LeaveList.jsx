@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Plus, Check, X, Calendar, FileText, User, Clock,
+    Plus, Check, X, Clock,
     CheckCircle, XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -9,13 +9,12 @@ import { toast } from 'react-hot-toast';
 import { hrAPI } from '../../utils/api';
 import { hasPermission } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
-import '../../components/ModuleStyles.css';
 import SimpleModal from '../../components/common/SimpleModal';
-import Pagination, { usePagination } from '../../components/common/Pagination';
 import { formatShortDate } from '../../utils/dateUtils';
-
-import DateInput from '../../components/common/DateInput';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 import BackButton from '../../components/common/BackButton';
+
 const LeaveList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -24,7 +23,8 @@ const LeaveList = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
-    const [filter, setFilter] = useState('all');
+    const [search, setSearch] = useState('');
+    const [filterValues, setFilterValues] = useState({});
     const { currentBranch } = useBranch();
 
     // Permissions
@@ -126,8 +126,126 @@ const LeaveList = () => {
     const pendingRequests = leaves.filter(l => l.status === 'pending').length;
     const approvedRequests = leaves.filter(l => l.status === 'approved').length;
 
-    const filteredLeaves = leaves.filter(l => filter === 'all' || l.status === filter);
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(filteredLeaves);
+    const filteredData = useMemo(() => {
+        let result = leaves;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(leave =>
+                leave.employee_name?.toLowerCase().includes(q) ||
+                leave.reason?.toLowerCase().includes(q)
+            );
+        }
+        if (filterValues.status) {
+            result = result.filter(leave => leave.status === filterValues.status);
+        }
+        if (filterValues.leave_type) {
+            result = result.filter(leave => leave.leave_type === filterValues.leave_type);
+        }
+        return result;
+    }, [leaves, search, filterValues]);
+
+    const columns = [
+        {
+            key: 'employee_name',
+            label: t('hr.leaves.employee'),
+            width: '25%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="avatar-xs" style={{ background: '#eff6ff', color: 'var(--primary)', fontWeight: 'bold' }}>
+                        {val?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{val || t('common.me')}</span>
+                </div>
+            ),
+        },
+        {
+            key: 'leave_type',
+            label: t('hr.leaves.type'),
+            width: '15%',
+            render: (val) => <span style={{ color: 'var(--text-primary)' }}>{getLeaveTypeLabel(val)}</span>,
+        },
+        {
+            key: 'start_date',
+            label: t('hr.leaves.period'),
+            width: '20%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{formatShortDate(val)}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('common.to')} {formatShortDate(row.end_date)}</span>
+                </div>
+            ),
+        },
+        {
+            key: '_duration',
+            label: t('hr.leaves.duration'),
+            width: '10%',
+            headerStyle: { textAlign: 'center' },
+            style: { textAlign: 'center' },
+            render: (_val, row) => {
+                const start = new Date(row.start_date);
+                const end = new Date(row.end_date);
+                const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                return <span className="badge" style={{ background: '#f1f5f9', color: 'var(--text-secondary)' }}>{duration} {t('common.days')}</span>;
+            },
+        },
+        {
+            key: 'reason',
+            label: t('hr.leaves.reason'),
+            width: '20%',
+            style: { maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' },
+            render: (val) => val || '-',
+        },
+        {
+            key: 'status',
+            label: t('common.status_title'),
+            render: (val) => getStatusBadge(val),
+        },
+        {
+            key: 'created_at',
+            label: t('common.created_at'),
+            width: '10%',
+            render: (val) => <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatShortDate(val)}</span>,
+        },
+        ...(canManageLeaves ? [{
+            key: '_actions',
+            label: t('common.actions'),
+            headerStyle: { textAlign: 'end' },
+            style: { textAlign: 'end' },
+            render: (_val, row) => (
+                row.status === 'pending' ? (
+                    <div className="btn-group">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleStatusUpdate(row.id, 'approved'); }}
+                            className="table-action-btn text-success"
+                            title={t('common.approve')}
+                        >
+                            <Check size={16} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleStatusUpdate(row.id, 'rejected'); }}
+                            className="table-action-btn text-danger"
+                            title={t('common.reject')}
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                ) : null
+            ),
+        }] : []),
+    ];
+
+    const statusFilterOptions = [
+        { value: 'pending', label: t('status.pending') },
+        { value: 'approved', label: t('status.approved') },
+        { value: 'rejected', label: t('status.rejected') },
+    ];
+
+    const typeFilterOptions = [
+        { value: 'annual', label: t('hr.leaves.type_annual') },
+        { value: 'sick', label: t('hr.leaves.type_sick') },
+        { value: 'emergency', label: t('hr.leaves.type_emergency') },
+        { value: 'unpaid', label: t('hr.leaves.type_unpaid') },
+    ];
 
     return (
         <div className="workspace fade-in">
@@ -135,18 +253,10 @@ const LeaveList = () => {
             <div className="workspace-header">
                 <BackButton />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                    <div className="d-flex align-items-center gap-4">
-                        <div>
-                            <h1 className="workspace-title">{t('hr.leaves.title')}</h1>
-                            <p className="workspace-subtitle">{t('hr.leaves.subtitle')}</p>
-                        </div>
-                        {/* Filters moved next to title (Right in RTL) */}
-                        <div className="btn-group">
-                            <button className={`btn btn-sm ${filter === 'all' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setFilter('all')}>{t('common.all')}</button>
-                            <button className={`btn btn-sm ${filter === 'pending' ? 'btn-warning' : 'btn-outline-secondary'}`} onClick={() => setFilter('pending')}>{t('status.pending')}</button>
-                        </div>
+                    <div>
+                        <h1 className="workspace-title">{t('hr.leaves.title')}</h1>
+                        <p className="workspace-subtitle">{t('hr.leaves.subtitle')}</p>
                     </div>
-
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="btn btn-primary"
@@ -179,93 +289,25 @@ const LeaveList = () => {
                 </div>
             </div>
 
-            {/* Content Table */}
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '25%' }}>{t('hr.leaves.employee')}</th>
-                            <th style={{ width: '15%' }}>{t('hr.leaves.type')}</th>
-                            <th style={{ width: '20%' }}>{t('hr.leaves.period')}</th>
-                            <th className="text-center" style={{ width: '10%' }}>{t('hr.leaves.duration')}</th>
-                            <th style={{ width: '20%' }}>{t('hr.leaves.reason')}</th>
-                            <th>{t('common.status_title')}</th>
-                            <th style={{ width: '10%' }}>{t('common.created_at')}</th>
-                            {canManageLeaves && <th className="text-end">{t('common.actions')}</th>}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr><td colSpan="8" className="text-center py-5"><div className="spinner-border text-primary"></div></td></tr>
-                        ) : filteredLeaves.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="start-guide">
-                                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
-                                        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('common.no_data')}</h3>
-                                        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-                                            {t('hr.leaves.request')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map((leave) => {
-                                const start = new Date(leave.start_date);
-                                const end = new Date(leave.end_date);
-                                const duration = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[
+                    { key: 'status', label: t('common.status_title'), options: statusFilterOptions },
+                    { key: 'leave_type', label: t('hr.leaves.type'), options: typeFilterOptions },
+                ]}
+                filterValues={filterValues}
+                onFilterChange={(key, value) => setFilterValues(prev => ({ ...prev, [key]: value }))}
+            />
 
-                                return (
-                                    <tr key={leave.id}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div className="avatar-xs" style={{ background: '#eff6ff', color: 'var(--primary)', fontWeight: 'bold' }}>
-                                                    {leave.employee_name?.charAt(0).toUpperCase() || 'U'}
-                                                </div>
-                                                <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{leave.employee_name || t('common.me')}</span>
-                                            </div>
-                                        </td>
-                                        <td><span style={{ color: 'var(--text-primary)' }}>{getLeaveTypeLabel(leave.leave_type)}</span></td>
-                                        <td>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{formatShortDate(leave.start_date)}</span>
-                                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('common.to')} {formatShortDate(leave.end_date)}</span>
-                                            </div>
-                                        </td>
-                                        <td className="text-center"><span className="badge" style={{ background: '#f1f5f9', color: 'var(--text-secondary)' }}>{duration} {t('common.days')}</span></td>
-                                        <td className="text-truncate" style={{ maxWidth: '150px', color: 'var(--text-secondary)' }} title={leave.reason}>{leave.reason || '-'}</td>
-                                        <td>{getStatusBadge(leave.status)}</td>
-                                        <td><span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatShortDate(leave.created_at)}</span></td>
-                                        {canManageLeaves && (
-                                            <td className="text-end">
-                                                {leave.status === 'pending' && (
-                                                    <div className="btn-group">
-                                                        <button
-                                                            onClick={() => handleStatusUpdate(leave.id, 'approved')}
-                                                            className="table-action-btn text-success"
-                                                            title={t('common.approve')}
-                                                        >
-                                                            <Check size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleStatusUpdate(leave.id, 'rejected')}
-                                                            className="table-action-btn text-danger"
-                                                            title={t('common.reject')}
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        )}
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                emptyTitle={t('common.no_data')}
+                emptyAction={{ label: t('hr.leaves.request'), onClick: () => setIsModalOpen(true) }}
+            />
 
             {/* Create Modal */}
             <SimpleModal
@@ -302,7 +344,6 @@ const LeaveList = () => {
                         <div className="form-group" style={{ flex: 1 }}>
                             <label className="form-label">{t('hr.leaves.start_date')}</label>
                             <input
-                               
                                 className="form-input"
                                 value={formData.start_date}
                                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
@@ -313,7 +354,6 @@ const LeaveList = () => {
                         <div className="form-group" style={{ flex: 1 }}>
                             <label className="form-label">{t('hr.leaves.end_date')}</label>
                             <input
-                               
                                 className="form-input"
                                 value={formData.end_date}
                                 onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}

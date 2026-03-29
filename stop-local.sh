@@ -44,16 +44,28 @@ pkill -f "npm run dev" 2>/dev/null || true
 
 # Stop Redis only if we started it from start-local.sh
 if [[ -f "$LOG_DIR/redis.started_by_script" ]]; then
-    if command -v redis-cli >/dev/null 2>&1; then
-        redis-cli shutdown >/dev/null 2>&1 || true
+    redis_mode="$(cat "$LOG_DIR/redis.started_by_script" 2>/dev/null || echo "daemon")"
+
+    if [[ "$redis_mode" == "docker" ]]; then
+        if command -v docker >/dev/null 2>&1; then
+            docker stop aman_local_redis >/dev/null 2>&1 || true
+            info "Redis stopped (Docker fallback instance)"
+        else
+            warn "Docker not available; could not stop aman_local_redis"
+        fi
+    else
+        if command -v redis-cli >/dev/null 2>&1; then
+            redis-cli shutdown >/dev/null 2>&1 || true
+        fi
+        if [[ -f "$LOG_DIR/redis-local.pid" ]]; then
+            pid="$(cat "$LOG_DIR/redis-local.pid" 2>/dev/null || true)"
+            [[ -n "${pid:-}" ]] && kill "$pid" 2>/dev/null || true
+            rm -f "$LOG_DIR/redis-local.pid"
+        fi
+        info "Redis stopped (local daemon instance)"
     fi
-    if [[ -f "$LOG_DIR/redis-local.pid" ]]; then
-        pid="$(cat "$LOG_DIR/redis-local.pid" 2>/dev/null || true)"
-        [[ -n "${pid:-}" ]] && kill "$pid" 2>/dev/null || true
-        rm -f "$LOG_DIR/redis-local.pid"
-    fi
+
     rm -f "$LOG_DIR/redis.started_by_script"
-    info "Redis stopped (started-by-script instance)"
 else
     info "Redis left running (not started by this script)"
 fi

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { hrAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { Plus, Check, X, DollarSign } from 'lucide-react';
@@ -9,10 +9,10 @@ import { toast } from 'react-hot-toast';
 import { hasPermission } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
-import Pagination, { usePagination } from '../../components/common/Pagination';
-
-import DateInput from '../../components/common/DateInput';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 import BackButton from '../../components/common/BackButton';
+
 const LoanList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
@@ -23,13 +23,20 @@ const LoanList = () => {
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(loans);
+    const [search, setSearch] = useState('');
+    const [filterValues, setFilterValues] = useState({});
 
     // Permissions
     const canManageLoans = hasPermission('hr.loans.manage');
     const canViewLoans = hasPermission('hr.loans.view');
 
-    // ... (state)
+    const [formData, setFormData] = useState({
+        employee_id: '',
+        amount: '',
+        total_installments: '6',
+        start_date: new Date().toISOString().split('T')[0],
+        reason: ''
+    });
 
     useEffect(() => {
         if (!canViewLoans) {
@@ -39,13 +46,6 @@ const LoanList = () => {
         }
         fetchData();
     }, []);
-    const [formData, setFormData] = useState({
-        employee_id: '',
-        amount: '',
-        total_installments: '6',
-        start_date: new Date().toISOString().split('T')[0],
-        reason: ''
-    });
 
     useEffect(() => {
         fetchData();
@@ -110,18 +110,94 @@ const LoanList = () => {
         }
     };
 
+    const filteredData = useMemo(() => {
+        let result = loans;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(loan =>
+                loan.employee_name?.toLowerCase().includes(q) ||
+                loan.reason?.toLowerCase().includes(q)
+            );
+        }
+        if (filterValues.status) {
+            result = result.filter(loan => loan.status === filterValues.status);
+        }
+        return result;
+    }, [loans, search, filterValues]);
+
+    const columns = [
+        {
+            key: 'employee_name',
+            label: t('hr.loans.employee'),
+            render: (val) => <span className="fw-bold">{val}</span>,
+        },
+        {
+            key: 'amount',
+            label: t('hr.loans.amount'),
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'paid_amount',
+            label: t('hr.loans.paid'),
+            render: (val) => <span className="text-success">{formatNumber(val)}</span>,
+        },
+        {
+            key: '_remaining',
+            label: t('hr.loans.remaining'),
+            render: (_val, row) => <span className="text-danger">{formatNumber(row.amount - row.paid_amount)}</span>,
+        },
+        {
+            key: 'monthly_installment',
+            label: t('hr.loans.installment'),
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'status',
+            label: t('hr.loans.status'),
+            render: (val) => getStatusBadge(val),
+        },
+        {
+            key: 'start_date',
+            label: t('hr.loans.start_date'),
+            render: (val) => <span className="text-muted small">{formatShortDate(val)}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '120px',
+            render: (_val, row) => (
+                row.status === 'pending' && canManageLoans ? (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); handleApprove(row.id); }}
+                        className="btn btn-icon text-success hover-bg-success-light"
+                        title={t('hr.loans.approve')}
+                    >
+                        <Check size={18} />
+                    </button>
+                ) : null
+            ),
+        },
+    ];
+
+    const statusFilterOptions = [
+        { value: 'pending', label: t('hr.loans.pending') },
+        { value: 'active', label: t('hr.loans.active') },
+        { value: 'completed', label: t('hr.loans.completed') },
+        { value: 'rejected', label: t('hr.loans.rejected') },
+    ];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <div className="header-title">
-                    <h1 className="workspace-title">
-                        <DollarSign size={24} className="me-2 text-primary" />
-                        {t('hr.loans.title')}
-                    </h1>
-                    <p className="workspace-subtitle">{t('hr.loans.subtitle')}</p>
-                </div>
-                <div className="header-actions">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title">
+                            <DollarSign size={24} className="me-2 text-primary" />
+                            {t('hr.loans.title')}
+                        </h1>
+                        <p className="workspace-subtitle">{t('hr.loans.subtitle')}</p>
+                    </div>
                     {canManageLoans && (
                         <button
                             onClick={() => setIsModalOpen(true)}
@@ -134,62 +210,25 @@ const LoanList = () => {
                 </div>
             </div>
 
-            <div className="card shadow-sm border-0 overflow-hidden">
-                <div className="card-body p-0">
-                    <div className="data-table-container">
-                        <table className="data-table mb-0 w-100">
-                            <thead>
-                                <tr>
-                                    <th>{t('hr.loans.employee')}</th>
-                                    <th>{t('hr.loans.amount')}</th>
-                                    <th>{t('hr.loans.paid')}</th>
-                                    <th>{t('hr.loans.remaining')}</th>
-                                    <th>{t('hr.loans.installment')}</th>
-                                    <th>{t('hr.loans.status')}</th>
-                                    <th>{t('hr.loans.start_date')}</th>
-                                    <th style={{ width: '120px' }}>{t('common.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr><td colSpan="8" className="text-center p-5"><div className="spinner-border text-primary"></div></td></tr>
-                                ) : loans.length > 0 ? (
-                                    paginatedItems.map((loan) => (
-                                        <tr key={loan.id} className="hover-row">
-                                            <td className="fw-bold">{loan.employee_name}</td>
-                                            <td>{formatNumber(loan.amount)}</td>
-                                            <td className="text-success">{formatNumber(loan.paid_amount)}</td>
-                                            <td className="text-danger">{formatNumber(loan.amount - loan.paid_amount)}</td>
-                                            <td>{formatNumber(loan.monthly_installment)}</td>
-                                            <td>{getStatusBadge(loan.status)}</td>
-                                            <td className="text-muted small">{formatShortDate(loan.start_date)}</td>
-                                            <td>
-                                                {loan.status === 'pending' && canManageLoans && (
-                                                    <button
-                                                        onClick={() => handleApprove(loan.id)}
-                                                        className="btn btn-icon text-success hover-bg-success-light"
-                                                        title={t('hr.loans.approve')}
-                                                    >
-                                                        <Check size={18} />
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="8" className="p-5 text-center text-muted">
-                                            <div className="mb-3"><DollarSign size={48} className="text-light" /></div>
-                                            <p>{t('common.no_records_found')}</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                        <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-                    </div>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[
+                    { key: 'status', label: t('hr.loans.status'), options: statusFilterOptions },
+                ]}
+                filterValues={filterValues}
+                onFilterChange={(key, value) => setFilterValues(prev => ({ ...prev, [key]: value }))}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                emptyIcon={<DollarSign size={48} className="text-light" />}
+                emptyTitle={t('common.no_records_found')}
+                emptyAction={canManageLoans ? { label: t('hr.loans.add'), onClick: () => setIsModalOpen(true) } : undefined}
+            />
 
             {/* Create Modal */}
             {isModalOpen && (
@@ -243,7 +282,6 @@ const LoanList = () => {
                                 <div className="mb-3">
                                     <label className="form-label">{t('hr.loans.start_date')}</label>
                                     <input
-                                       
                                         className="form-input"
                                         value={formData.start_date}
                                         onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, File, Up
 import shutil
 import os
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import date, datetime, timedelta
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -18,6 +18,7 @@ from utils.accounting import (
 )
 from utils.audit import log_activity
 from sqlalchemy import text
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 import logging
 
 logger = logging.getLogger(__name__)
@@ -148,7 +149,7 @@ async def get_project(project_id: int, current_user: dict = Depends(get_current_
         if not project:
             raise HTTPException(status_code=404, detail="المشروع غير موجود")
 
-        project_data = dict(project._mapping)
+        project_data: Dict[str, Any] = dict(project._mapping)
 
         # Tasks
         tasks = db.execute(text("""
@@ -564,41 +565,40 @@ async def create_project_expense(
         }).scalar()
 
         # 2. Journal Entry
-        entry_num = generate_sequential_number(db, f"PEXP-{datetime.now().year}", "journal_entries", "entry_number")
-
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, status,
-                currency, exchange_rate, created_by
-            ) VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid)
-            RETURNING id
-        """), {
-            "num": entry_num, "date": expense.expense_date,
-            "desc": f"مصروف مشروع: {project._mapping['project_name']} - {expense.description or expense.expense_type}",
-            "curr": base_currency, "uid": current_user.id
-        }).scalar()
-
         cost_center_id = db.execute(text(
             "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
         ), {"name": f"%{project._mapping['project_name']}%"}).scalar()
-
-        # Dr Expense
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, cost_center_id)
-            VALUES (:jid, :aid, :amt, 0, :desc, :cc)
-        """), {"jid": je_id, "aid": expense_acc, "amt": amount,
-               "desc": expense.description or expense.expense_type, "cc": cost_center_id})
-
-        # Cr Cash
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, cost_center_id)
-            VALUES (:jid, :aid, 0, :amt, :desc, :cc)
-        """), {"jid": je_id, "aid": cash_acc, "amt": amount,
-               "desc": expense.description or expense.expense_type, "cc": cost_center_id})
-
-        # 3. Update balances
-        update_account_balance(db, account_id=expense_acc, debit_base=amount, credit_base=0)
-        update_account_balance(db, account_id=cash_acc, debit_base=0, credit_base=amount)
+        
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=expense.expense_date.isoformat() if hasattr(expense.expense_date, 'isoformat') else str(expense.expense_date),
+            description=f"مصروف مشروع: {project._mapping['project_name']} - {expense.description or expense.expense_type}",
+            reference=None,
+            status="posted",
+            currency=base_currency,
+            exchange_rate=1.0,
+            lines=[
+                {
+                    "account_id": expense_acc,
+                    "debit": amount,
+                    "credit": 0,
+                    "description": expense.description or expense.expense_type,
+                    "cost_center_id": cost_center_id
+                },
+                {
+                    "account_id": cash_acc,
+                    "debit": 0,
+                    "credit": amount,
+                    "description": expense.description or expense.expense_type,
+                    "cost_center_id": cost_center_id
+                }
+            ],
+            user_id=current_user.id,
+            branch_id=project._mapping.get('branch_id'),
+            source="project_expense",
+            source_id=exp_id
+        )
 
         if expense.treasury_id:
             db.execute(text(
@@ -708,34 +708,40 @@ async def create_project_revenue(
         }).scalar()
 
         # 2. Journal Entry
-        entry_num = generate_sequential_number(db, f"PREV-{datetime.now().year}", "journal_entries", "entry_number")
+        cost_center_id = db.execute(text(
+            "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+        ), {"name": f"%{project._mapping['project_name']}%"}).scalar()
 
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, status,
-                currency, exchange_rate, created_by
-            ) VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid)
-            RETURNING id
-        """), {
-            "num": entry_num, "date": revenue.revenue_date,
-            "desc": f"إيراد مشروع: {project._mapping['project_name']} - {revenue.description or revenue.revenue_type}",
-            "curr": base_currency, "uid": current_user.id
-        }).scalar()
-
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-            VALUES (:jid, :aid, :amt, 0, :desc)
-        """), {"jid": je_id, "aid": debit_acc, "amt": amount,
-               "desc": revenue.description or revenue.revenue_type})
-
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-            VALUES (:jid, :aid, 0, :amt, :desc)
-        """), {"jid": je_id, "aid": revenue_acc, "amt": amount,
-               "desc": revenue.description or revenue.revenue_type})
-
-        update_account_balance(db, account_id=debit_acc, debit_base=amount, credit_base=0)
-        update_account_balance(db, account_id=revenue_acc, debit_base=0, credit_base=amount)
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=revenue.revenue_date.isoformat() if hasattr(revenue.revenue_date, 'isoformat') else str(revenue.revenue_date),
+            description=f"إيراد مشروع: {project._mapping['project_name']} - {revenue.description or revenue.revenue_type}",
+            reference=None,
+            status="posted",
+            currency=base_currency,
+            exchange_rate=1.0,
+            lines=[
+                {
+                    "account_id": debit_acc,
+                    "debit": amount,
+                    "credit": 0,
+                    "description": revenue.description or revenue.revenue_type,
+                    "cost_center_id": cost_center_id
+                },
+                {
+                    "account_id": revenue_acc,
+                    "debit": 0,
+                    "credit": amount,
+                    "description": revenue.description or revenue.revenue_type,
+                    "cost_center_id": cost_center_id
+                }
+            ],
+            user_id=current_user.id,
+            branch_id=project._mapping.get('branch_id'),
+            source="project_revenue",
+            source_id=rev_id
+        )
 
         db.commit()
 
@@ -901,7 +907,7 @@ async def get_resource_allocation(
         # Fetch actual timesheets for verification (Optional, maybe for a different view)
         # For allocation, we mainly care about "Planned" load to avoid overloading.
 
-        allocation = {}
+        allocation: Dict[int, Dict[str, Any]] = {}
 
         # Helper to generate date range
         from datetime import timedelta
@@ -946,7 +952,7 @@ async def get_resource_allocation(
                 "id": data["id"],
                 "name": data["name"],
                 "projects": list(data["projects"]),
-                "daily_load": [{"date": d, "hours": round(h, 2)} for d, h in data["daily_load"].items()]
+                "daily_load": [{"date": d, "hours": float(f"{float(h):.2f}")} for d, h in data["daily_load"].items()]
             })
 
         return result
@@ -1185,36 +1191,40 @@ async def approve_timesheets(
                 }).scalar()
 
                 # B. Create Journal Entry
-                je_num = generate_sequential_number(db, f"PLAB-{datetime.now().year}", "journal_entries", "entry_number")
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, status,
-                        currency, exchange_rate, created_by
-                    ) VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid)
-                    RETURNING id
-                """), {
-                    "num": je_num,
-                    "date": ts.date,
-                    "desc": f"قيد تكلفة عمالة مشروع: {project.project_name} - {ts.emp_name}",
-                    "curr": base_curr,
-                    "uid": current_user.id
-                }).scalar()
+                cost_center_id = db.execute(text(
+                    "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+                ), {"name": f"%{project.project_name}%"}).scalar()
 
-                # Debit: Labor Expense
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :acc, :amt, 0, :desc)
-                """), {"jid": je_id, "acc": acc_labor_exp, "amt": total_cost, "desc": f"تكلفة عمالة مشروع {project.project_name}"})
-
-                # Credit: Accrued Salaries
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :acc, 0, :amt, :desc)
-                """), {"jid": je_id, "acc": acc_payable, "amt": total_cost, "desc": f"استحقاق رواتب - مشروع {project.project_name}"})
-
-                # C. Update Account Balances
-                update_account_balance(db, acc_labor_exp, debit_base=total_cost, credit_base=0)
-                update_account_balance(db, acc_payable, debit_base=0, credit_base=total_cost)
+                je_id, _ = gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.company_id,
+                    date=ts.date.isoformat() if hasattr(ts.date, 'isoformat') else str(ts.date),
+                    description=f"قيد تكلفة عمالة مشروع: {project.project_name} - {ts.emp_name}",
+                    reference=None,
+                    status="posted",
+                    currency=base_curr,
+                    exchange_rate=1.0,
+                    lines=[
+                        {
+                            "account_id": acc_labor_exp,
+                            "debit": total_cost,
+                            "credit": 0,
+                            "description": f"تكلفة عمالة مشروع {project.project_name}",
+                            "cost_center_id": cost_center_id
+                        },
+                        {
+                            "account_id": acc_payable,
+                            "debit": 0,
+                            "credit": total_cost,
+                            "description": f"استحقاق رواتب - مشروع {project.project_name}",
+                            "cost_center_id": cost_center_id
+                        }
+                    ],
+                    user_id=current_user.id,
+                    branch_id=project.branch_id,
+                    source="project_timesheet",
+                    source_id=ts_id
+                )
 
             # D. Update Timesheet Status
             db.execute(text("UPDATE project_timesheets SET status = 'approved' WHERE id = :id"), {"id": ts_id})
@@ -1459,60 +1469,56 @@ async def create_project_invoice(
         base_currency = get_base_currency(db)
         
         if ar_acc and rev_acc and grand_total > 0:
-            entry_num = generate_sequential_number(db, f"PINV-{datetime.now().year}", "journal_entries", "entry_number")
-            
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, description, status,
-                    currency, exchange_rate, created_by
-                ) VALUES (:num, :date, :desc, 'posted', :curr, :rate, :uid)
-                RETURNING id
-            """), {
-                "num": entry_num, "date": invoice_data.invoice_date,
-                "desc": f"فاتورة مشروع: {project.project_name} — {inv_num}",
-                "curr": inv_currency, "rate": exchange_rate, "uid": current_user.id
-            }).scalar()
-            
+            lines = []
+            cost_center_id = db.execute(text(
+                "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+            ), {"name": f"%{project.project_name}%"}).scalar()
+
             # Dr: Accounts Receivable = grand_total
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
-                VALUES (:jid, :aid, :amt, 0, :desc, :curr, :rate)
-            """), {
-                "jid": je_id, "aid": ar_acc, "amt": grand_total,
-                "desc": f"ذمم مدينة — فاتورة مشروع {inv_num}",
-                "curr": inv_currency, "rate": exchange_rate
+            lines.append({
+                "account_id": ar_acc,
+                "debit": grand_total,
+                "credit": 0,
+                "description": f"ذمم مدينة — فاتورة مشروع {inv_num}",
+                "cost_center_id": cost_center_id
             })
-            update_account_balance(db, account_id=ar_acc, debit_base=grand_total * exchange_rate, credit_base=0,
-                                   debit_curr=grand_total, credit_curr=0, currency=inv_currency)
             
             # Cr: Revenue = subtotal (before tax)
             net_revenue = subtotal - total_discount
             if net_revenue > 0:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
-                    VALUES (:jid, :aid, 0, :amt, :desc, :curr, :rate)
-                """), {
-                    "jid": je_id, "aid": rev_acc, "amt": net_revenue,
-                    "desc": f"إيراد مشروع {project.project_name}",
-                    "curr": inv_currency, "rate": exchange_rate
+                lines.append({
+                    "account_id": rev_acc,
+                    "debit": 0,
+                    "credit": net_revenue,
+                    "description": f"إيراد مشروع {project.project_name}",
+                    "cost_center_id": cost_center_id
                 })
-                update_account_balance(db, account_id=rev_acc, debit_base=0, credit_base=net_revenue * exchange_rate,
-                                       debit_curr=0, credit_curr=net_revenue, currency=inv_currency)
             
             # Cr: VAT Output = tax_amount (if applicable)
             if total_tax > 0:
                 vat_acc = get_mapped_account_id(db, "acc_map_vat_out") or get_mapped_account_id(db, "acc_map_tax_payable")
                 if vat_acc:
-                    db.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency, exchange_rate)
-                        VALUES (:jid, :aid, 0, :amt, :desc, :curr, :rate)
-                    """), {
-                        "jid": je_id, "aid": vat_acc, "amt": total_tax,
-                        "desc": f"ضريبة القيمة المضافة — فاتورة مشروع {inv_num}",
-                        "curr": inv_currency, "rate": exchange_rate
+                    lines.append({
+                        "account_id": vat_acc,
+                        "debit": 0,
+                        "credit": total_tax,
+                        "description": f"ضريبة القيمة المضافة — فاتورة مشروع {inv_num}",
+                        "cost_center_id": cost_center_id
                     })
-                    update_account_balance(db, account_id=vat_acc, debit_base=0, credit_base=total_tax * exchange_rate,
-                                           debit_curr=0, credit_curr=total_tax, currency=inv_currency)
+
+            je_id, entry_num = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                date=invoice_data.invoice_date,
+                description=f"فاتورة مشروع: {project.project_name} — {inv_num}",
+                status="posted",
+                currency=inv_currency,
+                exchange_rate=exchange_rate,
+                lines=lines,
+                user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                source="project_invoice",
+                source_id=inv_id
+            )
             
             # Update invoice with journal entry reference
             db.execute(text("UPDATE invoices SET notes = notes || ' | JE: ' || :je_num WHERE id = :id"),
@@ -1740,8 +1746,6 @@ async def close_project(
 
         je_id = None
         if abs(net_profit_loss) > 0.01:
-            entry_num = generate_sequential_number(db, f"PCLOSE-{close_date.year}", "journal_entries", "entry_number")
-
             pl_acc = get_mapped_account_id(db, "acc_map_project_pl")
             if not pl_acc:
                 pl_acc = db.execute(text(
@@ -1749,51 +1753,51 @@ async def close_project(
                 )).scalar()
 
             if pl_acc:
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, status,
-                        currency, exchange_rate, created_by
-                    ) VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid)
-                    RETURNING id
-                """), {
-                    "num": entry_num, "date": close_date,
-                    "desc": f"إقفال مشروع: {p['project_name']} — صافي {'ربح' if net_profit_loss > 0 else 'خسارة'}: {abs(net_profit_loss):.2f}",
-                    "curr": base_currency, "uid": current_user.id
-                }).scalar()
+                lines = []
+                cost_center_id = db.execute(text(
+                    "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+                ), {"name": f"%{p['project_name']}%"}).scalar()
 
                 if net_profit_loss > 0:
                     rev_acc = get_mapped_account_id(db, "acc_map_sales_rev")
                     if rev_acc:
-                        db.execute(text("""
-                            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                            VALUES (:jid, :aid, :amt, 0, :desc)
-                        """), {"jid": je_id, "aid": rev_acc, "amt": net_profit_loss,
-                               "desc": f"إقفال إيرادات مشروع {p['project_name']}"})
-                        db.execute(text("""
-                            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                            VALUES (:jid, :aid, 0, :amt, :desc)
-                        """), {"jid": je_id, "aid": pl_acc, "amt": net_profit_loss,
-                               "desc": f"ربح مشروع {p['project_name']}"})
-                        update_account_balance(db, account_id=rev_acc, debit_base=net_profit_loss, credit_base=0)
-                        update_account_balance(db, account_id=pl_acc, debit_base=0, credit_base=net_profit_loss)
+                        lines.append({
+                            "account_id": rev_acc, "debit": net_profit_loss, "credit": 0,
+                            "description": f"إقفال إيرادات مشروع {p['project_name']}", "cost_center_id": cost_center_id
+                        })
+                        lines.append({
+                            "account_id": pl_acc, "debit": 0, "credit": net_profit_loss,
+                            "description": f"ربح مشروع {p['project_name']}", "cost_center_id": cost_center_id
+                        })
                 else:
                     loss_amount = abs(net_profit_loss)
                     exp_acc = db.execute(text(
                         "SELECT id FROM accounts WHERE account_number = '5200' OR account_number = '52' LIMIT 1"
                     )).scalar()
                     if exp_acc:
-                        db.execute(text("""
-                            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                            VALUES (:jid, :aid, :amt, 0, :desc)
-                        """), {"jid": je_id, "aid": pl_acc, "amt": loss_amount,
-                               "desc": f"خسارة مشروع {p['project_name']}"})
-                        db.execute(text("""
-                            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                            VALUES (:jid, :aid, 0, :amt, :desc)
-                        """), {"jid": je_id, "aid": exp_acc, "amt": loss_amount,
-                               "desc": f"إقفال مصاريف مشروع {p['project_name']}"})
-                        update_account_balance(db, account_id=pl_acc, debit_base=loss_amount, credit_base=0)
-                        update_account_balance(db, account_id=exp_acc, debit_base=0, credit_base=loss_amount)
+                        lines.append({
+                            "account_id": pl_acc, "debit": loss_amount, "credit": 0,
+                            "description": f"خسارة مشروع {p['project_name']}", "cost_center_id": cost_center_id
+                        })
+                        lines.append({
+                            "account_id": exp_acc, "debit": 0, "credit": loss_amount,
+                            "description": f"إقفال مصاريف مشروع {p['project_name']}", "cost_center_id": cost_center_id
+                        })
+                
+                if lines:
+                    je_id, entry_num = gl_create_journal_entry(
+                        db=db,
+                        company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                        date=close_date,
+                        description=f"إقفال مشروع: {p['project_name']} — صافي {'ربح' if net_profit_loss > 0 else 'خسارة'}: {abs(net_profit_loss):.2f}",
+                        status="posted",
+                        currency=base_currency,
+                        exchange_rate=1.0,
+                        lines=lines,
+                        user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                        source="project_closure",
+                        source_id=project_id
+                    )
 
         db.execute(text("""
             UPDATE projects
@@ -1969,29 +1973,32 @@ async def generate_retainer_invoices(
             # GL Entry: Dr AR / Cr Revenue
             je_id = None
             if ar_acc and rev_acc:
-                entry_num = generate_sequential_number(db, f"RETJE-{target_date.year}", "journal_entries", "entry_number")
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (entry_number, entry_date, description, status, currency, exchange_rate, created_by)
-                    VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid) RETURNING id
-                """), {
-                    "num": entry_num, "date": target_date,
-                    "desc": f"فاتورة Retainer — {p['project_name']} — {inv_num}",
-                    "curr": base_currency, "uid": current_user.id
-                }).scalar()
-                
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :aid, :amt, 0, :desc)
-                """), {"jid": je_id, "aid": ar_acc, "amt": amount,
-                       "desc": f"ذمم مدينة — Retainer {p['project_name']}"})
-                update_account_balance(db, ar_acc, debit_base=amount, credit_base=0)
-                
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :aid, 0, :amt, :desc)
-                """), {"jid": je_id, "aid": rev_acc, "amt": amount,
-                       "desc": f"إيراد Retainer {p['project_name']}"})
-                update_account_balance(db, rev_acc, debit_base=0, credit_base=amount)
+                cost_center_id = db.execute(text(
+                    "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+                ), {"name": f"%{p['project_name']}%"}).scalar()
+
+                je_id, entry_num = gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                    date=target_date,
+                    description=f"فاتورة Retainer — {p['project_name']} — {inv_num}",
+                    status="posted",
+                    currency=base_currency,
+                    exchange_rate=1.0,
+                    lines=[
+                        {
+                            "account_id": ar_acc, "debit": amount, "credit": 0,
+                            "description": f"ذمم مدينة — Retainer {p['project_name']}", "cost_center_id": cost_center_id
+                        },
+                        {
+                            "account_id": rev_acc, "debit": 0, "credit": amount,
+                            "description": f"إيراد Retainer {p['project_name']}", "cost_center_id": cost_center_id
+                        }
+                    ],
+                    user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                    source="project_invoice",
+                    source_id=inv_id
+                )
             
             # Calculate next billing date
             cycle = p.get("billing_cycle", "monthly")

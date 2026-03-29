@@ -1,26 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 
 
 const ShipmentList = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const { currentBranch } = useBranch();
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('');
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
 
     useEffect(() => {
         fetchShipments();
-    }, [filter, currentBranch]);
+    }, [statusFilter, currentBranch]);
 
     const fetchShipments = async () => {
         try {
-            const res = await inventoryAPI.listShipments({ status_filter: filter || undefined, branch_id: currentBranch?.id });
+            setLoading(true);
+            const res = await inventoryAPI.listShipments({ status_filter: statusFilter || undefined, branch_id: currentBranch?.id });
             setShipments(res.data);
         } catch (err) {
             console.error("Failed to load shipments", err);
@@ -50,7 +55,59 @@ const ShipmentList = () => {
         );
     };
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    const filteredShipments = useMemo(() => {
+        if (!search) return shipments;
+        const q = search.toLowerCase();
+        return shipments.filter(s =>
+            (s.shipment_ref || '').toLowerCase().includes(q) ||
+            (s.source_warehouse || '').toLowerCase().includes(q) ||
+            (s.destination_warehouse || '').toLowerCase().includes(q)
+        );
+    }, [shipments, search]);
+
+    const columns = [
+        {
+            key: 'shipment_ref',
+            label: t('stock.shipments.table.ref'),
+            render: (val) => <span className="font-medium">{val}</span>,
+        },
+        {
+            key: 'source_warehouse',
+            label: t('stock.shipments.table.from'),
+        },
+        {
+            key: 'destination_warehouse',
+            label: t('stock.shipments.table.to'),
+        },
+        {
+            key: 'item_count',
+            label: t('stock.shipments.table.items'),
+        },
+        {
+            key: 'status',
+            label: t('stock.shipments.table.status'),
+            render: (val) => getStatusBadge(val),
+        },
+        {
+            key: 'created_at',
+            label: t('stock.shipments.table.date'),
+            render: (val) => <span className="text-muted">{formatShortDate(val)}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('stock.shipments.table.actions'),
+            width: '120px',
+            render: (_, row) => (
+                <Link
+                    to={`/stock/shipments/${row.id}`}
+                    className="btn btn-sm btn-secondary"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {t('stock.shipments.view')}
+                </Link>
+            ),
+        },
+    ];
 
     return (
         <div className="workspace fade-in">
@@ -70,66 +127,31 @@ const ShipmentList = () => {
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="section-card" style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <span style={{ fontWeight: '600' }}>{t('stock.shipments.filter_status')}</span>
-                    <select
-                        className="form-input"
-                        style={{ width: 'auto' }}
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                    >
-                        <option value="">{t('stock.shipments.all')}</option>
-                        <option value="pending">{t('stock.shipments.status.pending')}</option>
-                        <option value="received">{t('stock.shipments.status.received')}</option>
-                        <option value="cancelled">{t('stock.shipments.status.cancelled')}</option>
-                    </select>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('stock.shipments.search_placeholder', 'بحث بالمرجع أو المستودع...')}
+                filters={[{
+                    key: 'status',
+                    label: t('stock.shipments.filter_status'),
+                    options: [
+                        { value: 'pending', label: t('stock.shipments.status.pending') },
+                        { value: 'received', label: t('stock.shipments.status.received') },
+                        { value: 'cancelled', label: t('stock.shipments.status.cancelled') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
 
-            {/* Table */}
-            <div className="section-card">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('stock.shipments.table.ref')}</th>
-                            <th>{t('stock.shipments.table.from')}</th>
-                            <th>{t('stock.shipments.table.to')}</th>
-                            <th>{t('stock.shipments.table.items')}</th>
-                            <th>{t('stock.shipments.table.status')}</th>
-                            <th>{t('stock.shipments.table.date')}</th>
-                            <th>{t('stock.shipments.table.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {shipments.length === 0 && (
-                            <tr>
-                                <td colSpan="7" className="text-center text-muted py-5">
-                                    {t('stock.shipments.empty')}
-                                </td>
-                            </tr>
-                        ) || null}
-                        {shipments.map(s => (
-                            <tr key={s.id}>
-                                <td className="font-medium">{s.shipment_ref}</td>
-                                <td>{s.source_warehouse}</td>
-                                <td>{s.destination_warehouse}</td>
-                                <td>{s.item_count}</td>
-                                <td>{getStatusBadge(s.status)}</td>
-                                <td className="text-muted">
-                                    {formatShortDate(s.created_at)}
-                                </td>
-                                <td>
-                                    <Link to={`/stock/shipments/${s.id}`} className="btn btn-sm btn-secondary">
-                                        {t('stock.shipments.view')}
-                                    </Link>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredShipments}
+                loading={loading}
+                onRowClick={(row) => navigate(`/stock/shipments/${row.id}`)}
+                emptyIcon="📦"
+                emptyTitle={t('stock.shipments.empty')}
+            />
         </div>
     );
 };

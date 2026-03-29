@@ -9,6 +9,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function InvoiceForm() {
     const { t } = useTranslation()
@@ -142,6 +143,7 @@ function InvoiceForm() {
                     if (product) {
                         updatedItem.description = product.item_name
                         updatedItem.unit_price = product.selling_price
+                        updatedItem.unit = product.unit || 'قطعة'
                         updatedItem.tax_rate = product.tax_rate !== undefined ? product.tax_rate : 15
                         // Try applying item-level effect from group
                         const customer = customers.find(c => c.id === parseInt(formData.customer_id));
@@ -215,8 +217,11 @@ function InvoiceForm() {
         productIds.forEach(id => fetchProductStock(parseInt(id), formData.warehouse_id));
     }, [formData.warehouse_id]);
 
+    const DISCRETE_UNITS = ['قطعة', 'علبة', 'كرتون', 'piece', 'box', 'carton', 'unit'];
+    const isDiscreteUnit = (unit) => DISCRETE_UNITS.includes((unit || '').trim().toLowerCase()) || DISCRETE_UNITS.includes((unit || '').trim());
+
     const addItem = () => {
-        setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0 }])
+        setItems([...items, { product_id: '', description: '', quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0, unit: '' }])
     }
 
     const removeItem = (index) => {
@@ -422,8 +427,7 @@ function InvoiceForm() {
                                 ))}
                             </select>
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('stock.warehouses.title')}</label>
+                        <FormField label={t('stock.warehouses.title')} style={{ flex: 1 }}>
                             <select
                                 className="form-input"
                                 value={formData.warehouse_id || ''}
@@ -434,15 +438,15 @@ function InvoiceForm() {
                                     <option key={wh.id} value={wh.id}>{wh.name}</option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group">
+                        </FormField>
+                        <FormField>
                             <CustomDatePicker
                                 label={t('sales.invoices.form.date')}
                                 selected={formData.invoice_date}
                                 onChange={(dateStr) => setFormData({ ...formData, invoice_date: dateStr })}
                                 required
                             />
-                        </div>
+                        </FormField>
                     </div>
                 </div>
 
@@ -486,9 +490,14 @@ function InvoiceForm() {
                                         </td>
                                         <td>
                                             <input
-                                                type="number" className="form-input" min="1" step={getStep()}
+                                                type="number" className="form-input" min={isDiscreteUnit(item.unit) ? "1" : "0.01"}
+                                                step={isDiscreteUnit(item.unit) ? "1" : getStep()}
                                                 value={item.quantity}
-                                                onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                                onChange={(e) => {
+                                                    let val = parseFloat(e.target.value) || 0;
+                                                    if (isDiscreteUnit(item.unit)) val = Math.round(val);
+                                                    handleItemChange(index, 'quantity', val);
+                                                }}
                                             />
                                             {item.product_id && productStocks[item.product_id] !== undefined && (
                                                 <small style={{ display: 'block', color: '#666', marginTop: '2px' }}>
@@ -544,8 +553,7 @@ function InvoiceForm() {
 
                         {/* Currency Selection */}
                         <div className="form-row mb-3">
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">{t('common.currency')}</label>
+                            <FormField label={t('common.currency')} style={{ flex: 1 }}>
                                 <select
                                     className="form-input form-input-sm"
                                     value={formData.currency}
@@ -563,23 +571,21 @@ function InvoiceForm() {
                                         <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                             {formData.currency !== currency && (
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('accounting.currencies.table.rate')}</label>
+                                <FormField label={t('accounting.currencies.table.rate')} style={{ flex: 1 }}>
                                     <input
                                         type="number"
                                         step="0.000001"
                                         className="form-input form-input-sm font-mono"
                                         value={formData.exchange_rate}
-                                        onChange={e => setFormData({ ...formData, exchange_rate: parseFloat(e.target.value) || 1 })}
+                                        onChange={e => setFormData({ ...formData, exchange_rate: Math.max(parseFloat(e.target.value) || 1, 0.0001) })}
                                     />
-                                </div>
+                                </FormField>
                             )}
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">{t('sales.invoices.form.payment.method')}</label>
+                        <FormField label={t('sales.invoices.form.payment.method')}>
                             <div style={{ display: 'flex', gap: '16px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                     <input
@@ -606,7 +612,7 @@ function InvoiceForm() {
                                     {t('sales.invoices.form.payment.credit')}
                                 </label>
                             </div>
-                        </div>
+                        </FormField>
 
                         {formData.payment_method && formData.payment_method !== 'credit' && (
                             <div className="form-group animate-fade-in">
@@ -710,14 +716,13 @@ function InvoiceForm() {
                         )}
 
 
-                        <div className="form-group">
-                            <label className="form-label">{t('sales.invoices.form.notes')}</label>
+                        <FormField label={t('sales.invoices.form.notes')}>
                             <textarea
                                 className="form-input" rows="3"
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{ width: '300px', padding: '24px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>

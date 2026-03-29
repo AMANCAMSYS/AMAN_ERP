@@ -1,10 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Briefcase } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 
 const PositionList = () => {
     const { t } = useTranslation();
@@ -12,6 +14,8 @@ const PositionList = () => {
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [search, setSearch] = useState('');
+    const [departmentFilter, setDepartmentFilter] = useState('');
 
     const [formData, setFormData] = useState({
         position_name: '',
@@ -59,15 +63,57 @@ const PositionList = () => {
         }
     };
 
+    const filteredData = useMemo(() => {
+        let result = positions;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(pos =>
+                (pos.position_name || '').toLowerCase().includes(q) ||
+                (pos.department_name || '').toLowerCase().includes(q)
+            );
+        }
+        if (departmentFilter) {
+            result = result.filter(pos => String(pos.department_id) === departmentFilter);
+        }
+        return result;
+    }, [positions, search, departmentFilter]);
+
+    const departmentOptions = useMemo(() =>
+        departments.map(dept => ({ value: String(dept.id), label: dept.department_name })),
+        [departments]
+    );
+
+    const columns = [
+        { key: 'position_name', label: t("hr.positions.job_title"), style: { fontWeight: 'bold' } },
+        {
+            key: 'department_name', label: t("hr.positions.department"),
+            render: (val) => val ? (
+                <span className="badge bg-light text-dark border">{val}</span>
+            ) : '-',
+        },
+        {
+            key: '_actions', label: t("common.actions"), width: '100px',
+            render: (_val, row) => (
+                <button
+                    className="btn btn-icon text-danger"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}
+                    title={t("common.delete")}
+                >
+                    <Trash2 size={16} />
+                </button>
+            ),
+        },
+    ];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <div className="header-title">
-                    <h1 className="workspace-title">{t("hr.positions.title")}</h1>
-                    <p className="workspace-subtitle">{t("hr.positions.subtitle")}</p>
-                </div>
-                <div className="header-actions">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title">{t("hr.positions.title")}</h1>
+                        <p className="workspace-subtitle">{t("hr.positions.subtitle")}</p>
+                    </div>
                     <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                         <Plus size={18} className="ms-2" />
                         {t('hr.positions.add')}
@@ -75,55 +121,25 @@ const PositionList = () => {
                 </div>
             </div>
 
-            <div className="card shadow-sm border-0">
-                <div className="card-body p-0">
-                    <table className="data-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>{t("hr.positions.job_title")}</th>
-                                <th>{t("hr.positions.department")}</th>
-                                <th style={{ width: '100px' }}>{t("common.actions")}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="4" className="text-center p-4">{t("common.loading")}</td></tr>
-                            ) : positions.length === 0 ? (
-                                <tr>
-                                    <td colSpan="4" className="text-center p-5">
-                                        <div className="text-muted mb-3" style={{ fontSize: '30px' }}>💼</div>
-                                        <p>{t("hr.positions.no_positions")}</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                positions.map((pos, index) => (
-                                    <tr key={pos.id} className="hover-row">
-                                        <td>{index + 1}</td>
-                                        <td className="fw-bold">{pos.position_name}</td>
-                                        <td>
-                                            {pos.department_name ? (
-                                                <span className="badge bg-light text-dark border">
-                                                    {pos.department_name}
-                                                </span>
-                                            ) : '-'}
-                                        </td>
-                                        <td>
-                                            <button
-                                                className="btn btn-icon text-danger"
-                                                onClick={() => handleDelete(pos.id)}
-                                                title={t("common.delete")}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t("hr.positions.job_title")}
+                filters={[
+                    { key: 'department', label: t("hr.positions.department"), options: departmentOptions },
+                ]}
+                filterValues={{ department: departmentFilter }}
+                onFilterChange={(_key, val) => setDepartmentFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                emptyIcon="💼"
+                emptyTitle={t("hr.positions.no_positions")}
+                emptyAction={{ label: t('hr.positions.add'), onClick: () => setShowModal(true) }}
+            />
 
             {/* Create Modal */}
             {showModal && (

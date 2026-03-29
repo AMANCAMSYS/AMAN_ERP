@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function ContractForm() {
     const { t } = useTranslation()
@@ -147,12 +148,10 @@ function ContractForm() {
             <form onSubmit={handleSubmit}>
                 <div className="card mb-4">
                     <div className="form-row">
-                        <div className="form-group">
-                            <label className="form-label">{t("sales.contracts.form.contract_number")}</label>
+                        <FormField label={t("sales.contracts.form.contract_number")}>
                             <input type="text" className="form-input" value={formData.contract_number} readOnly />
-                        </div>
-                        <div className="form-group" style={{ flex: 2 }}>
-                            <label className="form-label">{t("sales.contracts.form.customer")} *</label>
+                        </FormField>
+                        <FormField label={t("sales.contracts.form.customer")} required style={{ flex: 2 }}>
                             <select
                                 className="form-input"
                                 value={formData.party_id}
@@ -162,9 +161,8 @@ function ContractForm() {
                                 <option value="">{t("sales.contracts.form.select_customer")}</option>
                                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">{t("sales.contracts.form.contract_type")}</label>
+                        </FormField>
+                        <FormField label={t("sales.contracts.form.contract_type")}>
                             <select
                                 className="form-input"
                                 value={formData.contract_type}
@@ -174,7 +172,7 @@ function ContractForm() {
                                 <option value="fixed">{t("sales.contracts.type_fixed")}</option>
                                 <option value="recurring">{t("sales.contracts.type_recurring")}</option>
                             </select>
-                        </div>
+                        </FormField>
                     </div>
                     <div className="form-row mt-3">
                         <div className="form-group">
@@ -191,8 +189,7 @@ function ContractForm() {
                                 onChange={d => setFormData({ ...formData, end_date: d })}
                             />
                         </div>
-                        <div className="form-group">
-                            <label className="form-label">{t("sales.contracts.form.billing_interval")}</label>
+                        <FormField label={t("sales.contracts.form.billing_interval")}>
                             <select
                                 className="form-input"
                                 value={formData.billing_interval}
@@ -202,7 +199,7 @@ function ContractForm() {
                                 <option value="quarterly">{t("sales.contracts.form.quarterly")}</option>
                                 <option value="yearly">{t("sales.contracts.form.yearly")}</option>
                             </select>
-                        </div>
+                        </FormField>
                     </div>
                 </div>
 
@@ -258,8 +255,9 @@ function ContractForm() {
                 <div className="card mb-4">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ flex: 1 }}>
-                            <label className="form-label">{t("sales.contracts.form.notes")}</label>
-                            <textarea className="form-input" rows="3" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })}></textarea>
+                            <FormField label={t("sales.contracts.form.notes")}>
+                                <textarea className="form-input" rows="3" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })}></textarea>
+                            </FormField>
                         </div>
                         <div style={{ width: '300px', marginLeft: '32px', textAlign: 'left' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>

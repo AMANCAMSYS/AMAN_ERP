@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
-import Pagination, { usePagination } from '../../components/common/Pagination'
-import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
+import BackButton from '../../components/common/BackButton'
 
 function PurchaseInvoiceList() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const [invoices, setInvoices] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
 
     useEffect(() => {
         const fetchInvoices = async () => {
@@ -32,9 +35,54 @@ function PurchaseInvoiceList() {
         fetchInvoices()
     }, [currentBranch, t])
 
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(invoices)
+    const filteredInvoices = useMemo(() => {
+        let result = invoices
+        if (search) {
+            const q = search.toLowerCase()
+            result = result.filter(inv =>
+                (inv.invoice_number || '').toLowerCase().includes(q) ||
+                (inv.supplier_name || '').toLowerCase().includes(q)
+            )
+        }
+        if (statusFilter) {
+            result = result.filter(inv => inv.status === statusFilter)
+        }
+        return result
+    }, [invoices, search, statusFilter])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const columns = [
+        {
+            key: 'invoice_number',
+            label: t('buying.purchase_invoices.table.invoice_number'),
+            style: { fontWeight: 'bold' },
+        },
+        {
+            key: 'supplier_name',
+            label: t('buying.purchase_invoices.table.supplier'),
+        },
+        {
+            key: 'invoice_date',
+            label: t('buying.purchase_invoices.table.date'),
+            render: (val) => formatShortDate(val),
+        },
+        {
+            key: 'total',
+            label: t('buying.purchase_invoices.table.total'),
+            style: { fontWeight: 'bold' },
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'status',
+            label: t('buying.purchase_invoices.table.status'),
+            render: (val) => (
+                <span className={`badge ${val === 'paid' ? 'badge-success' : val === 'partial' ? 'badge-warning' : 'badge-danger'}`}>
+                    {val === 'paid' ? t('buying.purchase_invoices.details.status.paid') :
+                        val === 'partial' ? t('buying.purchase_invoices.details.status.partial') :
+                            t('buying.purchase_invoices.details.status.unpaid')}
+                </span>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -54,51 +102,32 @@ function PurchaseInvoiceList() {
 
             {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('buying.purchase_invoices.table.invoice_number')}</th>
-                            <th>{t('buying.purchase_invoices.table.supplier')}</th>
-                            <th>{t('buying.purchase_invoices.table.date')}</th>
-                            <th>{t('buying.purchase_invoices.table.total')}</th>
-                            <th>{t('buying.purchase_invoices.table.status')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invoices.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="start-guide">
-                                    <div style={{ padding: '40px', textAlign: 'center' }}>
-                                        <h3>{t('buying.purchase_invoices.empty.title')}</h3>
-                                        <p>{t('buying.purchase_invoices.empty.desc')}</p>
-                                        <button className="btn btn-primary mt-4" onClick={() => navigate('/buying/invoices/new')}>
-                                            {t('buying.purchase_invoices.empty.action')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map(inv => (
-                                <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/buying/invoices/${inv.id}`)}>
-                                    <td style={{ fontWeight: 'bold' }}>{inv.invoice_number}</td>
-                                    <td>{inv.supplier_name}</td>
-                                    <td>{formatShortDate(inv.invoice_date)}</td>
-                                    <td>{formatNumber(inv.total)}</td>
-                                    <td>
-                                        <span className={`badge ${inv.status === 'paid' ? 'badge-success' : inv.status === 'partial' ? 'badge-warning' : 'badge-danger'}`}>
-                                            {inv.status === 'paid' ? t('buying.purchase_invoices.details.status.paid') :
-                                                inv.status === 'partial' ? t('buying.purchase_invoices.details.status.partial') :
-                                                    t('buying.purchase_invoices.details.status.unpaid')}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('buying.purchase_invoices.search_placeholder', '\u0628\u062D\u062B \u0628\u0631\u0642\u0645 \u0627\u0644\u0641\u0627\u062A\u0648\u0631\u0629 \u0623\u0648 \u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0631\u062F...')}
+                filters={[{
+                    key: 'status',
+                    label: t('buying.purchase_invoices.table.status'),
+                    options: [
+                        { value: 'paid', label: t('buying.purchase_invoices.details.status.paid') },
+                        { value: 'partial', label: t('buying.purchase_invoices.details.status.partial') },
+                        { value: 'unpaid', label: t('buying.purchase_invoices.details.status.unpaid') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredInvoices}
+                loading={loading}
+                onRowClick={(row) => navigate(`/buying/invoices/${row.id}`)}
+                emptyTitle={t('buying.purchase_invoices.empty.title')}
+                emptyDesc={t('buying.purchase_invoices.empty.desc')}
+                emptyAction={{ label: t('buying.purchase_invoices.empty.action'), onClick: () => navigate('/buying/invoices/new') }}
+            />
         </div>
     )
 }

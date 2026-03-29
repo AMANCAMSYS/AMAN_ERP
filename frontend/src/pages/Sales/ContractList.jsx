@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { contractsAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
-import BackButton from '../../components/common/BackButton';
+import BackButton from '../../components/common/BackButton'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 
 function ContractList() {
     const { t } = useTranslation()
@@ -14,6 +16,9 @@ function ContractList() {
     const [contracts, setContracts] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
+    const [typeFilter, setTypeFilter] = useState('')
 
     useEffect(() => {
         const fetchContracts = async () => {
@@ -31,8 +36,6 @@ function ContractList() {
         fetchContracts()
     }, [currentBranch, t])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
-
     const getStatusBadge = (status) => {
         switch (status) {
             case 'active': return 'badge-success'
@@ -41,6 +44,61 @@ function ContractList() {
             default: return 'badge-info'
         }
     }
+
+    const filteredContracts = useMemo(() => {
+        let result = contracts
+        if (search) {
+            const q = search.toLowerCase()
+            result = result.filter(c =>
+                (c.contract_number || '').toLowerCase().includes(q) ||
+                (c.party_name || '').toLowerCase().includes(q)
+            )
+        }
+        if (statusFilter) {
+            result = result.filter(c => c.status === statusFilter)
+        }
+        if (typeFilter) {
+            result = result.filter(c => c.contract_type === typeFilter)
+        }
+        return result
+    }, [contracts, search, statusFilter, typeFilter])
+
+    const columns = [
+        {
+            key: 'contract_number',
+            label: t('sales.contracts.table.number'),
+            style: { fontWeight: 'bold' },
+        },
+        {
+            key: 'party_name',
+            label: t('sales.contracts.table.customer'),
+        },
+        {
+            key: 'contract_type',
+            label: t('sales.contracts.table.type'),
+            render: (val) => val === 'subscription' ? t('sales.contracts.subscription') : t('sales.contracts.fixed'),
+        },
+        {
+            key: 'start_date',
+            label: t('sales.contracts.table.start_date'),
+            render: (val) => formatShortDate(val),
+        },
+        {
+            key: 'total_amount',
+            label: t('sales.contracts.table.total'),
+            style: { fontWeight: 'bold' },
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'status',
+            label: t('sales.contracts.table.status'),
+            render: (val) => (
+                <span className={`badge ${getStatusBadge(val)}`}>
+                    {val}
+                </span>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -59,50 +117,46 @@ function ContractList() {
 
             {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="card card-flush" style={{ overflow: 'hidden' }}>
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('sales.contracts.table.number')}</th>
-                            <th>{t('sales.contracts.table.customer')}</th>
-                            <th>{t('sales.contracts.table.type')}</th>
-                            <th>{t('sales.contracts.table.start_date')}</th>
-                            <th>{t('sales.contracts.table.total')}</th>
-                            <th>{t('sales.contracts.table.status')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {contracts.length === 0 ? (
-                            <tr>
-                                <td colSpan="6" className="start-guide">
-                                    <div style={{ padding: '40px', textAlign: 'center' }}>
-                                        <h3>{t('sales.contracts.no_contracts')}</h3>
-                                        <p>{t('sales.contracts.empty_desc')}</p>
-                                        <button className="btn btn-primary mt-4" onClick={() => navigate('/sales/contracts/new')}>
-                                            {t('sales.contracts.create_btn')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            contracts.map(contract => (
-                                <tr key={contract.id} onClick={() => navigate(`/sales/contracts/${contract.id}`)} style={{ cursor: 'pointer' }}>
-                                    <td style={{ fontWeight: 'bold' }}>{contract.contract_number}</td>
-                                    <td>{contract.party_name}</td>
-                                    <td>{contract.contract_type === 'subscription' ? t('sales.contracts.subscription') : t('sales.contracts.fixed')}</td>
-                                    <td>{formatShortDate(contract.start_date)}</td>
-                                    <td style={{ fontWeight: 'bold' }}>{formatNumber(contract.total_amount)}</td>
-                                    <td>
-                                        <span className={`badge ${getStatusBadge(contract.status)}`}>
-                                            {contract.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[
+                    {
+                        key: 'status',
+                        label: t('sales.contracts.table.status'),
+                        options: [
+                            { value: 'active', label: 'Active' },
+                            { value: 'expired', label: 'Expired' },
+                            { value: 'cancelled', label: 'Cancelled' },
+                            { value: 'draft', label: 'Draft' },
+                        ],
+                    },
+                    {
+                        key: 'type',
+                        label: t('sales.contracts.table.type'),
+                        options: [
+                            { value: 'subscription', label: t('sales.contracts.subscription') },
+                            { value: 'fixed', label: t('sales.contracts.fixed') },
+                        ],
+                    },
+                ]}
+                filterValues={{ status: statusFilter, type: typeFilter }}
+                onFilterChange={(key, val) => {
+                    if (key === 'status') setStatusFilter(val)
+                    if (key === 'type') setTypeFilter(val)
+                }}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredContracts}
+                loading={loading}
+                onRowClick={(row) => navigate(`/sales/contracts/${row.id}`)}
+                emptyTitle={t('sales.contracts.no_contracts')}
+                emptyDesc={t('sales.contracts.empty_desc')}
+                emptyAction={{ label: t('sales.contracts.create_btn'), onClick: () => navigate('/sales/contracts/new') }}
+            />
         </div>
     )
 }

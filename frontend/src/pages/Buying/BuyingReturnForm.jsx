@@ -9,6 +9,7 @@ import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import { toastEmitter } from '../../utils/toastEmitter'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function BuyingReturnForm() {
     const { t } = useTranslation()
@@ -290,8 +291,7 @@ function BuyingReturnForm() {
             <form onSubmit={handleSubmit} className="card">
                 {/* Header Info */}
                 <div className="form-row">
-                    <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label">{t('buying.returns.form.supplier')}</label>
+                    <FormField label={t('buying.returns.form.supplier')} required style={{ flex: 1 }}>
                         <select
                             className="form-input"
                             value={formData.supplier_id}
@@ -301,10 +301,9 @@ function BuyingReturnForm() {
                             <option value="">{t('buying.returns.form.supplier_placeholder')}</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name || 'No Name'}</option>)}
                         </select>
-                    </div>
+                    </FormField>
 
-                    <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label">{t('stock.warehouses.title')}</label>
+                    <FormField label={t('stock.warehouses.title')} style={{ flex: 1 }}>
                         <select
                             className="form-input"
                             value={formData.warehouse_id}
@@ -315,10 +314,9 @@ function BuyingReturnForm() {
                                 <option key={wh.id} value={wh.id}>{wh.name}</option>
                             ))}
                         </select>
-                    </div>
+                    </FormField>
 
-                    <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label">{t('buying.returns.form.original_invoice')}</label>
+                    <FormField label={t('buying.returns.form.original_invoice')} style={{ flex: 1 }}>
                         <select
                             className="form-input"
                             value={formData.invoice_id}
@@ -333,15 +331,15 @@ function BuyingReturnForm() {
                             ))}
                         </select>
                         {formData.invoice_id && <small style={{ color: 'green' }}>{t('buying.returns.form.invoice_loaded')}</small>}
-                    </div>
+                    </FormField>
 
-                    <div className="form-group">
+                    <FormField>
                         <CustomDatePicker
                             label={t('buying.returns.form.return_date')}
                             selected={formData.invoice_date}
                             onChange={(dateStr) => setFormData({ ...formData, invoice_date: dateStr })}
                         />
-                    </div>
+                    </FormField>
                 </div>
 
                 {/* Items Table */}
@@ -448,15 +446,14 @@ function BuyingReturnForm() {
                 {/* Footer Totals */}
                 <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                        <div className="form-group">
-                            <label className="form-label">{t('buying.returns.form.notes.label')}</label>
+                        <FormField label={t('buying.returns.form.notes.label')}>
                             <textarea
                                 className="form-input" rows="3"
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                                 placeholder={t('buying.returns.form.notes.placeholder')}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{ width: '300px', padding: '24px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fee2e2' }}>
@@ -487,8 +484,7 @@ function BuyingReturnForm() {
 
                             {receiveRefund && (
                                 <div className="fade-in">
-                                    <div className="form-group" style={{ marginBottom: '8px' }}>
-                                        <label className="form-label" style={{ fontSize: '0.85em' }}>{t('buying.returns.form.refund.method_label')}</label>
+                                    <FormField label={t('buying.returns.form.refund.method_label')} style={{ marginBottom: '8px' }}>
                                         <select
                                             className="form-input"
                                             value={paymentMethod}
@@ -498,7 +494,7 @@ function BuyingReturnForm() {
                                             <option value="cash">{t('buying.returns.form.refund.methods.cash')}</option>
                                             <option value="bank">{t('buying.returns.form.refund.methods.bank')}</option>
                                         </select>
-                                    </div>
+                                    </FormField>
                                     <div style={{ fontSize: '0.85em', color: 'green' }}>
                                         {t('buying.returns.form.refund.auto_receipt')}
                                     </div>

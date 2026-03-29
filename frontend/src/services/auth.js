@@ -14,6 +14,12 @@ export const authAPI = {
     },
     me: () => api.get('/auth/me'),
     updateMe: (data) => api.put('/auth/me', data),
-    logout: () => api.post('/auth/logout'),
-    refresh: () => api.post('/auth/refresh'),
+    logout: () => {
+        const refreshToken = localStorage.getItem('refresh_token')
+        return api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {})
+    },
+    refresh: () => {
+        const refreshToken = localStorage.getItem('refresh_token')
+        return api.post('/auth/refresh', { refresh_token: refreshToken })
+    },
 }

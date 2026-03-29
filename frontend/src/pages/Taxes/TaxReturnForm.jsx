@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function TaxReturnForm() {
     const { t } = useTranslation()
@@ -145,54 +146,49 @@ function TaxReturnForm() {
                             </div>
 
                             <div className="form-row">
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.period_type')} *</label>
+                                <FormField label={t('taxes.period_type')} required style={{ flex: 1 }}>
                                     <select className="form-input" value={form.period_type}
                                         onChange={e => setForm({...form, period_type: e.target.value})}>
                                         <option value="monthly">{t('taxes.monthly')}</option>
                                         <option value="quarterly">{t('taxes.quarterly')}</option>
                                     </select>
-                                </div>
+                                </FormField>
 
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.year')} *</label>
+                                <FormField label={t('taxes.year')} required style={{ flex: 1 }}>
                                     <select className="form-input" value={form.year}
                                         onChange={e => setForm({...form, year: parseInt(e.target.value)})}>
                                         {[currentYear - 2, currentYear - 1, currentYear, currentYear + 1].map(y => (
                                             <option key={y} value={y}>{y}</option>
                                         ))}
                                     </select>
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row">
                                 {form.period_type === 'monthly' ? (
-                                    <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">{t('taxes.month')} *</label>
+                                    <FormField label={t('taxes.month')} required style={{ flex: 1 }}>
                                         <select className="form-input" value={form.month}
                                             onChange={e => setForm({...form, month: parseInt(e.target.value)})}>
                                             {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                         </select>
-                                    </div>
+                                    </FormField>
                                 ) : (
-                                    <div className="form-group" style={{ flex: 1 }}>
-                                        <label className="form-label">{t('taxes.quarter')} *</label>
+                                    <FormField label={t('taxes.quarter')} required style={{ flex: 1 }}>
                                         <select className="form-input" value={form.quarter}
                                             onChange={e => setForm({...form, quarter: parseInt(e.target.value)})}>
                                             {quarters.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}
                                         </select>
-                                    </div>
+                                    </FormField>
                                 )}
 
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.tax_type')}</label>
+                                <FormField label={t('taxes.tax_type')} style={{ flex: 1 }}>
                                     <select className="form-input" value={form.tax_type}
                                         onChange={e => setForm({...form, tax_type: e.target.value})}>
                                         <option value="vat">{t('taxes.vat')}</option>
                                         <option value="income">{t('taxes.income_tax')}</option>
                                         <option value="withholding">{t('taxes.withholding')}</option>
                                     </select>
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row">
@@ -204,19 +200,17 @@ function TaxReturnForm() {
                                         placeholder="YYYY/MM/DD"
                                     />
                                 </div>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('taxes.selected_period')}</label>
+                                <FormField label={t('taxes.selected_period')} style={{ flex: 1 }}>
                                     <input className="form-input" value={getPeriodString()} readOnly
                                         style={{ fontFamily: 'monospace', fontWeight: 'bold', background: 'var(--bg-secondary)' }} />
-                                </div>
+                                </FormField>
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">{t('taxes.notes')}</label>
+                            <FormField label={t('taxes.notes')}>
                                 <textarea className="form-input" rows="3" value={form.notes}
                                     onChange={e => setForm({...form, notes: e.target.value})}
                                     placeholder={t('taxes.notes_placeholder')} />
-                            </div>
+                            </FormField>
 
                             <div className="alert alert-info mt-3">
                                 ℹ️ {t('taxes.auto_calc_note')}

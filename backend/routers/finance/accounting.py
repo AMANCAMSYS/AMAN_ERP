@@ -13,6 +13,7 @@ from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import get_base_currency
 from fastapi import Request
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 from schemas.accounting import AccountCreate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
 from utils.cache import cache
@@ -525,125 +526,25 @@ async def create_journal_entry(
     """
     db = get_db_connection(current_user.company_id)
     try:
-        # 1. Validation
-        if "lines" not in entry_data or not entry_data["lines"]:
-            raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
-
-        for i, line in enumerate(entry_data["lines"]):
-            d = float(line.get("debit", 0))
-            c = float(line.get("credit", 0))
-            if d < 0 or c < 0:
-                raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن إدخال مبالغ سالبة")
-            if d > 0 and c > 0:
-                raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن أن يكون مدين ودائن معاً في نفس السطر")
-
-        total_debit = sum(float(line.get("debit", 0)) for line in entry_data["lines"])
-        total_credit = sum(float(line.get("credit", 0)) for line in entry_data["lines"])
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
         
-        if total_debit == 0 and total_credit == 0:
-            raise HTTPException(status_code=400, detail="لا يمكن إنشاء قيد بمبالغ صفرية")
-
-        if abs(total_debit - total_credit) > 0.01:
-             raise HTTPException(status_code=400, detail="القيود غير موزونة (المدين لا يساوي الدائن)")
-
-        # Determine entry status (draft or posted)
         entry_status = entry_data.get("status", "posted")
-        if entry_status not in ("draft", "posted"):
-            entry_status = "posted"
-
-        # 1b. Closed Period Check (only for posted entries)
-        entry_date = entry_data.get("date")
-        if entry_date and entry_status == "posted":
-            closed_period = db.execute(text("""
-                SELECT 1 FROM fiscal_periods 
-                WHERE :entry_date BETWEEN start_date AND end_date 
-                AND is_closed = TRUE
-                LIMIT 1
-            """), {"entry_date": entry_date}).fetchone()
-            if closed_period:
-                raise HTTPException(status_code=400, detail="لا يمكن ترحيل قيود في فترة محاسبية مغلقة")
-
-        # 2. Create Header
-        from utils.accounting import generate_sequential_number
-        entry_number = generate_sequential_number(db, "JE", "journal_entries", "entry_number")
         
-        # Get Company Base Currency
-        base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
-        if not base_currency_row:
-             base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")).fetchone()
-        base_currency = base_currency_row[0] if base_currency_row else "SYP"
-
-        currency = entry_data.get("currency", base_currency)
-        exchange_rate = float(entry_data.get("exchange_rate", 1.0))
-        
-        journal_res = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at)
-            VALUES (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at)
-            RETURNING id
-        """), {
-            "num": entry_number,
-            "date": entry_data["date"],
-            "desc": entry_data["description"],
-            "ref": entry_data.get("reference"),
-            "status": entry_status,
-            "branch_id": entry_data.get("branch_id"),
-            "user": current_user.id,
-            "curr": currency,
-            "rate": exchange_rate,
-            "posted_at": datetime.now() if entry_status == "posted" else None
-        }).fetchone()
-        
-        journal_id = journal_res.id
-
-        # 3. Create Lines and Update Balances (only if posted)
-        for line in entry_data["lines"]:
-            input_debit = float(line.get("debit", 0))
-            input_credit = float(line.get("credit", 0))
-            
-            # Exchange rate convention: 1 unit of foreign currency = exchange_rate units of base currency
-            # e.g. 1 USD = 13000 SYP → exchange_rate = 13000
-            # Input amounts are in foreign currency, multiply by rate to get base currency
-            debit_base = input_debit * exchange_rate
-            credit_base = input_credit * exchange_rate
-            
-            account_id = line["account_id"]
-            
-            line_currency = line.get("currency") or currency
-            
-            if line.get("amount_currency"):
-                line_amount_currency = float(line["amount_currency"])
-            else:
-                line_amount_currency = input_debit + input_credit
-
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description, 
-                    cost_center_id, amount_currency, currency
-                )
-                VALUES (:jid, :aid, :deb, :cred, :desc, :cc_id, :amt_curr, :curr)
-            """), {
-                "jid": journal_id,
-                "aid": account_id,
-                "deb": debit_base,
-                "cred": credit_base,
-                "desc": line.get("description", entry_data["description"]),
-                "cc_id": line.get("cost_center_id"),
-                "amt_curr": line_amount_currency,
-                "curr": line_currency
-            })
-            
-            # Update Account Balances ONLY if posting immediately
-            if entry_status == "posted":
-                from utils.accounting import update_account_balance
-                update_account_balance(
-                    db, 
-                    account_id=account_id, 
-                    debit_base=debit_base, 
-                    credit_base=credit_base, 
-                    debit_curr=input_debit, 
-                    credit_curr=input_credit, 
-                    currency=line_currency
-                )
+        journal_id, entry_number = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=entry_data.get("date"),
+            description=entry_data.get("description", ""),
+            lines=entry_data.get("lines", []),
+            user_id=current_user.id,
+            branch_id=entry_data.get("branch_id"),
+            reference=entry_data.get("reference"),
+            status=entry_status,
+            currency=entry_data.get("currency"),
+            exchange_rate=float(entry_data.get("exchange_rate", 1.0)),
+            source="Manual",
+            source_id=None
+        )
 
         db.commit()
 
@@ -980,68 +881,33 @@ async def void_journal_entry(
         if not lines:
             raise HTTPException(status_code=400, detail="القيد لا يحتوي على أسطر")
         
-        # 3. Create reversal entry
-        from utils.accounting import generate_sequential_number
-        rev_num = f"REV-{original.entry_number}"
-        
-        rev_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status, 
-                branch_id, created_by, currency, exchange_rate
-            ) VALUES (
-                :num, CURRENT_DATE, :desc, :ref, 'posted', 
-                :bid, :uid, :curr, :rate
-            ) RETURNING id
-        """), {
-            "num": rev_num,
-            "desc": f"عكس قيد: {original.description}",
-            "ref": original.entry_number,
-            "bid": original.branch_id,
-            "uid": current_user.id,
-            "curr": original.currency,
-            "rate": original.exchange_rate
-        }).scalar()
-        
-        # 4. Create reversed lines (swap debit/credit) and reverse balances
-        from utils.accounting import update_account_balance
-        
+        # 3. Create reversal entry via centralized GL service
+        rev_lines = []
         for line in lines:
-            # Insert reversed line
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency, cost_center_id
-                ) VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr, :cc)
-            """), {
-                "jid": rev_id,
-                "aid": line.account_id,
-                "deb": float(line.credit),   # Swap: original credit becomes debit
-                "cred": float(line.debit),   # Swap: original debit becomes credit
-                "desc": f"عكس: {line.description or ''}",
-                "amt_curr": float(line.amount_currency or 0),
-                "curr": line.currency,
-                "cc": line.cost_center_id
+            rev_lines.append({
+                "account_id": line.account_id,
+                "debit": float(line.credit or 0),
+                "credit": float(line.debit or 0),
+                "description": f"عكس: {line.description or ''}",
+                "amount_currency": float(line.amount_currency or 0),
+                "currency": line.currency,
+                "cost_center_id": line.cost_center_id,
             })
-            
-            # Reverse balance: original was (debit, credit), reversal is (credit, debit)
-            je_rate = float(original.exchange_rate or 1.0)
-            debit_base = float(line.credit)
-            credit_base = float(line.debit)
-            if je_rate != 0:
-                debit_curr = debit_base / je_rate
-                credit_curr = credit_base / je_rate
-            else:
-                debit_curr = debit_base
-                credit_curr = credit_base
-            update_account_balance(
-                db, 
-                account_id=line.account_id,
-                debit_base=debit_base,
-                credit_base=credit_base,
-                debit_curr=debit_curr,
-                credit_curr=credit_curr,
-                currency=line.currency
-            )
+
+        rev_id, rev_entry_number = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(date.today()),
+            description=f"عكس قيد: {original.description}",
+            lines=rev_lines,
+            user_id=current_user.id,
+            branch_id=original.branch_id,
+            reference=original.entry_number,
+            currency=original.currency,
+            exchange_rate=float(original.exchange_rate or 1),
+            source="journal_void",
+            source_id=entry_id,
+        )
         
         # 5. Mark original as voided
         db.execute(text("""
@@ -1057,7 +923,7 @@ async def void_journal_entry(
             action="accounting.journal.void",
             resource_type="journal_entry",
             resource_id=str(entry_id),
-            details={"original_entry": original.entry_number, "reversal_entry": rev_num},
+            details={"original_entry": original.entry_number, "reversal_entry": rev_entry_number},
             request=request,
             branch_id=original.branch_id
         )
@@ -1066,7 +932,7 @@ async def void_journal_entry(
             "success": True, 
             "message": "تم إلغاء القيد بنجاح وإنشاء قيد عكسي",
             "reversal_entry_id": rev_id,
-            "reversal_entry_number": rev_num
+            "reversal_entry_number": rev_entry_number
         }
     except HTTPException:
         raise
@@ -1374,77 +1240,56 @@ def close_fiscal_year(
             raise HTTPException(status_code=400,
                 detail="لا توجد حركات إيرادات أو مصاريف لهذه السنة المالية")
 
-        # 4. Create the closing journal entry
-        entry_num = _generate_sequential_number(db, f"CLS-{year}", "journal_entries", "entry_number")
-
-        entry_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description,
-                status, created_by, posted_at
-            ) VALUES (
-                :num, :edate, :ref, :desc,
-                'posted', :user, NOW()
-            ) RETURNING id
-        """), {
-            "num": entry_num,
-            "edate": fy.end_date,
-            "ref": f"Year-End Closing {year}",
-            "desc": f"قيد إقفال السنة المالية {year} - ترحيل صافي {'الربح' if net_income >= 0 else 'الخسارة'} إلى الأرباح المبقاة",
-            "user": current_user.id
-        }).scalar()
-
-        # 5. Create closing lines - use update_account_balance for proper sign handling
-        from utils.accounting import update_account_balance as _uab_fy
+        # 4. Build and create the closing journal entry via centralized GL service
+        closing_lines = []
 
         # A) Close revenue accounts (debit revenue to zero it out)
         for rev in revenue_data:
             balance = float(rev.balance)
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je, :acc, :debit, :credit, :desc)
-            """), {
-                "je": entry_id, "acc": rev.id,
-                "debit": abs(balance), "credit": 0,
-                "desc": f"إقفال حساب إيرادات - {year}"
+            closing_lines.append({
+                "account_id": rev.id,
+                "debit": abs(balance),
+                "credit": 0,
+                "description": f"إقفال حساب إيرادات - {year}",
             })
-            _uab_fy(db, account_id=rev.id, debit_base=abs(balance), credit_base=0)
 
         # B) Close expense accounts (credit expense to zero it out)
         for exp in expense_data:
             balance = float(exp.balance)
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je, :acc, :debit, :credit, :desc)
-            """), {
-                "je": entry_id, "acc": exp.id,
-                "debit": 0, "credit": abs(balance),
-                "desc": f"إقفال حساب مصاريف - {year}"
+            closing_lines.append({
+                "account_id": exp.id,
+                "debit": 0,
+                "credit": abs(balance),
+                "description": f"إقفال حساب مصاريف - {year}",
             })
-            _uab_fy(db, account_id=exp.id, debit_base=0, credit_base=abs(balance))
 
         # C) Transfer net income to retained earnings
         if net_income >= 0:
-            # Profit → Credit retained earnings
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je, :acc, 0, :amt, :desc)
-            """), {
-                "je": entry_id, "acc": re_account_id,
-                "amt": abs(net_income),
-                "desc": f"ترحيل صافي ربح {year} إلى الأرباح المبقاة"
+            closing_lines.append({
+                "account_id": re_account_id,
+                "debit": 0,
+                "credit": abs(net_income),
+                "description": f"ترحيل صافي ربح {year} إلى الأرباح المبقاة",
             })
-            _uab_fy(db, account_id=re_account_id, debit_base=0, credit_base=abs(net_income))
         else:
-            # Loss → Debit retained earnings
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je, :acc, :amt, 0, :desc)
-            """), {
-                "je": entry_id, "acc": re_account_id,
-                "amt": abs(net_income),
-                "desc": f"ترحيل صافي خسارة {year} إلى الأرباح المبقاة"
+            closing_lines.append({
+                "account_id": re_account_id,
+                "debit": abs(net_income),
+                "credit": 0,
+                "description": f"ترحيل صافي خسارة {year} إلى الأرباح المبقاة",
             })
-            _uab_fy(db, account_id=re_account_id, debit_base=abs(net_income), credit_base=0)
+
+        entry_id, entry_num = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(fy.end_date),
+            description=f"قيد إقفال السنة المالية {year} - ترحيل صافي {'الربح' if net_income >= 0 else 'الخسارة'} إلى الأرباح المبقاة",
+            lines=closing_lines,
+            user_id=current_user.id,
+            reference=f"Year-End Closing {year}",
+            source="fiscal_year_closing",
+            source_id=fy.id,
+        )
 
         # 6. Close fiscal periods for this year (if requested)
         closed_periods = 0
@@ -1517,46 +1362,40 @@ def reopen_fiscal_year(
 
         # 2. Reverse the closing journal entry
         if fy.closing_entry_id:
+            closing_entry = db.execute(text("""
+                SELECT entry_number, branch_id, currency, exchange_rate
+                FROM journal_entries
+                WHERE id = :id
+            """), {"id": fy.closing_entry_id}).fetchone()
+
             closing_lines = db.execute(text("""
                 SELECT account_id, debit, credit FROM journal_lines
                 WHERE journal_entry_id = :id
             """), {"id": fy.closing_entry_id}).fetchall()
 
-            # Create reversal entry
-            rev_num = _generate_sequential_number(db, f"RCLS-{year}", "journal_entries", "entry_number")
-            rev_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, reference, description,
-                    status, created_by, posted_at
-                ) VALUES (
-                    :num, :edate, :ref, :desc,
-                    'posted', :user, NOW()
-                ) RETURNING id
-            """), {
-                "num": rev_num,
-                "edate": fy.end_date,
-                "ref": f"Reversal of Year-End Closing {year}",
-                "desc": f"عكس قيد إقفال السنة المالية {year}" + (f" - {data.reason}" if data.reason else ""),
-                "user": current_user.id
-            }).scalar()
-
-            # Reverse each line (swap debit/credit) and reverse balance impact
-            from utils.accounting import update_account_balance as _uab_rev
+            rev_lines = []
             for line in closing_lines:
-                rev_debit = float(line.credit)
-                rev_credit = float(line.debit)
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je, :acc, :debit, :credit, :desc)
-                """), {
-                    "je": rev_id, "acc": line.account_id,
-                    "debit": rev_debit, "credit": rev_credit,
-                    "desc": f"عكس إقفال {year}"
+                rev_lines.append({
+                    "account_id": line.account_id,
+                    "debit": float(line.credit or 0),
+                    "credit": float(line.debit or 0),
+                    "description": f"عكس إقفال {year}",
                 })
 
-                # Reverse account balance using proper helper
-                _uab_rev(db, account_id=line.account_id,
-                         debit_base=rev_debit, credit_base=rev_credit)
+            rev_id, _ = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(fy.end_date),
+                description=f"عكس قيد إقفال السنة المالية {year}" + (f" - {data.reason}" if data.reason else ""),
+                lines=rev_lines,
+                user_id=current_user.id,
+                branch_id=closing_entry.branch_id if closing_entry else None,
+                reference=f"Reversal of Year-End Closing {year}",
+                currency=closing_entry.currency if closing_entry else None,
+                exchange_rate=float(closing_entry.exchange_rate or 1) if closing_entry else 1,
+                source="fiscal_year_reopen",
+                source_id=fy.id,
+            )
 
             # Mark original closing entry as voided
             db.execute(text("""
@@ -1996,56 +1835,35 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
 
     today = date.today()
     entry_status = "posted" if tmpl.auto_post else "draft"
-
-    number = _generate_sequential_number(db, "JE", "journal_entries", "entry_number")
     description = f"{tmpl.name} - {today.strftime('%Y-%m-%d')}"
     if tmpl.description:
         description = f"{tmpl.description} ({today.strftime('%Y-%m-%d')})"
 
-    result = db.execute(text("""
-        INSERT INTO journal_entries
-            (entry_number, entry_date, description, reference, status,
-             branch_id, currency, exchange_rate, created_by, posted_at)
-        VALUES
-            (:number, :entry_date, :desc, :ref, :status,
-             :branch, :currency, :rate, :user,
-             CASE WHEN :status = 'posted' THEN NOW() ELSE NULL END)
-        RETURNING id
-    """), {
-        "number": number,
-        "entry_date": today,
-        "desc": description,
-        "ref": tmpl.reference or f"REC-{tmpl.id}",
-        "status": entry_status,
-        "branch": tmpl.branch_id or getattr(current_user, "branch_id", None),
-        "currency": tmpl.currency or get_base_currency(db),
-        "rate": float(tmpl.exchange_rate or 1),
-        "user": current_user.id,
-    })
-    entry_id = result.fetchone()[0]
-
-    from utils.accounting import update_account_balance
+    je_lines = []
     for line in lines:
-        debit_val = float(line.debit or 0)
-        credit_val = float(line.credit or 0)
-        db.execute(text("""
-            INSERT INTO journal_lines
-                (journal_entry_id, account_id, debit, credit, description, cost_center_id)
-            VALUES (:eid, :acc, :debit, :credit, :desc, :cc)
-        """), {
-            "eid": entry_id,
-            "acc": line.account_id,
-            "debit": debit_val,
-            "credit": credit_val,
-            "desc": line.description or "",
-            "cc": line.cost_center_id,
+        je_lines.append({
+            "account_id": line.account_id,
+            "debit": float(line.debit or 0),
+            "credit": float(line.credit or 0),
+            "description": line.description or "",
+            "cost_center_id": line.cost_center_id,
         })
 
-        if entry_status == "posted":
-            update_account_balance(
-                db, account_id=line.account_id,
-                debit_base=debit_val, credit_base=credit_val
-            )
+    entry_id, _ = gl_create_journal_entry(
+        db=db,
+        company_id=current_user.company_id,
+        date=str(today),
+        description=description,
+        lines=je_lines,
+        user_id=current_user.id,
+        branch_id=tmpl.branch_id or getattr(current_user, "branch_id", None),
+        reference=tmpl.reference or f"REC-{tmpl.id}",
+        status=entry_status,
+        currency=tmpl.currency or get_base_currency(db),
+        exchange_rate=float(tmpl.exchange_rate or 1),
+        source="recurring_template",
+        source_id=tmpl.id,
+    )
 
     # Update template tracking
     freq_map = {
@@ -2170,32 +1988,8 @@ def save_opening_balances(
                          debit_base=float(ol.credit or 0),
                          credit_base=float(ol.debit or 0))
 
-            # Delete old lines and update entry
-            db.execute(text("DELETE FROM journal_lines WHERE journal_entry_id = :eid"), {"eid": existing.id})
-            db.execute(text("""
-                UPDATE journal_entries SET
-                    entry_date = :dt, status = 'posted', posted_at = NOW(),
-                    description = :desc, updated_at = NOW()
-                WHERE id = :id
-            """), {"dt": entry_date, "desc": "أرصدة افتتاحية / Opening Balances", "id": existing.id})
-            entry_id = existing.id
-        else:
-            # Create new entry
-            number = _generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-            result = db.execute(text("""
-                INSERT INTO journal_entries
-                    (entry_number, entry_date, description, reference, status, branch_id, created_by, posted_at)
-                VALUES
-                    (:num, :dt, :desc, 'OPENING-BALANCE', 'posted', :branch, :user, NOW())
-                RETURNING id
-            """), {
-                "num": number,
-                "dt": entry_date,
-                "desc": "أرصدة افتتاحية / Opening Balances",
-                "branch": getattr(current_user, "branch_id", None),
-                "user": current_user.id,
-            })
-            entry_id = result.fetchone()[0]
+            # Replace old opening balance entry with a fresh centralized one
+            db.execute(text("DELETE FROM journal_entries WHERE id = :eid"), {"eid": existing.id})
 
         # If not balanced, add a suspense line (difference to equity - opening balance equity)
         if round(total_debit, 4) != round(total_credit, 4):
@@ -2216,26 +2010,26 @@ def save_opening_balances(
                     "description": "فرق الأرصدة الافتتاحية / Opening Balance Difference"
                 })
 
-        # Insert new lines
-        from utils.accounting import update_account_balance as _uab2
+        gl_lines = []
         for line in valid_lines:
-            d_val = float(line.get("debit", 0))
-            c_val = float(line.get("credit", 0))
-            db.execute(text("""
-                INSERT INTO journal_lines
-                    (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:eid, :acc, :debit, :credit, :desc)
-            """), {
-                "eid": entry_id,
-                "acc": int(line["account_id"]),
-                "debit": d_val,
-                "credit": c_val,
-                "desc": line.get("description", "رصيد افتتاحي"),
+            gl_lines.append({
+                "account_id": int(line["account_id"]),
+                "debit": float(line.get("debit", 0)),
+                "credit": float(line.get("credit", 0)),
+                "description": line.get("description", "رصيد افتتاحي"),
             })
 
-            # Update account balance using proper helper (respects account type)
-            _uab2(db, account_id=int(line["account_id"]),
-                  debit_base=d_val, credit_base=c_val)
+        entry_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=entry_date,
+            description="أرصدة افتتاحية / Opening Balances",
+            lines=gl_lines,
+            user_id=current_user.id,
+            branch_id=getattr(current_user, "branch_id", None),
+            reference="OPENING-BALANCE",
+            source="opening_balances",
+        )
 
         db.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username,
@@ -2391,114 +2185,119 @@ def generate_closing_entries(
         created_entries = []
         target_account_id = income_summary_id if use_income_summary else retained_earnings_id
 
-        from utils.accounting import update_account_balance as _uab_closing
-
         # Entry 1: Close Revenue accounts
         if revenues:
-            num1 = _generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-            r1 = db.execute(text("""
-                INSERT INTO journal_entries
-                    (entry_number, entry_date, description, reference, status, branch_id, created_by, posted_at)
-                VALUES (:num, :dt, :desc, 'CLOSING-REVENUE', 'posted', :branch, :user, NOW())
-                RETURNING id
-            """), {
-                "num": num1, "dt": entry_date_str,
-                "desc": f"إقفال حسابات الإيرادات - {start_date_str} إلى {end_date_str}",
-                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
-            })
-            eid1 = r1.fetchone()[0]
+            lines1 = []
 
             for rev in revenues:
                 bal = float(rev.balance)
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, :debit, 0, :desc)
-                """), {"eid": eid1, "acc": rev.id, "debit": bal, "desc": f"إقفال {rev.name}"})
-                # Debit revenue → zeroes it out (revenue normal balance is credit)
-                _uab_closing(db, account_id=rev.id, debit_base=bal, credit_base=0)
+                lines1.append({
+                    "account_id": rev.id,
+                    "debit": bal,
+                    "credit": 0,
+                    "description": f"إقفال {rev.name}",
+                })
 
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:eid, :acc, 0, :credit, :desc)
-            """), {"eid": eid1, "acc": target_account_id, "credit": total_revenue,
-                   "desc": "إجمالي الإيرادات المقفلة"})
-            _uab_closing(db, account_id=target_account_id, debit_base=0, credit_base=total_revenue)
+            lines1.append({
+                "account_id": target_account_id,
+                "debit": 0,
+                "credit": total_revenue,
+                "description": "إجمالي الإيرادات المقفلة",
+            })
+
+            eid1, num1 = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=entry_date_str,
+                description=f"إقفال حسابات الإيرادات - {start_date_str} إلى {end_date_str}",
+                lines=lines1,
+                user_id=current_user.id,
+                branch_id=branch_id or getattr(current_user, "branch_id", None),
+                reference="CLOSING-REVENUE",
+                source="closing_entries_revenue",
+            )
 
             created_entries.append({"id": eid1, "type": "close_revenue", "number": num1})
 
         # Entry 2: Close Expense accounts
         if expenses:
-            num2 = _generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-            r2 = db.execute(text("""
-                INSERT INTO journal_entries
-                    (entry_number, entry_date, description, reference, status, branch_id, created_by, posted_at)
-                VALUES (:num, :dt, :desc, 'CLOSING-EXPENSE', 'posted', :branch, :user, NOW())
-                RETURNING id
-            """), {
-                "num": num2, "dt": entry_date_str,
-                "desc": f"إقفال حسابات المصاريف - {start_date_str} إلى {end_date_str}",
-                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
-            })
-            eid2 = r2.fetchone()[0]
+            lines2 = []
 
             for exp in expenses:
                 bal = float(exp.balance)
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, 0, :credit, :desc)
-                """), {"eid": eid2, "acc": exp.id, "credit": bal, "desc": f"إقفال {exp.name}"})
-                # Credit expense → zeroes it out (expense normal balance is debit)
-                _uab_closing(db, account_id=exp.id, debit_base=0, credit_base=bal)
+                lines2.append({
+                    "account_id": exp.id,
+                    "debit": 0,
+                    "credit": bal,
+                    "description": f"إقفال {exp.name}",
+                })
 
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:eid, :acc, :debit, 0, :desc)
-            """), {"eid": eid2, "acc": target_account_id, "debit": total_expense,
-                   "desc": "إجمالي المصاريف المقفلة"})
-            _uab_closing(db, account_id=target_account_id, debit_base=total_expense, credit_base=0)
+            lines2.append({
+                "account_id": target_account_id,
+                "debit": total_expense,
+                "credit": 0,
+                "description": "إجمالي المصاريف المقفلة",
+            })
+
+            eid2, num2 = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=entry_date_str,
+                description=f"إقفال حسابات المصاريف - {start_date_str} إلى {end_date_str}",
+                lines=lines2,
+                user_id=current_user.id,
+                branch_id=branch_id or getattr(current_user, "branch_id", None),
+                reference="CLOSING-EXPENSE",
+                source="closing_entries_expense",
+            )
 
             created_entries.append({"id": eid2, "type": "close_expense", "number": num2})
 
         # Entry 3: Transfer Income Summary → Retained Earnings
         if use_income_summary and net_income != 0:
-            num3 = _generate_sequential_number(db, "JE", "journal_entries", "entry_number")
-            r3 = db.execute(text("""
-                INSERT INTO journal_entries
-                    (entry_number, entry_date, description, reference, status, branch_id, created_by, posted_at)
-                VALUES (:num, :dt, :desc, 'CLOSING-TRANSFER', 'posted', :branch, :user, NOW())
-                RETURNING id
-            """), {
-                "num": num3, "dt": entry_date_str,
-                "desc": f"ترحيل ملخص الدخل إلى الأرباح المبقاة - صافي: {net_income}",
-                "branch": branch_id or getattr(current_user, "branch_id", None), "user": current_user.id,
-            })
-            eid3 = r3.fetchone()[0]
+            lines3 = []
 
             if net_income > 0:
                 # Profit: Debit Income Summary, Credit Retained Earnings
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, :amt, 0, 'إقفال ملخص الدخل')
-                """), {"eid": eid3, "acc": income_summary_id, "amt": net_income})
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, 0, :amt, 'صافي أرباح الفترة')
-                """), {"eid": eid3, "acc": retained_earnings_id, "amt": net_income})
-                _uab_closing(db, account_id=income_summary_id, debit_base=net_income, credit_base=0)
-                _uab_closing(db, account_id=retained_earnings_id, debit_base=0, credit_base=net_income)
+                lines3.append({
+                    "account_id": income_summary_id,
+                    "debit": net_income,
+                    "credit": 0,
+                    "description": "إقفال ملخص الدخل",
+                })
+                lines3.append({
+                    "account_id": retained_earnings_id,
+                    "debit": 0,
+                    "credit": net_income,
+                    "description": "صافي أرباح الفترة",
+                })
             else:
                 loss = abs(net_income)
                 # Loss: Credit Income Summary, Debit Retained Earnings
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, 0, :amt, 'إقفال ملخص الدخل')
-                """), {"eid": eid3, "acc": income_summary_id, "amt": loss})
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:eid, :acc, :amt, 0, 'صافي خسائر الفترة')
-                """), {"eid": eid3, "acc": retained_earnings_id, "amt": loss})
-                _uab_closing(db, account_id=income_summary_id, debit_base=0, credit_base=loss)
-                _uab_closing(db, account_id=retained_earnings_id, debit_base=loss, credit_base=0)
+                lines3.append({
+                    "account_id": income_summary_id,
+                    "debit": 0,
+                    "credit": loss,
+                    "description": "إقفال ملخص الدخل",
+                })
+                lines3.append({
+                    "account_id": retained_earnings_id,
+                    "debit": loss,
+                    "credit": 0,
+                    "description": "صافي خسائر الفترة",
+                })
+
+            eid3, num3 = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=entry_date_str,
+                description=f"ترحيل ملخص الدخل إلى الأرباح المبقاة - صافي: {net_income}",
+                lines=lines3,
+                user_id=current_user.id,
+                branch_id=branch_id or getattr(current_user, "branch_id", None),
+                reference="CLOSING-TRANSFER",
+                source="closing_entries_transfer",
+            )
 
             created_entries.append({"id": eid3, "type": "transfer_to_retained", "number": num3})
 
@@ -2537,7 +2336,7 @@ class ProvisionRequest(BaseModel):
 @router.post("/provisions/bad-debt", dependencies=[Depends(require_permission("accounting.manage"))])
 def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
     """إنشاء قيد مخصص ديون معدومة — Dr مصروف ديون معدومة / Cr مخصص الديون المعدومة"""
-    from utils.accounting import get_mapped_account_id, get_base_currency, update_account_balance
+    from utils.accounting import get_mapped_account_id, get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
     db = get_db_connection(current_user.company_id)
     trans = db.begin()
@@ -2548,22 +2347,37 @@ def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depend
         if not acc_bad_debt_exp or not acc_prov_doubtful:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حسابات الديون المعدومة في الإعدادات")
 
-        je_num = f"JE-BD-PROV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         desc = req.description or "مخصص ديون معدومة"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate, posted_at)
-            VALUES (:num, CURRENT_DATE, 'BAD-DEBT-PROV', :desc, 'posted', :uid, :br, :curr, 1, NOW()) RETURNING id
-        """), {"num": je_num, "desc": desc, "uid": current_user.id, "br": branch_id, "curr": base_currency}).scalar()
-
-        for acc_id, debit, credit, line_desc in [
-            (acc_bad_debt_exp, req.amount, 0, "مصروف ديون معدومة"),
-            (acc_prov_doubtful, 0, req.amount, "مخصص الديون المعدومة"),
-        ]:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, :d, :c, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_id, "d": debit, "c": credit, "desc": line_desc, "amt": req.amount, "curr": base_currency})
-            update_account_balance(db, account_id=acc_id, debit_base=debit, credit_base=credit)
+        _, je_num = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(date.today()),
+            description=desc,
+            lines=[
+                {
+                    "account_id": acc_bad_debt_exp,
+                    "debit": float(req.amount),
+                    "credit": 0,
+                    "description": "مصروف ديون معدومة",
+                    "amount_currency": float(req.amount),
+                    "currency": base_currency,
+                },
+                {
+                    "account_id": acc_prov_doubtful,
+                    "debit": 0,
+                    "credit": float(req.amount),
+                    "description": "مخصص الديون المعدومة",
+                    "amount_currency": float(req.amount),
+                    "currency": base_currency,
+                },
+            ],
+            user_id=current_user.id,
+            branch_id=branch_id,
+            reference="BAD-DEBT-PROV",
+            currency=base_currency,
+            exchange_rate=1,
+            source="bad_debt_provision",
+        )
 
         trans.commit()
         return {"success": True, "journal_entry": je_num, "amount": req.amount}
@@ -2584,7 +2398,7 @@ def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depend
 @router.post("/provisions/leave", dependencies=[Depends(require_permission("accounting.manage"))])
 def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
     """إنشاء قيد مخصص إجازات — Dr مصروف إجازات / Cr مخصص الإجازات"""
-    from utils.accounting import get_mapped_account_id, get_base_currency, update_account_balance
+    from utils.accounting import get_mapped_account_id, get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
     db = get_db_connection(current_user.company_id)
     trans = db.begin()
@@ -2595,22 +2409,37 @@ def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(g
         if not acc_leave_exp or not acc_leave_prov:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حسابات الإجازات في الإعدادات")
 
-        je_num = f"JE-LV-PROV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         desc = req.description or "مخصص إجازات الموظفين"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate, posted_at)
-            VALUES (:num, CURRENT_DATE, 'LEAVE-PROV', :desc, 'posted', :uid, :br, :curr, 1, NOW()) RETURNING id
-        """), {"num": je_num, "desc": desc, "uid": current_user.id, "br": branch_id, "curr": base_currency}).scalar()
-
-        for acc_id, debit, credit, line_desc in [
-            (acc_leave_exp, req.amount, 0, "مصروف الإجازات"),
-            (acc_leave_prov, 0, req.amount, "مخصص الإجازات"),
-        ]:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, :d, :c, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_id, "d": debit, "c": credit, "desc": line_desc, "amt": req.amount, "curr": base_currency})
-            update_account_balance(db, account_id=acc_id, debit_base=debit, credit_base=credit)
+        _, je_num = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(date.today()),
+            description=desc,
+            lines=[
+                {
+                    "account_id": acc_leave_exp,
+                    "debit": float(req.amount),
+                    "credit": 0,
+                    "description": "مصروف الإجازات",
+                    "amount_currency": float(req.amount),
+                    "currency": base_currency,
+                },
+                {
+                    "account_id": acc_leave_prov,
+                    "debit": 0,
+                    "credit": float(req.amount),
+                    "description": "مخصص الإجازات",
+                    "amount_currency": float(req.amount),
+                    "currency": base_currency,
+                },
+            ],
+            user_id=current_user.id,
+            branch_id=branch_id,
+            reference="LEAVE-PROV",
+            currency=base_currency,
+            exchange_rate=1,
+            source="leave_provision",
+        )
 
         trans.commit()
         return {"success": True, "journal_entry": je_num, "amount": req.amount}
@@ -2636,7 +2465,7 @@ class FXRevaluationRequest(BaseModel):
 @router.post("/fx-revaluation", dependencies=[Depends(require_permission("accounting.manage"))])
 def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_current_user)):
     """إعادة تقييم أرصدة العملات الأجنبية — الفروقات تسجل كربح/خسارة غير محققة"""
-    from utils.accounting import get_mapped_account_id, get_base_currency, update_account_balance
+    from utils.accounting import get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
     db = get_db_connection(current_user.company_id)
     trans = db.begin()
@@ -2672,16 +2501,7 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
 
         adjustments = []
         total_diff = 0.0
-
-        je_num = f"JE-FX-REVAL-{req.currency_code}-{datetime.now().strftime('%Y%m%d')}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
-            VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :br, :curr, 1) RETURNING id
-        """), {
-            "num": je_num, "ref": f"FX-REVAL-{req.currency_code}",
-            "desc": f"إعادة تقييم عملة {req.currency_code} بسعر {req.new_rate}",
-            "uid": current_user.id, "br": branch_id, "curr": base_currency
-        }).scalar()
+        je_lines = []
 
         for bal in balances:
             m = bal._mapping
@@ -2694,17 +2514,23 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
 
             total_diff += diff
             if diff > 0:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:jid, :acc, :d, 0, :desc, 0, :curr)
-                """), {"jid": je_id, "acc": m["account_id"], "d": abs(diff), "desc": f"تعديل سعر {req.currency_code}", "curr": base_currency})
-                update_account_balance(db, account_id=m["account_id"], debit_base=abs(diff), credit_base=0)
+                je_lines.append({
+                    "account_id": m["account_id"],
+                    "debit": abs(diff),
+                    "credit": 0,
+                    "description": f"تعديل سعر {req.currency_code}",
+                    "amount_currency": 0,
+                    "currency": base_currency,
+                })
             else:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:jid, :acc, 0, :c, :desc, 0, :curr)
-                """), {"jid": je_id, "acc": m["account_id"], "c": abs(diff), "desc": f"تعديل سعر {req.currency_code}", "curr": base_currency})
-                update_account_balance(db, account_id=m["account_id"], debit_base=0, credit_base=abs(diff))
+                je_lines.append({
+                    "account_id": m["account_id"],
+                    "debit": 0,
+                    "credit": abs(diff),
+                    "description": f"تعديل سعر {req.currency_code}",
+                    "amount_currency": 0,
+                    "currency": base_currency,
+                })
 
             adjustments.append({
                 "account_id": m["account_id"], "account_number": m["account_number"], "name": m["name"],
@@ -2714,17 +2540,39 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
 
         # Post the offsetting FX gain/loss
         if total_diff > 0 and ufx_gain:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, 0, :amt, 'أرباح فروقات عملة (غير محققة)', 0, :curr)
-            """), {"jid": je_id, "acc": ufx_gain, "amt": abs(total_diff), "curr": base_currency})
-            update_account_balance(db, account_id=ufx_gain, debit_base=0, credit_base=abs(total_diff))
+            je_lines.append({
+                "account_id": ufx_gain,
+                "debit": 0,
+                "credit": abs(total_diff),
+                "description": "أرباح فروقات عملة (غير محققة)",
+                "amount_currency": 0,
+                "currency": base_currency,
+            })
         elif total_diff < 0 and ufx_loss:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, :amt, 0, 'خسائر فروقات عملة (غير محققة)', 0, :curr)
-            """), {"jid": je_id, "acc": ufx_loss, "amt": abs(total_diff), "curr": base_currency})
-            update_account_balance(db, account_id=ufx_loss, debit_base=abs(total_diff), credit_base=0)
+            je_lines.append({
+                "account_id": ufx_loss,
+                "debit": abs(total_diff),
+                "credit": 0,
+                "description": "خسائر فروقات عملة (غير محققة)",
+                "amount_currency": 0,
+                "currency": base_currency,
+            })
+
+        je_num = None
+        if je_lines:
+            _, je_num = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(date.today()),
+                description=f"إعادة تقييم عملة {req.currency_code} بسعر {req.new_rate}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=branch_id,
+                reference=f"FX-REVAL-{req.currency_code}",
+                currency=base_currency,
+                exchange_rate=1,
+                source="fx_revaluation",
+            )
 
         trans.commit()
         return {

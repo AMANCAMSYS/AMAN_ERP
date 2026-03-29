@@ -123,11 +123,13 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
         """), {"uid": current_user.id})
         db.commit()
 
-        # Generate backup codes
-        backup_codes = [pyotp.random_base32()[:8] for _ in range(8)]
+        # SEC-FIX: Generate backup codes with better entropy (12 chars) and hash before storage
+        import hashlib
+        backup_codes = [pyotp.random_base32()[:12] for _ in range(8)]
+        hashed_codes = [hashlib.sha256(code.encode()).hexdigest() for code in backup_codes]
         db.execute(text("""
             UPDATE user_2fa_settings SET backup_codes = :codes WHERE user_id = :uid
-        """), {"uid": current_user.id, "codes": ",".join(backup_codes)})
+        """), {"uid": current_user.id, "codes": ",".join(hashed_codes)})
         db.commit()
 
         try:

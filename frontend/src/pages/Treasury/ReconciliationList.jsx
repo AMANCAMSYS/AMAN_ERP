@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Landmark, Trash2, CheckCircle, Clock, FileText } from 'lucide-react';
+import { Plus, Landmark, Trash2, CheckCircle, Clock } from 'lucide-react';
 import { treasuryAPI, reconciliationAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 
 const ReconciliationList = () => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
 
@@ -17,6 +18,8 @@ const ReconciliationList = () => {
     const [selectedAccount, setSelectedAccount] = useState('');
     const [reconciliations, setReconciliations] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
 
     useEffect(() => {
         const fetchAccounts = async () => {
@@ -68,11 +71,11 @@ const ReconciliationList = () => {
         const pct = Math.round((matched / total) * 100);
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ 
-                    width: '80px', height: '6px', borderRadius: '3px', 
-                    backgroundColor: 'var(--border-color)', overflow: 'hidden' 
+                <div style={{
+                    width: '80px', height: '6px', borderRadius: '3px',
+                    backgroundColor: 'var(--border-color)', overflow: 'hidden'
                 }}>
-                    <div style={{ 
+                    <div style={{
                         width: `${pct}%`, height: '100%', borderRadius: '3px',
                         backgroundColor: pct === 100 ? 'var(--success)' : 'var(--primary)',
                         transition: 'width 0.3s ease'
@@ -82,6 +85,86 @@ const ReconciliationList = () => {
             </div>
         );
     };
+
+    const filteredReconciliations = useMemo(() => {
+        let result = reconciliations;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(rec =>
+                (rec.statement_date || '').toLowerCase().includes(q) ||
+                (rec.created_by_name || '').toLowerCase().includes(q)
+            );
+        }
+        if (statusFilter) {
+            result = result.filter(rec => rec.status === statusFilter);
+        }
+        return result;
+    }, [reconciliations, search, statusFilter]);
+
+    const columns = [
+        {
+            key: '_index',
+            label: '#',
+            render: (_, row) => {
+                const idx = filteredReconciliations.indexOf(row);
+                return <span className="text-muted small">{idx + 1}</span>;
+            },
+        },
+        {
+            key: 'statement_date',
+            label: t('common.date'),
+            style: { fontWeight: 'bold', color: 'var(--text-dark)' },
+        },
+        {
+            key: 'status',
+            label: t('treasury.reconciliation.status'),
+            render: (val) => (
+                <span className={`badge ${val === 'posted' ? 'badge-success' : 'badge-warning'}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {val === 'posted'
+                        ? <><CheckCircle size={12} /> {t('treasury.reconciliation.status_posted')}</>
+                        : <><Clock size={12} /> {t('treasury.reconciliation.status_draft')}</>
+                    }
+                </span>
+            ),
+        },
+        {
+            key: 'start_balance',
+            label: t('treasury.reconciliation.start_bal'),
+            render: (val) => <span className="font-monospace fw-bold">{Number(val).toLocaleString('en', { minimumFractionDigits: 2 })}</span>,
+        },
+        {
+            key: 'end_balance',
+            label: t('treasury.reconciliation.end_bal'),
+            render: (val) => <span className="font-monospace fw-bold">{Number(val).toLocaleString('en', { minimumFractionDigits: 2 })}</span>,
+        },
+        {
+            key: 'matched_count',
+            label: t('treasury.reconciliation.progress'),
+            render: (val, row) => getProgressBar(val || 0, row.total_lines || 0),
+        },
+        {
+            key: 'created_by_name',
+            label: t('common.created_by'),
+            render: (val) => <span className="small text-muted">{val || 'Admin'}</span>,
+        },
+        {
+            key: '_actions',
+            label: '',
+            width: 60,
+            render: (_, row) => (
+                row.status === 'draft' ? (
+                    <button
+                        className="btn btn-link text-danger p-0"
+                        onClick={(e) => handleDelete(e, row.id)}
+                        title={t('common.delete')}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                ) : null
+            ),
+        },
+    ];
 
     return (
         <div className="workspace fade-in">
@@ -127,73 +210,31 @@ const ReconciliationList = () => {
                 </div>
             </div>
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>{t('common.date')}</th>
-                            <th>{t('treasury.reconciliation.status')}</th>
-                            <th>{t('treasury.reconciliation.start_bal')}</th>
-                            <th>{t('treasury.reconciliation.end_bal')}</th>
-                            <th>{t('treasury.reconciliation.progress')}</th>
-                            <th>{t('common.created_by')}</th>
-                            <th style={{ width: '60px' }}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan="8" className="text-center py-5">
-                                    <div className="spinner-border text-primary spinner-border-sm" role="status"></div>
-                                </td>
-                            </tr>
-                        ) : reconciliations.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="text-center py-5 text-muted">
-                                    <div style={{ fontSize: '48px', opacity: 0.2 }} className="mb-2">📑</div>
-                                    {t('common.no_data')}
-                                </td>
-                            </tr>
-                        ) : (
-                            reconciliations.map((rec, idx) => (
-                                <tr
-                                    key={rec.id}
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => navigate(`/treasury/reconciliation/${rec.id}`)}
-                                >
-                                    <td className="text-muted small">{idx + 1}</td>
-                                    <td className="fw-bold text-dark">{rec.statement_date}</td>
-                                    <td>
-                                        <span className={`badge ${rec.status === 'posted' ? 'badge-success' : 'badge-warning'}`}
-                                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                            {rec.status === 'posted' 
-                                                ? <><CheckCircle size={12} /> {t('treasury.reconciliation.status_posted')}</>
-                                                : <><Clock size={12} /> {t('treasury.reconciliation.status_draft')}</>
-                                            }
-                                        </span>
-                                    </td>
-                                    <td className="font-monospace fw-bold">{Number(rec.start_balance).toLocaleString('en', { minimumFractionDigits: 2 })}</td>
-                                    <td className="font-monospace fw-bold">{Number(rec.end_balance).toLocaleString('en', { minimumFractionDigits: 2 })}</td>
-                                    <td>{getProgressBar(rec.matched_count || 0, rec.total_lines || 0)}</td>
-                                    <td className="small text-muted">{rec.created_by_name || 'Admin'}</td>
-                                    <td className="text-end">
-                                        {rec.status === 'draft' && (
-                                            <button
-                                                className="btn btn-link text-danger p-0"
-                                                onClick={(e) => handleDelete(e, rec.id)}
-                                                title={t('common.delete')}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[{
+                    key: 'status',
+                    label: t('treasury.reconciliation.status'),
+                    options: [
+                        { value: 'draft', label: t('treasury.reconciliation.status_draft') },
+                        { value: 'posted', label: t('treasury.reconciliation.status_posted') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(_key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredReconciliations}
+                loading={loading}
+                onRowClick={(row) => navigate(`/treasury/reconciliation/${row.id}`)}
+                emptyIcon="📑"
+                emptyTitle={t('common.no_data')}
+                emptyAction={{ label: t('treasury.reconciliation.new'), onClick: () => navigate('/treasury/reconciliation/new') }}
+            />
         </div>
     );
 };

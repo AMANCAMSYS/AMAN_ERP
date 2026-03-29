@@ -65,24 +65,50 @@ start_redis_if_available() {
         return
     fi
 
-    if ! command -v redis-server >/dev/null 2>&1; then
-        warn "redis-server not installed. System will run with in-memory fallback."
+    # If redis-cli is unavailable, a listening 6379 usually means Redis is already up.
+    if is_port_listening 6379; then
+        info "Port 6379 is already in use; assuming Redis is available"
         return
     fi
 
-    info "Starting local Redis..."
-    redis-server --daemonize yes \
-        --bind 127.0.0.1 \
-        --port 6379 \
-        --pidfile "$LOG_DIR/redis-local.pid" \
-        --logfile "$LOG_DIR/redis.log" >/dev/null 2>&1 || true
+    if command -v redis-server >/dev/null 2>&1; then
+        info "Starting local Redis..."
+        redis-server --daemonize yes \
+            --bind 127.0.0.1 \
+            --port 6379 \
+            --pidfile "$LOG_DIR/redis-local.pid" \
+            --logfile "$LOG_DIR/redis.log" >/dev/null 2>&1 || true
 
-    if command -v redis-cli >/dev/null 2>&1 && redis-cli ping >/dev/null 2>&1; then
-        info "Redis started successfully"
-        echo "started" > "$LOG_DIR/redis.started_by_script"
-    else
-        warn "Could not start Redis. Backend will continue using fallback mode if supported."
+        sleep 1
+        if is_port_listening 6379; then
+            info "Redis started successfully"
+            echo "daemon" > "$LOG_DIR/redis.started_by_script"
+        else
+            warn "Could not start Redis daemon. Backend will continue using fallback mode if supported."
+        fi
+        return
     fi
+
+    if command -v docker >/dev/null 2>&1; then
+        info "redis-server not installed. Starting Redis using Docker fallback..."
+
+        if docker ps -a --format '{{.Names}}' | grep -qx "aman_local_redis"; then
+            docker start aman_local_redis >/dev/null 2>&1 || true
+        else
+            docker run -d --name aman_local_redis -p 6379:6379 redis:7-alpine >/dev/null 2>&1 || true
+        fi
+
+        sleep 1
+        if is_port_listening 6379; then
+            info "Redis started successfully (Docker fallback)"
+            echo "docker" > "$LOG_DIR/redis.started_by_script"
+        else
+            warn "Could not start Redis with Docker fallback. Backend will continue using fallback mode if supported."
+        fi
+        return
+    fi
+
+    warn "redis-server not installed and Docker unavailable. System will run with in-memory fallback."
 }
 
 start_backend() {

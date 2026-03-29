@@ -6,6 +6,7 @@ import { projectsAPI, salesAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 export default function ProjectForm() {
     const { t, i18n } = useTranslation();
@@ -155,45 +156,51 @@ export default function ProjectForm() {
 
                         <div className="row g-3">
                             <div className="col-md-6">
-                                <label className="form-label">{t('projects.fields.name')} *</label>
-                                <input type="text" className="form-input" name="project_name"
-                                    value={formData.project_name} onChange={handleChange} required />
+                                <FormField label={t('projects.fields.name')} required>
+                                    <input type="text" className="form-input" name="project_name"
+                                        value={formData.project_name} onChange={handleChange} required />
+                                </FormField>
                             </div>
                             <div className="col-md-6">
-                                <label className="form-label">{t('projects.fields.name_en')}</label>
-                                <input type="text" className="form-input" name="project_name_en"
-                                    value={formData.project_name_en} onChange={handleChange} dir="ltr" />
+                                <FormField label={t('projects.fields.name_en')}>
+                                    <input type="text" className="form-input" name="project_name_en"
+                                        value={formData.project_name_en} onChange={handleChange} dir="ltr" />
+                                </FormField>
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.code')}</label>
-                                <input type="text" className="form-input" name="project_code"
-                                    value={formData.project_code} onChange={handleChange}
-                                    placeholder={t('projects.fields.code_auto')} dir="ltr" />
+                                <FormField label={t('projects.fields.code')}>
+                                    <input type="text" className="form-input" name="project_code"
+                                        value={formData.project_code} onChange={handleChange}
+                                        placeholder={t('projects.fields.code_auto')} dir="ltr" />
+                                </FormField>
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.type')}</label>
-                                <select className="form-input" name="project_type"
-                                    value={formData.project_type} onChange={handleChange}>
-                                    <option value="internal">{t('projects.types.internal')}</option>
-                                    <option value="external">{t('projects.types.external')}</option>
-                                    <option value="consulting">{t('projects.types.consulting')}</option>
-                                </select>
+                                <FormField label={t('projects.fields.type')}>
+                                    <select className="form-input" name="project_type"
+                                        value={formData.project_type} onChange={handleChange}>
+                                        <option value="internal">{t('projects.types.internal')}</option>
+                                        <option value="external">{t('projects.types.external')}</option>
+                                        <option value="consulting">{t('projects.types.consulting')}</option>
+                                    </select>
+                                </FormField>
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.status')}</label>
-                                <select className="form-input" name="status"
-                                    value={formData.status} onChange={handleChange}>
-                                    <option value="planning">{t('projects.status.planning')}</option>
-                                    <option value="in_progress">{t('projects.status.in_progress')}</option>
-                                    <option value="on_hold">{t('projects.status.on_hold')}</option>
-                                    <option value="completed">{t('projects.status.completed')}</option>
-                                    <option value="cancelled">{t('projects.status.cancelled')}</option>
-                                </select>
+                                <FormField label={t('projects.fields.status')}>
+                                    <select className="form-input" name="status"
+                                        value={formData.status} onChange={handleChange}>
+                                        <option value="planning">{t('projects.status.planning')}</option>
+                                        <option value="in_progress">{t('projects.status.in_progress')}</option>
+                                        <option value="on_hold">{t('projects.status.on_hold')}</option>
+                                        <option value="completed">{t('projects.status.completed')}</option>
+                                        <option value="cancelled">{t('projects.status.cancelled')}</option>
+                                    </select>
+                                </FormField>
                             </div>
                             <div className="col-12">
-                                <label className="form-label">{t('projects.fields.description')}</label>
-                                <textarea className="form-input" name="description" rows={3}
-                                    value={formData.description} onChange={handleChange} />
+                                <FormField label={t('projects.fields.description')}>
+                                    <textarea className="form-input" name="description" rows={3}
+                                        value={formData.description} onChange={handleChange} />
+                                </FormField>
                             </div>
                         </div>
                     </div>
@@ -215,24 +222,26 @@ export default function ProjectForm() {
 
                         <div className="row g-3">
                             <div className="col-md-6">
-                                <label className="form-label">{t('projects.fields.customer')}</label>
-                                <select className="form-input" name="customer_id"
-                                    value={formData.customer_id} onChange={handleChange}>
-                                    <option value="">{t('projects.fields.no_customer')}</option>
-                                    {customers.map(c => (
-                                        <option key={c.id} value={c.id}>{c.customer_name}</option>
-                                    ))}
-                                </select>
+                                <FormField label={t('projects.fields.customer')}>
+                                    <select className="form-input" name="customer_id"
+                                        value={formData.customer_id} onChange={handleChange}>
+                                        <option value="">{t('projects.fields.no_customer')}</option>
+                                        {customers.map(c => (
+                                            <option key={c.id} value={c.id}>{c.customer_name}</option>
+                                        ))}
+                                    </select>
+                                </FormField>
                             </div>
                             <div className="col-md-6">
-                                <label className="form-label">{t('projects.fields.manager')}</label>
-                                <select className="form-input" name="manager_id"
-                                    value={formData.manager_id} onChange={handleChange}>
-                                    <option value="">{t('common.not_specified')}</option>
-                                    {employees.map(e => (
-                                        <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
-                                    ))}
-                                </select>
+                                <FormField label={t('projects.fields.manager')}>
+                                    <select className="form-input" name="manager_id"
+                                        value={formData.manager_id} onChange={handleChange}>
+                                        <option value="">{t('common.not_specified')}</option>
+                                        {employees.map(e => (
+                                            <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
+                                        ))}
+                                    </select>
+                                </FormField>
                             </div>
                         </div>
                     </div>
@@ -254,20 +263,23 @@ export default function ProjectForm() {
 
                         <div className="row g-3">
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.start_date')}</label>
-                                <DateInput className="form-input" name="start_date"
-                                    value={formData.start_date} onChange={handleChange} />
+                                <FormField label={t('projects.fields.start_date')}>
+                                    <DateInput className="form-input" name="start_date"
+                                        value={formData.start_date} onChange={handleChange} />
+                                </FormField>
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.end_date')}</label>
-                                <DateInput className="form-input" name="end_date"
-                                    value={formData.end_date} onChange={handleChange} />
+                                <FormField label={t('projects.fields.end_date')}>
+                                    <DateInput className="form-input" name="end_date"
+                                        value={formData.end_date} onChange={handleChange} />
+                                </FormField>
                             </div>
                             <div className="col-md-4">
-                                <label className="form-label">{t('projects.fields.budget')}</label>
-                                <input type="number" className="form-input" name="planned_budget"
-                                    value={formData.planned_budget} onChange={handleChange}
-                                    min="0" step="0.01" placeholder="0.00" dir="ltr" />
+                                <FormField label={t('projects.fields.budget')}>
+                                    <input type="number" className="form-input" name="planned_budget"
+                                        value={formData.planned_budget} onChange={handleChange}
+                                        min="0" step="0.01" placeholder="0.00" dir="ltr" />
+                                </FormField>
                             </div>
                         </div>
                     </div>

@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 
 const SalesReturnForm = () => {
@@ -107,6 +108,7 @@ const SalesReturnForm = () => {
                         discount: discount,
                         discount_percent: discountPercent,
                         reason: '',
+                        unit: item.unit || '',
                         total: total
                     };
                 });
@@ -129,8 +131,11 @@ const SalesReturnForm = () => {
         }));
     };
 
+    const DISCRETE_UNITS = ['قطعة', 'علبة', 'كرتون', 'piece', 'box', 'carton', 'unit'];
+    const isDiscreteUnit = (unit) => DISCRETE_UNITS.includes((unit || '').trim().toLowerCase()) || DISCRETE_UNITS.includes((unit || '').trim());
+
     const addItem = () => {
-        setFormData({ ...formData, items: [...formData.items, { product_id: '', description: '', quantity: 1, max_quantity: 999999, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0, reason: '' }] })
+        setFormData({ ...formData, items: [...formData.items, { product_id: '', description: '', quantity: 1, max_quantity: 999999, unit_price: 0, tax_rate: 0, discount: 0, discount_percent: 0, reason: '', unit: '' }] })
     };
 
     const removeItem = (index) => {
@@ -160,6 +165,7 @@ const SalesReturnForm = () => {
                     if (product) {
                         updated.description = product.item_name;
                         updated.unit_price = product.selling_price;
+                        updated.unit = product.unit || 'قطعة';
                         updated.tax_rate = product.tax_rate !== undefined ? product.tax_rate : 15;
                     }
                 }
@@ -239,6 +245,14 @@ const SalesReturnForm = () => {
                 customer_id: parseInt(formData.customer_id) || null,
                 warehouse_id: formData.warehouse_id ? parseInt(formData.warehouse_id) : null,
                 invoice_id: formData.invoice_id ? parseInt(formData.invoice_id) : null,
+                items: formData.items.map(item => ({
+                    ...item,
+                    product_id: item.product_id ? parseInt(item.product_id) : null,
+                    quantity: parseFloat(item.quantity) || 0,
+                    unit_price: parseFloat(item.unit_price) || 0,
+                    tax_rate: parseFloat(item.tax_rate) || 0,
+                    discount: parseFloat(item.discount) || 0,
+                })),
                 bank_account_id: formData.bank_account_id ? parseInt(formData.bank_account_id) : null,
                 check_number: formData.check_number || null,
                 check_date: formData.check_date || null,
@@ -250,7 +264,7 @@ const SalesReturnForm = () => {
             navigate(`/sales/returns/${res.data.id}`);
         } catch (error) {
             console.error('Error creating return:', error);
-            toastEmitter.emit(`${t('sales.returns.form.errors.create_failed')}: ` + (error.response?.data?.detail || error.message), 'error');
+            // Global interceptor in apiClient.js handles toast display
         } finally {
             setLoading(false);
         }
@@ -269,8 +283,7 @@ const SalesReturnForm = () => {
 
             <form onSubmit={handleSubmit} className="card">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div className="form-group">
-                        <label className="form-label">{t('sales.returns.form.customer')}</label>
+                    <FormField label={t('sales.returns.form.customer')}>
                         <select
                             required
                             value={formData.customer_id}
@@ -280,10 +293,9 @@ const SalesReturnForm = () => {
                             <option value="">{t('sales.returns.form.customer_placeholder')}</option>
                             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
-                    </div>
+                    </FormField>
 
-                    <div className="form-group">
-                        <label className="form-label">{t('sales.invoices.form.warehouse')}</label>
+                    <FormField label={t('sales.invoices.form.warehouse')}>
                         <select
                             required
                             value={formData.warehouse_id}
@@ -293,7 +305,7 @@ const SalesReturnForm = () => {
                             <option value="">{t('common.select')}</option>
                             {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouse_name}</option>)}
                         </select>
-                    </div>
+                    </FormField>
 
                     <div className="form-group">
                         <label className="form-label">{t('sales.returns.form.invoice')}</label>
@@ -364,14 +376,14 @@ const SalesReturnForm = () => {
                         )}
                     </div>
 
-                    <div className="form-group">
+                    <FormField>
                         <CustomDatePicker
                             label={t('sales.returns.form.return_date')}
                             selected={formData.return_date}
                             onChange={(dateStr) => setFormData({ ...formData, return_date: dateStr })}
                             required
                         />
-                    </div>
+                    </FormField>
                 </div>
 
                 <div className="mb-6">
@@ -419,10 +431,14 @@ const SalesReturnForm = () => {
                                             <td>
                                                 <input
                                                     type="number"
-                                                    min="1"
-                                                    step="1"
+                                                    min={isDiscreteUnit(item.unit) ? "1" : "0.01"}
+                                                    step={isDiscreteUnit(item.unit) ? "1" : "any"}
                                                     value={item.quantity}
-                                                    onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
+                                                    onChange={(e) => {
+                                                        let val = parseFloat(e.target.value) || 0;
+                                                        if (isDiscreteUnit(item.unit)) val = Math.round(val);
+                                                        updateItem(index, 'quantity', val);
+                                                    }}
                                                     className="form-input text-center"
                                                 />
                                             </td>
@@ -488,8 +504,7 @@ const SalesReturnForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start mb-6">
-                    <div className="form-group">
-                        <label className="form-label">{t('sales.returns.form.refund_method')}</label>
+                    <FormField label={t('sales.returns.form.refund_method')}>
                         <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', padding: '10px 0' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                                 <input
@@ -535,8 +550,7 @@ const SalesReturnForm = () => {
 
                         {formData.refund_method !== 'credit' && (
                             <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
-                                <div className="form-group" style={{ marginBottom: '10px' }}>
-                                    <label className="form-label">{t('sales.returns.form.refund_amount')}</label>
+                                <FormField label={t('sales.returns.form.refund_amount')} style={{ marginBottom: '10px' }}>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -544,12 +558,11 @@ const SalesReturnForm = () => {
                                         onChange={(e) => setFormData({ ...formData, refund_amount: parseFloat(e.target.value) || 0 })}
                                         className="form-input"
                                     />
-                                </div>
+                                </FormField>
 
                                 {formData.refund_method === 'check' && (
                                     <>
-                                        <div className="form-group" style={{ marginBottom: '10px' }}>
-                                            <label className="form-label">{t('sales.returns.form.check_number')}</label>
+                                        <FormField label={t('sales.returns.form.check_number')} style={{ marginBottom: '10px' }}>
                                             <input
                                                 type="text"
                                                 value={formData.check_number}
@@ -557,24 +570,23 @@ const SalesReturnForm = () => {
                                                 className="form-input"
                                                 placeholder="CH-12345"
                                             />
-                                        </div>
-                                        <div className="form-group">
+                                        </FormField>
+                                        <FormField>
                                             <CustomDatePicker
                                                 label={t('sales.returns.form.check_date')}
                                                 selected={formData.check_date}
                                                 onChange={(dateStr) => setFormData({ ...formData, check_date: dateStr })}
                                             />
-                                        </div>
+                                        </FormField>
                                     </>
                                 )}
                             </div>
                         )}
-                    </div>
+                    </FormField>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                    <div className="form-group">
-                        <label className="form-label">{t('sales.returns.form.notes')}</label>
+                    <FormField label={t('sales.returns.form.notes')}>
                         <textarea
                             rows="4"
                             value={formData.notes}
@@ -582,7 +594,7 @@ const SalesReturnForm = () => {
                             className="form-input"
                             placeholder={t('sales.returns.form.notes_placeholder')}
                         ></textarea>
-                    </div>
+                    </FormField>
 
                     <div style={{
                         width: '340px',

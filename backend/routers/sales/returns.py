@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -85,22 +86,33 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
         if not branch_id and data.invoice_id:
             branch_id = db.execute(text("SELECT branch_id FROM invoices WHERE id = :id"), {"id": data.invoice_id}).scalar()
 
-        # Calculate totals
-        subtotal = 0
-        total_tax = 0
+        # FIN-FIX: Fiscal period lock on returns (was missing — could post to closed periods)
+        from utils.accounting import check_fiscal_period_open
+        check_fiscal_period_open(db, data.return_date)
+
+        # UOM Validation: Discrete units must have integer quantities
+        from utils.quantity_validation import validate_quantity_for_product
+        for item in data.items:
+            validate_quantity_for_product(db, item.product_id, item.quantity)
+
+        # FIN-FIX: Calculate totals using Decimal for precision (was using float)
+        _D2 = Decimal('0.01')
+        _dec = lambda v: Decimal(str(v or 0))
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
         lines_to_save = []
 
         for item in data.items:
-            line_total = float(item.quantity) * float(item.unit_price)
-            line_tax = float(line_total) * (float(item.tax_rate or 15.0) / 100.0)
-            final_total = float(line_total) + float(line_tax)
+            line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_total * _dec(item.tax_rate or 15) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            final_total = line_total + line_tax
 
-            subtotal += float(line_total)
-            total_tax += float(line_tax)
+            subtotal += line_total
+            total_tax += line_tax
 
             lines_to_save.append({
                 **item.model_dump(),
-                "total": final_total
+                "total": float(final_total)
             })
 
         grand_total = subtotal + total_tax
@@ -120,8 +132,8 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
             ) RETURNING id
         """), {
             "num": ret_num, "cust": data.customer_id, "inv": data.invoice_id,
-            "rdate": data.return_date, "sub": subtotal, "tax": total_tax,
-            "total": grand_total, "notes": data.notes, "user": current_user.id,
+            "rdate": data.return_date, "sub": float(subtotal), "tax": float(total_tax),
+            "total": float(grand_total), "notes": data.notes, "user": current_user.id,
             "rmethod": data.refund_method, "ramount": data.refund_amount,
             "rbank": data.bank_account_id, "treasury": data.bank_account_id,
             "rcheck": data.check_number,

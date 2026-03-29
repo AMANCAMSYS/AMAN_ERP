@@ -1,17 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Calendar, DollarSign, Eye, CheckCircle } from 'lucide-react';
+import { Plus, Eye } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getCurrency, hasPermission } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
-import Pagination, { usePagination } from '../../components/common/Pagination';
-
-import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
+
 const PayrollList = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -19,7 +19,8 @@ const PayrollList = () => {
     const [periods, setPeriods] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(periods);
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
 
     // New Period Form
     const [formData, setFormData] = useState({
@@ -56,15 +57,60 @@ const PayrollList = () => {
         }
     };
 
+    const filteredData = useMemo(() => {
+        let result = periods;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(period =>
+                (period.name || '').toLowerCase().includes(q)
+            );
+        }
+        if (statusFilter) {
+            result = result.filter(period => period.status === statusFilter);
+        }
+        return result;
+    }, [periods, search, statusFilter]);
+
+    const columns = [
+        { key: 'name', label: t("hr.payroll.period_name"), style: { fontWeight: 'bold' } },
+        { key: 'start_date', label: t("hr.payroll.start_date"), render: (val) => formatShortDate(val) },
+        { key: 'end_date', label: t("hr.payroll.end_date"), render: (val) => formatShortDate(val) },
+        {
+            key: 'status', label: t("common.status_title"),
+            render: (val) => (
+                <span className={`status-badge status-${val === 'posted' ? 'active' : 'draft'}`}>
+                    {val === 'posted' ? t('common.posted') : t('common.draft')}
+                </span>
+            ),
+        },
+        {
+            key: 'total_net', label: t("hr.payroll.total_salaries"),
+            style: { fontWeight: 'bold', color: 'var(--primary)' },
+            render: (val) => `${formatNumber(val)} ${currency}`,
+        },
+        {
+            key: '_actions', label: t("common.actions"),
+            render: (_val, row) => (
+                <button
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/hr/payroll/${row.id}`); }}
+                >
+                    <Eye size={14} className="ms-1" />
+                    {t('common.view_details')}
+                </button>
+            ),
+        },
+    ];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <div className="header-title">
-                    <h1 className="workspace-title">{t("hr.payroll.title")}</h1>
-                    <p className="workspace-subtitle">{t("hr.payroll.subtitle")}</p>
-                </div>
-                <div className="header-actions">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title">{t("hr.payroll.title")}</h1>
+                        <p className="workspace-subtitle">{t("hr.payroll.subtitle")}</p>
+                    </div>
                     {hasPermission('hr.manage') && (
                         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                             <Plus size={18} className="ms-2" />
@@ -74,63 +120,31 @@ const PayrollList = () => {
                 </div>
             </div>
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t("hr.payroll.period_name")}</th>
-                            <th>{t("hr.payroll.start_date")}</th>
-                            <th>{t("hr.payroll.end_date")}</th>
-                            <th>{t("common.status_title")}</th>
-                            <th>{t("hr.payroll.total_salaries")}</th>
-                            <th>{t("common.actions")}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr><td colSpan="6" className="text-center p-4">{t("common.loading")}</td></tr>
-                        ) : periods.length === 0 ? (
-                            <tr>
-                                <td colSpan="6" className="text-center p-5">
-                                    <div className="text-muted mb-3" style={{ fontSize: '40px' }}>📅</div>
-                                    <p>{t("hr.payroll.no_periods")}</p>
-                                    {hasPermission('hr.manage') && (
-                                        <button className="btn btn-outline-primary btn-sm" onClick={() => setShowModal(true)}>
-                                            {t('hr.payroll.create_first')}
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map(period => (
-                                <tr key={period.id} className="hover-row">
-                                    <td className="fw-bold">{period.name}</td>
-                                    <td>{formatShortDate(period.start_date)}</td>
-                                    <td>{formatShortDate(period.end_date)}</td>
-                                    <td>
-                                        <span className={`status-badge status-${period.status === 'posted' ? 'active' : 'draft'}`}>
-                                            {period.status === 'posted' ? t('common.posted') : t('common.draft')}
-                                        </span>
-                                    </td>
-                                    <td className="fw-bold text-primary">
-                                        {formatNumber(period.total_net)} {currency}
-                                    </td>
-                                    <td>
-                                        <button
-                                            className="btn btn-sm btn-outline-primary"
-                                            onClick={() => navigate(`/hr/payroll/${period.id}`)}
-                                        >
-                                            <Eye size={14} className="ms-1" />
-                                            {t('common.view_details')}
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t("hr.payroll.period_name")}
+                filters={[
+                    {
+                        key: 'status', label: t("common.status_title"), options: [
+                            { value: 'draft', label: t('common.draft') },
+                            { value: 'posted', label: t('common.posted') },
+                        ]
+                    },
+                ]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(_key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                emptyIcon="📅"
+                emptyTitle={t("hr.payroll.no_periods")}
+                emptyAction={hasPermission('hr.manage') ? { label: t('hr.payroll.create_first'), onClick: () => setShowModal(true) } : undefined}
+                onRowClick={(row) => navigate(`/hr/payroll/${row.id}`)}
+            />
 
             {/* Create Modal */}
             {showModal && (
@@ -157,7 +171,7 @@ const PayrollList = () => {
                                     <div className="col-6 mb-3">
                                         <label className="form-label">{t("hr.payroll.start_date")}</label>
                                         <input
-                                           
+
                                             className="form-input"
                                             required
                                             value={formData.start_date}
@@ -168,7 +182,7 @@ const PayrollList = () => {
                                     <div className="col-6 mb-3">
                                         <label className="form-label">{t("hr.payroll.end_date")}</label>
                                         <input
-                                           
+
                                             className="form-input"
                                             required
                                             value={formData.end_date}
@@ -180,7 +194,7 @@ const PayrollList = () => {
                                 <div className="mb-3">
                                     <label className="form-label">{t("hr.payroll.payment_date")}</label>
                                     <input
-                                       
+
                                         className="form-input"
                                         value={formData.payment_date}
                                         onChange={e => setFormData({ ...formData, payment_date: e.target.value })}

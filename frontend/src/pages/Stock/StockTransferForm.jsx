@@ -6,6 +6,7 @@ import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 const StockTransferForm = () => {
     const { t } = useTranslation();
@@ -125,8 +126,7 @@ const StockTransferForm = () => {
             <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
                 <form onSubmit={handleSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div className="form-group">
-                            <label className="form-label">{t('stock.transfer.from_warehouse')}</label>
+                        <FormField label={t('stock.transfer.from_warehouse')}>
                             <select
                                 className="form-input"
                                 required
@@ -138,10 +138,9 @@ const StockTransferForm = () => {
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                        </div>
+                        </FormField>
 
-                        <div className="form-group">
-                            <label className="form-label">{t('stock.transfer.to_warehouse')}</label>
+                        <FormField label={t('stock.transfer.to_warehouse')}>
                             <select
                                 className="form-input"
                                 required
@@ -153,7 +152,7 @@ const StockTransferForm = () => {
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div className="mb-6">
@@ -201,15 +200,14 @@ const StockTransferForm = () => {
                         ))}
                     </div>
 
-                    <div className="form-group mb-6">
-                        <label className="form-label">{t('stock.transfer.notes')}</label>
+                    <FormField label={t('stock.transfer.notes')} className="mb-6">
                         <textarea
                             className="form-input"
                             rows="2"
                             value={formData.notes}
                             onChange={e => setFormData({ ...formData, notes: e.target.value })}
                         ></textarea>
-                    </div>
+                    </FormField>
 
                     <div className="flex justify-end gap-4">
                         <button type="button" className="btn btn-secondary" onClick={() => navigate('/stock')}>{t('stock.transfer.cancel')}</button>

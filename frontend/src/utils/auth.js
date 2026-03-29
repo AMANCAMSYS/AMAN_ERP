@@ -14,6 +14,10 @@ export function getToken() {
     return localStorage.getItem('token')
 }
 
+export function getRefreshToken() {
+    return localStorage.getItem('refresh_token')
+}
+
 export function getUser() {
     try {
         const user = localStorage.getItem('user')
@@ -105,8 +109,11 @@ export function updateUser(userData) {
     localStorage.setItem('user', JSON.stringify(updatedUser));
 }
 
-export function setAuth(token, user, companyId) {
+export function setAuth(token, user, companyId, refreshToken = null) {
     localStorage.setItem('token', token)
+    if (refreshToken) {
+        localStorage.setItem('refresh_token', refreshToken)
+    }
     localStorage.setItem('user', JSON.stringify(user))
     if (companyId) {
         localStorage.setItem('company_id', companyId)
@@ -122,6 +129,7 @@ export function setAuth(token, user, companyId) {
 
 export function clearAuth() {
     localStorage.removeItem('token')
+    localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
     localStorage.removeItem('company_id')
     localStorage.removeItem('industry_type')

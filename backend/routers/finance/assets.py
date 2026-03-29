@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import get_mapped_account_id
+from utils.fiscal_lock import check_fiscal_period_open
 from schemas.assets import AssetCreate, AssetUpdate, AssetDisposal
 
 router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"], dependencies=[Depends(require_module("assets"))])
@@ -543,33 +544,35 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
             )).fetchone()
 
             if rou_acc and liability_acc:
-                je = conn.execute(text("""
-                    INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by)
-                    VALUES (
-                        'LEASE-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'LEASE-%')::text, '1'), 6, '0'),
-                        :entry_date, :description, 'posted', 'lease_contract', :user_id
-                    ) RETURNING id
-                """), {
-                    "entry_date": lease["start_date"],
-                    "description": f"اعتراف أولي بعقد إيجار IFRS 16 - {lease.get('description', '')} - {lease.get('lessor_name', '')}",
-                    "user_id": current_user.id,
-                }).fetchone()
-                journal_entry_id = je.id if je else None
-
-                if journal_entry_id:
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:je_id, :acc_id, :amount, 0, :desc)
-                    """), {"je_id": journal_entry_id, "acc_id": rou_acc.id, "amount": rou_value,
-                           "desc": f"أصل حق الاستخدام - {lease.get('description', '')}"})
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:je_id, :acc_id, 0, :amount, :desc)
-                    """), {"je_id": journal_entry_id, "acc_id": liability_acc.id, "amount": rou_value,
-                           "desc": f"التزام إيجار - {lease.get('description', '')}"})
-
-                    update_account_balance(conn, account_id=rou_acc.id, debit_base=rou_value, credit_base=0)
-                    update_account_balance(conn, account_id=liability_acc.id, debit_base=0, credit_base=rou_value)
+                check_fiscal_period_open(conn, lease["start_date"])
+                
+                je_lines = [
+                    {
+                        "account_id": rou_acc.id, "debit": float(rou_value), "credit": 0,
+                        "description": f"أصل حق الاستخدام - {lease.get('description', '')}"
+                    },
+                    {
+                        "account_id": liability_acc.id, "debit": 0, "credit": float(rou_value),
+                        "description": f"التزام إيجار - {lease.get('description', '')}"
+                    }
+                ]
+                
+                from services.gl_service import create_journal_entry as gl_create_journal_entry
+                from utils.accounting import get_base_currency
+                base_currency = get_base_currency(conn)
+                
+                journal_entry_id, entry_number = gl_create_journal_entry(
+                    db=conn,
+                    company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                    date=lease["start_date"],
+                    description=f"اعتراف أولي بعقد إيجار IFRS 16 - {lease.get('description', '')} - {lease.get('lessor_name', '')}",
+                    lines=je_lines,
+                    user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                    currency=base_currency,
+                    exchange_rate=1.0,
+                    source="lease_contract",
+                    source_id=lid
+                )
 
         conn.commit()
         return {
@@ -692,7 +695,8 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
         # Cr Accumulated Depreciation (1519)
         # We need to find these Account IDs. For now assuming they exist or using placeholders.
         # Ideally, we should fetch them from chart of accounts based on code.
-        
+
+        check_fiscal_period_open(conn, item.date)
         # Use Dynamic Mappings for Depreciation
         exp_acc_id = get_mapped_account_id(conn, "acc_map_depr_exp")
         acc_depr_id = get_mapped_account_id(conn, "acc_map_acc_depr")
@@ -701,48 +705,34 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
              raise HTTPException(status_code=400, detail="Depreciation accounts (mapped roles: acc_map_depr_exp, acc_map_acc_depr) not found.")
 
         # Create Header
-        je_res = conn.execute(text("""
-            INSERT INTO journal_entries (
-                company_id, branch_id, entry_date, reference, description, status, created_by,
-                currency, exchange_rate
-            ) VALUES (
-                :cid, :bid, :date, :ref, :desc, 'posted', :user, :curr, :rate
-            ) RETURNING id
-        """), {
-            "cid": current_user.company_id,
-            "bid": asset.branch_id,
-            "date": item.date,
-            "ref": f"DEPR-{asset.code}-{item.fiscal_year}",
-            "desc": f"Depreciation for asset {asset.name} ({asset.code}) - {item.fiscal_year}",
-            "user": current_user.username,
-            "curr": asset.currency or base_currency,
-            "rate": 1.0
-        }).fetchone()
-        je_id = je_res.id
+        je_lines = [
+            {
+                "account_id": exp_acc_id, "debit": float(item.amount), "credit": 0,
+                "description": "Depreciation Expense"
+            },
+            {
+                "account_id": acc_depr_id, "debit": 0, "credit": float(item.amount),
+                "description": "Accumulated Depreciation"
+            }
+        ]
         
-        # DB Lines Created
-        # Debit Expense
-        conn.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, description, debit, credit,
-                amount_currency, currency
-            )
-            VALUES (:jid, :aid, :desc, :dr, 0, :amt_curr, :curr)
-        """), {"jid": je_id, "aid": exp_acc_id, "desc": "Depreciation Expense", "dr": item.amount, "amt_curr": item.amount, "curr": asset.currency or base_currency})
-        
-        # Credit Accumulated Depr
-        conn.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, description, debit, credit,
-                amount_currency, currency
-            )
-            VALUES (:jid, :aid, :desc, 0, :cr, :amt_curr, :curr)
-        """), {"jid": je_id, "aid": acc_depr_id, "desc": "Accumulated Depreciation", "cr": item.amount, "amt_curr": item.amount, "curr": asset.currency or base_currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, entry_number = gl_create_journal_entry(
+            db=conn,
+            company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+            date=item.date,
+            description=f"Depreciation for asset {asset.name} ({asset.code}) - {item.fiscal_year}",
+            lines=je_lines,
+            user_id=current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            branch_id=asset.branch_id,
+            reference=f"DEPR-{asset.code}-{item.fiscal_year}",
+            currency=asset.currency or base_currency,
+            exchange_rate=1.0,
+            source="asset_depreciation",
+            source_id=schedule_id
+        )
 
-        # Update Account Balances
-        from utils.accounting import update_account_balance
-        update_account_balance(conn, account_id=exp_acc_id, debit_base=float(item.amount), credit_base=0)
-        update_account_balance(conn, account_id=acc_depr_id, debit_base=0, credit_base=float(item.amount))
+        # Update Account Balances handled by gl_service
 
         # Update Schedule
         conn.execute(text("UPDATE asset_depreciation_schedule SET posted = TRUE, journal_entry_id = :jid WHERE id = :sid"), 
@@ -799,77 +789,52 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         if exists:
              raise HTTPException(status_code=400, detail="تم ترحيل قيد استبعاد لهذا الأصل مسبقاً")
 
-        je_id = conn.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description, status, created_by, branch_id,
-                currency, exchange_rate
-            )
-            VALUES (:num, :date, :ref, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
-        """), {
-            "num": je_num, "date": disposal.disposal_date, "ref": f"ASSET-DISP-{asset_id}",
-            "desc": f"استبعاد الأصل {asset.name} ({asset.code})", 
-            "uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id, 
-            "bid": asset.branch_id,
-            "curr": asset.currency or base_currency,
-            "rate": 1.0
-        }).scalar()
+        check_fiscal_period_open(conn, disposal.disposal_date)
         
-        # A. Debit Cash (Sales Price)
+        je_lines = []
         if disposal.disposal_price > 0:
-            conn.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :acc, :amt, 0, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_cash, "amt": disposal.disposal_price, "desc": 'ثمن بيع أصل', "curr": asset.currency or base_currency})
-                         
-        # B. Debit Accumulated Depreciation
+            je_lines.append({
+                "account_id": acc_cash, "debit": float(disposal.disposal_price), "credit": 0,
+                "description": 'ثمن بيع أصل'
+            })
+            
         if acc_depr_recorded > 0:
-            conn.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :acc, :amt, 0, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_acc_depr, "amt": acc_depr_recorded, "desc": 'استبعاد إهلاك متراكم', "curr": asset.currency or base_currency})
-                         
-        # C. Credit Fixed Asset (Original Cost)
-        conn.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, debit, credit, description,
-                amount_currency, currency
-            ) VALUES (:jid, :acc, 0, :amt, :desc, :amt, :curr)
-        """), {"jid": je_id, "acc": acc_fixed_assets, "amt": asset.cost, "desc": 'استبعاد تكلفة أصل تاريخية', "curr": asset.currency or base_currency})
-                     
-        # D. Gain or Loss
-        if gain_loss > 0:
-            # Credit Gain (Revenue)
-            conn.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :acc, 0, :amt, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_gain, "amt": gain_loss, "desc": 'أرباح بيع أصول', "curr": asset.currency or base_currency})
-        elif gain_loss < 0:
-            # Debit Loss (Expense)
-            conn.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :acc, :amt, 0, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_loss, "amt": abs(gain_loss), "desc": 'خسائر بيع أصول', "curr": asset.currency or base_currency})
+            je_lines.append({
+                "account_id": acc_acc_depr, "debit": float(acc_depr_recorded), "credit": 0,
+                "description": 'استبعاد إهلاك متراكم'
+            })
+            
+        je_lines.append({
+            "account_id": acc_fixed_assets, "debit": 0, "credit": float(asset.cost),
+            "description": 'استبعاد تكلفة أصل تاريخية'
+        })
         
-        # --- Update Account Balances ---
-        from utils.accounting import update_account_balance
-        if disposal.disposal_price > 0 and acc_cash:
-            update_account_balance(conn, account_id=acc_cash, debit_base=float(disposal.disposal_price), credit_base=0)
-        if acc_depr_recorded > 0 and acc_acc_depr:
-            update_account_balance(conn, account_id=acc_acc_depr, debit_base=float(acc_depr_recorded), credit_base=0)
-        if acc_fixed_assets:
-            update_account_balance(conn, account_id=acc_fixed_assets, debit_base=0, credit_base=float(asset.cost))
-        if gain_loss > 0 and acc_gain:
-            update_account_balance(conn, account_id=acc_gain, debit_base=0, credit_base=float(gain_loss))
-        elif gain_loss < 0 and acc_loss:
-            update_account_balance(conn, account_id=acc_loss, debit_base=float(abs(gain_loss)), credit_base=0)
+        if gain_loss > 0:
+            je_lines.append({
+                "account_id": acc_gain, "debit": 0, "credit": float(gain_loss),
+                "description": 'أرباح بيع أصول'
+            })
+        elif gain_loss < 0:
+            je_lines.append({
+                "account_id": acc_loss, "debit": abs(float(gain_loss)), "credit": 0,
+                "description": 'خسائر بيع أصول'
+            })
+            
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, je_num = gl_create_journal_entry(
+            db=conn,
+            company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+            date=disposal.disposal_date,
+            description=f"استبعاد الأصل {asset.name} ({asset.code})",
+            lines=je_lines,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            branch_id=asset.branch_id,
+            reference=f"ASSET-DISP-{asset_id}",
+            currency=asset.currency or base_currency,
+            exchange_rate=1.0,
+            source="asset_disposal",
+            source_id=asset_id
+        )
                          
         trans.commit()
         return {"id": asset_id, "status": "disposed", "journal_entry": je_num}
@@ -918,6 +883,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
 
         cost = float(asset.cost)
 
+        check_fiscal_period_open(conn, date.today())
         # Create 2 JEs — one for sending branch, one for receiving
         for je_type, branch_id, lines in [
             ("SEND", from_branch_id, [
@@ -929,24 +895,30 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
                 (acc_inter, 0, cost, f"نقل أصل #{asset_id} من فرع {from_branch_id}")
             ]),
         ]:
-            ts = datetime.now().strftime('%Y%m%d%H%M%S')
-            je_num = f"JE-ASSET-XFER-{je_type}-{asset_id}-{ts}"
-            je_id = conn.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
-                VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :br, :curr, 1)
-                RETURNING id
-            """), {
-                "num": je_num, "ref": f"ASSET-XFER-{asset_id}",
-                "desc": f"نقل أصل #{asset_id} — {je_type}",
-                "uid": current_user.id, "br": branch_id, "curr": base_currency
-            }).scalar()
-
-            for acc_id, debit, credit, desc in lines:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:jid, :acc, :d, :c, :desc, :amt, :curr)
-                """), {"jid": je_id, "acc": acc_id, "d": debit, "c": credit, "desc": desc, "amt": debit or credit, "curr": base_currency})
-                update_account_balance(conn, account_id=acc_id, debit_base=debit, credit_base=credit)
+            je_lines_formatted = [
+                {"account_id": row[0], "debit": float(row[1]), "credit": float(row[2]), "description": row[3]}
+                for row in lines
+            ]
+            
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            from utils.accounting import get_base_currency
+            
+            base_currency = get_base_currency(conn)
+            
+            je_id, je_num = gl_create_journal_entry(
+                db=conn,
+                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                date=date.today(),
+                description=f"نقل أصل #{asset_id} — {je_type}",
+                lines=je_lines_formatted,
+                user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                branch_id=branch_id,
+                reference=f"ASSET-XFER-{asset_id}-{je_type}",
+                currency=base_currency,
+                exchange_rate=1.0,
+                source="asset_transfer",
+                source_id=asset_id
+            )
 
         # Update asset branch
         conn.execute(text("UPDATE assets SET branch_id = :br, updated_at = NOW() WHERE id = :id"),
@@ -1002,40 +974,36 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         if diff < 0 and not acc_loss:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حساب خسائر الأصول في الإعدادات")
 
-        ts = datetime.now().strftime('%Y%m%d%H%M%S')
-        je_num = f"JE-ASSET-REVAL-{asset_id}-{ts}"
-        je_id = conn.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, created_by, branch_id, currency, exchange_rate)
-            VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :br, :curr, 1) RETURNING id
-        """), {
-            "num": je_num, "ref": f"ASSET-REVAL-{asset_id}", "desc": reval.reason,
-            "uid": current_user.id, "br": asset.branch_id, "curr": base_currency
-        }).scalar()
-
+        check_fiscal_period_open(conn, date.today())
+        check_fiscal_period_open(conn, date.today())
+        
+        je_lines = []
         if diff > 0:
-            # Increase: Debit fixed assets, Credit revaluation reserve
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, :amt, 0, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_fixed, "amt": abs(diff), "desc": f"زيادة قيمة أصل #{asset_id}", "curr": base_currency})
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, 0, :amt, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_reval, "amt": abs(diff), "desc": "احتياطي إعادة تقييم", "curr": base_currency})
-            update_account_balance(conn, account_id=acc_fixed, debit_base=abs(diff), credit_base=0)
-            update_account_balance(conn, account_id=acc_reval, debit_base=0, credit_base=abs(diff))
+            je_lines.extend([
+                {"account_id": acc_fixed, "debit": float(abs(diff)), "credit": 0, "description": f"زيادة قيمة أصل #{asset_id}"},
+                {"account_id": acc_reval, "debit": 0, "credit": float(abs(diff)), "description": "احتياطي إعادة تقييم"}
+            ])
         else:
-            # Decrease: Debit loss, Credit fixed assets
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, :amt, 0, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_loss, "amt": abs(diff), "desc": f"انخفاض قيمة أصل #{asset_id}", "curr": base_currency})
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :acc, 0, :amt, :desc, :amt, :curr)
-            """), {"jid": je_id, "acc": acc_fixed, "amt": abs(diff), "desc": f"تخفيض أصل #{asset_id}", "curr": base_currency})
-            update_account_balance(conn, account_id=acc_loss, debit_base=abs(diff), credit_base=0)
-            update_account_balance(conn, account_id=acc_fixed, debit_base=0, credit_base=abs(diff))
+            je_lines.extend([
+                {"account_id": acc_loss, "debit": float(abs(diff)), "credit": 0, "description": f"انخفاض قيمة أصل #{asset_id}"},
+                {"account_id": acc_fixed, "debit": 0, "credit": float(abs(diff)), "description": f"تخفيض أصل #{asset_id}"}
+            ])
+            
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, je_num = gl_create_journal_entry(
+            db=conn,
+            company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+            date=date.today(),
+            description=reval.reason or "إعادة تقييم أصل",
+            lines=je_lines,
+            user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+            branch_id=asset.branch_id,
+            reference=f"ASSET-REVAL-{asset_id}",
+            currency=base_currency,
+            exchange_rate=1.0,
+            source="asset_revaluation",
+            source_id=asset_id
+        )
 
         # Update asset cost
         conn.execute(text("UPDATE assets SET cost = cost + :diff, updated_at = NOW() WHERE id = :id"),
@@ -1303,33 +1271,34 @@ def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Dep
             )).fetchone()
 
             if imp_loss_acc and acc_imp_acc:
-                je = conn.execute(text("""
-                    INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by)
-                    VALUES (
-                        'IMP-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'IMP-%')::text, '1'), 6, '0'),
-                        :entry_date, :description, 'posted', 'asset_impairment', :user_id
-                    ) RETURNING id
-                """), {
-                    "entry_date": str(date.today()),
-                    "description": f"خسارة انخفاض قيمة الأصل: {asset.get('name', '')} (IAS 36) - مبلغ {impairment_loss:,.2f}",
-                    "user_id": current_user.id,
-                }).fetchone()
-                journal_entry_id = je.id if je else None
-
-                if journal_entry_id:
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:je_id, :acc_id, :amount, 0, :desc)
-                    """), {"je_id": journal_entry_id, "acc_id": imp_loss_acc.id, "amount": impairment_loss,
-                           "desc": f"خسارة انخفاض قيمة - {asset.get('name', '')}"})
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:je_id, :acc_id, 0, :amount, :desc)
-                    """), {"je_id": journal_entry_id, "acc_id": acc_imp_acc.id, "amount": impairment_loss,
-                           "desc": f"مجمع انخفاض قيمة - {asset.get('name', '')}"})
-
-                    update_account_balance(conn, account_id=imp_loss_acc.id, debit_base=impairment_loss, credit_base=0)
-                    update_account_balance(conn, account_id=acc_imp_acc.id, debit_base=0, credit_base=impairment_loss)
+                check_fiscal_period_open(conn, date.today())
+                
+                je_lines = [
+                    {
+                        "account_id": imp_loss_acc.id, "debit": float(impairment_loss), "credit": 0,
+                        "description": f"خسارة انخفاض قيمة - {asset.get('name', '')}"
+                    },
+                    {
+                        "account_id": acc_imp_acc.id, "debit": 0, "credit": float(impairment_loss),
+                        "description": f"مجمع انخفاض قيمة - {asset.get('name', '')}"
+                    }
+                ]
+                
+                from services.gl_service import create_journal_entry as gl_create_journal_entry
+                from utils.accounting import get_base_currency
+                
+                je_id, entry_number = gl_create_journal_entry(
+                    db=conn,
+                    company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                    date=date.today(),
+                    description=f"خسارة انخفاض قيمة الأصل: {asset.get('name', '')} (IAS 36)",
+                    lines=je_lines,
+                    user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                    currency=get_base_currency(conn),
+                    exchange_rate=1.0,
+                    source="asset_impairment",
+                    source_id=imp_id
+                )
 
         conn.commit()
         return {

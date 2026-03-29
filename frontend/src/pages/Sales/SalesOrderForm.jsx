@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function SalesOrderForm() {
     const { t } = useTranslation()
@@ -231,8 +232,7 @@ function SalesOrderForm() {
 
             <form onSubmit={handleSubmit} className="card">
                 <div className="form-row">
-                    <div className="form-group" style={{ flex: 1.5 }}>
-                        <label className="form-label">{t('sales.orders.form.customer')} *</label>
+                    <FormField label={t('sales.orders.form.customer')} required style={{ flex: 1.5 }}>
                         <select
                             className="form-input"
                             required
@@ -244,10 +244,9 @@ function SalesOrderForm() {
                                 <option key={c.id} value={c.id}>{c.name || c.customer_name}</option>
                             ))}
                         </select>
-                    </div>
+                    </FormField>
 
-                    <div className="form-group" style={{ flex: 1.5 }}>
-                        <label className="form-label">{t('stock.warehouses.title')}</label>
+                    <FormField label={t('stock.warehouses.title')} style={{ flex: 1.5 }}>
                         <select
                             className="form-input"
                             value={formData.warehouse_id || ''}
@@ -258,7 +257,7 @@ function SalesOrderForm() {
                                 <option key={wh.id} value={wh.id}>{wh.name}</option>
                             ))}
                         </select>
-                    </div>
+                    </FormField>
                     <div className="form-group">
                         <CustomDatePicker
                             label={t('sales.orders.form.date')}
@@ -372,15 +371,14 @@ function SalesOrderForm() {
 
                 <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                        <div className="form-group">
-                            <label className="form-label font-bold">{t('sales.orders.form.notes_label')}</label>
+                        <FormField label={t('sales.orders.form.notes_label')} className="font-bold">
                             <textarea
                                 className="form-input" rows="5"
                                 placeholder={t('sales.orders.form.notes_placeholder')}
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{

@@ -4,6 +4,14 @@ Shared calculations for End of Service and other HR operations.
 Compliant with Saudi Labor Law (Articles 84 & 85).
 """
 
+from decimal import Decimal, ROUND_HALF_UP
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v):
+    return Decimal(str(v or 0))
+
 
 def calculate_eos_gratuity(total_salary: float, total_years: float, termination_reason: str = "termination") -> dict:
     """
@@ -29,37 +37,41 @@ def calculate_eos_gratuity(total_salary: float, total_years: float, termination_
     Returns:
         dict with full_gratuity, resignation_factor, final_gratuity
     """
-    if total_years <= 0:
+    salary = _dec(total_salary)
+    years = _dec(total_years)
+
+    if years <= 0:
         return {
             "full_gratuity": 0.0,
             "resignation_factor": 0.0,
             "final_gratuity": 0.0
         }
-    
+
     # Calculate base gratuity
-    if total_years <= 5:
-        gratuity = (total_salary / 2) * total_years
+    if years <= 5:
+        gratuity = (salary / Decimal('2')) * years
     else:
-        first_five = (total_salary / 2) * 5
-        remaining = total_salary * (total_years - 5)
+        first_five = (salary / Decimal('2')) * Decimal('5')
+        remaining = salary * (years - Decimal('5'))
         gratuity = first_five + remaining
-    
+
     # Apply resignation factor
-    resignation_factor = 1.0
+    resignation_factor = Decimal('1')
     if termination_reason == "resignation":
-        if total_years < 2:
-            resignation_factor = 0.0
-        elif total_years < 5:
-            resignation_factor = 1 / 3
-        elif total_years < 10:
-            resignation_factor = 2 / 3
+        if years < 2:
+            resignation_factor = Decimal('0')
+        elif years < 5:
+            resignation_factor = Decimal('1') / Decimal('3')
+        elif years < 10:
+            resignation_factor = Decimal('2') / Decimal('3')
         else:
-            resignation_factor = 1.0
-    
-    final_gratuity = round(gratuity * resignation_factor, 2)
-    
+            resignation_factor = Decimal('1')
+
+    full_gratuity = gratuity.quantize(_D2, ROUND_HALF_UP)
+    final_gratuity = (gratuity * resignation_factor).quantize(_D2, ROUND_HALF_UP)
+
     return {
-        "full_gratuity": round(gratuity, 2),
-        "resignation_factor": resignation_factor,
-        "final_gratuity": final_gratuity
+        "full_gratuity": float(full_gratuity),
+        "resignation_factor": float(resignation_factor.quantize(_D2, ROUND_HALF_UP)),
+        "final_gratuity": float(final_gratuity)
     }

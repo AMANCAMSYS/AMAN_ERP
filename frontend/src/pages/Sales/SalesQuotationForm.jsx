@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function SalesQuotationForm() {
     const { t } = useTranslation()
@@ -181,8 +182,7 @@ function SalesQuotationForm() {
 
             <form onSubmit={handleSubmit} className="card">
                 <div className="form-row">
-                    <div className="form-group" style={{ flex: 2 }}>
-                        <label className="form-label">{t('sales.quotations.form.customer')} *</label>
+                    <FormField label={t('sales.quotations.form.customer')} required style={{ flex: 2 }}>
                         <select
                             className="form-input"
                             required
@@ -194,7 +194,7 @@ function SalesQuotationForm() {
                                 <option key={c.id} value={c.id}>{c.name || c.customer_name}</option>
                             ))}
                         </select>
-                    </div>
+                    </FormField>
                     <div className="form-group">
                         <CustomDatePicker
                             label={t('sales.quotations.form.date')}
@@ -307,8 +307,7 @@ function SalesQuotationForm() {
 
                 <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                        <div className="form-group">
-                            <label className="form-label font-bold">{t('sales.quotations.form.notes_label')}</label>
+                        <FormField label={t('sales.quotations.form.notes_label')} className="font-bold">
                             <textarea
                                 className="form-input" rows="3"
                                 placeholder={t('sales.quotations.form.notes_placeholder')}
@@ -316,13 +315,14 @@ function SalesQuotationForm() {
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                                 style={{ marginBottom: '16px' }}
                             ></textarea>
-                            <label className="form-label">{t('sales.quotations.form.terms_label')}</label>
+                        </FormField>
+                        <FormField label={t('sales.quotations.form.terms_label')}>
                             <textarea
                                 className="form-input" rows="3"
                                 value={formData.terms_conditions}
                                 onChange={e => setFormData({ ...formData, terms_conditions: e.target.value })}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{

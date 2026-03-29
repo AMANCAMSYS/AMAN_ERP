@@ -148,22 +148,30 @@ function BalanceSheet() {
                             📥 {t('common.export')}
                         </button>
                         {showExport && <div className="dropdown-menu" style={{ display: 'block', position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-                            <a
-                                href={`${api.defaults.baseURL}/reports/accounting/balance-sheet/export?format=pdf&as_of_date=${asOfDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}&token=${localStorage.getItem('token')}`}
-                                target="_blank"
+                            <button
+                                onClick={async () => {
+                                    const res = await api.get(`/reports/accounting/balance-sheet/export?format=pdf&as_of_date=${asOfDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}`, { responseType: 'blob' });
+                                    const url = URL.createObjectURL(res.data);
+                                    window.open(url, '_blank');
+                                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                }}
                                 className="dropdown-item"
-                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none' }}
+                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'start' }}
                             >
                                 📄 PDF
-                            </a>
-                            <a
-                                href={`${api.defaults.baseURL}/reports/accounting/balance-sheet/export?format=excel&as_of_date=${asOfDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}&token=${localStorage.getItem('token')}`}
-                                target="_blank"
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    const res = await api.get(`/reports/accounting/balance-sheet/export?format=excel&as_of_date=${asOfDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}`, { responseType: 'blob' });
+                                    const url = URL.createObjectURL(res.data);
+                                    const a = document.createElement('a'); a.href = url; a.download = 'balance-sheet.xlsx'; a.click();
+                                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                }}
                                 className="dropdown-item"
-                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none' }}
+                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'start' }}
                             >
                                 📊 Excel
-                            </a>
+                            </button>
                         </div>}
                     </div>
                     <button className="btn btn-secondary" onClick={() => window.print()}>

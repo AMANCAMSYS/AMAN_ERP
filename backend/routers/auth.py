@@ -2,7 +2,7 @@
 AMAN ERP - Authentication Router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form, Body
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
@@ -22,12 +22,13 @@ from utils.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["المصادقة"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 logger = logging.getLogger(__name__)
 
 # ============ SEC-FIX: Redis-backed rate limiter ============
 # Persists across restarts and works in multi-worker / multi-instance environments.
-MAX_LOGIN_ATTEMPTS = 500  # TEMP: increased for TestSprite testing (was 5)
-MAX_USERNAME_ATTEMPTS = 1000  # TEMP: increased for TestSprite testing (was 10)
+MAX_LOGIN_ATTEMPTS = 5  # SEC-FIX: Production rate limit (reverted from 500 testing value)
+MAX_USERNAME_ATTEMPTS = 10  # SEC-FIX: Production rate limit (reverted from 1000 testing value)
 LOCKOUT_SECONDS = 15 * 60  # 15 minutes
 
 _rate_redis = None  # lazy-initialised Redis connection
@@ -280,10 +281,22 @@ token_blacklist = _token_blacklist_cache
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
+    to_encode.setdefault("token_use", "access")
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    to_encode.update({"token_use": "refresh"})
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -296,7 +309,7 @@ def decode_token(token: str) -> dict:
 
 
 @router.post("/login", response_model=Token)
-@limiter.limit("1000/minute")  # TEMP: increased for TestSprite testing (was 10/minute)
+@limiter.limit("10/minute")  # SEC-FIX: Production rate limit (reverted from 1000 testing value)
 async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -346,13 +359,15 @@ async def login(
                 )
             
             clear_failed_attempts(request, form_data.username)
-            access_token = create_access_token({
+            auth_payload = {
                 "sub": form_data.username,
                 "role": "system_admin",
                 "type": "system_admin",
                 "company_id": None,
                 "permissions": ["*"]
-            })
+            }
+            access_token = create_access_token(auth_payload)
+            refresh_token = create_refresh_token(auth_payload)
             # LOG SYSTEM ADMIN LOGIN
             log_system_activity(
                 action="auth.login",
@@ -363,6 +378,7 @@ async def login(
             
             return Token(
                 access_token=access_token,
+                refresh_token=refresh_token,
                 token_type="bearer",
                 user={"username": form_data.username, "role": "system_admin", "company_id": None, "permissions": ["*"]}
             )
@@ -514,7 +530,7 @@ async def login(
                     except Exception:
                         enabled_modules = []
 
-                access_token = create_access_token({
+                auth_payload = {
                     "sub": result[1],
                     "user_id": result[0],
                     "company_id": company_id,
@@ -523,7 +539,9 @@ async def login(
                     "enabled_modules": enabled_modules,
                     "allowed_branches": allowed_branches,
                     "type": "company_user"
-                })
+                }
+                access_token = create_access_token(auth_payload)
+                refresh_token = create_refresh_token(auth_payload)
 
                 decimal_places = 2
                 company_country = "SA"
@@ -559,6 +577,7 @@ async def login(
 
                 return Token(
                     access_token=access_token,
+                    refresh_token=refresh_token,
                     token_type="bearer",
                     user={
                         "id": result[0],
@@ -603,6 +622,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("token_use") == "refresh":
+            raise credentials_exception
         username: str = payload.get("sub")
         company_id: str = payload.get("company_id")
         permissions: list = payload.get("permissions")
@@ -768,6 +789,14 @@ class SelfProfileUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+
 @router.put("/me", response_model=UserResponse)
 async def update_current_user_profile(
     data: SelfProfileUpdateRequest,
@@ -853,7 +882,10 @@ async def update_current_user_profile(
 
 
 @router.post("/logout")
-async def logout(token: str = Depends(oauth2_scheme)):
+async def logout(
+    body: Optional[LogoutRequest] = Body(default=None),
+    token: str = Depends(oauth2_scheme)
+):
     """تسجيل الخروج - يتم إضافة التوكن إلى القائمة السوداء"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
@@ -862,23 +894,43 @@ async def logout(token: str = Depends(oauth2_scheme)):
     except JWTError:
         username = None
     add_token_to_blacklist(token, username=username, reason="logout")
+    if body and body.refresh_token:
+        add_token_to_blacklist(body.refresh_token, username=username, reason="logout_refresh")
     return {"message": "تم تسجيل الخروج بنجاح"}
 
 
 @router.post("/refresh")
-async def refresh_token(token: str = Depends(oauth2_scheme)):
-    """تجديد التوكن — يُنشئ توكن جديد من توكن صالح"""
+async def refresh_token(
+    body: Optional[RefreshTokenRequest] = Body(default=None),
+    token: Optional[str] = Depends(oauth2_scheme_optional)
+):
+    """تجديد الجلسة باستخدام refresh token (دوار)"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="التوكن منتهي أو غير صالح",
+        detail="رمز التحديث منتهي أو غير صالح",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    provided_refresh_token = None
+    if body and body.refresh_token:
+        provided_refresh_token = body.refresh_token.strip()
+    elif token:
+        provided_refresh_token = token
+
+    if not provided_refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="رمز التحديث مطلوب"
+        )
     
-    if is_token_blacklisted(token):
+    if is_token_blacklisted(provided_refresh_token):
         raise credentials_exception
         
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(provided_refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("token_use") != "refresh":
+            raise credentials_exception
+
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -899,13 +951,15 @@ async def refresh_token(token: str = Depends(oauth2_scheme)):
         if payload.get("allowed_branches"):
             new_payload["allowed_branches"] = payload["allowed_branches"]
         
-        new_token = create_access_token(new_payload)
+        new_access_token = create_access_token(new_payload)
+        new_refresh_token = create_refresh_token(new_payload)
         
-        # SEC-FIX-003: Blacklist the old token to prevent reuse
-        add_token_to_blacklist(token, username=username, reason="refresh")
+        # Rotate refresh token: revoke old one and return new one
+        add_token_to_blacklist(provided_refresh_token, username=username, reason="refresh_rotate")
         
         return {
-            "access_token": new_token,
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
     except JWTError:
@@ -1026,8 +1080,8 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
         frontend_url = prod_url or settings.FRONTEND_URL or "http://localhost:5173"
         reset_url = f"{frontend_url}/reset-password?token={reset_token}"
 
-        # Always log the reset URL — useful when SMTP is not configured
-        logger.info(f"🔑 Password reset URL for {email}: {reset_url}")
+        # SEC-FIX: Never log full reset token — only log a prefix for debugging
+        logger.info(f"Password reset generated for {email} (token prefix: {reset_token[:8]}...)")
 
         # Send email
         email_sent = False
@@ -1068,7 +1122,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
         # SEC-FIX-001: Never expose reset token in API response
         # In development, log the URL server-side only
         if not smtp_configured or not email_sent:
-            logger.warning(f"⚠️ SMTP not available — DEV ONLY reset URL: {reset_url}")
+            logger.warning(f"SMTP not available — password reset token generated but not delivered for {email}")
             # Return the same generic message regardless (prevent email enumeration)
 
         return success_msg

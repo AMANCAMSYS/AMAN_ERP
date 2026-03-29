@@ -10,6 +10,7 @@ import { formatNumber } from '../../utils/format';
 import CurrencySelector from '../../components/common/CurrencySelector';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 const JournalEntryForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -161,42 +162,46 @@ const JournalEntryForm = () => {
                                 />
                             </div>
                             <div className="col-md-2 mb-3">
-                                <label className="form-label">{t('common.exchange_rate')}</label>
-                                <input
-                                    type="number"
-                                    step="0.000001"
-                                    className="form-input"
-                                    value={formData.exchange_rate || 1.0}
-                                    onChange={(e) => setFormData({ ...formData, exchange_rate: parseFloat(e.target.value) || 1 })}
-                                />
+                                <FormField label={t('common.exchange_rate')}>
+                                    <input
+                                        type="number"
+                                        step="0.000001"
+                                        className="form-input"
+                                        value={formData.exchange_rate || 1.0}
+                                        onChange={(e) => setFormData({ ...formData, exchange_rate: parseFloat(e.target.value) || 1 })}
+                                    />
+                                </FormField>
                             </div>
                             <div className="col-md-2 mb-3">
-                                <label className="form-label">{t('common.date')}</label>
-                                <CustomDatePicker
-                                    selected={formData.date}
-                                    onChange={(dateStr) => setFormData({ ...formData, date: dateStr })}
-                                    required
-                                />
+                                <FormField label={t('common.date')}>
+                                    <CustomDatePicker
+                                        selected={formData.date}
+                                        onChange={(dateStr) => setFormData({ ...formData, date: dateStr })}
+                                        required
+                                    />
+                                </FormField>
                             </div>
                             <div className="col-md-2 mb-3">
-                                <label className="form-label">{t('common.reference')}</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={formData.reference}
-                                    onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                                />
+                                <FormField label={t('common.reference')}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={formData.reference}
+                                        onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                                    />
+                                </FormField>
                             </div>
                             <div className="col-md-4 mb-3">
-                                <label className="form-label">{t('common.description')}</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                    required
-                                    placeholder={t("accounting.journal.desc_placeholder")}
-                                />
+                                <FormField label={t('common.description')} required>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        required
+                                        placeholder={t("accounting.journal.desc_placeholder")}
+                                    />
+                                </FormField>
                             </div>
                         </div>
                     </div>

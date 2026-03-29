@@ -13,9 +13,10 @@ from sqlalchemy import text
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    get_base_currency, update_account_balance
+    get_base_currency, update_account_balance, validate_je_lines
 )
 from utils.audit import log_activity
+from utils.fiscal_lock import check_fiscal_period_open
 import logging
 
 logger = logging.getLogger(__name__)
@@ -58,54 +59,43 @@ def get_expense_account_by_type(db, expense_type: str) -> Optional[int]:
 
 def create_expense_journal_entry(db, expense_data: dict, user_id: int, base_currency: str):
     """إنشاء قيد محاسبي للمصروف"""
+    from services.gl_service import create_journal_entry as gl_create_journal_entry
+    
     je_number = generate_sequential_number(db, "EXP", "journal_entries", "entry_number")
     
-    je_id = db.execute(text("""
-        INSERT INTO journal_entries (
-            entry_number, entry_date, description, status, 
-            created_by, branch_id, currency, exchange_rate
-        ) VALUES (:num, :date, :desc, 'posted', :uid, :bid, :curr, 1.0)
-        RETURNING id
-    """), {
-        "num": je_number,
-        "date": expense_data["expense_date"],
-        "desc": f"مصروف {expense_data['expense_type']}: {expense_data.get('description', '')}",
-        "uid": user_id,
-        "bid": expense_data.get("branch_id"),
-        "curr": base_currency
-    }).scalar()
+    je_lines = [
+        {
+            "account_id": expense_data["expense_account_id"], 
+            "debit": float(expense_data["amount"]), 
+            "credit": 0,
+            "cost_center_id": expense_data.get("cost_center_id"),
+            "description": expense_data.get("description")
+        },
+        {
+            "account_id": expense_data["cash_account_id"], 
+            "debit": 0, 
+            "credit": float(expense_data["amount"]),
+            "description": expense_data.get("description")
+        },
+    ]
+
+    je_id, _ = gl_create_journal_entry(
+        db=db,
+        company_id=expense_data.get("company_id", 1), # Fallback to 1 if not provided
+        date=expense_data["expense_date"],
+        description=f"مصروف {expense_data['expense_type']}: {expense_data.get('description', '')}",
+        lines=je_lines,
+        user_id=user_id,
+        branch_id=expense_data.get("branch_id"),
+        reference=je_number,
+        currency=base_currency,
+        exchange_rate=1.0,
+        source="expense",
+        source_id=expense_data.get("expense_id")
+    )
     
-    # Debit: Expense Account
-    db.execute(text("""
-        INSERT INTO journal_lines (
-            journal_entry_id, account_id, debit, credit, 
-            description, cost_center_id
-        ) VALUES (:jid, :aid, :amt, 0, :desc, :ccid)
-    """), {
-        "jid": je_id,
-        "aid": expense_data["expense_account_id"],
-        "amt": expense_data["amount"],
-        "desc": expense_data.get("description"),
-        "ccid": expense_data.get("cost_center_id")
-    })
-    
-    # Credit: Cash/Bank Account
-    db.execute(text("""
-        INSERT INTO journal_lines (
-            journal_entry_id, account_id, debit, credit, description
-        ) VALUES (:jid, :aid, 0, :amt, :desc)
-    """), {
-        "jid": je_id,
-        "aid": expense_data["cash_account_id"],
-        "amt": expense_data["amount"],
-        "desc": expense_data.get("description")
-    })
-    
-    # Update account balances
-    update_account_balance(db, expense_data["expense_account_id"], 
-                          debit_base=expense_data["amount"], credit_base=0)
-    update_account_balance(db, expense_data["cash_account_id"], 
-                          debit_base=0, credit_base=expense_data["amount"])
+    # Update journal entry number to keep the EXP- prefix (since gl_service generates JV-)
+    db.execute(text("UPDATE journal_entries SET entry_number = :num WHERE id = :id"), {"num": je_number, "id": je_id})
     
     return je_id, je_number
 
@@ -480,7 +470,9 @@ async def create_expense(
                 "expense_account_id": expense_account_id,
                 "cash_account_id": cash_account_id,
                 "cost_center_id": expense.cost_center_id,
-                "branch_id": expense.branch_id
+                "branch_id": expense.branch_id,
+                "company_id": current_user.company_id,
+                "expense_id": expense_id
             }
             je_id, je_number = create_expense_journal_entry(db, expense_data, current_user.id, base_currency)
             
@@ -704,7 +696,9 @@ async def approve_expense(
                 "expense_account_id": expense["expense_account_id"],
                 "cash_account_id": cash_account_id,
                 "cost_center_id": expense["cost_center_id"],
-                "branch_id": expense["branch_id"]
+                "branch_id": expense["branch_id"],
+                "company_id": current_user.company_id,
+                "expense_id": expense_id
             }
             je_id, je_number = create_expense_journal_entry(db, expense_data, current_user.id, base_currency)
             

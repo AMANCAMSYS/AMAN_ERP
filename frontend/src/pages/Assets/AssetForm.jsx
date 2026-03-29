@@ -9,6 +9,7 @@ import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { Save, Building, DollarSign, Calendar, Hash, Briefcase, MapPin } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 const AssetForm = () => {
     const { t, i18n } = useTranslation();
@@ -117,59 +118,53 @@ const AssetForm = () => {
 
                                         <div className="row g-4">
                                             <div className="col-12">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="name">
-                                                    <Hash size={14} /> {t('assets.name', 'Asset Name')}
-                                                    <span className="text-danger">*</span>
-                                                </label>
-                                                <input
-                                                    id="name"
-                                                    className={`form-input ${errors.name ? 'is-invalid' : ''}`}
-                                                    {...register('name', { required: true })}
-                                                    placeholder={t('assets.name_placeholder', 'e.g. Server R-740')}
-                                                />
+                                                <FormField label={<><Hash size={14} /> {t('assets.name', 'Asset Name')}</>} required>
+                                                    <input
+                                                        id="name"
+                                                        className={`form-input ${errors.name ? 'is-invalid' : ''}`}
+                                                        {...register('name', { required: true })}
+                                                        placeholder={t('assets.name_placeholder', 'e.g. Server R-740')}
+                                                    />
+                                                </FormField>
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="type">
-                                                    <Briefcase size={14} /> {t('assets.type', 'Asset Type')}
-                                                    <span className="text-danger">*</span>
-                                                </label>
-                                                <select
-                                                    id="type"
-                                                    className="form-select"
-                                                    {...register('type', { required: true })}
-                                                >
-                                                    <option value="tangible">{t('assets.types.tangible', 'Tangible (Hardware, Furniture)')}</option>
-                                                    <option value="intangible">{t('assets.types.intangible', 'Intangible (Software, License)')}</option>
-                                                </select>
+                                                <FormField label={<><Briefcase size={14} /> {t('assets.type', 'Asset Type')}</>} required>
+                                                    <select
+                                                        id="type"
+                                                        className="form-select"
+                                                        {...register('type', { required: true })}
+                                                    >
+                                                        <option value="tangible">{t('assets.types.tangible', 'Tangible (Hardware, Furniture)')}</option>
+                                                        <option value="intangible">{t('assets.types.intangible', 'Intangible (Software, License)')}</option>
+                                                    </select>
+                                                </FormField>
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="branch_id">
-                                                    <MapPin size={14} /> {t('common.branch', 'Branch')}
-                                                </label>
-                                                <select
-                                                    id="branch_id"
-                                                    className="form-select"
-                                                    {...register('branch_id')}
-                                                >
-                                                    <option value="">{t('common.select_branch', 'Select Branch')}</option>
-                                                    {branches.map(branch => (
-                                                        <option key={branch.id} value={branch.id}>{branch.branch_name}</option>
-                                                    ))}
-                                                </select>
+                                                <FormField label={<><MapPin size={14} /> {t('common.branch', 'Branch')}</>}>
+                                                    <select
+                                                        id="branch_id"
+                                                        className="form-select"
+                                                        {...register('branch_id')}
+                                                    >
+                                                        <option value="">{t('common.select_branch', 'Select Branch')}</option>
+                                                        {branches.map(branch => (
+                                                            <option key={branch.id} value={branch.id}>{branch.branch_name}</option>
+                                                        ))}
+                                                    </select>
+                                                </FormField>
                                             </div>
 
                                             <div className="col-12">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="code">
-                                                    <Hash size={14} /> {t('assets.code', 'Asset Code')}
-                                                </label>
-                                                <input
-                                                    id="code"
-                                                    className="form-input"
-                                                    {...register('code')}
-                                                    placeholder={t('assets.code_placeholder', 'Auto-generated if empty')}
-                                                />
+                                                <FormField label={<><Hash size={14} /> {t('assets.code', 'Asset Code')}</>}>
+                                                    <input
+                                                        id="code"
+                                                        className="form-input"
+                                                        {...register('code')}
+                                                        placeholder={t('assets.code_placeholder', 'Auto-generated if empty')}
+                                                    />
+                                                </FormField>
                                             </div>
                                         </div>
                                     </div>
@@ -204,53 +199,45 @@ const AssetForm = () => {
                                             </div>
 
                                             <div className="col-12">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="cost">
-                                                    <DollarSign size={14} /> {t('assets.cost', 'Initial Cost')}
-                                                    <span className="text-danger">*</span>
-                                                </label>
-                                                <div className="input-group">
+                                                <FormField label={<><DollarSign size={14} /> {t('assets.cost', 'Initial Cost')}</>} required>
+                                                    <div className="input-group">
+                                                        <input
+                                                            id="cost"
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="form-input"
+                                                            {...register('cost', { required: true })}
+                                                        />
+                                                        <span className="input-group-text">
+                                                            {currency}
+                                                        </span>
+                                                    </div>
+                                                </FormField>
+                                            </div>
+
+
+                                            <div className="col-12">
+                                                <FormField label={<><Hash size={14} /> {t('assets.life_years', 'Useful Life (Years)')}</>} required>
                                                     <input
-                                                        id="cost"
+                                                        id="life_years"
+                                                        type="number"
+                                                        className="form-input"
+                                                        {...register('life_years', { required: true, min: 1 })}
+                                                    />
+                                                </FormField>
+                                            </div>
+
+                                            <div className="col-12">
+                                                <FormField label={<><DollarSign size={14} /> {t('assets.residual_value', 'Residual Value')}</>} hint={t('assets.residual_hint', 'Expected value at end of useful life')}>
+                                                    <input
+                                                        id="residual_value"
                                                         type="number"
                                                         step="0.01"
                                                         className="form-input"
-                                                        {...register('cost', { required: true })}
+                                                        {...register('residual_value')}
+                                                        defaultValue={0}
                                                     />
-                                                    <span className="input-group-text">
-                                                        {currency}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-
-                                            <div className="col-12">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="life_years">
-                                                    <Hash size={14} /> {t('assets.life_years', 'Useful Life (Years)')}
-                                                    <span className="text-danger">*</span>
-                                                </label>
-                                                <input
-                                                    id="life_years"
-                                                    type="number"
-                                                    className="form-input"
-                                                    {...register('life_years', { required: true, min: 1 })}
-                                                />
-                                            </div>
-
-                                            <div className="col-12">
-                                                <label className="form-label small fw-bold text-secondary mb-2 d-flex align-items-center gap-2" htmlFor="residual_value">
-                                                    <DollarSign size={14} /> {t('assets.residual_value', 'Residual Value')}
-                                                </label>
-                                                <input
-                                                    id="residual_value"
-                                                    type="number"
-                                                    step="0.01"
-                                                    className="form-input"
-                                                    {...register('residual_value')}
-                                                    defaultValue={0}
-                                                />
-                                                <p className="form-text text-muted small mt-2 mb-0">
-                                                    {t('assets.residual_hint', 'Expected value at end of useful life')}
-                                                </p>
+                                                </FormField>
                                             </div>
                                         </div>
                                     </div>

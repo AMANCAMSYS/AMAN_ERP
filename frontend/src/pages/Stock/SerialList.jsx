@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
-import { formatShortDate } from '../../utils/dateUtils';
-import BackButton from '../../components/common/BackButton';
-
+import { formatShortDate } from '../../utils/dateUtils'
+import BackButton from '../../components/common/BackButton'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 
 function SerialList() {
     const { t } = useTranslation()
@@ -147,20 +148,70 @@ function SerialList() {
         return <span className={`badge ${s.cls}`}>{s.label}</span>
     }
 
+    const filteredSerials = useMemo(() => serials, [serials])
+
+    const handleFilterChange = (key, value) => {
+        if (key === 'status') setStatusFilter(value)
+        if (key === 'product') setProductFilter(value)
+    }
+
+    const columns = [
+        {
+            key: 'serial_number',
+            label: t('stock.serial.serial_number'),
+            width: '15%',
+            render: (val) => <strong>{val}</strong>,
+        },
+        {
+            key: 'product_name',
+            label: t('common.product'),
+            width: '20%',
+        },
+        {
+            key: 'warehouse_name',
+            label: t('stock.serial.warehouse'),
+            width: '15%',
+        },
+        {
+            key: 'batch_number',
+            label: t('stock.serial.batch_number'),
+            width: '12%',
+            render: (val) => val || '-',
+        },
+        {
+            key: 'warranty_expiry',
+            label: t('stock.serial.expiry_date'),
+            width: '12%',
+            render: (val) => val || '-',
+        },
+        {
+            key: 'status',
+            label: t('common.status_title'),
+            width: '10%',
+            render: (val) => getStatusBadge(val),
+        },
+        {
+            key: 'created_at',
+            label: t('stock.serial.created_date'),
+            width: '16%',
+            render: (val) => val ? formatShortDate(val) : '-',
+        },
+    ]
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">🏷️ {t('stock.serials.title')}</h1>
+                    <h1 className="workspace-title">{t('stock.serials.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.serials.subtitle')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button className="btn btn-secondary" onClick={() => setShowLookup(!showLookup)}>
-                        🔍 {t('stock.serial.quick_search')}
+                        {t('stock.serial.quick_search')}
                     </button>
                     <button className="btn btn-secondary" onClick={() => setShowBulkModal(true)}>
-                        📋 {t('stock.serial.bulk_create')}
+                        {t('stock.serial.bulk_create')}
                     </button>
                     <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
                         + {t('stock.serial.add_serial')}
@@ -171,7 +222,7 @@ function SerialList() {
             {/* Quick Lookup */}
             {showLookup && (
                 <div className="card mb-4" style={{ background: 'var(--bg-secondary)' }}>
-                    <h3 style={{ marginBottom: '12px' }}>🔍 {t('stock.serial.quick_search_title')}</h3>
+                    <h3 style={{ marginBottom: '12px' }}>{t('stock.serial.quick_search_title')}</h3>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <input type="text" className="form-input" style={{ maxWidth: '350px' }}
                             placeholder={t('stock.serial.enter_serial')}
@@ -243,68 +294,42 @@ function SerialList() {
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="card mb-4">
-                <div className="form-row" style={{ gap: '12px', flexWrap: 'wrap' }}>
-                    <input type="text" className="form-input" style={{ maxWidth: '250px' }}
-                        placeholder={t('stock.serial.search_placeholder')}
-                        value={search} onChange={(e) => setSearch(e.target.value)} />
-                    <select className="form-input" style={{ maxWidth: '180px' }}
-                        value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">{t('common.all_statuses')}</option>
-                        <option value="available">{t('stock.serial.available')}</option>
-                        <option value="sold">{t('stock.serial.sold')}</option>
-                        <option value="reserved">{t('stock.serial.reserved')}</option>
-                        <option value="defective">{t('stock.serial.defective')}</option>
-                        <option value="returned">{t('stock.serial.returned')}</option>
-                    </select>
-                    <select className="form-input" style={{ maxWidth: '200px' }}
-                        value={productFilter} onChange={(e) => setProductFilter(e.target.value)}>
-                        <option value="">{t('stock.serial.all_products')}</option>
-                        {products.filter(p => p.item_type === 'product').map(p => (
-                            <option key={p.id} value={p.id}>{p.item_name}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('stock.serial.search_placeholder')}
+                filters={[
+                    {
+                        key: 'status',
+                        label: t('common.all_statuses'),
+                        options: [
+                            { value: 'available', label: t('stock.serial.available') },
+                            { value: 'sold', label: t('stock.serial.sold') },
+                            { value: 'reserved', label: t('stock.serial.reserved') },
+                            { value: 'defective', label: t('stock.serial.defective') },
+                            { value: 'returned', label: t('stock.serial.returned') },
+                        ],
+                    },
+                    {
+                        key: 'product',
+                        label: t('stock.serial.all_products'),
+                        options: products.filter(p => p.item_type === 'product').map(p => ({
+                            value: String(p.id),
+                            label: p.item_name,
+                        })),
+                    },
+                ]}
+                filterValues={{ status: statusFilter, product: productFilter }}
+                onFilterChange={handleFilterChange}
+            />
 
-            {/* Table */}
-            <div className="card">
-                <div className="invoice-items-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr style={{ background: 'var(--bg-secondary)' }}>
-                                <th style={{ width: '15%' }}>{t('stock.serial.serial_number')}</th>
-                                <th style={{ width: '20%' }}>{t('common.product')}</th>
-                                <th style={{ width: '15%' }}>{t('stock.serial.warehouse')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.serial.batch_number')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.serial.expiry_date')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
-                                <th style={{ width: '16%' }}>{t('stock.serial.created_date')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</td></tr>
-                            ) : serials.length === 0 ? (
-                                <tr><td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                                    {t('stock.serial.no_serials')}
-                                </td></tr>
-                            ) : serials.map(serial => (
-                                <tr key={serial.id}>
-                                    <td><strong>{serial.serial_number}</strong></td>
-                                    <td>{serial.product_name}</td>
-                                    <td>{serial.warehouse_name}</td>
-                                    <td>{serial.batch_number || '-'}</td>
-                                    <td>{serial.warranty_expiry || '-'}</td>
-                                    <td>{getStatusBadge(serial.status)}</td>
-                                    <td>{serial.created_at ? formatShortDate(serial.created_at) : '-'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredSerials}
+                loading={loading}
+                emptyIcon={'\uD83C\uDFF7\uFE0F'}
+                emptyTitle={t('stock.serial.no_serials')}
+            />
 
             {/* Create Single Modal */}
             {showCreateModal && (

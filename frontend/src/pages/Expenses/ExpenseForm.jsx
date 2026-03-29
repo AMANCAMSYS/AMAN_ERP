@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 export default function ExpenseForm() {
   const { t, i18n } = useTranslation();
@@ -194,8 +195,7 @@ export default function ExpenseForm() {
               />
             </div>
 
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.type')} *</label>
+            <FormField label={t('expenses.fields.type')} required style={{ flex: 1 }}>
               <select
                 name="expense_type"
                 className="form-input"
@@ -212,12 +212,11 @@ export default function ExpenseForm() {
                 <option value="salaries">{t('expenses.types.salaries')}</option>
                 <option value="other">{t('expenses.types.other')}</option>
               </select>
-            </div>
+            </FormField>
           </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.amount')} *</label>
+            <FormField label={t('expenses.fields.amount')} required style={{ flex: 1 }}>
               <input
                 type="number"
                 name="amount"
@@ -229,10 +228,9 @@ export default function ExpenseForm() {
                 placeholder={`0.00 ${currency}`}
                 required
               />
-            </div>
+            </FormField>
 
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.vendor')}</label>
+            <FormField label={t('expenses.fields.vendor')} style={{ flex: 1 }}>
               <input
                 type="text"
                 name="vendor_name"
@@ -241,11 +239,10 @@ export default function ExpenseForm() {
                 onChange={handleChange}
                 placeholder={t('expenses.placeholders.vendor')}
               />
-            </div>
+            </FormField>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">{t('expenses.fields.description')}</label>
+          <FormField label={t('expenses.fields.description')}>
             <textarea
               name="description"
               className="form-input"
@@ -254,7 +251,7 @@ export default function ExpenseForm() {
               onChange={handleChange}
               placeholder={t('expenses.placeholders.description')}
             />
-          </div>
+          </FormField>
           </div>
         </div>
 
@@ -269,8 +266,7 @@ export default function ExpenseForm() {
             </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.paymentMethod')}</label>
+            <FormField label={t('expenses.fields.paymentMethod')} style={{ flex: 1 }}>
               <select
                 name="payment_method"
                 className="form-input"
@@ -281,10 +277,9 @@ export default function ExpenseForm() {
                 <option value="bank">{t('expenses.payment.bank')}</option>
                 <option value="credit_card">{t('expenses.payment.creditCard')}</option>
               </select>
-            </div>
+            </FormField>
 
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.treasury')}</label>
+            <FormField label={t('expenses.fields.treasury')} style={{ flex: 1 }}>
               <select
                 name="treasury_id"
                 className="form-input"
@@ -298,12 +293,11 @@ export default function ExpenseForm() {
                   <option key={tr.id} value={tr.id}>{tr.name}</option>
                 ))}
               </select>
-            </div>
+            </FormField>
           </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.account')}</label>
+            <FormField label={t('expenses.fields.account')} hint={t('expenses.help.autoAccount')} style={{ flex: 1 }}>
               <select
                 name="expense_account_id"
                 className="form-input"
@@ -317,11 +311,9 @@ export default function ExpenseForm() {
                   </option>
                 ))}
               </select>
-              <small className="text-muted">{t('expenses.help.autoAccount')}</small>
-            </div>
+            </FormField>
 
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.receiptNumber')}</label>
+            <FormField label={t('expenses.fields.receiptNumber')} style={{ flex: 1 }}>
               <input
                 type="text"
                 name="receipt_number"
@@ -330,7 +322,7 @@ export default function ExpenseForm() {
                 onChange={handleChange}
                 placeholder={t('expenses.placeholders.receipt')}
               />
-            </div>
+            </FormField>
           </div>
           </div>
         </div>
@@ -346,8 +338,7 @@ export default function ExpenseForm() {
             </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.costCenter')}</label>
+            <FormField label={t('expenses.fields.costCenter')} style={{ flex: 1 }}>
               <select
                 name="cost_center_id"
                 className="form-input"
@@ -359,10 +350,9 @@ export default function ExpenseForm() {
                   <option key={cc.id} value={cc.id}>{cc.center_name}</option>
                 ))}
               </select>
-            </div>
+            </FormField>
 
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.project')}</label>
+            <FormField label={t('expenses.fields.project')} style={{ flex: 1 }}>
               <select
                 name="project_id"
                 className="form-input"
@@ -376,12 +366,11 @@ export default function ExpenseForm() {
                   </option>
                 ))}
               </select>
-            </div>
+            </FormField>
           </div>
 
           <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">{t('expenses.fields.category')}</label>
+            <FormField label={t('expenses.fields.category')} style={{ flex: 1 }}>
               <input
                 type="text"
                 name="category"
@@ -389,7 +378,7 @@ export default function ExpenseForm() {
                 value={formData.category}
                 onChange={handleChange}
               />
-            </div>
+            </FormField>
 
             {!isEdit && (
               <div className="form-group" style={{ flex: 1, display: 'flex', alignItems: 'center', paddingTop: '24px' }}>

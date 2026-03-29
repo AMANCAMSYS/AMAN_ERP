@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
+from decimal import Decimal, ROUND_HALF_UP
 from pydantic import BaseModel
 import io, csv, logging
 
@@ -21,6 +22,12 @@ from utils.accounting import (
 
 router = APIRouter(prefix="/hr", tags=["HR - WPS & Compliance"])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+def _dec(v):
+    """Convert a value to Decimal safely (None → 0)."""
+    return Decimal(str(v or 0))
 
 # ────────────────────────────────────────────────────────────────────────────
 # ⚠️  REGION NOTE — الملاحظات الإقليمية
@@ -98,7 +105,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
 
         # ── Build SIF File ──
         lines = []
-        total_amount = 0
+        total_amount = Decimal('0')
         record_count = 0
         month_str = period.start_date.strftime("%m%Y") if period.start_date else datetime.now().strftime("%m%Y")
 
@@ -108,13 +115,15 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
         employer_iban = getattr(company, 'bank_account_iban', '') if company else ''
 
         for entry in entries:
-            net = float(entry.net_salary)
+            net = _dec(entry.net_salary)
             total_amount += net
             record_count += 1
 
             iban = entry.iban_number or entry.bank_account_number or ''
             nat_id = entry.national_id or entry.id_number or ''
             emp_name = f"{entry.first_name} {entry.last_name}".strip()
+
+            other_earnings = (_dec(entry.other_allowances) + _dec(entry.overtime_amount)).quantize(_D2, ROUND_HALF_UP)
 
             # SIF format fields
             lines.append({
@@ -123,11 +132,11 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
                 "national_id": nat_id,
                 "iban": iban,
                 "bank_code": entry.bank_name or '',
-                "net_salary": f"{net:.2f}",
-                "basic_salary": f"{float(entry.basic_salary or 0):.2f}",
-                "housing_allowance": f"{float(entry.housing_allowance or 0):.2f}",
-                "other_earnings": f"{float(entry.other_allowances or 0) + float(entry.overtime_amount or 0):.2f}",
-                "deductions": f"{float(entry.deductions or 0):.2f}",
+                "net_salary": str(net.quantize(_D2, ROUND_HALF_UP)),
+                "basic_salary": str(_dec(entry.basic_salary).quantize(_D2, ROUND_HALF_UP)),
+                "housing_allowance": str(_dec(entry.housing_allowance).quantize(_D2, ROUND_HALF_UP)),
+                "other_earnings": str(other_earnings),
+                "deductions": str(_dec(entry.deductions).quantize(_D2, ROUND_HALF_UP)),
                 "nationality": entry.nat_code or 'SA'
             })
 
@@ -142,7 +151,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
             "Employer Bank", employer_bank,
             "Month", month_str,
             "Total Records", record_count,
-            "Total Amount", f"{total_amount:.2f}"
+            "Total Amount", str(total_amount.quantize(_D2, ROUND_HALF_UP))
         ])
         writer.writerow([])  # blank row
 
@@ -165,7 +174,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
 
         # Summary row
         writer.writerow([])
-        writer.writerow(["Total", "", "", "", "", f"{total_amount:.2f}"])
+        writer.writerow(["Total", "", "", "", "", str(total_amount.quantize(_D2, ROUND_HALF_UP))])
 
         csv_content = output.getvalue()
         filename = f"WPS_{mol_id}_{month_str}.csv"
@@ -175,7 +184,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
         log_activity(db, user_id, "wps.export", f"تصدير WPS للفترة {period.name}", {
             "period_id": body.period_id,
             "records": record_count,
-            "total": total_amount
+            "total": float(total_amount)
         })
 
         return Response(
@@ -226,7 +235,7 @@ def preview_wps(period_id: int, current_user=Depends(get_current_user)):
             "period": dict(period._mapping),
             "entries": result,
             "total_employees": len(result),
-            "total_amount": sum(float(e.get('net_salary', 0)) for e in result),
+            "total_amount": float(sum(_dec(e.get('net_salary', 0)) for e in result)),
             "warnings": warnings,
             "warnings_count": len(warnings)
         }
@@ -467,16 +476,16 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         delta = relativedelta(term_date, join_date)
         total_years = delta.years + (delta.months / 12) + (delta.days / 365.25)
 
-        base_salary = float(emp.basic_salary or 0)
-        total_salary = base_salary + float(emp.housing_allowance) + float(emp.transport_allowance)
+        base_salary = _dec(emp.basic_salary)
+        total_salary = base_salary + _dec(emp.housing_allowance) + _dec(emp.transport_allowance)
 
         # ── Calculate EOS Gratuity using shared helper (Saudi Labor Law Art. 84/85) ──
         from utils.hr_helpers import calculate_eos_gratuity
-        eos = calculate_eos_gratuity(total_salary, total_years, body.termination_reason)
-        eos_amount = eos["final_gratuity"]
+        eos = calculate_eos_gratuity(float(total_salary), total_years, body.termination_reason)
+        eos_amount = _dec(eos["final_gratuity"])
 
         # ── Vacation balance ──
-        vacation_amount = 0
+        vacation_amount = Decimal('0')
         if body.include_vacation_balance:
             used = db.execute(text("""
                 SELECT COALESCE(SUM(days_requested), 0) FROM leave_requests
@@ -484,22 +493,22 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
                 AND leave_type = 'annual' AND EXTRACT(YEAR FROM start_date) = :y
             """), {"eid": body.employee_id, "y": term_date.year}).scalar() or 0
 
-            entitled = float(emp.annual_leave_entitlement or 30)
+            entitled = _dec(emp.annual_leave_entitlement or 30)
             # Prorate for months worked this year
             months_worked = term_date.month
-            prorated = round(entitled * months_worked / 12, 1)
-            remaining_days = max(0, prorated - float(used))
-            daily_rate = total_salary / 30
-            vacation_amount = round(remaining_days * daily_rate, 2)
+            prorated = (entitled * Decimal(str(months_worked)) / Decimal('12')).quantize(Decimal('0.1'), ROUND_HALF_UP)
+            remaining_days = max(Decimal('0'), prorated - _dec(used))
+            daily_rate = total_salary / Decimal('30')
+            vacation_amount = (remaining_days * daily_rate).quantize(_D2, ROUND_HALF_UP)
 
         # ── Pending salary ──
-        pending_salary = 0
+        pending_salary = Decimal('0')
         if body.include_pending_salary:
-            days_in_month = 30  # Standard
-            day_of_month = term_date.day
-            pending_salary = round(total_salary * day_of_month / days_in_month, 2)
+            days_in_month = Decimal('30')  # Standard
+            day_of_month = Decimal(str(term_date.day))
+            pending_salary = (total_salary * day_of_month / days_in_month).quantize(_D2, ROUND_HALF_UP)
 
-        total_settlement = eos_amount + vacation_amount + pending_salary - body.additional_deductions
+        total_settlement = eos_amount + vacation_amount + pending_salary - _dec(body.additional_deductions)
 
         # ── Create Journal Entry ──
         base_currency = get_base_currency(db)
@@ -574,11 +583,11 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
             "employee_name": emp.employee_name,
             "service_years": round(total_years, 2),
             "termination_reason": body.termination_reason,
-            "eos_gratuity": eos_amount,
-            "vacation_balance_amount": vacation_amount,
-            "pending_salary": pending_salary,
+            "eos_gratuity": float(eos_amount),
+            "vacation_balance_amount": float(vacation_amount),
+            "pending_salary": float(pending_salary),
             "additional_deductions": body.additional_deductions,
-            "total_settlement": total_settlement,
+            "total_settlement": float(total_settlement),
             "journal_entry_id": je_id,
             "journal_entry_number": je_number,
             "message": "تم تسوية نهاية الخدمة بنجاح"

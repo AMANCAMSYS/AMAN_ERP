@@ -8,6 +8,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function ExpenseForm() {
     const { t } = useTranslation()
@@ -119,8 +120,7 @@ function ExpenseForm() {
                                 required
                             />
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.expense_amount')} *</label>
+                        <FormField label={t('treasury.expense_amount')} required style={{ flex: 1 }}>
                             <div className="input-group">
                                 <span className="input-group-text">
                                     {currency}
@@ -134,12 +134,11 @@ function ExpenseForm() {
                                     onChange={e => setForm({ ...form, amount: e.target.value })}
                                 />
                             </div>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div className="form-row">
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.allocation_branch')} *</label>
+                        <FormField label={t('treasury.allocation_branch')} required style={{ flex: 1 }}>
                             <select
                                 className="form-input"
                                 required
@@ -153,9 +152,8 @@ function ExpenseForm() {
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.account_label')} *</label>
+                        </FormField>
+                        <FormField label={t('treasury.account_label')} required style={{ flex: 1 }}>
                             <select
                                 className="form-input"
                                 required
@@ -177,9 +175,8 @@ function ExpenseForm() {
                                     </span>
                                 </div>
                             )}
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.expense_type')} *</label>
+                        </FormField>
+                        <FormField label={t('treasury.expense_type')} required style={{ flex: 1 }}>
                             <select
                                 className="form-input"
                                 required
@@ -198,11 +195,10 @@ function ExpenseForm() {
                                     })
                                 }
                             </select>
-                        </div>
+                        </FormField>
                     </div>
 
-                    <div className="form-group mt-3">
-                        <label className="form-label">{t('common.reference')}</label>
+                    <FormField label={t('common.reference')} className="mt-3">
                         <input
                             type="text"
                             className="form-input"
@@ -210,17 +206,16 @@ function ExpenseForm() {
                             value={form.reference_number}
                             onChange={e => setForm({ ...form, reference_number: e.target.value })}
                         />
-                    </div>
+                    </FormField>
 
-                    <div className="form-group mt-3">
-                        <label className="form-label">{t('common.notes')}</label>
+                    <FormField label={t('common.notes')} className="mt-3">
                         <textarea
                             className="form-input"
                             rows="3"
                             value={form.notes}
                             onChange={e => setForm({ ...form, notes: e.target.value })}
                         ></textarea>
-                    </div>
+                    </FormField>
 
                     <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
                         <button

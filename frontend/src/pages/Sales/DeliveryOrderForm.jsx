@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton'
 import DateInput from '../../components/common/DateInput';
+import FormField from '../../components/common/FormField';
 
 function DeliveryOrderForm() {
     const { t } = useTranslation()
@@ -81,33 +82,28 @@ function DeliveryOrderForm() {
             <form onSubmit={handleSubmit}>
                 <div className="card p-4">
                     <div className="form-grid-3">
-                        <div className="form-group">
-                            <label>{t('delivery_orders.from_sales_order')}</label>
+                        <FormField label={t('delivery_orders.from_sales_order')}>
                             <select className="form-select" value={form.so_id} onChange={e => handleSOChange(e.target.value)}>
                                 <option value="">{t('delivery_orders.manual_entry')}</option>
                                 {salesOrders.map(so => (
                                     <option key={so.id} value={so.id}>{so.so_number} - {so.customer_name}</option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group">
-                            <label>{t('common.date')} *</label>
+                        </FormField>
+                        <FormField label={t('common.date')} required>
                             <DateInput className="form-input" value={form.do_date} onChange={e => setForm(f => ({ ...f, do_date: e.target.value }))} required />
-                        </div>
-                        <div className="form-group">
-                            <label>{t('delivery_orders.shipping_date')}</label>
+                        </FormField>
+                        <FormField label={t('delivery_orders.shipping_date')}>
                             <DateInput className="form-input" value={form.shipping_date} onChange={e => setForm(f => ({ ...f, shipping_date: e.target.value }))} />
-                        </div>
+                        </FormField>
                     </div>
                     <div className="form-grid-2 mt-3">
-                        <div className="form-group">
-                            <label>{t('delivery_orders.shipping_address')}</label>
+                        <FormField label={t('delivery_orders.shipping_address')}>
                             <textarea className="form-input" rows="2" value={form.shipping_address} onChange={e => setForm(f => ({ ...f, shipping_address: e.target.value }))} />
-                        </div>
-                        <div className="form-group">
-                            <label>{t('delivery_orders.shipping_method')}</label>
+                        </FormField>
+                        <FormField label={t('delivery_orders.shipping_method')}>
                             <input type="text" className="form-input" value={form.shipping_method} onChange={e => setForm(f => ({ ...f, shipping_method: e.target.value }))} />
-                        </div>
+                        </FormField>
                     </div>
                 </div>
 

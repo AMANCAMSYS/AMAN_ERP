@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission, require_module
@@ -26,6 +26,11 @@ from schemas.hr_advanced import (
     ViolationCreate, ViolationUpdate, ViolationResponse,
     CustodyCreate, CustodyUpdate, CustodyResponse,
 )
+
+_D2 = Decimal('0.01')
+
+def _dec(v):
+    return Decimal(str(v or 0))
 
 router = APIRouter(prefix="/hr-advanced", tags=["HR Advanced - الموارد البشرية المتقدمة"], dependencies=[Depends(require_module("hr"))])
 
@@ -220,9 +225,9 @@ def create_overtime_request(data: OvertimeRequestCreate, current_user: UserRespo
         if not emp:
             raise HTTPException(status_code=404, detail="الموظف غير موجود")
 
-        hourly_rate = (float(emp.salary or 0) / 30) / 8
-        multiplier = float(data.multiplier) if data.multiplier else (1.5 if data.overtime_type == "normal" else 2.0)
-        amount = round(hourly_rate * float(data.hours) * multiplier, 2)
+        hourly_rate = (_dec(emp.salary) / Decimal('30') / Decimal('8'))
+        multiplier = _dec(data.multiplier) if data.multiplier else (Decimal('1.5') if data.overtime_type == "normal" else Decimal('2'))
+        amount = float((hourly_rate * _dec(data.hours) * multiplier).quantize(_D2, ROUND_HALF_UP))
 
         result = conn.execute(text("""
             INSERT INTO overtime_requests (employee_id, request_date, overtime_date, hours, overtime_type, multiplier, calculated_amount, reason, branch_id)
@@ -230,7 +235,7 @@ def create_overtime_request(data: OvertimeRequestCreate, current_user: UserRespo
             RETURNING id
         """), {
             "eid": data.employee_id, "odate": data.overtime_date, "hours": data.hours,
-            "otype": data.overtime_type, "mult": multiplier, "amt": amount,
+            "otype": data.overtime_type, "mult": float(multiplier), "amt": amount,
             "reason": data.reason, "bid": data.branch_id
         })
         conn.commit()
@@ -296,10 +301,10 @@ def calculate_gosi(current_user: UserResponse = Depends(get_current_user)):
     try:
         # Get active settings
         settings = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
-        emp_pct = float(settings.employee_share_percentage) if settings else 9.75
-        empr_pct = float(settings.employer_share_percentage) if settings else 11.75
-        occ_pct = float(settings.occupational_hazard_percentage) if settings else 2.0
-        max_sal = float(settings.max_contributable_salary) if settings else 45000
+        emp_pct = _dec(settings.employee_share_percentage) if settings else Decimal('9.75')
+        empr_pct = _dec(settings.employer_share_percentage) if settings else Decimal('11.75')
+        occ_pct = _dec(settings.occupational_hazard_percentage) if settings else Decimal('2.0')
+        max_sal = _dec(settings.max_contributable_salary) if settings else Decimal('45000')
 
         employees = conn.execute(text("""
             SELECT id, first_name || ' ' || last_name as name, salary, housing_allowance
@@ -308,19 +313,19 @@ def calculate_gosi(current_user: UserResponse = Depends(get_current_user)):
 
         results = []
         for emp in employees:
-            basic = float(emp.salary or 0)
-            housing = float(emp.housing_allowance or 0)
+            basic = _dec(emp.salary)
+            housing = _dec(emp.housing_allowance)
             contributable = min(basic + housing, max_sal)
-            emp_share = round(contributable * emp_pct / 100, 2)
-            empr_share = round(contributable * empr_pct / 100, 2)
-            occ_hazard = round(contributable * occ_pct / 100, 2)
+            emp_share = (contributable * emp_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            empr_share = (contributable * empr_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            occ_hazard = (contributable * occ_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             results.append({
                 "employee_id": emp.id, "employee_name": emp.name,
-                "basic_salary": basic, "housing_allowance": housing,
-                "contributable_salary": contributable,
-                "employee_share": emp_share, "employer_share": empr_share,
-                "occupational_hazard": occ_hazard,
-                "total_contribution": round(emp_share + empr_share + occ_hazard, 2)
+                "basic_salary": float(basic), "housing_allowance": float(housing),
+                "contributable_salary": float(contributable),
+                "employee_share": float(emp_share), "employer_share": float(empr_share),
+                "occupational_hazard": float(occ_hazard),
+                "total_contribution": float((emp_share + empr_share + occ_hazard).quantize(_D2, ROUND_HALF_UP))
             })
         return results
     finally:
@@ -342,10 +347,10 @@ def export_gosi(
     try:
         # Get active settings
         settings = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
-        emp_pct = float(settings.employee_share_percentage) if settings else 9.75
-        empr_pct = float(settings.employer_share_percentage) if settings else 11.75
-        occ_pct = float(settings.occupational_hazard_percentage) if settings else 2.0
-        max_sal = float(settings.max_contributable_salary) if settings else 45000
+        emp_pct = _dec(settings.employee_share_percentage) if settings else Decimal('9.75')
+        empr_pct = _dec(settings.employer_share_percentage) if settings else Decimal('11.75')
+        occ_pct = _dec(settings.occupational_hazard_percentage) if settings else Decimal('2.0')
+        max_sal = _dec(settings.max_contributable_salary) if settings else Decimal('45000')
 
         # Get employees with additional GOSI-relevant fields
         employees = conn.execute(text("""
@@ -361,19 +366,19 @@ def export_gosi(
         target_year = year or date.today().year
 
         export_data = []
-        total_emp_share = 0
-        total_empr_share = 0
-        total_occ_hazard = 0
-        total_all = 0
+        total_emp_share = Decimal('0')
+        total_empr_share = Decimal('0')
+        total_occ_hazard = Decimal('0')
+        total_all = Decimal('0')
 
         for emp in employees:
-            basic = float(emp.salary or 0)
-            housing = float(emp.housing_allowance or 0)
+            basic = _dec(emp.salary)
+            housing = _dec(emp.housing_allowance)
             contributable = min(basic + housing, max_sal)
-            emp_share = round(contributable * emp_pct / 100, 2)
-            empr_share = round(contributable * empr_pct / 100, 2)
-            occ_hazard = round(contributable * occ_pct / 100, 2)
-            total = round(emp_share + empr_share + occ_hazard, 2)
+            emp_share = (contributable * emp_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            empr_share = (contributable * empr_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            occ_hazard = (contributable * occ_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            total = (emp_share + empr_share + occ_hazard).quantize(_D2, ROUND_HALF_UP)
 
             total_emp_share += emp_share
             total_empr_share += empr_share
@@ -386,13 +391,13 @@ def export_gosi(
                 "رقم الهوية / National ID": getattr(emp, 'national_id', '') or '',
                 "الجنسية / Nationality": getattr(emp, 'nationality', '') or '',
                 "القسم / Department": getattr(emp, 'department', '') or '',
-                "الراتب الأساسي / Basic Salary": basic,
-                "بدل السكن / Housing": housing,
-                "الراتب الخاضع / Contributable": contributable,
-                f"حصة الموظف {emp_pct}% / Employee Share": emp_share,
-                f"حصة صاحب العمل {empr_pct}% / Employer Share": empr_share,
-                f"أخطار مهنية {occ_pct}% / Occ. Hazard": occ_hazard,
-                "الإجمالي / Total": total,
+                "الراتب الأساسي / Basic Salary": float(basic),
+                "بدل السكن / Housing": float(housing),
+                "الراتب الخاضع / Contributable": float(contributable),
+                f"حصة الموظف {emp_pct}% / Employee Share": float(emp_share),
+                f"حصة صاحب العمل {empr_pct}% / Employer Share": float(empr_share),
+                f"أخطار مهنية {occ_pct}% / Occ. Hazard": float(occ_hazard),
+                "الإجمالي / Total": float(total),
             })
 
         # Summary row
@@ -405,10 +410,10 @@ def export_gosi(
             "الراتب الأساسي / Basic Salary": "",
             "بدل السكن / Housing": "",
             "الراتب الخاضع / Contributable": "",
-            f"حصة الموظف {emp_pct}% / Employee Share": round(total_emp_share, 2),
-            f"حصة صاحب العمل {empr_pct}% / Employer Share": round(total_empr_share, 2),
-            f"أخطار مهنية {occ_pct}% / Occ. Hazard": round(total_occ_hazard, 2),
-            "الإجمالي / Total": round(total_all, 2),
+            f"حصة الموظف {emp_pct}% / Employee Share": float(total_emp_share.quantize(_D2, ROUND_HALF_UP)),
+            f"حصة صاحب العمل {empr_pct}% / Employer Share": float(total_empr_share.quantize(_D2, ROUND_HALF_UP)),
+            f"أخطار مهنية {occ_pct}% / Occ. Hazard": float(total_occ_hazard.quantize(_D2, ROUND_HALF_UP)),
+            "الإجمالي / Total": float(total_all.quantize(_D2, ROUND_HALF_UP)),
         })
 
         columns = list(export_data[0].keys())

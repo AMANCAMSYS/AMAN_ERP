@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, Any, Dict
 from routers.roles import DEFAULT_ROLES
 from pydantic import BaseModel
 from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
 from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse
@@ -13,8 +14,14 @@ from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
 from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+def _dec(v: Any) -> Decimal:
+    return Decimal(str(v or 0))
 
 router = APIRouter(prefix="/hr", tags=["HR & Employees"], dependencies=[Depends(require_module("hr"))])
 
@@ -618,7 +625,7 @@ def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(g
     company_id = current_user.company_id
     conn = get_db_connection(company_id)
     try:
-        monthly_installment = loan.amount / loan.total_installments
+        monthly_installment = float((_dec(loan.amount) / Decimal(str(loan.total_installments))).quantize(_D2, ROUND_HALF_UP))
         
         # Check if employee exists
         emp = conn.execute(text("SELECT id FROM employees WHERE id=:id"), {"id": loan.employee_id}).fetchone()
@@ -695,31 +702,32 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         
         if acc_loan and acc_cash:
             import random
-            je_num = f"JE-LOAN-{loan_id}-{random.randint(100, 999)}"
+            from utils.accounting import generate_sequential_number
+            je_num = generate_sequential_number(conn, f"LOAN-{datetime.now().year}", "journal_entries", "entry_number")
             base_currency = get_base_currency(conn)
-            je_id = conn.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, reference, description, status, created_by,
-                    currency, exchange_rate
-                )
-                VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :uid, :currency, 1.0) RETURNING id
-            """), {
-                "num": je_num, "ref": f"LOAN-{loan_id}", 
-                "desc": f"صرف سلفة لموظف - رقم {loan_id}", "uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
-                "currency": base_currency
-            }).scalar()
+            user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
             
-            # Debit: Employee Loans (Asset)
-            conn.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :acc, :amt, 0, 'مدين سلفة موظف')"),
-                         {"jid": je_id, "acc": acc_loan, "amt": loan.amount})
-            # Credit: Cash (Asset)
-            conn.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :acc, 0, :amt, 'دائن نقدية/صرف سلفة')"),
-                         {"jid": je_id, "acc": acc_cash, "amt": loan.amount})
-            
-            # Update Account Balances
-            from utils.accounting import update_account_balance
-            update_account_balance(conn, account_id=acc_loan, debit_base=float(loan.amount), credit_base=0)
-            update_account_balance(conn, account_id=acc_cash, debit_base=0, credit_base=float(loan.amount))
+            gl_create_journal_entry(
+                db=conn,
+                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                date=datetime.now().date(),
+                reference=f"LOAN-{loan_id}",
+                description=f"صرف سلفة لموظف - رقم {loan_id}",
+                status="posted",
+                currency=base_currency,
+                exchange_rate=1.0,
+                lines=[
+                    {
+                        "account_id": acc_loan, "debit": loan.amount, "credit": 0,
+                        "description": "مدين سلفة موظف"
+                    },
+                    {
+                        "account_id": acc_cash, "debit": 0, "credit": loan.amount,
+                        "description": "دائن نقدية/صرف سلفة"
+                    }
+                ],
+                user_id=user_id
+            )
         
         trans.commit()
         return {"status": "active"}
@@ -756,20 +764,20 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
 
         # Fetch GOSI settings (active)
         gosi = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
-        gosi_emp_pct = float(gosi.employee_share_percentage) if gosi else 9.75
-        gosi_empr_pct = float(gosi.employer_share_percentage) if gosi else 11.75
-        gosi_max_sal = float(gosi.max_contributable_salary) if gosi else 45000
+        gosi_emp_pct = _dec(gosi.employee_share_percentage) if gosi else Decimal('9.75')
+        gosi_empr_pct = _dec(gosi.employer_share_percentage) if gosi else Decimal('11.75')
+        gosi_max_sal = _dec(gosi.max_contributable_salary) if gosi else Decimal('45000')
         
         count = 0
         for emp in employees:
-            basic = float(emp.salary or 0)
-            housing = float(emp.housing_allowance or 0)
-            transport = float(emp.transport_allowance or 0)
-            other = float(emp.other_allowances or 0)
+            basic: Decimal = _dec(emp.salary)
+            housing: Decimal = _dec(emp.housing_allowance)
+            transport: Decimal = _dec(emp.transport_allowance)
+            other: Decimal = _dec(emp.other_allowances)
 
             # === 1. Salary Components (earnings & deductions) ===
-            comp_earning = 0
-            comp_deduction = 0
+            comp_earning = Decimal('0')
+            comp_deduction = Decimal('0')
             try:
                 components = conn.execute(text("""
                     SELECT esc.amount, sc.component_type, sc.calculation_type, sc.percentage_of, sc.percentage_value
@@ -780,58 +788,58 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
 
                 for comp in components:
                     if comp.calculation_type == 'percentage':
-                        base_val = basic if (comp.percentage_of or 'basic') == 'basic' else (basic + housing)
-                        amt = round(base_val * float(comp.percentage_value or 0) / 100, 2)
+                        base_val = basic if (comp.percentage_of or 'basic') == 'basic' else (basic + housing)  # pyre-ignore
+                        amt = (_dec(comp.percentage_value) / Decimal('100') * base_val).quantize(_D2, ROUND_HALF_UP)
                     else:
-                        amt = float(comp.amount or 0)
+                        amt = _dec(comp.amount)
                     
                     if comp.component_type == 'earning':
-                        comp_earning += amt
+                        comp_earning += amt  # pyre-ignore
                     else:
-                        comp_deduction += amt
+                        comp_deduction += amt  # pyre-ignore
             except Exception:
                 pass  # Table may not exist in older DBs
 
             # === 2. Approved Overtime (not yet processed) ===
-            overtime_amount = 0
+            overtime_amount = Decimal('0')
             try:
                 ot_rows = conn.execute(text("""
                     SELECT COALESCE(SUM(calculated_amount), 0) as total
                     FROM overtime_requests
                     WHERE employee_id = :eid AND status = 'approved'
                 """), {"eid": emp.id}).fetchone()
-                overtime_amount = float(ot_rows.total) if ot_rows else 0
+                overtime_amount = _dec(ot_rows.total) if ot_rows else Decimal('0')
             except Exception:
                 pass
 
             # === 3. GOSI Deductions ===
             contributable = min(basic + housing, gosi_max_sal)
-            gosi_emp_share = round(contributable * gosi_emp_pct / 100, 2)
-            gosi_empr_share = round(contributable * gosi_empr_pct / 100, 2)
+            gosi_emp_share = (contributable * gosi_emp_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            gosi_empr_share = (contributable * gosi_empr_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
 
             # === 4. Violation Deductions (open, deduct_from_salary, not yet deducted) ===
-            violation_deduction = 0
+            violation_deduction = Decimal('0')
             try:
                 viol = conn.execute(text("""
                     SELECT COALESCE(SUM(penalty_amount), 0) as total
                     FROM employee_violations
-                    WHERE employee_id = :eid AND deduct_from_salary = TRUE 
+                    WHERE employee_id = :eid AND deduct_from_salary = TRUE
                     AND status = 'open' AND (payroll_period_id IS NULL)
                 """), {"eid": emp.id}).fetchone()
-                violation_deduction = float(viol.total) if viol else 0
+                violation_deduction = _dec(viol.total) if viol else Decimal('0')
             except Exception:
                 pass
 
             # === 5. Loan Deductions ===
             active_loan = conn.execute(text("SELECT * FROM employee_loans WHERE employee_id=:eid AND status='active' AND paid_amount < amount"), {"eid": emp.id}).fetchone()
-            loan_deduction = 0
+            loan_deduction = Decimal('0')
             if active_loan:
-                loan_deduction = float(min(active_loan.monthly_installment, active_loan.amount - active_loan.paid_amount))
+                loan_deduction = min(_dec(active_loan.monthly_installment), _dec(active_loan.amount) - _dec(active_loan.paid_amount))
 
             # === Calculate totals ===
             total_earnings = basic + housing + transport + other + comp_earning + overtime_amount
             total_deductions = comp_deduction + gosi_emp_share + violation_deduction + loan_deduction
-            net = round(total_earnings - total_deductions, 2)
+            net = (total_earnings - total_deductions).quantize(_D2, ROUND_HALF_UP)
             
             # === Currency & Exchange Rate ===
             emp_currency = getattr(emp, 'currency', None) or getattr(emp, 'branch_currency', None) or base_currency
@@ -840,11 +848,11 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
                 rate_row = conn.execute(text("""
                     SELECT current_rate FROM currencies WHERE code = :code AND is_active = TRUE
                 """), {"code": emp_currency}).fetchone()
-                exchange_rate = float(rate_row.current_rate) if rate_row and rate_row.current_rate else 1.0
+                exchange_rate = _dec(rate_row.current_rate) if rate_row and rate_row.current_rate else Decimal('1')
             else:
-                exchange_rate = 1.0
-            
-            net_base = round(net * exchange_rate, 2)
+                exchange_rate = Decimal('1')
+
+            net_base = (net * exchange_rate).quantize(_D2, ROUND_HALF_UP)
             
             conn.execute(text("""
                 INSERT INTO payroll_entries (
@@ -859,12 +867,12 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
                         :currency, :exchange_rate, :net_base)
             """), {
                 "pid": period_id, "eid": emp.id,
-                "basic": basic, "housing": housing, "transport": transport, "other": other,
-                "comp_earn": comp_earning, "comp_ded": comp_deduction,
-                "overtime": overtime_amount, "gosi_emp": gosi_emp_share, "gosi_empr": gosi_empr_share,
-                "viol_ded": violation_deduction, "loan_ded": loan_deduction,
-                "total_ded": total_deductions, "net": net,
-                "currency": emp_currency, "exchange_rate": exchange_rate, "net_base": net_base
+                "basic": float(basic), "housing": float(housing), "transport": float(transport), "other": float(other),
+                "comp_earn": float(comp_earning), "comp_ded": float(comp_deduction),
+                "overtime": float(overtime_amount), "gosi_emp": float(gosi_emp_share), "gosi_empr": float(gosi_empr_share),
+                "viol_ded": float(violation_deduction), "loan_ded": float(loan_deduction),
+                "total_ded": float(total_deductions), "net": float(net),
+                "currency": emp_currency, "exchange_rate": float(exchange_rate), "net_base": float(net_base)
             })
             count += 1
             
@@ -906,13 +914,13 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             FROM payroll_entries WHERE period_id = :id
         """), {"id": period_id}).fetchone()
         
-        total_net = float(totals.total_net_base or 0)
-        totals_gross = float(totals.total_gross_base or 0)
-        total_gosi_emp = float(totals.total_gosi_emp_base or 0)
-        total_gosi_empr = float(totals.total_gosi_empr_base or 0)
-        total_violations = float(totals.total_violations_base or 0)
-        total_loans = float(totals.total_loans_base or 0)
-        total_comp_ded = float(totals.total_comp_ded_base or 0)
+        total_net = _dec(totals.total_net_base)
+        totals_gross = _dec(totals.total_gross_base)
+        total_gosi_emp = _dec(totals.total_gosi_emp_base)
+        total_gosi_empr = _dec(totals.total_gosi_empr_base)
+        total_violations = _dec(totals.total_violations_base)
+        total_loans = _dec(totals.total_loans_base)
+        total_comp_ded = _dec(totals.total_comp_ded_base)
         
         # Get net salary grouped by currency for bank payout lines
         net_by_currency = conn.execute(text("""
@@ -924,7 +932,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             GROUP BY COALESCE(currency, :base)
         """), {"id": period_id, "base": base_currency}).fetchall()
         
-        if total_net == 0:
+        if total_net == Decimal('0'):
             raise HTTPException(status_code=400, detail="No payroll calculated to post")
 
         # 3. Handle Loan Deductions & Balances
@@ -933,10 +941,10 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             for entry in entries_with_loans:
                 loan = conn.execute(text("SELECT * FROM employee_loans WHERE employee_id=:eid AND status='active' AND paid_amount < amount"), {"eid": entry.employee_id}).fetchone()
                 if loan:
-                    new_paid = float(loan.paid_amount) + float(entry.loan_deduction)
-                    new_status = 'completed' if new_paid >= float(loan.amount) else 'active'
-                    conn.execute(text("UPDATE employee_loans SET paid_amount = :paid, status = :status WHERE id=:id"), 
-                                 {"paid": new_paid, "status": new_status, "id": loan.id})
+                    new_paid = _dec(loan.paid_amount) + _dec(entry.loan_deduction)
+                    new_status = 'completed' if new_paid >= _dec(loan.amount) else 'active'
+                    conn.execute(text("UPDATE employee_loans SET paid_amount = :paid, status = :status WHERE id=:id"),
+                                 {"paid": float(new_paid.quantize(_D2, ROUND_HALF_UP)), "status": new_status, "id": loan.id})
 
         # 4. Mark processed overtime requests (so they're not counted again)
         try:
@@ -968,113 +976,113 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         #   Cr Employee Loans (loan deductions)
         #   Cr Bank/Cash (net salary payout)
         
-        je_num = f"PAY-{period_id}-{datetime.now().strftime('%Y%m%d')}"
+        from utils.accounting import generate_sequential_number
+        je_num = generate_sequential_number(conn, f"PAY-{datetime.now().year}", "journal_entries", "entry_number")
         user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
         branch_id = current_user.get("branch_id") if isinstance(current_user, dict) else (current_user.allowed_branches[0] if current_user.allowed_branches else None)
         
-        je_id = conn.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, status, branch_id, created_by,
-                currency, exchange_rate
-            )
-            VALUES (:num, :date, :desc, 'posted', :bid, :uid, :currency, 1.0) RETURNING id
-        """), {
-            "num": je_num, "date": datetime.now().date(),
-            "desc": f"Payroll for period {period.name}",
-            "bid": branch_id, "uid": user_id,
-            "currency": base_currency
-        }).fetchone()[0]
-        
-        from utils.accounting import update_account_balance
+        lines = []
 
         # Line 1: Dr Salaries Expense (Gross)
         acc_salaries_exp = get_mapped_account_id(conn, "acc_map_salaries_exp")
         if acc_salaries_exp:
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:je, :acc, :amount, 0, 'مصروف رواتب وأجور - Salaries Expense', :amount, :currency)
-            """), {"je": je_id, "acc": acc_salaries_exp, "amount": totals_gross, "currency": base_currency})
-            update_account_balance(conn, account_id=acc_salaries_exp, debit_base=totals_gross, credit_base=0)
+            lines.append({
+                "account_id": acc_salaries_exp, "debit": totals_gross, "credit": 0,
+                "description": 'مصروف رواتب وأجور - Salaries Expense',
+                "currency": base_currency, "exchange_rate": 1.0
+            })
 
         # Line 2: Dr GOSI Employer Expense
-        if total_gosi_empr > 0:
+        if total_gosi_empr > Decimal('0'):
             acc_gosi_exp = get_mapped_account_id(conn, "acc_map_gosi_expense")
             if acc_gosi_exp:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, :amount, 0, 'مصروف تأمينات اجتماعية (حصة صاحب العمل) - GOSI Employer', :amount, :currency)
-                """), {"je": je_id, "acc": acc_gosi_exp, "amount": total_gosi_empr, "currency": base_currency})
-                update_account_balance(conn, account_id=acc_gosi_exp, debit_base=total_gosi_empr, credit_base=0)
+                lines.append({
+                    "account_id": acc_gosi_exp, "debit": total_gosi_empr, "credit": 0,
+                    "description": 'مصروف تأمينات اجتماعية (حصة صاحب العمل) - GOSI Employer',
+                    "currency": base_currency, "exchange_rate": 1.0
+                })
 
         # Line 3: Cr GOSI Payable (employee + employer shares)
         total_gosi = total_gosi_emp + total_gosi_empr
-        if total_gosi > 0:
+        if total_gosi > Decimal('0'):
             acc_gosi_payable = get_mapped_account_id(conn, "acc_map_gosi_payable")
             if acc_gosi_payable:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'التأمينات المستحقة (حصة موظف + صاحب عمل) - GOSI Payable', :amount, :currency)
-                """), {"je": je_id, "acc": acc_gosi_payable, "amount": total_gosi, "currency": base_currency})
-                update_account_balance(conn, account_id=acc_gosi_payable, debit_base=0, credit_base=total_gosi)
+                lines.append({
+                    "account_id": acc_gosi_payable, "debit": 0, "credit": total_gosi,
+                    "description": 'التأمينات المستحقة (حصة موظف + صاحب عمل) - GOSI Payable',
+                    "currency": base_currency, "exchange_rate": 1.0
+                })
 
         # Line 4: Cr Employee Loans (Deductions)
-        if total_loans > 0:
+        if total_loans > Decimal('0'):
             acc_loans_adv = get_mapped_account_id(conn, "acc_map_loans_adv")
             if acc_loans_adv:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'استقطاع سلف موظفين - Loan Repayment', :amount, :currency)
-                """), {"je": je_id, "acc": acc_loans_adv, "amount": total_loans, "currency": base_currency})
-                update_account_balance(conn, account_id=acc_loans_adv, debit_base=0, credit_base=total_loans)
+                lines.append({
+                    "account_id": acc_loans_adv, "debit": 0, "credit": total_loans,
+                    "description": 'استقطاع سلف موظفين - Loan Repayment',
+                    "currency": base_currency, "exchange_rate": 1.0
+                })
 
         # Line 5: Cr Violation Deductions
-        if total_violations > 0:
+        if total_violations > Decimal('0'):
             acc_violations = get_mapped_account_id(conn, "acc_map_violations") or get_mapped_account_id(conn, "acc_map_other_payable")
             if acc_violations:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'استقطاع مخالفات موظفين - Violation Deductions', :amount, :currency)
-                """), {"je": je_id, "acc": acc_violations, "amount": total_violations, "currency": base_currency})
-                update_account_balance(conn, account_id=acc_violations, debit_base=0, credit_base=total_violations)
+                lines.append({
+                    "account_id": acc_violations, "debit": 0, "credit": total_violations,
+                    "description": 'استقطاع مخالفات موظفين - Violation Deductions',
+                    "currency": base_currency, "exchange_rate": 1.0
+                })
 
         # Line 6: Cr Salary Component Deductions (other deductions)
-        if total_comp_ded > 0:
+        if total_comp_ded > Decimal('0'):
             acc_comp_ded = get_mapped_account_id(conn, "acc_map_other_deductions") or get_mapped_account_id(conn, "acc_map_other_payable")
             if acc_comp_ded:
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, 'استقطاعات عناصر الراتب - Salary Component Deductions', :amount, :currency)
-                """), {"je": je_id, "acc": acc_comp_ded, "amount": total_comp_ded, "currency": base_currency})
-                update_account_balance(conn, account_id=acc_comp_ded, debit_base=0, credit_base=total_comp_ded)
+                lines.append({
+                    "account_id": acc_comp_ded, "debit": 0, "credit": total_comp_ded,
+                    "description": 'استقطاعات عناصر الراتب - Salary Component Deductions',
+                    "currency": base_currency, "exchange_rate": 1.0
+                })
 
         # Line 7: Cr Bank (Net Payout) — one line per currency for proper tracking
-        # Also update treasury_accounts balance for bank reconciliation
-        total_net_all = 0
+        total_net_all = Decimal('0')
         acc_bank = get_mapped_account_id(conn, "acc_map_bank")
         if acc_bank:
             for cur_row in net_by_currency:
                 pay_currency = cur_row.pay_currency
-                local_amount = float(cur_row.total_net_local)
-                base_amount = float(cur_row.total_net_base)
-                rate = float(cur_row.rate)
-                
+                local_amount = _dec(cur_row.total_net_local)
+                base_amount = _dec(cur_row.total_net_base)
+                rate = _dec(cur_row.rate)
+
                 if pay_currency == base_currency:
                     desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({pay_currency})'
                 else:
-                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({local_amount:,.2f} {pay_currency} × {rate})'
-                
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                    VALUES (:je, :acc, 0, :amount, :desc, :amt_cur, :currency)
-                """), {
-                    "je": je_id, "acc": acc_bank, "amount": base_amount,
-                    "desc": desc_text, "amt_cur": local_amount, "currency": pay_currency
+                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({float(local_amount):,.2f} {pay_currency} × {float(rate)})'
+
+                lines.append({
+                    "account_id": acc_bank, "debit": 0, "credit": base_amount,
+                    "description": desc_text,
+                    "currency": pay_currency, "exchange_rate": rate
                 })
-                update_account_balance(conn, account_id=acc_bank, debit_base=0, credit_base=base_amount)
                 total_net_all += base_amount
 
+        if lines:
+            gl_create_journal_entry(
+                db=conn,
+                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                date=datetime.now().date(),
+                description=f"Payroll for period {period.name}",
+                status="posted",
+                currency=base_currency,
+                exchange_rate=1.0,
+                branch_id=branch_id,
+                source="payroll",
+                source_id=period_id,
+                lines=lines,
+                user_id=user_id
+            )
+
         # 7a. Update Treasury (bank) balance to keep treasury in sync with GL
-        if total_net_all > 0:
+        if total_net_all > Decimal('0'):
             try:
                 # Find treasury account linked to the GL bank account
                 treasury = conn.execute(text("""
@@ -1087,7 +1095,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                         UPDATE treasury_accounts
                         SET current_balance = current_balance - :amt, updated_at = CURRENT_TIMESTAMP
                         WHERE id = :tid
-                    """), {"amt": total_net_all, "tid": treasury.id})
+                    """), {"amt": float(total_net_all), "tid": treasury.id})
             except Exception as tres_err:
                 logger.warning(f"Treasury balance update for payroll skipped: {tres_err}")
 
@@ -1105,38 +1113,11 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                 AND u.role IN ('admin', 'superuser')
             """), {
                 "title": "💰 تم ترحيل الرواتب",
-                "message": f"تم ترحيل مسير الرواتب {period.name} بنجاح — {emp_count} موظف — إجمالي {total_net:,.2f} {base_currency}",
+                "message": f"تم ترحيل مسير الرواتب {period.name} بنجاح — {emp_count} موظف — إجمالي {float(total_net):,.2f} {base_currency}",
                 "link": "/hr/payroll"
             })
         except Exception:
             pass  # Non-blocking
-
-        # ACCT-FIX: Post-insert balance verification — prevent unbalanced JE from reaching DB
-        # This catches missing account mappings that silently skip Credit lines.
-        balance_check = conn.execute(text("""
-            SELECT
-                COALESCE(SUM(debit), 0)  AS total_debit,
-                COALESCE(SUM(credit), 0) AS total_credit
-            FROM journal_lines
-            WHERE journal_entry_id = :je_id
-        """), {"je_id": je_id}).fetchone()
-        if balance_check:
-            diff = abs(float(balance_check.total_debit) - float(balance_check.total_credit))
-            if diff > 0.01:
-                trans.rollback()
-                logger.error(
-                    f"Payroll JE {je_id} is unbalanced — "
-                    f"Dr={balance_check.total_debit}, Cr={balance_check.total_credit}, diff={diff:.4f}. "
-                    "Check account mappings for GOSI, loans, violations, bank."
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=(
-                        "فشل ترحيل الرواتب: القيد المحاسبي غير متوازن. "
-                        f"المدين={balance_check.total_debit:.2f}, الدائن={balance_check.total_credit:.2f}. "
-                        "يرجى التحقق من إعدادات ربط الحسابات (الرواتب، التأمينات، السلف، البنك)."
-                    )
-                )
 
         trans.commit()
         return {"message": "Payroll posted successfully", "journal_entry": je_num}
@@ -1761,18 +1742,18 @@ def calculate_end_of_service(
         # Calculate service years
         from dateutil.relativedelta import relativedelta
         delta = relativedelta(termination_date, join_date)
-        total_years = delta.years + (delta.months / 12) + (delta.days / 365.25)
+        total_years = _dec(delta.years) + (_dec(delta.months) / Decimal('12')) + (_dec(delta.days) / Decimal('365.25'))
         
-        if total_years < 0:
+        if total_years < Decimal('0'):
             raise HTTPException(status_code=400, detail="تاريخ الإنهاء قبل تاريخ التعيين")
         
         # Total salary (basic + housing + transport) used as base
-        base_salary = float(emp.basic_salary or 0)
-        total_salary = base_salary + float(emp.housing_allowance) + float(emp.transport_allowance)
+        base_salary = _dec(emp.basic_salary)
+        total_salary = base_salary + _dec(emp.housing_allowance) + _dec(emp.transport_allowance)
         
         # Calculate EOS using shared helper (Saudi Labor Law Art. 84/85)
         from utils.hr_helpers import calculate_eos_gratuity
-        eos = calculate_eos_gratuity(total_salary, total_years, data.termination_reason)
+        eos = calculate_eos_gratuity(float(total_salary), float(total_years), data.termination_reason)
         
         gratuity = eos["full_gratuity"]
         resignation_factor = eos["resignation_factor"]
@@ -1792,10 +1773,10 @@ def calculate_end_of_service(
             "join_date": str(join_date),
             "termination_date": str(termination_date),
             "termination_reason": data.termination_reason,
-            "service_years": round(total_years, 2),
+            "service_years": float(total_years.quantize(_D2, ROUND_HALF_UP)),
             "service_years_display": f"{delta.years} سنة و {delta.months} شهر و {delta.days} يوم",
-            "base_salary": base_salary,
-            "total_salary_used": total_salary,
+            "base_salary": float(base_salary),
+            "total_salary_used": float(total_salary),
             "full_gratuity": round(gratuity, 2),
             "resignation_factor": resignation_factor,
             "final_gratuity": final_gratuity,
@@ -1964,44 +1945,44 @@ def generate_single_payslip(data: PayslipGenerateRequest, current_user: UserResp
         if existing:
             raise HTTPException(status_code=400, detail="Payslip already exists for this period")
 
-        basic = float(emp.basic_salary or 0)
-        housing = float(emp.housing_allowance or 0)
-        transport = float(emp.transport_allowance or 0)
-        other = float(emp.other_allowances or 0)
+        basic = _dec(emp.basic_salary)
+        housing = _dec(emp.housing_allowance)
+        transport = _dec(emp.transport_allowance)
+        other = _dec(emp.other_allowances)
         gross = basic + housing + transport + other
 
         # Calculate GOSI deductions
         gosi_settings = conn.execute(text("SELECT * FROM gosi_settings LIMIT 1")).fetchone()
-        gosi_emp = 0
-        gosi_empr = 0
+        gosi_emp = Decimal('0')
+        gosi_empr = Decimal('0')
         if gosi_settings:
-            gosi_max_sal = float(gosi_settings.max_contributable_salary or 45000)
-            emp_rate = float(gosi_settings.employee_percentage or 9.75) / 100
-            empr_rate = float(gosi_settings.employer_percentage or 11.75) / 100
+            gosi_max_sal = _dec(gosi_settings.max_contributable_salary) if gosi_settings.max_contributable_salary else Decimal('45000')
+            emp_rate = _dec(gosi_settings.employee_percentage) if gosi_settings.employee_percentage else Decimal('9.75')
+            empr_rate = _dec(gosi_settings.employer_percentage) if gosi_settings.employer_percentage else Decimal('11.75')
             contributable = min(basic + housing, gosi_max_sal)
-            gosi_emp = round(contributable * emp_rate, 2)
-            gosi_empr = round(contributable * empr_rate, 2)
+            gosi_emp = (contributable * emp_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            gosi_empr = (contributable * empr_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
 
         # Calculate violation deductions for the month
         violation_total = conn.execute(text("""
             SELECT COALESCE(SUM(deduction_amount), 0) FROM employee_violations
             WHERE employee_id = :eid AND violation_date BETWEEN :start AND :end AND status = 'approved'
         """), {"eid": data.employee_id, "start": start_date, "end": end_date}).scalar() or 0
-        violation_deduction = float(violation_total)
+        violation_deduction = _dec(violation_total)
 
         # Calculate loan deductions
-        loan_deduction = 0
+        loan_deduction = Decimal('0')
         active_loan = conn.execute(text("""
             SELECT monthly_deduction FROM employee_loans
             WHERE employee_id = :eid AND status = 'active' AND paid_amount < amount
             LIMIT 1
         """), {"eid": data.employee_id}).fetchone()
         if active_loan:
-            loan_deduction = float(active_loan.monthly_deduction or 0)
+            loan_deduction = _dec(active_loan.monthly_deduction)
 
         # Calculate salary component earnings/deductions
-        comp_earning = 0
-        comp_deduction = 0
+        comp_earning = Decimal('0')
+        comp_deduction = Decimal('0')
         components = conn.execute(text("""
             SELECT sc.amount, sc.component_type
             FROM salary_components sc
@@ -2009,12 +1990,12 @@ def generate_single_payslip(data: PayslipGenerateRequest, current_user: UserResp
         """), {"eid": data.employee_id}).fetchall()
         for comp in components:
             if comp.component_type == 'earning':
-                comp_earning += float(comp.amount or 0)
+                comp_earning += _dec(comp.amount)  # pyre-ignore
             elif comp.component_type == 'deduction':
-                comp_deduction += float(comp.amount or 0)
+                comp_deduction += _dec(comp.amount)  # pyre-ignore
 
-        total_deductions = gosi_emp + violation_deduction + loan_deduction + comp_deduction
-        net = gross + comp_earning - total_deductions
+        total_deductions = gosi_emp + violation_deduction + loan_deduction + comp_deduction  # pyre-ignore
+        net = gross + comp_earning - total_deductions  # pyre-ignore
 
         conn.execute(text("""
             INSERT INTO payroll_entries
@@ -2022,12 +2003,12 @@ def generate_single_payslip(data: PayslipGenerateRequest, current_user: UserResp
              salary_components_earning,salary_components_deduction,overtime_amount,
              gosi_employee_share,gosi_employer_share,violation_deduction,loan_deduction,deductions,net_salary)
             VALUES (:pid,:eid,:basic,:housing,:transport,:other,:comp_earn,:comp_ded,0,:gosi_emp,:gosi_empr,:violation,:loan,:deductions,:net)
-        """), {"pid": period_id, "eid": data.employee_id, "basic": basic,
-               "housing": housing, "transport": transport, "other": other,
-               "comp_earn": comp_earning, "comp_ded": comp_deduction,
-               "gosi_emp": gosi_emp, "gosi_empr": gosi_empr,
-               "violation": violation_deduction, "loan": loan_deduction,
-               "deductions": total_deductions, "net": net})
+        """), {"pid": period_id, "eid": data.employee_id, "basic": float(basic),
+               "housing": float(housing), "transport": float(transport), "other": float(other),
+               "comp_earn": float(comp_earning), "comp_ded": float(comp_deduction),
+               "gosi_emp": float(gosi_emp), "gosi_empr": float(gosi_empr),
+               "violation": float(violation_deduction), "loan": float(loan_deduction),
+               "deductions": float(total_deductions), "net": float(net)})
         conn.commit()
         return {"message": "Payslip generated successfully"}
     finally:
@@ -2074,7 +2055,7 @@ def list_job_openings(status: Optional[str] = None, branch_id: Optional[int] = N
         q = """SELECT jo.*,
                    (SELECT COUNT(*) FROM job_applications ja WHERE ja.opening_id = jo.id) as applications_count
             FROM job_openings jo WHERE 1=1"""
-        params = {}
+        params: Dict[str, Any] = {}
         if status:
             q += " AND jo.status = :status"
             params["status"] = status
@@ -2240,14 +2221,15 @@ def get_leave_balance(emp_id: int, current_user: UserResponse = Depends(get_curr
             SELECT COALESCE(SUM(carried_days),0) as carried FROM leave_carryover
             WHERE employee_id=:id AND year=:y
         """), {"id": emp_id, "y": year}).fetchone()
-        entitled = float(emp.annual_leave_entitlement or 30)
-        used_d = float(used.used or 0)
-        carried_d = float(carryover.carried or 0)
+        entitled = _dec(emp.annual_leave_entitlement) if emp.annual_leave_entitlement else Decimal('30')
+        used_d = _dec(used.used)
+        carried_d = _dec(carryover.carried)
+        remaining = max(Decimal('0'), entitled + carried_d - used_d)
         return {
             "employee_id": emp_id, "employee_name": emp.name, "year": year,
-            "balances": [{"leave_type": "annual", "entitled_days": entitled,
-                          "used_days": used_d, "carried_days": carried_d,
-                          "remaining_days": max(0, entitled + carried_d - used_d)}]
+            "balances": [{"leave_type": "annual", "entitled_days": float(entitled),
+                          "used_days": float(used_d), "carried_days": float(carried_d),
+                          "remaining_days": float(remaining)}]
         }
     finally:
         conn.close()
@@ -2279,22 +2261,22 @@ def calculate_leave_carryover(data: LeaveCarryoverRequest, current_user: UserRes
             SELECT COALESCE(SUM(days_requested),0) as used FROM leave_requests
             WHERE employee_id=:id AND status='approved' AND EXTRACT(YEAR FROM start_date)=:y
         """), {"id": data.employee_id, "y": year}).fetchone()
-        entitled = float(emp.annual_leave_entitlement or 30)
-        used_d = float(used.used or 0)
-        max_carry = float(emp.leave_carryover_max or 5)
+        entitled = _dec(emp.annual_leave_entitlement) if emp.annual_leave_entitlement else Decimal('30')
+        used_d = _dec(used.used)
+        max_carry = _dec(emp.leave_carryover_max) if emp.leave_carryover_max else Decimal('5')
         remaining = entitled - used_d
-        carried = min(max(0, remaining), max_carry)
-        expired = max(0, remaining - carried)
+        carried = min(max(Decimal('0'), remaining), max_carry)
+        expired = max(Decimal('0'), remaining - carried)
         conn.execute(text("""
             INSERT INTO leave_carryover (employee_id,leave_type,year,entitled_days,used_days,carried_days,expired_days,max_carryover)
             VALUES (:eid,'annual',:year,:entitled,:used,:carried,:expired,:max_carry)
             ON CONFLICT (employee_id,leave_type,year) DO UPDATE SET
             entitled_days=EXCLUDED.entitled_days, used_days=EXCLUDED.used_days,
             carried_days=EXCLUDED.carried_days, expired_days=EXCLUDED.expired_days, calculated_at=NOW()
-        """), {"eid": data.employee_id, "year": year, "entitled": entitled, "used": used_d,
-               "carried": carried, "expired": expired, "max_carry": max_carry})
+        """), {"eid": data.employee_id, "year": year, "entitled": float(entitled), "used": float(used_d),
+               "carried": float(carried), "expired": float(expired), "max_carry": float(max_carry)})
         conn.commit()
         return {"employee_id": data.employee_id, "employee_name": emp.name, "year": year,
-                "entitled_days": entitled, "used_days": used_d, "carried_days": carried, "expired_days": expired}
+                "entitled_days": float(entitled), "used_days": float(used_d), "carried_days": float(carried), "expired_days": float(expired)}
     finally:
         conn.close()

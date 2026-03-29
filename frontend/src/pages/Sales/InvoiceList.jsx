@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
-import Pagination, { usePagination } from '../../components/common/Pagination'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 import BackButton from '../../components/common/BackButton';
 
 function InvoiceList() {
@@ -15,13 +16,19 @@ function InvoiceList() {
     const [invoices, setInvoices] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
 
     useEffect(() => {
         const fetchInvoices = async () => {
             try {
                 setLoading(true)
                 const response = await salesAPI.listInvoices({ branch_id: currentBranch?.id })
-                setInvoices(response.data)
+                const payload = response.data
+                const normalizedInvoices = Array.isArray(payload)
+                    ? payload
+                    : (Array.isArray(payload?.items) ? payload.items : [])
+                setInvoices(normalizedInvoices)
             } catch (err) {
                 setError(t('common.error_loading'))
                 console.error(err)
@@ -32,9 +39,54 @@ function InvoiceList() {
         fetchInvoices()
     }, [currentBranch, t])
 
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(invoices)
+    const filteredInvoices = useMemo(() => {
+        let result = Array.isArray(invoices) ? invoices : [];
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(inv =>
+                (inv.invoice_number || '').toLowerCase().includes(q) ||
+                (inv.customer_name || '').toLowerCase().includes(q)
+            );
+        }
+        if (statusFilter) {
+            result = result.filter(inv => inv.status === statusFilter);
+        }
+        return result;
+    }, [invoices, search, statusFilter]);
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const columns = [
+        {
+            key: 'invoice_number',
+            label: t('sales.invoices.table.number'),
+            style: { fontWeight: 'bold' },
+        },
+        {
+            key: 'customer_name',
+            label: t('sales.invoices.table.customer'),
+        },
+        {
+            key: 'invoice_date',
+            label: t('sales.invoices.table.date'),
+            render: (val) => formatShortDate(val),
+        },
+        {
+            key: 'total',
+            label: t('sales.invoices.table.total'),
+            style: { fontWeight: 'bold' },
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'status',
+            label: t('sales.invoices.table.status'),
+            render: (val) => (
+                <span className={`badge ${val === 'paid' ? 'badge-success' : val === 'partial' ? 'badge-warning' : 'badge-danger'}`}>
+                    {val === 'paid' ? t('sales.invoices.status.paid') :
+                        val === 'partial' ? t('sales.invoices.status.partial') :
+                            t('sales.invoices.status.unpaid')}
+                </span>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -53,54 +105,32 @@ function InvoiceList() {
 
             {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="card card-flush" style={{ overflow: 'hidden' }}>
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('sales.invoices.table.number')}</th>
-                            <th>{t('sales.invoices.table.customer')}</th>
-                            <th>{t('sales.invoices.table.date')}</th>
-                            <th>{t('sales.invoices.table.total')}</th>
-                            <th>{t('sales.invoices.table.status')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invoices.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="start-guide">
-                                    <div style={{ padding: '40px', textAlign: 'center' }}>
-                                        <h3>{t('sales.invoices.no_invoices')}</h3>
-                                        <p>{t('sales.invoices.empty_desc')}</p>
-                                        <button className="btn btn-primary mt-4" onClick={() => navigate('/sales/invoices/new')}>
-                                            {t('sales.invoices.create_btn')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map(invoice => (
-                                <tr key={invoice.id} onClick={() => navigate(`/sales/invoices/${invoice.id}`)} style={{ cursor: 'pointer' }}>
-                                    <td style={{ fontWeight: 'bold' }}>{invoice.invoice_number}</td>
-                                    <td>{invoice.customer_name}</td>
-                                    <td>{formatShortDate(invoice.invoice_date)}</td>
-                                    <td style={{ fontWeight: 'bold' }}>{formatNumber(invoice.total)}</td>
-                                    <td>
-                                        <span className={`badge ${invoice.status === 'paid' ? 'badge-success' :
-                                            invoice.status === 'partial' ? 'badge-warning' :
-                                                'badge-danger'
-                                            }`}>
-                                            {invoice.status === 'paid' ? t('sales.invoices.status.paid') :
-                                                invoice.status === 'partial' ? t('sales.invoices.status.partial') :
-                                                    t('sales.invoices.status.unpaid')}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('sales.invoices.search_placeholder', 'بحث برقم الفاتورة أو اسم العميل...')}
+                filters={[{
+                    key: 'status',
+                    label: t('sales.invoices.table.status'),
+                    options: [
+                        { value: 'paid', label: t('sales.invoices.status.paid') },
+                        { value: 'partial', label: t('sales.invoices.status.partial') },
+                        { value: 'unpaid', label: t('sales.invoices.status.unpaid') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredInvoices}
+                loading={loading}
+                onRowClick={(row) => navigate(`/sales/invoices/${row.id}`)}
+                emptyTitle={t('sales.invoices.no_invoices')}
+                emptyDesc={t('sales.invoices.empty_desc')}
+                emptyAction={{ label: t('sales.invoices.create_btn'), onClick: () => navigate('/sales/invoices/new') }}
+            />
         </div>
     )
 }

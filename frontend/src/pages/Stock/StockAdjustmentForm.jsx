@@ -5,6 +5,7 @@ import { Save, AlertCircle, Trash2 } from 'lucide-react';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 const StockAdjustmentForm = () => {
     const { t } = useTranslation();
@@ -101,8 +102,7 @@ const StockAdjustmentForm = () => {
                 <div className="card" style={{ padding: '32px' }}>
                     <form onSubmit={handleSubmit}>
                         <div className="row">
-                            <div className="col-md-6 mb-4">
-                                <label className="form-label">{t('stock.adjustments.form.warehouse')} <span className="text-danger">*</span></label>
+                            <FormField label={t('stock.adjustments.form.warehouse')} required className="col-md-6 mb-4">
                                 <select
                                     name="warehouse_id"
                                     value={formData.warehouse_id}
@@ -115,10 +115,9 @@ const StockAdjustmentForm = () => {
                                         <option key={w.id} value={w.id}>{w.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
 
-                            <div className="col-md-6 mb-4">
-                                <label className="form-label">{t('stock.adjustments.form.product')} <span className="text-danger">*</span></label>
+                            <FormField label={t('stock.adjustments.form.product')} required className="col-md-6 mb-4">
                                 <select
                                     name="product_id"
                                     value={formData.product_id}
@@ -131,22 +130,23 @@ const StockAdjustmentForm = () => {
                                         <option key={p.id} value={p.id}>{p.product_name} {p.item_code ? `(${p.item_code})` : ''}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                         </div>
 
                         <div className="mb-4">
-                            <label className="form-label fw-bold" style={{ fontSize: '15px' }}>{t('stock.adjustments.form.actual_quantity')} <span className="text-danger">*</span></label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                name="new_quantity"
-                                value={formData.new_quantity}
-                                onChange={handleChange}
-                                className="form-input"
-                                style={{ fontSize: '18px', fontWeight: 'bold', background: '#f0f7ff', borderColor: '#bfdbfe' }}
-                                placeholder={t('stock.adjustments.form.quantity_placeholder')}
-                                required
-                            />
+                            <FormField label={t('stock.adjustments.form.actual_quantity')} required>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="new_quantity"
+                                    value={formData.new_quantity}
+                                    onChange={handleChange}
+                                    className="form-input"
+                                    style={{ fontSize: '18px', fontWeight: 'bold', background: '#f0f7ff', borderColor: '#bfdbfe' }}
+                                    placeholder={t('stock.adjustments.form.quantity_placeholder')}
+                                    required
+                                />
+                            </FormField>
                             <div className="mt-2 text-muted" style={{ fontSize: '12px' }}>
                                 <AlertCircle size={12} style={{ display: 'inline', marginLeft: '4px' }} />
                                 {t('stock.adjustments.form.quantity_help')}
@@ -154,19 +154,17 @@ const StockAdjustmentForm = () => {
                         </div>
 
                         <div className="row">
-                            <div className="col-md-6 mb-4">
-                                <label className="form-label">{t('stock.adjustments.form.reason')}</label>
+                            <FormField label={t('stock.adjustments.form.reason')} className="col-md-6 mb-4">
                                 <select name="reason" value={formData.reason} onChange={handleChange} className="form-input">
                                     <option value="Physical Count">{t('stock.adjustments.reasons.physical_count')}</option>
                                     <option value="Damaged">{t('stock.adjustments.reasons.damaged')}</option>
                                     <option value="Theft">{t('stock.adjustments.reasons.theft')}</option>
                                     <option value="Other">{t('stock.adjustments.reasons.other')}</option>
                                 </select>
-                            </div>
+                            </FormField>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="form-label">{t('stock.adjustments.form.notes')}</label>
+                        <FormField label={t('stock.adjustments.form.notes')} className="mb-4">
                             <textarea
                                 name="notes"
                                 value={formData.notes}
@@ -175,7 +173,7 @@ const StockAdjustmentForm = () => {
                                 style={{ height: '100px' }}
                                 placeholder={t('common.notes_placeholder')}
                             />
-                        </div>
+                        </FormField>
 
                         <div className="mt-6 pt-4 border-top d-flex justify-content-end gap-3">
                             <button

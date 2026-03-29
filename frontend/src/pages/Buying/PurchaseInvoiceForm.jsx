@@ -7,6 +7,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber, getStep } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function PurchaseInvoiceForm() {
     const { t } = useTranslation()
@@ -372,8 +373,7 @@ function PurchaseInvoiceForm() {
             <form onSubmit={handleSubmit} className="card">
                 {/* Header Info */}
                 <div className="form-row">
-                    <div className="form-group" style={{ flex: 2 }}>
-                        <label className="form-label">{t('buying.purchase_invoices.form.supplier')}</label>
+                    <FormField label={t('buying.purchase_invoices.form.supplier')} required style={{ flex: 2 }}>
                         <select
                             className="form-input"
                             value={formData.supplier_id || ''}
@@ -411,9 +411,8 @@ function PurchaseInvoiceForm() {
                             <option value="">{t('buying.purchase_invoices.form.supplier_placeholder')}</option>
                             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name || t('common.no_name')}</option>)}
                         </select>
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label">{t('stock.warehouses.title')}</label>
+                    </FormField>
+                    <FormField label={t('stock.warehouses.title')} style={{ flex: 1 }}>
                         <select
                             className="form-input"
                             value={formData.warehouse_id || ''}
@@ -424,21 +423,21 @@ function PurchaseInvoiceForm() {
                                 <option key={wh.id} value={wh.id}>{wh.name}</option>
                             ))}
                         </select>
-                    </div>
-                    <div className="form-group">
+                    </FormField>
+                    <FormField>
                         <CustomDatePicker
                             label={t('buying.purchase_invoices.form.invoice_date')}
                             selected={formData.invoice_date}
                             onChange={(dateStr) => setFormData({ ...formData, invoice_date: dateStr })}
                         />
-                    </div>
-                    <div className="form-group">
+                    </FormField>
+                    <FormField>
                         <CustomDatePicker
                             label={t('buying.purchase_invoices.form.due_date')}
                             selected={formData.due_date}
                             onChange={(dateStr) => setFormData({ ...formData, due_date: dateStr })}
                         />
-                    </div>
+                    </FormField>
 
 
 
@@ -542,8 +541,7 @@ function PurchaseInvoiceForm() {
                         <h4 style={{ marginBottom: '12px' }}>{t('buying.purchase_invoices.form.payment.title')}</h4>
                         {/* Currency Selection */}
                         <div className="form-row mb-3">
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label className="form-label">{t('common.currency')}</label>
+                            <FormField label={t('common.currency')} style={{ flex: 1 }}>
                                 <select
                                     className="form-input form-input-sm"
                                     value={formData.currency}
@@ -561,10 +559,9 @@ function PurchaseInvoiceForm() {
                                         <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                             {formData.currency !== currency && (
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('accounting.currencies.table.rate')}</label>
+                                <FormField label={t('accounting.currencies.table.rate')} style={{ flex: 1 }}>
                                     <input
                                         type="number"
                                         step="0.000001"
@@ -572,12 +569,11 @@ function PurchaseInvoiceForm() {
                                         value={formData.exchange_rate}
                                         onChange={e => setFormData({ ...formData, exchange_rate: e.target.value })}
                                     />
-                                </div>
+                                </FormField>
                             )}
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">{t('buying.purchase_invoices.form.payment.method')}</label>
+                        <FormField label={t('buying.purchase_invoices.form.payment.method')} required>
                             <div style={{ display: 'flex', gap: '16px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                     <input
@@ -607,7 +603,7 @@ function PurchaseInvoiceForm() {
                                     {t('buying.purchase_invoices.form.payment.methods.credit')}
                                 </label>
                             </div>
-                        </div>
+                        </FormField>
 
                         {formData.is_prepayment && (
                             <div style={{ background: 'rgba(52, 152, 219, 0.1)', padding: '12px', borderRadius: '8px', borderLeft: '4px solid var(--primary)', marginTop: '16px' }}>
@@ -618,10 +614,7 @@ function PurchaseInvoiceForm() {
                         )}
 
                         {formData.payment_method && formData.payment_method !== 'credit' && (
-                            <div className="form-group">
-                                <label className="form-label">
-                                    {formData.payment_method === 'bank' ? t('treasury.accounts.bank') : t('treasury.accounts.cash')}
-                                </label>
+                            <FormField label={formData.payment_method === 'bank' ? t('treasury.accounts.bank') : t('treasury.accounts.cash')} required>
                                 <select
                                     className="form-input"
                                     value={formData.treasury_id || ''}
@@ -645,12 +638,11 @@ function PurchaseInvoiceForm() {
                                         </span>
                                     </div>
                                 )}
-                            </div>
+                            </FormField>
                         )}
 
                         {formData.payment_method === 'credit' && (
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.purchase_invoices.form.payment.paid_amount')}</label>
+                            <FormField label={t('buying.purchase_invoices.form.payment.paid_amount')}>
                                 <div className="input-with-suffix">
                                     <input
                                         type="number" className="form-input"
@@ -726,17 +718,16 @@ function PurchaseInvoiceForm() {
                                 <small style={{ color: 'var(--text-secondary)', display: 'block', marginTop: '8px' }}>
                                     {t('buying.purchase_invoices.form.payment.remaining_note')} ({formatNumber(totals.total - formData.paid_amount)} {formData.currency})
                                 </small>
-                            </div>
+                            </FormField>
                         )}
 
-                        <div className="form-group">
-                            <label className="form-label">{t('buying.purchase_invoices.form.notes')}</label>
+                        <FormField label={t('buying.purchase_invoices.form.notes')}>
                             <textarea
                                 className="form-input" rows="3"
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{ width: '300px', padding: '24px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>

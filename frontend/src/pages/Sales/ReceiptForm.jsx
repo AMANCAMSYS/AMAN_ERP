@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 
 function ReceiptForm() {
@@ -317,8 +318,7 @@ function ReceiptForm() {
                     <div className="card">
                         <h3 className="section-title">{t('sales.receipts.form.basic_info')}</h3>
                         <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div className="form-group">
-                                <label className="form-label">{t('sales.receipts.form.customer')} *</label>
+                            <FormField label={t('sales.receipts.form.customer')} required>
                                 <select
                                     required
                                     value={formData.customer_id}
@@ -331,16 +331,16 @@ function ReceiptForm() {
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
 
-                            <div className="form-group">
+                            <FormField>
                                 <CustomDatePicker
                                     label={t('sales.receipts.form.date')}
                                     selected={formData.voucher_date}
                                     onChange={(dateStr) => setFormData({ ...formData, voucher_date: dateStr })}
                                     required
                                 />
-                            </div>
+                            </FormField>
                         </div>
 
                         {/* Customer Info Display (from CustomerPaymentForm) */}
@@ -483,8 +483,7 @@ function ReceiptForm() {
                                     </div>
                                 </div>
 
-                                <div className="form-group" style={{ marginTop: '8px' }}>
-                                    <label className="form-label" style={{ marginBottom: '8px', display: 'block' }}>{t('sales.receipts.form.payment_method')} *</label>
+                                <FormField label={t('sales.receipts.form.payment_method')} required style={{ marginTop: '8px' }}>
                                     <div style={{ display: 'flex', gap: '16px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                             <input
@@ -517,32 +516,30 @@ function ReceiptForm() {
                                             <span style={{ fontSize: '14px' }}>{t('sales.receipts.payment_methods.check')}</span>
                                         </label>
                                     </div>
-                                </div>
+                                </FormField>
                             </div>
 
                             {formData.payment_method === 'check' && (
                                 <div className="grid grid-cols-2 gap-4 mt-2 p-4 bg-gray-50 rounded-lg">
-                                    <div className="form-group">
-                                        <label className="form-label">{t('sales.receipts.form.check_number')}</label>
+                                    <FormField label={t('sales.receipts.form.check_number')}>
                                         <input
                                             type="text"
                                             value={formData.check_number}
                                             onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
                                             className="form-input"
                                         />
-                                    </div>
-                                    <div className="form-group">
+                                    </FormField>
+                                    <FormField>
                                         <CustomDatePicker
                                             label={t('sales.receipts.form.check_date')}
                                             selected={formData.check_date}
                                             onChange={(dateStr) => setFormData({ ...formData, check_date: dateStr })}
                                         />
-                                    </div>
+                                    </FormField>
                                 </div>
                             )}
 
-                            <div className="form-group mt-4">
-                                <label className="form-label">{t('sales.receipts.form.notes')}</label>
+                            <FormField label={t('sales.receipts.form.notes')} className="mt-4">
                                 <textarea
                                     rows="2"
                                     value={formData.notes}
@@ -550,7 +547,7 @@ function ReceiptForm() {
                                     className="form-input"
                                     placeholder={t('sales.receipts.form.notes_placeholder')}
                                 />
-                            </div>
+                            </FormField>
                         </div>
 
                         <div style={{ width: '300px', padding: '24px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>

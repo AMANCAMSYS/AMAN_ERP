@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function BuyingOrderForm() {
     const { t } = useTranslation()
@@ -261,8 +262,7 @@ function BuyingOrderForm() {
             <form onSubmit={handleSubmit} className="card">
                 {/* Header Information */}
                 <div className="form-row">
-                    <div className="form-group" style={{ flex: 2 }}>
-                        <label className="form-label">{t('buying.orders.form.supplier')} *</label>
+                    <FormField label={t('buying.orders.form.supplier')} required style={{ flex: 2 }}>
                         <select
                             className="form-input"
                             required
@@ -310,23 +310,23 @@ function BuyingOrderForm() {
                                 <option key={s.id} value={s.id}>{s.name || s.supplier_name}</option>
                             ))}
                         </select>
-                    </div>
-                    <div className="form-group">
+                    </FormField>
+                    <FormField>
                         <CustomDatePicker
                             label={t('buying.orders.form.order_date')}
                             selected={formData.order_date}
                             onChange={(dateStr) => setFormData({ ...formData, order_date: dateStr })}
                             required
                         />
-                    </div>
-                    <div className="form-group">
+                    </FormField>
+                    <FormField>
                         <CustomDatePicker
                             label={t('buying.orders.form.expected_date')}
                             selected={formData.expected_date}
                             onChange={(dateStr) => setFormData({ ...formData, expected_date: dateStr })}
                             required
                         />
-                    </div>
+                    </FormField>
                 </div>
 
                 {/* Items Section */}
@@ -429,15 +429,14 @@ function BuyingOrderForm() {
                 {/* Footer Section */}
                 <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', marginTop: '12px' }}>
                     <div style={{ flex: 1 }}>
-                        <div className="form-group">
-                            <label className="form-label font-bold">{t('buying.orders.form.notes.label')}</label>
+                        <FormField label={t('buying.orders.form.notes.label')} className="font-bold">
                             <textarea
                                 className="form-input" rows="6"
                                 placeholder={t('buying.orders.form.notes.placeholder')}
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                             ></textarea>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div style={{

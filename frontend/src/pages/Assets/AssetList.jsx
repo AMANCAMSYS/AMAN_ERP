@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { assetsAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 import { formatShortDate } from '../../utils/dateUtils';
-import Pagination, { usePagination } from '../../components/common/Pagination';
 
 const AssetList = () => {
     const { t, i18n } = useTranslation();
@@ -14,8 +15,8 @@ const AssetList = () => {
     const currency = getCurrency();
     const [assets, setAssets] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all');
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(assets);
+    const [filter, setFilter] = useState('');
+    const [search, setSearch] = useState('');
 
     useEffect(() => {
         fetchAssets();
@@ -24,7 +25,7 @@ const AssetList = () => {
     const fetchAssets = async () => {
         try {
             setLoading(true);
-            const response = await assetsAPI.list(filter !== 'all' ? { status: filter } : {});
+            const response = await assetsAPI.list(filter ? { status: filter } : {});
             setAssets(response.data);
         } catch (error) {
             console.error("Failed to fetch assets", error);
@@ -32,6 +33,63 @@ const AssetList = () => {
             setLoading(false);
         }
     };
+
+    const filteredAssets = useMemo(() => {
+        if (!search) return assets;
+        const q = search.toLowerCase();
+        return assets.filter(a =>
+            (a.code || '').toLowerCase().includes(q) ||
+            (a.name || '').toLowerCase().includes(q)
+        );
+    }, [assets, search]);
+
+    const columns = [
+        {
+            key: 'code',
+            label: t('assets.code', 'Code'),
+            render: (val) => <span className="badge rounded-pill bg-light text-dark border px-3">{val}</span>,
+        },
+        {
+            key: 'name',
+            label: t('assets.name', 'Name'),
+            style: { fontWeight: 600, color: 'var(--text-dark)' },
+        },
+        {
+            key: 'type',
+            label: t('assets.type', 'Type'),
+            render: (val) => (
+                <span className="text-muted d-flex align-items-center gap-2">
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: val === 'tangible' ? 'var(--primary)' : 'var(--warning)' }}></div>
+                    {t(`assets.types.${val}`, val)}
+                </span>
+            ),
+        },
+        {
+            key: 'purchase_date',
+            label: t('assets.purchase_date', 'Purchase Date'),
+            headerStyle: { textAlign: 'center' },
+            style: { textAlign: 'center' },
+            render: (val) => <span className="text-muted small">{formatShortDate(val)}</span>,
+        },
+        {
+            key: 'cost',
+            label: t('assets.cost', 'Cost'),
+            headerStyle: { textAlign: 'end' },
+            style: { textAlign: 'end', fontWeight: 'bold', color: 'var(--text-dark)' },
+            render: (val) => <>{parseFloat(val).toLocaleString()} {currency}</>,
+        },
+        {
+            key: 'status',
+            label: t('common.status.title', 'Status'),
+            headerStyle: { textAlign: 'center' },
+            style: { textAlign: 'center' },
+            render: (val) => (
+                <span className={`badge ${val === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} border px-3`}>
+                    {t(`status.${val}`, val)}
+                </span>
+            ),
+        },
+    ];
 
     return (
         <div className="workspace fade-in">
@@ -78,80 +136,30 @@ const AssetList = () => {
                 </div>
             </div>
 
-            <div className="card section-card">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div className="d-flex gap-3">
-                        <div className="search-box">
-                            <Search size={16} />
-                            <input
-                                type="text"
-                                name="asset_search"
-                                id="asset_search"
-                                placeholder={t('common.search')}
-                                className="form-input form-input-sm"
-                                autoComplete="off"
-                            />
-                        </div>
-                        <div className="d-flex align-items-center gap-2 bg-light p-1 rounded-3 border">
-                            <Filter size={14} className="text-muted ms-2" />
-                            <select
-                                name="asset_status_filter"
-                                id="asset_status_filter"
-                                className="form-select border-0 bg-transparent form-select-sm w-auto cursor-pointer"
-                                value={filter}
-                                onChange={(e) => setFilter(e.target.value)}
-                                aria-label={t('common.filter_status')}
-                            >
-                                <option value="all">{t('common.all_status')}</option>
-                                <option value="active">{t('status.active')}</option>
-                                <option value="disposed">{t('status.disposed')}</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div className="data-table-container border-0 bg-transparent">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th className="bg-transparent">{t('assets.code', 'Code')}</th>
-                                <th className="bg-transparent">{t('assets.name', 'Name')}</th>
-                                <th className="bg-transparent">{t('assets.type', 'Type')}</th>
-                                <th className="bg-transparent text-center">{t('assets.purchase_date', 'Purchase Date')}</th>
-                                <th className="bg-transparent text-end">{t('assets.cost', 'Cost')}</th>
-                                <th className="bg-transparent text-center">{t('common.status.title', 'Status')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="6" className="text-center py-5"><span className="loading"></span></td></tr>
-                            ) : assets.length === 0 ? (
-                                <tr><td colSpan="6" className="text-center py-5 text-muted">{t('common.no_data')}</td></tr>
-                            ) : (
-                                paginatedItems.map(asset => (
-                                    <tr key={asset.id} onClick={() => navigate(`/assets/${asset.id}`)} style={{ cursor: 'pointer' }} className="align-middle">
-                                        <td><span className="badge rounded-pill bg-light text-dark border px-3">{asset.code}</span></td>
-                                        <td className="fw-semibold text-dark">{asset.name}</td>
-                                        <td>
-                                            <span className="text-muted d-flex align-items-center gap-2">
-                                                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: asset.type === 'tangible' ? 'var(--primary)' : 'var(--warning)' }}></div>
-                                                {t(`assets.types.${asset.type}`, asset.type)}
-                                            </span>
-                                        </td>
-                                        <td className="text-center text-muted small">{formatShortDate(asset.purchase_date)}</td>
-                                        <td className="text-end fw-bold text-dark">{parseFloat(asset.cost).toLocaleString()} {currency}</td>
-                                        <td className="text-center">
-                                            <span className={`badge ${asset.status === 'active' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'} border px-3`}>
-                                                {t(`status.${asset.status}`, asset.status)}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                    <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[{
+                    key: 'status',
+                    label: t('common.status.title', 'Status'),
+                    options: [
+                        { value: 'active', label: t('status.active') },
+                        { value: 'disposed', label: t('status.disposed') },
+                    ],
+                }]}
+                filterValues={{ status: filter }}
+                onFilterChange={(key, val) => setFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredAssets}
+                loading={loading}
+                onRowClick={(row) => navigate(`/assets/${row.id}`)}
+                emptyTitle={t('common.no_data')}
+                emptyAction={{ label: t('assets.new', 'New Asset'), onClick: () => navigate('/assets/new') }}
+            />
         </div>
     );
 };

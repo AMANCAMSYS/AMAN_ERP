@@ -8,6 +8,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function TransferForm() {
     const { t } = useTranslation()
@@ -97,8 +98,7 @@ function TransferForm() {
                                 required
                             />
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('common.amount')} *</label>
+                        <FormField label={t('common.amount')} required style={{ flex: 1 }}>
                             <div className="input-group">
                                 <span className="input-group-text">
                                     {currency}
@@ -112,12 +112,11 @@ function TransferForm() {
                                     onChange={e => setForm({ ...form, amount: e.target.value })}
                                 />
                             </div>
-                        </div>
+                        </FormField>
                     </div>
 
                     <div className="form-row">
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.transfer_from')} *</label>
+                        <FormField label={t('treasury.transfer_from')} required style={{ flex: 1 }}>
                             <select
                                 required
                                 className="form-input"
@@ -139,9 +138,8 @@ function TransferForm() {
                                     </span>
                                 </div>
                             )}
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label className="form-label">{t('treasury.transfer_to')} *</label>
+                        </FormField>
+                        <FormField label={t('treasury.transfer_to')} required style={{ flex: 1 }}>
                             <select
                                 required
                                 className="form-input"
@@ -163,11 +161,10 @@ function TransferForm() {
                                     </span>
                                 </div>
                             )}
-                        </div>
+                        </FormField>
                     </div>
 
-                    <div className="form-group mt-3">
-                        <label className="form-label">{t('common.reference')}</label>
+                    <FormField label={t('common.reference')} className="mt-3">
                         <input
                             type="text"
                             className="form-input"
@@ -175,17 +172,16 @@ function TransferForm() {
                             value={form.reference_number}
                             onChange={e => setForm({ ...form, reference_number: e.target.value })}
                         />
-                    </div>
+                    </FormField>
 
-                    <div className="form-group mt-3">
-                        <label className="form-label">{t('common.notes')}</label>
+                    <FormField label={t('common.notes')} className="mt-3">
                         <textarea
                             className="form-input"
                             rows="3"
                             value={form.notes}
                             onChange={e => setForm({ ...form, notes: e.target.value })}
                         ></textarea>
-                    </div>
+                    </FormField>
 
                     <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
                         <button

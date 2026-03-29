@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 import { useToast } from '../../context/ToastContext'
 
 function SupplierForm() {
@@ -129,34 +130,30 @@ function SupplierForm() {
                                 <span style={{ fontSize: '24px' }}>🏢</span> {t('buying.suppliers.form.basic_info')}
                             </h3>
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.suppliers.form.name_ar')} *</label>
+                                <FormField label={t('buying.suppliers.form.name_ar')} required style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="name" className="form-input" required
                                         value={formData.name} onChange={handleChange}
                                         placeholder={t('buying.suppliers.form.name_ar')}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.suppliers.form.name_en')}</label>
+                                </FormField>
+                                <FormField label={t('buying.suppliers.form.name_en')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="name_en" className="form-input"
                                         value={formData.name_en} onChange={handleChange}
                                         placeholder="e.g. Al-Noor Trading"
                                     />
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.suppliers.form.tax_number')}</label>
+                                <FormField label={t('buying.suppliers.form.tax_number')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="tax_number" className="form-input"
                                         value={formData.tax_number} onChange={handleChange}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('common.currency')}</label>
+                                </FormField>
+                                <FormField label={t('common.currency')} style={{ marginBottom: 0 }}>
                                     <select
                                         name="currency"
                                         className="form-input"
@@ -169,12 +166,11 @@ function SupplierForm() {
                                             </option>
                                         ))}
                                     </select>
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.supplier_groups.title')}</label>
+                                <FormField label={t('buying.supplier_groups.title')} style={{ marginBottom: 0 }}>
                                     <div className="input-group">
                                         <select
                                             name="group_id"
@@ -199,10 +195,10 @@ function SupplierForm() {
                                             +
                                         </button>
                                     </div>
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                </FormField>
+                                <FormField style={{ marginBottom: 0 }}>
                                     {/* Spacer */}
-                                </div>
+                                </FormField>
                             </div>
                         </div>
 
@@ -211,28 +207,25 @@ function SupplierForm() {
                                 <span style={{ fontSize: '24px' }}>📞</span> {t('buying.suppliers.form.contact_info')}
                             </h3>
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.suppliers.form.phone')}</label>
+                                <FormField label={t('buying.suppliers.form.phone')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="tel" name="phone" className="form-input"
                                         value={formData.phone} onChange={handleChange}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('buying.suppliers.form.email')}</label>
+                                </FormField>
+                                <FormField label={t('buying.suppliers.form.email')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="email" name="email" className="form-input"
                                         value={formData.email} onChange={handleChange}
                                     />
-                                </div>
+                                </FormField>
                             </div>
-                            <div className="form-group" style={{ marginTop: '24px', marginBottom: 0 }}>
-                                <label className="form-label">{t('buying.suppliers.form.address')}</label>
+                            <FormField label={t('buying.suppliers.form.address')} style={{ marginTop: '24px', marginBottom: 0 }}>
                                 <textarea
                                     name="address" className="form-input" rows="3"
                                     value={formData.address} onChange={handleChange}
                                 ></textarea>
-                            </div>
+                            </FormField>
                         </div>
                     </div>
 

@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { inventoryAPI, branchesAPI } from '../../utils/api'
 import { Edit2, Trash2, Plus, X, Warehouse } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
 import { toastEmitter } from '../../utils/toastEmitter'
-import BackButton from '../../components/common/BackButton';
+import BackButton from '../../components/common/BackButton'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 
 function WarehouseList() {
     const { t } = useTranslation()
@@ -18,6 +20,7 @@ function WarehouseList() {
     const [showModal, setShowModal] = useState(false)
     const [editingItem, setEditingItem] = useState(null)
     const [formData, setFormData] = useState({ name: '', code: '', branch_id: null })
+    const [search, setSearch] = useState('')
 
     const fetchWarehouses = async () => {
         try {
@@ -102,7 +105,64 @@ function WarehouseList() {
         setShowModal(true)
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const filteredWarehouses = useMemo(() => {
+        if (!search) return warehouses
+        const q = search.toLowerCase()
+        return warehouses.filter(wh =>
+            (wh.name || '').toLowerCase().includes(q) ||
+            (wh.code || '').toLowerCase().includes(q) ||
+            (wh.branch_name || '').toLowerCase().includes(q)
+        )
+    }, [warehouses, search])
+
+    const columns = [
+        {
+            key: 'code',
+            label: t('stock.warehouses.table.code'),
+            render: (val) => <span className="font-medium text-primary">{val}</span>,
+        },
+        {
+            key: 'name',
+            label: t('stock.warehouses.table.name'),
+            render: (val) => <span style={{ fontWeight: 600 }}>{val}</span>,
+        },
+        {
+            key: 'branch_name',
+            label: t('branches.name'),
+            render: (val) => <span className="text-muted">{val || '-'}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('stock.warehouses.table.actions'),
+            width: '100px',
+            render: (_, row) => (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            openModal(row)
+                        }}
+                        className="btn-icon"
+                        style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                        title={t('common.edit')}
+                    >
+                        <Edit2 size={14} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(row.id)
+                        }}
+                        className="btn-icon"
+                        style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
+                        title={t('common.delete')}
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </div>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -121,66 +181,20 @@ function WarehouseList() {
                 </button>
             </div>
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>{t('stock.warehouses.table.code')}</th>
-                            <th>{t('stock.warehouses.table.name')}</th>
-                            <th>{t('branches.name')}</th>
-                            <th style={{ width: '100px' }}>{t('stock.warehouses.table.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {warehouses.map(wh => (
-                            <tr
-                                key={wh.id}
-                                className="hover-row"
-                                onClick={() => navigate(`/stock/warehouses/${wh.id}`)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                <td className="font-medium text-primary">{wh.code}</td>
-                                <td style={{ fontWeight: 600 }}>{wh.name}</td>
-                                <td className="text-muted">{wh.branch_name || '-'}</td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                openModal(wh)
-                                            }}
-                                            className="btn-icon"
-                                            style={{ width: '30px', height: '30px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
-                                            title={t('common.edit')}
-                                        >
-                                            <Edit2 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDelete(wh.id)
-                                            }}
-                                            className="btn-icon"
-                                            style={{ width: '30px', height: '30px', background: '#fee2e2', color: '#ef4444' }}
-                                            title={t('common.delete')}
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                        {warehouses.length === 0 && (
-                            <tr>
-                                <td colSpan="4" className="text-center" style={{ padding: '60px' }}>
-                                    <Warehouse size={48} style={{ color: 'var(--border)', marginBottom: '16px' }} />
-                                    <p style={{ color: 'var(--text-secondary)' }}>{t('stock.warehouses.empty')}</p>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('stock.warehouses.search_placeholder', 'بحث بالاسم أو الكود...')}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredWarehouses}
+                loading={loading}
+                onRowClick={(row) => navigate(`/stock/warehouses/${row.id}`)}
+                emptyIcon="🏭"
+                emptyTitle={t('stock.warehouses.empty')}
+            />
 
             {/* Modal */}
             {showModal && (

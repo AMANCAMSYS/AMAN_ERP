@@ -1,4 +1,5 @@
 """أوراق القبض والدفع - Notes Receivable & Payable"""
+from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from typing import Optional
@@ -8,9 +9,16 @@ from pydantic import BaseModel
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
-from utils.accounting import get_base_currency
+from utils.accounting import get_base_currency, validate_je_lines
+from utils.fiscal_lock import check_fiscal_period_open
 
 router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"], dependencies=[Depends(require_module("treasury"))])
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v):
+    return Decimal(str(v or 0))
 
 
 # ─── Schemas ───
@@ -126,10 +134,10 @@ def receivable_stats(branch_id: Optional[int] = None, current_user: dict = Depen
         overdue = db.execute(text(f"SELECT COUNT(*), COALESCE(SUM(amount),0) {base} AND status='pending' AND due_date < :today"), {**params, "today": today}).fetchone()
         
         return {
-            "pending": {"count": pending[0], "total": float(pending[1])},
-            "collected": {"count": collected[0], "total": float(collected[1])},
-            "protested": {"count": protested[0], "total": float(protested[1])},
-            "overdue": {"count": overdue[0], "total": float(overdue[1])},
+            "pending": {"count": pending[0], "total": float(_dec(pending[1]).quantize(_D2, ROUND_HALF_UP))},
+            "collected": {"count": collected[0], "total": float(_dec(collected[1]).quantize(_D2, ROUND_HALF_UP))},
+            "protested": {"count": protested[0], "total": float(_dec(protested[1]).quantize(_D2, ROUND_HALF_UP))},
+            "overdue": {"count": overdue[0], "total": float(_dec(overdue[1]).quantize(_D2, ROUND_HALF_UP))},
         }
     finally:
         db.close()
@@ -177,30 +185,26 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
             raise HTTPException(status_code=500, detail="حساب العملاء (1200/1201) غير موجود")
 
         # Create journal entry
-        import random
-        entry_number = f"NR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": data.issue_date or date.today().isoformat(),
-            "desc": f"ورقة قبض - {data.note_number} - {data.drawer_name or ''}",
-            "uid": current_user.id, "bid": data.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, data.issue_date or date.today().isoformat())
 
-        # Dr. Notes Receivable 1210
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": nr_account.id, "amt": data.amount,
-               "desc": f"ورقة قبض {data.note_number}", "cur": data.currency})
-
-        # Cr. Accounts Receivable
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": ar_account.id, "amt": data.amount,
-               "desc": f"ورقة قبض {data.note_number}", "cur": data.currency})
+        # Build and validate journal lines
+        amt = float(_dec(data.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": nr_account.id, "debit": amt, "credit": 0, "description": f"ورقة قبض {data.note_number}", "currency": data.currency},
+            {"account_id": ar_account.id, "debit": 0, "credit": amt, "description": f"ورقة قبض {data.note_number}", "currency": data.currency},
+        ]
+        
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data.issue_date or date.today().isoformat(),
+            description=f"ورقة قبض - {data.note_number} - {data.drawer_name or ''}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=data.branch_id,
+            source="note_receivable"
+        )
 
         note_id = db.execute(text("""
             INSERT INTO notes_receivable (
@@ -214,7 +218,7 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
             ) RETURNING id
         """), {
             "num": data.note_number, "drawer": data.drawer_name, "bank": data.bank_name,
-            "amt": data.amount, "cur": data.currency,
+            "amt": amt, "cur": data.currency,
             "issue": data.issue_date, "due": data.due_date, "mat": data.maturity_date or data.due_date,
             "pid": data.party_id, "tid": data.treasury_account_id,
             "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id
@@ -264,35 +268,32 @@ def collect_note_receivable(note_id: int, data: dict = None,
         nr_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '1210'")).fetchone()
         coll_date = collection_date or date.today().isoformat()
 
-        import random
-        entry_number = f"NRC-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": coll_date,
-            "desc": f"تحصيل ورقة قبض {note.note_number}",
-            "uid": current_user.id, "bid": note.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, coll_date)
 
-        # Dr. Bank
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": treasury.gl_account_id, "amt": float(note.amount),
-               "desc": f"تحصيل ورقة {note.note_number}", "cur": note.currency})
+        # Build and validate journal lines
+        amt = float(_dec(note.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": treasury.gl_account_id, "debit": amt, "credit": 0, "description": f"تحصيل ورقة {note.note_number}", "currency": note.currency},
+            {"account_id": nr_account.id, "debit": 0, "credit": amt, "description": f"تحصيل ورقة {note.note_number}", "currency": note.currency},
+        ]
 
-        # Cr. Notes Receivable 1210
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": nr_account.id, "amt": float(note.amount),
-               "desc": f"تحصيل ورقة {note.note_number}", "cur": note.currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=coll_date,
+            description=f"تحصيل ورقة قبض {note.note_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=note.branch_id,
+            source="note_collection",
+            source_id=note_id
+        )
 
         # Update treasury balance
         db.execute(text("""
             UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid
-        """), {"amt": float(note.amount), "tid": tid})
+        """), {"amt": amt, "tid": tid})
 
         db.execute(text("""
             UPDATE notes_receivable 
@@ -340,33 +341,30 @@ def protest_note_receivable(note_id: int, data: dict = None,
             raise HTTPException(status_code=500, detail="حسابات أوراق القبض أو العملاء غير موجودة")
         pdate = protest_date or date.today().isoformat()
 
-        import random
-        entry_number = f"NRP-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": pdate,
-            "desc": f"رفض ورقة قبض {note.note_number} - {reason or ''}",
-            "uid": current_user.id, "bid": note.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, pdate)
 
-        # Dr. AR (reverse)
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": ar_account.id, "amt": float(note.amount),
-               "desc": f"رفض ورقة {note.note_number}", "cur": note.currency})
+        # Build and validate journal lines
+        amt = float(_dec(note.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": ar_account.id, "debit": amt, "credit": 0, "description": f"رفض ورقة {note.note_number}", "currency": note.currency},
+            {"account_id": nr_account.id, "debit": 0, "credit": amt, "description": f"رفض ورقة {note.note_number}", "currency": note.currency},
+        ]
 
-        # Cr. Notes Receivable 1210
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": nr_account.id, "amt": float(note.amount),
-               "desc": f"رفض ورقة {note.note_number}", "cur": note.currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=pdate,
+            description=f"رفض ورقة قبض {note.note_number} - {reason or ''}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=note.branch_id,
+            source="note_protest",
+            source_id=note_id
+        )
 
         db.execute(text("""
-            UPDATE notes_receivable 
+            UPDATE notes_receivable
             SET status = 'protested', protest_date = :date, protest_reason = :reason,
                 protest_journal_id = :je, updated_at = NOW()
             WHERE id = :id
@@ -439,10 +437,10 @@ def payable_stats(branch_id: Optional[int] = None, current_user: dict = Depends(
         overdue = db.execute(text(f"SELECT COUNT(*), COALESCE(SUM(amount),0) {base} AND status='issued' AND due_date < :today"), {**params, "today": today}).fetchone()
 
         return {
-            "issued": {"count": issued[0], "total": float(issued[1])},
-            "paid": {"count": paid[0], "total": float(paid[1])},
-            "protested": {"count": protested[0], "total": float(protested[1])},
-            "overdue": {"count": overdue[0], "total": float(overdue[1])},
+            "issued": {"count": issued[0], "total": float(_dec(issued[1]).quantize(_D2, ROUND_HALF_UP))},
+            "paid": {"count": paid[0], "total": float(_dec(paid[1]).quantize(_D2, ROUND_HALF_UP))},
+            "protested": {"count": protested[0], "total": float(_dec(protested[1]).quantize(_D2, ROUND_HALF_UP))},
+            "overdue": {"count": overdue[0], "total": float(_dec(overdue[1]).quantize(_D2, ROUND_HALF_UP))},
         }
     finally:
         db.close()
@@ -489,30 +487,26 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
         if not ap_account:
             raise HTTPException(status_code=500, detail="حساب الموردين (2100/2101) غير موجود")
 
-        import random
-        entry_number = f"NP-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": data.issue_date or date.today().isoformat(),
-            "desc": f"ورقة دفع - {data.note_number} - {data.beneficiary_name or ''}",
-            "uid": current_user.id, "bid": data.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, data.issue_date or date.today().isoformat())
 
-        # Dr. Accounts Payable
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": ap_account.id, "amt": data.amount,
-               "desc": f"ورقة دفع {data.note_number}", "cur": data.currency})
+        # Build and validate journal lines
+        amt = float(_dec(data.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": ap_account.id, "debit": amt, "credit": 0, "description": f"ورقة دفع {data.note_number}", "currency": data.currency},
+            {"account_id": np_account.id, "debit": 0, "credit": amt, "description": f"ورقة دفع {data.note_number}", "currency": data.currency},
+        ]
 
-        # Cr. Notes Payable 2110
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": np_account.id, "amt": data.amount,
-               "desc": f"ورقة دفع {data.note_number}", "cur": data.currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data.issue_date or date.today().isoformat(),
+            description=f"ورقة دفع - {data.note_number} - {data.beneficiary_name or ''}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=data.branch_id,
+            source="note_payable"
+        )
 
         note_id = db.execute(text("""
             INSERT INTO notes_payable (
@@ -526,7 +520,7 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
             ) RETURNING id
         """), {
             "num": data.note_number, "bene": data.beneficiary_name, "bank": data.bank_name,
-            "amt": data.amount, "cur": data.currency,
+            "amt": amt, "cur": data.currency,
             "issue": data.issue_date, "due": data.due_date, "mat": data.maturity_date or data.due_date,
             "pid": data.party_id, "tid": data.treasury_account_id,
             "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id
@@ -576,35 +570,32 @@ def pay_note_payable(note_id: int, data: dict = None,
         np_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2110'")).fetchone()
         pay_date = payment_date or date.today().isoformat()
 
-        import random
-        entry_number = f"NPP-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": pay_date,
-            "desc": f"سداد ورقة دفع {note.note_number}",
-            "uid": current_user.id, "bid": note.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, pay_date)
 
-        # Dr. Notes Payable 2110
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": np_account.id, "amt": float(note.amount),
-               "desc": f"سداد ورقة {note.note_number}", "cur": note.currency})
+        # Build and validate journal lines
+        amt = float(_dec(note.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": np_account.id, "debit": amt, "credit": 0, "description": f"سداد ورقة {note.note_number}", "currency": note.currency},
+            {"account_id": treasury.gl_account_id, "debit": 0, "credit": amt, "description": f"سداد ورقة {note.note_number}", "currency": note.currency},
+        ]
 
-        # Cr. Bank
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": treasury.gl_account_id, "amt": float(note.amount),
-               "desc": f"سداد ورقة {note.note_number}", "cur": note.currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=pay_date,
+            description=f"سداد ورقة دفع {note.note_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=note.branch_id,
+            source="note_payment",
+            source_id=note_id
+        )
 
         # Update treasury balance
         db.execute(text("""
             UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid
-        """), {"amt": float(note.amount), "tid": tid})
+        """), {"amt": amt, "tid": tid})
 
         db.execute(text("""
             UPDATE notes_payable 
@@ -652,33 +643,30 @@ def protest_note_payable(note_id: int, data: dict = None,
             raise HTTPException(status_code=500, detail="حسابات أوراق الدفع أو الموردين غير موجودة")
         pdate = protest_date or date.today().isoformat()
 
-        import random
-        entry_number = f"NPPR-{datetime.now().strftime('%Y%m%d%H%M%S')}-{random.randint(1000,9999)}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid) RETURNING id
-        """), {
-            "num": entry_number, "date": pdate,
-            "desc": f"رفض ورقة دفع {note.note_number} - {reason or ''}",
-            "uid": current_user.id, "bid": note.branch_id
-        }).scalar()
+        check_fiscal_period_open(db, pdate)
 
-        # Dr. Notes Payable 2110 (reverse)
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, :amt, 0, :desc, :cur)
-        """), {"je": je_id, "acc": np_account.id, "amt": float(note.amount),
-               "desc": f"رفض ورقة {note.note_number}", "cur": note.currency})
+        # Build and validate journal lines
+        amt = float(_dec(note.amount).quantize(_D2, ROUND_HALF_UP))
+        je_lines = [
+            {"account_id": np_account.id, "debit": amt, "credit": 0, "description": f"رفض ورقة {note.note_number}", "currency": note.currency},
+            {"account_id": ap_account.id, "debit": 0, "credit": amt, "description": f"رفض ورقة {note.note_number}", "currency": note.currency},
+        ]
 
-        # Cr. AP (reverse)
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, currency)
-            VALUES (:je, :acc, 0, :amt, :desc, :cur)
-        """), {"je": je_id, "acc": ap_account.id, "amt": float(note.amount),
-               "desc": f"رفض ورقة {note.note_number}", "cur": note.currency})
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=pdate,
+            description=f"رفض ورقة دفع {note.note_number} - {reason or ''}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=note.branch_id,
+            source="note_protest",
+            source_id=note_id
+        )
 
         db.execute(text("""
-            UPDATE notes_payable 
+            UPDATE notes_payable
             SET status = 'protested', protest_date = :date, protest_reason = :reason,
                 protest_journal_id = :je, updated_at = NOW()
             WHERE id = :id

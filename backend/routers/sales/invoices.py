@@ -135,6 +135,11 @@ def create_sales_invoice(
         # --- FISCAL-LOCK: Reject if accounting period is closed ---
         check_fiscal_period_open(db, invoice.invoice_date)
 
+        # --- UOM Validation: Discrete units must have integer quantities ---
+        from utils.quantity_validation import validate_quantity_for_product
+        for item in invoice.items:
+            validate_quantity_for_product(db, item.product_id, item.quantity)
+
         # --- 2. Calculate Totals (using Decimal for precision) ---
         subtotal = Decimal('0')
         total_tax = Decimal('0')
@@ -159,6 +164,24 @@ def create_sales_invoice(
 
         grand_total = subtotal - total_discount + total_tax
 
+        # --- ZATCA FIX: Header-level discount must reduce tax base ---
+        # Customer group effects (discount %) are applied on top of the
+        # line-level subtotal.  ZATCA mandates VAT is computed on the net
+        # amount AFTER all discounts, so we proportionally reduce the tax.
+        header_discount = Decimal('0')
+        if getattr(invoice, 'effect_type', 'discount') == 'discount' and _dec(invoice.effect_percentage) > 0:
+            header_discount = (subtotal * _dec(invoice.effect_percentage) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            # Proportionally reduce tax: new_tax = old_tax * (1 - effect% / 100)
+            adjusted_tax = (total_tax * (Decimal('1') - _dec(invoice.effect_percentage) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
+            total_tax = adjusted_tax
+            grand_total = subtotal - total_discount - header_discount + total_tax
+        elif getattr(invoice, 'effect_type', 'discount') == 'markup' and _dec(invoice.markup_amount) > 0:
+            # Markup case: add the markup to the grand total (tax already calculated on line items)
+            grand_total = grand_total + _dec(invoice.markup_amount).quantize(_D2, ROUND_HALF_UP)
+
+        # Include header discount in total_discount so the stored value is complete
+        total_discount = total_discount + header_discount
+
         # --- 3. Handle Payment ---
         paid_amount = _dec(invoice.paid_amount or 0)
 
@@ -179,8 +202,8 @@ def create_sales_invoice(
         gl_paid = to_base(paid_amount)
         remaining_gl = gl_total - gl_paid
 
-        # --- 4. Credit Limit Check ---
-        customer = db.execute(text("SELECT credit_limit, current_balance FROM parties WHERE id = :id"), {"id": invoice.customer_id}).fetchone()
+        # --- 4. Credit Limit Check (CONC-FIX: lock party row to prevent concurrent bypass) ---
+        customer = db.execute(text("SELECT credit_limit, current_balance FROM parties WHERE id = :id FOR UPDATE"), {"id": invoice.customer_id}).fetchone()
         if customer and customer.credit_limit > 0:
             # Check in BASE currency
             new_balance = float(customer.current_balance or 0) + remaining_gl
@@ -300,7 +323,21 @@ def create_sales_invoice(
                 "disc": item["discount"], "markup": item.get("markup", 0), "total": item["total"]
             })
 
-            # Deduct inventory
+            # CONC-FIX: Lock inventory row before deduction to prevent overselling
+            inv_row = db.execute(text("""
+                SELECT quantity FROM inventory
+                WHERE product_id = :pid AND warehouse_id = :wh
+                FOR UPDATE
+            """), {"pid": item["product_id"], "wh": wh_id}).fetchone()
+
+            if inv_row and float(inv_row.quantity) < float(item["quantity"]):
+                prod_name = item.get("description", str(item["product_id"]))
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {inv_row.quantity}, المطلوب: {item['quantity']}"
+                )
+
+            # Deduct inventory (row is locked by FOR UPDATE above)
             db.execute(text("""
                 UPDATE inventory SET quantity = quantity - :qty
                 WHERE product_id = :pid AND warehouse_id = :wh
@@ -473,55 +510,20 @@ def create_sales_invoice(
 
         # Insert Journal Entry
         if je_lines:
-            from utils.accounting import validate_je_lines
-            valid_lines = validate_je_lines(je_lines, source=f"SALE-{inv_num}")
-
-            if valid_lines:
-                je_num = f"JE-SALE-{inv_num}"
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, reference, status, 
-                        created_by, branch_id, currency, exchange_rate
-                    )
-                    VALUES (
-                        :num, :date, :desc, :ref, 'posted', 
-                        :user, :branch, :currency, :rate
-                    ) RETURNING id
-                """), {
-                    "num": je_num, "date": invoice.invoice_date,
-                    "desc": f"Sales Invoice {inv_num} ({inv_currency})",
-                    "ref": inv_num, "user": current_user.id, "branch": invoice.branch_id,
-                    "currency": inv_currency, "rate": exchange_rate
-                }).scalar()
-
-                for line in valid_lines:
-                    db.execute(text("""
-                        INSERT INTO journal_lines (
-                            journal_entry_id, account_id, debit, credit, description,
-                            amount_currency, currency
-                        )
-                        VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                    """), {
-                        "jid": je_id,
-                        "aid": line["account_id"],
-                        "deb": line["debit"],
-                        "cred": line["credit"],
-                        "desc": line["description"],
-                        "amt_curr": line.get("amount_currency", 0),
-                        "curr": line.get("currency", base_currency)
-                    })
-
-                    # Update Account Balance
-                    from utils.accounting import update_account_balance
-                    update_account_balance(
-                        db,
-                        account_id=line["account_id"],
-                        debit_base=line["debit"],
-                        credit_base=line["credit"],
-                        debit_curr=line.get("amount_currency", 0) if line["debit"] > 0 else 0,
-                        credit_curr=line.get("amount_currency", 0) if line["credit"] > 0 else 0,
-                        currency=line.get("currency", base_currency)
-                    )
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=invoice.invoice_date,
+                description=f"Sales Invoice {inv_num} ({inv_currency})",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=invoice.branch_id,
+                reference=inv_num,
+                currency=inv_currency,
+                source="Sales-Invoice",
+                source_id=invoice_id
+            )
 
         # --- 7.5 Update Treasury Balance ---
         if invoice.treasury_id and gl_paid > 0:

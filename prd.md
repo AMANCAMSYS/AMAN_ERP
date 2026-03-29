@@ -383,6 +383,57 @@ Work Centers -> Routings -> BOM -> Production Order -> Start -> Complete
 
 ---
 
+### 4.13 Expenses (المصروفات)
+
+**Base URL:** `/expenses`
+
+#### Features
+- Complete expense tracking and categorization
+- Multi-step approval workflows for expenses
+- Automated journal entries upon approval
+- Receipt attachments and document management
+- Configurable expense policies and spending limits
+
+---
+
+### 4.14 Services (الخدمات)
+
+**Base URL:** `/services`
+
+#### Features
+- Service request management and tracking
+- Assignment of tasks to service agents or technicians
+- Centralized document archiving and management
+- Maintenance logs and service history
+
+---
+
+### 4.15 Approvals (الموافقات)
+
+**Base URL:** `/approvals`
+
+#### Features
+- Unified dashboard for all pending approvals (Orders, Expenses, Leaves, etc.)
+- Customizable approval workflows (multi-level, role-based)
+- Audit trail for all approval actions (Approved, Rejected, Delegated)
+- Automated email/in-app notifications for pending requests
+
+---
+
+### 4.16 Admin & Settings (الإدارة والإعدادات)
+
+**Base URLs:** `/admin` and `/settings`
+
+#### Features
+- **Multi-Tenancy:** Manage multiple companies from a single registry
+- **Role-Based Access Control (RBAC):** Granular permissions down to module and action (e.g., `sales.create`)
+- **System Settings:** 23 configuration tabs covering Finance, Billing, Brands, Workflows, etc.
+- **Audit Logs:** Immutable tracking of all user activities (`audit_logs`)
+- **Setup Wizard:** Guided onboarding with industry-specific default templates
+- **Data Import/Export:** Tools for initial data migration (Opening Balances, Customers, Products)
+
+---
+
 ## 5. Industry Templates
 
 ### 5.1 Available Templates
@@ -545,7 +596,34 @@ Metrics: Total Sales, AR Collection Rate, Inventory Turnover, Project Profitabil
 
 ---
 
-## 11. Glossary
+## 11. Automated API Testing (TestSprite Integration)
+
+To ensure successful automated API testing with tools like **TestSprite**, the following technical specifications must be strictly adhered to:
+
+### 11.1 Global URL Configuration
+- **API Prefix:** All REST API endpoints are prefixed with `/api`.
+- **Example:** `http://<domain_or_localhost>:8000/api/auth/login`
+
+### 11.2 Authentication Flow
+The system uses FastAPI's `OAuth2PasswordRequestForm` for login, which strictly requires form-data and not JSON.
+- **Endpoint:** `POST /api/auth/login`
+- **Content-Type:** `application/x-www-form-urlencoded`
+- **Payload Fields:**
+  - `username` (string, required)
+  - `password` (string, required)
+  - `company_code` (string, required for company users. Leave empty for `system_admin`).
+- **Response:** Returns JSON containing `access_token` and `token_type` ("bearer").
+
+### 11.3 Authorization Header
+All protected endpoints require the generated access token to be passed in the headers:
+- `Authorization: Bearer <access_token>`
+
+### 11.4 Standard Payload Formats
+Except for the `/api/auth/login` and file upload endpoints, all other API requests (POST/PUT/PATCH) expect standard JSON payloads (`Content-Type: application/json`).
+
+---
+
+## 12. Glossary
 
 | Term | Arabic | Definition |
 |------|--------|-----------|
@@ -571,3 +649,4 @@ Metrics: Total Sales, AR Collection Rate, Inventory Turnover, Project Profitabil
 ---
 
 *Generated from AMAN ERP Knowledge Base v7.0 — 5 مارس 2026*
+

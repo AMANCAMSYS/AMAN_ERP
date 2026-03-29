@@ -121,20 +121,20 @@ const ManufacturingHome = () => {
 
                         {/* Production & Orders */}
                         <div className="card">
-                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="section-title section-title-icon">
                                 <FaClipboardList style={{ color: 'var(--primary)' }} /> {t('manufacturing.production', 'الإنتاج والأوامر')}
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-                                <Link to="/manufacturing/orders" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <div className="manufacturing-links-grid">
+                                <Link to="/manufacturing/orders" className="btn btn-outline manufacturing-nav-link">
                                     <FaClipboardList /> {t('manufacturing.manage_orders')}
                                 </Link>
-                                <Link to="/manufacturing/job-cards" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/job-cards" className="btn btn-outline manufacturing-nav-link">
                                     <FaIdCard /> {t('manufacturing.job_cards.title')}
                                 </Link>
-                                <Link to="/manufacturing/mrp" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/mrp" className="btn btn-outline manufacturing-nav-link">
                                     <FaBoxes /> {t('manufacturing.mrp.title')}
                                 </Link>
-                                <Link to="/manufacturing/schedule" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/schedule" className="btn btn-outline manufacturing-nav-link">
                                     <FaCalendarAlt /> {t('manufacturing.production_schedule')}
                                 </Link>
                             </div>
@@ -142,20 +142,20 @@ const ManufacturingHome = () => {
 
                         {/* Master Data */}
                         <div className="card">
-                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="section-title section-title-icon">
                                 <FaCogs style={{ color: 'var(--secondary)' }} /> {t('manufacturing.master_data', 'البيانات الأساسية')}
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-                                <Link to="/manufacturing/work-centers" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <div className="manufacturing-links-grid">
+                                <Link to="/manufacturing/work-centers" className="btn btn-outline manufacturing-nav-link">
                                     <FaIndustry /> {t('manufacturing.manage_work_centers')}
                                 </Link>
-                                <Link to="/manufacturing/routes" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/routes" className="btn btn-outline manufacturing-nav-link">
                                     <FaRoute /> {t('manufacturing.manage_routes')}
                                 </Link>
-                                <Link to="/manufacturing/boms" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/boms" className="btn btn-outline manufacturing-nav-link">
                                     <FaLayerGroup /> {t('manufacturing.manage_boms')}
                                 </Link>
-                                <Link to="/manufacturing/equipment" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/equipment" className="btn btn-outline manufacturing-nav-link">
                                     <FaTools /> {t('manufacturing.equipment_maintenance')}
                                 </Link>
                             </div>
@@ -163,20 +163,20 @@ const ManufacturingHome = () => {
 
                         {/* Reports */}
                         <div className="card">
-                            <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 className="section-title section-title-icon">
                                 <FaChartLine style={{ color: 'var(--success)' }} /> {t('common.reports', 'التقارير')}
                             </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-                                <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                            <div className="manufacturing-links-grid manufacturing-links-grid-single">
+                                <Link to="/manufacturing/reports/direct-labor" className="btn btn-outline manufacturing-nav-link">
                                     👷 {t('manufacturing.direct_labor.title', 'تقرير العمالة المباشرة')}
                                 </Link>
-                                <Link to="/manufacturing/reports/analytics" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/reports/analytics" className="btn btn-outline manufacturing-nav-link">
                                     📊 {t('manufacturing.analytics.title', 'تحليل الإنتاج')}
                                 </Link>
-                                <Link to="/manufacturing/reports/work-orders" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/reports/work-orders" className="btn btn-outline manufacturing-nav-link">
                                     📋 {t('manufacturing.work_orders_report.title', 'حالة أوامر العمل')}
                                 </Link>
-                                <Link to="/manufacturing/capacity" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                <Link to="/manufacturing/capacity" className="btn btn-outline manufacturing-nav-link">
                                     🏭 {t('manufacturing.capacity_planning', 'تخطيط الطاقة الإنتاجية')}
                                 </Link>
                             </div>

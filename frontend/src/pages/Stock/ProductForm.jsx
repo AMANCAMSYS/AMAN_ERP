@@ -6,6 +6,7 @@ import { getCurrency, hasPermission } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
 import { getStep } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 function ProductForm() {
     const { t } = useTranslation()
@@ -126,44 +127,39 @@ function ProductForm() {
                     <div className="form-section">
                         <h3 className="section-title">{t('stock.products.form.basic_info')}</h3>
                         <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.code')} *</label>
+                            <FormField label={t('stock.products.form.code')} required>
                                 <input
                                     type="text" name="item_code" className="form-input" required
                                     value={formData.item_code} onChange={handleChange}
                                     placeholder={t('stock.products.form.placeholder_code')}
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.type')}</label>
+                            </FormField>
+                            <FormField label={t('stock.products.form.type')}>
                                 <select name="item_type" className="form-input" value={formData.item_type} onChange={handleChange}>
                                     <option value="product">{t('stock.products.form.types.product')}</option>
                                     <option value="service">{t('stock.products.form.types.service')}</option>
                                     <option value="consumable">{t('stock.products.form.types.consumable')}</option>
                                 </select>
-                            </div>
+                            </FormField>
                         </div>
 
                         <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.name_ar')} *</label>
+                            <FormField label={t('stock.products.form.name_ar')} required>
                                 <input
                                     type="text" name="item_name" className="form-input" required
                                     value={formData.item_name} onChange={handleChange}
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.name_en')}</label>
+                            </FormField>
+                            <FormField label={t('stock.products.form.name_en')}>
                                 <input
                                     type="text" name="item_name_en" className="form-input"
                                     value={formData.item_name_en} onChange={handleChange}
                                 />
-                            </div>
+                            </FormField>
                         </div>
 
                         <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.unit')}</label>
+                            <FormField label={t('stock.products.form.unit')}>
                                 <select name="unit" className="form-input" value={formData.unit} onChange={handleChange}>
                                     <option value="قطعة">{t('stock.products.form.units.piece')}</option>
                                     <option value="كيلو">{t('stock.products.form.units.kg')}</option>
@@ -172,9 +168,8 @@ function ProductForm() {
                                     <option value="علبة">{t('stock.products.form.units.box')}</option>
                                     <option value="كرتون">{t('stock.products.form.units.carton')}</option>
                                 </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.category')} *</label>
+                            </FormField>
+                            <FormField label={t('stock.products.form.category')} required>
                                 <select
                                     name="category_id"
                                     className="form-input"
@@ -187,7 +182,7 @@ function ProductForm() {
                                         <option key={cat.id} value={cat.id}>{cat.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                         </div>
                     </div>
 
@@ -195,28 +190,25 @@ function ProductForm() {
                         <h3 className="section-title">{t('stock.products.form.pricing')}</h3>
                         <div className="form-row">
                             {hasPermission('stock.view_cost') && (
-                                <div className="form-group">
-                                    <label className="form-label">{t('stock.products.form.buying_price')} ({currency}) *</label>
+                                <FormField label={`${t('stock.products.form.buying_price')} (${currency})`} required>
                                     <input
                                         type="number" name="buying_price" className="form-input" min="0" step={getStep()}
                                         value={formData.buying_price} onChange={handleChange} required
                                     />
-                                </div>
+                                </FormField>
                             )}
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.selling_price')} ({currency}) *</label>
+                            <FormField label={`${t('stock.products.form.selling_price')} (${currency})`} required>
                                 <input
                                     type="number" name="selling_price" className="form-input" min="0" step={getStep()}
                                     value={formData.selling_price} onChange={handleChange} required
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('stock.products.form.tax_rate')}</label>
+                            </FormField>
+                            <FormField label={t('stock.products.form.tax_rate')}>
                                 <input
                                     type="number" name="tax_rate" className="form-input" min="0" max="100"
                                     value={formData.tax_rate} onChange={handleChange}
                                 />
-                            </div>
+                            </FormField>
                         </div>
                     </div>
 
@@ -284,13 +276,12 @@ function ProductForm() {
                         </div>
                     )}
 
-                    <div className="form-group">
-                        <label className="form-label">{t('stock.products.form.description')}</label>
+                    <FormField label={t('stock.products.form.description')}>
                         <textarea
                             name="description" className="form-input" rows="3"
                             value={formData.description} onChange={handleChange}
                         ></textarea>
-                    </div>
+                    </FormField>
 
                     <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                         <button type="submit" className="btn btn-primary" disabled={loading}>

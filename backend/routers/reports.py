@@ -107,12 +107,16 @@ def get_sales_summary(
                 COALESCE(SUM(paid_amount * exchange_rate), 0) as total_paid,
                 COALESCE(SUM(GREATEST(total - paid_amount, 0) * exchange_rate), 0) as total_due,
                 COALESCE(SUM((total * COALESCE(exchange_rate, 1.0) * (
-                    CASE WHEN source = 'invoice' THEN 
-                        (SELECT AVG(tax_rate) FROM invoice_lines WHERE invoice_id = all_sales.id)
+                    CASE WHEN source = 'invoice' THEN
+                        COALESCE((SELECT AVG(tax_rate) FROM invoice_lines WHERE invoice_id = all_sales.id), 0)
                     ELSE
-                        15 -- Standard POS tax if not easily fetchable in this CTE
+                        COALESCE((SELECT AVG(tax_rate) FROM pos_order_lines WHERE order_id = all_sales.id), 0)
                     END
-                ) / (100 + 15)) ), 0) as total_tax
+                ) / (100 + CASE WHEN source = 'invoice' THEN
+                        COALESCE((SELECT AVG(tax_rate) FROM invoice_lines WHERE invoice_id = all_sales.id), 15)
+                    ELSE
+                        COALESCE((SELECT AVG(tax_rate) FROM pos_order_lines WHERE order_id = all_sales.id), 15)
+                    END)) ), 0) as total_tax
             FROM all_sales 
             WHERE sale_date BETWEEN :start AND :end
             {branch_filter.replace('branch_id', 'branch_id')}

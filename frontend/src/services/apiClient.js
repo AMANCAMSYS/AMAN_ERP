@@ -50,23 +50,35 @@ api.interceptors.response.use(
         const skipToast = error.config?.skipGlobalToast;
         const originalRequest = error.config;
 
+        // --- 429 Rate Limit: Retry with backoff ---
+        if (error.response?.status === 429 && !originalRequest._retryCount) {
+            originalRequest._retryCount = 1;
+            const retryAfter = parseInt(error.response.headers['retry-after'], 10);
+            const delay = (retryAfter && retryAfter > 0) ? retryAfter * 1000 : 2000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return api(originalRequest);
+        }
+
         // --- Auto Token Refresh ---
         if (error.response?.status === 401 && !originalRequest._isRetry) {
             originalRequest._isRetry = true;
-            const currentToken = localStorage.getItem('token');
+            const currentRefreshToken = localStorage.getItem('refresh_token');
 
-            if (currentToken) {
+            if (currentRefreshToken) {
                 try {
-                    // Attempt to refresh the token
+                    // Attempt to refresh access token using long-lived refresh token
                     const refreshRes = await axios.post(
                         `${api.defaults.baseURL}/auth/refresh`,
-                        null,
-                        { headers: { Authorization: `Bearer ${currentToken}` } }
+                        { refresh_token: currentRefreshToken }
                     );
 
                     const newToken = refreshRes.data?.access_token;
+                    const newRefreshToken = refreshRes.data?.refresh_token;
                     if (newToken) {
                         localStorage.setItem('token', newToken);
+                        if (newRefreshToken) {
+                            localStorage.setItem('refresh_token', newRefreshToken);
+                        }
                         originalRequest.headers.Authorization = `Bearer ${newToken}`;
                         return api(originalRequest); // retry original request
                     }
@@ -77,6 +89,7 @@ api.interceptors.response.use(
 
             // If we reach here, refresh failed or no token exists
             localStorage.removeItem('token');
+            localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
             localStorage.removeItem('company_id');
             window.location.href = '/login';

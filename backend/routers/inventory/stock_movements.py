@@ -33,6 +33,11 @@ def create_stock_receipt(
         ref = movement.reference or f"REC-{datetime.now().year}-{random.randint(10000, 99999)}"
         txn_date = movement.date or datetime.now().strftime("%Y-%m-%d")
 
+        # UOM Validation: Discrete units must have integer quantities
+        from utils.quantity_validation import validate_quantity_for_product
+        for item in movement.items:
+            validate_quantity_for_product(db, item.product_id, item.quantity)
+
         for item in movement.items:
             # Update WAC before quantity change
             unit_cost = float(getattr(item, 'unit_cost', 0) or 0)
@@ -106,20 +111,27 @@ def create_stock_delivery(
         ref = movement.reference or f"DEL-{datetime.now().year}-{random.randint(10000, 99999)}"
         txn_date = movement.date or datetime.now().strftime("%Y-%m-%d")
 
+        # UOM Validation: Discrete units must have integer quantities
+        from utils.quantity_validation import validate_quantity_for_product
         for item in movement.items:
-            # Check availability
-            current_qty = db.execute(text("""
-                SELECT quantity FROM inventory 
-                WHERE product_id = :pid AND warehouse_id = :wh
-            """), {"pid": item.product_id, "wh": movement.warehouse_id}).scalar() or 0
+            validate_quantity_for_product(db, item.product_id, item.quantity)
 
+        for item in movement.items:
+            # CONC-FIX: Lock row and check availability atomically
+            inv_row = db.execute(text("""
+                SELECT quantity FROM inventory
+                WHERE product_id = :pid AND warehouse_id = :wh
+                FOR UPDATE
+            """), {"pid": item.product_id, "wh": movement.warehouse_id}).fetchone()
+
+            current_qty = float(inv_row.quantity) if inv_row else 0
             if current_qty < item.quantity:
                 prod_name = db.execute(text("SELECT product_name FROM products WHERE id = :pid"), {"pid": item.product_id}).scalar()
-                raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}")
+                raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}. المتوفر: {current_qty}, المطلوب: {item.quantity}")
 
-            # Deduct inventory
+            # Deduct inventory (row is locked by FOR UPDATE above)
             db.execute(text("""
-                UPDATE inventory SET quantity = quantity - :qty 
+                UPDATE inventory SET quantity = quantity - :qty
                 WHERE product_id = :pid AND warehouse_id = :wh
             """), {"qty": item.quantity, "pid": item.product_id, "wh": movement.warehouse_id})
 

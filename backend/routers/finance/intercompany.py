@@ -10,13 +10,27 @@ from datetime import datetime
 from pydantic import BaseModel
 import logging
 import json
+import uuid
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 router = APIRouter(prefix="/accounting/intercompany", tags=["المعاملات بين الشركات"])
 logger = logging.getLogger(__name__)
+
+
+def _normalize_company_uuid(company_identifier: str) -> str:
+    """Convert company code/ID to a valid UUID string for intercompany tables."""
+    raw = str(company_identifier or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="رمز الشركة غير صالح")
+    try:
+        return str(uuid.UUID(raw))
+    except ValueError:
+        # Support legacy/non-UUID company codes by mapping deterministically.
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, raw.lower()))
 
 
 # ======================== Schemas ========================
@@ -76,6 +90,9 @@ def create_intercompany_transaction(
     db = get_db_connection(current_user.company_id)
     try:
         ref = data.reference or f"IC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        source_company_uuid = _normalize_company_uuid(str(current_user.company_id))
+        target_company_uuid = _normalize_company_uuid(data.target_company_id)
+
         tid = db.execute(text("""
             INSERT INTO intercompany_transactions (
                 source_company_id, target_company_id, transaction_type,
@@ -85,8 +102,8 @@ def create_intercompany_transaction(
                 :ref, :desc, :amount, :curr, 'pending', :uid
             ) RETURNING id
         """), {
-            "source": str(current_user.company_id),
-            "target": data.target_company_id,
+            "source": source_company_uuid,
+            "target": target_company_uuid,
             "type": data.transaction_type,
             "ref": ref, "desc": data.description,
             "amount": data.amount, "curr": data.currency,
@@ -125,25 +142,32 @@ def process_intercompany_transaction(txn_id: int, current_user=Depends(get_curre
         if not ic_receivable or not ic_revenue:
             raise HTTPException(400, "يجب إعداد حسابات المعاملات بين الشركات أولاً")
 
-        # Create journal entry
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, date, description, reference, status, created_by)
-            VALUES (:num, CURRENT_DATE, :desc, :ref, 'posted', :uid) RETURNING id
-        """), {
-            "num": f"IC-JE-{txn['reference']}",
-            "desc": f"معاملة بين الشركات: {txn['description']}",
-            "ref": txn["reference"], "uid": current_user.id
-        }).scalar()
+        je_lines = [
+            {
+                "account_id": ic_receivable,
+                "debit": float(txn["amount"]),
+                "credit": 0,
+                "description": txn["description"],
+            },
+            {
+                "account_id": ic_revenue,
+                "debit": 0,
+                "credit": float(txn["amount"]),
+                "description": txn["description"],
+            },
+        ]
 
-        db.execute(text("""
-            INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-            VALUES (:je, :acc, :amount, 0, :desc),
-                   (:je, :rev, 0, :amount, :desc)
-        """), {
-            "je": je_id, "acc": ic_receivable,
-            "rev": ic_revenue, "amount": txn["amount"],
-            "desc": txn["description"]
-        })
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=datetime.now().date().isoformat(),
+            description=f"معاملة بين الشركات: {txn['description']}",
+            lines=je_lines,
+            user_id=current_user.id,
+            reference=txn["reference"],
+            source="intercompany_transaction",
+            source_id=txn_id,
+        )
 
         db.execute(text("""
             UPDATE intercompany_transactions
@@ -333,32 +357,45 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
         if period.get("recognized"):
             raise HTTPException(400, "تم الاعتراف بهذه الفترة مسبقاً")
 
-        amount = period["amount"]
+        amount = float(period["amount"])
 
         # Create journal entry: Deferred Revenue (Dr) → Revenue (Cr)
         deferred_acc = db.execute(text("SELECT id FROM accounts WHERE account_code LIKE '22%' LIMIT 1")).scalar()
         revenue_acc = db.execute(text("SELECT id FROM accounts WHERE account_type = 'revenue' LIMIT 1")).scalar()
 
         if deferred_acc and revenue_acc:
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, date, description, status, created_by)
-                VALUES (:num, CURRENT_DATE, :desc, 'posted', :uid) RETURNING id
-            """), {
-                "num": f"RR-{schedule_id}-{period_index}",
-                "desc": f"اعتراف بإيرادات - جدول #{schedule_id}",
-                "uid": current_user.id
-            }).scalar()
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je, :def_acc, :amt, 0, 'اعتراف بإيرادات مؤجلة'),
-                       (:je, :rev_acc, 0, :amt, 'إيرادات معترف بها')
-            """), {"je": je_id, "def_acc": deferred_acc, "rev_acc": revenue_acc, "amt": amount})
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=datetime.now().date().isoformat(),
+                description=f"اعتراف بإيرادات - جدول #{schedule_id}",
+                lines=[
+                    {
+                        "account_id": deferred_acc,
+                        "debit": float(amount),
+                        "credit": 0,
+                        "description": "اعتراف بإيرادات مؤجلة",
+                    },
+                    {
+                        "account_id": revenue_acc,
+                        "debit": 0,
+                        "credit": float(amount),
+                        "description": "إيرادات معترف بها",
+                    },
+                ],
+                user_id=current_user.id,
+                reference=f"RR-{schedule_id}-{period_index}",
+                source="revenue_recognition",
+                source_id=schedule_id,
+            )
 
         # Update schedule
         lines[period_index]["recognized"] = True
         lines[period_index]["recognized_at"] = datetime.now().isoformat()
-        new_recognized = schedule["recognized_amount"] + amount
-        new_deferred = schedule["total_amount"] - new_recognized
+        existing_recognized = float(schedule.get("recognized_amount") or 0)
+        total_amount = float(schedule.get("total_amount") or 0)
+        new_recognized = existing_recognized + amount
+        new_deferred = total_amount - new_recognized
         new_status = "completed" if new_deferred <= 0 else "active"
 
         db.execute(text("""

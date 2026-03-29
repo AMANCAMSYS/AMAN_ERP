@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
-import BackButton from '../../components/common/BackButton';
+import { formatDate } from '../../utils/dateUtils'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
+import BackButton from '../../components/common/BackButton'
 
 function JournalEntryList() {
     const { t, i18n } = useTranslation()
@@ -84,15 +86,71 @@ function JournalEntryList() {
 
     const statusBadge = (status) => {
         const map = {
-            draft: { class: 'badge-warning', label: t('common.status_draft') || (t('accounting.journal_entries.draft')) },
-            posted: { class: 'badge-success', label: t('common.status_posted') || (t('accounting.journal_entries.posted')) },
-            voided: { class: 'badge-secondary', label: t('common.status_voided') || (t('accounting.journal_entries.voided')) },
+            draft: { class: 'badge-warning', label: t('common.status_draft') || t('accounting.journal_entries.draft') },
+            posted: { class: 'badge-success', label: t('common.status_posted') || t('accounting.journal_entries.posted') },
+            voided: { class: 'badge-secondary', label: t('common.status_voided') || t('accounting.journal_entries.voided') },
         }
         const s = map[status] || { class: '', label: status }
         return <span className={`badge ${s.class}`}>{s.label}</span>
     }
 
     const totalPages = Math.ceil(total / limit)
+
+    const columns = [
+        {
+            key: 'entry_number',
+            label: t('accounting.journal_entries.table.id'),
+            render: (val) => <strong>{val}</strong>,
+        },
+        {
+            key: 'entry_date',
+            label: t('accounting.journal_entries.table.date'),
+            render: (val) => formatDate(val),
+        },
+        {
+            key: 'description',
+            label: t('accounting.journal_entries.table.description'),
+            style: { maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+        },
+        {
+            key: 'reference',
+            label: t('common.reference'),
+            render: (val) => val || '\u2014',
+        },
+        {
+            key: 'total_debit',
+            label: t('accounting.journal_entries.table.debit'),
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'total_credit',
+            label: t('accounting.journal_entries.table.credit'),
+            render: (val) => formatNumber(val),
+        },
+        {
+            key: 'status',
+            label: t('accounting.journal_entries.table.status'),
+            render: (val) => statusBadge(val),
+        },
+        ...((canPost || canVoid) ? [{
+            key: '_actions',
+            label: t('accounting.journal_entries.table.actions'),
+            render: (_, row) => (
+                <div onClick={ev => ev.stopPropagation()} style={{ display: 'flex', gap: '0.25rem' }}>
+                    {row.status === 'draft' && canPost && (
+                        <button className="btn btn-sm btn-success" onClick={() => handlePost(row.id)}>
+                            {t('accounting.journal_entries.post')}
+                        </button>
+                    )}
+                    {row.status === 'posted' && canVoid && (
+                        <button className="btn btn-sm btn-danger" onClick={() => handleVoid(row.id)}>
+                            {t('accounting.journal_entries.void')}
+                        </button>
+                    )}
+                </div>
+            ),
+        }] : []),
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -113,103 +171,47 @@ function JournalEntryList() {
                 )}
             </div>
 
-            {/* Filters */}
-            <div className="card mt-3 p-3" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <select
-                    className="form-input"
-                    style={{ width: '180px' }}
-                    value={statusFilter}
-                    onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-                >
-                    <option value="">{t('common.all_status')}</option>
-                    <option value="draft">{t('common.status_draft') || (t('accounting.journal_entries.draft'))}</option>
-                    <option value="posted">{t('common.status_posted') || (t('accounting.journal_entries.posted'))}</option>
-                    <option value="voided">{t('common.status_voided') || (t('accounting.journal_entries.voided'))}</option>
-                </select>
-                <input
-                    type="text"
-                    className="form-input"
-                    style={{ width: '250px' }}
-                    placeholder={t('common.search')}
-                    value={search}
-                    onChange={e => { setSearch(e.target.value); setPage(1) }}
-                />
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={(val) => { setSearch(val); setPage(1) }}
+                placeholder={t('accounting.journal_entries.search_placeholder', '\u0628\u062D\u062B \u0628\u0627\u0644\u0645\u0631\u062C\u0639 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641...')}
+                filters={[{
+                    key: 'status',
+                    label: t('common.all_status'),
+                    options: [
+                        { value: 'draft', label: t('common.status_draft') || t('accounting.journal_entries.draft') },
+                        { value: 'posted', label: t('common.status_posted') || t('accounting.journal_entries.posted') },
+                        { value: 'voided', label: t('common.status_voided') || t('accounting.journal_entries.voided') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => { setStatusFilter(val); setPage(1) }}
+            />
 
-            {/* Table */}
-            <div className="card mt-3">
-                <div className="data-table-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>{t('accounting.journal_entries.table.id')}</th>
-                                <th>{t('accounting.journal_entries.table.date')}</th>
-                                <th>{t('accounting.journal_entries.table.description')}</th>
-                                <th>{t('common.reference')}</th>
-                                <th>{t('accounting.journal_entries.table.debit')}</th>
-                                <th>{t('accounting.journal_entries.table.credit')}</th>
-                                <th>{t('accounting.journal_entries.table.status')}</th>
-                                {(canPost || canVoid) && <th>{t('accounting.journal_entries.table.actions')}</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {t('accounting.journal_entries.loading')}
-                                </td></tr>
-                            ) : entries.length === 0 ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
-                                    {t('accounting.journal_entries.no_entries_found')}
-                                </td></tr>
-                            ) : entries.map(e => (
-                                <tr key={e.id} style={{ cursor: 'pointer' }}
-                                    onClick={() => handleViewDetail(e.id)}>
-                                    <td><strong>{e.entry_number}</strong></td>
-                                    <td>{formatDate(e.entry_date)}</td>
-                                    <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {e.description}
-                                    </td>
-                                    <td>{e.reference || '—'}</td>
-                                    <td>{formatNumber(e.total_debit)}</td>
-                                    <td>{formatNumber(e.total_credit)}</td>
-                                    <td>{statusBadge(e.status)}</td>
-                                    {(canPost || canVoid) && (
-                                        <td onClick={ev => ev.stopPropagation()}>
-                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                {e.status === 'draft' && canPost && (
-                                                    <button className="btn btn-sm btn-success" onClick={() => handlePost(e.id)}>
-                                                        {t('accounting.journal_entries.post')}
-                                                    </button>
-                                                )}
-                                                {e.status === 'posted' && canVoid && (
-                                                    <button className="btn btn-sm btn-danger" onClick={() => handleVoid(e.id)}>
-                                                        {t('accounting.journal_entries.void')}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            <DataTable
+                columns={columns}
+                data={entries}
+                loading={loading}
+                onRowClick={(row) => handleViewDetail(row.id)}
+                paginate={false}
+                emptyTitle={t('accounting.journal_entries.no_entries_found')}
+                emptyAction={canCreate ? { label: t('accounting.journal_entries.new_entry'), onClick: () => navigate('/accounting/journal-entries/new') } : undefined}
+            />
+
+            {/* Server-side Pagination */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem' }}>
+                    <button className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                        {isRTL ? '\u2192' : '\u2190'}
+                    </button>
+                    <span style={{ padding: '0.25rem 1rem', lineHeight: '32px' }}>
+                        {page} / {totalPages}
+                    </span>
+                    <button className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                        {isRTL ? '\u2190' : '\u2192'}
+                    </button>
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem' }}>
-                        <button className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                            {isRTL ? '→' : '←'}
-                        </button>
-                        <span style={{ padding: '0.25rem 1rem', lineHeight: '32px' }}>
-                            {page} / {totalPages}
-                        </span>
-                        <button className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                            {isRTL ? '←' : '→'}
-                        </button>
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Detail Modal */}
             {selectedEntry && (
@@ -217,21 +219,21 @@ function JournalEntryList() {
                     <div className="modal-content" onClick={ev => ev.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '80vh', overflow: 'auto' }}>
                         <div className="modal-header">
                             <h3>{selectedEntry.entry_number} — {statusBadge(selectedEntry.status)}</h3>
-                            <button className="modal-close" onClick={() => setSelectedEntry(null)}>✕</button>
+                            <button className="modal-close" onClick={() => setSelectedEntry(null)}>{'\u2715'}</button>
                         </div>
                         <div className="modal-body">
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                                 <div><strong>{t('common.date')}:</strong> {formatDate(selectedEntry.entry_date)}</div>
-                                <div><strong>{t('common.reference')}:</strong> {selectedEntry.reference || '—'}</div>
+                                <div><strong>{t('common.reference')}:</strong> {selectedEntry.reference || '\u2014'}</div>
                                 <div style={{ gridColumn: '1 / -1' }}><strong>{t('common.description')}:</strong> {selectedEntry.description}</div>
-                                <div><strong>{t('common.currency') || (t('accounting.journal_entries.currency'))}:</strong> {selectedEntry.currency}</div>
+                                <div><strong>{t('common.currency') || t('accounting.journal_entries.currency')}:</strong> {selectedEntry.currency}</div>
                                 <div><strong>{t('common.created_by')}:</strong> {selectedEntry.created_by_name}</div>
                             </div>
 
                             <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                 <thead>
                                     <tr>
-                                        <th>{t('common.account') || (t('accounting.journal_entries.account'))}</th>
+                                        <th>{t('common.account') || t('accounting.journal_entries.account')}</th>
                                         <th>{t('common.description')}</th>
                                         <th>{t('accounting.journal_entries.table.debit')}</th>
                                         <th>{t('accounting.journal_entries.table.credit')}</th>
@@ -241,7 +243,7 @@ function JournalEntryList() {
                                     {selectedEntry.lines?.map((l, i) => (
                                         <tr key={i}>
                                             <td>{l.account_number} - {isRTL ? l.account_name : (l.account_name_en || l.account_name)}</td>
-                                            <td>{l.description || '—'}</td>
+                                            <td>{l.description || '\u2014'}</td>
                                             <td>{l.debit > 0 ? formatNumber(l.debit) : ''}</td>
                                             <td>{l.credit > 0 ? formatNumber(l.credit) : ''}</td>
                                         </tr>
@@ -257,12 +259,12 @@ function JournalEntryList() {
                         <div className="modal-footer">
                             {selectedEntry.status === 'draft' && canPost && (
                                 <button className="btn btn-success" onClick={() => handlePost(selectedEntry.id)}>
-                                    ✓ {t('accounting.journal_entries.post_entry')}
+                                    {'\u2713'} {t('accounting.journal_entries.post_entry')}
                                 </button>
                             )}
                             {selectedEntry.status === 'posted' && canVoid && (
                                 <button className="btn btn-danger" onClick={() => handleVoid(selectedEntry.id)}>
-                                    ✕ {t('accounting.journal_entries.void_entry')}
+                                    {'\u2715'} {t('accounting.journal_entries.void_entry')}
                                 </button>
                             )}
                             <button className="btn btn-secondary" onClick={() => setSelectedEntry(null)}>

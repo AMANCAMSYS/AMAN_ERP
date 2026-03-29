@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext'
 import { getUser } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
 import CurrencySelector from '../../components/common/CurrencySelector';
+import FormField from '../../components/common/FormField';
 
 function CustomerForm() {
     const { t } = useTranslation()
@@ -126,32 +127,29 @@ function CustomerForm() {
                                 <span style={{ fontSize: '24px' }}>🏢</span> {t('sales.customers.form.basic_info')}
                             </h3>
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.name_ar')} *</label>
+                                <FormField label={t('sales.customers.form.name_ar')} required style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="name" className="form-input" required
                                         value={formData.name} onChange={handleChange}
                                         placeholder={t('sales.customers.form.name_ar')}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.name_en')}</label>
+                                </FormField>
+                                <FormField label={t('sales.customers.form.name_en')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="name_en" className="form-input"
                                         value={formData.name_en} onChange={handleChange}
                                         placeholder="e.g. Al-Noor Trading"
                                     />
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.tax_number')}</label>
+                                <FormField label={t('sales.customers.form.tax_number')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="text" name="tax_number" className="form-input"
                                         value={formData.tax_number} onChange={handleChange}
                                     />
-                                </div>
+                                </FormField>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     <label className="form-label">{t('sales.customers.form.group')}</label>
                                     <div className="input-group">
@@ -182,8 +180,7 @@ function CustomerForm() {
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.credit_limit')}</label>
+                                <FormField label={t('sales.customers.form.credit_limit')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="number"
                                         name="credit_limit"
@@ -192,20 +189,18 @@ function CustomerForm() {
                                         value={formData.credit_limit}
                                         onChange={handleChange}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('common.currency')}</label>
+                                </FormField>
+                                <FormField label={t('common.currency')} style={{ marginBottom: 0 }}>
                                     <CurrencySelector
                                         value={formData.currency}
                                         onChange={(code) => setFormData({ ...formData, currency: code })}
                                         className="form-input"
                                     />
-                                </div>
+                                </FormField>
                             </div>
 
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.table.status')}</label>
+                                <FormField label={t('sales.customers.table.status')} style={{ marginBottom: 0 }}>
                                     <select
                                         name="status"
                                         className="form-input"
@@ -215,7 +210,7 @@ function CustomerForm() {
                                         <option value="active">{t('sales.customers.status.active')}</option>
                                         <option value="inactive">{t('sales.customers.status.inactive')}</option>
                                     </select>
-                                </div>
+                                </FormField>
                                 <div className="form-group" style={{ marginBottom: 0 }}>
                                     {/* Spacer */}
                                 </div>
@@ -227,28 +222,25 @@ function CustomerForm() {
                                 <span style={{ fontSize: '24px' }}>📞</span> {t('sales.customers.form.contact_info')}
                             </h3>
                             <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.phone')}</label>
+                                <FormField label={t('sales.customers.form.phone')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="tel" name="phone" className="form-input"
                                         value={formData.phone} onChange={handleChange}
                                     />
-                                </div>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">{t('sales.customers.form.email')}</label>
+                                </FormField>
+                                <FormField label={t('sales.customers.form.email')} style={{ marginBottom: 0 }}>
                                     <input
                                         type="email" name="email" className="form-input"
                                         value={formData.email} onChange={handleChange}
                                     />
-                                </div>
+                                </FormField>
                             </div>
-                            <div className="form-group" style={{ marginTop: '24px', marginBottom: 0 }}>
-                                <label className="form-label">{t('sales.customers.form.address')}</label>
+                            <FormField label={t('sales.customers.form.address')} style={{ marginTop: '24px', marginBottom: 0 }}>
                                 <textarea
                                     name="address" className="form-input" rows="3"
                                     value={formData.address} onChange={handleChange}
                                 ></textarea>
-                            </div>
+                            </FormField>
                         </div>
                     </div>
 

@@ -1,6 +1,11 @@
 
 from sqlalchemy import text
 from typing import Optional
+from decimal import Decimal, ROUND_HALF_UP
+
+# FIN-FIX: Precision constants for costing calculations
+_D4 = Decimal('0.0001')
+_dec = lambda v: Decimal(str(v or 0))
 
 class CostingService:
     @staticmethod
@@ -16,12 +21,24 @@ class CostingService:
         new_qty: float,
         new_price: float
     ) -> float:
-        """Standard WAC Formula"""
-        if current_qty + new_qty <= 0:
-            return new_price
-        
-        total_value = (current_qty * current_cost) + (new_qty * new_price)
-        return total_value / (current_qty + new_qty)
+        """Standard WAC Formula using Decimal for precision."""
+        d_curr_qty = _dec(current_qty)
+        d_curr_cost = _dec(current_cost)
+        d_new_qty = _dec(new_qty)
+        d_new_price = _dec(new_price)
+
+        # Guard: reset if current qty is negative (corrupted state)
+        if d_curr_qty < 0:
+            d_curr_qty = Decimal('0')
+            d_curr_cost = Decimal('0')
+
+        total_qty = d_curr_qty + d_new_qty
+        if total_qty <= 0:
+            return float(d_new_price)
+
+        total_value = (d_curr_qty * d_curr_cost) + (d_new_qty * d_new_price)
+        result = (total_value / total_qty).quantize(_D4, ROUND_HALF_UP)
+        return float(result)
 
 
     @staticmethod

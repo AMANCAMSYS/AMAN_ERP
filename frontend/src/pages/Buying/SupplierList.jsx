@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { inventoryAPI, companiesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
-import Pagination, { usePagination } from '../../components/common/Pagination'
-
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
-import BackButton from '../../components/common/BackButton';
+import { formatShortDate } from '../../utils/dateUtils'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
+import BackButton from '../../components/common/BackButton'
 
 function SupplierList() {
     const { t, i18n } = useTranslation()
@@ -16,11 +16,12 @@ function SupplierList() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
     const [currency, setCurrency] = useState('')
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState('')
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch suppliers and company currency
                 setLoading(true)
                 const userStr = localStorage.getItem('user')
                 const user = userStr ? JSON.parse(userStr) : null
@@ -45,9 +46,128 @@ function SupplierList() {
         fetchData()
     }, [t, currentBranch])
 
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(suppliers)
+    const filteredSuppliers = useMemo(() => {
+        let result = suppliers
+        if (search) {
+            const q = search.toLowerCase()
+            result = result.filter(s =>
+                (s.name || '').toLowerCase().includes(q) ||
+                (s.name_en || '').toLowerCase().includes(q) ||
+                (s.party_code || '').toLowerCase().includes(q) ||
+                (s.phone || '').includes(q)
+            )
+        }
+        if (statusFilter) {
+            if (statusFilter === 'active') {
+                result = result.filter(s => s.is_active)
+            } else if (statusFilter === 'inactive') {
+                result = result.filter(s => !s.is_active)
+            }
+        }
+        return result
+    }, [suppliers, search, statusFilter])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const columns = [
+        {
+            key: 'party_code',
+            label: t('buying.suppliers.table.code'),
+            width: '12%',
+            render: (val) => (
+                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)', fontSize: '13px', background: 'rgba(37,99,235,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
+                    {val || '\u2014'}
+                </span>
+            ),
+        },
+        {
+            key: 'name',
+            label: t('buying.suppliers.table.name'),
+            width: '25%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                        width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-hover)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+                    }}>
+                        {'\uD83C\uDFE2'}
+                    </div>
+                    <div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{val}</div>
+                        {row.name_en && <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{row.name_en}</div>}
+                    </div>
+                </div>
+            ),
+        },
+        {
+            key: 'phone',
+            label: t('buying.suppliers.table.contact'),
+            width: '20%',
+            render: (val, row) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {val && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                            <span>{'\uD83D\uDCDE'}</span>
+                            <span style={{ direction: 'ltr' }}>{val}</span>
+                        </div>
+                    )}
+                    {row.email && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            <span>{'\u2709\uFE0F'}</span>
+                            <span>{row.email}</span>
+                        </div>
+                    )}
+                    {!val && !row.email && <span style={{ color: 'var(--text-muted)' }}>-</span>}
+                </div>
+            ),
+        },
+        {
+            key: 'current_balance',
+            label: t('buying.suppliers.table.balance'),
+            width: '15%',
+            render: (val, row) => (
+                <div style={{
+                    fontWeight: '600', fontSize: '15px',
+                    color: val > 0 ? 'var(--error)' : 'var(--text-primary)',
+                    direction: 'ltr',
+                    textAlign: i18n.language === 'ar' ? 'right' : 'left',
+                }}>
+                    {(val || 0).toLocaleString()} {row.currency || currency}
+                </div>
+            ),
+        },
+        {
+            key: 'is_active',
+            label: t('buying.suppliers.table.status'),
+            width: '10%',
+            render: (val) => (
+                <span className={`badge ${val ? 'badge-success' : 'badge-danger'}`}>
+                    {val ? t('common.active') : t('common.inactive')}
+                </span>
+            ),
+        },
+        {
+            key: 'created_at',
+            label: t('buying.suppliers.table.created_at'),
+            width: '10%',
+            render: (val) => <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{formatShortDate(val)}</span>,
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '8%',
+            headerStyle: { textAlign: 'center' },
+            style: { textAlign: 'center' },
+            render: (_, row) => (
+                <button
+                    className="btn btn-icon"
+                    title={t('common.edit', 'Edit')}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/buying/suppliers/${row.id}/edit`); }}
+                    style={{ padding: '4px', color: 'var(--primary)' }}
+                >
+                    {'\u270F\uFE0F'}
+                </button>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -67,117 +187,33 @@ function SupplierList() {
 
             {error && <div className="alert alert-error">{error}</div>}
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '12%' }}>{t('buying.suppliers.table.code')}</th>
-                            <th style={{ width: '25%' }}>{t('buying.suppliers.table.name')}</th>
-                            <th style={{ width: '20%' }}>{t('buying.suppliers.table.contact')}</th>
-                            <th style={{ width: '15%' }}>{t('buying.suppliers.table.balance')}</th>
-                            <th style={{ width: '10%' }}>{t('buying.suppliers.table.status')}</th>
-                            <th style={{ width: '10%' }}>{t('buying.suppliers.table.created_at')}</th>
-                            <th style={{ width: '8%', textAlign: 'center' }}>{t('common.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {suppliers.length === 0 ? (
-                            <tr>
-                                <td colSpan="7" className="start-guide">
-                                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏬</div>
-                                        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('buying.suppliers.empty.title')}</h3>
-                                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-                                            {t('buying.suppliers.empty.desc')}
-                                        </p>
-                                        <button className="btn btn-primary" onClick={() => navigate('/buying/suppliers/new')}>
-                                            {t('buying.suppliers.empty.action')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            paginatedItems.map(supplier => (
-                                <tr key={supplier.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/buying/suppliers/${supplier.id}`)}>
-                                    <td>
-                                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)', fontSize: '13px', background: 'rgba(37,99,235,0.08)', padding: '2px 8px', borderRadius: '4px' }}>
-                                            {supplier.party_code || '—'}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{
-                                                width: '36px', height: '36px',
-                                                borderRadius: '50%', background: 'var(--bg-hover)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontSize: '18px'
-                                            }}>
-                                                🏢
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{supplier.name}</div>
-                                                {supplier.name_en && (
-                                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                        {supplier.name_en}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                            {supplier.phone && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                                                    <span>📞</span>
-                                                    <span style={{ direction: 'ltr' }}>{supplier.phone}</span>
-                                                </div>
-                                            )}
-                                            {supplier.email && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                    <span>✉️</span>
-                                                    <span>{supplier.email}</span>
-                                                </div>
-                                            )}
-                                            {!supplier.phone && !supplier.email && <span style={{ color: 'var(--text-muted)' }}>-</span>}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{
-                                            fontWeight: '600',
-                                            fontSize: '15px',
-                                            color: supplier.current_balance > 0 ? 'var(--error)' : 'var(--text-primary)',
-                                            direction: 'ltr',
-                                            textAlign: i18n.language === 'ar' ? 'right' : 'left'
-                                        }}>
-                                            {supplier.current_balance.toLocaleString()} {supplier.currency || currency}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${supplier.is_active ? 'badge-success' : 'badge-danger'}`}>
-                                            {supplier.is_active ? t('common.active') : t('common.inactive')}
-                                        </span>
-                                    </td>
-                                    <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                                        {formatShortDate(supplier.created_at)}
-                                    </td>
-                                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                            className="btn btn-icon"
-                                            title={t('common.edit', 'Edit')}
-                                            onClick={() => navigate(`/buying/suppliers/${supplier.id}/edit`)}
-                                            style={{ padding: '4px', color: 'var(--primary)' }}
-                                        >
-                                            ✏️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-                <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-            </div>
-        </div >
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('buying.suppliers.search_placeholder', '\u0628\u062D\u062B \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0643\u0648\u062F \u0623\u0648 \u0627\u0644\u0647\u0627\u062A\u0641...')}
+                filters={[{
+                    key: 'status',
+                    label: t('buying.suppliers.table.status'),
+                    options: [
+                        { value: 'active', label: t('common.active') },
+                        { value: 'inactive', label: t('common.inactive') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredSuppliers}
+                loading={loading}
+                onRowClick={(row) => navigate(`/buying/suppliers/${row.id}`)}
+                emptyIcon={'\uD83C\uDFEC'}
+                emptyTitle={t('buying.suppliers.empty.title')}
+                emptyDesc={t('buying.suppliers.empty.desc')}
+                emptyAction={{ label: t('buying.suppliers.empty.action'), onClick: () => navigate('/buying/suppliers/new') }}
+            />
+        </div>
     )
 }
 

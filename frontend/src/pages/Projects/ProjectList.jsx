@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, FolderKanban, TrendingUp, Clock, CheckCircle2, PauseCircle, XCircle, BarChart3, Users, DollarSign, Calendar } from 'lucide-react';
+import { Plus, FolderKanban, TrendingUp, Clock, CheckCircle2, BarChart3, Users, DollarSign } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 import { useBranch } from '../../context/BranchContext';
-import Pagination, { usePagination } from '../../components/common/Pagination';
 import '../../components/ModuleStyles.css';
 
 export default function ProjectList() {
@@ -16,7 +17,7 @@ export default function ProjectList() {
     const [projects, setProjects] = useState([]);
     const [summary, setSummary] = useState({});
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
 
     useEffect(() => {
@@ -45,13 +46,15 @@ export default function ProjectList() {
         }
     };
 
-    const filteredProjects = projects.filter(p =>
-        p.project_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.project_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const { currentPage, pageSize, totalItems, paginatedItems, onPageChange, onPageSizeChange } = usePagination(filteredProjects);
+    const filteredProjects = useMemo(() => {
+        if (!search) return projects;
+        const q = search.toLowerCase();
+        return projects.filter(p =>
+            p.project_name?.toLowerCase().includes(q) ||
+            p.project_code?.toLowerCase().includes(q) ||
+            p.customer_name?.toLowerCase().includes(q)
+        );
+    }, [projects, search]);
 
     const getStatusBadge = (status) => {
         const map = {
@@ -71,6 +74,80 @@ export default function ProjectList() {
         if (pct >= 20) return '#17a2b8';
         return '#6c757d';
     };
+
+    const columns = [
+        {
+            key: 'project_code',
+            label: t('projects.fields.code'),
+            style: { fontWeight: 500 },
+        },
+        {
+            key: 'project_name',
+            label: t('projects.fields.name'),
+            style: { fontWeight: 'bold' },
+        },
+        {
+            key: 'customer_name',
+            label: t('projects.fields.customer'),
+            render: (val) => val || '-',
+        },
+        {
+            key: 'manager_name',
+            label: t('projects.fields.manager'),
+            render: (val) => val || '-',
+        },
+        {
+            key: 'status',
+            label: t('projects.fields.status'),
+            render: (val) => getStatusBadge(val),
+        },
+        {
+            key: 'progress_percentage',
+            label: t('projects.fields.progress'),
+            width: 140,
+            render: (val) => {
+                const progress = parseFloat(val || 0);
+                return (
+                    <div className="d-flex align-items-center gap-2">
+                        <div style={{
+                            flex: 1, height: 8, borderRadius: 4,
+                            background: '#e9ecef', overflow: 'hidden'
+                        }}>
+                            <div style={{
+                                width: `${progress}%`, height: '100%',
+                                background: getProgressColor(progress),
+                                borderRadius: 4, transition: 'width 0.3s'
+                            }} />
+                        </div>
+                        <small className="text-muted">{progress.toFixed(0)}%</small>
+                    </div>
+                );
+            },
+        },
+        {
+            key: 'planned_budget',
+            label: t('projects.fields.budget'),
+            render: (val) => formatNumber(val || 0),
+        },
+        {
+            key: 'total_expenses',
+            label: t('projects.fields.expenses'),
+            render: (val, row) => (
+                <span className={parseFloat(val || 0) > parseFloat(row.planned_budget || 0) ? 'text-danger fw-bold' : ''}>
+                    {formatNumber(val || 0)}
+                </span>
+            ),
+        },
+        {
+            key: 'total_tasks',
+            label: t('projects.fields.tasks'),
+            render: (val, row) => (
+                <span className="text-muted">
+                    {row.completed_tasks || 0}/{val || 0}
+                </span>
+            ),
+        },
+    ];
 
     return (
         <div className="workspace fade-in">
@@ -192,107 +269,34 @@ export default function ProjectList() {
                 </div>
             </div>
 
-            {/* Search & Filter */}
-            <div className="card section-card">
-                <div className="card-body">
-                    <div className="d-flex gap-3 mb-3 flex-wrap">
-                        <div className="search-box flex-grow-1">
-                            <Search size={18} />
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder={t('common.search')}
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                        <select
-                            className="form-input"
-                            style={{ width: 180 }}
-                            value={statusFilter}
-                            onChange={e => setStatusFilter(e.target.value)}
-                        >
-                            <option value="">{t('common.all')}</option>
-                            <option value="planning">{t('projects.status.planning')}</option>
-                            <option value="in_progress">{t('projects.status.in_progress')}</option>
-                            <option value="completed">{t('projects.status.completed')}</option>
-                            <option value="on_hold">{t('projects.status.on_hold')}</option>
-                            <option value="cancelled">{t('projects.status.cancelled')}</option>
-                        </select>
-                    </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('common.search')}
+                filters={[{
+                    key: 'status',
+                    label: t('projects.fields.status'),
+                    options: [
+                        { value: 'planning', label: t('projects.status.planning') },
+                        { value: 'in_progress', label: t('projects.status.in_progress') },
+                        { value: 'completed', label: t('projects.status.completed') },
+                        { value: 'on_hold', label: t('projects.status.on_hold') },
+                        { value: 'cancelled', label: t('projects.status.cancelled') },
+                    ],
+                }]}
+                filterValues={{ status: statusFilter }}
+                onFilterChange={(key, val) => setStatusFilter(val)}
+            />
 
-                    <div className="data-table-container">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>{t('projects.fields.code')}</th>
-                                    <th>{t('projects.fields.name')}</th>
-                                    <th>{t('projects.fields.customer')}</th>
-                                    <th>{t('projects.fields.manager')}</th>
-                                    <th>{t('projects.fields.status')}</th>
-                                    <th>{t('projects.fields.progress')}</th>
-                                    <th>{t('projects.fields.budget')}</th>
-                                    <th>{t('projects.fields.expenses')}</th>
-                                    <th>{t('projects.fields.tasks')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan="9" className="text-center py-5">
-                                            <span className="loading"></span>
-                                        </td>
-                                    </tr>
-                                ) : filteredProjects.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="9" className="text-center py-5 text-muted">
-                                            {t('common.no_data')}
-                                        </td>
-                                    </tr>
-                                ) : paginatedItems.map(project => {
-                                    const progress = parseFloat(project.progress_percentage || 0);
-                                    return (
-                                        <tr key={project.id}
-                                            onClick={() => navigate(`/projects/${project.id}`)}
-                                            style={{ cursor: 'pointer' }}>
-                                            <td className="fw-medium">{project.project_code}</td>
-                                            <td className="fw-bold">{project.project_name}</td>
-                                            <td>{project.customer_name || '-'}</td>
-                                            <td>{project.manager_name || '-'}</td>
-                                            <td>{getStatusBadge(project.status)}</td>
-                                            <td style={{ minWidth: 120 }}>
-                                                <div className="d-flex align-items-center gap-2">
-                                                    <div style={{
-                                                        flex: 1, height: 8, borderRadius: 4,
-                                                        background: '#e9ecef', overflow: 'hidden'
-                                                    }}>
-                                                        <div style={{
-                                                            width: `${progress}%`, height: '100%',
-                                                            background: getProgressColor(progress),
-                                                            borderRadius: 4, transition: 'width 0.3s'
-                                                        }} />
-                                                    </div>
-                                                    <small className="text-muted">{progress.toFixed(0)}%</small>
-                                                </div>
-                                            </td>
-                                            <td>{formatNumber(project.planned_budget || 0)}</td>
-                                            <td className={parseFloat(project.total_expenses || 0) > parseFloat(project.planned_budget || 0) ? 'text-danger fw-bold' : ''}>
-                                                {formatNumber(project.total_expenses || 0)}
-                                            </td>
-                                            <td>
-                                                <span className="text-muted">
-                                                    {project.completed_tasks || 0}/{project.total_tasks || 0}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                        <Pagination currentPage={currentPage} totalItems={totalItems} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-                    </div>
-                </div>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredProjects}
+                loading={loading}
+                onRowClick={(row) => navigate(`/projects/${row.id}`)}
+                emptyIcon="📁"
+                emptyTitle={t('common.no_data')}
+                emptyAction={{ label: t('projects.new'), onClick: () => navigate('/projects/new') }}
+            />
         </div>
     );
 }

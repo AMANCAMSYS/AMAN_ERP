@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { treasuryAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
@@ -7,7 +7,9 @@ import { useBranch } from '../../context/BranchContext'
 import { currenciesAPI } from '../../utils/api'
 import SimpleModal from '../../components/common/SimpleModal'
 import { toastEmitter } from '../../utils/toastEmitter'
-import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
+import BackButton from '../../components/common/BackButton'
 
 export default function TreasuryAccountList() {
     const { t } = useTranslation()
@@ -21,6 +23,8 @@ export default function TreasuryAccountList() {
     const [showEdit, setShowEdit] = useState(false)
     const [showDelete, setShowDelete] = useState(false)
     const [selectedAccount, setSelectedAccount] = useState(null)
+    const [search, setSearch] = useState('')
+    const [typeFilter, setTypeFilter] = useState('')
     const [accountForm, setAccountForm] = useState({
         name: '', name_en: '', account_type: 'cash', currency: '',
         bank_name: '', account_number: '', iban: '', branch_id: '',
@@ -48,7 +52,6 @@ export default function TreasuryAccountList() {
         try {
             const response = await currenciesAPI.list()
             setCurrencies(response.data)
-            // Set default currency if not set
             if (!accountForm.currency && response.data.length > 0) {
                 const defaultCurr = response.data.find(c => c.is_base) || response.data[0]
                 setAccountForm(prev => ({
@@ -139,7 +142,92 @@ export default function TreasuryAccountList() {
         }
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    const filteredAccounts = useMemo(() => {
+        let result = accounts
+        if (search) {
+            const q = search.toLowerCase()
+            result = result.filter(acc =>
+                (acc.name || '').toLowerCase().includes(q) ||
+                (acc.name_en || '').toLowerCase().includes(q) ||
+                (acc.bank_name || '').toLowerCase().includes(q)
+            )
+        }
+        if (typeFilter) {
+            result = result.filter(acc => acc.account_type === typeFilter)
+        }
+        return result
+    }, [accounts, search, typeFilter])
+
+    const columns = [
+        {
+            key: 'name',
+            label: t('common.name'),
+            width: '40%',
+            render: (val, row) => (
+                <div>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{val}</div>
+                    {row.bank_name && <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{row.bank_name} - {row.account_number}</div>}
+                </div>
+            ),
+        },
+        {
+            key: 'account_type',
+            label: t('treasury.account_type'),
+            width: '20%',
+            render: (val) => (
+                <span className={`badge ${val === 'bank' ? 'badge-info' : 'badge-success'}`}>
+                    {val === 'bank' ? t('treasury.bank_name') : t('treasury.cash_box')}
+                </span>
+            ),
+        },
+        {
+            key: 'current_balance',
+            label: t('treasury.current_balance'),
+            width: '20%',
+            render: (val, row) => (
+                <div style={{ fontWeight: '600', direction: 'ltr', textAlign: 'right' }}>
+                    {row.currency && row.currency !== baseCurrency ? (
+                        <>
+                            <div>{Number(row.balance_in_currency || 0).toLocaleString()} {row.currency}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                {Number(val).toLocaleString()} {baseCurrency}
+                            </div>
+                        </>
+                    ) : (
+                        <div>{Number(val).toLocaleString()} {row.currency || baseCurrency}</div>
+                    )}
+                </div>
+            ),
+        },
+        {
+            key: '_actions',
+            label: t('common.actions'),
+            width: '20%',
+            render: (_, row) => (
+                <div onClick={(e) => e.stopPropagation()}>
+                    <button className="btn btn-link" onClick={() => navigate(`/treasury/accounts/${row.id}`)}>
+                        {t('common.view_details')}
+                    </button>
+                    <button
+                        className="btn-icon"
+                        onClick={() => handleEditClick(row)}
+                        title={t('common.edit')}
+                        style={{ marginRight: '8px' }}
+                    >
+                        {'\u270F\uFE0F'}
+                    </button>
+                    <button
+                        className="btn-icon"
+                        onClick={() => handleDeleteClick(row)}
+                        title={t('common.delete')}
+                        style={{ color: 'var(--danger)' }}
+                    >
+                        {'\uD83D\uDDD1\uFE0F'}
+                    </button>
+                </div>
+            ),
+        },
+    ]
 
     return (
         <div className="workspace fade-in">
@@ -157,82 +245,30 @@ export default function TreasuryAccountList() {
                 </div>
             </div>
 
-            <div className="data-table-container">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '40%' }}>{t('common.name')}</th>
-                            <th style={{ width: '20%' }}>{t('treasury.account_type')}</th>
-                            <th style={{ width: '20%' }}>{t('treasury.current_balance')}</th>
-                            <th style={{ width: '20%' }}>{t('common.actions')}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {accounts.length === 0 ? (
-                            <tr>
-                                <td colSpan="4" className="start-guide">
-                                    <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏦</div>
-                                        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{t('treasury.no_accounts')}</h3>
-                                        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-                                            {t('common.add_new')}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ) : (
-                            accounts.map(acc => (
-                                <tr key={acc.id}>
-                                    <td>
-                                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{acc.name}</div>
-                                        {acc.bank_name && <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{acc.bank_name} - {acc.account_number}</div>}
-                                    </td>
-                                    <td>
-                                        <span className={`badge ${acc.account_type === 'bank' ? 'badge-info' : 'badge-success'}`}>
-                                            {acc.account_type === 'bank' ? t('treasury.bank_name') : t('treasury.cash_box')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontWeight: '600', direction: 'ltr', textAlign: 'right' }}>
-                                            {acc.currency && acc.currency !== baseCurrency ? (
-                                                <>
-                                                    <div>{Number(acc.balance_in_currency || 0).toLocaleString()} {acc.currency}</div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                                        {Number(acc.current_balance).toLocaleString()} {baseCurrency}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div>{Number(acc.current_balance).toLocaleString()} {acc.currency || baseCurrency}</div>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <button className="btn btn-link" onClick={() => navigate(`/treasury/accounts/${acc.id}`)}>
-                                            {t('common.view_details')}
-                                        </button>
-                                        <button
-                                            className="btn-icon"
-                                            onClick={() => handleEditClick(acc)}
-                                            title={t('common.edit')}
-                                            style={{ marginRight: '8px' }}
-                                        >
-                                            ✏️
-                                        </button>
-                                        <button
-                                            className="btn-icon"
-                                            onClick={() => handleDeleteClick(acc)}
-                                            title={t('common.delete')}
-                                            style={{ color: 'var(--danger)' }}
-                                        >
-                                            🗑️
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('treasury.search_placeholder', '\u0628\u062D\u062B \u0628\u0627\u0633\u0645 \u0627\u0644\u062D\u0633\u0627\u0628...')}
+                filters={[{
+                    key: 'type',
+                    label: t('treasury.account_type'),
+                    options: [
+                        { value: 'cash', label: t('treasury.cash_box') },
+                        { value: 'bank', label: t('treasury.bank_name') },
+                    ],
+                }]}
+                filterValues={{ type: typeFilter }}
+                onFilterChange={(key, val) => setTypeFilter(val)}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredAccounts}
+                loading={loading}
+                emptyIcon={'\uD83C\uDFE6'}
+                emptyTitle={t('treasury.no_accounts')}
+                emptyAction={{ label: t('common.add_new'), onClick: () => setShowAdd(true) }}
+            />
 
             <SimpleModal
                 isOpen={showAdd}
@@ -403,7 +439,7 @@ export default function TreasuryAccountList() {
                 <div className="modal-overlay" onClick={() => setShowDelete(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
                         <div className="modal-header">
-                            <h2 style={{ color: 'var(--danger)' }}>⚠️ {t('common.confirm_delete')}</h2>
+                            <h2 style={{ color: 'var(--danger)' }}>{'\u26A0\uFE0F'} {t('common.confirm_delete')}</h2>
                             <button onClick={() => setShowDelete(false)} className="close-btn">&times;</button>
                         </div>
                         <div style={{ padding: '1rem 0' }}>
@@ -474,4 +510,3 @@ export default function TreasuryAccountList() {
         </div>
     )
 }
-

@@ -45,9 +45,9 @@ function Login() {
                 formData.password,
                 isSystemAdmin ? null : formData.company_code
             )
-            const { access_token, user, company_id } = response.data
+            const { access_token, refresh_token, user, company_id } = response.data
 
-            setAuth(access_token, user, company_id)
+            setAuth(access_token, user, company_id, refresh_token)
 
             if (user?.role !== 'system_admin' && !hasIndustryTypeSet()) {
                 window.location.href = '/setup/industry'

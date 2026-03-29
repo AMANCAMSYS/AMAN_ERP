@@ -201,7 +201,7 @@ def get_all_table_sql() -> str:
         default_currency VARCHAR(3) DEFAULT NULL,
         phone VARCHAR(50),
         email VARCHAR(255),
-        manager_id INTEGER,
+        manager_id INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         is_default BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -264,7 +264,7 @@ def get_all_table_sql() -> str:
         branch_id INTEGER REFERENCES branches(id),
         
         -- Commercial Terms
-        price_list_id INTEGER, 
+        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
         payment_terms VARCHAR(100),
         credit_limit DECIMAL(18, 4) DEFAULT 0,
         
@@ -287,13 +287,13 @@ def get_all_table_sql() -> str:
         debit DECIMAL(18, 4) DEFAULT 0,
         credit DECIMAL(18, 4) DEFAULT 0,
         balance DECIMAL(18, 4) DEFAULT 0,
-        payment_id INTEGER, -- Link to payment_vouchers if needed
-        invoice_id INTEGER, -- Link to invoices if needed
+        payment_id INTEGER REFERENCES payment_vouchers(id) ON DELETE SET NULL, -- Link to payment_vouchers
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL, -- Link to invoices
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    
+
     CREATE TABLE IF NOT EXISTS accounts (
         id SERIAL PRIMARY KEY,
         account_number VARCHAR(50) UNIQUE NOT NULL,
@@ -354,22 +354,43 @@ def get_all_table_sql() -> str:
         account_id INTEGER NOT NULL REFERENCES accounts(id),
         debit DECIMAL(18, 4) DEFAULT 0,
         credit DECIMAL(18, 4) DEFAULT 0,
-        cost_center_id INTEGER,
+        cost_center_id INTEGER REFERENCES cost_centers(id) ON DELETE SET NULL,
         amount_currency DECIMAL(18, 4) DEFAULT 0,
         currency VARCHAR(3) DEFAULT NULL,
         description TEXT,
         is_reconciled BOOLEAN DEFAULT FALSE,
-        reconciliation_id INTEGER,
+        reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    
+    CREATE OR REPLACE FUNCTION check_journal_balance() RETURNS TRIGGER AS $$
+    BEGIN
+        IF (SELECT ABS(SUM(debit) - SUM(credit)) FROM journal_lines
+            WHERE journal_entry_id = NEW.journal_entry_id) > 0.01 THEN
+            RAISE EXCEPTION 'Journal entry % is not balanced', NEW.journal_entry_id;
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_journal_balance') THEN
+            CREATE CONSTRAINT TRIGGER trg_journal_balance
+            AFTER INSERT OR UPDATE ON journal_lines
+            DEFERRABLE INITIALLY DEFERRED
+            FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
+        END IF;
+    END
+    $$;
     
     CREATE TABLE IF NOT EXISTS invoices (
         id SERIAL PRIMARY KEY,
         invoice_number VARCHAR(50) UNIQUE NOT NULL,
         invoice_type VARCHAR(20) NOT NULL,
         party_id INTEGER REFERENCES parties(id),
-        customer_id INTEGER, -- Deprecated
-        supplier_id INTEGER, -- Deprecated
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
         invoice_date DATE NOT NULL,
         due_date DATE,
         subtotal DECIMAL(18, 4) DEFAULT 0,
@@ -384,19 +405,19 @@ def get_all_table_sql() -> str:
         notes TEXT,
         down_payment_method VARCHAR(20),
         branch_id INTEGER REFERENCES branches(id),
-        warehouse_id INTEGER,
-        related_invoice_id INTEGER,
+        warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL,
+        related_invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS invoice_lines (
         id SERIAL PRIMARY KEY,
         invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-        product_id INTEGER,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
         description VARCHAR(500),
         quantity DECIMAL(18, 4) DEFAULT 1,
         unit_price DECIMAL(18, 4) DEFAULT 0,
@@ -502,8 +523,8 @@ def get_all_table_sql() -> str:
         debit DECIMAL(18, 4) DEFAULT 0,
         credit DECIMAL(18, 4) DEFAULT 0,
         balance DECIMAL(18, 4) DEFAULT 0,
-        payment_id INTEGER,
-        invoice_id INTEGER,
+        payment_id INTEGER REFERENCES supplier_payments(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -517,7 +538,7 @@ def get_all_table_sql() -> str:
         amount DECIMAL(18, 4) NOT NULL,
         currency VARCHAR(3) DEFAULT NULL,
         exchange_rate DECIMAL(10, 6) DEFAULT 1,
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         reference VARCHAR(100),
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
@@ -542,12 +563,12 @@ def get_additional_tables_sql() -> str:
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
         effect_type VARCHAR(20) DEFAULT 'discount',
         application_scope VARCHAR(20) DEFAULT 'total',
-        price_list_id INTEGER,
+        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
         customer_code VARCHAR(50) UNIQUE,
@@ -571,14 +592,14 @@ def get_additional_tables_sql() -> str:
         credit_limit DECIMAL(18, 4) DEFAULT 0,
         current_balance DECIMAL(18, 4) DEFAULT 0,
         currency VARCHAR(3) DEFAULT NULL,
-        price_list_id INTEGER,
+        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
         tax_exempt BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS customer_contacts (
         id SERIAL PRIMARY KEY,
         customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
@@ -619,8 +640,8 @@ def get_additional_tables_sql() -> str:
         debit DECIMAL(18, 4) DEFAULT 0,
         credit DECIMAL(18, 4) DEFAULT 0,
         balance DECIMAL(18, 4) DEFAULT 0,
-        receipt_id INTEGER,
-        invoice_id INTEGER,
+        receipt_id INTEGER REFERENCES customer_receipts(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -634,7 +655,7 @@ def get_additional_tables_sql() -> str:
         amount DECIMAL(18, 4) NOT NULL,
         currency VARCHAR(3) DEFAULT NULL,
         exchange_rate DECIMAL(10, 6) DEFAULT 1,
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         reference VARCHAR(100),
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
@@ -722,12 +743,12 @@ def get_additional_tables_sql() -> str:
     
     CREATE TABLE IF NOT EXISTS customer_price_list_items (
         id SERIAL PRIMARY KEY,
-        price_list_id INTEGER NOT NULL,
+        price_list_id INTEGER NOT NULL REFERENCES customer_price_lists(id) ON DELETE CASCADE,
         product_id INTEGER REFERENCES products(id),
         price DECIMAL(18, 4) NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS warehouses (
         id SERIAL PRIMARY KEY,
         warehouse_code VARCHAR(50) UNIQUE,
@@ -818,7 +839,7 @@ def get_additional_tables_sql() -> str:
 
     CREATE TABLE IF NOT EXISTS stock_transfer_log (
         id SERIAL PRIMARY KEY,
-        shipment_id INTEGER,
+        shipment_id INTEGER REFERENCES stock_shipments(id) ON DELETE SET NULL,
         product_id INTEGER REFERENCES products(id),
         from_warehouse_id INTEGER REFERENCES warehouses(id),
         to_warehouse_id INTEGER REFERENCES warehouses(id),
@@ -834,7 +855,7 @@ def get_additional_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         po_number VARCHAR(50) UNIQUE NOT NULL,
         party_id INTEGER REFERENCES parties(id),
-        supplier_id INTEGER, -- Deprecated
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
         branch_id INTEGER REFERENCES branches(id),
         order_date DATE NOT NULL,
         expected_date DATE,
@@ -921,7 +942,7 @@ def get_additional_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         sq_number VARCHAR(50) UNIQUE NOT NULL,
         party_id INTEGER REFERENCES parties(id),
-        customer_id INTEGER, -- Deprecated
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
         branch_id INTEGER REFERENCES branches(id),
         quotation_date DATE NOT NULL,
         expiry_date DATE,
@@ -954,7 +975,7 @@ def get_additional_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         so_number VARCHAR(50) UNIQUE NOT NULL,
         party_id INTEGER REFERENCES parties(id),
-        customer_id INTEGER, -- Deprecated
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
         branch_id INTEGER REFERENCES branches(id),
         warehouse_id INTEGER REFERENCES warehouses(id),
         quotation_id INTEGER REFERENCES sales_quotations(id),
@@ -990,7 +1011,7 @@ def get_additional_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         return_number VARCHAR(50) UNIQUE NOT NULL,
         party_id INTEGER REFERENCES parties(id),
-        customer_id INTEGER, -- Deprecated
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
         branch_id INTEGER REFERENCES branches(id),
         warehouse_id INTEGER REFERENCES warehouses(id),
         invoice_id INTEGER REFERENCES invoices(id),
@@ -1002,7 +1023,7 @@ def get_additional_tables_sql() -> str:
         notes TEXT,
         refund_method VARCHAR(20),
         refund_amount DECIMAL(18, 4) DEFAULT 0,
-        bank_account_id INTEGER, -- legacy, use treasury_account_id
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL, -- legacy, use treasury_account_id
         treasury_account_id INTEGER REFERENCES treasury_accounts(id),
         check_number VARCHAR(50),
         check_date DATE,
@@ -1030,10 +1051,10 @@ def get_additional_tables_sql() -> str:
         voucher_type VARCHAR(20) NOT NULL, -- receipt, payment
         voucher_date DATE NOT NULL,
         party_type VARCHAR(20) NOT NULL, -- customer, supplier
-        party_id INTEGER NOT NULL, -- References parties(id) now effectively
+        party_id INTEGER NOT NULL REFERENCES parties(id),
         amount DECIMAL(18, 4) NOT NULL,
         payment_method VARCHAR(20) NOT NULL, -- cash, bank, check
-        bank_account_id INTEGER, -- legacy, use treasury_account_id
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL, -- legacy, use treasury_account_id
         treasury_account_id INTEGER REFERENCES treasury_accounts(id),
         check_number VARCHAR(50),
         check_date DATE,
@@ -1058,9 +1079,9 @@ def get_additional_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS commission_rules (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        salesperson_id INTEGER,
-        product_id INTEGER,
-        category_id INTEGER,
+        salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        category_id INTEGER REFERENCES product_categories(id) ON DELETE SET NULL,
         rate_type VARCHAR(20) DEFAULT 'percentage',
         rate DECIMAL(10, 4) DEFAULT 0,
         min_amount DECIMAL(18, 4) DEFAULT 0,
@@ -1072,9 +1093,9 @@ def get_additional_tables_sql() -> str:
 
     CREATE TABLE IF NOT EXISTS sales_commissions (
         id SERIAL PRIMARY KEY,
-        salesperson_id INTEGER,
+        salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
         salesperson_name VARCHAR(255),
-        invoice_id INTEGER,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
         invoice_number VARCHAR(50),
         invoice_date DATE,
         invoice_total DECIMAL(18, 4) DEFAULT 0,
@@ -1114,7 +1135,7 @@ def get_additional_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS rfq_responses (
         id SERIAL PRIMARY KEY,
         rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
-        supplier_id INTEGER,
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
         supplier_name VARCHAR(255),
         unit_price NUMERIC(15, 2),
         total_price NUMERIC(15, 2),
@@ -1127,8 +1148,8 @@ def get_additional_tables_sql() -> str:
     -- ===== SUPPLIER RATINGS =====
     CREATE TABLE IF NOT EXISTS supplier_ratings (
         id SERIAL PRIMARY KEY,
-        supplier_id INTEGER NOT NULL,
-        po_id INTEGER,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        po_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
         quality_score NUMERIC(3, 1) DEFAULT 0,
         delivery_score NUMERIC(3, 1) DEFAULT 0,
         price_score NUMERIC(3, 1) DEFAULT 0,
@@ -1143,7 +1164,7 @@ def get_additional_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS purchase_agreements (
         id SERIAL PRIMARY KEY,
         agreement_number VARCHAR(50) UNIQUE,
-        supplier_id INTEGER NOT NULL,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
         agreement_type VARCHAR(30) DEFAULT 'blanket',
         title VARCHAR(255),
         start_date DATE,
@@ -1195,12 +1216,12 @@ def get_organization_tables_sql() -> str:
         department_name_en VARCHAR(255),
         parent_id INTEGER REFERENCES departments(id),
         branch_id INTEGER REFERENCES branches(id),
-        manager_id INTEGER,
+        manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
         description TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS employee_positions (
         id SERIAL PRIMARY KEY,
         position_code VARCHAR(50) UNIQUE,
@@ -1225,7 +1246,7 @@ def get_organization_tables_sql() -> str:
 
     CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER,
+        user_id INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         username VARCHAR(100),
         action VARCHAR(100),
         resource_type VARCHAR(50),
@@ -1264,7 +1285,7 @@ def get_organization_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT NULL,
         user_id INTEGER REFERENCES company_users(id),
         account_id INTEGER REFERENCES accounts(id),
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         tax_id VARCHAR(50),
         social_security VARCHAR(50),
         address TEXT,
@@ -1525,7 +1546,7 @@ def get_organization_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         department_id INTEGER REFERENCES departments(id),
-        position_id INTEGER,
+        position_id INTEGER REFERENCES employee_positions(id) ON DELETE SET NULL,
         description TEXT,
         requirements TEXT,
         employment_type VARCHAR(50) DEFAULT 'full_time',
@@ -1628,7 +1649,7 @@ def get_financial_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT NULL,
         exchange_rate DECIMAL(10, 6) DEFAULT 1,
         payment_method VARCHAR(50),
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         reference VARCHAR(100),
         check_number VARCHAR(50),
         check_date DATE,
@@ -1649,7 +1670,7 @@ def get_financial_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT NULL,
         exchange_rate DECIMAL(10, 6) DEFAULT 1,
         payment_method VARCHAR(50),
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         reference VARCHAR(100),
         check_number VARCHAR(50),
         check_date DATE,
@@ -1695,7 +1716,7 @@ def get_financial_tables_sql() -> str:
         end_date DATE NOT NULL,
         status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'closed')),
         retained_earnings_account_id INTEGER REFERENCES accounts(id),
-        closing_entry_id INTEGER,  -- references journal_entries(id) after closing
+        closing_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         closed_by INTEGER REFERENCES company_users(id),
         closed_at TIMESTAMPTZ,
         reopened_by INTEGER REFERENCES company_users(id),
@@ -1733,7 +1754,7 @@ def get_financial_tables_sql() -> str:
         debit DECIMAL(18,4) DEFAULT 0,
         credit DECIMAL(18,4) DEFAULT 0,
         description TEXT,
-        cost_center_id INTEGER
+        cost_center_id INTEGER REFERENCES cost_centers(id) ON DELETE SET NULL
     );
 
     -- ===== FISCAL PERIODS =====
@@ -1869,7 +1890,7 @@ def get_financial_tables_sql() -> str:
         accumulated_amount DECIMAL(18, 4) DEFAULT 0,
         book_value DECIMAL(18, 4) DEFAULT 0,
         posted BOOLEAN DEFAULT FALSE,
-        journal_entry_id INTEGER, -- REFERENCES journal_entries(id)
+        journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
@@ -1882,9 +1903,9 @@ def get_financial_tables_sql() -> str:
         reason TEXT,
         notes TEXT,
         book_value_at_transfer NUMERIC(15, 2) DEFAULT 0,
-        approved_by INTEGER,
+        approved_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         status VARCHAR(20) DEFAULT 'pending',
-        created_by INTEGER,
+        created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_asset_transfers_asset ON asset_transfers(asset_id);
@@ -1899,9 +1920,9 @@ def get_financial_tables_sql() -> str:
         disposal_value DECIMAL(18, 4) DEFAULT 0,
         disposal_reason TEXT,
         buyer_name VARCHAR(255),
-        buyer_id INTEGER,
+        buyer_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
         notes TEXT,
-        approved_by INTEGER,
+        approved_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         status VARCHAR(20) DEFAULT 'pending',
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -1915,7 +1936,7 @@ def get_financial_tables_sql() -> str:
         new_value NUMERIC(15, 2) NOT NULL,
         difference NUMERIC(15, 2) NOT NULL,
         reason TEXT,
-        journal_entry_id INTEGER,
+        journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -2084,13 +2105,13 @@ def get_financial_tables_sql() -> str:
         actual_cost DECIMAL(18, 4) DEFAULT 0,
         progress_percentage DECIMAL(5, 2) DEFAULT 0,
         manager_id INTEGER REFERENCES employees(id),
-        branch_id INTEGER,
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         contract_type VARCHAR(30) DEFAULT 'fixed_price',
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS project_tasks (
         id SERIAL PRIMARY KEY,
         project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
@@ -2127,13 +2148,13 @@ def get_financial_tables_sql() -> str:
         expense_date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
-        receipt_id INTEGER,
+        receipt_id INTEGER REFERENCES receipts(id) ON DELETE SET NULL,
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
-    
+
     CREATE TABLE IF NOT EXISTS project_revenues (
         id SERIAL PRIMARY KEY,
         project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
@@ -2141,7 +2162,7 @@ def get_financial_tables_sql() -> str:
         revenue_date DATE NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         description TEXT,
-        invoice_id INTEGER,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
@@ -2255,7 +2276,7 @@ def get_financial_tables_sql() -> str:
         month_number INTEGER NOT NULL,
         target_amount DECIMAL(18, 4) DEFAULT 0,
         branch_id INTEGER REFERENCES branches(id),
-        salesperson_id INTEGER,
+        salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -2335,7 +2356,7 @@ def get_treasury_tables_sql() -> str:
         bounce_date DATE,
         party_id INTEGER REFERENCES parties(id),
         treasury_account_id INTEGER REFERENCES treasury_accounts(id),
-        receipt_id INTEGER,
+        receipt_id INTEGER REFERENCES receipts(id) ON DELETE SET NULL,
         journal_entry_id INTEGER REFERENCES journal_entries(id),
         collection_journal_id INTEGER REFERENCES journal_entries(id),
         bounce_journal_id INTEGER REFERENCES journal_entries(id),
@@ -2362,7 +2383,7 @@ def get_treasury_tables_sql() -> str:
         bounce_date DATE,
         party_id INTEGER REFERENCES parties(id),
         treasury_account_id INTEGER REFERENCES treasury_accounts(id),
-        payment_voucher_id INTEGER,
+        payment_voucher_id INTEGER REFERENCES payment_vouchers(id) ON DELETE SET NULL,
         journal_entry_id INTEGER REFERENCES journal_entries(id),
         clearance_journal_id INTEGER REFERENCES journal_entries(id),
         bounce_journal_id INTEGER REFERENCES journal_entries(id),
@@ -2572,8 +2593,8 @@ def get_costing_policy_tables_sql() -> str:
 
     CREATE TABLE IF NOT EXISTS inventory_cost_snapshots (
         id SERIAL PRIMARY KEY,
-        warehouse_id INTEGER,
-        product_id INTEGER,
+        warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
         average_cost DECIMAL(18, 4),
         quantity DECIMAL(18, 4),
         policy_type VARCHAR(50),
@@ -2602,7 +2623,7 @@ def get_advanced_inventory_tables_sql() -> str:
         quantity DECIMAL(18, 4) DEFAULT 0,
         available_quantity DECIMAL(18, 4) DEFAULT 0,
         unit_cost DECIMAL(18, 4) DEFAULT 0,
-        supplier_id INTEGER,
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
         reference_type VARCHAR(50),
         reference_id INTEGER,
         status VARCHAR(20) DEFAULT 'active',
@@ -2627,7 +2648,7 @@ def get_advanced_inventory_tables_sql() -> str:
         sale_date DATE,
         sale_reference VARCHAR(100),
         sale_price DECIMAL(18, 4) DEFAULT 0,
-        customer_id INTEGER,
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
         warranty_start DATE,
         warranty_end DATE,
         notes TEXT,
@@ -3040,7 +3061,7 @@ def get_manufacturing_tables_sql() -> str:
         priority VARCHAR(50) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
         status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled')),
         customer_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
-        asset_id INTEGER,
+        asset_id INTEGER REFERENCES fixed_assets(id) ON DELETE SET NULL,
         assigned_to INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         assigned_at TIMESTAMPTZ,
         estimated_hours DECIMAL(8, 2),
@@ -3153,9 +3174,9 @@ def sync_essential_columns(conn):
         """CREATE TABLE IF NOT EXISTS commission_rules (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
-            salesperson_id INTEGER,
-            product_id INTEGER,
-            category_id INTEGER,
+            salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+            product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+            category_id INTEGER REFERENCES product_categories(id) ON DELETE SET NULL,
             rate_type VARCHAR(20) DEFAULT 'percentage',
             rate DECIMAL(10, 4) DEFAULT 0,
             min_amount DECIMAL(18, 4) DEFAULT 0,
@@ -3167,9 +3188,9 @@ def sync_essential_columns(conn):
         # sales_commissions
         """CREATE TABLE IF NOT EXISTS sales_commissions (
             id SERIAL PRIMARY KEY,
-            salesperson_id INTEGER,
+            salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
             salesperson_name VARCHAR(255),
-            invoice_id INTEGER,
+            invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
             invoice_number VARCHAR(50),
             invoice_date DATE,
             invoice_total DECIMAL(18, 4) DEFAULT 0,
@@ -3184,7 +3205,7 @@ def sync_essential_columns(conn):
         # stock_transfer_log
         """CREATE TABLE IF NOT EXISTS stock_transfer_log (
             id SERIAL PRIMARY KEY,
-            shipment_id INTEGER,
+            shipment_id INTEGER REFERENCES stock_shipments(id) ON DELETE SET NULL,
             product_id INTEGER REFERENCES products(id),
             from_warehouse_id INTEGER REFERENCES warehouses(id),
             to_warehouse_id INTEGER REFERENCES warehouses(id),
@@ -3198,7 +3219,7 @@ def sync_essential_columns(conn):
         # customer_price_list_items
         """CREATE TABLE IF NOT EXISTS customer_price_list_items (
             id SERIAL PRIMARY KEY,
-            price_list_id INTEGER NOT NULL,
+            price_list_id INTEGER NOT NULL REFERENCES price_lists(id) ON DELETE CASCADE,
             product_id INTEGER REFERENCES products(id),
             price DECIMAL(18, 4) NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -3958,7 +3979,7 @@ def get_pos_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS pos_return_items (
         id SERIAL PRIMARY KEY,
         return_id INTEGER REFERENCES pos_returns(id) ON DELETE CASCADE,
-        original_item_id INTEGER,
+        original_item_id INTEGER REFERENCES pos_order_lines(id) ON DELETE SET NULL,
         quantity DECIMAL(18, 4) NOT NULL DEFAULT 1,
         reason TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -3979,8 +4000,8 @@ def get_pos_tables_sql() -> str:
         start_date TIMESTAMPTZ,
         end_date TIMESTAMPTZ,
         is_active BOOLEAN DEFAULT TRUE,
-        branch_id INTEGER,
-        created_by INTEGER,
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -3994,14 +4015,14 @@ def get_pos_tables_sql() -> str:
         min_points_redeem INTEGER DEFAULT 100,
         tier_rules JSONB DEFAULT '[]'::jsonb,
         is_active BOOLEAN DEFAULT TRUE,
-        branch_id INTEGER,
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS pos_loyalty_points (
         id SERIAL PRIMARY KEY,
         program_id INTEGER REFERENCES pos_loyalty_programs(id),
-        party_id INTEGER,
+        party_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
         points_earned NUMERIC(12, 2) DEFAULT 0,
         points_redeemed NUMERIC(12, 2) DEFAULT 0,
         balance NUMERIC(12, 2) DEFAULT 0,
@@ -4013,7 +4034,7 @@ def get_pos_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS pos_loyalty_transactions (
         id SERIAL PRIMARY KEY,
         loyalty_id INTEGER REFERENCES pos_loyalty_points(id),
-        order_id INTEGER,
+        order_id INTEGER REFERENCES pos_orders(id) ON DELETE SET NULL,
         txn_type VARCHAR(20) NOT NULL,
         points NUMERIC(12, 2) NOT NULL,
         description TEXT,
@@ -4031,7 +4052,7 @@ def get_pos_tables_sql() -> str:
         shape VARCHAR(20) DEFAULT 'square',
         pos_x NUMERIC(8, 2) DEFAULT 0,
         pos_y NUMERIC(8, 2) DEFAULT 0,
-        branch_id INTEGER,
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -4039,20 +4060,20 @@ def get_pos_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS pos_table_orders (
         id SERIAL PRIMARY KEY,
         table_id INTEGER REFERENCES pos_tables(id),
-        order_id INTEGER,
+        order_id INTEGER REFERENCES pos_orders(id) ON DELETE SET NULL,
         seated_at TIMESTAMPTZ DEFAULT NOW(),
         cleared_at TIMESTAMPTZ,
         guests INTEGER DEFAULT 1,
-        waiter_id INTEGER,
+        waiter_id INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         status VARCHAR(20) DEFAULT 'seated'
     );
 
     -- POS Kitchen Display
     CREATE TABLE IF NOT EXISTS pos_kitchen_orders (
         id SERIAL PRIMARY KEY,
-        order_id INTEGER,
-        order_line_id INTEGER,
-        product_id INTEGER,
+        order_id INTEGER REFERENCES pos_orders(id) ON DELETE SET NULL,
+        order_line_id INTEGER REFERENCES pos_order_lines(id) ON DELETE SET NULL,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
         product_name VARCHAR(255),
         quantity NUMERIC(12, 3),
         notes TEXT,
@@ -4063,7 +4084,7 @@ def get_pos_tables_sql() -> str:
         accepted_at TIMESTAMPTZ,
         ready_at TIMESTAMPTZ,
         served_at TIMESTAMPTZ,
-        branch_id INTEGER
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_pos_returns_session ON pos_returns(session_id);
@@ -4087,7 +4108,7 @@ def get_approval_tables_sql() -> str:
         conditions JSONB DEFAULT '{}',
         steps JSONB DEFAULT '[]',
         is_active BOOLEAN DEFAULT TRUE,
-        created_by INTEGER,
+        created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4102,7 +4123,7 @@ def get_approval_tables_sql() -> str:
         current_step INTEGER DEFAULT 1,
         total_steps INTEGER DEFAULT 1,
         status VARCHAR(20) DEFAULT 'pending',
-        requested_by INTEGER,
+        requested_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         completed_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -4545,7 +4566,7 @@ def get_system_completion_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         delivery_order_id INTEGER NOT NULL REFERENCES delivery_orders(id) ON DELETE CASCADE,
         product_id INTEGER REFERENCES products(id),
-        so_line_id INTEGER,
+        so_line_id INTEGER REFERENCES sales_order_lines(id) ON DELETE SET NULL,
         description TEXT,
         ordered_qty NUMERIC(15,4) DEFAULT 0,
         delivered_qty NUMERIC(15,4) DEFAULT 0,
@@ -4562,7 +4583,7 @@ def get_system_completion_tables_sql() -> str:
         lc_number VARCHAR(50) UNIQUE NOT NULL,
         lc_date DATE NOT NULL DEFAULT CURRENT_DATE,
         purchase_order_id INTEGER REFERENCES purchase_orders(id),
-        grn_id INTEGER,
+        grn_id INTEGER REFERENCES goods_receipt_notes(id) ON DELETE SET NULL,
         reference VARCHAR(100),
         description TEXT,
         total_amount NUMERIC(15,4) DEFAULT 0,
@@ -4572,7 +4593,7 @@ def get_system_completion_tables_sql() -> str:
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        journal_entry_id INTEGER,
+        journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4592,7 +4613,7 @@ def get_system_completion_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         landed_cost_id INTEGER NOT NULL REFERENCES landed_costs(id) ON DELETE CASCADE,
         product_id INTEGER NOT NULL REFERENCES products(id),
-        po_line_id INTEGER,
+        po_line_id INTEGER REFERENCES purchase_order_lines(id) ON DELETE SET NULL,
         original_cost NUMERIC(15,4) NOT NULL DEFAULT 0,
         allocated_amount NUMERIC(15,4) NOT NULL DEFAULT 0,
         new_cost NUMERIC(15,4) NOT NULL DEFAULT 0,
@@ -4623,7 +4644,7 @@ def get_system_completion_tables_sql() -> str:
     CREATE TABLE IF NOT EXISTS bank_import_batches (
         id SERIAL PRIMARY KEY,
         file_name VARCHAR(300),
-        bank_account_id INTEGER,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
         total_lines INTEGER DEFAULT 0,
         imported_lines INTEGER DEFAULT 0,
         matched_lines INTEGER DEFAULT 0,
@@ -4645,8 +4666,8 @@ def get_system_completion_tables_sql() -> str:
         credit NUMERIC(15,4) DEFAULT 0,
         balance NUMERIC(15,4),
         status VARCHAR(20) DEFAULT 'unmatched',
-        matched_transaction_id INTEGER,
-        account_id INTEGER,
+        matched_transaction_id INTEGER REFERENCES treasury_transactions(id) ON DELETE SET NULL,
+        account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
         notes TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4661,7 +4682,7 @@ def get_system_completion_tables_sql() -> str:
         zakat_amount NUMERIC(15,4) DEFAULT 0,
         details JSONB DEFAULT '{}',
         status VARCHAR(20) DEFAULT 'calculated',
-        journal_entry_id INTEGER,
+        journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         notes TEXT,
         calculated_by INTEGER REFERENCES company_users(id),
         calculated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -4699,7 +4720,7 @@ def get_system_completion_tables_sql() -> str:
     );
 
     -- ===== ADD COLUMNS TO EXISTING TABLES =====
-    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER;
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER REFERENCES delivery_orders(id) ON DELETE SET NULL;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(5) DEFAULT NULL;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_saudi BOOLEAN DEFAULT FALSE;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS eos_eligible BOOLEAN DEFAULT TRUE;
@@ -4762,7 +4783,7 @@ def get_system_completion_tables_sql() -> str:
     -- B4: Manufacturing Capacity Planning
     CREATE TABLE IF NOT EXISTS capacity_plans (
         id SERIAL PRIMARY KEY,
-        work_center_id INTEGER NOT NULL,
+        work_center_id INTEGER NOT NULL REFERENCES work_centers(id) ON DELETE CASCADE,
         plan_date DATE NOT NULL,
         available_hours NUMERIC(8,2) DEFAULT 8,
         planned_hours NUMERIC(8,2) DEFAULT 0,
@@ -4778,7 +4799,7 @@ def get_system_completion_tables_sql() -> str:
     -- B5: Project Risks
     CREATE TABLE IF NOT EXISTS project_risks (
         id SERIAL PRIMARY KEY,
-        project_id INTEGER NOT NULL,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         title VARCHAR(200) NOT NULL,
         description TEXT,
         probability VARCHAR(20) DEFAULT 'medium',
@@ -4797,9 +4818,9 @@ def get_system_completion_tables_sql() -> str:
     -- B5: Task Dependencies
     CREATE TABLE IF NOT EXISTS task_dependencies (
         id SERIAL PRIMARY KEY,
-        project_id INTEGER NOT NULL,
-        task_id INTEGER NOT NULL,
-        depends_on_task_id INTEGER NOT NULL,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        task_id INTEGER NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
+        depends_on_task_id INTEGER NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
         dependency_type VARCHAR(20) DEFAULT 'finish_to_start',
         lag_days INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -4809,7 +4830,7 @@ def get_system_completion_tables_sql() -> str:
     -- B6: Lease Contracts (IFRS 16)
     CREATE TABLE IF NOT EXISTS lease_contracts (
         id SERIAL PRIMARY KEY,
-        asset_id INTEGER,
+        asset_id INTEGER REFERENCES fixed_assets(id) ON DELETE SET NULL,
         description VARCHAR(300) NOT NULL,
         lessor_name VARCHAR(200),
         lease_type VARCHAR(30) DEFAULT 'operating',
@@ -4830,13 +4851,13 @@ def get_system_completion_tables_sql() -> str:
     -- B6: Asset Impairment (IAS 36)
     CREATE TABLE IF NOT EXISTS asset_impairments (
         id SERIAL PRIMARY KEY,
-        asset_id INTEGER NOT NULL,
+        asset_id INTEGER NOT NULL REFERENCES fixed_assets(id) ON DELETE CASCADE,
         test_date DATE NOT NULL,
         carrying_amount NUMERIC(15,4) NOT NULL,
         recoverable_amount NUMERIC(15,4) NOT NULL,
         impairment_loss NUMERIC(15,4) DEFAULT 0,
         reason TEXT,
-        journal_entry_id INTEGER,
+        journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4847,7 +4868,7 @@ def get_system_completion_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         name VARCHAR(200) NOT NULL,
         expense_type VARCHAR(50),
-        department_id INTEGER,
+        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
         daily_limit NUMERIC(15,4) DEFAULT 0,
         monthly_limit NUMERIC(15,4) DEFAULT 0,
         annual_limit NUMERIC(15,4) DEFAULT 0,
@@ -4925,4 +4946,69 @@ def get_performance_indexes_sql() -> str:
 
     -- Notifications
     CREATE INDEX IF NOT EXISTS idx_notif_user_read ON notifications(user_id, is_read);
+
+    -- Phase 1 Hardening: Missing FK and query indexes
+    CREATE INDEX IF NOT EXISTS idx_parties_party_code ON parties(party_code);
+    CREATE INDEX IF NOT EXISTS idx_parties_branch_id ON parties(branch_id);
+    CREATE INDEX IF NOT EXISTS idx_parties_party_group_id ON parties(party_group_id);
+
+    CREATE INDEX IF NOT EXISTS idx_party_transactions_payment_id ON party_transactions(payment_id);
+    CREATE INDEX IF NOT EXISTS idx_party_transactions_invoice_id ON party_transactions(invoice_id);
+
+    CREATE INDEX IF NOT EXISTS idx_invoices_warehouse_id ON invoices(warehouse_id);
+    CREATE INDEX IF NOT EXISTS idx_invoices_branch_id ON invoices(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_invoice_lines_product_id ON invoice_lines(product_id);
+
+    CREATE INDEX IF NOT EXISTS idx_journal_lines_cost_center_id ON journal_lines(cost_center_id);
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_branch_id ON journal_entries(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_suppliers_branch_id ON suppliers(branch_id);
+    CREATE INDEX IF NOT EXISTS idx_suppliers_supplier_group_id ON suppliers(supplier_group_id);
+
+    CREATE INDEX IF NOT EXISTS idx_supplier_transactions_payment_id ON supplier_transactions(payment_id);
+    CREATE INDEX IF NOT EXISTS idx_supplier_transactions_invoice_id ON supplier_transactions(invoice_id);
+
+    CREATE INDEX IF NOT EXISTS idx_customers_branch_id ON customers(branch_id);
+    CREATE INDEX IF NOT EXISTS idx_customers_customer_group_id ON customers(customer_group_id);
+
+    CREATE INDEX IF NOT EXISTS idx_customer_transactions_receipt_id ON customer_transactions(receipt_id);
+    CREATE INDEX IF NOT EXISTS idx_customer_transactions_invoice_id ON customer_transactions(invoice_id);
+
+    CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+    CREATE INDEX IF NOT EXISTS idx_products_unit_id ON products(unit_id);
+
+    CREATE INDEX IF NOT EXISTS idx_inventory_transactions_warehouse_id ON inventory_transactions(warehouse_id);
+    CREATE INDEX IF NOT EXISTS idx_inventory_transactions_product_id ON inventory_transactions(product_id);
+    CREATE INDEX IF NOT EXISTS idx_inventory_transactions_reference_id ON inventory_transactions(reference_id);
+
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_party_id ON purchase_orders(party_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_orders_branch_id ON purchase_orders(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_sales_orders_party_id ON sales_orders(party_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_orders_branch_id ON sales_orders(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_sales_returns_party_id ON sales_returns(party_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_returns_branch_id ON sales_returns(branch_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_returns_invoice_id ON sales_returns(invoice_id);
+
+    CREATE INDEX IF NOT EXISTS idx_payment_vouchers_party_id ON payment_vouchers(party_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_vouchers_branch_id ON payment_vouchers(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_employees_position_id ON employees(position_id);
+    CREATE INDEX IF NOT EXISTS idx_employees_manager_id ON employees(manager_id);
+    CREATE INDEX IF NOT EXISTS idx_employees_user_id ON employees(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_employee_loans_employee_id ON employee_loans(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_employee_loans_branch_id ON employee_loans(branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_cost_centers_department_id ON cost_centers(department_id);
+
+    CREATE INDEX IF NOT EXISTS idx_commission_rules_salesperson_id ON commission_rules(salesperson_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_commissions_invoice_id ON sales_commissions(invoice_id);
+
+    CREATE INDEX IF NOT EXISTS idx_customer_price_list_items_price_list_id ON customer_price_list_items(price_list_id);
+
+    CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product_id ON stock_adjustments(product_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_adjustments_warehouse_id ON stock_adjustments(warehouse_id);
     """

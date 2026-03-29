@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { companiesAPI } from '../../utils/api'
-import { Search, ChevronLeft, ChevronRight, Info } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 
 
 function CompanyList() {
@@ -14,6 +16,7 @@ function CompanyList() {
     const [total, setTotal] = useState(0)
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState('')
+    const [filterValues, setFilterValues] = useState({})
     const limit = 20
 
     const fetchCompanies = async () => {
@@ -40,6 +43,70 @@ function CompanyList() {
 
     const totalPages = Math.ceil(total / limit)
 
+    const filteredCompanies = useMemo(() => {
+        let result = companies;
+        if (filterValues.status) {
+            result = result.filter(c => c.status === filterValues.status);
+        }
+        return result;
+    }, [companies, filterValues]);
+
+    const columns = useMemo(() => [
+        {
+            key: 'id',
+            label: t('admin.companies.id'),
+            render: (val) => (
+                <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{val}</span>
+            ),
+        },
+        {
+            key: 'company_name',
+            label: t('admin.companies.name'),
+        },
+        {
+            key: 'database_name',
+            label: t('admin.companies.database'),
+            render: (val) => (
+                <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                    {val}
+                </code>
+            ),
+        },
+        {
+            key: 'email',
+            label: t('admin.companies.email'),
+        },
+        {
+            key: 'status',
+            label: t('common.status_title'),
+            render: (val) => (
+                <span className={`badge badge-${val === 'active' ? 'success' : 'warning'}`}>
+                    {val === 'active' ? t('common.active') : t('common.disabled')}
+                </span>
+            ),
+        },
+        {
+            key: 'plan_type',
+            label: t('admin.companies.plan'),
+        },
+        {
+            key: 'created_at',
+            label: t('admin.companies.reg_date'),
+            render: (val) => formatShortDate(val),
+        },
+    ], [t]);
+
+    const filters = useMemo(() => [
+        {
+            key: 'status',
+            label: t('common.status_title'),
+            options: [
+                { value: 'active', label: t('common.active') },
+                { value: 'disabled', label: t('common.disabled') },
+            ],
+        },
+    ], [t]);
+
     return (
         <div className="workspace">
             <div className="workspace-header">
@@ -48,71 +115,30 @@ function CompanyList() {
                     <h1 className="workspace-title">{t('admin.companies.title')}</h1>
                     <p className="workspace-subtitle">{t('admin.companies.subtitle')}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            className="form-input pr-10 min-w-[300px]"
-                            placeholder={t('common.search') || "Search companies..."}
-                            value={search}
-                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                        />
-                    </div>
-                </div>
             </div>
 
             {error && <div className="alert alert-error mb-4">{error}</div>}
 
-            <div className="card">
-                <div className="table-container">
-                    <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ textAlign: 'right', borderBottom: '2px solid var(--border-color)' }}>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.id')}</th>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.name')}</th>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.database')}</th>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.email')}</th>
-                                <th style={{ padding: '12px' }}>{t('common.status_title')}</th>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.plan')}</th>
-                                <th style={{ padding: '12px' }}>{t('admin.companies.reg_date')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className={loading ? 'opacity-50' : ''}>
-                            {companies.map(company => (
-                                <tr key={company.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: '12px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                        {company.id}
-                                    </td>
-                                    <td style={{ padding: '12px' }}>{company.company_name}</td>
-                                    <td style={{ padding: '12px' }}>
-                                        <code style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
-                                            {company.database_name}
-                                        </code>
-                                    </td>
-                                    <td style={{ padding: '12px' }}>{company.email}</td>
-                                    <td style={{ padding: '12px' }}>
-                                        <span className={`badge badge-${company.status === 'active' ? 'success' : 'warning'}`}>
-                                            {company.status === 'active' ? t('common.active') : t('common.disabled')}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px' }}>{company.plan_type}</td>
-                                    <td style={{ padding: '12px' }}>
-                                        {formatShortDate(company.created_at)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+            <SearchFilter
+                value={search}
+                onChange={(val) => { setSearch(val); setPage(1); }}
+                placeholder={t('common.search')}
+                filters={filters}
+                filterValues={filterValues}
+                onFilterChange={(key, value) => setFilterValues(prev => ({ ...prev, [key]: value }))}
+            />
 
-                {companies.length === 0 && !loading && (
-                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                        {t('admin.companies.no_companies')}
-                    </div>
-                )}
+            <DataTable
+                columns={columns}
+                data={filteredCompanies}
+                loading={loading}
+                emptyTitle={t('admin.companies.no_companies')}
+                rowKey="id"
+                paginate={false}
+            />
 
-                {/* Pagination footer */}
+            {/* Server-side pagination */}
+            {total > 0 && (
                 <div className="flex items-center justify-between mt-6 p-4 border-t border-slate-100">
                     <div className="text-sm text-slate-500">
                         {t('common.showing') || "Showing"} {Math.min(total, (page - 1) * limit + 1)} - {Math.min(total, page * limit)} {t('common.of') || "of"} {total}
@@ -137,7 +163,7 @@ function CompanyList() {
                         </button>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }

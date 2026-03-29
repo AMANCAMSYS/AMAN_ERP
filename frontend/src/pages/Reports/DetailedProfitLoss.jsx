@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { detailedReportsAPI } from '../../services/reports';
+import { api } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -9,7 +10,7 @@ import {
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+
 
 const DetailedProfitLoss = () => {
     const { t, i18n } = useTranslation();
@@ -64,8 +65,7 @@ const DetailedProfitLoss = () => {
         [t('reports.detailed_pl.gross_profit')]: row.gross_profit || 0,
     }));
 
-    const handleExport = (format) => {
-        const token = localStorage.getItem('token');
+    const handleExport = async (format) => {
         const params = new URLSearchParams({
             start_date: startDate,
             end_date: endDate,
@@ -73,7 +73,14 @@ const DetailedProfitLoss = () => {
             format,
             ...(currentBranch?.id ? { branch_id: currentBranch.id } : {}),
         });
-        window.open(`${API_BASE}/api/reports/accounting/profit-loss/detailed?${params}&token=${token}`, '_blank');
+        const res = await api.get(`/reports/accounting/profit-loss/detailed?${params}`, { responseType: 'blob' });
+        const url = URL.createObjectURL(res.data);
+        if (format === 'pdf') {
+            window.open(url, '_blank');
+        } else {
+            const a = document.createElement('a'); a.href = url; a.download = `profit-loss.${format === 'excel' ? 'xlsx' : format}`; a.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
 
     const fmt = (n) => Number(n || 0).toLocaleString(isRTL ? 'ar-SA' : 'en-US', {

@@ -3,8 +3,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 from pydantic import BaseModel
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    """Convert any numeric value to Decimal safely."""
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -13,6 +19,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission, require_module
 from utils.accounting import get_mapped_account_id, generate_sequential_number, update_account_balance, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 from schemas.purchases import PurchaseLineItem, PurchaseCreate, SupplierGroupCreate, POCreate, ReceiveItem, POReceiveRequest, SupplierCreate, PaymentAllocationSchema, SupplierPaymentCreate
 
 router = APIRouter(prefix="/buying", tags=["المشتريات"], dependencies=[Depends(require_module("buying"))])
@@ -484,11 +491,11 @@ def create_purchase_order(
         from utils.accounting import generate_sequential_number
         po_num = generate_sequential_number(db, f"PO-{datetime.now().year}", "purchase_orders", "po_number")
         
-        # Calculate Totals
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
-        
+        # Calculate Totals (using Decimal for precision)
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
+        total_discount = Decimal('0')
+
         lines_data = []
         for item in po.items:
             # Validate quantities and prices
@@ -496,23 +503,23 @@ def create_purchase_order(
                 raise HTTPException(status_code=400, detail=f"الكمية يجب أن تكون أكبر من صفر: {item.description}")
             if float(item.unit_price) < 0:
                 raise HTTPException(status_code=400, detail=f"سعر الوحدة لا يمكن أن يكون سالباً: {item.description}")
-            
-            line_total = float(item.quantity) * float(item.unit_price)
-            line_discount = float(item.discount)
-            
+
+            line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+            line_discount = _dec(item.discount)
+
             if line_discount < 0:
                 raise HTTPException(status_code=400, detail=f"الخصم لا يمكن أن يكون سالباً: {item.description}")
             if line_discount > line_total:
                 raise HTTPException(status_code=400, detail=f"الخصم ({line_discount}) يتجاوز إجمالي السطر ({line_total}): {item.description}")
-            
-            taxable = line_total - line_discount
-            line_tax = taxable * (float(item.tax_rate) / 100)
+
+            taxable = (line_total - line_discount).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             final_total = taxable + line_tax
-            
+
             subtotal += line_total
             total_discount += line_discount
             total_tax += line_tax
-            
+
             lines_data.append({
                 "product_id": item.product_id,
                 "description": item.description,
@@ -520,7 +527,7 @@ def create_purchase_order(
                 "unit_price": item.unit_price,
                 "tax_rate": item.tax_rate,
                 "discount": item.discount,
-                "total": final_total
+                "total": float(final_total)
             })
 
         grand_total = subtotal - total_discount + total_tax
@@ -845,35 +852,25 @@ def receive_purchase_order(
             acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
             
             if acc_inventory and acc_unbilled:
-                je_num = f"JE-RECV-{po.po_number}-{datetime.now().strftime('%M%S')}"
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (entry_number, entry_date, description, reference, status, created_by, branch_id)
-                    VALUES (:num, NOW(), :desc, :ref, 'posted', :user, :branch) RETURNING id
-                """), {
-                    "num": je_num, 
-                    "desc": f"استحقاق توريد بضاعة - {po.po_number}", 
-                    "ref": po.po_number, 
-                    "user": int(current_user.get("id") if isinstance(current_user, dict) else current_user.id),
-                    "branch": po.branch_id
-                }).scalar()
+                je_lines = [
+                    {"account_id": acc_inventory, "debit": receipt_value_base, "credit": 0, "description": f"Inventory Receipt - {po.po_number}", "amount_currency": receipt_value_base / exchange_rate if exchange_rate else receipt_value_base, "currency": po.currency},
+                    {"account_id": acc_unbilled, "debit": 0, "credit": receipt_value_base, "description": f"Unbilled Accrual - {po.po_number}", "amount_currency": receipt_value_base / exchange_rate if exchange_rate else receipt_value_base, "currency": po.currency}
+                ]
                 
-                # Debit Inventory
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :aid, :deb, 0, :desc)
-                """), {"jid": je_id, "aid": acc_inventory, "deb": receipt_value_base, "desc": f"Inventory Receipt - {po.po_number}"})
-                
-                # Credit Unbilled Purchases
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:jid, :aid, 0, :cred, :desc)
-                """), {"jid": je_id, "aid": acc_unbilled, "cred": receipt_value_base, "desc": f"Unbilled Accrual - {po.po_number}"})
-                
-                # Update Account Balances
-                from utils.accounting import update_account_balance
-                receipt_value_fc = receipt_value_base / exchange_rate if exchange_rate else receipt_value_base
-                update_account_balance(db, account_id=acc_inventory, debit_base=receipt_value_base, credit_base=0, debit_curr=receipt_value_fc, credit_curr=0, currency=po.currency)
-                update_account_balance(db, account_id=acc_unbilled, debit_base=0, credit_base=receipt_value_base, debit_curr=0, credit_curr=receipt_value_fc, currency=po.currency)
+                gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.company_id,
+                    date=str(datetime.now().date()),
+                    description=f"استحقاق توريد بضاعة - {po.po_number}",
+                    reference=po.po_number,
+                    lines=je_lines,
+                    user_id=int(current_user.get("id") if isinstance(current_user, dict) else current_user.id),
+                    branch_id=po.branch_id,
+                    currency=po.currency,
+                    exchange_rate=exchange_rate,
+                    source="purchase_order_receipt",
+                    source_id=id
+                )
         
         db.commit()
         
@@ -1507,58 +1504,20 @@ async def create_purchase_invoice(
         
         # Insert Journal Entry
         if je_lines:
-            # Validate JE lines (balancing, None accounts, negatives)
-            from utils.accounting import validate_je_lines
-            valid_lines = validate_je_lines(je_lines, source=f"PURCH-{inv_num}")
-            
-            if valid_lines:
-                import uuid
-                je_num = f"JE-PURCH-{inv_num}"
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, reference, status, 
-                        created_by, branch_id, currency, exchange_rate
-                    )
-                    VALUES (
-                        :num, :date, :desc, :ref, 'posted', 
-                        :user, :branch, :currency, :rate
-                    ) RETURNING id
-                """), {
-                    "num": je_num, "date": invoice.invoice_date, 
-                    "desc": f"Purchase Invoice {inv_num} ({inv_currency})", 
-                    "ref": inv_num, "user": current_user.get("id") if isinstance(current_user, dict) else current_user.id,
-                    "branch": invoice.branch_id,
-                    "currency": inv_currency, "rate": exchange_rate
-                }).scalar()
-                
-                for line in valid_lines:
-                    db.execute(text("""
-                        INSERT INTO journal_lines (
-                            journal_entry_id, account_id, debit, credit, description,
-                            amount_currency, currency
-                        )
-                        VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                    """), {
-                        "jid": je_id, 
-                        "aid": line["account_id"], 
-                        "deb": line["debit"], 
-                        "cred": line["credit"], 
-                        "desc": line["description"],
-                        "amt_curr": line.get("amount_currency", 0),
-                        "curr": line.get("currency", base_currency)
-                    })
-                    
-                    # Update Account Balance
-                    from utils.accounting import update_account_balance
-                    update_account_balance(
-                        db,
-                        account_id=line["account_id"],
-                        debit_base=line["debit"],
-                        credit_base=line["credit"],
-                        debit_curr=line.get("amount_currency", 0) if line["debit"] > 0 else 0,
-                        credit_curr=line.get("amount_currency", 0) if line["credit"] > 0 else 0,
-                        currency=line.get("currency", base_currency)
-                    )
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(invoice.invoice_date),
+                description=f"Purchase Invoice {inv_num} ({inv_currency})",
+                reference=inv_num,
+                lines=je_lines,
+                user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                branch_id=invoice.branch_id,
+                currency=inv_currency,
+                exchange_rate=exchange_rate,
+                source="purchase_invoice",
+                source_id=invoice_id
+            )
 
         # --- 8. Insert Currency Transaction (if Foreign Currency) ---
         if inv_currency != base_currency:
@@ -1872,50 +1831,27 @@ def create_purchase_return(
                 # Fix small rounding difference by adjusting inventory credit
                 gl_subtotal = gl_total - (gl_tax if gl_tax > 0 and vat_acc else 0)
 
-            entry_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_date, reference, description, status, created_by, branch_id,
-                    currency, exchange_rate
-                ) 
-                VALUES (:date, :ref, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
-            """), {
-                "date": invoice.invoice_date, "ref": return_number, 
-                "desc": f"مردود مشتريات {return_number} ({invoice.currency})", 
-                "uid": user_id, "bid": invoice.branch_id,
-                "curr": invoice.currency or base_currency, "rate": exchange_rate
-            }).fetchone()[0]
-
-            # Debit AP (Decrease Liability)
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:eid, :acc, :amount, 0, 'مردود مشتريات', :amt_curr, :curr)
-            """), {"eid": entry_id, "acc": ap_acc, "amount": gl_total, "amt_curr": total, "curr": invoice.currency or base_currency})
-
-            # Credit Inventory
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:eid, :acc, 0, :amount, 'تكلفة البضاعة', :amt_curr, :curr)
-            """), {"eid": entry_id, "acc": inventory_acc, "amount": gl_subtotal, "amt_curr": subtotal, "curr": invoice.currency or base_currency})
-            
-            # Credit VAT
+            je_lines = [
+                {"account_id": ap_acc, "debit": gl_total, "credit": 0, "description": "مردود مشتريات", "amount_currency": total, "currency": invoice.currency or base_currency},
+                {"account_id": inventory_acc, "debit": 0, "credit": gl_subtotal, "description": "تكلفة البضاعة", "amount_currency": subtotal, "currency": invoice.currency or base_currency}
+            ]
             if gl_tax > 0 and vat_acc:
-                 db.execute(text("""
-                     INSERT INTO journal_lines (
-                         journal_entry_id, account_id, debit, credit, description,
-                         amount_currency, currency
-                     ) VALUES (:eid, :acc, 0, :amount, 'استرداد ضريبة', :amt_curr, :curr)
-                 """), {"eid": entry_id, "acc": vat_acc, "amount": gl_tax, "amt_curr": tax_total, "curr": invoice.currency or base_currency})
+                je_lines.append({"account_id": vat_acc, "debit": 0, "credit": gl_tax, "description": "استرداد ضريبة", "amount_currency": tax_total, "currency": invoice.currency or base_currency})
 
-            # Update Account Balances
-            from utils.accounting import update_account_balance
-            update_account_balance(db, account_id=ap_acc, debit_base=gl_total, credit_base=0)
-            update_account_balance(db, account_id=inventory_acc, debit_base=0, credit_base=gl_subtotal)
-            if gl_tax > 0 and vat_acc:
-                update_account_balance(db, account_id=vat_acc, debit_base=0, credit_base=gl_tax)
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(invoice.invoice_date),
+                description=f"مردود مشتريات {return_number} ({invoice.currency})",
+                reference=return_number,
+                lines=je_lines,
+                user_id=user_id,
+                branch_id=invoice.branch_id,
+                currency=invoice.currency or base_currency,
+                exchange_rate=exchange_rate,
+                source="purchase_return",
+                source_id=new_invoice_id
+            )
 
         # 7. INTEGRATED REFUND (If paid_amount > 0)
         if invoice.paid_amount and invoice.paid_amount > 0:
@@ -1961,38 +1897,25 @@ def create_purchase_return(
                 cash_acc = get_mapped_account_id(db, "acc_map_bank")
 
             if cash_acc and ap_acc:
-                ref_entry_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_date, reference, description, status, created_by, branch_id,
-                        currency, exchange_rate
-                    ) 
-                    VALUES (:date, :ref, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
-                """), {
-                    "date": invoice.invoice_date, "ref": voucher_num, 
-                    "desc": f"سند قبض مورد {voucher_num} ({invoice.currency})", 
-                    "uid": user_id, "bid": invoice.branch_id,
-                    "curr": invoice.currency or base_currency, "rate": exchange_rate
-                }).fetchone()[0]
-
-                # Debit Cash (We received money)
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, :amount, 0, 'قبض', :amt_curr, :curr)
-                """), {"eid": ref_entry_id, "acc": cash_acc, "amount": gl_paid, "amt_curr": invoice.paid_amount, "curr": invoice.currency or base_currency})
-
-                # Credit AP (We owe them again / Clear the Debit note)
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, 0, :amount, 'تسوية مردود', :amt_curr, :curr)
-                """), {"eid": ref_entry_id, "acc": ap_acc, "amount": gl_paid, "amt_curr": invoice.paid_amount, "curr": invoice.currency or base_currency})
-
-                # Update account balances for refund
-                update_account_balance(db, account_id=cash_acc, debit_base=gl_paid, credit_base=0)
-                update_account_balance(db, account_id=ap_acc, debit_base=0, credit_base=gl_paid)
+                je_lines_refund = [
+                    {"account_id": cash_acc, "debit": gl_paid, "credit": 0, "description": "قبض", "amount_currency": invoice.paid_amount, "currency": invoice.currency or base_currency},
+                    {"account_id": ap_acc, "debit": 0, "credit": gl_paid, "description": "تسوية مردود", "amount_currency": invoice.paid_amount, "currency": invoice.currency or base_currency}
+                ]
+                
+                gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.company_id,
+                    date=str(invoice.invoice_date),
+                    description=f"سند قبض مورد {voucher_num} ({invoice.currency})",
+                    reference=voucher_num,
+                    lines=je_lines_refund,
+                    user_id=user_id,
+                    branch_id=invoice.branch_id,
+                    currency=invoice.currency or base_currency,
+                    exchange_rate=exchange_rate,
+                    source="payment_voucher",
+                    source_id=vid
+                )
 
         db.commit()
 
@@ -2209,52 +2132,15 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         amount_base_cash = locals().get('amount_base_cash', amount_base)
 
         if ap_acc and cash_acc:
-            je_num = f"JE-{voucher_num}"
-            entry_id = db.execute(text("""
-                INSERT INTO journal_entries (
-                    entry_number, entry_date, reference, description, status, 
-                    created_by, branch_id, currency, exchange_rate
-                ) VALUES (
-                    :num, :date, :ref, :desc, 'posted', 
-                    :uid, :bid, :curr, :rate
-                ) RETURNING id
-            """), {
-                "num": je_num, "date": data.voucher_date, "ref": voucher_num, 
-                "desc": f"{'سند قبض من' if data.voucher_type=='refund' else 'سند صرف لـ'} مورد {voucher_num} ({data.currency})", 
-                "uid": current_user.id, "bid": data.branch_id,
-                "curr": data.currency, "rate": data.exchange_rate or 1.0
-            }).scalar()
-
+            je_lines = []
             if data.voucher_type == 'refund':
                 # Receipt: Debit Cash, Credit AP
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, :amt, 0, 'قبض', :amt_curr, :curr)
-                """), {"eid": entry_id, "acc": cash_acc, "amt": amount_base_cash, "amt_curr": amount_treasury_curr, "curr": treasury_curr})
-                
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, 0, :amt, 'من مورد', :amt_curr, :curr)
-                """), {"eid": entry_id, "acc": ap_acc, "amt": amount_base, "amt_curr": data.amount, "curr": data.currency})
+                je_lines.append({"account_id": cash_acc, "debit": amount_base_cash, "credit": 0, "description": "قبض", "amount_currency": amount_treasury_curr, "currency": treasury_curr})
+                je_lines.append({"account_id": ap_acc, "debit": 0, "credit": amount_base, "description": "من مورد", "amount_currency": data.amount, "currency": data.currency})
             else:
                 # Payment: Debit AP, Credit Cash
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, :amt, 0, 'صرف', :amt_curr, :curr)
-                """), {"eid": entry_id, "acc": ap_acc, "amt": amount_base, "amt_curr": data.amount, "curr": data.currency})
-                
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    ) VALUES (:eid, :acc, 0, :amt, 'من خزينة', :amt_curr, :curr)
-                """), {"eid": entry_id, "acc": cash_acc, "amt": amount_base_cash, "amt_curr": amount_treasury_curr, "curr": treasury_curr})
+                je_lines.append({"account_id": ap_acc, "debit": amount_base, "credit": 0, "description": "صرف", "amount_currency": data.amount, "currency": data.currency})
+                je_lines.append({"account_id": cash_acc, "debit": 0, "credit": amount_base_cash, "description": "من خزينة", "amount_currency": amount_treasury_curr, "currency": treasury_curr})
             
             # 5. Handle Exchange Difference to Balance the JE
             diff = round(amount_base - amount_base_cash, 2)
@@ -2264,31 +2150,23 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                     # Logic: If diff (AP-Cash) is +ve, we need More Credit (if Payment) or More Debit (if Refund)
                     je_diff = -diff if data.voucher_type != 'refund' else diff # Adjustment to Debit
                     if je_diff > 0:
-                        db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:eid, :acc, :amt, 0, 'فرق سعر صرف')"), {"eid": entry_id, "acc": fx_acc, "amt": abs(je_diff)})
+                        je_lines.append({"account_id": fx_acc, "debit": abs(je_diff), "credit": 0, "description": "فرق سعر صرف"})
                     else:
-                        db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:eid, :acc, 0, :amt, 'فرق سعر صرف')"), {"eid": entry_id, "acc": fx_acc, "amt": abs(je_diff)})
+                        je_lines.append({"account_id": fx_acc, "debit": 0, "credit": abs(je_diff), "description": "فرق سعر صرف"})
 
-            # 6. Update account balances
-            from utils.accounting import update_account_balance
-            # AP side
-            update_account_balance(
-                db,
-                account_id=ap_acc,
-                debit_base=amount_base if data.voucher_type != 'refund' else 0,
-                credit_base=amount_base if data.voucher_type == 'refund' else 0,
-                debit_curr=data.amount if data.voucher_type != 'refund' else 0,
-                credit_curr=data.amount if data.voucher_type == 'refund' else 0,
-                currency=data.currency
-            )
-            # Cash side
-            update_account_balance(
-                db,
-                account_id=cash_acc,
-                debit_base=amount_base_cash if data.voucher_type == 'refund' else 0,
-                credit_base=amount_base_cash if data.voucher_type != 'refund' else 0,
-                debit_curr=amount_treasury_curr if data.voucher_type == 'refund' else 0,
-                credit_curr=amount_treasury_curr if data.voucher_type != 'refund' else 0,
-                currency=treasury_curr
+            gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(data.voucher_date),
+                description=f"{'سند قبض من' if data.voucher_type=='refund' else 'سند صرف لـ'} مورد {voucher_num} ({data.currency})",
+                reference=voucher_num,
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=data.branch_id,
+                currency=data.currency,
+                exchange_rate=data.exchange_rate or 1.0,
+                source="payment_voucher",
+                source_id=voucher_id
             )
 
         db.commit()
@@ -2670,31 +2548,20 @@ def create_purchase_credit_note(
                              "description": f"إشعار دائن مشتريات - عكس ضريبة {inv_num}",
                              "amount_currency": tax_total, "currency": currency})
 
-        je_num = f"JE-PCN-{inv_num}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status,
-                created_by, branch_id, currency, exchange_rate, posted_at
-            ) VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :curr, :rate, NOW())
-            RETURNING id
-        """), {
-            "num": je_num, "date": inv_date,
-            "desc": f"إشعار دائن مشتريات {inv_num}",
-            "ref": inv_num, "user": current_user.id,
-            "branch": branch_id, "curr": currency, "rate": exchange_rate,
-        }).scalar()
-
-        for jl in je_lines:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
-            """), {"jid": je_id, "aid": jl["account_id"], "deb": jl["debit"], "cred": jl["credit"],
-                   "desc": jl["description"], "amt": jl["amount_currency"], "curr": jl["currency"]})
-            update_account_balance(db, account_id=jl["account_id"],
-                                   debit_base=jl["debit"], credit_base=jl["credit"],
-                                   debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
-                                   credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
-                                   currency=jl["currency"])
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(inv_date),
+            description=f"إشعار دائن مشتريات {inv_num}",
+            reference=inv_num,
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=branch_id,
+            currency=currency,
+            exchange_rate=exchange_rate,
+            source="purchase_credit_note",
+            source_id=note_id
+        )
 
         # Reduce related invoice balance
         if related_invoice_id:
@@ -2936,31 +2803,20 @@ def create_purchase_debit_note(
                          "description": f"إشعار مدين مشتريات - زيادة ذمم {inv_num}",
                          "amount_currency": total, "currency": currency})
 
-        je_num = f"JE-PDN-{inv_num}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status,
-                created_by, branch_id, currency, exchange_rate, posted_at
-            ) VALUES (:num, :date, :desc, :ref, 'posted', :user, :branch, :curr, :rate, NOW())
-            RETURNING id
-        """), {
-            "num": je_num, "date": inv_date,
-            "desc": f"إشعار مدين مشتريات {inv_num}",
-            "ref": inv_num, "user": current_user.id,
-            "branch": branch_id, "curr": currency, "rate": exchange_rate,
-        }).scalar()
-
-        for jl in je_lines:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description, amount_currency, currency)
-                VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
-            """), {"jid": je_id, "aid": jl["account_id"], "deb": jl["debit"], "cred": jl["credit"],
-                   "desc": jl["description"], "amt": jl["amount_currency"], "curr": jl["currency"]})
-            update_account_balance(db, account_id=jl["account_id"],
-                                   debit_base=jl["debit"], credit_base=jl["credit"],
-                                   debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
-                                   credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
-                                   currency=jl["currency"])
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(inv_date),
+            description=f"إشعار مدين مشتريات {inv_num}",
+            reference=inv_num,
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=branch_id,
+            currency=currency,
+            exchange_rate=exchange_rate,
+            source="purchase_debit_note",
+            source_id=note_id
+        )
 
         # Update supplier balance (debit note INCREASES what we owe supplier)
         gl_total_base = round(total * exchange_rate, 4)

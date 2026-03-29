@@ -11,14 +11,22 @@ from datetime import date
 from pydantic import BaseModel
 import logging
 
+from decimal import Decimal, ROUND_HALF_UP
+
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.audit import log_activity
-from utils.accounting import update_account_balance
+from utils.accounting import update_account_balance, validate_je_lines
+from utils.fiscal_lock import check_fiscal_period_open
 from utils.cache import cache
 from fastapi import Request
 from schemas.treasury import TreasuryAccountCreate, TreasuryAccountResponse, TransactionCreate, TransactionResponse
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    """Convert any numeric value to Decimal safely."""
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 router = APIRouter(prefix="/treasury", tags=["الخزينة والمصروفات"], dependencies=[Depends(require_module("treasury"))])
 logger = logging.getLogger(__name__)
@@ -197,26 +205,9 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
         
         # 5. Handle Opening Balance
         if account.opening_balance and account.opening_balance > 0:
-            # Calculate Base Balance
-            exchange_rate = float(account.exchange_rate or 1.0)
-            balance_base = round(account.opening_balance * exchange_rate, 2)
-            
             # Update Treasury Balance (Current Balance is always in account currency)
             db.execute(text("UPDATE treasury_accounts SET current_balance = :bal WHERE id = :id"), 
                        {"bal": account.opening_balance, "id": new_treasury[0]})
-            
-            # Update GL Account Balance using proper utility
-            update_account_balance(
-                db, account_id=gl_id,
-                debit_base=balance_base, credit_base=0,
-                debit_curr=account.opening_balance if account.currency else 0,
-                credit_curr=0,
-                currency=account.currency or None
-            )
-            
-            # Create Balancing Journal Entry
-            import uuid
-            je_num = f"OPEN-{uuid.uuid4().hex[:6].upper()}"
             
             # Credit Capital (3101 - Placeholder for Capital/Opening Balance)
             # Find Capital account or use 31 as root
@@ -224,57 +215,25 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
             capital_gl_id = capital_acc[0] if capital_acc else None
             
             if capital_gl_id:
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, status, branch_id, created_by,
-                        currency, exchange_rate
-                    )
-                    VALUES (:num, CURRENT_DATE, :desc, 'posted', :bid, :uid, :curr, :rate) RETURNING id
-                """), {
-                    "num": je_num,
-                    "desc": f"Opening Balance - {account.name}",
-                    "bid": account.branch_id,
-                    "uid": current_user.id,
-                    "curr": account.currency or base_currency, # Default to base if empty
-                    "rate": exchange_rate
-                }).scalar()
+                # Build and validate journal lines
+                je_lines = [
+                    {"account_id": gl_id, "debit": float(account.opening_balance), "credit": 0, "currency": account.currency, "exchange_rate": float(account.exchange_rate or 1)},
+                    {"account_id": capital_gl_id, "debit": 0, "credit": float(account.opening_balance) * float(account.exchange_rate or 1), "currency": base_currency, "exchange_rate": 1.0},
+                ]
                 
-                # Debit Treasury (Asset Increases)
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:je_id, :acc_id, :amt, 0, :desc, :amt_curr, :curr)
-                """), {
-                    "je_id": je_id, 
-                    "acc_id": gl_id, 
-                    "amt": balance_base, 
-                    "desc": "Opening Balance",
-                    "amt_curr": account.opening_balance,
-                    "curr": account.currency
-                })
-                
-                # Credit Capital (Equity Increases)
-                # Capital is typically kept in Base Currency, so amount_currency = 0 or balance_base if we want to track it
-                # For now, let's assume Capital is base currency only.
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:je_id, :acc_id, 0, :amt, :desc, 0, NULL)
-                """), {
-                    "je_id": je_id, 
-                    "acc_id": capital_gl_id, 
-                    "amt": balance_base, 
-                    "desc": "Opening Balance"
-                })
-                
-                # Update Capital Balance
-                update_account_balance(
-                    db, account_id=capital_gl_id,
-                    debit_base=0, credit_base=balance_base
+                from services.gl_service import create_journal_entry as gl_create_journal_entry
+                gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.company_id,
+                    date=date.today().isoformat(),
+                    description=f"Opening Balance - {account.name}",
+                    lines=je_lines,
+                    user_id=current_user.id,
+                    branch_id=account.branch_id,
+                    currency=base_currency,
+                    exchange_rate=1.0,
+                    source="treasury_account_opening",
+                    source_id=new_treasury[0]
                 )
         
         db.commit()
@@ -489,8 +448,8 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
             raise HTTPException(status_code=404, detail="الخزينة غير موجودة")
             
         treasury_gl_id, _, treasury_branch_id, treasury_currency = treasury
-        exchange_rate = float(data.exchange_rate or 1.0)
-        amount_base = round(data.amount * exchange_rate, 2)
+        exchange_rate = _dec(data.exchange_rate or 1)
+        amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
         
         # Determine the branch for this transaction (Allocation Branch)
         final_branch_id = data.branch_id if data.branch_id is not None else treasury_branch_id
@@ -524,61 +483,27 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
                    {"amt": data.amount, "id": data.treasury_id})
         
         # 4. Create Journal Entry
-        # Credit Treasury (Asset decreases), Debit Expense (Expense increases)
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, status, created_by, branch_id,
-                currency, exchange_rate
-            )
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
-        """), {
-            "num": trans_num,
-            "date": data.transaction_date,
-            "desc": f"Expense: {data.description} ({treasury_currency})",
-            "uid": current_user.id,
-            "bid": final_branch_id,
-            "curr": treasury_currency,
-            "rate": exchange_rate
-        }).scalar()
+        check_fiscal_period_open(db, data.transaction_date)
         
-        # Debit Expense
-        db.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, debit, credit, description,
-                amount_currency, currency
-            )
-            VALUES (:je_id, :acc_id, :amt, 0, :desc, :amt_curr, :curr)
-        """), {
-            "je_id": je_id, "acc_id": data.target_account_id, "amt": amount_base, "desc": data.description,
-            "amt_curr": data.amount, "curr": treasury_currency
-        })
-        
-        # Credit Treasury
-        db.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, debit, credit, description,
-                amount_currency, currency
-            )
-            VALUES (:je_id, :acc_id, 0, :amt, :desc, :amt_curr, :curr)
-        """), {
-            "je_id": je_id, "acc_id": treasury_gl_id, "amt": amount_base, "desc": data.description,
-            "amt_curr": data.amount, "curr": treasury_currency
-        })
-        
-        # Update GL Accounts Balances
-        update_account_balance(
-            db, account_id=data.target_account_id,
-            debit_base=amount_base, credit_base=0,
-            debit_curr=data.amount if treasury_currency else 0,
-            credit_curr=0,
-            currency=treasury_currency
-        )
-        update_account_balance(
-            db, account_id=treasury_gl_id,
-            debit_base=0, credit_base=amount_base,
-            debit_curr=0,
-            credit_curr=data.amount if treasury_currency else 0,
-            currency=treasury_currency
+        je_lines = [
+            {"account_id": data.target_account_id, "debit": float(data.amount), "credit": 0},
+            {"account_id": treasury_gl_id, "debit": 0, "credit": float(data.amount)},
+        ]
+
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data.transaction_date,
+            description=f"Expense: {data.description} ({treasury_currency})",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=final_branch_id,
+            reference=trans_num,
+            currency=treasury_currency,
+            exchange_rate=float(exchange_rate),
+            source="expense_transaction",
+            source_id=trans_id
         )
         
         db.commit()
@@ -639,9 +564,9 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
         source_gl, source_name, branch_id, source_currency = source
         target_gl, target_name, target_currency = target
         
-        exchange_rate = float(data.exchange_rate or 1.0)
-        amount_base = round(data.amount * exchange_rate, 2)
-        
+        exchange_rate = _dec(data.exchange_rate or 1)
+        amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
+
         # 1. Insert Transaction Log
         trans_id = db.execute(text("""
             INSERT INTO treasury_transactions (
@@ -666,75 +591,47 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
         db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), {"amt": data.amount, "id": data.treasury_id})
         
         # Cross-currency: convert amount to target currency before adding to target treasury
-        if source_currency != target_currency and exchange_rate != 1.0:
+        if source_currency != target_currency and exchange_rate != Decimal('1'):
             # data.amount is in source currency, exchange_rate converts source->base
             # For target treasury, we need to convert: source_amount * source_rate / target_rate
             target_rate_row = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": target_currency}).fetchone()
-            target_rate = float(target_rate_row.current_rate) if target_rate_row else 1.0
-            target_amount = round((data.amount * exchange_rate) / target_rate, 2) if target_rate else data.amount
+            target_rate = _dec(target_rate_row.current_rate) if target_rate_row else Decimal('1')
+            target_amount = ((_dec(data.amount) * exchange_rate) / target_rate).quantize(_D2, ROUND_HALF_UP) if target_rate else _dec(data.amount)
         else:
             target_amount = data.amount
         
         db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), {"amt": target_amount, "id": data.target_treasury_id})
         
         # 3. Create Journal Entry
-        # Credit Source (Asset decreases), Debit Target (Asset increases)
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, status, created_by, branch_id,
-                currency, exchange_rate
-            )
-            VALUES (:num, :date, :desc, 'posted', :uid, :bid, :curr, :rate) RETURNING id
-        """), {
-            "num": trans_num,
-            "date": data.transaction_date,
-            "desc": f"Transfer: {source_name} -> {target_name} ({source_currency})",
-            "uid": current_user.id,
-            "bid": branch_id,
-            "curr": source_currency,
-            "rate": exchange_rate
-        }).scalar()
+        check_fiscal_period_open(db, data.transaction_date)
         
-        # Debit Target
-        db.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, debit, credit, description,
-                amount_currency, currency
-            )
-            VALUES (:je_id, :acc_id, :amt, 0, :desc, :amt_curr, :curr)
-        """), {
-            "je_id": je_id, "acc_id": target_gl, "amt": amount_base, "desc": "Transfer In",
-            "amt_curr": target_amount if source_currency != target_currency else data.amount,
-            "curr": target_currency
-        })
+        target_rate = (_dec(amount_base) / _dec(target_amount)) if _dec(target_amount) else Decimal('1')
         
-        # Credit Source
-        db.execute(text("""
-            INSERT INTO journal_lines (
-                journal_entry_id, account_id, debit, credit, description,
-                amount_currency, currency
-            )
-            VALUES (:je_id, :acc_id, 0, :amt, :desc, :amt_curr, :curr)
-        """), {
-            "je_id": je_id, "acc_id": source_gl, "amt": amount_base, "desc": "Transfer Out",
-            "amt_curr": data.amount, "curr": source_currency
-        })
-        
-        # Update GL
-        target_fc_amount = target_amount if source_currency != target_currency else data.amount
-        update_account_balance(
-            db, account_id=target_gl,
-            debit_base=amount_base, credit_base=0,
-            debit_curr=target_fc_amount,
-            credit_curr=0,
-            currency=target_currency
-        )
-        update_account_balance(
-            db, account_id=source_gl,
-            debit_base=0, credit_base=amount_base,
-            debit_curr=0,
-            credit_curr=data.amount,
-            currency=source_currency
+        je_lines = [
+            {
+                "account_id": target_gl, "debit": float(target_amount), "credit": 0, 
+                "currency": target_currency, "exchange_rate": float(target_rate), "description": "Transfer In"
+            },
+            {
+                "account_id": source_gl, "debit": 0, "credit": float(data.amount), 
+                "currency": source_currency, "exchange_rate": float(exchange_rate), "description": "Transfer Out"
+            },
+        ]
+
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data.transaction_date,
+            description=f"Transfer: {source_name} -> {target_name} ({source_currency})",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=branch_id,
+            reference=trans_num,
+            currency=source_currency,
+            exchange_rate=float(exchange_rate),
+            source="treasury_transfer",
+            source_id=trans_id
         )
         
         db.commit()
@@ -797,9 +694,9 @@ def get_treasury_balances_report(
         rows = db.execute(q, params).fetchall()
 
         accounts = []
-        total_cash = 0
-        total_bank = 0
-        total_all = 0
+        total_cash = Decimal('0')
+        total_bank = Decimal('0')
+        total_all = Decimal('0')
 
         # Load base currency and exchange rates once
         base_currency = db.execute(text(
@@ -812,23 +709,23 @@ def get_treasury_balances_report(
                 "SELECT code, current_rate FROM currencies WHERE is_active = true"
             )).fetchall()
             for rr in rate_rows:
-                fx_rates[rr.code] = float(rr.current_rate or 1.0)
+                fx_rates[rr.code] = _dec(rr.current_rate or 1)
         except Exception:
             pass
 
         for r in rows:
-            bal = float(r.current_balance or 0)
+            bal = _dec(r.current_balance or 0)
             currency = r.currency or base_currency
-            rate = fx_rates.get(currency, 1.0) if currency != base_currency else 1.0
-            bal_base = round(bal * rate, 2)
+            rate = fx_rates.get(currency, Decimal('1')) if currency != base_currency else Decimal('1')
+            bal_base = (bal * rate).quantize(_D2, ROUND_HALF_UP)
 
             acc = {
                 "id": r.id, "name": r.name, "name_en": r.name_en,
                 "account_type": r.account_type, "currency": currency,
-                "current_balance": bal,
-                "balance_in_currency": bal,
-                "balance_in_base": bal_base,
-                "exchange_rate": rate,
+                "current_balance": float(bal),
+                "balance_in_currency": float(bal),
+                "balance_in_base": float(bal_base),
+                "exchange_rate": float(rate),
                 "base_currency": base_currency,
                 "branch_name": r.branch_name
             }
@@ -859,9 +756,9 @@ def get_treasury_balances_report(
         return {
             "accounts": accounts,
             "summary": {
-                "total_cash": total_cash,
-                "total_bank": total_bank,
-                "total_all": total_all,
+                "total_cash": float(total_cash),
+                "total_bank": float(total_bank),
+                "total_all": float(total_all),
                 "cash_count": sum(1 for a in accounts if a["account_type"] == "cash"),
                 "bank_count": sum(1 for a in accounts if a["account_type"] == "bank"),
             },

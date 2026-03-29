@@ -1,16 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Building } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import DataTable from '../../components/common/DataTable';
+import SearchFilter from '../../components/common/SearchFilter';
 
 const DepartmentList = () => {
     const { t } = useTranslation();
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [search, setSearch] = useState('');
 
     const [formData, setFormData] = useState({
         department_name: ''
@@ -53,15 +56,42 @@ const DepartmentList = () => {
         }
     };
 
+    const filteredData = useMemo(() => {
+        let result = departments;
+        if (search) {
+            const q = search.toLowerCase();
+            result = result.filter(dept =>
+                (dept.department_name || '').toLowerCase().includes(q)
+            );
+        }
+        return result;
+    }, [departments, search]);
+
+    const columns = [
+        { key: 'department_name', label: t("hr.departments.name"), style: { fontWeight: 'bold' } },
+        {
+            key: '_actions', label: t("common.actions"), width: '100px',
+            render: (_val, row) => (
+                <button
+                    className="btn btn-icon text-danger"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(row.id); }}
+                    title={t("common.delete")}
+                >
+                    <Trash2 size={16} />
+                </button>
+            ),
+        },
+    ];
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <div className="header-title">
-                    <h1 className="workspace-title">{t("hr.departments.title")}</h1>
-                    <p className="workspace-subtitle">{t("hr.departments.subtitle")}</p>
-                </div>
-                <div className="header-actions">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <h1 className="workspace-title">{t("hr.departments.title")}</h1>
+                        <p className="workspace-subtitle">{t("hr.departments.subtitle")}</p>
+                    </div>
                     <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                         <Plus size={18} className="ms-2" />
                         {t('hr.departments.add')}
@@ -69,47 +99,20 @@ const DepartmentList = () => {
                 </div>
             </div>
 
-            <div className="card shadow-sm border-0">
-                <div className="card-body p-0">
-                    <table className="data-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>{t("hr.departments.name")}</th>
-                                <th style={{ width: '100px' }}>{t("common.actions")}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="3" className="text-center p-4">{t("common.loading")}</td></tr>
-                            ) : departments.length === 0 ? (
-                                <tr>
-                                    <td colSpan="3" className="text-center p-5">
-                                        <div className="text-muted mb-3" style={{ fontSize: '30px' }}>🏢</div>
-                                        <p>{t("hr.departments.no_departments")}</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                departments.map((dept, index) => (
-                                    <tr key={dept.id} className="hover-row">
-                                        <td>{index + 1}</td>
-                                        <td className="fw-bold">{dept.department_name}</td>
-                                        <td>
-                                            <button
-                                                className="btn btn-icon text-danger"
-                                                onClick={() => handleDelete(dept.id)}
-                                                title={t("common.delete")}
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t("hr.departments.name")}
+            />
+
+            <DataTable
+                columns={columns}
+                data={filteredData}
+                loading={loading}
+                emptyIcon="🏢"
+                emptyTitle={t("hr.departments.no_departments")}
+                emptyAction={{ label: t('hr.departments.add'), onClick: () => setShowModal(true) }}
+            />
 
             {/* Create Modal */}
             {showModal && (

@@ -10,6 +10,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 const ReconciliationForm = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -223,8 +224,7 @@ const ReconciliationForm = () => {
                 <div className="card p-4 mx-auto" style={{ maxWidth: '600px' }}>
                     <form onSubmit={handleCreate}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div className="form-group">
-                                <label className="form-label">{t('treasury.reconciliation.select_account')} *</label>
+                            <FormField label={t('treasury.reconciliation.select_account')} required>
                                 <select className="form-input" required
                                     value={formData.treasury_account_id}
                                     onChange={e => setFormData({ ...formData, treasury_account_id: e.target.value })}>
@@ -233,7 +233,7 @@ const ReconciliationForm = () => {
                                         <option key={acc.id} value={acc.id}>{acc.name} ({acc.currency})</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                             <div className="form-group">
                                 <CustomDatePicker
                                     label={t('treasury.reconciliation.statement_date')}
@@ -242,28 +242,25 @@ const ReconciliationForm = () => {
                                     required />
                             </div>
                             <div style={{ display: 'flex', gap: '16px' }}>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('treasury.reconciliation.start_bal')} *</label>
+                                <FormField label={t('treasury.reconciliation.start_bal')} required style={{ flex: 1 }}>
                                     <input type="number" step="0.01" className="form-input" required
                                         value={formData.start_balance}
                                         onChange={e => setFormData({ ...formData, start_balance: e.target.value })}
                                         placeholder="0.00" />
-                                </div>
-                                <div className="form-group" style={{ flex: 1 }}>
-                                    <label className="form-label">{t('treasury.reconciliation.end_bal')} *</label>
+                                </FormField>
+                                <FormField label={t('treasury.reconciliation.end_bal')} required style={{ flex: 1 }}>
                                     <input type="number" step="0.01" className="form-input" required
                                         value={formData.end_balance}
                                         onChange={e => setFormData({ ...formData, end_balance: e.target.value })}
                                         placeholder="0.00" />
-                                </div>
+                                </FormField>
                             </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.notes')}</label>
+                            <FormField label={t('common.notes')}>
                                 <textarea className="form-input" rows="2"
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
                                     placeholder={t('treasury.reconciliation.notes_placeholder')} />
-                            </div>
+                            </FormField>
                             <button type="submit" className="btn btn-primary w-100 py-3 mt-2">
                                 {t('treasury.reconciliation.create')}
                             </button>

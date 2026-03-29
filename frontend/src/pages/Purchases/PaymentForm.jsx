@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 
 function PaymentForm() {
@@ -343,8 +344,7 @@ function PaymentForm() {
                         <h3 className="section-title text-purple-700">{t('buying.payments.form.basic_info')}</h3>
                         <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="form-group">
-                                    <label className="form-label">{t('buying.payments.form.supplier')}</label>
+                                <FormField label={t('buying.payments.form.supplier')}>
                                     <select
                                         required
                                         value={formData.supplier_id}
@@ -357,7 +357,7 @@ function PaymentForm() {
                                             <option key={s.id} value={s.id}>{s.name}</option>
                                         ))}
                                     </select>
-                                </div>
+                                </FormField>
 
                                 <div className="form-group">
                                     <CustomDatePicker
@@ -369,8 +369,7 @@ function PaymentForm() {
                                 </div>
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">{t('buying.payments.form.payment_currency')}</label>
+                            <FormField label={t('buying.payments.form.payment_currency')}>
                                 <select
                                     value={recordCurrency}
                                     onChange={(e) => handleRecordCurrencyChange(e.target.value)}
@@ -380,7 +379,7 @@ function PaymentForm() {
                                         <option key={c.code} value={c.code}>{c.code} - {c.name}</option>
                                     ))}
                                 </select>
-                            </div>
+                            </FormField>
                         </div>
                     </div>
 
@@ -513,8 +512,7 @@ function PaymentForm() {
                             <h4 style={{ marginBottom: '12px' }} className="text-purple-800">{t('buying.payments.form.payment_info')}</h4>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="form-group">
-                                    <label className="form-label">{formData.voucher_type === 'payment' ? t('buying.payments.form.amount_paid') : t('buying.payments.form.amount_received')}</label>
+                                <FormField label={formData.voucher_type === 'payment' ? t('buying.payments.form.amount_paid') : t('buying.payments.form.amount_received')}>
                                     <div className="relative">
                                         <input
                                             type="number"
@@ -527,10 +525,9 @@ function PaymentForm() {
                                         />
                                         <span className="absolute left-3 top-2 text-gray-400">{recordCurrency}</span>
                                     </div>
-                                </div>
+                                </FormField>
 
-                                <div className="form-group" style={{ marginTop: '8px' }}>
-                                    <label className="form-label" style={{ marginBottom: '8px', display: 'block' }}>{t('buying.payments.form.payment_method')}</label>
+                                <FormField label={t('buying.payments.form.payment_method')} style={{ marginTop: '8px' }}>
                                     <div style={{ display: 'flex', gap: '16px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                                             <input
@@ -563,7 +560,7 @@ function PaymentForm() {
                                             <span style={{ fontSize: '14px' }}>{t('buying.payments.form.payment_methods.check')}</span>
                                         </label>
                                     </div>
-                                </div>
+                                </FormField>
 
                                 {(formData.payment_method === 'cash' || formData.payment_method === 'bank') && (
                                     <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
@@ -665,15 +662,14 @@ function PaymentForm() {
 
                             {formData.payment_method === 'check' && (
                                 <div className="grid grid-cols-2 gap-4 mt-2 p-4 bg-purple-50 rounded-lg">
-                                    <div className="form-group">
-                                        <label className="form-label text-purple-800">{t('buying.payments.form.check_number')}</label>
+                                    <FormField label={t('buying.payments.form.check_number')}>
                                         <input
                                             type="text"
                                             value={formData.check_number}
                                             onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
                                             className="form-input border-purple-200"
                                         />
-                                    </div>
+                                    </FormField>
                                     <div className="form-group">
                                         <CustomDatePicker
                                             label={t('buying.payments.form.check_date')}
@@ -684,8 +680,7 @@ function PaymentForm() {
                                 </div>
                             )}
 
-                            <div className="form-group mt-4">
-                                <label className="form-label">{t('buying.payments.form.notes')}</label>
+                            <FormField label={t('buying.payments.form.notes')} className="mt-4">
                                 <textarea
                                     rows="2"
                                     value={formData.notes}
@@ -693,7 +688,7 @@ function PaymentForm() {
                                     className="form-input border-purple-100"
                                     placeholder={t('buying.payments.form.notes_placeholder')}
                                 />
-                            </div>
+                            </FormField>
                         </div>
 
                         <div style={{ width: '300px', padding: '24px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>

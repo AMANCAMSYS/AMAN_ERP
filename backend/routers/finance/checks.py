@@ -8,9 +8,19 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission, validate_branch_access, require_module
-from utils.accounting import update_account_balance, get_base_currency
-from datetime import date, datetime
+from utils.accounting import get_base_currency
+from utils.fiscal_lock import check_fiscal_period_open
+from services.gl_service import create_journal_entry as gl_create_journal_entry
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import date
 from typing import Optional
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v):
+    """Convert a value to Decimal safely (avoids float-binary noise)."""
+    return Decimal(str(v or 0))
 
 router = APIRouter(prefix="/checks", tags=["checks"], dependencies=[Depends(require_module("treasury"))])
 
@@ -89,7 +99,7 @@ def list_checks_receivable(
             items.append({
                 "id": r.id, "check_number": r.check_number,
                 "drawer_name": r.drawer_name, "bank_name": r.bank_name,
-                "branch_name": r.branch_name, "amount": float(r.amount),
+                "branch_name": r.branch_name, "amount": float(_dec(r.amount)),
                 "currency": r.currency,
                 "issue_date": str(r.issue_date) if r.issue_date else None,
                 "due_date": str(r.due_date) if r.due_date else None,
@@ -132,10 +142,10 @@ def checks_receivable_stats(branch_id: Optional[int] = None, current_user=Depend
             FROM checks_receivable WHERE 1=1 {cond}
         """), params).fetchone()
         return {
-            "pending": {"count": stats.pending_count, "amount": float(stats.pending_amount)},
-            "collected": {"count": stats.collected_count, "amount": float(stats.collected_amount)},
-            "bounced": {"count": stats.bounced_count, "amount": float(stats.bounced_amount)},
-            "overdue": {"count": stats.overdue_count, "amount": float(stats.overdue_amount)},
+            "pending": {"count": stats.pending_count, "amount": float(_dec(stats.pending_amount))},
+            "collected": {"count": stats.collected_count, "amount": float(_dec(stats.collected_amount))},
+            "bounced": {"count": stats.bounced_count, "amount": float(_dec(stats.bounced_amount))},
+            "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -164,7 +174,7 @@ def get_check_receivable(check_id: int, current_user=Depends(get_current_user)):
         return {
             "id": r.id, "check_number": r.check_number,
             "drawer_name": r.drawer_name, "bank_name": r.bank_name,
-            "branch_name": r.branch_name, "amount": float(r.amount),
+            "branch_name": r.branch_name, "amount": float(_dec(r.amount)),
             "currency": r.currency,
             "issue_date": str(r.issue_date) if r.issue_date else None,
             "due_date": str(r.due_date) if r.due_date else None,
@@ -206,7 +216,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
 
         _ensure_checks_accounts(db)
 
-        amount = float(data["amount"])
+        amount = _dec(data["amount"]).quantize(_D2, ROUND_HALF_UP)
 
         checks_account = db.execute(text(
             "SELECT id FROM accounts WHERE account_code = '1205' LIMIT 1"
@@ -219,35 +229,23 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
         if not checks_account or not ar_account:
             raise HTTPException(500, "حسابات الشيكات (1205) أو العملاء (1200/1201) غير موجودة. يرجى إعداد دليل الحسابات أولاً.")
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-            VALUES (
-                'CHK-R-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-R-%')::text, '1'), 6, '0'),
-                :entry_date, :description, 'posted', 'check_receivable', :user_id, :branch_id
-            ) RETURNING id
-        """), {
-            "entry_date": data.get("issue_date", str(date.today())),
-            "description": f"استلام شيك رقم {data['check_number']} - {data.get('drawer_name', '')}",
-            "user_id": current_user.id,
-            "branch_id": data.get("branch_id"),
-        }).fetchone()
-        je_id = je.id if je else None
+        check_fiscal_period_open(db, data.get("issue_date", str(date.today())))
+        
+        je_lines = [
+            {"account_id": checks_account.id, "debit": float(amount), "credit": 0, "description": f"شيك تحت التحصيل {data['check_number']}"},
+            {"account_id": ar_account.id, "debit": 0, "credit": float(amount), "description": f"شيك تحت التحصيل {data['check_number']}"},
+        ]
 
-        if je_id:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, :amount, 0, :desc)
-            """), {"je_id": je_id, "account_id": checks_account.id, "amount": amount,
-                   "desc": f"شيك تحت التحصيل {data['check_number']}"})
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, 0, :amount, :desc)
-            """), {"je_id": je_id, "account_id": ar_account.id, "amount": amount,
-                   "desc": f"شيك تحت التحصيل {data['check_number']}"})
-
-            # Update Account Balances
-            update_account_balance(db, account_id=checks_account.id, debit_base=amount, credit_base=0)
-            update_account_balance(db, account_id=ar_account.id, debit_base=0, credit_base=amount)
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data.get("issue_date", str(date.today())),
+            description=f"استلام شيك رقم {data['check_number']} - {data.get('drawer_name', '')}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=data.get("branch_id"),
+            source="check_receivable"
+        )
 
         result = db.execute(text("""
             INSERT INTO checks_receivable (
@@ -264,7 +262,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
             "drawer_name": data.get("drawer_name", ""),
             "bank_name": data.get("bank_name", ""),
             "branch_name": data.get("branch_name", ""),
-            "amount": amount,
+            "amount": float(amount),
             "currency": data.get("currency", get_base_currency(db)),
             "issue_date": data.get("issue_date"),
             "due_date": data["due_date"],
@@ -280,7 +278,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
         db.commit()
         try:
             log_activity(db, current_user.id, current_user.username, "create", "checks_receivable", str(result.id),
-                         {"check_number": data["check_number"], "amount": amount})
+                         {"check_number": data["check_number"], "amount": float(amount)})
         except Exception:
             pass
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
@@ -325,41 +323,31 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
         if not checks_account:
             raise HTTPException(500, "حساب الشيكات تحت التحصيل (1205) غير موجود")
 
-        amount = float(check.amount)
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-            VALUES (
-                'CHK-C-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-C-%')::text, '1'), 6, '0'),
-                :entry_date, :description, 'posted', 'check_collection', :user_id, :branch_id
-            ) RETURNING id
-        """), {
-            "entry_date": collection_date,
-            "description": f"تحصيل شيك رقم {check.check_number}",
-            "user_id": current_user.id,
-            "branch_id": check.branch_id,
-        }).fetchone()
-        coll_je_id = je.id if je else None
-
-        if coll_je_id:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, :amount, 0, :desc)
-            """), {"je_id": coll_je_id, "account_id": treasury.gl_account_id, "amount": amount,
-                   "desc": f"تحصيل شيك {check.check_number}"})
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, 0, :amount, :desc)
-            """), {"je_id": coll_je_id, "account_id": checks_account.id, "amount": amount,
-                   "desc": f"تحصيل شيك {check.check_number}"})
-
-            # Update Account Balances
-            update_account_balance(db, account_id=treasury.gl_account_id, debit_base=amount, credit_base=0)
-            update_account_balance(db, account_id=checks_account.id, debit_base=0, credit_base=amount)
+        check_fiscal_period_open(db, collection_date)
+        
+        je_lines = [
+            {"account_id": treasury.gl_account_id, "debit": float(amount), "credit": 0, "description": f"تحصيل شيك {check.check_number}"},
+            {"account_id": checks_account.id, "debit": 0, "credit": float(amount), "description": f"تحصيل شيك {check.check_number}"},
+        ]
+        
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        coll_je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=collection_date,
+            description=f"تحصيل شيك رقم {check.check_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=check.branch_id,
+            source="check_collection",
+            source_id=check_id
+        )
 
         # Update treasury balance
         db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid"),
-                   {"amt": amount, "tid": treasury_id})
+                   {"amt": float(amount), "tid": treasury_id})
 
         db.execute(text("""
             UPDATE checks_receivable SET status = 'collected', collection_date = :cdate,
@@ -404,7 +392,7 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
 
         bounce_reason = data.get("bounce_reason", "")
         bounce_date = data.get("bounce_date", str(date.today()))
-        amount = float(check.amount)
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
 
         ar_account = db.execute(text(
             "SELECT id FROM accounts WHERE account_code IN ('1201', '1200') AND is_active = TRUE ORDER BY account_code LIMIT 1"
@@ -414,6 +402,7 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
         if not ar_account:
             raise HTTPException(500, "حساب العملاء (1200/1201) غير موجود")
 
+        check_fiscal_period_open(db, bounce_date)
         bounce_je_id = None
 
         if check.status == 'collected':
@@ -422,71 +411,45 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
             if not treasury:
                 raise HTTPException(400, "حساب الخزينة غير مرتبط بالشيك المحصّل")
 
-            je = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-                VALUES (
-                    'CHK-B-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-B-%')::text, '1'), 6, '0'),
-                    :entry_date, :description, 'posted', 'check_bounce', :user_id, :branch_id
-                ) RETURNING id
-            """), {
-                "entry_date": bounce_date,
-                "description": f"ارتجاع شيك رقم {check.check_number} - {bounce_reason}",
-                "user_id": current_user.id,
-                "branch_id": check.branch_id,
-            }).fetchone()
-            bounce_je_id = je.id if je else None
-
-            if bounce_je_id:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, :amount, 0, :desc)
-                """), {"je_id": bounce_je_id, "account_id": ar_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك {check.check_number}"})
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, 0, :amount, :desc)
-                """), {"je_id": bounce_je_id, "account_id": treasury.gl_account_id, "amount": amount,
-                       "desc": f"ارتجاع شيك {check.check_number}"})
-
-                # Update Account Balances
-                update_account_balance(db, account_id=ar_account.id, debit_base=amount, credit_base=0)
-                update_account_balance(db, account_id=treasury.gl_account_id, debit_base=0, credit_base=amount)
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            je_lines = [
+                {"account_id": ar_account.id, "debit": float(amount), "credit": 0, "description": f"ارتجاع شيك {check.check_number}"},
+                {"account_id": treasury.gl_account_id, "debit": 0, "credit": float(amount), "description": f"ارتجاع شيك {check.check_number}"},
+            ]
+            bounce_je_id, _ = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=bounce_date,
+                description=f"ارتجاع شيك رقم {check.check_number} - {bounce_reason}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=check.branch_id,
+                source="check_bounce",
+                source_id=check_id
+            )
 
             db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid"),
-                       {"amt": amount, "tid": check.treasury_account_id})
+                       {"amt": float(amount), "tid": check.treasury_account_id})
         else:
             if not checks_account:
                 raise HTTPException(500, "حساب الشيكات تحت التحصيل (1205) غير موجود")
 
-            je = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-                VALUES (
-                    'CHK-B-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-B-%')::text, '1'), 6, '0'),
-                    :entry_date, :description, 'posted', 'check_bounce', :user_id, :branch_id
-                ) RETURNING id
-            """), {
-                "entry_date": bounce_date,
-                "description": f"ارتجاع شيك رقم {check.check_number} - {bounce_reason}",
-                "user_id": current_user.id,
-                "branch_id": check.branch_id,
-            }).fetchone()
-            bounce_je_id = je.id if je else None
-
-            if bounce_je_id:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, :amount, 0, :desc)
-                """), {"je_id": bounce_je_id, "account_id": ar_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك {check.check_number}"})
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, 0, :amount, :desc)
-                """), {"je_id": bounce_je_id, "account_id": checks_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك {check.check_number}"})
-
-                # Update Account Balances
-                update_account_balance(db, account_id=ar_account.id, debit_base=amount, credit_base=0)
-                update_account_balance(db, account_id=checks_account.id, debit_base=0, credit_base=amount)
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+            je_lines = [
+                {"account_id": ar_account.id, "debit": float(amount), "credit": 0, "description": f"ارتجاع شيك {check.check_number}"},
+                {"account_id": checks_account.id, "debit": 0, "credit": float(amount), "description": f"ارتجاع شيك {check.check_number}"},
+            ]
+            bounce_je_id, _ = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=bounce_date,
+                description=f"ارتجاع شيك رقم {check.check_number} - {bounce_reason}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=check.branch_id,
+                source="check_bounce",
+                source_id=check_id
+            )
 
         db.execute(text("""
             UPDATE checks_receivable SET status = 'bounced', bounce_date = :bdate,
@@ -561,7 +524,7 @@ def list_checks_payable(
             items.append({
                 "id": r.id, "check_number": r.check_number,
                 "beneficiary_name": r.beneficiary_name, "bank_name": r.bank_name,
-                "branch_name": r.branch_name, "amount": float(r.amount),
+                "branch_name": r.branch_name, "amount": float(_dec(r.amount)),
                 "currency": r.currency,
                 "issue_date": str(r.issue_date) if r.issue_date else None,
                 "due_date": str(r.due_date) if r.due_date else None,
@@ -604,10 +567,10 @@ def checks_payable_stats(branch_id: Optional[int] = None, current_user=Depends(g
             FROM checks_payable WHERE 1=1 {cond}
         """), params).fetchone()
         return {
-            "issued": {"count": stats.issued_count, "amount": float(stats.issued_amount)},
-            "cleared": {"count": stats.cleared_count, "amount": float(stats.cleared_amount)},
-            "bounced": {"count": stats.bounced_count, "amount": float(stats.bounced_amount)},
-            "overdue": {"count": stats.overdue_count, "amount": float(stats.overdue_amount)},
+            "issued": {"count": stats.issued_count, "amount": float(_dec(stats.issued_amount))},
+            "cleared": {"count": stats.cleared_count, "amount": float(_dec(stats.cleared_amount))},
+            "bounced": {"count": stats.bounced_count, "amount": float(_dec(stats.bounced_amount))},
+            "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -636,7 +599,7 @@ def get_check_payable(check_id: int, current_user=Depends(get_current_user)):
         return {
             "id": r.id, "check_number": r.check_number,
             "beneficiary_name": r.beneficiary_name, "bank_name": r.bank_name,
-            "branch_name": r.branch_name, "amount": float(r.amount),
+            "branch_name": r.branch_name, "amount": float(_dec(r.amount)),
             "currency": r.currency,
             "issue_date": str(r.issue_date) if r.issue_date else None,
             "due_date": str(r.due_date) if r.due_date else None,
@@ -678,7 +641,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
 
         _ensure_checks_accounts(db)
 
-        amount = float(data["amount"])
+        amount = _dec(data["amount"]).quantize(_D2, ROUND_HALF_UP)
 
         checks_pay_account = db.execute(text(
             "SELECT id FROM accounts WHERE account_code = '2105' LIMIT 1"
@@ -691,35 +654,23 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
         if not checks_pay_account or not ap_account:
             raise HTTPException(500, "حسابات الشيكات (2105) أو الموردين (2100/2101) غير موجودة. يرجى إعداد دليل الحسابات أولاً.")
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-            VALUES (
-                'CHK-P-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-P-%')::text, '1'), 6, '0'),
-                :entry_date, :description, 'posted', 'check_payable', :user_id, :branch_id
-            ) RETURNING id
-        """), {
-            "entry_date": data["issue_date"],
-            "description": f"إصدار شيك رقم {data['check_number']} - {data.get('beneficiary_name', '')}",
-            "user_id": current_user.id,
-            "branch_id": data.get("branch_id"),
-        }).fetchone()
-        je_id = je.id if je else None
+        check_fiscal_period_open(db, data["issue_date"])
+        
+        je_lines = [
+            {"account_id": ap_account.id, "debit": float(amount), "credit": 0, "description": f"شيك صادر {data['check_number']}"},
+            {"account_id": checks_pay_account.id, "debit": 0, "credit": float(amount), "description": f"شيك صادر {data['check_number']}"},
+        ]
 
-        if je_id:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, :amount, 0, :desc)
-            """), {"je_id": je_id, "account_id": ap_account.id, "amount": amount,
-                   "desc": f"شيك صادر {data['check_number']}"})
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, 0, :amount, :desc)
-            """), {"je_id": je_id, "account_id": checks_pay_account.id, "amount": amount,
-                   "desc": f"شيك صادر {data['check_number']}"})
-
-            # Update Account Balances
-            update_account_balance(db, account_id=ap_account.id, debit_base=amount, credit_base=0)
-            update_account_balance(db, account_id=checks_pay_account.id, debit_base=0, credit_base=amount)
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=data["issue_date"],
+            description=f"إصدار شيك رقم {data['check_number']} - {data.get('beneficiary_name', '')}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=data.get("branch_id"),
+            source="check_payable"
+        )
 
         result = db.execute(text("""
             INSERT INTO checks_payable (
@@ -736,7 +687,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
             "beneficiary_name": data.get("beneficiary_name", ""),
             "bank_name": data.get("bank_name", ""),
             "branch_name": data.get("branch_name", ""),
-            "amount": amount,
+            "amount": float(amount),
             "currency": data.get("currency", get_base_currency(db)),
             "issue_date": data["issue_date"],
             "due_date": data["due_date"],
@@ -752,7 +703,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
         db.commit()
         try:
             log_activity(db, current_user.id, current_user.username, "create", "checks_payable", str(result.id),
-                         {"check_number": data["check_number"], "amount": amount})
+                         {"check_number": data["check_number"], "amount": float(amount)})
         except Exception:
             pass
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
@@ -797,40 +748,38 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
         if not checks_pay_account:
             raise HTTPException(500, "حساب الشيكات تحت الدفع (2105) غير موجود")
 
-        amount = float(check.amount)
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-            VALUES (
-                'CHK-CL-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-CL-%')::text, '1'), 6, '0'),
-                :entry_date, :description, 'posted', 'check_clearance', :user_id, :branch_id
-            ) RETURNING id
-        """), {
-            "entry_date": clearance_date,
-            "description": f"صرف شيك رقم {check.check_number}",
-            "user_id": current_user.id,
-            "branch_id": check.branch_id,
-        }).fetchone()
-        clear_je_id = je.id if je else None
+        check_fiscal_period_open(db, clearance_date)
+        je_lines = [
+            {
+                "account_id": checks_pay_account.id,
+                "debit": float(amount),
+                "credit": 0,
+                "description": f"صرف شيك {check.check_number}"
+            },
+            {
+                "account_id": treasury.gl_account_id,
+                "debit": 0,
+                "credit": float(amount),
+                "description": f"صرف شيك {check.check_number}"
+            },
+        ]
 
-        if clear_je_id:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, :amount, 0, :desc)
-            """), {"je_id": clear_je_id, "account_id": checks_pay_account.id, "amount": amount,
-                   "desc": f"صرف شيك {check.check_number}"})
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:je_id, :account_id, 0, :amount, :desc)
-            """), {"je_id": clear_je_id, "account_id": treasury.gl_account_id, "amount": amount,
-                   "desc": f"صرف شيك {check.check_number}"})
-
-            # Update Account Balances
-            update_account_balance(db, account_id=checks_pay_account.id, debit_base=amount, credit_base=0)
-            update_account_balance(db, account_id=treasury.gl_account_id, debit_base=0, credit_base=amount)
+        clear_je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=clearance_date,
+            description=f"صرف شيك رقم {check.check_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=check.branch_id,
+            source="check_clearance",
+            source_id=check_id,
+        )
 
         db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid"),
-                   {"amt": amount, "tid": treasury_id})
+                   {"amt": float(amount), "tid": treasury_id})
 
         db.execute(text("""
             UPDATE checks_payable SET status = 'cleared', clearance_date = :cdate,
@@ -874,7 +823,7 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
 
         bounce_reason = data.get("bounce_reason", "")
         bounce_date = data.get("bounce_date", str(date.today()))
-        amount = float(check.amount)
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
 
         checks_pay_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2105' LIMIT 1")).fetchone()
         ap_account = db.execute(text(
@@ -884,6 +833,7 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
         if not checks_pay_account or not ap_account:
             raise HTTPException(500, "حسابات الشيكات أو الموردين غير موجودة")
 
+        check_fiscal_period_open(db, bounce_date)
         bounce_je_id = None
 
         if check.status == 'cleared':
@@ -894,73 +844,65 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
             if not treasury:
                 raise HTTPException(400, "حساب الخزينة غير مرتبط بالشيك")
 
-            je = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-                VALUES (
-                    'CHK-BP-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-BP-%')::text, '1'), 6, '0'),
-                    :entry_date, :description, 'posted', 'check_payable_bounce', :user_id, :branch_id
-                ) RETURNING id
-            """), {
-                "entry_date": bounce_date,
-                "description": f"ارتجاع شيك صادر رقم {check.check_number} (مصروف سابقاً) - {bounce_reason}",
-                "user_id": current_user.id,
-                "branch_id": check.branch_id,
-            }).fetchone()
-            bounce_je_id = je.id if je else None
+            je_lines = [
+                {
+                    "account_id": treasury.gl_account_id,
+                    "debit": float(amount),
+                    "credit": 0,
+                    "description": f"ارتجاع شيك مصروف {check.check_number}"
+                },
+                {
+                    "account_id": ap_account.id,
+                    "debit": 0,
+                    "credit": float(amount),
+                    "description": f"ارتجاع شيك مصروف {check.check_number}"
+                },
+            ]
 
-            if bounce_je_id:
-                # Dr. Bank (money returns to us)
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, :amount, 0, :desc)
-                """), {"je_id": bounce_je_id, "account_id": treasury.gl_account_id, "amount": amount,
-                       "desc": f"ارتجاع شيك مصروف {check.check_number}"})
-                # Cr. AP (we still owe the supplier)
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, 0, :amount, :desc)
-                """), {"je_id": bounce_je_id, "account_id": ap_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك مصروف {check.check_number}"})
-
-                # Update Account Balances
-                update_account_balance(db, account_id=treasury.gl_account_id, debit_base=amount, credit_base=0)
-                update_account_balance(db, account_id=ap_account.id, debit_base=0, credit_base=amount)
+            bounce_je_id, _ = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=bounce_date,
+                description=f"ارتجاع شيك صادر رقم {check.check_number} (مصروف سابقاً) - {bounce_reason}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=check.branch_id,
+                source="check_payable_bounce",
+                source_id=check_id,
+            )
 
             # Treasury balance increases (money came back)
             db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid"),
-                       {"amt": amount, "tid": check.treasury_account_id})
+                       {"amt": float(amount), "tid": check.treasury_account_id})
         else:
             # Issued (not cleared) check bounced: reverse issuance only
             # Dr. 2105 / Cr. AP
-            je = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, source, created_by, branch_id)
-                VALUES (
-                    'CHK-BP-' || LPAD(COALESCE((SELECT COUNT(*)+1 FROM journal_entries WHERE entry_number LIKE 'CHK-BP-%')::text, '1'), 6, '0'),
-                    :entry_date, :description, 'posted', 'check_payable_bounce', :user_id, :branch_id
-                ) RETURNING id
-            """), {
-                "entry_date": bounce_date,
-                "description": f"ارتجاع شيك صادر رقم {check.check_number} - {bounce_reason}",
-                "user_id": current_user.id,
-                "branch_id": check.branch_id,
-            }).fetchone()
-            bounce_je_id = je.id if je else None
+            je_lines = [
+                {
+                    "account_id": checks_pay_account.id,
+                    "debit": float(amount),
+                    "credit": 0,
+                    "description": f"ارتجاع شيك صادر {check.check_number}"
+                },
+                {
+                    "account_id": ap_account.id,
+                    "debit": 0,
+                    "credit": float(amount),
+                    "description": f"ارتجاع شيك صادر {check.check_number}"
+                },
+            ]
 
-            if bounce_je_id:
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, :amount, 0, :desc)
-                """), {"je_id": bounce_je_id, "account_id": checks_pay_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك صادر {check.check_number}"})
-                db.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                    VALUES (:je_id, :account_id, 0, :amount, :desc)
-                """), {"je_id": bounce_je_id, "account_id": ap_account.id, "amount": amount,
-                       "desc": f"ارتجاع شيك صادر {check.check_number}"})
-
-                # Update Account Balances
-                update_account_balance(db, account_id=checks_pay_account.id, debit_base=amount, credit_base=0)
-                update_account_balance(db, account_id=ap_account.id, debit_base=0, credit_base=amount)
+            bounce_je_id, _ = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=bounce_date,
+                description=f"ارتجاع شيك صادر رقم {check.check_number} - {bounce_reason}",
+                lines=je_lines,
+                user_id=current_user.id,
+                branch_id=check.branch_id,
+                source="check_payable_bounce",
+                source_id=check_id,
+            )
 
         db.execute(text("""
             UPDATE checks_payable SET status = 'bounced', bounce_date = :bdate,
@@ -1016,13 +958,13 @@ def get_due_checks_alerts(days_ahead: int = Query(7, ge=1, le=90), branch_id: Op
         for r in receivable:
             alerts.append({
                 "id": r.id, "check_number": r.check_number, "party": r.party,
-                "amount": float(r.amount), "due_date": str(r.due_date),
+                "amount": float(_dec(r.amount)), "due_date": str(r.due_date),
                 "type": "receivable", "is_overdue": r.due_date <= date.today()
             })
         for r in payable:
             alerts.append({
                 "id": r.id, "check_number": r.check_number, "party": r.party,
-                "amount": float(r.amount), "due_date": str(r.due_date),
+                "amount": float(_dec(r.amount)), "due_date": str(r.due_date),
                 "type": "payable", "is_overdue": r.due_date <= date.today()
             })
 
@@ -1080,7 +1022,7 @@ def checks_aging_report(
                 results.append({
                     "id": r.id, "check_number": r.check_number,
                     "party_name": r.party_name, "bank_name": r.bank_name,
-                    "amount": float(r.amount), "currency": r.currency or "",
+                    "amount": float(_dec(r.amount)), "currency": r.currency or "",
                     "issue_date": str(r.issue_date) if r.issue_date else None,
                     "due_date": str(r.due_date) if r.due_date else None,
                     "status": r.status, "days_old": days, "bucket": bucket,
@@ -1114,7 +1056,7 @@ def checks_aging_report(
                 results.append({
                     "id": r.id, "check_number": r.check_number,
                     "party_name": r.party_name, "bank_name": r.bank_name,
-                    "amount": float(r.amount), "currency": r.currency or "",
+                    "amount": float(_dec(r.amount)), "currency": r.currency or "",
                     "issue_date": str(r.issue_date) if r.issue_date else None,
                     "due_date": str(r.due_date) if r.due_date else None,
                     "status": r.status, "days_old": days, "bucket": bucket,
@@ -1123,16 +1065,18 @@ def checks_aging_report(
 
         results.sort(key=lambda x: x["days_old"], reverse=True)
 
-        # Build bucket summary
-        buckets = {"0-30": {"receivable": 0, "payable": 0}, "31-60": {"receivable": 0, "payable": 0},
-                   "61-90": {"receivable": 0, "payable": 0}, "90+": {"receivable": 0, "payable": 0}}
+        # Build bucket summary using Decimal for accumulation
+        buckets = {"0-30": {"receivable": _dec(0), "payable": _dec(0)}, "31-60": {"receivable": _dec(0), "payable": _dec(0)},
+                   "61-90": {"receivable": _dec(0), "payable": _dec(0)}, "90+": {"receivable": _dec(0), "payable": _dec(0)}}
         for r in results:
-            buckets[r["bucket"]][r["check_type"]] += r["amount"]
+            buckets[r["bucket"]][r["check_type"]] += _dec(r["amount"])
+        # Serialize bucket summary to float for JSON
+        bucket_summary = {k: {"receivable": float(v["receivable"]), "payable": float(v["payable"])} for k, v in buckets.items()}
 
         return {
             "checks": results,
             "total": len(results),
-            "bucket_summary": buckets,
+            "bucket_summary": bucket_summary,
         }
     except Exception as e:
         raise HTTPException(500, str(e))

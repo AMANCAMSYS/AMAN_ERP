@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
-import { useNavigate } from 'react-router-dom'
+import DateInput from '../../components/common/DateInput'
+import BackButton from '../../components/common/BackButton'
+import DataTable from '../../components/common/DataTable'
+import SearchFilter from '../../components/common/SearchFilter'
 
-import DateInput from '../../components/common/DateInput';
-import BackButton from '../../components/common/BackButton';
 function BatchList() {
     const { t } = useTranslation()
     const navigate = useNavigate()
@@ -113,12 +115,68 @@ function BatchList() {
         return <span style={{ color: 'var(--success)' }}>{t('stock.batch.days_remaining', { days })}</span>
     }
 
+    const filteredBatches = useMemo(() => batches, [batches])
+
+    const handleFilterChange = (key, value) => {
+        if (key === 'status') setStatusFilter(value)
+        if (key === 'warehouse') setWarehouseFilter(value)
+    }
+
+    const columns = [
+        {
+            key: 'batch_number',
+            label: t('stock.batch.batch_number'),
+            width: '12%',
+            render: (val) => <strong>{val}</strong>,
+        },
+        {
+            key: 'product_name',
+            label: t('common.product'),
+            width: '20%',
+        },
+        {
+            key: 'warehouse_name',
+            label: t('stock.batch.warehouse'),
+            width: '12%',
+        },
+        {
+            key: 'quantity',
+            label: t('common.quantity'),
+            width: '10%',
+            render: (val) => parseFloat(val || 0).toLocaleString(),
+        },
+        {
+            key: 'manufacturing_date',
+            label: t('stock.batch.manufacturing_date'),
+            width: '12%',
+            render: (val) => val || '-',
+        },
+        {
+            key: 'expiry_date',
+            label: t('stock.batch.expiry_date'),
+            width: '12%',
+            render: (val) => val || '-',
+        },
+        {
+            key: '_remaining',
+            label: t('stock.batch.remaining'),
+            width: '12%',
+            render: (_, row) => getDaysRemaining(row.expiry_date) || '-',
+        },
+        {
+            key: 'status',
+            label: t('common.status_title'),
+            width: '10%',
+            render: (val) => getStatusBadge(val),
+        },
+    ]
+
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">📦 {t('stock.batches.title')}</h1>
+                    <h1 className="workspace-title">{t('stock.batches.title')}</h1>
                     <p className="workspace-subtitle">{t('stock.batches.subtitle')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
@@ -168,67 +226,38 @@ function BatchList() {
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="card mb-4">
-                <div className="form-row" style={{ gap: '12px', flexWrap: 'wrap' }}>
-                    <input type="text" className="form-input" style={{ maxWidth: '250px' }}
-                        placeholder={t('stock.batch.search_placeholder')}
-                        value={search} onChange={(e) => setSearch(e.target.value)} />
-                    <select className="form-input" style={{ maxWidth: '180px' }}
-                        value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                        <option value="">{t('common.all_statuses')}</option>
-                        <option value="active">{t('stock.batch.active')}</option>
-                        <option value="expired">{t('stock.batch.expired')}</option>
-                        <option value="consumed">{t('stock.batch.consumed')}</option>
-                    </select>
-                    <select className="form-input" style={{ maxWidth: '200px' }}
-                        value={warehouseFilter} onChange={(e) => setWarehouseFilter(e.target.value)}>
-                        <option value="">{t('stock.batch.all_warehouses')}</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.warehouse_name}</option>)}
-                    </select>
-                </div>
-            </div>
+            <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder={t('stock.batch.search_placeholder')}
+                filters={[
+                    {
+                        key: 'status',
+                        label: t('common.all_statuses'),
+                        options: [
+                            { value: 'active', label: t('stock.batch.active') },
+                            { value: 'expired', label: t('stock.batch.expired') },
+                            { value: 'consumed', label: t('stock.batch.consumed') },
+                        ],
+                    },
+                    {
+                        key: 'warehouse',
+                        label: t('stock.batch.all_warehouses'),
+                        options: warehouses.map(w => ({ value: String(w.id), label: w.warehouse_name })),
+                    },
+                ]}
+                filterValues={{ status: statusFilter, warehouse: warehouseFilter }}
+                onFilterChange={handleFilterChange}
+            />
 
-            {/* Table */}
-            <div className="card">
-                <div className="invoice-items-container">
-                    <table className="data-table">
-                        <thead>
-                            <tr style={{ background: 'var(--bg-secondary)' }}>
-                                <th style={{ width: '12%' }}>{t('stock.batch.batch_number')}</th>
-                                <th style={{ width: '20%' }}>{t('common.product')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.batch.warehouse')}</th>
-                                <th style={{ width: '10%' }}>{t('common.quantity')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.batch.manufacturing_date')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.batch.expiry_date')}</th>
-                                <th style={{ width: '12%' }}>{t('stock.batch.remaining')}</th>
-                                <th style={{ width: '10%' }}>{t('common.status_title')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px' }}>{t('common.loading')}</td></tr>
-                            ) : batches.length === 0 ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                                    {t('stock.batch.no_batches')}
-                                </td></tr>
-                            ) : batches.map(batch => (
-                                <tr key={batch.id} style={{ cursor: 'pointer' }}
-                                    onClick={() => navigate(`/stock/batches/${batch.id}`)}>
-                                    <td><strong>{batch.batch_number}</strong></td>
-                                    <td>{batch.product_name}</td>
-                                    <td>{batch.warehouse_name}</td>
-                                    <td>{parseFloat(batch.quantity || 0).toLocaleString()}</td>
-                                    <td>{batch.manufacturing_date || '-'}</td>
-                                    <td>{batch.expiry_date || '-'}</td>
-                                    <td>{getDaysRemaining(batch.expiry_date) || '-'}</td>
-                                    <td>{getStatusBadge(batch.status)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <DataTable
+                columns={columns}
+                data={filteredBatches}
+                loading={loading}
+                onRowClick={(row) => navigate(`/stock/batches/${row.id}`)}
+                emptyIcon={'\uD83D\uDCE6'}
+                emptyTitle={t('stock.batch.no_batches')}
+            />
 
             {/* Create Modal */}
             {showCreateModal && (

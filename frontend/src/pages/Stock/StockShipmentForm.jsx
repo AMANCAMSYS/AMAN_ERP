@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import FormField from '../../components/common/FormField';
 
 const StockShipmentForm = () => {
     const { t } = useTranslation();
@@ -124,8 +125,7 @@ const StockShipmentForm = () => {
                 <div className="section-card">
                     <h3 className="section-title">{t('stock.shipments.form.shipment_data')}</h3>
                     <div className="form-grid">
-                        <div className="form-group">
-                            <label className="form-label">{t('stock.shipments.form.from_warehouse')}</label>
+                        <FormField label={t('stock.shipments.form.from_warehouse')}>
                             <select
                                 className="form-input"
                                 value={formData.source_warehouse_id}
@@ -136,9 +136,8 @@ const StockShipmentForm = () => {
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">{t('stock.shipments.form.to_warehouse')}</label>
+                        </FormField>
+                        <FormField label={t('stock.shipments.form.to_warehouse')}>
                             <select
                                 className="form-input"
                                 value={formData.destination_warehouse_id}
@@ -149,16 +148,15 @@ const StockShipmentForm = () => {
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group full-width">
-                            <label className="form-label">{t('stock.shipments.form.notes')}</label>
+                        </FormField>
+                        <FormField label={t('stock.shipments.form.notes')} className="full-width">
                             <textarea
                                 className="form-input"
                                 rows="2"
                                 value={formData.notes}
                                 onChange={e => setFormData({ ...formData, notes: e.target.value })}
                             />
-                        </div>
+                        </FormField>
                     </div>
                 </div>
 
@@ -166,8 +164,7 @@ const StockShipmentForm = () => {
                     <h3 className="section-title">{t('stock.shipments.form.shipped_products')}</h3>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '16px', alignItems: 'end', marginBottom: '24px', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">{t('stock.shipments.form.product')}</label>
+                        <FormField label={t('stock.shipments.form.product')} style={{ marginBottom: 0 }}>
                             <select
                                 className="form-input"
                                 value={currentItem.product_id}
@@ -178,9 +175,8 @@ const StockShipmentForm = () => {
                                     <option key={p.id} value={p.id}>{p.item_name} ({p.item_code})</option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label">{t('stock.shipments.form.quantity')}</label>
+                        </FormField>
+                        <FormField label={t('stock.shipments.form.quantity')} style={{ marginBottom: 0 }}>
                             <input
                                 type="number"
                                 className="form-input"
@@ -190,7 +186,7 @@ const StockShipmentForm = () => {
                                 onChange={e => setCurrentItem({ ...currentItem, quantity: e.target.value })}
                                 onKeyDown={e => e.key === 'Enter' && addItem()}
                             />
-                        </div>
+                        </FormField>
                         <button
                             className="btn btn-primary"
                             onClick={addItem}
