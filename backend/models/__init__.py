@@ -177,6 +177,7 @@ from .phase27_maintenance_manufacturing_marketing import (
     ManufacturingRoute,
     MarketingCampaign,
 )
+from .phase28_messages_mrp_notifications import Message, MfgQcCheck, MrpItem, MrpPlan, Notification
 
 
 target_metadata = ModelBase.metadata
@@ -345,6 +346,11 @@ __all__ = [
     "ManufacturingOperation",
     "ManufacturingRoute",
     "MarketingCampaign",
+    "Message",
+    "MfgQcCheck",
+    "MrpItem",
+    "MrpPlan",
+    "Notification",
     "target_metadata",
     "MODELED_TABLES",
 ]
