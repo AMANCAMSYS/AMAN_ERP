@@ -135,6 +135,13 @@ from .phase21_hr_compliance_recruitment import (
     JobApplication,
     JobOpening,
 )
+from .phase22_mfg_attachments_commissions import (
+    Attachment,
+    BillOfMaterial,
+    BomOutput,
+    CheckStatusLog,
+    CommissionRule,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -273,6 +280,11 @@ __all__ = [
     "EmployeeCustody",
     "JobOpening",
     "JobApplication",
+    "Attachment",
+    "BillOfMaterial",
+    "BomOutput",
+    "CheckStatusLog",
+    "CommissionRule",
     "target_metadata",
     "MODELED_TABLES",
 ]
