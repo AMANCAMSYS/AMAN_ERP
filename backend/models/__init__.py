@@ -114,6 +114,13 @@ from .phase18_inventory_traceability_quality import (
     QualityInspection,
     QualityInspectionCriteria,
 )
+from .phase19_customer_master_pricing import (
+    Customer,
+    CustomerBankAccount,
+    CustomerContact,
+    CustomerPriceList,
+    CustomerPriceListItem,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -237,6 +244,11 @@ __all__ = [
     "QualityInspection",
     "QualityInspectionCriteria",
     "ProductKitItem",
+    "Customer",
+    "CustomerContact",
+    "CustomerBankAccount",
+    "CustomerPriceList",
+    "CustomerPriceListItem",
     "target_metadata",
     "MODELED_TABLES",
 ]
