@@ -1,3 +1,11 @@
+"""Central ORM model exports.
+
+Developer guidance:
+- Prefer domain-first discovery under backend.models.domains for new work.
+- Phase files remain as compatibility/history from incremental rollout.
+- Keep this module as the stable export surface for legacy imports.
+"""
+
 from .base import ModelBase
 from .business_core import (
     CompanySetting,
