@@ -178,6 +178,13 @@ from .phase27_maintenance_manufacturing_marketing import (
     MarketingCampaign,
 )
 from .phase28_messages_mrp_notifications import Message, MfgQcCheck, MrpItem, MrpPlan, Notification
+from .phase29_opportunity_overtime_party_payments_security import (
+    OpportunityActivity,
+    OvertimeRequest,
+    PartyTransaction,
+    PasswordHistory,
+    PaymentAllocation,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -351,6 +358,11 @@ __all__ = [
     "MrpItem",
     "MrpPlan",
     "Notification",
+    "OpportunityActivity",
+    "OvertimeRequest",
+    "PartyTransaction",
+    "PasswordHistory",
+    "PaymentAllocation",
     "target_metadata",
     "MODELED_TABLES",
 ]
