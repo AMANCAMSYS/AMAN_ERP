@@ -108,7 +108,7 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 |---|---|
 | **الأولوية** | P1 |
 | **الجهد** | 2-4 أسابيع |
-| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4/phase6/phase7/phase8/phase9/phase10/phase11/phase12/phase13/phase14/phase15/phase16/phase17/phase18/phase19/phase20/phase21 + drift-fix إضافي لـ `asset_impairments` و`expense_policies` + revision سابع: `a4b2c9d8e6f1`) |
+| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4/phase6/phase7/phase8/phase9/phase10/phase11/phase12/phase13/phase14/phase15/phase16/phase17/phase18/phase19/phase20/phase21 + drift-fix إضافي لـ `asset_impairments` و`expense_policies` + bulk drift normalization + revision ثامن: `c1f4e8d9b2a6`) |
 | **المشكلة** | Schema يُنشأ بـ `CREATE TABLE IF NOT EXISTS` — لا تتبع للتغييرات، لا rollback |
 | **الخطر** | تعديل جدول موجود يتطلب `ALTER TABLE` يدوي — احتمال نسيان تطبيقه على بيئات مختلفة |
 | **الحل** | إعداد Alembic مع `autogenerate`، تحويل database.py إلى SQLAlchemy models، إنشاء migration أولي |
@@ -119,7 +119,7 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 3. ✅ إنشاء ومراجعة revision رابع غير فارغ عبر autogenerate: `908f5baa6f93_phase4_ops_support_autogen_reviewed.py` (إصلاح drift أعمدة مهم في service/docs)
 4. ✅ إنشاء Phase 5 targeted migration: `e1c5a8b6d6f2_phase5_targeted_missing_tables.py` لإنشاء جدولَي `service_request_costs` و`document_versions` فقط عند الحاجة وفي شركتين محددتين
 5. ✅ تعديل `create_company_tables()` لتشغيل `alembic -x company=<id> upgrade head` تلقائيًا بعد إنشاء الجداول
-6. ✅ اختبار على شركة تجريبية + النظام (نجح على المسارين، ثم تمت ترقية جميع القواعد إلى `alembic_version=a4b2c9d8e6f1`)
+6. ✅ اختبار على شركة تجريبية + النظام (نجح على المسارين، ثم تمت ترقية جميع القواعد إلى `alembic_version=c1f4e8d9b2a6`)
 
 **مخرجات Phase 2 (مطبقة على 11/11 شركة + النظام):**
 - إضافة أعمدة خصومات/Markup الناقصة في `purchase_orders` (`effect_type`, `effect_percentage`, `markup_amount`) عبر هجرة idempotent.
@@ -240,6 +240,13 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 - إضافة نماذج ORM لوحدة HR compliance/recruitment: `employee_documents`, `employee_violations`, `employee_custody`, `job_openings`, `job_applications`.
 - توسيع `MODELED_TABLES` من 126 إلى 131 جدولًا.
 - نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Drift-fix bulk normalization (مطبقة على 11/11 شركة + النظام):**
+- إنشاء migration شامل idempotent: `alembic/versions/c1f4e8d9b2a6_bulk_drift_normalization.py`.
+- تغطية 27 جدولًا و90 عمودًا (إضافة أعمدة ناقصة + توحيد النوع + توحيد nullable) على الجداول غير الممثلة ORM.
+- نتيجة التحقق بعد التطبيق: `REMAINING_DRIFT_SET=0` (لا يوجد drift بنيوي متبقٍ في الجداول الكاملة الحضور).
+- ملاحظة فنية: تبقى `REMAINING_DRIFT_ORDER_ONLY=20` كاختلاف ترتيب أعمدة فقط (`set_variants=1`) بدون اختلاف بنيوي.
+- توحيد نسخة Alembic: كل الشركات والنظام على `c1f4e8d9b2a6`.
 
 ---
 
