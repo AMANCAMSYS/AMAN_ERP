@@ -108,14 +108,14 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 |---|---|
 | **الأولوية** | P1 |
 | **الجهد** | 2-4 أسابيع |
-| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4/phase6/phase7/phase8/phase9/phase10/phase11/phase12/phase13/phase14/phase15/phase16/phase17/phase18/phase19/phase20/phase21/phase22/phase23/phase24/phase25 + drift-fix إضافي لـ `asset_impairments` و`expense_policies` + bulk drift normalization + revision ثامن: `c1f4e8d9b2a6`) |
+| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4/phase6/phase7/phase8/phase9/phase10/phase11/phase12/phase13/phase14/phase15/phase16/phase17/phase18/phase19/phase20/phase21/phase22/phase23/phase24/phase25/phase26 + drift-fix إضافي لـ `asset_impairments` و`expense_policies` + bulk drift normalization + revision ثامن: `c1f4e8d9b2a6`) |
 | **المشكلة** | Schema يُنشأ بـ `CREATE TABLE IF NOT EXISTS` — لا تتبع للتغييرات، لا rollback |
 | **الخطر** | تعديل جدول موجود يتطلب `ALTER TABLE` يدوي — احتمال نسيان تطبيقه على بيئات مختلفة |
 | **الحل** | إعداد Alembic مع `autogenerate`، تحويل database.py إلى SQLAlchemy models، إنشاء migration أولي |
 
 **خطوات التنفيذ:**
 1. `alembic init migrations`
-2. 🚧 إنشاء SQLAlchemy models من الجداول الحالية (phase1 + phase2 + phase3 + phase4 + phase6 + phase7 + phase8 + phase9 + phase10 + phase11 + phase12 + phase13 + phase14 + phase15 + phase16 + phase17 + phase18 + phase19 + phase20 + phase21 + phase22 + phase23 + phase24 + phase25 مكتملة حاليًا لـ 151 جدولًا؛ تم توسيع النطاق إلى المخزون/المشتريات/HR + الخزينة/الضرائب/المشاريع + الشيكات/المستندات/الدعم + الموافقات + الأصول الأساسية + الميزانيات الأساسية + مراكز/سياسات التكلفة + الأصول المتقدمة + العملات/استيراد البنوك + الإقفال المالي/الزكاة + العقود/بنود العقود + سياسات المصروفات + CRM advanced scoring/segmentation/forecasting + مفاتيح API/Security/Ops reporting + advanced inventory bins/cycle counting + variants/kits + traceability/quality + customer master/pricing + receivables/delivery + HR compliance/recruitment + MFG/attachments/commissions + reporting/documents/fx/crm contacts + mfg capacity/contracts amendments/crm knowledge/customer groups + dashboard/fiscal/gosi/intercompany/landed costs)
+2. 🚧 إنشاء SQLAlchemy models من الجداول الحالية (phase1 + phase2 + phase3 + phase4 + phase6 + phase7 + phase8 + phase9 + phase10 + phase11 + phase12 + phase13 + phase14 + phase15 + phase16 + phase17 + phase18 + phase19 + phase20 + phase21 + phase22 + phase23 + phase24 + phase25 + phase26 مكتملة حاليًا لـ 156 جدولًا؛ تم توسيع النطاق إلى المخزون/المشتريات/HR + الخزينة/الضرائب/المشاريع + الشيكات/المستندات/الدعم + الموافقات + الأصول الأساسية + الميزانيات الأساسية + مراكز/سياسات التكلفة + الأصول المتقدمة + العملات/استيراد البنوك + الإقفال المالي/الزكاة + العقود/بنود العقود + سياسات المصروفات + CRM advanced scoring/segmentation/forecasting + مفاتيح API/Security/Ops reporting + advanced inventory bins/cycle counting + variants/kits + traceability/quality + customer master/pricing + receivables/delivery + HR compliance/recruitment + MFG/attachments/commissions + reporting/documents/fx/crm contacts + mfg capacity/contracts amendments/crm knowledge/customer groups + dashboard/fiscal/gosi/intercompany/landed costs + landed costs/leasing/leave carryover/security login)
 3. ✅ إنشاء ومراجعة revision رابع غير فارغ عبر autogenerate: `908f5baa6f93_phase4_ops_support_autogen_reviewed.py` (إصلاح drift أعمدة مهم في service/docs)
 4. ✅ إنشاء Phase 5 targeted migration: `e1c5a8b6d6f2_phase5_targeted_missing_tables.py` لإنشاء جدولَي `service_request_costs` و`document_versions` فقط عند الحاجة وفي شركتين محددتين
 5. ✅ تعديل `create_company_tables()` لتشغيل `alembic -x company=<id> upgrade head` تلقائيًا بعد إنشاء الجداول
@@ -259,6 +259,11 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 **مخرجات Phase 25 ORM coverage (مطبقة على الشركات الحالية + النظام):**
 - إضافة نماذج ORM لوحدة dashboard/fiscal/gosi/intercompany/landed costs: `dashboard_layouts`, `fiscal_periods`, `gosi_settings`, `intercompany_transactions`, `landed_cost_allocations`.
 - توسيع `MODELED_TABLES` من 146 إلى 151 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات الحالية (`present=2/2`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Phase 26 ORM coverage (مطبقة على الشركات الحالية + النظام):**
+- إضافة نماذج ORM لوحدة landed costs/leasing/leave carryover/security login: `landed_costs`, `landed_cost_items`, `lease_contracts`, `leave_carryover`, `login_attempts`.
+- توسيع `MODELED_TABLES` من 151 إلى 156 جدولًا.
 - نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات الحالية (`present=2/2`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
 
 **مخرجات Drift-fix bulk normalization (مطبقة على 11/11 شركة + النظام):**

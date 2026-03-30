@@ -163,6 +163,13 @@ from .phase25_dashboard_fiscal_gosi_intercompany_landed_costs import (
     IntercompanyTransaction,
     LandedCostAllocation,
 )
+from .phase26_landed_costs_leases_leave_security import (
+    LandedCost,
+    LandedCostItem,
+    LeaseContract,
+    LeaveCarryover,
+    LoginAttempt,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -321,6 +328,11 @@ __all__ = [
     "GosiSetting",
     "IntercompanyTransaction",
     "LandedCostAllocation",
+    "LandedCost",
+    "LandedCostItem",
+    "LeaseContract",
+    "LeaveCarryover",
+    "LoginAttempt",
     "target_metadata",
     "MODELED_TABLES",
 ]
