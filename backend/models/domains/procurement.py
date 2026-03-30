@@ -9,6 +9,8 @@ from .. import (
     PurchaseAgreementLine,
     PurchaseOrder,
     PurchaseOrderLine,
+)
+from ..domain_models.procurement_suppliers import (
     Supplier,
     SupplierBalance,
     SupplierBankAccount,

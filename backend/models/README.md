@@ -26,3 +26,9 @@ use the domain-first organization.
 - Phase files remain as a stable compatibility layer.
 - Domain facades are the preferred entry point for model discovery and new code.
 - Physical consolidation of phase files can be done later in small, safe batches.
+
+## Migration Status
+
+- Wave 1 complete: physical model definitions from phase 32 and phase 33 moved into
+	`backend/models/domain_models/` grouped by business domains.
+- `phase32_*` and `phase33_*` are now compatibility wrappers that re-export from domain modules.

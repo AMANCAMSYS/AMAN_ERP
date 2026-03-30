@@ -24,16 +24,19 @@ from .. import (
     PaymentVoucher,
     RecurringJournalLine,
     RecurringJournalTemplate,
-    TaxCalendar,
     TaxGroup,
     TaxPayment,
     TaxRate,
     TaxRegime,
     TaxReturn,
     TreasuryTransaction,
+    ZakatCalculation,
+)
+from ..domain_models.finance_recognition_tax import (
+    RevenueRecognitionSchedule,
+    TaxCalendar,
     WhtRate,
     WhtTransaction,
-    ZakatCalculation,
 )
 
 __all__ = [
@@ -66,6 +69,7 @@ __all__ = [
     "CostingPolicyHistory",
     "InventoryCostSnapshot",
     "TaxCalendar",
+    "RevenueRecognitionSchedule",
     "WhtRate",
     "WhtTransaction",
     "BankImportBatch",

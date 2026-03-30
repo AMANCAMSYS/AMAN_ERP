@@ -22,8 +22,8 @@ from .. import (
     ProjectRisk,
     ProjectTask,
     ProjectTimesheet,
-    TaskDependency,
 )
+from ..domain_models.projects_dependencies import TaskDependency
 
 __all__ = [
     "Project",

@@ -22,10 +22,8 @@ from .. import (
     QualityInspection,
     QualityInspectionCriteria,
     StockAdjustment,
-    StockShipment,
-    StockShipmentItem,
-    StockTransferLog,
 )
+from ..domain_models.inventory_transfers import StockShipment, StockShipmentItem, StockTransferLog
 
 __all__ = [
     "ProductCategory",

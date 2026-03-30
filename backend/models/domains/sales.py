@@ -27,8 +27,10 @@ from .. import (
     PosTable,
     PosTableOrder,
     Receipt,
+)
+from ..domain_models.finance_recognition_tax import RevenueRecognitionSchedule
+from ..domain_models.sales_rfq import (
     RequestForQuotation,
-    RevenueRecognitionSchedule,
     RfqLine,
     RfqResponse,
     SalesCommission,

@@ -13,8 +13,8 @@ from .. import (
     MrpPlan,
     ProductionOrder,
     ProductionOrderOperation,
-    WorkCenter,
 )
+from ..domain_models.manufacturing_resources import WorkCenter
 
 __all__ = [
     "BillOfMaterial",

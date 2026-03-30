@@ -21,6 +21,8 @@ from .. import (
     PasswordHistory,
     PrintTemplate,
     ReportTemplate,
+)
+from ..domain_models.security_reporting import (
     Role,
     ScheduledReport,
     SecurityEvent,

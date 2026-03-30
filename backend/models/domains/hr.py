@@ -20,9 +20,8 @@ from .. import (
     PerformanceReview,
     SalaryComponent,
     SalaryStructure,
-    TrainingParticipant,
-    TrainingProgram,
 )
+from ..domain_models.hr_training import TrainingParticipant, TrainingProgram
 
 __all__ = [
     "Department",

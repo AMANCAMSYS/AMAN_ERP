@@ -24,5 +24,11 @@ Use these modules for new code navigation and imports in new services.
 - operations.py
 - security_reporting.py
 
-Each domain module imports canonical model classes from `backend.models` and exposes
+Each domain module imports canonical model classes either from `backend.models`
+(compatibility exports) or directly from `backend/models/domain_models/`, and exposes
 an explicit `__all__` list.
+
+Migration note:
+
+- Newly extracted classes are loaded from `backend/models/domain_models/`.
+- Domain facades can consume from domain models directly while preserving legacy exports.
