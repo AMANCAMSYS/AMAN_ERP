@@ -12,18 +12,16 @@ from .. import (
     CrmLeadScoringRule,
     CrmSalesForecast,
     CustomerGroup,
-    OpportunityActivity,
     Project,
     ProjectBudget,
     ProjectChangeOrder,
     ProjectDocument,
     ProjectExpense,
     ProjectRevenue,
-    ProjectRisk,
     ProjectTask,
-    ProjectTimesheet,
 )
 from ..domain_models.projects_dependencies import TaskDependency
+from ..domain_models.projects_execution import OpportunityActivity, ProjectRisk, ProjectTimesheet
 
 __all__ = [
     "Project",

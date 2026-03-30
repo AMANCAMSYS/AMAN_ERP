@@ -32,3 +32,4 @@ Migration note:
 
 - Newly extracted classes are loaded from `backend/models/domain_models/`.
 - Domain facades can consume from domain models directly while preserving legacy exports.
+- Waves completed so far: phase26-33 extracted to domain-owned physical modules.

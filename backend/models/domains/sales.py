@@ -11,6 +11,9 @@ from .. import (
     CustomerTransaction,
     DeliveryOrder,
     DeliveryOrderLine,
+)
+from ..domain_models.finance_recognition_tax import RevenueRecognitionSchedule
+from ..domain_models.sales_pos import (
     PendingReceivable,
     PosKitchenOrder,
     PosLoyaltyPoint,
@@ -28,7 +31,6 @@ from .. import (
     PosTableOrder,
     Receipt,
 )
-from ..domain_models.finance_recognition_tax import RevenueRecognitionSchedule
 from ..domain_models.sales_rfq import (
     RequestForQuotation,
     RfqLine,

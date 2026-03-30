@@ -9,9 +9,6 @@ from .. import (
     DocumentVersion,
     Expense,
     IntercompanyTransaction,
-    LeaseContract,
-    MaintenanceLog,
-    MarketingCampaign,
     NotePayable,
     NoteReceivable,
     ServiceRequest,
@@ -19,6 +16,7 @@ from .. import (
     SupportTicket,
     TicketComment,
 )
+from ..domain_models.operations_support import LeaseContract, MaintenanceLog, MarketingCampaign
 
 __all__ = [
     "Expense",

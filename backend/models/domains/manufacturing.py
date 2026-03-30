@@ -5,6 +5,8 @@ from .. import (
     BomComponent,
     BomOutput,
     CapacityPlan,
+)
+from ..domain_models.manufacturing_execution import (
     ManufacturingEquipment,
     ManufacturingOperation,
     ManufacturingRoute,

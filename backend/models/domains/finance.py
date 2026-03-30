@@ -19,11 +19,6 @@ from .. import (
     FiscalPeriodLock,
     FiscalYear,
     InventoryCostSnapshot,
-    Payment,
-    PaymentAllocation,
-    PaymentVoucher,
-    RecurringJournalLine,
-    RecurringJournalTemplate,
     TaxGroup,
     TaxPayment,
     TaxRate,
@@ -31,6 +26,13 @@ from .. import (
     TaxReturn,
     TreasuryTransaction,
     ZakatCalculation,
+)
+from ..domain_models.finance_cashflow import (
+    Payment,
+    PaymentAllocation,
+    PaymentVoucher,
+    RecurringJournalLine,
+    RecurringJournalTemplate,
 )
 from ..domain_models.finance_recognition_tax import (
     RevenueRecognitionSchedule,

@@ -12,15 +12,13 @@ from .. import (
     EmployeeViolation,
     JobApplication,
     JobOpening,
-    LeaveCarryover,
     LeaveRequest,
-    OvertimeRequest,
     PayrollEntry,
     PayrollPeriod,
-    PerformanceReview,
     SalaryComponent,
     SalaryStructure,
 )
+from ..domain_models.hr_workforce import LeaveCarryover, OvertimeRequest, PerformanceReview
 from ..domain_models.hr_training import TrainingParticipant, TrainingProgram
 
 __all__ = [

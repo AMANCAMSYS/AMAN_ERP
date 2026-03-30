@@ -1,14 +1,16 @@
 """Procurement, suppliers, and payable-side entities."""
 
 from .. import (
-    LandedCost,
     LandedCostAllocation,
+    PurchaseOrder,
+    PurchaseOrderLine,
+)
+from ..domain_models.procurement_costs import (
+    LandedCost,
     LandedCostItem,
     PendingPayable,
     PurchaseAgreement,
     PurchaseAgreementLine,
-    PurchaseOrder,
-    PurchaseOrderLine,
 )
 from ..domain_models.procurement_suppliers import (
     Supplier,
