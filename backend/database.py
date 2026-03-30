@@ -1,5 +1,9 @@
 
 import logging
+import os
+import re
+import subprocess
+import sys
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
@@ -364,20 +368,42 @@ def get_all_table_sql() -> str:
     );
     
     CREATE OR REPLACE FUNCTION check_journal_balance() RETURNS TRIGGER AS $$
+    DECLARE
+        target_journal_entry_id INTEGER;
+        total_debit NUMERIC;
+        total_credit NUMERIC;
     BEGIN
-        IF (SELECT ABS(SUM(debit) - SUM(credit)) FROM journal_lines
-            WHERE journal_entry_id = NEW.journal_entry_id) > 0.01 THEN
-            RAISE EXCEPTION 'Journal entry % is not balanced', NEW.journal_entry_id;
+        target_journal_entry_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
+
+        SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
+          INTO total_debit, total_credit
+        FROM journal_lines
+        WHERE journal_entry_id = target_journal_entry_id;
+
+        IF ABS(total_debit - total_credit) > 0.01 THEN
+            RAISE EXCEPTION
+                'Journal entry % is not balanced (debit %, credit %)',
+                target_journal_entry_id, total_debit, total_credit;
         END IF;
-        RETURN NEW;
+
+        RETURN COALESCE(NEW, OLD);
     END;
     $$ LANGUAGE plpgsql;
 
     DO $$
     BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_journal_balance') THEN
+        IF to_regclass('public.journal_lines') IS NOT NULL THEN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_trigger
+                WHERE tgname = 'trg_journal_balance'
+                  AND tgrelid = 'journal_lines'::regclass
+            ) THEN
+                DROP TRIGGER trg_journal_balance ON journal_lines;
+            END IF;
+
             CREATE CONSTRAINT TRIGGER trg_journal_balance
-            AFTER INSERT OR UPDATE ON journal_lines
+            AFTER INSERT OR UPDATE OR DELETE ON journal_lines
             DEFERRABLE INITIALLY DEFERRED
             FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
         END IF;
@@ -563,7 +589,7 @@ def get_additional_tables_sql() -> str:
         discount_percentage DECIMAL(5, 2) DEFAULT 0,
         effect_type VARCHAR(20) DEFAULT 'discount',
         application_scope VARCHAR(20) DEFAULT 'total',
-        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
+        price_list_id INTEGER,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -1216,7 +1242,7 @@ def get_organization_tables_sql() -> str:
         department_name_en VARCHAR(255),
         parent_id INTEGER REFERENCES departments(id),
         branch_id INTEGER REFERENCES branches(id),
-        manager_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+        manager_id INTEGER,
         description TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -3061,7 +3087,7 @@ def get_manufacturing_tables_sql() -> str:
         priority VARCHAR(50) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
         status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled')),
         customer_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
-        asset_id INTEGER REFERENCES fixed_assets(id) ON DELETE SET NULL,
+        asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL,
         assigned_to INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         assigned_at TIMESTAMPTZ,
         estimated_hours DECIMAL(8, 2),
@@ -3219,7 +3245,7 @@ def sync_essential_columns(conn):
         # customer_price_list_items
         """CREATE TABLE IF NOT EXISTS customer_price_list_items (
             id SERIAL PRIMARY KEY,
-            price_list_id INTEGER NOT NULL REFERENCES price_lists(id) ON DELETE CASCADE,
+            price_list_id INTEGER NOT NULL REFERENCES customer_price_lists(id) ON DELETE CASCADE,
             product_id INTEGER REFERENCES products(id),
             price DECIMAL(18, 4) NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -3238,7 +3264,208 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
     """Create all 91 tables for a company database"""
     db_name = f"aman_{company_id}"
     connection_url = settings.get_company_database_url(company_id)
+
+    def split_sql_statements(sql_block: str) -> list[str]:
+        """Split SQL safely, preserving PostgreSQL $$...$$ and $tag$...$tag$ blocks."""
+        statements = []
+        current = []
+        in_single_quote = False
+        in_double_quote = False
+        dollar_quote_tag = None
+        i = 0
+
+        while i < len(sql_block):
+            char = sql_block[i]
+
+            if dollar_quote_tag:
+                if sql_block.startswith(dollar_quote_tag, i):
+                    current.append(dollar_quote_tag)
+                    i += len(dollar_quote_tag)
+                    dollar_quote_tag = None
+                    continue
+                current.append(char)
+                i += 1
+                continue
+
+            if not in_single_quote and not in_double_quote and char == "$":
+                match = re.match(r"\$[A-Za-z0-9_]*\$", sql_block[i:])
+                if match:
+                    dollar_quote_tag = match.group(0)
+                    current.append(dollar_quote_tag)
+                    i += len(dollar_quote_tag)
+                    continue
+
+            if char == "'" and not in_double_quote:
+                if in_single_quote and i + 1 < len(sql_block) and sql_block[i + 1] == "'":
+                    current.append("''")
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                current.append(char)
+                i += 1
+                continue
+
+            if char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                current.append(char)
+                i += 1
+                continue
+
+            if char == ";" and not in_single_quote and not in_double_quote:
+                statement = "".join(current).strip()
+                if statement:
+                    statements.append(statement)
+                current = []
+                i += 1
+                continue
+
+            current.append(char)
+            i += 1
+
+        tail = "".join(current).strip()
+        if tail:
+            statements.append(tail)
+
+        return statements
+
+    def run_company_alembic_upgrade() -> Tuple[bool, str]:
+        """Run Alembic migrations to head for a single company database."""
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        alembic_ini = os.path.join(backend_dir, "alembic.ini")
+        alembic_args = [
+            "-c",
+            alembic_ini,
+            "-x",
+            f"company={company_id}",
+            "upgrade",
+            "head",
+        ]
+        candidate_commands = [
+            [sys.executable, "-m", "alembic", *alembic_args],
+            ["alembic", *alembic_args],
+        ]
+        errors = []
+
+        for alembic_cmd in candidate_commands:
+            try:
+                result = subprocess.run(
+                    alembic_cmd,
+                    cwd=backend_dir,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+            except FileNotFoundError:
+                errors.append(f"Command not found: {' '.join(alembic_cmd)}")
+                continue
+            except Exception as exc:
+                errors.append(f"Execution failed for {' '.join(alembic_cmd)}: {exc}")
+                continue
+
+            if result.returncode == 0:
+                logger.info(f"✅ Alembic upgrade head applied for {db_name}")
+                return True, "ok"
+
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            details = stderr or stdout or "Unknown Alembic error"
+            errors.append(f"{' '.join(alembic_cmd)} -> {details}")
+
+        combined_error = " | ".join(errors)
+        logger.error(f"❌ Alembic upgrade failed for {db_name}: {combined_error}")
+        return False, combined_error
+
+    def get_statement_kind(statement: str) -> str:
+        """Return normalized statement kind (CREATE TABLE/CREATE INDEX/OTHER)."""
+        stmt = statement.lstrip()
+
+        # Remove leading SQL comments so we can correctly detect statement type.
+        while True:
+            if stmt.startswith("--"):
+                newline_idx = stmt.find("\n")
+                if newline_idx == -1:
+                    stmt = ""
+                    break
+                stmt = stmt[newline_idx + 1 :].lstrip()
+                continue
+            if stmt.startswith("/*"):
+                end_idx = stmt.find("*/")
+                if end_idx == -1:
+                    break
+                stmt = stmt[end_idx + 2 :].lstrip()
+                continue
+            break
+
+        stmt_upper = stmt.upper()
+        if stmt_upper.startswith("CREATE TABLE"):
+            return "CREATE TABLE"
+        if re.match(r"^CREATE\s+(UNIQUE\s+)?INDEX\b", stmt_upper):
+            return "CREATE INDEX"
+        if stmt_upper.startswith("ALTER TABLE"):
+            return "ALTER TABLE"
+        return "OTHER"
+
+    def should_defer_statement(statement: str, error: Exception) -> bool:
+        """Defer statements that fail only due to unresolved table dependencies."""
+        statement_kind = get_statement_kind(statement)
+        if statement_kind not in ("CREATE TABLE", "CREATE INDEX", "ALTER TABLE"):
+            return False
+        error_text = str(error)
+        return "UndefinedTable" in error_text
+
+    def ensure_fk_if_missing(
+        conn,
+        table_name: str,
+        column_name: str,
+        referenced_table: str,
+        constraint_name: str,
+    ) -> None:
+        """Create FK only when no FK already exists for the same column+target table."""
+        exists = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                 AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.referential_constraints rc
+                  ON tc.constraint_name = rc.constraint_name
+                 AND tc.table_schema = rc.constraint_schema
+                JOIN information_schema.constraint_column_usage ccu
+                  ON rc.unique_constraint_name = ccu.constraint_name
+                 AND rc.unique_constraint_schema = ccu.constraint_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = current_schema()
+                  AND tc.table_name = :table_name
+                  AND kcu.column_name = :column_name
+                  AND ccu.table_name = :referenced_table
+                LIMIT 1
+                """
+            ),
+            {
+                "table_name": table_name,
+                "column_name": column_name,
+                "referenced_table": referenced_table,
+            },
+        ).fetchone()
+
+        if exists:
+            return
+
+        conn.execute(
+            text(
+                f"""
+                ALTER TABLE {table_name}
+                ADD CONSTRAINT {constraint_name}
+                FOREIGN KEY ({column_name})
+                REFERENCES {referenced_table}(id)
+                ON DELETE SET NULL
+                """
+            )
+        )
     
+    company_engine = None
     try:
         company_engine = create_engine(connection_url, isolation_level="AUTOCOMMIT")
         
@@ -3266,22 +3493,94 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 get_system_completion_tables_sql()    # 15: System Completion (Phase 9)
             ]
             
+            deferred_statements = []
+
             for index, sql_block in enumerate(sql_blocks):
                 # Replace default currency
                 processed_sql = sql_block.replace("'SAR'", f"'{currency}'")
                 
                 # Split and execute individual statements
-                statements = [s.strip() for s in processed_sql.split(';') if s.strip()]
+                statements = split_sql_statements(processed_sql)
                 
                 logger.info(f"Executing SQL block {index} ({len(statements)} statements)")
                 for i, stmt in enumerate(statements):
                     try:
                         conn.execute(text(stmt + ";"))
                     except Exception as e:
+                        if should_defer_statement(stmt, e):
+                            deferred_statements.append((index, i, stmt, str(e)))
+                            logger.warning(
+                                f"Deferring statement {i} in block {index} due to unresolved dependency"
+                            )
+                            continue
                         logger.error(f"Failed at statement {i} in block {index}")
                         logger.error(f"Statement: {stmt[:100]}...")
                         logger.error(f"Error: {str(e)}")
                         raise e
+
+            retry_round = 1
+            while deferred_statements:
+                logger.info(
+                    f"Retrying deferred CREATE TABLE statements, pass {retry_round} "
+                    f"({len(deferred_statements)} statements)"
+                )
+                remaining = []
+                progress_made = False
+
+                for index, i, stmt, _last_error in deferred_statements:
+                    try:
+                        conn.execute(text(stmt + ";"))
+                        progress_made = True
+                    except Exception as e:
+                        if should_defer_statement(stmt, e):
+                            remaining.append((index, i, stmt, str(e)))
+                            continue
+                        logger.error(f"Failed at deferred statement {i} in block {index}")
+                        logger.error(f"Statement: {stmt[:100]}...")
+                        logger.error(f"Error: {str(e)}")
+                        raise e
+
+                if not remaining:
+                    break
+
+                if not progress_made:
+                    unresolved_non_index = [
+                        item for item in remaining if get_statement_kind(item[2]) != "CREATE INDEX"
+                    ]
+                    if unresolved_non_index:
+                        first_block, first_i, first_stmt, first_error = unresolved_non_index[0]
+                        raise RuntimeError(
+                            "Unresolved table dependency after retries "
+                            f"(block={first_block}, statement={first_i}): {first_stmt[:120]} | "
+                            f"last_error={first_error[:200]}"
+                        )
+
+                    for block_num, stmt_num, unresolved_stmt, _stmt_error in remaining:
+                        logger.warning(
+                            "Skipping unresolved index due to missing table "
+                            f"(block={block_num}, statement={stmt_num}): {unresolved_stmt[:120]}"
+                        )
+                    break
+
+                deferred_statements = remaining
+                retry_round += 1
+
+            # Break cycle between customer_groups <-> customer_price_lists
+            ensure_fk_if_missing(
+                conn,
+                table_name="customer_groups",
+                column_name="price_list_id",
+                referenced_table="customer_price_lists",
+                constraint_name="fk_customer_groups_price_list_id",
+            )
+
+            ensure_fk_if_missing(
+                conn,
+                table_name="departments",
+                column_name="manager_id",
+                referenced_table="employees",
+                constraint_name="fk_departments_manager_id",
+            )
             
             # Create indexes
             indexes = [
@@ -3369,16 +3668,21 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
             
             # Note: with isolation_level="AUTOCOMMIT", we don't need conn.commit()
             # but it doesn't hurt.
+
+        migration_ok, migration_msg = run_company_alembic_upgrade()
+        if not migration_ok:
+            return False, f"فشل ترحيل Alembic: {migration_msg}"
         
-        logger.info(f"✅ Created all tables for {db_name}")
-        return True, "تم إنشاء جميع الجداول بنجاح"
+        logger.info(f"✅ Created all tables and applied Alembic for {db_name}")
+        return True, "تم إنشاء جميع الجداول وتطبيق ترحيلات Alembic بنجاح"
 
         
     except Exception as e:
         logger.error(f"❌ Error creating tables: {str(e)}")
         return False, str(e)
     finally:
-        company_engine.dispose()
+        if company_engine is not None:
+            company_engine.dispose()
 
 
 # Country → official currency mapping
@@ -4583,7 +4887,7 @@ def get_system_completion_tables_sql() -> str:
         lc_number VARCHAR(50) UNIQUE NOT NULL,
         lc_date DATE NOT NULL DEFAULT CURRENT_DATE,
         purchase_order_id INTEGER REFERENCES purchase_orders(id),
-        grn_id INTEGER REFERENCES goods_receipt_notes(id) ON DELETE SET NULL,
+        grn_id INTEGER,
         reference VARCHAR(100),
         description TEXT,
         total_amount NUMERIC(15,4) DEFAULT 0,
@@ -4830,7 +5134,7 @@ def get_system_completion_tables_sql() -> str:
     -- B6: Lease Contracts (IFRS 16)
     CREATE TABLE IF NOT EXISTS lease_contracts (
         id SERIAL PRIMARY KEY,
-        asset_id INTEGER REFERENCES fixed_assets(id) ON DELETE SET NULL,
+        asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL,
         description VARCHAR(300) NOT NULL,
         lessor_name VARCHAR(200),
         lease_type VARCHAR(30) DEFAULT 'operating',
@@ -4851,7 +5155,7 @@ def get_system_completion_tables_sql() -> str:
     -- B6: Asset Impairment (IAS 36)
     CREATE TABLE IF NOT EXISTS asset_impairments (
         id SERIAL PRIMARY KEY,
-        asset_id INTEGER NOT NULL REFERENCES fixed_assets(id) ON DELETE CASCADE,
+        asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
         test_date DATE NOT NULL,
         carrying_amount NUMERIC(15,4) NOT NULL,
         recoverable_amount NUMERIC(15,4) NOT NULL,

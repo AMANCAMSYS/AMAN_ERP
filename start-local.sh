@@ -123,17 +123,26 @@ start_backend() {
         exit 1
     fi
 
-    if [[ ! -d "$VENV_DIR" ]]; then
-        err "Missing Python virtual environment at .venv"
-        err "Create it and install backend requirements, then retry."
+    local -a backend_cmd
+    if [[ -x "$VENV_DIR/bin/python" ]] && "$VENV_DIR/bin/python" -c "import uvicorn" >/dev/null 2>&1; then
+        backend_cmd=("$VENV_DIR/bin/python" "-m" "uvicorn")
+        info "Using virtual environment Python for backend"
+    elif /usr/bin/python3 -c "import uvicorn" >/dev/null 2>&1; then
+        backend_cmd=("/usr/bin/python3" "-m" "uvicorn")
+        warn "Virtual environment not required; using system Python for backend"
+    elif command -v uvicorn >/dev/null 2>&1; then
+        backend_cmd=("uvicorn")
+        warn "Using uvicorn from PATH"
+    else
+        err "Uvicorn is not available in .venv, system Python, or PATH"
+        err "Install backend requirements and retry."
         exit 1
     fi
 
     info "Starting backend (FastAPI/Uvicorn)..."
     (
         cd "$BACKEND_DIR"
-        source "$VENV_DIR/bin/activate"
-        nohup uvicorn main:app --host 0.0.0.0 --port 8000 --reload > "$LOG_DIR/backend.log" 2>&1 &
+        nohup "${backend_cmd[@]}" main:app --host 0.0.0.0 --port 8000 --reload > "$LOG_DIR/backend.log" 2>&1 &
         echo $! > "$LOG_DIR/backend.pid"
     )
 

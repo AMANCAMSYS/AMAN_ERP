@@ -40,12 +40,24 @@ def apply_trigger():
                     
                     conn.execute(text("""
                         CREATE OR REPLACE FUNCTION check_journal_balance() RETURNS TRIGGER AS $$
+                        DECLARE
+                            target_journal_entry_id INTEGER;
+                            total_debit NUMERIC;
+                            total_credit NUMERIC;
                         BEGIN
-                            IF (SELECT ABS(SUM(debit) - SUM(credit)) FROM journal_lines
-                                WHERE journal_entry_id = NEW.journal_entry_id) > 0.01 THEN
-                                RAISE EXCEPTION 'Journal entry % is not balanced', NEW.journal_entry_id;
+                            target_journal_entry_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
+
+                            SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
+                              INTO total_debit, total_credit
+                            FROM journal_lines
+                            WHERE journal_entry_id = target_journal_entry_id;
+
+                            IF ABS(total_debit - total_credit) > 0.01 THEN
+                                RAISE EXCEPTION
+                                    'Journal entry % is not balanced (debit %, credit %)',
+                                    target_journal_entry_id, total_debit, total_credit;
                             END IF;
-                            RETURN NEW;
+                            RETURN COALESCE(NEW, OLD);
                         END;
                         $$ LANGUAGE plpgsql;
                     """))
@@ -53,12 +65,19 @@ def apply_trigger():
                     conn.execute(text("""
                         DO $$
                         BEGIN
-                            IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_journal_balance') THEN
-                                CREATE CONSTRAINT TRIGGER trg_journal_balance
-                                AFTER INSERT OR UPDATE ON journal_lines
-                                DEFERRABLE INITIALLY DEFERRED
-                                FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
+                            IF EXISTS (
+                                SELECT 1
+                                FROM pg_trigger
+                                WHERE tgname = 'trg_journal_balance'
+                                  AND tgrelid = 'journal_lines'::regclass
+                            ) THEN
+                                DROP TRIGGER trg_journal_balance ON journal_lines;
                             END IF;
+
+                            CREATE CONSTRAINT TRIGGER trg_journal_balance
+                            AFTER INSERT OR UPDATE OR DELETE ON journal_lines
+                            DEFERRABLE INITIALLY DEFERRED
+                            FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
                         END
                         $$;
                     """))

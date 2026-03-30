@@ -403,8 +403,8 @@ cd /opt/aman && git pull origin main
 # 2. أنشئ الحاويات الجديدة
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build
 
-# 3. شغّل الهجرات
-docker compose exec backend alembic upgrade head
+# 3. شغّل الهجرات (System + جميع قواعد الشركات)
+docker compose exec backend alembic -x company=all upgrade head
 
 # 4. أعد النشر (rolling update)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
@@ -427,8 +427,8 @@ git checkout HEAD~1
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build backend
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps backend
 
-# 3. تراجع عن آخر هجرة (إن لزم)
-docker compose exec backend alembic downgrade -1
+# 3. تراجع عن آخر هجرة (إن لزم) على جميع الشركات
+docker compose exec backend alembic -x company=all downgrade -1
 ```
 
 ### تحديث Frontend فقط
