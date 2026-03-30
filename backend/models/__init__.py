@@ -170,6 +170,13 @@ from .phase26_landed_costs_leases_leave_security import (
     LeaveCarryover,
     LoginAttempt,
 )
+from .phase27_maintenance_manufacturing_marketing import (
+    MaintenanceLog,
+    ManufacturingEquipment,
+    ManufacturingOperation,
+    ManufacturingRoute,
+    MarketingCampaign,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -333,6 +340,11 @@ __all__ = [
     "LeaseContract",
     "LeaveCarryover",
     "LoginAttempt",
+    "MaintenanceLog",
+    "ManufacturingEquipment",
+    "ManufacturingOperation",
+    "ManufacturingRoute",
+    "MarketingCampaign",
     "target_metadata",
     "MODELED_TABLES",
 ]
