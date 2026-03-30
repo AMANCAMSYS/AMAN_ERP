@@ -2,11 +2,10 @@
 
 This package currently contains two structures:
 
-1. Historical phase files (`phase*.py`) used during the incremental ORM rollout.
+1. Remaining historical phase files (`phase*.py`) used during the incremental ORM rollout.
 2. Domain-first facades under `backend/models/domains/` for easier long-term maintenance.
 
-The phase files are still valid and are kept for rollout traceability. For new development,
-use the domain-first organization.
+For new development, use the domain-first organization.
 
 ## Developer Note (New Contributors)
 
@@ -23,7 +22,8 @@ use the domain-first organization.
 
 ## Transition Strategy
 
-- Phase files remain as a stable compatibility layer.
+- Extracted phases are removed once `backend/models/__init__.py` is switched to direct
+	imports from `backend/models/domain_models/` and validated.
 - Domain facades are the preferred entry point for model discovery and new code.
 - Physical consolidation of phase files is happening incrementally in verified batches.
 
@@ -31,7 +31,7 @@ use the domain-first organization.
 
 - Wave 1 complete: physical model definitions from phase 32 and phase 33 moved into
 	`backend/models/domain_models/` grouped by business domains.
-- `phase32_*` and `phase33_*` are now compatibility wrappers that re-export from domain modules.
 - Wave 2 complete: physical model definitions from phase 26 through phase 31 moved into
 	`backend/models/domain_models/` with domain-first placement (50 tables in one batch).
-- `phase26_*` through `phase31_*` are now compatibility wrappers that re-export from domain modules.
+- `phase26_*` through `phase33_*` were retired and removed after the central registry
+	`backend/models/__init__.py` was rewired to direct domain-model imports.

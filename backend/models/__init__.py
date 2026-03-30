@@ -171,85 +171,39 @@ from .phase25_dashboard_fiscal_gosi_intercompany_landed_costs import (
     IntercompanyTransaction,
     LandedCostAllocation,
 )
-from .phase26_landed_costs_leases_leave_security import (
-    LandedCost,
-    LandedCostItem,
-    LeaseContract,
-    LeaveCarryover,
-    LoginAttempt,
+from .domain_models.finance_cashflow import (
+    PartyTransaction,
+    Payment,
+    PaymentAllocation,
+    PaymentVoucher,
+    RecurringJournalLine,
+    RecurringJournalTemplate,
 )
-from .phase27_maintenance_manufacturing_marketing import (
-    MaintenanceLog,
+from .domain_models.finance_recognition_tax import RevenueRecognitionSchedule, TaxCalendar, WhtRate, WhtTransaction
+from .domain_models.hr_training import TrainingParticipant, TrainingProgram
+from .domain_models.hr_workforce import LeaveCarryover, OvertimeRequest, PerformanceReview
+from .domain_models.inventory_transfers import StockShipment, StockShipmentItem, StockTransferLog
+from .domain_models.manufacturing_execution import (
     ManufacturingEquipment,
     ManufacturingOperation,
     ManufacturingRoute,
-    MarketingCampaign,
-)
-from .phase28_messages_mrp_notifications import Message, MfgQcCheck, MrpItem, MrpPlan, Notification
-from .phase29_opportunity_overtime_party_payments_security import (
-    OpportunityActivity,
-    OvertimeRequest,
-    PartyTransaction,
-    PasswordHistory,
-    PaymentAllocation,
-)
-from .phase30_payments_pending_performance_pos_loyalty import (
-    PaymentVoucher,
-    Payment,
-    PendingPayable,
-    PendingReceivable,
-    PerformanceReview,
-    PosKitchenOrder,
-    PosLoyaltyPoint,
-    PosLoyaltyProgram,
-    PosLoyaltyTransaction,
-    PosOrderLine,
-)
-from .phase31_pos_operations_projects_procurement_batch20 import (
-    PosOrderPayment,
-    PosOrder,
-    PosPayment,
-    PosPromotion,
-    PosReturnItem,
-    PosReturn,
-    PosSession,
-    PosTableOrder,
-    PosTable,
-    PrintTemplate,
-    ProductionOrderOperation,
+    MfgQcCheck,
+    MrpItem,
+    MrpPlan,
     ProductionOrder,
-    ProjectRisk,
-    ProjectTimesheet,
-    PurchaseAgreementLine,
+    ProductionOrderOperation,
+)
+from .domain_models.manufacturing_resources import WorkCenter
+from .domain_models.operations_support import LeaseContract, MaintenanceLog, MarketingCampaign
+from .domain_models.procurement_costs import (
+    LandedCost,
+    LandedCostItem,
+    PendingPayable,
     PurchaseAgreement,
-    Receipt,
-    RecurringJournalLine,
-    RecurringJournalTemplate,
-    ReportTemplate,
+    PurchaseAgreementLine,
 )
-from .phase32_sales_rfq_security_stock_batch20 import (
-    RequestForQuotation,
-    RevenueRecognitionSchedule,
-    RfqLine,
-    RfqResponse,
-    Role,
-    SalesCommission,
-    SalesOpportunity,
-    SalesOrderLine,
-    SalesOrder,
-    SalesQuotationLine,
-    SalesQuotation,
-    SalesReturnLine,
-    SalesReturn,
-    SalesTarget,
-    ScheduledReport,
-    SecurityEvent,
-    SharedReport,
-    StockShipmentItem,
-    StockShipment,
-    StockTransferLog,
-)
-from .phase33_supplier_tax_training_security_webhooks_batch19 import (
+from .domain_models.procurement_suppliers import (
+    Supplier,
     SupplierBalance,
     SupplierBankAccount,
     SupplierContact,
@@ -257,18 +211,51 @@ from .phase33_supplier_tax_training_security_webhooks_batch19 import (
     SupplierPayment,
     SupplierRating,
     SupplierTransaction,
-    Supplier,
-    TaskDependency,
-    TaxCalendar,
-    TrainingParticipant,
-    TrainingProgram,
+)
+from .domain_models.projects_dependencies import TaskDependency
+from .domain_models.projects_execution import OpportunityActivity, ProjectRisk, ProjectTimesheet
+from .domain_models.sales_pos import (
+    PendingReceivable,
+    PosKitchenOrder,
+    PosLoyaltyPoint,
+    PosLoyaltyProgram,
+    PosLoyaltyTransaction,
+    PosOrder,
+    PosOrderLine,
+    PosOrderPayment,
+    PosPayment,
+    PosPromotion,
+    PosReturn,
+    PosReturnItem,
+    PosSession,
+    PosTable,
+    PosTableOrder,
+    Receipt,
+)
+from .domain_models.sales_rfq import (
+    RequestForQuotation,
+    RfqLine,
+    RfqResponse,
+    SalesCommission,
+    SalesOpportunity,
+    SalesOrder,
+    SalesOrderLine,
+    SalesQuotation,
+    SalesQuotationLine,
+    SalesReturn,
+    SalesReturnLine,
+    SalesTarget,
+)
+from .domain_models.security_comms import LoginAttempt, Message, Notification, PasswordHistory, PrintTemplate, ReportTemplate
+from .domain_models.security_reporting import (
+    Role,
+    ScheduledReport,
+    SecurityEvent,
+    SharedReport,
     User2FASetting,
     UserSession,
     WebhookLog,
     Webhook,
-    WhtRate,
-    WhtTransaction,
-    WorkCenter,
 )
 
 
