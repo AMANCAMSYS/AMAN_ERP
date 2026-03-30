@@ -156,6 +156,13 @@ from .phase24_mfg_capacity_contracts_crm_groups import (
     CrmKnowledgeBase,
     CustomerGroup,
 )
+from .phase25_dashboard_fiscal_gosi_intercompany_landed_costs import (
+    DashboardLayout,
+    FiscalPeriod,
+    GosiSetting,
+    IntercompanyTransaction,
+    LandedCostAllocation,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -309,6 +316,11 @@ __all__ = [
     "ContractAmendment",
     "CrmKnowledgeBase",
     "CustomerGroup",
+    "DashboardLayout",
+    "FiscalPeriod",
+    "GosiSetting",
+    "IntercompanyTransaction",
+    "LandedCostAllocation",
     "target_metadata",
     "MODELED_TABLES",
 ]
