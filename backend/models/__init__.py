@@ -63,6 +63,57 @@ from .phase4_operations_support import (
     SupportTicket,
     TicketComment,
 )
+from .phase6_approvals import ApprovalAction, ApprovalRequest, ApprovalWorkflow
+from .phase7_assets_core import Asset, AssetCategory, AssetTransfer
+from .phase8_budgets_core import Budget, BudgetItem, BudgetLine
+from .phase9_costing_core import (
+    CostCenter,
+    CostCenterBudget,
+    CostingPolicy,
+    CostingPolicyDetail,
+    CostingPolicyHistory,
+    InventoryCostSnapshot,
+)
+from .phase10_assets_advanced import (
+    AssetDepreciationSchedule,
+    AssetDisposal,
+    AssetImpairment,
+    AssetInsurance,
+    AssetMaintenance,
+    AssetRevaluation,
+)
+from .phase11_currency_bank_import import BankImportBatch, BankImportLine, Currency, ExchangeRate
+from .phase12_fiscal_zakat import FiscalPeriodLock, FiscalYear, ZakatCalculation
+from .phase13_contracts_expenses import Contract, ContractItem, ExpensePolicy
+from .phase14_crm_advanced import (
+    CrmCustomerSegment,
+    CrmCustomerSegmentMember,
+    CrmLeadScore,
+    CrmLeadScoringRule,
+    CrmSalesForecast,
+)
+from .phase15_ops_security_reporting import ApiKey, AuditLog, BackupHistory, CustomReport, EmailTemplate
+from .phase16_inventory_bins_cycle import (
+    BatchSerialMovement,
+    BinInventory,
+    BinLocation,
+    CycleCount,
+    CycleCountItem,
+)
+from .phase17_inventory_variants_kits import (
+    ProductAttribute,
+    ProductAttributeValue,
+    ProductKit,
+    ProductVariant,
+    ProductVariantAttribute,
+)
+from .phase18_inventory_traceability_quality import (
+    ProductBatch,
+    ProductKitItem,
+    ProductSerial,
+    QualityInspection,
+    QualityInspectionCriteria,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -130,6 +181,62 @@ __all__ = [
     "DocumentVersion",
     "SupportTicket",
     "TicketComment",
+    "ApprovalWorkflow",
+    "ApprovalRequest",
+    "ApprovalAction",
+    "AssetCategory",
+    "Asset",
+    "AssetTransfer",
+    "Budget",
+    "BudgetItem",
+    "BudgetLine",
+    "CostCenter",
+    "CostCenterBudget",
+    "CostingPolicy",
+    "CostingPolicyDetail",
+    "CostingPolicyHistory",
+    "InventoryCostSnapshot",
+    "AssetDepreciationSchedule",
+    "AssetDisposal",
+    "AssetRevaluation",
+    "AssetInsurance",
+    "AssetMaintenance",
+    "AssetImpairment",
+    "Currency",
+    "ExchangeRate",
+    "BankImportBatch",
+    "BankImportLine",
+    "FiscalYear",
+    "FiscalPeriodLock",
+    "ZakatCalculation",
+    "Contract",
+    "ContractItem",
+    "ExpensePolicy",
+    "CrmLeadScoringRule",
+    "CrmLeadScore",
+    "CrmCustomerSegment",
+    "CrmCustomerSegmentMember",
+    "CrmSalesForecast",
+    "ApiKey",
+    "AuditLog",
+    "BackupHistory",
+    "CustomReport",
+    "EmailTemplate",
+    "BatchSerialMovement",
+    "CycleCount",
+    "CycleCountItem",
+    "BinLocation",
+    "BinInventory",
+    "ProductAttribute",
+    "ProductAttributeValue",
+    "ProductVariant",
+    "ProductVariantAttribute",
+    "ProductKit",
+    "ProductBatch",
+    "ProductSerial",
+    "QualityInspection",
+    "QualityInspectionCriteria",
+    "ProductKitItem",
     "target_metadata",
     "MODELED_TABLES",
 ]

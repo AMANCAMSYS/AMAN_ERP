@@ -108,18 +108,18 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 |---|---|
 | **الأولوية** | P1 |
 | **الجهد** | 2-4 أسابيع |
-| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4 + Phase5 targeted drift fix + revision خامس: `e1c5a8b6d6f2`) |
+| **الحالة** | 🚧 قيد التنفيذ المتقدم (تم تفعيل Alembic + ربط provisioning + ORM phase1/phase2/phase3/phase4/phase6/phase7/phase8/phase9/phase10/phase11/phase12/phase13/phase14/phase15/phase16/phase17/phase18 + drift-fix إضافي لـ `asset_impairments` و`expense_policies` + revision سابع: `a4b2c9d8e6f1`) |
 | **المشكلة** | Schema يُنشأ بـ `CREATE TABLE IF NOT EXISTS` — لا تتبع للتغييرات، لا rollback |
 | **الخطر** | تعديل جدول موجود يتطلب `ALTER TABLE` يدوي — احتمال نسيان تطبيقه على بيئات مختلفة |
 | **الحل** | إعداد Alembic مع `autogenerate`، تحويل database.py إلى SQLAlchemy models، إنشاء migration أولي |
 
 **خطوات التنفيذ:**
 1. `alembic init migrations`
-2. 🚧 إنشاء SQLAlchemy models من الجداول الحالية (phase1 + phase2 + phase3 + phase4 مكتملة حاليًا لـ 60 جدولًا؛ تم توسيع النطاق إلى المخزون/المشتريات/HR + الخزينة/الضرائب/المشاريع + الشيكات/المستندات/الدعم)
+2. 🚧 إنشاء SQLAlchemy models من الجداول الحالية (phase1 + phase2 + phase3 + phase4 + phase6 + phase7 + phase8 + phase9 + phase10 + phase11 + phase12 + phase13 + phase14 + phase15 + phase16 + phase17 + phase18 مكتملة حاليًا لـ 116 جدولًا؛ تم توسيع النطاق إلى المخزون/المشتريات/HR + الخزينة/الضرائب/المشاريع + الشيكات/المستندات/الدعم + الموافقات + الأصول الأساسية + الميزانيات الأساسية + مراكز/سياسات التكلفة + الأصول المتقدمة + العملات/استيراد البنوك + الإقفال المالي/الزكاة + العقود/بنود العقود + سياسات المصروفات + CRM advanced scoring/segmentation/forecasting + مفاتيح API/Security/Ops reporting + advanced inventory bins/cycle counting + variants/kits + traceability/quality)
 3. ✅ إنشاء ومراجعة revision رابع غير فارغ عبر autogenerate: `908f5baa6f93_phase4_ops_support_autogen_reviewed.py` (إصلاح drift أعمدة مهم في service/docs)
 4. ✅ إنشاء Phase 5 targeted migration: `e1c5a8b6d6f2_phase5_targeted_missing_tables.py` لإنشاء جدولَي `service_request_costs` و`document_versions` فقط عند الحاجة وفي شركتين محددتين
 5. ✅ تعديل `create_company_tables()` لتشغيل `alembic -x company=<id> upgrade head` تلقائيًا بعد إنشاء الجداول
-6. ✅ اختبار على شركة تجريبية + النظام (نجح على المسارين، ثم تمت ترقية جميع القواعد إلى `alembic_version=e1c5a8b6d6f2`)
+6. ✅ اختبار على شركة تجريبية + النظام (نجح على المسارين، ثم تمت ترقية جميع القواعد إلى `alembic_version=a4b2c9d8e6f1`)
 
 **مخرجات Phase 2 (مطبقة على 11/11 شركة + النظام):**
 - إضافة أعمدة خصومات/Markup الناقصة في `purchase_orders` (`effect_type`, `effect_percentage`, `markup_amount`) عبر هجرة idempotent.
@@ -138,7 +138,7 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 - إضافة أعمدة ربط/إصدار ناقصة في `documents` (`related_module`, `related_id`, `current_version`, `updated_at`).
 - إضافة أعمدة تتبّع ناقصة في `document_versions` (`change_notes`, `created_at`).
 - توحيد نسخة Alembic: كل الشركات والنظام على `908f5baa6f93`.
-- ملاحظة drift متبقّية: شركتان (`aman_8f3e504b`, `aman_fcfa5fae`) لا تحتويان أصلًا على جدولَي `service_request_costs` و`document_versions`، لذا لم تُضف لهما أعمدة (الهجرة الحالية additive فقط). إنشاء الجداول كاملة يُعالج في phase لاحقة عند اعتماد هذه الوحدات على هاتين الشركتين.
+- ملاحظة drift (تم إغلاقها): كانت شركتان (`aman_8f3e504b`, `aman_fcfa5fae`) تفتقدان جدولَي `service_request_costs` و`document_versions`، وتمت معالجتها بالكامل في Phase 5 targeted fix.
 
 **مخرجات Phase 5 targeted fix (مطبقة على 11/11 شركة + النظام):**
 - إنشاء مشروط لجدول `service_request_costs` فقط إذا كان مفقودًا.
@@ -146,6 +146,85 @@ FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
 - تفعيل الإنشاء فقط على الشركتين المستهدفتين `aman_8f3e504b` و`aman_fcfa5fae` عبر شرط اسم قاعدة البيانات داخل migration.
 - نتيجة التحقق: لا توجد أي شركة مفقود بها هذان الجدولان بعد التطبيق.
 - توحيد نسخة Alembic: كل الشركات والنظام على `e1c5a8b6d6f2`.
+
+**مخرجات Phase 6 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة الموافقات: `approval_workflows`, `approval_requests`, `approval_actions`.
+- توسيع `MODELED_TABLES` من 60 إلى 63 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Phase 7 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM للأصول الأساسية: `asset_categories`, `assets`, `asset_transfers`.
+- توسيع `MODELED_TABLES` من 63 إلى 66 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Phase 8 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM للميزانيات الأساسية: `budgets`, `budget_items`, `budget_lines`.
+- توسيع `MODELED_TABLES` من 66 إلى 69 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Phase 9 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لمراكز وسياسات التكلفة: `cost_centers`, `cost_centers_budgets`, `costing_policies`, `costing_policy_details`, `costing_policy_history`, `inventory_cost_snapshots`.
+- توسيع `MODELED_TABLES` من 69 إلى 75 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Phase 10 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM للأصول المتقدمة: `asset_depreciation_schedule`, `asset_disposals`, `asset_revaluations`, `asset_insurance`, `asset_maintenance`.
+- توسيع `MODELED_TABLES` من 75 إلى 80 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Drift-fix (asset_impairments) (مطبقة على 11/11 شركة + النظام):**
+- إنشاء migration مخصص: `f3a1d9c42b7e_asset_impairments_created_by_drift_fix.py`.
+- إضافة العمود الناقص `created_by` في `asset_impairments` فقط عند غيابه (idempotent).
+- نتيجة التحقق: توحيد schema للجدول من `variants=2` إلى `variants=1` عبر جميع الشركات.
+- تمت إضافة نموذج ORM لجدول `asset_impairments` بعد توحيده.
+- توحيد نسخة Alembic: كل الشركات والنظام على `f3a1d9c42b7e`.
+
+**مخرجات Phase 11 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة العملات واستيراد البنوك: `currencies`, `exchange_rates`, `bank_import_batches`, `bank_import_lines`.
+- توسيع `MODELED_TABLES` من 81 إلى 85 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Phase 12 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة الإقفال المالي/الزكاة: `fiscal_years`, `fiscal_period_locks`, `zakat_calculations`.
+- توسيع `MODELED_TABLES` من 85 إلى 88 جدولًا.
+- نتيجة التحقق: لا يوجد drift بنيوي في هذه الجداول عبر جميع الشركات (لا حاجة revision جديدة لهذه الدفعة).
+
+**مخرجات Drift-fix (expense_policies) (مطبقة على 11/11 شركة + النظام):**
+- إنشاء migration مخصص: `a4b2c9d8e6f1_expense_policies_created_by_drift_fix.py`.
+- إضافة العمود الناقص `created_by` في `expense_policies` فقط عند غيابه (idempotent).
+- نتيجة التحقق: توحيد الأعمدة فعليًا عبر جميع الشركات (`set_variants=1`).
+- ملاحظة فنية: ما زال `ordered_variants=2` بسبب اختلاف ترتيب العمود (`created_by` قبل/بعد `created_at`) وليس بسبب فقدان أعمدة.
+- توحيد نسخة Alembic: كل الشركات والنظام على `a4b2c9d8e6f1`.
+
+**مخرجات Phase 13 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة العقود/المصروفات: `contracts`, `contract_items`, `expense_policies`.
+- توسيع `MODELED_TABLES` من 88 إلى 91 جدولًا.
+- نتيجة التحقق: لا يوجد missing modeled tables عبر جميع الشركات، والجداول الثلاثة مستقرة بنيويًا.
+
+**مخرجات Phase 14 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة CRM المتقدمة: `crm_lead_scoring_rules`, `crm_lead_scores`, `crm_customer_segments`, `crm_customer_segment_members`, `crm_sales_forecasts`.
+- توسيع `MODELED_TABLES` من 91 إلى 96 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Phase 15 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة Security/Ops/Reporting: `api_keys`, `audit_logs`, `backup_history`, `custom_reports`, `email_templates`.
+- توسيع `MODELED_TABLES` من 96 إلى 101 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Phase 16 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة المخزون المتقدم (bins/cycle): `batch_serial_movements`, `cycle_counts`, `cycle_count_items`, `bin_locations`, `bin_inventory`.
+- توسيع `MODELED_TABLES` من 101 إلى 106 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Phase 17 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة variants/kits: `product_attributes`, `product_attribute_values`, `product_variants`, `product_variant_attributes`, `product_kits`.
+- توسيع `MODELED_TABLES` من 106 إلى 111 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
+
+**مخرجات Phase 18 ORM coverage (مطبقة على 11/11 شركة + النظام):**
+- إضافة نماذج ORM لوحدة traceability/quality: `product_batches`, `product_serials`, `quality_inspections`, `quality_inspection_criteria`, `product_kit_items`.
+- توسيع `MODELED_TABLES` من 111 إلى 116 جدولًا.
+- نتيجة التحقق: الجداول الخمسة مستقرة عبر جميع الشركات (`present=11/11`, `ordered_variants=1`, `set_variants=1`) ولا يوجد missing modeled tables.
 
 ---
 
