@@ -185,6 +185,18 @@ from .phase29_opportunity_overtime_party_payments_security import (
     PasswordHistory,
     PaymentAllocation,
 )
+from .phase30_payments_pending_performance_pos_loyalty import (
+    PaymentVoucher,
+    Payment,
+    PendingPayable,
+    PendingReceivable,
+    PerformanceReview,
+    PosKitchenOrder,
+    PosLoyaltyPoint,
+    PosLoyaltyProgram,
+    PosLoyaltyTransaction,
+    PosOrderLine,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -363,6 +375,16 @@ __all__ = [
     "PartyTransaction",
     "PasswordHistory",
     "PaymentAllocation",
+    "PaymentVoucher",
+    "Payment",
+    "PendingPayable",
+    "PendingReceivable",
+    "PerformanceReview",
+    "PosKitchenOrder",
+    "PosLoyaltyPoint",
+    "PosLoyaltyProgram",
+    "PosLoyaltyTransaction",
+    "PosOrderLine",
     "target_metadata",
     "MODELED_TABLES",
 ]
