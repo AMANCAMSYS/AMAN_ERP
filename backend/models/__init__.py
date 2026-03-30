@@ -149,6 +149,13 @@ from .phase23_reporting_documents_fx_crm import (
     DocumentType,
     FinancialReport,
 )
+from .phase24_mfg_capacity_contracts_crm_groups import (
+    BomComponent,
+    CapacityPlan,
+    ContractAmendment,
+    CrmKnowledgeBase,
+    CustomerGroup,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -297,6 +304,11 @@ __all__ = [
     "DocumentTemplate",
     "CurrencyTransaction",
     "CrmContact",
+    "BomComponent",
+    "CapacityPlan",
+    "ContractAmendment",
+    "CrmKnowledgeBase",
+    "CustomerGroup",
     "target_metadata",
     "MODELED_TABLES",
 ]
