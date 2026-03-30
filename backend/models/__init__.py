@@ -128,6 +128,13 @@ from .phase20_receivables_delivery import (
     DeliveryOrder,
     DeliveryOrderLine,
 )
+from .phase21_hr_compliance_recruitment import (
+    EmployeeCustody,
+    EmployeeDocument,
+    EmployeeViolation,
+    JobApplication,
+    JobOpening,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -261,6 +268,11 @@ __all__ = [
     "CustomerBalance",
     "DeliveryOrder",
     "DeliveryOrderLine",
+    "EmployeeDocument",
+    "EmployeeViolation",
+    "EmployeeCustody",
+    "JobOpening",
+    "JobApplication",
     "target_metadata",
     "MODELED_TABLES",
 ]
