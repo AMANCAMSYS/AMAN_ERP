@@ -142,6 +142,13 @@ from .phase22_mfg_attachments_commissions import (
     CheckStatusLog,
     CommissionRule,
 )
+from .phase23_reporting_documents_fx_crm import (
+    CrmContact,
+    CurrencyTransaction,
+    DocumentTemplate,
+    DocumentType,
+    FinancialReport,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -285,6 +292,11 @@ __all__ = [
     "BomOutput",
     "CheckStatusLog",
     "CommissionRule",
+    "FinancialReport",
+    "DocumentType",
+    "DocumentTemplate",
+    "CurrencyTransaction",
+    "CrmContact",
     "target_metadata",
     "MODELED_TABLES",
 ]
