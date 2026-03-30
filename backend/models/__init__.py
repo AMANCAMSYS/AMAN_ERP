@@ -121,6 +121,13 @@ from .phase19_customer_master_pricing import (
     CustomerPriceList,
     CustomerPriceListItem,
 )
+from .phase20_receivables_delivery import (
+    CustomerBalance,
+    CustomerReceipt,
+    CustomerTransaction,
+    DeliveryOrder,
+    DeliveryOrderLine,
+)
 
 
 target_metadata = ModelBase.metadata
@@ -249,6 +256,11 @@ __all__ = [
     "CustomerBankAccount",
     "CustomerPriceList",
     "CustomerPriceListItem",
+    "CustomerTransaction",
+    "CustomerReceipt",
+    "CustomerBalance",
+    "DeliveryOrder",
+    "DeliveryOrderLine",
     "target_metadata",
     "MODELED_TABLES",
 ]
