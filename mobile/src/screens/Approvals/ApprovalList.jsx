@@ -9,10 +9,12 @@ import {
 import { useNetwork } from '../../../App';
 import { approvalAPI } from '../../services/api';
 import { enqueue } from '../../services/syncService';
+import { formatAmount, getMobileCurrencyCode } from '../../utils/formatters';
 
 export default function ApprovalList() {
   const { isConnected } = useNetwork();
   const [approvals, setApprovals] = useState([]);
+  const [currencyCode, setCurrencyCode] = useState('SAR');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
@@ -23,8 +25,10 @@ export default function ApprovalList() {
         const res = await approvalAPI.list({ status: 'pending', limit: 50 });
         setApprovals(res.items || res || []);
       }
+      setCurrencyCode(await getMobileCurrencyCode());
     } catch {
       // keep existing list
+      setCurrencyCode(await getMobileCurrencyCode());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -92,7 +96,7 @@ export default function ApprovalList() {
       </View>
       <Text style={styles.desc}>{item.description || item.notes || ''}</Text>
       {item.amount != null && (
-        <Text style={styles.amount}>{item.amount} ر.س</Text>
+        <Text style={styles.amount}>{formatAmount(item.amount, item.currency || item.currency_code || currencyCode)}</Text>
       )}
       <Text style={styles.requester}>مقدم الطلب: {item.requester_name || '—'}</Text>
 

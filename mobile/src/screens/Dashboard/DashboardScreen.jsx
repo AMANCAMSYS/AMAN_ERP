@@ -9,6 +9,7 @@ import {
 import { useAuth, useNetwork } from '../../../App';
 import { mobileAPI } from '../../services/api';
 import { getQueueSize } from '../../services/syncService';
+import { setMobileCurrencyCode } from '../../utils/formatters';
 
 export default function DashboardScreen({ navigation }) {
   const { signOut } = useAuth();
@@ -23,6 +24,7 @@ export default function DashboardScreen({ navigation }) {
       if (isConnected) {
         const res = await mobileAPI.dashboard();
         setData(res);
+        await setMobileCurrencyCode(res?.currency_code);
       }
       setQueueSize(await getQueueSize());
     } catch {

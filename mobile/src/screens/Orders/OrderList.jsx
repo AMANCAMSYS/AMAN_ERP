@@ -8,6 +8,7 @@ import {
 import { useNetwork } from '../../../App';
 import { orderAPI } from '../../services/api';
 import { getOrders } from '../../store/offlineStore';
+import { formatAmount, formatDate, getMobileCurrencyCode } from '../../utils/formatters';
 
 const STATUS_LABELS = {
   draft: 'مسودة',
@@ -25,6 +26,7 @@ const STATUS_COLORS = {
 export default function OrderList() {
   const { isConnected } = useNetwork();
   const [orders, setOrders] = useState([]);
+  const [currencyCode, setCurrencyCode] = useState('SAR');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,8 +38,10 @@ export default function OrderList() {
       } else {
         setOrders(await getOrders());
       }
+      setCurrencyCode(await getMobileCurrencyCode());
     } catch {
       setOrders(await getOrders());
+      setCurrencyCode(await getMobileCurrencyCode());
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -58,9 +62,9 @@ export default function OrderList() {
         </View>
         <Text style={styles.customer}>{item.customer_name || '—'}</Text>
         <View style={styles.footer}>
-          <Text style={styles.amount}>{item.total_amount ?? '—'} ر.س</Text>
+          <Text style={styles.amount}>{formatAmount(item.total_amount, item.currency || item.currency_code || currencyCode)}</Text>
           <Text style={styles.date}>
-            {item.created_at ? new Date(item.created_at).toLocaleDateString('ar-SA') : ''}
+            {formatDate(item.created_at)}
           </Text>
         </View>
       </View>

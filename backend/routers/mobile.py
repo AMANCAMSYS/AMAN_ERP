@@ -75,6 +75,8 @@ class DashboardResponse(BaseModel):
     pending_orders: int
     pending_approvals: int
     recent_quotations: list
+    currency_code: str
+    currency_symbol: str
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +279,31 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
     company_id = _get_company_id(current_user)
     conn = get_db_connection(company_id)
     try:
+        # Company currency settings
+        currency_row = conn.execute(text("""
+            SELECT setting_value
+            FROM company_settings
+            WHERE setting_key = 'default_currency'
+            ORDER BY id DESC
+            LIMIT 1
+        """)).mappings().first()
+        currency_code = (
+            (currency_row["setting_value"] if currency_row else None)
+            or "SAR"
+        )
+        currency_code = str(currency_code).upper()
+        currency_symbol = {
+            "SAR": "ر.س",
+            "USD": "$",
+            "EUR": "€",
+            "GBP": "£",
+            "AED": "د.إ",
+            "KWD": "د.ك",
+            "QAR": "ر.ق",
+            "BHD": "د.ب",
+            "OMR": "ر.ع",
+        }.get(currency_code, currency_code)
+
         # Inventory summary
         inv_row = conn.execute(text("""
             SELECT COUNT(*) AS total_products,
@@ -316,6 +343,8 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
         pending_orders=pending_orders,
         pending_approvals=pending_approvals,
         recent_quotations=recent_quotations,
+        currency_code=currency_code,
+        currency_symbol=currency_symbol,
     )
 
 
