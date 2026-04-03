@@ -34,6 +34,7 @@ from ..domain_models.finance_cashflow import (
     RecurringJournalLine,
     RecurringJournalTemplate,
 )
+from ..domain_models.finance_forecast import CashFlowForecast, CashFlowForecastLine
 from ..domain_models.finance_recognition_tax import (
     RevenueRecognitionSchedule,
     TaxCalendar,
@@ -76,4 +77,6 @@ __all__ = [
     "WhtTransaction",
     "BankImportBatch",
     "BankImportLine",
+    "CashFlowForecast",
+    "CashFlowForecastLine",
 ]

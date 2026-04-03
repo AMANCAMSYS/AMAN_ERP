@@ -1,13 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Mail, Bell, Server, CheckCircle, XCircle } from 'lucide-react';
+import { Mail, Bell, Server, CheckCircle, XCircle, Sliders } from 'lucide-react';
 import api from '../../../utils/api';
+import { notificationsAPI } from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
+import DataTable from '../../../components/common/DataTable';
+
+// ── Notification Preferences (per-user event × channel toggles) ─────────────
+const EVENT_TYPES = [
+    'leave_approved', 'leave_rejected', 'invoice_held', 'invoice_approved',
+    'purchase_approved', 'review_reminder', 'subscription_expiring',
+    'performance_review_due', 'time_off_reminder', 'task_assigned',
+    'shipment_delayed', 'payment_received', 'approval_requested',
+];
+
+const CHANNELS = [
+    { key: 'email_enabled', label: 'notification_preferences.channel_email' },
+    { key: 'in_app_enabled', label: 'notification_preferences.channel_in_app' },
+    { key: 'push_enabled', label: 'notification_preferences.channel_push' },
+];
+
+function buildPrefMap(rows) {
+    const map = {};
+    EVENT_TYPES.forEach((evt) => {
+        map[evt] = { email_enabled: true, in_app_enabled: true, push_enabled: true };
+    });
+    rows.forEach((r) => {
+        if (map[r.event_type] !== undefined) {
+            map[r.event_type] = {
+                email_enabled: r.email_enabled,
+                in_app_enabled: r.in_app_enabled,
+                push_enabled: r.push_enabled,
+            };
+        }
+    });
+    return map;
+}
 
 const NotificationSettings = ({ settings, handleSettingChange }) => {
     const { t } = useTranslation();
     const { showToast } = useToast();
     const [testing, setTesting] = useState(false);
+
+    // ── User notification preferences state ──
+    const [prefs, setPrefs] = useState(() => buildPrefMap([]));
+    const [prefsLoading, setPrefsLoading] = useState(true);
+    const [prefSaving, setPrefSaving] = useState(null);
+
+    useEffect(() => {
+        notificationsAPI
+            .getPreferences()
+            .then((res) => setPrefs(buildPrefMap(res.data || [])))
+            .catch(() => {/* use defaults */})
+            .finally(() => setPrefsLoading(false));
+    }, []);
+
+    const handlePrefToggle = async (eventType, channel) => {
+        const current = prefs[eventType];
+        const updated = { ...current, [channel]: !current[channel] };
+        setPrefs((p) => ({ ...p, [eventType]: updated }));
+        setPrefSaving(eventType);
+        try {
+            await notificationsAPI.updatePreference({ event_type: eventType, ...updated });
+        } catch {
+            setPrefs((p) => ({ ...p, [eventType]: current }));
+        } finally {
+            setPrefSaving(null);
+        }
+    };
 
     // Test email connection via backend
     const testEmailConnection = async () => {
@@ -172,6 +232,56 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         </label>
                     </div>
                 </div>
+            </div>
+
+            {/* ── User Notification Preferences (event × channel toggles) ── */}
+            <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Sliders size={20} className="text-primary" />
+                    {t('notification_preferences.title')}
+                </h3>
+                <p className="text-sm text-base-content/60 mb-4">{t('notification_preferences.subtitle')}</p>
+
+                {prefsLoading ? (
+                    <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>
+                        {t('notification_preferences.loading')}
+                    </div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <DataTable
+                            data={EVENT_TYPES.map((evt) => ({ event_type: evt, ...prefs[evt] }))}
+                            columns={[
+                                {
+                                    key: 'event_type',
+                                    label: t('notification_preferences.event_type'),
+                                    render: (val) => (
+                                        <span style={{ fontWeight: 500 }}>
+                                            {t('notification_preferences.event_' + val)}
+                                            {prefSaving === val && (
+                                                <span style={{ marginInlineStart: 8, fontSize: '0.7rem', color: 'var(--muted)' }}>⏳</span>
+                                            )}
+                                        </span>
+                                    ),
+                                },
+                                ...CHANNELS.map((ch) => ({
+                                    key: ch.key,
+                                    label: t(ch.label),
+                                    render: (val, row) => (
+                                        <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={val ?? true}
+                                                onChange={() => handlePrefToggle(row.event_type, ch.key)}
+                                                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                            />
+                                        </label>
+                                    ),
+                                })),
+                            ]}
+                            rowKey="event_type"
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

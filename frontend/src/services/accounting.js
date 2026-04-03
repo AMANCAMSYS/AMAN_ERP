@@ -47,11 +47,22 @@ export const accountingAPI = {
     createBadDebtProvision: (data) => api.post('/accounting/provisions/bad-debt', data),
     createLeaveProvision: (data) => api.post('/accounting/provisions/leave', data),
 
-    // Intercompany Transactions (IC-001)
+    // Intercompany Transactions (IC-001) — legacy v1
     listIntercompanyTransactions: (params) => api.get('/accounting/intercompany/transactions', { params }),
     createIntercompanyTransaction: (data) => api.post('/accounting/intercompany/transactions', data),
     processIntercompanyTransaction: (id) => api.post(`/accounting/intercompany/transactions/${id}/process`),
     getIntercompanyEliminationReport: () => api.get('/accounting/intercompany/elimination-report'),
+
+    // Intercompany v2 — Entity Groups, Transactions, Consolidation, Mappings
+    listEntityGroups: () => api.get('/accounting/intercompany/entities'),
+    createEntityGroup: (data) => api.post('/accounting/intercompany/entities', data),
+    listICTransactionsV2: (params) => api.get('/accounting/intercompany/transactions', { params }),
+    createICTransactionV2: (data) => api.post('/accounting/intercompany/transactions', data),
+    getICTransactionV2: (id) => api.get(`/accounting/intercompany/transactions/${id}`),
+    runConsolidation: (data) => api.post('/accounting/intercompany/consolidate', data),
+    getICBalances: () => api.get('/accounting/intercompany/balances'),
+    listAccountMappings: () => api.get('/accounting/intercompany/mappings'),
+    createAccountMapping: (data) => api.post('/accounting/intercompany/mappings', data),
 
     // Revenue Recognition (REV-001)
     listRevenueSchedules: (params) => api.get('/accounting/revenue-recognition/schedules', { params }),

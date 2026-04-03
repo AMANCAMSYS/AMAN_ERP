@@ -30,9 +30,10 @@ export { purchasesAPI, landedCostsAPI } from '../services/purchases'
 
 // Inventory & Costing
 export { inventoryAPI, costingPolicyAPI } from '../services/inventory'
+export { costingLayerAPI } from '../services/costing'
 
 // HR
-export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI, wpsAPI } from '../services/hr'
+export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI, wpsAPI, selfServiceAPI } from '../services/hr'
 
 // Assets
 export { assetsAPI } from '../services/assets'
@@ -96,4 +97,7 @@ export { dataImportAPI } from '../services/dataImport'
 
 // Parties
 export { partiesAPI } from '../services/parties'
+
+// Cash Flow Forecast
+export { cashflowAPI } from '../services/cashflow'
 

@@ -171,6 +171,30 @@ function BuyingHome() {
                         </div>
                     </div>
                 )}
+
+                {/* Matching & Quality Section */}
+                {hasPermission('buying.view') && (
+                    <div className="card section-card">
+                        <h3 className="section-title">{i18n.language === 'ar' ? 'المطابقة والجودة' : 'Matching & Quality'}</h3>
+                        <div className="links-list">
+                            <div className="link-item" onClick={() => navigate('/buying/matching')}>
+                                <span className="link-icon">🔗</span>
+                                {i18n.language === 'ar' ? 'مطابقة ثلاثية' : '3-Way Matching'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/buying/matching/tolerances')}>
+                                <span className="link-icon">⚙️</span>
+                                {i18n.language === 'ar' ? 'إعدادات التفاوت' : 'Tolerance Settings'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/buying/landed-costs')}>
+                                <span className="link-icon">🚢</span>
+                                {i18n.language === 'ar' ? 'التكاليف الإضافية' : 'Landed Costs'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

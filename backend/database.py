@@ -3490,7 +3490,9 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 get_approval_tables_sql(),            # 12: Approval Workflows (Phase 7)
                 get_security_tables_sql(),            # 13: Security - 2FA, Passwords, Sessions (Phase 7)
                 get_performance_indexes_sql(),        # 14: Performance Indexes (Phase 7.5)
-                get_system_completion_tables_sql()    # 15: System Completion (Phase 9)
+                get_cashflow_forecast_tables_sql(),   # 15: Cash Flow Forecast (US5)
+                get_phase_features_tables_sql(),      # 16: Matching, SSO, Costing, Intercompany, Notifications
+                get_system_completion_tables_sql()     # 17: System Completion (Phase 9)
             ]
             
             deferred_statements = []
@@ -4833,6 +4835,262 @@ def get_security_tables_sql() -> str:
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS escalation_to INT;
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS allow_parallel BOOLEAN DEFAULT FALSE;
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS auto_approve_below DECIMAL(18,2);
+    """
+
+
+def get_cashflow_forecast_tables_sql() -> str:
+    """Returns SQL for Cash Flow Forecast tables (Phase 7 - US5)"""
+    return """
+    -- ===== CASH FLOW FORECAST =====
+    CREATE TABLE IF NOT EXISTS cashflow_forecasts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        forecast_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        horizon_days INTEGER NOT NULL DEFAULT 90,
+        mode VARCHAR(20) NOT NULL DEFAULT 'contractual',
+        generated_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS cashflow_forecast_lines (
+        id SERIAL PRIMARY KEY,
+        forecast_id INTEGER NOT NULL REFERENCES cashflow_forecasts(id) ON DELETE CASCADE,
+        date DATE NOT NULL,
+        bank_account_id INTEGER REFERENCES treasury_accounts(id) ON DELETE SET NULL,
+        source_type VARCHAR(20) NOT NULL,
+        source_document_id INTEGER,
+        projected_inflow DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        projected_outflow DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        projected_balance DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_at TIMESTAMPTZ
+    );
+    """
+
+
+def get_phase_features_tables_sql() -> str:
+    """Returns SQL for matching, SSO, costing, intercompany, notification-preferences tables."""
+    return """
+    -- ===== THREE-WAY MATCHING =====
+    CREATE TABLE IF NOT EXISTS match_tolerances (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        quantity_percent NUMERIC(5,2) DEFAULT 0,
+        quantity_absolute NUMERIC(18,4) DEFAULT 0,
+        price_percent NUMERIC(5,2) DEFAULT 0,
+        price_absolute NUMERIC(18,4) DEFAULT 0,
+        supplier_id INTEGER REFERENCES parties(id) ON DELETE SET NULL,
+        product_category_id INTEGER,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS three_way_matches (
+        id SERIAL PRIMARY KEY,
+        purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE RESTRICT,
+        invoice_id INTEGER NOT NULL,
+        match_status VARCHAR(30) NOT NULL DEFAULT 'matched',
+        matched_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        matched_by INTEGER,
+        exception_approved_by INTEGER,
+        exception_notes TEXT,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS three_way_match_lines (
+        id SERIAL PRIMARY KEY,
+        match_id INTEGER NOT NULL REFERENCES three_way_matches(id) ON DELETE CASCADE,
+        po_line_id INTEGER NOT NULL REFERENCES purchase_order_lines(id) ON DELETE RESTRICT,
+        grn_ids JSONB,
+        invoice_line_id INTEGER,
+        po_quantity NUMERIC(18,4) DEFAULT 0,
+        received_quantity NUMERIC(18,4) DEFAULT 0,
+        invoiced_quantity NUMERIC(18,4) DEFAULT 0,
+        po_unit_price NUMERIC(18,4) DEFAULT 0,
+        invoiced_unit_price NUMERIC(18,4) DEFAULT 0,
+        quantity_variance_pct NUMERIC(5,2) DEFAULT 0,
+        quantity_variance_abs NUMERIC(18,4) DEFAULT 0,
+        price_variance_pct NUMERIC(5,2) DEFAULT 0,
+        price_variance_abs NUMERIC(18,4) DEFAULT 0,
+        tolerance_id INTEGER REFERENCES match_tolerances(id) ON DELETE SET NULL,
+        line_status VARCHAR(30) NOT NULL DEFAULT 'matched',
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    -- ===== SSO / LDAP =====
+    CREATE TABLE IF NOT EXISTS sso_configurations (
+        id SERIAL PRIMARY KEY,
+        provider_type VARCHAR(10) NOT NULL,
+        display_name VARCHAR(255) NOT NULL,
+        metadata_url VARCHAR(1024),
+        metadata_xml TEXT,
+        ldap_host VARCHAR(255),
+        ldap_port INTEGER,
+        ldap_base_dn VARCHAR(512),
+        ldap_bind_dn VARCHAR(512),
+        ldap_use_tls BOOLEAN DEFAULT true,
+        is_active BOOLEAN DEFAULT false,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS sso_group_role_mappings (
+        id SERIAL PRIMARY KEY,
+        sso_configuration_id INTEGER NOT NULL REFERENCES sso_configurations(id) ON DELETE CASCADE,
+        external_group_name VARCHAR(255) NOT NULL,
+        aman_role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        UNIQUE(sso_configuration_id, external_group_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS sso_fallback_admins (
+        id SERIAL PRIMARY KEY,
+        sso_configuration_id INTEGER NOT NULL REFERENCES sso_configurations(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES company_users(id) ON DELETE CASCADE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    -- ===== COST LAYERS (FIFO/LIFO) =====
+    CREATE TABLE IF NOT EXISTS cost_layers (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+        warehouse_id INTEGER NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+        costing_method VARCHAR(10) NOT NULL,
+        purchase_date DATE NOT NULL,
+        original_quantity NUMERIC(18,4) NOT NULL,
+        remaining_quantity NUMERIC(18,4) NOT NULL,
+        unit_cost NUMERIC(18,4) NOT NULL,
+        source_document_type VARCHAR(30) NOT NULL,
+        source_document_id INTEGER,
+        is_exhausted BOOLEAN DEFAULT false,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        CONSTRAINT ck_cost_layers_remaining_qty_non_negative CHECK (remaining_quantity >= 0)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_cost_layers_product_wh_exhausted_date
+        ON cost_layers(product_id, warehouse_id, is_exhausted, purchase_date);
+
+    CREATE TABLE IF NOT EXISTS cost_layer_consumptions (
+        id SERIAL PRIMARY KEY,
+        cost_layer_id INTEGER NOT NULL REFERENCES cost_layers(id) ON DELETE CASCADE,
+        quantity_consumed NUMERIC(18,4) NOT NULL,
+        sale_document_type VARCHAR(30) NOT NULL,
+        sale_document_id INTEGER,
+        consumed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_cost_layer_consumptions_layer_id ON cost_layer_consumptions(cost_layer_id);
+
+    -- ===== INTERCOMPANY =====
+    CREATE TABLE IF NOT EXISTS entity_groups (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        parent_id INTEGER REFERENCES entity_groups(id) ON DELETE SET NULL,
+        company_id VARCHAR(100) NOT NULL,
+        group_currency VARCHAR(10) NOT NULL DEFAULT 'SAR',
+        consolidation_level INTEGER NOT NULL DEFAULT 0,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS intercompany_transactions_v2 (
+        id SERIAL PRIMARY KEY,
+        source_entity_id INTEGER NOT NULL REFERENCES entity_groups(id) ON DELETE RESTRICT,
+        target_entity_id INTEGER NOT NULL REFERENCES entity_groups(id) ON DELETE RESTRICT,
+        transaction_type VARCHAR(30) NOT NULL,
+        source_amount NUMERIC(18,4) NOT NULL,
+        source_currency VARCHAR(10) NOT NULL,
+        target_amount NUMERIC(18,4) NOT NULL,
+        target_currency VARCHAR(10) NOT NULL,
+        exchange_rate NUMERIC(18,8) NOT NULL DEFAULT 1,
+        source_journal_entry_id INTEGER,
+        target_journal_entry_id INTEGER,
+        elimination_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+        elimination_journal_entry_id INTEGER,
+        reference_document VARCHAR(255),
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        CONSTRAINT ck_ic_txn_diff_entities CHECK (source_entity_id != target_entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS intercompany_account_mappings (
+        id SERIAL PRIMARY KEY,
+        source_entity_id INTEGER NOT NULL REFERENCES entity_groups(id) ON DELETE CASCADE,
+        target_entity_id INTEGER NOT NULL REFERENCES entity_groups(id) ON DELETE CASCADE,
+        source_account_id INTEGER NOT NULL,
+        target_account_id INTEGER NOT NULL,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ
+    );
+
+    -- ===== NOTIFICATION PREFERENCES =====
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES company_users(id) ON DELETE CASCADE,
+        event_type VARCHAR(50) NOT NULL,
+        email_enabled BOOLEAN DEFAULT true,
+        in_app_enabled BOOLEAN DEFAULT true,
+        push_enabled BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        is_deleted BOOLEAN NOT NULL DEFAULT false,
+        deleted_at TIMESTAMPTZ,
+        UNIQUE(user_id, event_type)
+    );
     """
 
 

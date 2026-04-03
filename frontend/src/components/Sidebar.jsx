@@ -38,6 +38,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
 
         if (hasPermission('accounting.view') && isModuleEnabled('accounting')) {
             navItems.push({ path: '/accounting', label: t('nav.accounting'), icon: '📊' })
+            navItems.push({ path: '/accounting/intercompany/transactions', label: t('nav.intercompany'), icon: '🔄' })
         }
         if (hasPermission('assets.view') && isModuleEnabled('assets')) {
             navItems.push({ path: '/assets', label: t('nav.assets') || 'الأصول الثابتة', icon: '🏗️' })
@@ -45,6 +46,9 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
         if (hasPermission('treasury.view') && isModuleEnabled('treasury')) {
             navItems.push({ path: '/treasury', label: t('nav.treasury'), icon: '🏦' })
             navItems.push({ path: '/treasury/notes-receivable', label: t('nav.notes_receivable') || 'أوراق القبض', icon: '📝' })
+        }
+        if (hasPermission('finance.cashflow_view')) {
+            navItems.push({ path: '/finance/cashflow', label: t('cashflow.title'), icon: '�' })
         }
         if (hasPermission('sales.view') && isModuleEnabled('sales')) {
             navItems.push({ path: '/sales', label: t('nav.sales'), icon: '💰' })
@@ -56,6 +60,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
 
         if (hasPermission('buying.view') && isModuleEnabled('buying')) {
             navItems.push({ path: '/buying', label: t('nav.buying'), icon: '🛒' })
+            navItems.push({ path: '/buying/matching', label: t('nav.matching'), icon: '🔗' })
         }
         if (hasPermission(['stock.view', 'stock.reports']) && isModuleEnabled('stock')) {
             navItems.push({ path: '/stock', label: t('nav.inventory'), icon: '📦' })
@@ -96,6 +101,9 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
         if (hasPermission('hr.view') && isModuleEnabled('hr')) {
             navItems.push({ path: '/hr', label: t('nav.hr'), icon: '👥' })
         }
+        if (hasPermission('hr.self_service') && isModuleEnabled('hr')) {
+            navItems.push({ path: '/hr/self-service', label: t('nav.self_service'), icon: '🧑‍💼' })
+        }
         if (hasPermission('audit.view') && isModuleEnabled('audit')) {
             navItems.push({ path: '/admin/audit-logs', label: t('nav.auditLogs') || 'سجلات المراقبة', icon: '📋' })
         }
@@ -110,6 +118,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
         }
         if (hasPermission('admin.companies')) {
             navItems.push({ path: '/settings', label: t('nav.settings'), icon: '⚙️' })
+            navItems.push({ path: '/settings/sso', label: t('nav.sso'), icon: '🔐' })
         }
     }
 

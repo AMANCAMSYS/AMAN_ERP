@@ -1,0 +1,1 @@
+"""forecast module Pydantic schemas."""

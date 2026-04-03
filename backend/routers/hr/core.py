@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
-from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse
+from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse, get_current_user_company
 from utils.permissions import require_permission, validate_branch_access, check_permission, require_module
 from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
@@ -32,20 +32,16 @@ def has_permission(user: UserResponse, permission: str) -> bool:
     user_perms = getattr(user, 'permissions', []) or []
     return check_permission(user_perms, permission)
 
-def get_current_user_company(token: str = Depends(oauth2_scheme)):
-    payload = decode_token(token)
-    if not payload or not payload.get("company_id"):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return payload["company_id"]
+# get_current_user_company moved to routers.auth
 
 # --- Endpoints ---
 
 @router.get("/employees", dependencies=[Depends(require_permission("hr.view"))])
 def get_employees(
     branch_id: Optional[int] = None, 
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
+    company_id: str = Depends(get_current_user_company)
 ):
-    company_id = current_user.company_id
     conn = get_db_connection(company_id)
     try:
         query = """
@@ -142,8 +138,7 @@ def get_employees(
         conn.close()
 
 @router.post("/employees", dependencies=[Depends(require_permission("hr.manage"))])
-def create_employee(request: Request, employee: EmployeeCreate, current_user: UserResponse = Depends(get_current_user)):
-    company_id = current_user.company_id
+def create_employee(request: Request, employee: EmployeeCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -349,9 +344,9 @@ def update_employee(
     request: Request,
     employee_id: int, 
     employee: EmployeeUpdate, 
-    current_user: UserResponse = Depends(get_current_user)
+    current_user: UserResponse = Depends(get_current_user),
+    company_id: str = Depends(get_current_user_company)
 ):
-    company_id = current_user.company_id
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -617,12 +612,7 @@ def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, company
 # --- LOAN ENDPOINTS ---
 
 @router.post("/loans", response_model=LoanResponse, dependencies=[Depends(require_permission("hr.loans.manage"))])
-def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(get_current_user)):
-    # Standard restriction: only those with loan management permission can create
-    if not has_permission(current_user, "hr.loans.manage"):
-         raise HTTPException(status_code=403, detail="Not authorized")
-         
-    company_id = current_user.company_id
+def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         monthly_installment = float((_dec(loan.amount) / Decimal(str(loan.total_installments))).quantize(_D2, ROUND_HALF_UP))
@@ -652,10 +642,7 @@ def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(g
         conn.close()
 
 @router.get("/loans", dependencies=[Depends(require_permission("hr.loans.view"))])
-def list_loans(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
-    if not has_permission(current_user, "hr.loans.view"):
-        raise HTTPException(status_code=403, detail="Not authorized")
-    company_id = current_user.company_id
+def list_loans(branch_id: Optional[int] = None, company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         query = """
@@ -680,11 +667,7 @@ def list_loans(branch_id: Optional[int] = None, current_user: UserResponse = Dep
         conn.close()
 
 @router.put("/loans/{loan_id}/approve", dependencies=[Depends(require_permission("hr.loans.manage"))])
-def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_user)):
-    if not has_permission(current_user, "hr.loans.manage"): # Manager only
-         raise HTTPException(status_code=403, detail="Not authorized")
-         
-    company_id = current_user.company_id
+def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -709,7 +692,7 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
             
             gl_create_journal_entry(
                 db=conn,
-                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                company_id=company_id,
                 date=datetime.now().date(),
                 reference=f"LOAN-{loan_id}",
                 description=f"صرف سلفة لموظف - رقم {loan_id}",
@@ -738,8 +721,7 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         conn.close()
 
 @router.post("/payroll-periods/{period_id}/generate", dependencies=[Depends(require_permission(["hr.manage", "hr.payroll.manage"]))])
-def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_current_user)):
-    company_id = current_user.company_id
+def generate_payroll(period_id: int, company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -885,8 +867,7 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
         conn.close()
 
 @router.post("/payroll-periods/{period_id}/post", dependencies=[Depends(require_permission(["hr.manage", "hr.payroll.manage"]))])
-def post_payroll(period_id: int, current_user: UserResponse = Depends(get_current_user)):
-    company_id = current_user.company_id
+def post_payroll(period_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -1068,7 +1049,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         if lines:
             gl_create_journal_entry(
                 db=conn,
-                company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                company_id=company_id,
                 date=datetime.now().date(),
                 description=f"Payroll for period {period.name}",
                 status="posted",
@@ -1258,10 +1239,7 @@ def get_current_employee(
         conn.close()
 
 @router.post("/attendance/check-in", response_model=AttendanceResponse, dependencies=[Depends(require_permission(["hr.attendance.view", "hr.attendance.manage"]))])
-def check_in(
-    current_user: UserResponse = Depends(get_current_user),
-    company_id: str = Depends(get_current_user_company)
-):
+def check_in(current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -1480,8 +1458,8 @@ def get_attendance_history(
 # --- LEAVE REQUESTS ---
 
 @router.post("/leaves", response_model=LeaveRequestResponse, dependencies=[Depends(require_permission("hr.leaves.manage"))])
-def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         # Determine employee ID
         employee_id = request.employee_id
@@ -1621,14 +1599,14 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
         conn.close()
 
 @router.get("/leaves", response_model=List[LeaveRequestResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_leave_requests(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
+def list_leave_requests(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     # Basic view permission required
     if not has_permission(current_user, "hr.leaves.view"):
         pass 
         # Actually, let's enforce view permission to be safe, but typically all employees should have "hr.leaves.view" or "hr.view".
         # If strict: raise HTTPException(status_code=403, detail="Not authorized")
     
-    conn = get_db_connection(current_user.company_id)
+    conn = get_db_connection(company_id)
     try:
         # Check if manager
         is_manager = has_permission(current_user, "hr.leaves.manage")
@@ -1665,14 +1643,8 @@ def list_leave_requests(branch_id: Optional[int] = None, current_user: UserRespo
         conn.close()
 
 @router.put("/leaves/{leave_id}/status", dependencies=[Depends(require_permission("hr.leaves.manage"))])
-def update_leave_status(leave_id: int, status_in: str, current_user: UserResponse = Depends(get_current_user)):
-    if not has_permission(current_user, "hr.leaves.manage"):
-        raise HTTPException(status_code=403, detail="Not authorized")
-        
-    if status_in not in ['approved', 'rejected']:
-         raise HTTPException(status_code=400, detail="Invalid status")
-         
-    conn = get_db_connection(current_user.company_id)
+def update_leave_status(leave_id: int, status_in: str, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         conn.execute(text("""
             UPDATE leave_requests 
@@ -1807,8 +1779,8 @@ import calendar as cal_module
 # --- Payslips ---
 
 @router.get("/payslips", dependencies=[Depends(require_permission("hr.view"))])
-def list_all_payslips(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def list_all_payslips(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         q = """
             SELECT pe.id, pe.employee_id, pe.period_id,
@@ -1902,8 +1874,8 @@ class PayslipGenerateRequest(BaseModel):
 
 
 @router.post("/payslips/generate", dependencies=[Depends(require_permission("hr.manage"))])
-def generate_single_payslip(data: PayslipGenerateRequest, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def generate_single_payslip(data: PayslipGenerateRequest, company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         last_day = cal_module.monthrange(data.year, data.month)[1]
         start_date = f"{data.year}-{data.month:02d}-01"
@@ -2022,7 +1994,7 @@ class JobOpeningCreate(BaseModel):
     department: Optional[str] = None
     positions: int = 1
     requirements: Optional[str] = None
-    deadline: Optional[str] = None
+    deadline: Optional[date] = None
     description: Optional[str] = None
     employment_type: str = "full_time"
 
@@ -2032,7 +2004,7 @@ class JobOpeningUpdate(BaseModel):
     status: Optional[str] = None
     positions: Optional[int] = None
     requirements: Optional[str] = None
-    deadline: Optional[str] = None
+    deadline: Optional[date] = None
 
 
 class ApplicationCreate(BaseModel):
@@ -2049,8 +2021,8 @@ class ApplicationStageUpdate(BaseModel):
 
 
 @router.get("/recruitment/openings", dependencies=[Depends(require_permission("hr.view"))])
-def list_job_openings(status: Optional[str] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def list_job_openings(status: Optional[str] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         q = """SELECT jo.*,
                    (SELECT COUNT(*) FROM job_applications ja WHERE ja.opening_id = jo.id) as applications_count
@@ -2082,8 +2054,8 @@ def list_job_openings(status: Optional[str] = None, branch_id: Optional[int] = N
 
 
 @router.post("/recruitment/openings", dependencies=[Depends(require_permission("hr.manage"))])
-def create_job_opening(data: JobOpeningCreate, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def create_job_opening(data: JobOpeningCreate, company_id: str = Depends(get_current_user_company), current_user: UserResponse = Depends(get_current_user)):
+    conn = get_db_connection(company_id)
     try:
         res = conn.execute(text("""
             INSERT INTO job_openings (title,description,requirements,employment_type,vacancies,status,closing_date,created_by)
@@ -2099,8 +2071,8 @@ def create_job_opening(data: JobOpeningCreate, current_user: UserResponse = Depe
 
 
 @router.put("/recruitment/openings/{opening_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_job_opening(opening_id: int, data: JobOpeningUpdate, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def update_job_opening(opening_id: int, data: JobOpeningUpdate, company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": opening_id}
         for f, col in [("title","title"),("status","status"),("positions","vacancies"),("requirements","requirements"),("deadline","closing_date")]:
@@ -2116,8 +2088,8 @@ def update_job_opening(opening_id: int, data: JobOpeningUpdate, current_user: Us
 
 
 @router.get("/recruitment/openings/{opening_id}/applications", dependencies=[Depends(require_permission("hr.view"))])
-def list_opening_applications(opening_id: int, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def list_opening_applications(opening_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         # Check branch access for this opening
         if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
@@ -2128,38 +2100,27 @@ def list_opening_applications(opening_id: int, current_user: UserResponse = Depe
         result = conn.execute(text("""
             SELECT ja.*, jo.title as opening_title
             FROM job_applications ja
-            LEFT JOIN job_openings jo ON ja.opening_id = jo.id
-            WHERE ja.opening_id = :oid ORDER BY ja.created_at DESC
-        """), {"oid": opening_id}).fetchall()
+            JOIN job_openings jo ON ja.opening_id = jo.id
+            WHERE ja.opening_id = :id
+            ORDER BY ja.created_at DESC
+        """), {"id": opening_id}).fetchall()
         return [dict(row._mapping) for row in result]
     finally:
         conn.close()
 
 
 @router.get("/recruitment/applications", dependencies=[Depends(require_permission("hr.view"))])
-def list_all_applications(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def list_all_applications(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         q = """SELECT ja.*, jo.title as opening_title
             FROM job_applications ja
             LEFT JOIN job_openings jo ON ja.opening_id = jo.id
             WHERE 1=1"""
         params = {}
-        # Branch access control via job_openings
-        if current_user.role not in ['admin', 'system_admin', 'manager', 'gm']:
-            if current_user.allowed_branches:
-                if branch_id:
-                    if branch_id not in current_user.allowed_branches:
-                        raise HTTPException(status_code=403, detail="Unauthorized")
-                    q += " AND jo.branch_id = :bid"
-                    params["bid"] = branch_id
-                else:
-                    branches_str = ",".join(map(str, current_user.allowed_branches))
-                    q += f" AND (jo.branch_id IN ({branches_str}) OR jo.branch_id IS NULL)"
-        else:
-            if branch_id:
-                q += " AND jo.branch_id = :bid"
-                params["bid"] = branch_id
+        if branch_id:
+            q += " AND jo.branch_id = :bid"
+            params["bid"] = branch_id
         q += " ORDER BY ja.created_at DESC"
         result = conn.execute(text(q), params).fetchall()
         return [dict(row._mapping) for row in result]
@@ -2168,8 +2129,8 @@ def list_all_applications(branch_id: Optional[int] = None, current_user: UserRes
 
 
 @router.post("/recruitment/applications", dependencies=[Depends(require_permission("hr.manage"))])
-def create_application(data: ApplicationCreate, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def create_application(data: ApplicationCreate, company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         res = conn.execute(text("""
             INSERT INTO job_applications (opening_id,applicant_name,email,phone,resume_url,cover_letter,stage,status)
@@ -2184,8 +2145,8 @@ def create_application(data: ApplicationCreate, current_user: UserResponse = Dep
 
 
 @router.put("/recruitment/applications/{app_id}/stage", dependencies=[Depends(require_permission("hr.manage"))])
-def update_application_stage(app_id: int, data: ApplicationStageUpdate, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def update_application_stage(app_id: int, data: ApplicationStageUpdate, company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         conn.execute(text("UPDATE job_applications SET stage=:stage, updated_at=NOW() WHERE id=:id"),
                      {"stage": data.stage, "id": app_id})
@@ -2198,8 +2159,8 @@ def update_application_stage(app_id: int, data: ApplicationStageUpdate, current_
 # --- Leave Balance & Carryover (with branch access) ---
 
 @router.get("/leave-balance/{emp_id}", dependencies=[Depends(require_permission("hr.view"))])
-def get_leave_balance(emp_id: int, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def get_leave_balance(emp_id: int, company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         from datetime import datetime as dt
         emp = conn.execute(text("""
@@ -2241,8 +2202,8 @@ class LeaveCarryoverRequest(BaseModel):
 
 
 @router.post("/leave-carryover/calculate", dependencies=[Depends(require_permission("hr.manage"))])
-def calculate_leave_carryover(data: LeaveCarryoverRequest, current_user: UserResponse = Depends(get_current_user)):
-    conn = get_db_connection(current_user.company_id)
+def calculate_leave_carryover(data: LeaveCarryoverRequest, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+    conn = get_db_connection(company_id)
     try:
         from datetime import datetime as dt
         year = data.year or (dt.now().year - 1)

@@ -87,6 +87,7 @@ const CompanySettings = () => {
         { id: 'branches', label: t('settings.tabs.branches'), icon: Share2, gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', desc: t('settings.tabs_desc.branches'), permission: 'branches.view' },
         { id: 'workflow', label: t('settings.tabs.workflow'), icon: GitBranch, gradient: 'linear-gradient(135deg, #d946ef 0%, #c026d3 100%)', desc: t('settings.tabs_desc.workflow'), permission: 'settings.manage' },
         { id: 'audit', label: t('settings.tabs.audit'), icon: Database, gradient: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)', desc: t('settings.tabs_desc.audit'), permission: 'audit.view', module: 'audit' },
+        { id: 'sso', label: i18n.language === 'ar' ? 'تسجيل دخول موحد (SSO)' : 'SSO Configuration', icon: Key, gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', desc: i18n.language === 'ar' ? 'إدارة موفري تسجيل الدخول الموحد' : 'Manage Single Sign-On providers', permission: 'settings.manage', navigateTo: '/settings/sso' },
     ], [t]);
 
     const tabs = React.useMemo(() =>
@@ -145,6 +146,11 @@ const CompanySettings = () => {
 
     // Handlers
     const handleTabSelect = (tabId) => {
+        const tab = allTabs.find(t => t.id === tabId);
+        if (tab?.navigateTo) {
+            navigate(tab.navigateTo);
+            return;
+        }
         setSearchParams({ tab: tabId });
         setError('');
         setSuccess('');

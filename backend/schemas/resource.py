@@ -1,0 +1,1 @@
+"""resource module Pydantic schemas."""

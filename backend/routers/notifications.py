@@ -266,6 +266,79 @@ async def update_notification_settings(
         db.close()
 
 
+# ===================== Notification Preferences =====================
+
+class PreferenceUpdate(BaseModel):
+    event_type: str
+    email_enabled: bool = True
+    in_app_enabled: bool = True
+    push_enabled: bool = True
+
+
+@router.get("/preferences")
+async def get_preferences(current_user: dict = Depends(get_current_user)):
+    """جلب تفضيلات الإشعارات للمستخدم"""
+    company_id = getattr(current_user, "company_id", None)
+    if not company_id:
+        return []
+    user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    db = get_db_connection(company_id)
+    try:
+        rows = db.execute(text(
+            "SELECT event_type, email_enabled, in_app_enabled, push_enabled "
+            "FROM notification_preferences WHERE user_id = :uid"
+        ), {"uid": user_id}).fetchall()
+        return [
+            {
+                "event_type": r.event_type,
+                "email_enabled": r.email_enabled,
+                "in_app_enabled": r.in_app_enabled,
+                "push_enabled": r.push_enabled,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
+@router.put("/preferences")
+async def update_preference(body: PreferenceUpdate, current_user: dict = Depends(get_current_user)):
+    """تحديث تفضيل إشعار واحد (upsert)"""
+    company_id = getattr(current_user, "company_id", None)
+    if not company_id:
+        raise HTTPException(400, "company_id required")
+    user_id = getattr(current_user, "id", None) or getattr(current_user, "user_id", None)
+    db = get_db_connection(company_id)
+    try:
+        existing = db.execute(text(
+            "SELECT id FROM notification_preferences WHERE user_id = :uid AND event_type = :evt"
+        ), {"uid": user_id, "evt": body.event_type}).fetchone()
+        if existing:
+            db.execute(text("""
+                UPDATE notification_preferences
+                SET email_enabled = :email, in_app_enabled = :inapp, push_enabled = :push, updated_at = NOW()
+                WHERE user_id = :uid AND event_type = :evt
+            """), {
+                "uid": user_id, "evt": body.event_type,
+                "email": body.email_enabled, "inapp": body.in_app_enabled, "push": body.push_enabled,
+            })
+        else:
+            db.execute(text("""
+                INSERT INTO notification_preferences (user_id, event_type, email_enabled, in_app_enabled, push_enabled)
+                VALUES (:uid, :evt, :email, :inapp, :push)
+            """), {
+                "uid": user_id, "evt": body.event_type,
+                "email": body.email_enabled, "inapp": body.in_app_enabled, "push": body.push_enabled,
+            })
+        db.commit()
+        return {"detail": "Preference updated"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, str(e))
+    finally:
+        db.close()
+
+
 @router.post("/test-email", dependencies=[Depends(require_permission("settings.edit"))])
 async def test_email_connection(current_user: dict = Depends(get_current_user)):
     """اختبار اتصال SMTP"""
@@ -306,27 +379,35 @@ async def test_email_connection(current_user: dict = Depends(get_current_user)):
 # ===================== WebSocket Endpoint =====================
 
 @router.websocket("/ws")
-async def notifications_ws(ws: WebSocket, token: str = ""):
+async def notifications_ws(ws: WebSocket, token: Optional[str] = None):
     """
     WebSocket endpoint for real-time notifications.
     Connect: ws://host/api/notifications/ws?token=JWT_TOKEN
+    Support Cookie-based auth if token is missing.
     """
     from jose import jwt, JWTError
     from config import settings as app_settings
 
-    # Authenticate via token query param
-    if not token:
+    # Authenticate via token query param OR cookies
+    actual_token = token
+    if not actual_token:
+        actual_token = ws.cookies.get("access_token")
+
+    if not actual_token:
+        await ws.accept() # We must accept before we can close with a custom code in some versions of FastAPI/Starlette
         await ws.close(code=4001, reason="Missing token")
         return
 
     try:
-        payload = jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        payload = jwt.decode(actual_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
         user_id = payload.get("user_id")
         company_id = payload.get("company_id")
         if not user_id or not company_id:
+            await ws.accept()
             await ws.close(code=4001, reason="Invalid token")
             return
     except JWTError:
+        await ws.accept()
         await ws.close(code=4001, reason="Invalid token")
         return
 

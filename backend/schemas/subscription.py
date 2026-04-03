@@ -1,0 +1,1 @@
+"""subscription module Pydantic schemas."""

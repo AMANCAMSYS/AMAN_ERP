@@ -22,4 +22,13 @@ export const authAPI = {
         const refreshToken = localStorage.getItem('refresh_token')
         return api.post('/auth/refresh', { refresh_token: refreshToken })
     },
+    getSsoProviders: (companyCode) =>
+        api.get('/auth/sso/providers', { params: { company_code: companyCode } }),
+    ssoLogin: (ssoConfigurationId, companyCode, username, password) =>
+        api.post('/auth/sso/login', {
+            sso_configuration_id: ssoConfigurationId,
+            company_code: companyCode,
+            username,
+            password,
+        }),
 }

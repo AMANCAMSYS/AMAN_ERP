@@ -15,4 +15,8 @@ export const notificationsAPI = {
 
     // Test
     testEmail: (data) => api.post('/notifications/test-email', data),
+
+    // Notification Preferences
+    getPreferences: () => api.get('/notifications/preferences'),
+    updatePreference: (data) => api.put('/notifications/preferences', data),
 }

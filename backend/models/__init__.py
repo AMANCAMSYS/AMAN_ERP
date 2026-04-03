@@ -179,6 +179,7 @@ from .domain_models.finance_cashflow import (
     RecurringJournalLine,
     RecurringJournalTemplate,
 )
+from .domain_models.finance_forecast import CashFlowForecast, CashFlowForecastLine
 from .domain_models.finance_recognition_tax import RevenueRecognitionSchedule, TaxCalendar, WhtRate, WhtTransaction
 from .domain_models.hr_training import TrainingParticipant, TrainingProgram
 from .domain_models.hr_workforce import LeaveCarryover, OvertimeRequest, PerformanceReview
@@ -257,6 +258,11 @@ from .domain_models.security_reporting import (
     WebhookLog,
     Webhook,
 )
+from .domain_models.intercompany import EntityGroup, IntercompanyTransactionV2, IntercompanyAccountMapping
+from .domain_models.inventory_costing import CostLayer, CostLayerConsumption
+from .domain_models.matching import MatchTolerance, ThreeWayMatch, ThreeWayMatchLine
+from .domain_models.self_service import SelfServiceRequest
+from .domain_models.sso import SsoConfiguration, SsoGroupRoleMapping, SsoFallbackAdmin
 
 
 target_metadata = ModelBase.metadata
@@ -407,6 +413,8 @@ __all__ = [
     "CrmContact",
     "BomComponent",
     "CapacityPlan",
+    "CashFlowForecast",
+    "CashFlowForecastLine",
     "ContractAmendment",
     "CrmKnowledgeBase",
     "CustomerGroup",
@@ -504,6 +512,19 @@ __all__ = [
     "WhtRate",
     "WhtTransaction",
     "WorkCenter",
+    # Phase 2 domain models
+    "CostLayer",
+    "CostLayerConsumption",
+    "EntityGroup",
+    "IntercompanyAccountMapping",
+    "IntercompanyTransactionV2",
+    "MatchTolerance",
+    "SelfServiceRequest",
+    "SsoConfiguration",
+    "SsoFallbackAdmin",
+    "SsoGroupRoleMapping",
+    "ThreeWayMatch",
+    "ThreeWayMatchLine",
     "target_metadata",
     "MODELED_TABLES",
 ]

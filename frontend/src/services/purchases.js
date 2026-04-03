@@ -66,6 +66,16 @@ export const purchasesAPI = {
     createAgreement: (data) => api.post('/buying/agreements', data),
     activateAgreement: (id) => api.put(`/buying/agreements/${id}/activate`),
     callOffAgreement: (id, data) => api.post(`/buying/agreements/${id}/call-off`, data),
+
+    // Three-Way Matching
+    listMatches: (params) => api.get('/buying/matches', { params }),
+    getMatch: (id) => api.get(`/buying/matches/${id}`),
+    approveMatch: (id, data) => api.put(`/buying/matches/${id}/approve`, data),
+    rejectMatch: (id, data) => api.put(`/buying/matches/${id}/reject`, data),
+
+    // Match Tolerances
+    listTolerances: () => api.get('/buying/tolerances'),
+    saveTolerance: (data) => api.post('/buying/tolerances', data),
 }
 
 // Landed Costs

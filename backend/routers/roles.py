@@ -116,6 +116,29 @@ AVAILABLE_PERMISSIONS = [
     {"key": "hr.loans.manage", "section": "hr", "label_ar": "إدارة القروض والسلف", "label_en": "Manage Loans & Advances"},
     {"key": "hr.payroll.view", "section": "hr", "label_ar": "عرض كشوف الرواتب", "label_en": "View Payroll"},
     {"key": "hr.payroll.manage", "section": "hr", "label_ar": "إدارة الرواتب ومعالجتها", "label_en": "Manage & Process Payroll"},
+    {"key": "hr.self_service", "section": "hr", "label_ar": "الخدمة الذاتية للموظف", "label_en": "Employee Self-Service"},
+    {"key": "hr.self_service_approve", "section": "hr", "label_ar": "اعتماد طلبات الخدمة الذاتية", "label_en": "Approve Self-Service Requests"},
+
+    # ═══════════════════════ SSO ═══════════════════════
+    {"key": "sso.view", "section": "sso", "label_ar": "عرض إعدادات الدخول الموحد", "label_en": "View SSO Configuration"},
+    {"key": "sso.manage", "section": "sso", "label_ar": "إدارة إعدادات الدخول الموحد", "label_en": "Manage SSO Configuration"},
+
+    # ═══════════════════════ 3-Way Matching ═══════════════════════
+    {"key": "matching.view", "section": "matching", "label_ar": "عرض المطابقة الثلاثية", "label_en": "View 3-Way Matching"},
+    {"key": "matching.approve", "section": "matching", "label_ar": "اعتماد المطابقات", "label_en": "Approve Matches"},
+    {"key": "matching.manage", "section": "matching", "label_ar": "إدارة حدود التفاوت", "label_en": "Manage Tolerances"},
+
+    # ═══════════════════════ Intercompany ═══════════════════════
+    {"key": "intercompany.view", "section": "intercompany", "label_ar": "عرض المعاملات بين الشركات", "label_en": "View Intercompany Transactions"},
+    {"key": "intercompany.manage", "section": "intercompany", "label_ar": "إدارة المعاملات بين الشركات", "label_en": "Manage Intercompany Transactions"},
+
+    # ═══════════════════════ Inventory Costing ═══════════════════════
+    {"key": "costing.view", "section": "costing", "label_ar": "عرض تكاليف المخزون", "label_en": "View Inventory Costing"},
+    {"key": "costing.manage", "section": "costing", "label_ar": "إدارة طرق التكلفة", "label_en": "Manage Costing Methods"},
+
+    # ═══════════════════════ Cash Flow Forecast ═══════════════════════
+    {"key": "finance.cashflow_view", "section": "finance", "label_ar": "عرض توقعات التدفق النقدي", "label_en": "View Cash Flow Forecasts"},
+    {"key": "finance.cashflow_generate", "section": "finance", "label_ar": "إنشاء توقعات التدفق النقدي", "label_en": "Generate Cash Flow Forecasts"},
 
     # ═══════════════════════ Fixed Assets ═══════════════════════
     {"key": "assets.view", "section": "assets", "label_ar": "عرض الأصول الثابتة", "label_en": "View Fixed Assets"},
@@ -241,6 +264,11 @@ PERMISSION_SECTIONS = {
     "admin": {"label_ar": "الإدارة", "label_en": "Admin", "icon": "Settings"},
     "branches": {"label_ar": "الفروع", "label_en": "Branches", "icon": "GitBranch"},
     "settings": {"label_ar": "إعدادات النظام", "label_en": "System Settings", "icon": "Cog"},
+    "sso": {"label_ar": "الدخول الموحد", "label_en": "SSO", "icon": "KeyRound"},
+    "matching": {"label_ar": "المطابقة الثلاثية", "label_en": "3-Way Matching", "icon": "CheckCheck"},
+    "intercompany": {"label_ar": "بين الشركات", "label_en": "Intercompany", "icon": "Building2"},
+    "costing": {"label_ar": "تكاليف المخزون", "label_en": "Inventory Costing", "icon": "Layers"},
+    "finance": {"label_ar": "التمويل", "label_en": "Finance", "icon": "TrendingUp"},
 }
 
 
@@ -277,6 +305,12 @@ DEFAULT_ROLES = {
             "data_import.view",
             "branches.view",
             "settings.view",
+            "hr.self_service", "hr.self_service_approve",
+            "matching.view", "matching.approve",
+            "intercompany.view",
+            "costing.view",
+            "finance.cashflow_view", "finance.cashflow_generate",
+            "sso.view",
         ]
     },
     "accountant": {
@@ -295,6 +329,10 @@ DEFAULT_ROLES = {
             "hr.payroll.view",
             "branches.view",
             "notifications.view",
+            "intercompany.view", "intercompany.manage",
+            "costing.view",
+            "finance.cashflow_view", "finance.cashflow_generate",
+            "matching.view",
         ]
     },
     "sales": {
@@ -325,6 +363,7 @@ DEFAULT_ROLES = {
             "contracts.view",
             "notifications.view",
             "branches.view",
+            "matching.view", "matching.approve",
         ]
     },
     "inventory": {
@@ -344,11 +383,21 @@ DEFAULT_ROLES = {
         "permissions": [
             "dashboard.view",
             "hr.*", "hr.payroll.*",
+            "hr.self_service", "hr.self_service_approve",
             "expenses.view", "expenses.approve",
             "reports.view",
             "approvals.view", "approvals.approve",
             "notifications.view",
             "branches.view",
+        ]
+    },
+    "employee": {
+        "name_ar": "موظف",
+        "description": "صلاحيات الخدمة الذاتية الأساسية للموظفين",
+        "permissions": [
+            "dashboard.view",
+            "hr.self_service",
+            "notifications.view",
         ]
     },
     "cashier": {

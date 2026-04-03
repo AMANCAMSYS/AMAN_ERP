@@ -131,3 +131,17 @@ export const wpsAPI = {
     getSaudizationReport: (params) => api.get('/hr/saudization/report', { params }),
     settleEndOfService: (data) => api.post('/hr/end-of-service/settle', data),
 }
+
+// Employee Self-Service (US6)
+export const selfServiceAPI = {
+    getProfile: () => api.get('/hr/self-service/profile'),
+    updateProfile: (data) => api.put('/hr/self-service/profile', data),
+    listPayslips: () => api.get('/hr/self-service/payslips'),
+    getPayslip: (id) => api.get(`/hr/self-service/payslips/${id}`),
+    getLeaveBalance: () => api.get('/hr/self-service/leave-balance'),
+    submitLeaveRequest: (data) => api.post('/hr/self-service/leave-request', data),
+    listLeaveRequests: (params) => api.get('/hr/self-service/leave-requests', { params }),
+    listTeamRequests: (params) => api.get('/hr/self-service/team-requests', { params }),
+    approveLeave: (id) => api.post(`/hr/self-service/leave-request/${id}/approve`),
+    rejectLeave: (id, reason) => api.post(`/hr/self-service/leave-request/${id}/reject`, null, { params: { reason } }),
+}

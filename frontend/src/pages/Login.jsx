@@ -25,6 +25,47 @@ function Login() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
+    // SSO state
+    const [ssoProviders, setSsoProviders] = useState([])
+    const [ssoLoading, setSsoLoading] = useState(false)
+
+    // Fetch SSO providers when company_code changes
+    useEffect(() => {
+        const code = formData.company_code.trim()
+        if (!code || code.length < 2) {
+            setSsoProviders([])
+            return
+        }
+        const timeout = setTimeout(async () => {
+            try {
+                const res = await authAPI.getSsoProviders(code)
+                setSsoProviders(res.data || [])
+            } catch {
+                setSsoProviders([])
+            }
+        }, 500)
+        return () => clearTimeout(timeout)
+    }, [formData.company_code])
+
+    const handleSsoLogin = async (provider) => {
+        setSsoLoading(true)
+        setError('')
+        try {
+            const res = await authAPI.ssoLogin(provider.id, formData.company_code.trim())
+            if (res.data?.redirect_url) {
+                window.location.href = res.data.redirect_url
+            } else if (res.data?.access_token) {
+                const { access_token, refresh_token, user, company_id } = res.data
+                setAuth(access_token, user, company_id, refresh_token)
+                window.location.href = '/dashboard'
+            }
+        } catch (err) {
+            setError(err.response?.data?.detail || t('auth.sso_login_failed', 'SSO login failed'))
+        } finally {
+            setSsoLoading(false)
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
@@ -157,6 +198,31 @@ function Login() {
                         {loading ? <span className="loading"></span> : t('auth.login_btn')}
                     </button>
                 </form>
+
+                {/* SSO Providers */}
+                {ssoProviders.length > 0 && (
+                    <div style={{ marginTop: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0' }}>
+                            <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #e5e7eb' }} />
+                            <span style={{ fontSize: '13px', color: '#888' }}>{t('auth.or_sso', 'أو عبر تسجيل الدخول الموحد')}</span>
+                            <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #e5e7eb' }} />
+                        </div>
+                        {ssoProviders.map((provider) => (
+                            <button
+                                key={provider.id}
+                                type="button"
+                                className="btn btn-outline btn-block"
+                                style={{ marginBottom: '8px' }}
+                                onClick={() => handleSsoLogin(provider)}
+                                disabled={ssoLoading}
+                            >
+                                {ssoLoading ? <span className="loading"></span> : (
+                                    <>🔐 {t('auth.login_with_sso', 'تسجيل الدخول عبر')} {provider.display_name}</>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 <div className="mt-4 text-center">
                     <Link to="/register" className="link" style={{ fontSize: '14px' }}>

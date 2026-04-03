@@ -88,6 +88,13 @@ const FiscalPeriodLocks = React.lazy(() => import('./pages/Accounting/FiscalPeri
 const IntercompanyTransactions = React.lazy(() => import('./pages/Accounting/IntercompanyTransactions'))
 const RevenueRecognition = React.lazy(() => import('./pages/Accounting/RevenueRecognition'))
 
+// Intercompany v2 (Entity Groups, Consolidation, Mappings)
+const EntityGroupTree = React.lazy(() => import('./pages/Intercompany/EntityGroupTree'))
+const IntercompanyTransactionList = React.lazy(() => import('./pages/Intercompany/TransactionList'))
+const IntercompanyTransactionForm = React.lazy(() => import('./pages/Intercompany/TransactionForm'))
+const ConsolidationView = React.lazy(() => import('./pages/Intercompany/ConsolidationView'))
+const IntercompanyAccountMappings = React.lazy(() => import('./pages/Intercompany/AccountMappings'))
+
 // Admin
 const CompanyList = React.lazy(() => import('./pages/Admin/CompanyList'))
 const AuditLogs = React.lazy(() => import('./pages/Admin/AuditLogs'))
@@ -212,6 +219,11 @@ const NotesPayable = React.lazy(() => import('./pages/Treasury/NotesPayable'))
 // Bank Import
 const BankImport = React.lazy(() => import('./pages/Treasury/BankImport'))
 
+// Cash Flow Forecast
+const ForecastList = React.lazy(() => import('./pages/CashFlow/ForecastList'))
+const ForecastGenerate = React.lazy(() => import('./pages/CashFlow/ForecastGenerate'))
+const ForecastDetail = React.lazy(() => import('./pages/CashFlow/ForecastDetail'))
+
 // HR
 const HRHome = React.lazy(() => import('./pages/HR/HRHome'))
 const Employees = React.lazy(() => import('./pages/HR/Employees'))
@@ -243,6 +255,14 @@ const Recruitment = React.lazy(() => import('./pages/HR/Recruitment'))
 const WPSExport = React.lazy(() => import('./pages/HR/WPSExport'))
 const SaudizationDashboard = React.lazy(() => import('./pages/HR/SaudizationDashboard'))
 const EOSSettlement = React.lazy(() => import('./pages/HR/EOSSettlement'))
+
+// Employee Self-Service (US6)
+const SelfServiceDashboard = React.lazy(() => import('./pages/SelfService/EmployeeDashboard'))
+const SelfServiceLeaveForm = React.lazy(() => import('./pages/SelfService/LeaveRequestForm'))
+const SelfServicePayslips = React.lazy(() => import('./pages/SelfService/PayslipList'))
+const SelfServicePayslipDetail = React.lazy(() => import('./pages/SelfService/PayslipDetail'))
+const SelfServiceProfile = React.lazy(() => import('./pages/SelfService/ProfileEdit'))
+const SelfServiceTeamRequests = React.lazy(() => import('./pages/SelfService/TeamRequests'))
 
 // Assets
 const AssetList = React.lazy(() => import('./pages/Assets/AssetList'))
@@ -333,6 +353,23 @@ const CashFlowIAS7 = React.lazy(() => import('./pages/Reports/CashFlowIAS7'))
 
 const PaymentForm = React.lazy(() => import('./pages/Purchases/PaymentForm'))
 const PaymentDetails = React.lazy(() => import('./pages/Purchases/PaymentDetails'))
+
+// SSO Configuration
+const SsoConfigList = React.lazy(() => import('./pages/SSO/SsoConfigList'))
+const SsoConfigForm = React.lazy(() => import('./pages/SSO/SsoConfigForm'))
+
+// 3-Way Matching
+const MatchList = React.lazy(() => import('./pages/Matching/MatchList'))
+const MatchDetail = React.lazy(() => import('./pages/Matching/MatchDetail'))
+const ToleranceConfig = React.lazy(() => import('./pages/Matching/ToleranceConfig'))
+
+// Costing (FIFO/LIFO)
+const CostLayerList = React.lazy(() => import('./pages/Costing/CostLayerList'))
+const CostingMethodForm = React.lazy(() => import('./pages/Costing/CostingMethodForm'))
+const ValuationReport = React.lazy(() => import('./pages/Costing/ValuationReport'))
+
+// Notification Preferences
+const NotificationPreferences = React.lazy(() => import('./pages/Settings/NotificationPreferences'))
 
 
 function PrivateRoute({ children, permission, role, skipIndustryCheck = false }) {
@@ -443,6 +480,13 @@ function App() {
                 <Route path="/accounting/fiscal-locks" element={<PrivateRoute permission="accounting.manage"><FiscalPeriodLocks /></PrivateRoute>} />
                 <Route path="/accounting/intercompany" element={<PrivateRoute permission="accounting.view"><IntercompanyTransactions /></PrivateRoute>} />
                 <Route path="/accounting/revenue-recognition" element={<PrivateRoute permission="accounting.view"><RevenueRecognition /></PrivateRoute>} />
+
+                {/* Intercompany v2 */}
+                <Route path="/accounting/intercompany/entities" element={<PrivateRoute permission="accounting.view"><EntityGroupTree /></PrivateRoute>} />
+                <Route path="/accounting/intercompany/transactions" element={<PrivateRoute permission="accounting.view"><IntercompanyTransactionList /></PrivateRoute>} />
+                <Route path="/accounting/intercompany/transactions/new" element={<PrivateRoute permission="accounting.edit"><IntercompanyTransactionForm /></PrivateRoute>} />
+                <Route path="/accounting/intercompany/consolidation" element={<PrivateRoute permission="accounting.view"><ConsolidationView /></PrivateRoute>} />
+                <Route path="/accounting/intercompany/mappings" element={<PrivateRoute permission="accounting.view"><IntercompanyAccountMappings /></PrivateRoute>} />
                 <Route path="/stock/valuation-report" element={<PrivateRoute permission="reports.view"><InventoryValuation /></PrivateRoute>} />
                 <Route path="/admin/companies" element={<PrivateRoute role="system_admin"><CompanyList /></PrivateRoute>} />
                 <Route path="/admin/audit-logs" element={<PrivateRoute permission="audit.view"><AuditLogs /></PrivateRoute>} />
@@ -550,6 +594,11 @@ function App() {
                 <Route path="/stock/quality" element={<PrivateRoute permission="stock.view"><QualityInspections /></PrivateRoute>} />
                 <Route path="/stock/cycle-counts" element={<PrivateRoute permission="stock.view"><CycleCounts /></PrivateRoute>} />
 
+                {/* Costing (FIFO/LIFO) */}
+                <Route path="/stock/cost-layers" element={<PrivateRoute permission="stock.view"><CostLayerList /></PrivateRoute>} />
+                <Route path="/stock/costing-method" element={<PrivateRoute permission="stock.view"><CostingMethodForm /></PrivateRoute>} />
+                <Route path="/stock/costing-valuation" element={<PrivateRoute permission="stock.reports"><ValuationReport /></PrivateRoute>} />
+
                 {/* Buying Routes */}
                 <Route path="/buying" element={<PrivateRoute permission="buying.view"><BuyingHome /></PrivateRoute>} />
                 <Route path="/buying/suppliers" element={<PrivateRoute permission="buying.view"><SupplierList /></PrivateRoute>} />
@@ -584,6 +633,11 @@ function App() {
                 <Route path="/buying/landed-costs" element={<PrivateRoute permission="buying.view"><LandedCosts /></PrivateRoute>} />
                 <Route path="/buying/landed-costs/:id" element={<PrivateRoute permission="buying.view"><LandedCostDetails /></PrivateRoute>} />
 
+                {/* 3-Way Matching */}
+                <Route path="/buying/matching" element={<PrivateRoute permission="buying.view"><MatchList /></PrivateRoute>} />
+                <Route path="/buying/matching/tolerances" element={<PrivateRoute permission="buying.view"><ToleranceConfig /></PrivateRoute>} />
+                <Route path="/buying/matching/:id" element={<PrivateRoute permission="buying.view"><MatchDetail /></PrivateRoute>} />
+
                 {/* Treasury Routes */}
                 <Route path="/treasury" element={<PrivateRoute permission="treasury.view"><TreasuryHome /></PrivateRoute>} />
                 <Route path="/treasury/accounts" element={<PrivateRoute permission="treasury.view"><TreasuryAccountList /></PrivateRoute>} />
@@ -601,6 +655,11 @@ function App() {
 
                 {/* Bank Import */}
                 <Route path="/treasury/bank-import" element={<PrivateRoute permission="treasury.view"><BankImport /></PrivateRoute>} />
+
+                {/* Cash Flow Forecast */}
+                <Route path="/finance/cashflow" element={<PrivateRoute permission="finance.cashflow_view"><ForecastList /></PrivateRoute>} />
+                <Route path="/finance/cashflow/generate" element={<PrivateRoute permission="finance.cashflow_generate"><ForecastGenerate /></PrivateRoute>} />
+                <Route path="/finance/cashflow/:id" element={<PrivateRoute permission="finance.cashflow_view"><ForecastDetail /></PrivateRoute>} />
 
                 {/* Other Modules */}
                 <Route path="/reports" element={<PrivateRoute permission="reports.view"><ReportCenter /></PrivateRoute>} />
@@ -645,6 +704,15 @@ function App() {
                 <Route path="/hr/wps" element={<PrivateRoute permission="hr.view"><WPSExport /></PrivateRoute>} />
                 <Route path="/hr/saudization" element={<PrivateRoute permission="hr.view"><SaudizationDashboard /></PrivateRoute>} />
                 <Route path="/hr/end-of-service" element={<PrivateRoute permission="hr.view"><EOSSettlement /></PrivateRoute>} />
+
+                {/* HR Self-Service Routes */}
+                <Route path="/hr/self-service" element={<PrivateRoute permission="hr.self_service"><SelfServiceDashboard /></PrivateRoute>} />
+                <Route path="/hr/self-service/leave-request" element={<PrivateRoute permission="hr.self_service"><SelfServiceLeaveForm /></PrivateRoute>} />
+                <Route path="/hr/self-service/leave-requests" element={<PrivateRoute permission="hr.self_service"><SelfServiceDashboard /></PrivateRoute>} />
+                <Route path="/hr/self-service/payslips" element={<PrivateRoute permission="hr.self_service"><SelfServicePayslips /></PrivateRoute>} />
+                <Route path="/hr/self-service/payslips/:id" element={<PrivateRoute permission="hr.self_service"><SelfServicePayslipDetail /></PrivateRoute>} />
+                <Route path="/hr/self-service/profile" element={<PrivateRoute permission="hr.self_service"><SelfServiceProfile /></PrivateRoute>} />
+                <Route path="/hr/self-service/team-requests" element={<PrivateRoute permission="hr.self_service_approve"><SelfServiceTeamRequests /></PrivateRoute>} />
 
                 {/* Assets Routes */}
                 <Route path="/assets/reports" element={<PrivateRoute permission="assets.view"><AssetReports /></PrivateRoute>} />
@@ -708,6 +776,13 @@ function App() {
                 <Route path="/settings/api-keys" element={<PrivateRoute permission="settings.view"><ApiKeys /></PrivateRoute>} />
                 <Route path="/settings/webhooks" element={<PrivateRoute permission="settings.view"><WebhooksPage /></PrivateRoute>} />
                 <Route path="/settings/print-templates" element={<PrivateRoute permission="settings.view"><PrintTemplates /></PrivateRoute>} />
+
+                {/* SSO Configuration */}
+                <Route path="/settings/sso" element={<PrivateRoute permission="settings.view"><SsoConfigList /></PrivateRoute>} />
+                <Route path="/settings/sso/new" element={<PrivateRoute permission="settings.manage"><SsoConfigForm /></PrivateRoute>} />
+                <Route path="/settings/sso/:id" element={<PrivateRoute permission="settings.view"><SsoConfigForm /></PrivateRoute>} />
+
+
 
                 {/* POS Routes */}
                 <Route path="/pos/kpi" element={<PrivateRoute permission="pos.view"><RoleDashboard fixedRoleKey="pos" backPath="/pos" /></PrivateRoute>} />

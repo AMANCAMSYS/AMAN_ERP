@@ -1,0 +1,482 @@
+"""
+AMAN ERP — Intercompany Accounting Service
+Handles reciprocal journal entries, entity group management, consolidation elimination,
+and intercompany balance reporting.
+"""
+
+import logging
+from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import text
+
+from database import db_connection
+from services.gl_service import create_journal_entry as gl_create_je
+
+logger = logging.getLogger(__name__)
+
+_D4 = Decimal("0.0001")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v if v is not None else 0))
+
+
+# ---------------------------------------------------------------------------
+# Entity Group CRUD
+# ---------------------------------------------------------------------------
+
+def get_entity_tree(company_id: str) -> List[Dict[str, Any]]:
+    """Return all entity groups as a flat list (frontend builds the tree)."""
+    with db_connection(company_id) as conn:
+        rows = conn.execute(text(
+            "SELECT id, name, parent_id, company_id, group_currency, consolidation_level, "
+            "created_at, updated_at FROM entity_groups ORDER BY consolidation_level, name"
+        )).fetchall()
+        cols = ["id", "name", "parent_id", "company_id", "group_currency",
+                "consolidation_level", "created_at", "updated_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+
+def create_entity_group(data: Dict[str, Any], company_id: str, user_id: int) -> Dict[str, Any]:
+    """Create or update an entity group node."""
+    with db_connection(company_id) as conn:
+        # Compute consolidation_level from parent
+        level = 0
+        if data.get("parent_id"):
+            parent = conn.execute(
+                text("SELECT consolidation_level FROM entity_groups WHERE id = :pid"),
+                {"pid": data["parent_id"]},
+            ).fetchone()
+            if parent:
+                level = parent[0] + 1
+
+        row = conn.execute(text("""
+            INSERT INTO entity_groups (name, parent_id, company_id, group_currency, consolidation_level, created_by)
+            VALUES (:name, :parent_id, :company_id, :currency, :level, :uid)
+            RETURNING id, name, parent_id, company_id, group_currency, consolidation_level, created_at
+        """), {
+            "name": data["name"],
+            "parent_id": data.get("parent_id"),
+            "company_id": data.get("company_id", company_id),
+            "currency": data.get("group_currency", "SAR"),
+            "level": level,
+            "uid": str(user_id),
+        }).fetchone()
+        conn.commit()
+        cols = ["id", "name", "parent_id", "company_id", "group_currency",
+                "consolidation_level", "created_at"]
+        return dict(zip(cols, row))
+
+
+# ---------------------------------------------------------------------------
+# Intercompany Transaction — create with reciprocal JEs
+# ---------------------------------------------------------------------------
+
+def create_transaction(
+    data: Dict[str, Any],
+    company_id: str,
+    user_id: int,
+) -> Dict[str, Any]:
+    """
+    Create an intercompany transaction and post reciprocal journal entries
+    in the source entity's database.
+    """
+    source_amount = _dec(data["source_amount"])
+    exchange_rate = _dec(data.get("exchange_rate", 1))
+    target_amount = _dec(data.get("target_amount")) if data.get("target_amount") else \
+        (source_amount * exchange_rate).quantize(_D4, ROUND_HALF_UP)
+
+    with db_connection(company_id) as conn:
+        # Resolve entity names
+        src = conn.execute(
+            text("SELECT id, name, company_id FROM entity_groups WHERE id = :id"),
+            {"id": data["source_entity_id"]},
+        ).fetchone()
+        tgt = conn.execute(
+            text("SELECT id, name, company_id FROM entity_groups WHERE id = :id"),
+            {"id": data["target_entity_id"]},
+        ).fetchone()
+        if not src or not tgt:
+            raise ValueError("Source or target entity not found")
+
+        # Look up account mapping for this pair
+        mapping = conn.execute(text("""
+            SELECT source_account_id, target_account_id
+            FROM intercompany_account_mappings
+            WHERE source_entity_id = :sid AND target_entity_id = :tid
+            LIMIT 1
+        """), {"sid": data["source_entity_id"], "tid": data["target_entity_id"]}).fetchone()
+
+        # Fallback: find generic IC receivable / IC payable accounts
+        if mapping:
+            ic_receivable_id, ic_payable_id = mapping[0], mapping[1]
+        else:
+            ic_receivable_id = conn.execute(
+                text("SELECT id FROM accounts WHERE account_code LIKE '13%' LIMIT 1")
+            ).scalar()
+            ic_payable_id = conn.execute(
+                text("SELECT id FROM accounts WHERE account_code LIKE '21%' LIMIT 1")
+            ).scalar()
+
+        # Revenue and COGS/expense accounts for source entity
+        revenue_acct = conn.execute(
+            text("SELECT id FROM accounts WHERE account_type = 'revenue' LIMIT 1")
+        ).scalar()
+        expense_acct = conn.execute(
+            text("SELECT id FROM accounts WHERE account_type = 'expense' LIMIT 1")
+        ).scalar()
+
+        today = date.today().isoformat()
+        ref = data.get("reference_document") or f"IC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # --- Source entity JE: Dr IC Receivable, Cr Revenue ---
+        source_je_id = None
+        if ic_receivable_id and revenue_acct:
+            source_je_id, _ = gl_create_je(
+                db=conn,
+                company_id=company_id,
+                date=today,
+                description=f"معاملة بين الشركات — {src[1]} → {tgt[1]}",
+                lines=[
+                    {"account_id": ic_receivable_id, "debit": str(source_amount), "credit": "0",
+                     "description": f"ذمم بين الشركات — {tgt[1]}"},
+                    {"account_id": revenue_acct, "debit": "0", "credit": str(source_amount),
+                     "description": f"إيرادات بين الشركات — {tgt[1]}"},
+                ],
+                user_id=user_id,
+                reference=ref,
+                source="intercompany",
+                currency=data.get("source_currency", "SAR"),
+            )
+
+        # --- Target entity JE: Dr Expense/COGS, Cr IC Payable ---
+        target_je_id = None
+        if expense_acct and ic_payable_id:
+            target_je_id, _ = gl_create_je(
+                db=conn,
+                company_id=company_id,
+                date=today,
+                description=f"معاملة بين الشركات — {tgt[1]} ← {src[1]}",
+                lines=[
+                    {"account_id": expense_acct, "debit": str(target_amount), "credit": "0",
+                     "description": f"مصاريف بين الشركات — {src[1]}"},
+                    {"account_id": ic_payable_id, "debit": "0", "credit": str(target_amount),
+                     "description": f"ذمم دائنة بين الشركات — {src[1]}"},
+                ],
+                user_id=user_id,
+                reference=ref,
+                source="intercompany",
+                currency=data.get("target_currency", data.get("source_currency", "SAR")),
+                exchange_rate=float(exchange_rate),
+            )
+
+        # Insert the IC transaction record
+        row = conn.execute(text("""
+            INSERT INTO intercompany_transactions_v2
+                (source_entity_id, target_entity_id, transaction_type,
+                 source_amount, source_currency, target_amount, target_currency,
+                 exchange_rate, source_journal_entry_id, target_journal_entry_id,
+                 reference_document, created_by)
+            VALUES
+                (:src_eid, :tgt_eid, :txn_type,
+                 :src_amt, :src_curr, :tgt_amt, :tgt_curr,
+                 :rate, :src_je, :tgt_je,
+                 :ref, :uid)
+            RETURNING id
+        """), {
+            "src_eid": data["source_entity_id"],
+            "tgt_eid": data["target_entity_id"],
+            "txn_type": data.get("transaction_type", "sale"),
+            "src_amt": str(source_amount),
+            "src_curr": data.get("source_currency", "SAR"),
+            "tgt_amt": str(target_amount),
+            "tgt_curr": data.get("target_currency", data.get("source_currency", "SAR")),
+            "rate": str(exchange_rate),
+            "src_je": source_je_id,
+            "tgt_je": target_je_id,
+            "ref": ref,
+            "uid": str(user_id),
+        }).fetchone()
+        conn.commit()
+
+        return {
+            "id": row[0],
+            "source_journal_entry_id": source_je_id,
+            "target_journal_entry_id": target_je_id,
+            "reference_document": ref,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Query transactions
+# ---------------------------------------------------------------------------
+
+def get_transactions(
+    company_id: str,
+    status_filter: Optional[str] = None,
+    entity_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    with db_connection(company_id) as conn:
+        conditions = ["1=1"]
+        params: Dict[str, Any] = {}
+        if status_filter:
+            conditions.append("t.elimination_status = :status")
+            params["status"] = status_filter
+        if entity_id:
+            conditions.append("(t.source_entity_id = :eid OR t.target_entity_id = :eid)")
+            params["eid"] = entity_id
+
+        rows = conn.execute(text(f"""
+            SELECT t.*, se.name as source_entity_name, te.name as target_entity_name
+            FROM intercompany_transactions_v2 t
+            LEFT JOIN entity_groups se ON se.id = t.source_entity_id
+            LEFT JOIN entity_groups te ON te.id = t.target_entity_id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY t.created_at DESC
+        """), params).fetchall()
+        cols = [c.key for c in rows[0]._parent.keys] if rows else []
+        return [dict(zip(cols, r)) for r in rows]
+
+
+def get_transaction_by_id(txn_id: int, company_id: str) -> Optional[Dict[str, Any]]:
+    with db_connection(company_id) as conn:
+        row = conn.execute(text("""
+            SELECT t.*, se.name as source_entity_name, te.name as target_entity_name
+            FROM intercompany_transactions_v2 t
+            LEFT JOIN entity_groups se ON se.id = t.source_entity_id
+            LEFT JOIN entity_groups te ON te.id = t.target_entity_id
+            WHERE t.id = :id
+        """), {"id": txn_id}).fetchone()
+        if not row:
+            return None
+        return dict(row._mapping)
+
+
+# ---------------------------------------------------------------------------
+# Consolidation — generate elimination JEs
+# ---------------------------------------------------------------------------
+
+def run_consolidation(
+    entity_group_id: int,
+    company_id: str,
+    user_id: int,
+    as_of_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Traverse the entity group hierarchy bottom-up and generate elimination
+    journal entries for all pending intercompany transactions within the group.
+    """
+    with db_connection(company_id) as conn:
+        # Get the entity group info
+        group = conn.execute(
+            text("SELECT id, name, group_currency FROM entity_groups WHERE id = :id"),
+            {"id": entity_group_id},
+        ).fetchone()
+        if not group:
+            raise ValueError("Entity group not found")
+        group_id, group_name, group_currency = group
+
+        # Get all entity IDs in this group (the group and its descendants)
+        entity_ids = _get_descendant_ids(conn, entity_group_id)
+        if not entity_ids:
+            return {
+                "entity_group_id": entity_group_id,
+                "entity_group_name": group_name,
+                "eliminations": [],
+                "total_eliminated": Decimal("0"),
+                "journal_entry_ids": [],
+                "status": "no_transactions",
+            }
+
+        # Find pending IC transactions where both source and target are in this group
+        placeholders = ", ".join(f":e{i}" for i in range(len(entity_ids)))
+        params: Dict[str, Any] = {f"e{i}": eid for i, eid in enumerate(entity_ids)}
+
+        date_filter = ""
+        if as_of_date:
+            date_filter = " AND t.created_at::date <= :cutoff"
+            params["cutoff"] = as_of_date
+
+        pending = conn.execute(text(f"""
+            SELECT t.id, t.source_entity_id, t.target_entity_id,
+                   t.source_amount, t.source_currency,
+                   se.name as source_name, te.name as target_name
+            FROM intercompany_transactions_v2 t
+            JOIN entity_groups se ON se.id = t.source_entity_id
+            JOIN entity_groups te ON te.id = t.target_entity_id
+            WHERE t.elimination_status = 'pending'
+              AND t.source_entity_id IN ({placeholders})
+              AND t.target_entity_id IN ({placeholders})
+              {date_filter}
+            ORDER BY t.id
+            FOR UPDATE OF t
+        """), params).fetchall()
+
+        if not pending:
+            return {
+                "entity_group_id": entity_group_id,
+                "entity_group_name": group_name,
+                "eliminations": [],
+                "total_eliminated": Decimal("0"),
+                "journal_entry_ids": [],
+                "status": "no_pending",
+            }
+
+        # Generate elimination JEs
+        eliminations = []
+        je_ids = []
+        total_eliminated = Decimal("0")
+
+        # Find IC accounts for elimination
+        ic_receivable_id = conn.execute(
+            text("SELECT id FROM accounts WHERE account_code LIKE '13%' LIMIT 1")
+        ).scalar()
+        ic_payable_id = conn.execute(
+            text("SELECT id FROM accounts WHERE account_code LIKE '21%' LIMIT 1")
+        ).scalar()
+
+        if not ic_receivable_id or not ic_payable_id:
+            raise ValueError("Intercompany accounts (receivable/payable) not configured")
+
+        today = (as_of_date or date.today().isoformat())
+
+        for txn in pending:
+            txn_id, src_eid, tgt_eid, src_amount, src_currency, src_name, tgt_name = txn
+            amount = _dec(src_amount)
+
+            # Elimination JE: Dr IC Payable, Cr IC Receivable (nets to zero)
+            je_id, _ = gl_create_je(
+                db=conn,
+                company_id=company_id,
+                date=today,
+                description=f"استبعاد بين الشركات — {src_name} ↔ {tgt_name}",
+                lines=[
+                    {"account_id": ic_payable_id, "debit": str(amount), "credit": "0",
+                     "description": f"استبعاد ذمم دائنة — {src_name}"},
+                    {"account_id": ic_receivable_id, "debit": "0", "credit": str(amount),
+                     "description": f"استبعاد ذمم مدينة — {tgt_name}"},
+                ],
+                user_id=user_id,
+                reference=f"ELIM-{txn_id}",
+                source="intercompany_elimination",
+                source_id=txn_id,
+                currency=src_currency,
+            )
+            je_ids.append(je_id)
+
+            # Mark transaction as eliminated
+            conn.execute(text("""
+                UPDATE intercompany_transactions_v2
+                SET elimination_status = 'eliminated',
+                    elimination_journal_entry_id = :je_id,
+                    updated_at = NOW()
+                WHERE id = :tid
+            """), {"je_id": je_id, "tid": txn_id})
+
+            eliminations.append({
+                "source_entity_name": src_name,
+                "target_entity_name": tgt_name,
+                "amount": amount,
+                "currency": src_currency,
+                "transaction_id": txn_id,
+            })
+            total_eliminated += amount
+
+        conn.commit()
+        return {
+            "entity_group_id": entity_group_id,
+            "entity_group_name": group_name,
+            "eliminations": eliminations,
+            "total_eliminated": total_eliminated,
+            "journal_entry_ids": je_ids,
+            "status": "eliminated",
+        }
+
+
+def _get_descendant_ids(conn, group_id: int) -> List[int]:
+    """Get all entity IDs in this group and its children (recursive CTE)."""
+    rows = conn.execute(text("""
+        WITH RECURSIVE tree AS (
+            SELECT id FROM entity_groups WHERE id = :gid
+            UNION ALL
+            SELECT eg.id FROM entity_groups eg JOIN tree t ON eg.parent_id = t.id
+        )
+        SELECT id FROM tree
+    """), {"gid": group_id}).fetchall()
+    return [r[0] for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Intercompany Balances Report
+# ---------------------------------------------------------------------------
+
+def get_intercompany_balances(company_id: str) -> Dict[str, Any]:
+    """Report outstanding (pending) IC balances grouped by entity pair."""
+    with db_connection(company_id) as conn:
+        rows = conn.execute(text("""
+            SELECT t.source_entity_id, se.name as source_entity_name,
+                   t.target_entity_id, te.name as target_entity_name,
+                   SUM(t.source_amount) as net_amount,
+                   t.source_currency as currency,
+                   COUNT(*) as pending_count
+            FROM intercompany_transactions_v2 t
+            JOIN entity_groups se ON se.id = t.source_entity_id
+            JOIN entity_groups te ON te.id = t.target_entity_id
+            WHERE t.elimination_status = 'pending'
+            GROUP BY t.source_entity_id, se.name, t.target_entity_id, te.name, t.source_currency
+            ORDER BY net_amount DESC
+        """)).fetchall()
+
+        balances = []
+        total = Decimal("0")
+        for r in rows:
+            amt = _dec(r[4])
+            balances.append({
+                "source_entity_id": r[0],
+                "source_entity_name": r[1],
+                "target_entity_id": r[2],
+                "target_entity_name": r[3],
+                "net_amount": amt,
+                "currency": r[5],
+                "pending_count": r[6],
+            })
+            total += amt
+
+        return {"balances": balances, "total_pending": total}
+
+
+# ---------------------------------------------------------------------------
+# Account Mapping CRUD
+# ---------------------------------------------------------------------------
+
+def get_account_mappings(company_id: str) -> List[Dict[str, Any]]:
+    with db_connection(company_id) as conn:
+        rows = conn.execute(text(
+            "SELECT id, source_entity_id, target_entity_id, source_account_id, target_account_id, "
+            "created_at FROM intercompany_account_mappings ORDER BY id"
+        )).fetchall()
+        cols = ["id", "source_entity_id", "target_entity_id", "source_account_id",
+                "target_account_id", "created_at"]
+        return [dict(zip(cols, r)) for r in rows]
+
+
+def create_account_mapping(data: Dict[str, Any], company_id: str, user_id: int) -> Dict[str, Any]:
+    with db_connection(company_id) as conn:
+        row = conn.execute(text("""
+            INSERT INTO intercompany_account_mappings
+                (source_entity_id, target_entity_id, source_account_id, target_account_id, created_by)
+            VALUES (:src_eid, :tgt_eid, :src_aid, :tgt_aid, :uid)
+            RETURNING id, source_entity_id, target_entity_id, source_account_id, target_account_id, created_at
+        """), {
+            "src_eid": data["source_entity_id"],
+            "tgt_eid": data["target_entity_id"],
+            "src_aid": data["source_account_id"],
+            "tgt_aid": data["target_account_id"],
+            "uid": str(user_id),
+        }).fetchone()
+        conn.commit()
+        cols = ["id", "source_entity_id", "target_entity_id", "source_account_id",
+                "target_account_id", "created_at"]
+        return dict(zip(cols, row))

@@ -1283,6 +1283,24 @@ async def create_purchase_invoice(
                     new_price=new_price_bc
                 )
 
+                # 2a. FIFO/LIFO: Create cost layer if product uses layer-based costing
+                try:
+                    method = CostingService._get_product_costing_method(db, line["product_id"], wh_id)
+                    if method in ("fifo", "lifo"):
+                        CostingService.create_cost_layer(
+                            db,
+                            product_id=line["product_id"],
+                            warehouse_id=wh_id,
+                            quantity=float(line["quantity"]),
+                            unit_cost=new_price_bc,
+                            source_document_type="purchase_invoice",
+                            source_document_id=invoice_id,
+                            costing_method=method,
+                        )
+                except Exception as layer_err:
+                    import logging
+                    logging.getLogger(__name__).warning("Cost layer creation failed: %s", layer_err)
+
                 # 2. Update Inventory Quantity (Avoid double counting if already received via PO)
                 received_qty = po_received_map.get(line["product_id"], 0)
                 invoice_qty = float(line["quantity"])
@@ -1556,7 +1574,39 @@ async def create_purchase_invoice(
             branch_id=invoice.branch_id
         )
 
-        return {"success": True, "message": "تم إنشاء فاتورة المشتريات بنجاح", "invoice_id": invoice_id}
+        # ── 3-Way Matching: auto-match if invoice is linked to a PO ──
+        match_result = None
+        if invoice.original_invoice_id:
+            try:
+                from services.matching_service import perform_match
+                user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+                match_result = perform_match(
+                    db,
+                    invoice_id=invoice_id,
+                    po_id=invoice.original_invoice_id,
+                    supplier_id=invoice.supplier_id,
+                    user_id=user_id,
+                )
+                db.commit()
+                # Notify if match has exceptions
+                if match_result and match_result.get("match_status") == "exception":
+                    try:
+                        from services.notification_service import NotificationService
+                        ns = NotificationService(db)
+                        ns.dispatch(
+                            recipient_id=user_id,
+                            event_type="invoice_held",
+                            title="فاتورة مشتريات معلّقة - مطابقة ثلاثية",
+                            body=f"الفاتورة {inv_num} تحتوي على فروقات تحتاج مراجعة",
+                            reference_type="three_way_match",
+                            reference_id=match_result.get("match_id"),
+                        )
+                    except Exception as notif_err:
+                        logger.warning("Failed to dispatch matching notification: %s", notif_err)
+            except Exception as match_err:
+                logger.warning("3-way matching failed for invoice %s: %s", invoice_id, match_err)
+
+        return {"success": True, "message": "تم إنشاء فاتورة المشتريات بنجاح", "invoice_id": invoice_id, "match_result": match_result}
 
     except Exception as e:
         db.rollback()

@@ -61,6 +61,7 @@ from routers import role_dashboards
 # ── System Completion (Phase 100%) ─────────────────────────────────────────────
 from routers import delivery_orders, landed_costs, hr_wps_compliance
 from routers import system_completion
+from routers import sso, matching
 
 # OPS-001: Structured logging — JSON in production, human-readable in dev
 from utils.logging_config import setup_logging, RequestIDMiddleware
@@ -452,6 +453,8 @@ app.include_router(delivery_orders.router, prefix="/api")
 app.include_router(landed_costs.router, prefix="/api")
 app.include_router(hr_wps_compliance.router, prefix="/api")
 app.include_router(system_completion.router, prefix="/api")
+app.include_router(sso.router, prefix="/api")
+app.include_router(matching.router, prefix="/api")
 
 
 @app.get("/")

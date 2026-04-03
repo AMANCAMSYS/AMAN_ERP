@@ -165,6 +165,21 @@ function StockHome() {
                             {t('stock.home.links.cycle_counts')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
+                        <div className="link-item" onClick={() => navigate('/stock/cost-layers')}>
+                            <span className="link-icon">📊</span>
+                            {i18n.language === 'ar' ? 'طبقات التكلفة (FIFO/LIFO)' : 'Cost Layers (FIFO/LIFO)'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/costing-method')}>
+                            <span className="link-icon">⚙️</span>
+                            {i18n.language === 'ar' ? 'طريقة التكلفة' : 'Costing Method'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
+                        <div className="link-item" onClick={() => navigate('/stock/costing-valuation')}>
+                            <span className="link-icon">📈</span>
+                            {i18n.language === 'ar' ? 'تقرير تقييم المخزون' : 'Inventory Valuation Report'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
                     </div>
                 </div>
             </div>

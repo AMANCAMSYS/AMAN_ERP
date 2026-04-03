@@ -1,0 +1,26 @@
+{
+  "name": "aman-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "test": "jest"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-native": "0.76.9",
+    "@react-navigation/native": "^7.1.6",
+    "@react-navigation/stack": "^7.3.0",
+    "@react-native-async-storage/async-storage": "^2.1.2",
+    "react-native-sqlite-storage": "^6.0.1",
+    "@react-native-firebase/app": "^21.12.1",
+    "@react-native-firebase/messaging": "^21.12.1",
+    "@react-native-community/netinfo": "^12.1.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@testing-library/react-native": "^13.2.0"
+  }
+}

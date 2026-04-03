@@ -29,3 +29,8 @@ gunicorn
 # ── Observability ─────────────────────
 sentry-sdk[fastapi]
 prometheus-fastapi-instrumentator
+
+# ── SSO / Push Notifications ─────────
+python3-saml
+python-ldap
+firebase-admin

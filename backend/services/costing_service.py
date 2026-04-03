@@ -178,3 +178,299 @@ class CostingService:
             "affected_products_count": impact.affected_products or 0,
             "total_cost_impact": float(impact.total_deviation or 0)
         }
+
+    # ─────────────────────────────────────────────────────────────────────
+    # FIFO / LIFO Cost Layer Management
+    # ─────────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_product_costing_method(db, product_id: int, warehouse_id: Optional[int] = None) -> str:
+        """Return costing method for a product (fifo/lifo/wac)."""
+        if warehouse_id:
+            row = db.execute(text("""
+                SELECT costing_method FROM cost_layers
+                WHERE product_id = :pid AND warehouse_id = :wid AND is_exhausted = FALSE
+                ORDER BY id DESC LIMIT 1
+            """), {"pid": product_id, "wid": warehouse_id}).fetchone()
+            if row:
+                return row[0]
+        row = db.execute(text("""
+            SELECT costing_method FROM cost_layers
+            WHERE product_id = :pid AND is_exhausted = FALSE
+            ORDER BY id DESC LIMIT 1
+        """), {"pid": product_id}).fetchone()
+        return row[0] if row else "wac"
+
+    @staticmethod
+    def create_cost_layer(
+        db,
+        product_id: int,
+        warehouse_id: int,
+        quantity,
+        unit_cost,
+        source_document_type: str,
+        source_document_id: int,
+        costing_method: str = "fifo",
+    ) -> int:
+        """Create a new cost layer on purchase receipt. Returns the layer ID."""
+        qty = _dec(quantity)
+        cost = _dec(unit_cost)
+        row = db.execute(text("""
+            INSERT INTO cost_layers
+                (product_id, warehouse_id, costing_method, purchase_date, original_quantity,
+                 remaining_quantity, unit_cost, source_document_type, source_document_id, is_exhausted)
+            VALUES
+                (:pid, :wid, :method, CURRENT_DATE, :qty, :qty, :cost, :sdt, :sdi, FALSE)
+            RETURNING id
+        """), {
+            "pid": product_id, "wid": warehouse_id, "method": costing_method,
+            "qty": str(qty), "cost": str(cost),
+            "sdt": source_document_type, "sdi": source_document_id,
+        })
+        return row.scalar()
+
+    @staticmethod
+    def consume_layers(
+        db,
+        product_id: int,
+        warehouse_id: int,
+        quantity,
+        sale_document_type: str,
+        sale_document_id: int,
+        costing_method: str = "fifo",
+    ) -> Decimal:
+        """
+        Consume cost layers in FIFO (ASC) or LIFO (DESC) order.
+        Returns total COGS for the consumed quantity.
+        Raises ValueError if insufficient remaining quantity or available stock.
+        """
+        qty_remaining = _dec(quantity)
+
+        # ── Constitution VIII: validate qty_available before consuming ──
+        inv_row = db.execute(text("""
+            SELECT quantity, reserved_quantity, available_quantity
+            FROM inventory
+            WHERE product_id = :pid AND warehouse_id = :wid
+            FOR UPDATE
+        """), {"pid": product_id, "wid": warehouse_id}).fetchone()
+
+        if inv_row:
+            on_hand = _dec(inv_row[0])
+            reserved = _dec(inv_row[1])
+            available = on_hand - reserved   # authoritative formula
+            if qty_remaining > available:
+                raise ValueError(
+                    f"Insufficient available stock for product {product_id} in warehouse "
+                    f"{warehouse_id}. Available: {available}, requested: {qty_remaining}."
+                )
+        # If no inventory row exists, layer check below will catch the shortfall.
+
+        total_cogs = Decimal("0")
+        order = "purchase_date ASC, id ASC" if costing_method == "fifo" else "purchase_date DESC, id DESC"
+
+        layers = db.execute(text(f"""
+            SELECT id, remaining_quantity, unit_cost
+            FROM cost_layers
+            WHERE product_id = :pid AND warehouse_id = :wid AND is_exhausted = FALSE
+            ORDER BY {order}
+            FOR UPDATE
+        """), {"pid": product_id, "wid": warehouse_id}).fetchall()
+
+        for layer in layers:
+            if qty_remaining <= 0:
+                break
+            layer_id, layer_remaining, layer_cost = layer[0], _dec(layer[1]), _dec(layer[2])
+            consume_qty = min(qty_remaining, layer_remaining)
+
+            new_remaining = layer_remaining - consume_qty
+            is_exhausted = new_remaining <= 0
+
+            db.execute(text("""
+                UPDATE cost_layers
+                SET remaining_quantity = :rem, is_exhausted = :exh, updated_at = NOW()
+                WHERE id = :id
+            """), {"rem": str(new_remaining), "exh": is_exhausted, "id": layer_id})
+
+            db.execute(text("""
+                INSERT INTO cost_layer_consumptions
+                    (cost_layer_id, quantity_consumed, sale_document_type, sale_document_id, consumed_at)
+                VALUES (:lid, :qty, :sdt, :sdi, NOW())
+            """), {"lid": layer_id, "qty": str(consume_qty), "sdt": sale_document_type, "sdi": sale_document_id})
+
+            total_cogs += consume_qty * layer_cost
+            qty_remaining -= consume_qty
+
+        if qty_remaining > 0:
+            raise ValueError(
+                f"Insufficient cost layers for product {product_id} in warehouse {warehouse_id}. "
+                f"Short by {qty_remaining} units."
+            )
+
+        return total_cogs
+
+    @staticmethod
+    def handle_return(
+        db,
+        product_id: int,
+        warehouse_id: int,
+        quantity,
+        unit_cost,
+        source_document_type: str,
+        source_document_id: int,
+        costing_method: str = "fifo",
+    ) -> int:
+        """Handle a return by creating a new cost layer at the original unit cost."""
+        return CostingService.create_cost_layer(
+            db, product_id, warehouse_id, quantity, unit_cost,
+            source_document_type, source_document_id, costing_method,
+        )
+
+    @staticmethod
+    def get_cost_layers(db, product_id=None, warehouse_id=None, include_exhausted=False):
+        """Get cost layers with optional filters."""
+        conditions = ["1=1"]
+        params = {}
+        if product_id:
+            conditions.append("cl.product_id = :pid")
+            params["pid"] = product_id
+        if warehouse_id:
+            conditions.append("cl.warehouse_id = :wid")
+            params["wid"] = warehouse_id
+        if not include_exhausted:
+            conditions.append("cl.is_exhausted = FALSE")
+
+        return db.execute(text(f"""
+            SELECT cl.id, cl.product_id, cl.warehouse_id, cl.costing_method,
+                   cl.purchase_date, cl.original_quantity, cl.remaining_quantity,
+                   cl.unit_cost, cl.source_document_type, cl.source_document_id,
+                   cl.is_exhausted, cl.created_at, cl.updated_at,
+                   p.name as product_name, w.name as warehouse_name
+            FROM cost_layers cl
+            LEFT JOIN products p ON p.id = cl.product_id
+            LEFT JOIN warehouses w ON w.id = cl.warehouse_id
+            WHERE {' AND '.join(conditions)}
+            ORDER BY cl.purchase_date DESC, cl.id DESC
+        """), params).fetchall()
+
+    @staticmethod
+    def change_costing_method(db, product_id: int, warehouse_id: Optional[int], new_method: str, user_id: str):
+        """
+        Change costing method for a product. Creates an opening layer consolidating
+        remaining inventory at current average cost.
+        """
+        conditions = ["product_id = :pid", "is_exhausted = FALSE"]
+        params = {"pid": product_id}
+        if warehouse_id:
+            conditions.append("warehouse_id = :wid")
+            params["wid"] = warehouse_id
+
+        # Sum up remaining inventory from existing layers
+        agg = db.execute(text(f"""
+            SELECT COALESCE(SUM(remaining_quantity), 0) as total_qty,
+                   CASE WHEN SUM(remaining_quantity) > 0
+                        THEN SUM(remaining_quantity * unit_cost) / SUM(remaining_quantity)
+                        ELSE 0 END as avg_cost
+            FROM cost_layers
+            WHERE {' AND '.join(conditions)}
+        """), params).fetchone()
+
+        total_qty = _dec(agg[0])
+        avg_cost = _dec(agg[1])
+
+        # If no existing layers, check inventory/product cost
+        if total_qty <= 0:
+            if warehouse_id:
+                inv = db.execute(text(
+                    "SELECT quantity, average_cost FROM inventory WHERE product_id = :pid AND warehouse_id = :wid"
+                ), {"pid": product_id, "wid": warehouse_id}).fetchone()
+                if inv:
+                    total_qty = _dec(inv[0])
+                    avg_cost = _dec(inv[1])
+            if total_qty <= 0:
+                prod = db.execute(text(
+                    "SELECT cost_price FROM products WHERE id = :pid"
+                ), {"pid": product_id}).fetchone()
+                avg_cost = _dec(prod[0]) if prod else Decimal("0")
+
+        # Mark all existing layers as exhausted
+        db.execute(text(f"""
+            UPDATE cost_layers SET is_exhausted = TRUE, remaining_quantity = 0, updated_at = NOW()
+            WHERE {' AND '.join(conditions)}
+        """), params)
+
+        # Create opening layer with new method if there's inventory
+        opening_layer_id = None
+        if total_qty > 0:
+            wh = warehouse_id or db.execute(text(
+                "SELECT id FROM warehouses WHERE is_default = TRUE LIMIT 1"
+            )).scalar() or 1
+            opening_layer_id = CostingService.create_cost_layer(
+                db, product_id, wh, total_qty, avg_cost,
+                "method_change", 0, new_method,
+            )
+
+        return {
+            "product_id": product_id,
+            "warehouse_id": warehouse_id,
+            "new_method": new_method,
+            "opening_quantity": float(total_qty),
+            "opening_unit_cost": float(avg_cost),
+            "opening_layer_id": opening_layer_id,
+        }
+
+    @staticmethod
+    def calculate_inventory_valuation(db, as_of_date=None):
+        """Calculate inventory valuation grouped by product and costing method."""
+        date_filter = ""
+        params = {}
+        if as_of_date:
+            date_filter = "AND cl.purchase_date <= :cutoff"
+            params["cutoff"] = str(as_of_date)
+
+        rows = db.execute(text(f"""
+            SELECT cl.product_id, p.name as product_name, cl.costing_method,
+                   SUM(cl.remaining_quantity) as total_quantity,
+                   SUM(cl.remaining_quantity * cl.unit_cost) as total_value,
+                   CASE WHEN SUM(cl.remaining_quantity) > 0
+                        THEN SUM(cl.remaining_quantity * cl.unit_cost) / SUM(cl.remaining_quantity)
+                        ELSE 0 END as weighted_avg_cost
+            FROM cost_layers cl
+            JOIN products p ON p.id = cl.product_id
+            WHERE cl.is_exhausted = FALSE {date_filter}
+            GROUP BY cl.product_id, p.name, cl.costing_method
+            HAVING SUM(cl.remaining_quantity) > 0
+            ORDER BY p.name
+        """), params).fetchall()
+
+        items = []
+        grand_total = Decimal("0")
+        for r in rows:
+            val = _dec(r[4])
+            items.append({
+                "product_id": r[0],
+                "product_name": r[1],
+                "costing_method": r[2],
+                "total_quantity": float(_dec(r[3])),
+                "total_value": float(val),
+                "weighted_avg_cost": float(_dec(r[5])),
+            })
+            grand_total += val
+
+        return {
+            "as_of_date": str(as_of_date or "current"),
+            "items": items,
+            "grand_total": float(grand_total),
+        }
+
+    @staticmethod
+    def get_consumption_history(db, product_id: int):
+        """Get consumption history for a product's cost layers."""
+        return db.execute(text("""
+            SELECT clc.id, clc.cost_layer_id, clc.quantity_consumed,
+                   clc.sale_document_type, clc.sale_document_id, clc.consumed_at,
+                   cl.unit_cost, cl.costing_method, cl.purchase_date
+            FROM cost_layer_consumptions clc
+            JOIN cost_layers cl ON cl.id = clc.cost_layer_id
+            WHERE cl.product_id = :pid
+            ORDER BY clc.consumed_at DESC
+        """), {"pid": product_id}).fetchall()

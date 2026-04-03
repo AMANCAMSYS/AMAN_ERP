@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Form, Bo
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -671,112 +672,119 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         
         currency = company[1]
         
-        with get_db_connection(company_id) as company_conn:
-            result = company_conn.execute(
-                text("SELECT id, username, email, full_name, role, is_active, permissions FROM company_users WHERE id = :user_id"),
-                {"user_id": user_id}
-            ).fetchone()
-            
-            if result:
-                # Process permissions (same logic as login)
-                user_permissions = result[6]
-                
-                # Handle Legacy Format {'all': True}
-                if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
-                    user_permissions = ["*"]
-                elif not isinstance(user_permissions, list):
-                    user_permissions = []
-
-                # Fetch Role Permissions
-                role_permissions = []
-                if result[4]:  # role
-                    try:
-                        role_res = company_conn.execute(
-                            text("SELECT permissions FROM roles WHERE role_name = :r"),
-                            {"r": result[4]}
-                        ).scalar()
-                        if role_res:
-                            role_permissions = role_res if isinstance(role_res, list) else []
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch role permissions for '{result[4]}': {e}")
-
-                final_permissions = list(set((role_permissions or []) + user_permissions))
-
-                # Fetch Allowed Branches
-                allowed_branches_rows = company_conn.execute(
-                    text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
-                    {"uid": user_id}
-                ).fetchall()
-                allowed_branches = [r[0] for r in allowed_branches_rows]
-
-                # Force Admin Access
-                if result[4] in ['admin', 'system_admin', 'superuser']:
-                    final_permissions = ["*"]
-                elif "*" in final_permissions:
-                    final_permissions = ["*"]
-
-                # Fetch Decimal Places Setting
-                decimal_places = 2
-                company_country = "SY"
-                company_timezone = "Asia/Damascus"
-                industry_type_me = None
-                try:
-                    dp_res = company_conn.execute(
-                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
-                    ).scalar()
-                    if dp_res:
-                        decimal_places = int(dp_res)
-                    cc_res = company_conn.execute(
-                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
-                    ).scalar()
-                    if cc_res:
-                        company_country = cc_res
-                    tz_res = company_conn.execute(
-                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
-                    ).scalar()
-                    if tz_res:
-                        company_timezone = tz_res
-                    it_res = company_conn.execute(
-                        text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
-                    ).scalar()
-                    if it_res:
-                        industry_type_me = it_res
-                except Exception as e:
-                    logger.warning(f"Failed to fetch settings in /me: {e}")
-
-                # Fetch company details
-                company_info = db.execute(
-                    text("SELECT currency, enabled_modules FROM system_companies WHERE id = :id"),
-                    {"id": company_id}
+        try:
+            with get_db_connection(company_id) as company_conn:
+                result = company_conn.execute(
+                    text("SELECT id, username, email, full_name, role, is_active, permissions FROM company_users WHERE id = :user_id"),
+                    {"user_id": user_id}
                 ).fetchone()
+            
+                if result:
+                    # Process permissions (same logic as login)
+                    user_permissions = result[6]
                 
-                currency = company_info[0] if company_info else "SAR"
-                enabled_modules = company_info[1] if company_info and company_info[1] else []
-                
-                if isinstance(enabled_modules, str):
-                    import json
-                    try:
-                        enabled_modules = json.loads(enabled_modules)
-                    except:
-                        enabled_modules = []
+                    # Handle Legacy Format {'all': True}
+                    if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
+                        user_permissions = ["*"]
+                    elif not isinstance(user_permissions, list):
+                        user_permissions = []
 
-                return UserResponse(
-                    id=result[0],
-                    username=result[1],
-                    email=result[2],
-                    full_name=result[3],
-                    role=result[4],
-                    is_active=result[5],
-                    company_id=company_id,
-                    currency=currency,
-                    country=company_country,
-                    decimal_places=decimal_places,
-                    timezone=company_timezone,
-                    permissions=final_permissions,
-                    allowed_branches=allowed_branches,
-                    enabled_modules=enabled_modules,
-                    industry_type=industry_type_me
-                )
+                    # Fetch Role Permissions
+                    role_permissions = []
+                    if result[4]:  # role
+                        try:
+                            role_res = company_conn.execute(
+                                text("SELECT permissions FROM roles WHERE role_name = :r"),
+                                {"r": result[4]}
+                            ).scalar()
+                            if role_res:
+                                role_permissions = role_res if isinstance(role_res, list) else []
+                        except Exception as e:
+                            logger.warning(f"Failed to fetch role permissions for '{result[4]}': {e}")
+
+                    final_permissions = list(set((role_permissions or []) + user_permissions))
+
+                    # Fetch Allowed Branches
+                    allowed_branches_rows = company_conn.execute(
+                        text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
+                        {"uid": user_id}
+                    ).fetchall()
+                    allowed_branches = [r[0] for r in allowed_branches_rows]
+
+                    # Force Admin Access
+                    if result[4] in ['admin', 'system_admin', 'superuser']:
+                        final_permissions = ["*"]
+                    elif "*" in final_permissions:
+                        final_permissions = ["*"]
+
+                    # Fetch Decimal Places Setting
+                    decimal_places = 2
+                    company_country = "SY"
+                    company_timezone = "Asia/Damascus"
+                    industry_type_me = None
+                    try:
+                        dp_res = company_conn.execute(
+                            text("SELECT setting_value FROM company_settings WHERE setting_key = 'decimal_places'")
+                        ).scalar()
+                        if dp_res:
+                            decimal_places = int(dp_res)
+                        cc_res = company_conn.execute(
+                            text("SELECT setting_value FROM company_settings WHERE setting_key = 'company_country'")
+                        ).scalar()
+                        if cc_res:
+                            company_country = cc_res
+                        tz_res = company_conn.execute(
+                            text("SELECT setting_value FROM company_settings WHERE setting_key = 'timezone'")
+                        ).scalar()
+                        if tz_res:
+                            company_timezone = tz_res
+                        it_res = company_conn.execute(
+                            text("SELECT setting_value FROM company_settings WHERE setting_key = 'industry_type'")
+                        ).scalar()
+                        if it_res:
+                            industry_type_me = it_res
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch settings in /me: {e}")
+
+                    # Fetch company details
+                    company_info = db.execute(
+                        text("SELECT currency, enabled_modules FROM system_companies WHERE id = :id"),
+                        {"id": company_id}
+                    ).fetchone()
+                    
+                    currency = company_info[0] if company_info else "SAR"
+                    enabled_modules = company_info[1] if company_info and company_info[1] else []
+                    
+                    if isinstance(enabled_modules, str):
+                        import json
+                        try:
+                            enabled_modules = json.loads(enabled_modules)
+                        except:
+                            enabled_modules = []
+
+                    return UserResponse(
+                        id=result[0],
+                        username=result[1],
+                        email=result[2],
+                        full_name=result[3],
+                        role=result[4],
+                        is_active=result[5],
+                        company_id=company_id,
+                        currency=currency,
+                        country=company_country,
+                        decimal_places=decimal_places,
+                        timezone=company_timezone,
+                        permissions=final_permissions,
+                        allowed_branches=allowed_branches,
+                        enabled_modules=enabled_modules,
+                        industry_type=industry_type_me
+                    )
+        except (OperationalError, ProgrammingError):
+            logger.exception("Current user lookup failed due to tenant DB/schema issue for company %s", company_id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="بيانات الشركة غير جاهزة حالياً. يرجى إعادة تسجيل الدخول أو التواصل مع الدعم.",
+            )
 
     finally:
         db.close()
@@ -1190,3 +1198,12 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         )
 
         return {"message": "تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول"}
+
+def get_current_user_company(current_user: UserResponse = Depends(get_current_user)):
+    """Dependency that ensures a user is linked to a company and returns that company_id"""
+    if not current_user.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Unauthorized - User not linked to a company"
+        )
+    return current_user.company_id

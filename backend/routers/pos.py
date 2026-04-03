@@ -505,9 +505,28 @@ def create_order(
                 prod_name = prod_info[0] if prod_info else str(item.product_id)
                 raise HTTPException(status_code=400, detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {float(avail_qty):.0f}, المطلوب: {item.quantity}")
 
-            # Fetch cost price for COGS
-            cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": item.product_id}).scalar() or 0)
-            total_cogs += (cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)
+            # Fetch cost price for COGS (FIFO/LIFO or WAC)
+            try:
+                from services.costing_service import CostingService
+                method = CostingService._get_product_costing_method(db, item.product_id, warehouse_id)
+                if method in ("fifo", "lifo"):
+                    item_cogs = CostingService.consume_layers(
+                        db,
+                        product_id=item.product_id,
+                        warehouse_id=warehouse_id,
+                        quantity=float(item.quantity),
+                        sale_document_type="pos_order",
+                        sale_document_id=order_id,
+                        costing_method=method,
+                    )
+                    cost_price = (item_cogs / _dec(item.quantity)).quantize(_D4, ROUND_HALF_UP) if item.quantity else _dec(0)
+                    total_cogs += _dec(item_cogs).quantize(_D2, ROUND_HALF_UP)
+                else:
+                    cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": item.product_id}).scalar() or 0)
+                    total_cogs += (cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)
+            except Exception:
+                cost_price = _dec(db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": item.product_id}).scalar() or 0)
+                total_cogs += (cost_price * _dec(item.quantity)).quantize(_D2, ROUND_HALF_UP)
 
             db.execute(text("""
                 UPDATE inventory 

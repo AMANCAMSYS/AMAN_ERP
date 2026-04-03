@@ -1,0 +1,1 @@
+"""cpq module Pydantic schemas."""

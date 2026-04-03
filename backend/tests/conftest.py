@@ -21,7 +21,7 @@ from main import app
 from config import settings
 from database import get_db_connection
 
-DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_be67ce39"
+DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_73ab0722"
 
 TOLERANCE = Decimal("0.01")
 
@@ -36,7 +36,7 @@ TEST_ADMIN_PASSWORD = os.environ.get("AMAN_ADMIN_PASSWORD", "admin")  # bcrypt h
 # Company user credentials (for API tests that need company_id)
 TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "aaaa")
 TEST_COMPANY_PASSWORD = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
-TEST_COMPANY_ID = "be67ce39"
+TEST_COMPANY_ID = "73ab0722"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -60,7 +60,8 @@ def admin_token(client):
         data={
             "username": TEST_COMPANY_USERNAME,
             "password": TEST_COMPANY_PASSWORD,
-            "grant_type": "password"
+            "grant_type": "password",
+            "company_code": TEST_COMPANY_ID
         }
     )
     if response.status_code == 200:

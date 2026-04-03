@@ -354,12 +354,26 @@ def create_sales_invoice(
 
             # Calculate COGS using costing service
             try:
-                unit_cost = costing_service.get_cogs_cost(
-                    db,
-                    product_id=item["product_id"],
-                    warehouse_id=wh_id,
-                )
-                item_cogs = unit_cost * item["quantity"]
+                method = costing_service._get_product_costing_method(db, item["product_id"], wh_id)
+                if method in ("fifo", "lifo"):
+                    # FIFO/LIFO: consume cost layers and get precise COGS
+                    item_cogs = float(costing_service.consume_layers(
+                        db,
+                        product_id=item["product_id"],
+                        warehouse_id=wh_id,
+                        quantity=float(item["quantity"]),
+                        sale_document_type="sales_invoice",
+                        sale_document_id=invoice_id,
+                        costing_method=method,
+                    ))
+                    unit_cost = item_cogs / float(item["quantity"]) if item["quantity"] else 0
+                else:
+                    unit_cost = costing_service.get_cogs_cost(
+                        db,
+                        product_id=item["product_id"],
+                        warehouse_id=wh_id,
+                    )
+                    item_cogs = unit_cost * item["quantity"]
             except Exception:
                 # Fallback: use product cost_price
                 cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"),

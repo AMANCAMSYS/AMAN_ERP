@@ -162,6 +162,16 @@ function TreasuryHome() {
                                 {i18n.language === 'ar' ? 'تقادم الشيكات' : 'Checks Aging'}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
+                            <div className="link-item" onClick={() => navigate('/finance/cashflow')}>
+                                <span className="link-icon">📉</span>
+                                {i18n.language === 'ar' ? 'توقعات التدفق النقدي' : 'Cash Flow Forecast'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                            <div className="link-item" onClick={() => navigate('/treasury/bank-import')}>
+                                <span className="link-icon">🏦</span>
+                                {i18n.language === 'ar' ? 'استيراد كشف البنك' : 'Bank Statement Import'}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
                         </div>
                     </div>
                 )}

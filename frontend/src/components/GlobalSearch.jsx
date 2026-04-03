@@ -52,6 +52,13 @@ function useSearchablePages() {
     add('/accounting/zakat', 'الزكاة', 'Zakat Calculator', '🕌', 'Accounting', 'المحاسبة', 'accounting.view', 'accounting', ['zakat', 'زكاة'])
     add('/accounting/fiscal-locks', 'أقفال الفترات', 'Fiscal Period Locks', '🔐', 'Accounting', 'المحاسبة', 'accounting.manage', 'accounting', ['lock', 'قفل', 'فترة'])
 
+    // Intercompany v2
+    add('/accounting/intercompany/entities', 'مجموعات الكيانات', 'Entity Groups', '🏢', 'Accounting', 'المحاسبة', 'accounting.view', 'accounting', ['entity', 'كيان', 'مجموعة', 'intercompany', 'بين الشركات'])
+    add('/accounting/intercompany/transactions', 'معاملات بين الشركات', 'Intercompany Transactions', '🔄', 'Accounting', 'المحاسبة', 'accounting.view', 'accounting', ['intercompany', 'شركات', 'معاملة'])
+    add('/accounting/intercompany/transactions/new', 'معاملة جديدة بين الشركات', 'New Intercompany Transaction', '➕', 'Accounting', 'المحاسبة', 'accounting.edit', 'accounting', ['create', 'إنشاء', 'intercompany'])
+    add('/accounting/intercompany/consolidation', 'تجميع القوائم المالية', 'Consolidation', '📊', 'Accounting', 'المحاسبة', 'accounting.view', 'accounting', ['consolidation', 'تجميع', 'موحد'])
+    add('/accounting/intercompany/mappings', 'ربط الحسابات بين الشركات', 'Intercompany Account Mappings', '🔗', 'Accounting', 'المحاسبة', 'accounting.view', 'accounting', ['mapping', 'ربط', 'حسابات', 'intercompany'])
+
     // Sales
     add('/sales', 'المبيعات', 'Sales', '💰', 'Sales', 'المبيعات', 'sales.view', 'sales', ['بيع', 'مبيعات'])
     add('/sales/customers', 'العملاء', 'Customers', '👤', 'Sales', 'المبيعات', 'sales.view', 'sales', ['customer', 'عميل', 'زبون'])
@@ -102,6 +109,10 @@ function useSearchablePages() {
     add('/buying/reports/analytics', 'تقارير المشتريات', 'Purchase Reports', '📈', 'Buying', 'المشتريات', 'buying.reports', 'buying', ['analytics', 'تحليلات'])
     add('/buying/reports/supplier-statement', 'كشف حساب المورد', 'Supplier Statement', '📋', 'Buying', 'المشتريات', 'buying.reports', 'buying', ['statement', 'كشف حساب'])
 
+    // 3-Way Matching
+    add('/buying/matching', 'المطابقة الثلاثية', '3-Way Matching', '✅', 'Buying', 'المشتريات', 'buying.view', 'buying', ['match', 'مطابقة', 'three-way', 'ثلاثي'])
+    add('/buying/matching/tolerances', 'حدود التفاوت', 'Tolerance Configuration', '⚙️', 'Buying', 'المشتريات', 'buying.view', 'buying', ['tolerance', 'تفاوت', 'حد', 'threshold'])
+
     // Stock / Inventory
     add('/stock', 'المخزون', 'Inventory', '📦', 'Inventory', 'المخزون', 'stock.view', 'stock', ['stock', 'مخزون', 'inventory'])
     add('/stock/products', 'المنتجات', 'Products', '🏷️', 'Inventory', 'المخزون', 'stock.view', 'stock', ['product', 'منتج', 'صنف', 'أصناف'])
@@ -120,6 +131,11 @@ function useSearchablePages() {
     add('/stock/reports/balance', 'تقارير المخزون', 'Stock Reports', '📊', 'Inventory', 'المخزون', 'stock.reports', 'stock', ['report', 'تقرير', 'رصيد'])
     add('/stock/reports/movements', 'حركات المخزون', 'Stock Movements', '📊', 'Inventory', 'المخزون', 'stock.reports', 'stock', ['movement', 'حركة'])
     add('/stock/valuation-report', 'تقرير التقييم', 'Inventory Valuation', '💰', 'Inventory', 'المخزون', 'reports.view', 'stock', ['valuation', 'تقييم'])
+
+    // Inventory Costing (FIFO/LIFO)
+    add('/stock/cost-layers', 'طبقات التكلفة', 'Cost Layers', '📊', 'Inventory', 'المخزون', 'stock.view', 'stock', ['cost layer', 'طبقة', 'FIFO', 'LIFO', 'تكلفة'])
+    add('/stock/costing-method', 'طريقة التكلفة', 'Costing Method', '⚙️', 'Inventory', 'المخزون', 'stock.view', 'stock', ['costing method', 'FIFO', 'LIFO', 'متوسط', 'weighted'])
+    add('/stock/costing-valuation', 'تقرير تقييم التكلفة', 'Costing Valuation Report', '💰', 'Inventory', 'المخزون', 'stock.reports', 'stock', ['valuation', 'تقييم', 'costing', 'تكلفة'])
 
     // Manufacturing
     add('/manufacturing', 'التصنيع', 'Manufacturing', '🏭', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'manufacturing', ['production', 'إنتاج', 'تصنيع'])
@@ -148,6 +164,10 @@ function useSearchablePages() {
     add('/treasury/reports/balances', 'أرصدة الخزينة', 'Treasury Balances', '📊', 'Treasury', 'الخزينة', 'treasury.view', 'treasury', ['balance', 'رصيد'])
     add('/treasury/reports/cashflow', 'التدفق النقدي', 'Cash Flow', '💵', 'Treasury', 'الخزينة', 'treasury.view', 'treasury', ['cashflow', 'تدفق', 'نقدي'])
 
+    // Cash Flow Forecast
+    add('/finance/cashflow', 'توقعات التدفق النقدي', 'Cash Flow Forecasts', '🔮', 'Treasury', 'الخزينة', 'finance.cashflow_view', 'treasury', ['forecast', 'توقع', 'تدفق', 'cash flow'])
+    add('/finance/cashflow/generate', 'إنشاء توقع تدفق نقدي', 'Generate Forecast', '➕', 'Treasury', 'الخزينة', 'finance.cashflow_generate', 'treasury', ['generate', 'إنشاء', 'forecast', 'توقع'])
+
     // HR
     add('/hr', 'الموارد البشرية', 'Human Resources', '👥', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['hr', 'موارد', 'بشرية', 'موظفين'])
     add('/hr/employees', 'الموظفين', 'Employees', '👤', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['employee', 'موظف'])
@@ -171,6 +191,13 @@ function useSearchablePages() {
     add('/hr/saudization', 'السعودة', 'Saudization', '🇸🇦', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['saudization', 'سعودة', 'توطين'])
     add('/hr/end-of-service', 'مكافأة نهاية الخدمة', 'End of Service', '🎓', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['end of service', 'نهاية خدمة', 'مكافأة'])
     add('/hr/reports', 'تقارير الموارد البشرية', 'HR Reports', '📈', 'HR', 'الموارد البشرية', 'hr.reports', 'hr', ['report', 'تقرير'])
+
+    // Employee Self-Service
+    add('/hr/self-service', 'الخدمة الذاتية', 'Self-Service Portal', '👤', 'HR', 'الموارد البشرية', 'hr.self_service', 'hr', ['self-service', 'خدمة ذاتية', 'employee'])
+    add('/hr/self-service/leave-request', 'طلب إجازة', 'Leave Request', '🏖️', 'HR', 'الموارد البشرية', 'hr.self_service', 'hr', ['leave', 'إجازة', 'طلب'])
+    add('/hr/self-service/payslips', 'قسائم راتبي', 'My Payslips', '💰', 'HR', 'الموارد البشرية', 'hr.self_service', 'hr', ['payslip', 'قسيمة', 'راتب'])
+    add('/hr/self-service/profile', 'ملفي الشخصي', 'My Profile', '📝', 'HR', 'الموارد البشرية', 'hr.self_service', 'hr', ['profile', 'ملف', 'شخصي'])
+    add('/hr/self-service/team-requests', 'طلبات الفريق', 'Team Requests', '👥', 'HR', 'الموارد البشرية', 'hr.self_service_approve', 'hr', ['team', 'فريق', 'طلبات', 'approve'])
 
     // Assets
     add('/assets', 'الأصول الثابتة', 'Fixed Assets', '🏗️', 'Assets', 'الأصول', 'assets.view', 'assets', ['asset', 'أصل', 'أصول'])
@@ -225,6 +252,8 @@ function useSearchablePages() {
     add('/settings/costing-policy', 'سياسة التكلفة', 'Costing Policy', '💹', 'Admin', 'الإدارة', 'settings.view', null, ['costing', 'تكلفة', 'سياسة'])
     add('/settings/api-keys', 'مفاتيح API', 'API Keys', '🔑', 'Admin', 'الإدارة', 'settings.view', null, ['api', 'key', 'مفتاح'])
     add('/settings/webhooks', 'الويب هوك', 'Webhooks', '🔗', 'Admin', 'الإدارة', 'settings.view', null, ['webhook', 'ويب هوك'])
+    add('/settings/sso', 'الدخول الموحد', 'SSO Configuration', '🔑', 'Admin', 'الإدارة', 'settings.view', null, ['sso', 'دخول موحد', 'SAML', 'OAuth'])
+    add('/settings/sso/new', 'إعداد SSO جديد', 'New SSO Configuration', '➕', 'Admin', 'الإدارة', 'settings.manage', null, ['sso', 'create', 'إنشاء'])
     add('/settings/print-templates', 'قوالب الطباعة', 'Print Templates', '🖨️', 'Admin', 'الإدارة', 'settings.view', null, ['print', 'طباعة', 'قالب', 'فاتورة'])
     add('/admin/company-profile', 'ملف الشركة', 'Company Profile', '🏢', 'Admin', 'الإدارة', null, null, ['company', 'شركة', 'ملف'])
     add('/profile', 'الملف الشخصي', 'My Profile', '👤', 'General', 'عام', null, null, ['profile', 'ملف شخصي', 'حساب'])

@@ -25,7 +25,9 @@ from .assets import router as assets_router
 from .expenses import router as expenses_router
 from .intercompany import router as intercompany_router
 from .intercompany import rev_router as revenue_recognition_router
+from .intercompany_v2 import router as intercompany_v2_router
 from .advanced_workflow import router as advanced_workflow_router
+from .cashflow import router as cashflow_router
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
@@ -43,5 +45,7 @@ router.include_router(notes_router)
 router.include_router(assets_router)
 router.include_router(expenses_router)
 router.include_router(intercompany_router)
+router.include_router(intercompany_v2_router)
 router.include_router(revenue_recognition_router)
 router.include_router(advanced_workflow_router)
+router.include_router(cashflow_router)

@@ -1,0 +1,1 @@
+"""shopfloor module Pydantic schemas."""

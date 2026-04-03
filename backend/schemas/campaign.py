@@ -1,0 +1,1 @@
+"""campaign module Pydantic schemas."""

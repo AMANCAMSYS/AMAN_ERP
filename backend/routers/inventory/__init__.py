@@ -22,6 +22,7 @@ from .adjustments import adjustments_router
 from .reports import reports_router
 from .batches import batches_router
 from .advanced import advanced_router
+from .costing import costing_router
 
 router.include_router(products_router)
 router.include_router(suppliers_router)
@@ -36,3 +37,4 @@ router.include_router(adjustments_router)
 router.include_router(reports_router)
 router.include_router(batches_router)
 router.include_router(advanced_router)
+router.include_router(costing_router)
