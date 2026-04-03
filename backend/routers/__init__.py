@@ -31,7 +31,7 @@ from . import (
 from . import (
     services, role_dashboards, delivery_orders,
     landed_costs, hr_wps_compliance, system_completion,
-    sso, matching,
+    sso, matching, mobile,
 )
 
 __all__ = [
@@ -46,5 +46,5 @@ __all__ = [
     # Additional modules
     "services", "role_dashboards", "delivery_orders",
     "landed_costs", "hr_wps_compliance", "system_completion",
-    "sso", "matching",
+    "sso", "matching", "mobile",
 ]

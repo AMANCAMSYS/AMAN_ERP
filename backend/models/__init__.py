@@ -18,39 +18,33 @@ from .business_core import (
     Warehouse,
 )
 from .core_accounting import Account, Branch, CompanyUser, JournalEntry, JournalLine
-from .phase2_ops_hr import (
+from .domain_models.hr_core_payroll import (
     Attendance,
     Department,
     Employee,
     EmployeeLoan,
     EmployeePosition,
     EmployeeSalaryComponent,
-    Inventory,
-    InventoryTransaction,
     LeaveRequest,
     PayrollEntry,
     PayrollPeriod,
+    SalaryComponent,
+    SalaryStructure,
+)
+from .domain_models.inventory_core import (
+    Inventory,
+    InventoryTransaction,
     Product,
     ProductCategory,
     ProductUnit,
-    PurchaseOrder,
-    PurchaseOrderLine,
-    SalaryComponent,
-    SalaryStructure,
     StockAdjustment,
 )
-from .phase3_treasury_tax_projects import (
+from .domain_models.procurement_orders import PurchaseOrder, PurchaseOrderLine
+from .domain_models.finance_treasury_tax import (
     BankReconciliation,
     BankStatementLine,
     BranchTaxSetting,
     CompanyTaxSetting,
-    Project,
-    ProjectBudget,
-    ProjectChangeOrder,
-    ProjectDocument,
-    ProjectExpense,
-    ProjectRevenue,
-    ProjectTask,
     TaxGroup,
     TaxPayment,
     TaxRate,
@@ -58,7 +52,16 @@ from .phase3_treasury_tax_projects import (
     TaxReturn,
     TreasuryTransaction,
 )
-from .phase4_operations_support import (
+from .domain_models.projects_core import (
+    Project,
+    ProjectBudget,
+    ProjectChangeOrder,
+    ProjectDocument,
+    ProjectExpense,
+    ProjectRevenue,
+    ProjectTask,
+)
+from .domain_models.operations_financial_support import (
     CheckPayable,
     CheckReceivable,
     Document,
@@ -71,10 +74,10 @@ from .phase4_operations_support import (
     SupportTicket,
     TicketComment,
 )
-from .phase6_approvals import ApprovalAction, ApprovalRequest, ApprovalWorkflow
-from .phase7_assets_core import Asset, AssetCategory, AssetTransfer
-from .phase8_budgets_core import Budget, BudgetItem, BudgetLine
-from .phase9_costing_core import (
+from .domain_models.security_approvals import ApprovalAction, ApprovalRequest, ApprovalWorkflow
+from .domain_models.assets_core import Asset, AssetCategory, AssetTransfer
+from .domain_models.finance_budgets import Budget, BudgetItem, BudgetLine
+from .domain_models.finance_costing import (
     CostCenter,
     CostCenterBudget,
     CostingPolicy,
@@ -82,7 +85,7 @@ from .phase9_costing_core import (
     CostingPolicyHistory,
     InventoryCostSnapshot,
 )
-from .phase10_assets_advanced import (
+from .domain_models.assets_advanced import (
     AssetDepreciationSchedule,
     AssetDisposal,
     AssetImpairment,
@@ -90,81 +93,67 @@ from .phase10_assets_advanced import (
     AssetMaintenance,
     AssetRevaluation,
 )
-from .phase11_currency_bank_import import BankImportBatch, BankImportLine, Currency, ExchangeRate
-from .phase12_fiscal_zakat import FiscalPeriodLock, FiscalYear, ZakatCalculation
-from .phase13_contracts_expenses import Contract, ContractItem, ExpensePolicy
-from .phase14_crm_advanced import (
+from .domain_models.finance_currency_bank import BankImportBatch, BankImportLine, Currency, ExchangeRate
+from .domain_models.finance_fiscal_zakat import FiscalPeriodLock, FiscalYear, ZakatCalculation
+from .domain_models.projects_contracts_expenses import Contract, ContractItem, ExpensePolicy
+from .domain_models.projects_crm_advanced import (
     CrmCustomerSegment,
     CrmCustomerSegmentMember,
     CrmLeadScore,
     CrmLeadScoringRule,
     CrmSalesForecast,
 )
-from .phase15_ops_security_reporting import ApiKey, AuditLog, BackupHistory, CustomReport, EmailTemplate
-from .phase16_inventory_bins_cycle import (
+from .domain_models.security_admin_reporting import ApiKey, AuditLog, BackupHistory, CustomReport, EmailTemplate
+from .domain_models.inventory_advanced import (
     BatchSerialMovement,
     BinInventory,
     BinLocation,
     CycleCount,
     CycleCountItem,
 )
-from .phase17_inventory_variants_kits import (
+from .domain_models.inventory_advanced import (
     ProductAttribute,
     ProductAttributeValue,
     ProductKit,
     ProductVariant,
     ProductVariantAttribute,
 )
-from .phase18_inventory_traceability_quality import (
+from .domain_models.inventory_advanced import (
     ProductBatch,
     ProductKitItem,
     ProductSerial,
     QualityInspection,
     QualityInspectionCriteria,
 )
-from .phase19_customer_master_pricing import (
+from .domain_models.sales_customers_delivery import (
     Customer,
     CustomerBankAccount,
     CustomerContact,
     CustomerPriceList,
     CustomerPriceListItem,
 )
-from .phase20_receivables_delivery import (
+from .domain_models.sales_customers_delivery import (
     CustomerBalance,
     CustomerReceipt,
     CustomerTransaction,
     DeliveryOrder,
     DeliveryOrderLine,
 )
-from .phase21_hr_compliance_recruitment import (
+from .domain_models.hr_compliance_recruitment import (
     EmployeeCustody,
     EmployeeDocument,
     EmployeeViolation,
     JobApplication,
     JobOpening,
 )
-from .phase22_mfg_attachments_commissions import (
-    Attachment,
-    BillOfMaterial,
-    BomOutput,
-    CheckStatusLog,
-    CommissionRule,
-)
-from .phase23_reporting_documents_fx_crm import (
-    CrmContact,
-    CurrencyTransaction,
-    DocumentTemplate,
-    DocumentType,
-    FinancialReport,
-)
-from .phase24_mfg_capacity_contracts_crm_groups import (
-    BomComponent,
-    CapacityPlan,
-    ContractAmendment,
-    CrmKnowledgeBase,
-    CustomerGroup,
-)
-from .phase25_dashboard_fiscal_gosi_intercompany_landed_costs import (
+from .domain_models.operations_attachments_commissions import Attachment, CommissionRule
+from .domain_models.manufacturing_bom_capacity import BillOfMaterial, BomOutput
+from .domain_models.security_admin_reporting import CheckStatusLog
+from .domain_models.projects_crm_contract_extensions import CrmContact, ContractAmendment, CrmKnowledgeBase, CustomerGroup
+from .domain_models.finance_currency_transactions import CurrencyTransaction
+from .domain_models.security_admin_reporting import DocumentTemplate, DocumentType, FinancialReport
+from .domain_models.manufacturing_bom_capacity import BomComponent, CapacityPlan
+from .domain_models.shared_dashboard_fiscal_intercompany import (
     DashboardLayout,
     FiscalPeriod,
     GosiSetting,
@@ -263,6 +252,7 @@ from .domain_models.inventory_costing import CostLayer, CostLayerConsumption
 from .domain_models.matching import MatchTolerance, ThreeWayMatch, ThreeWayMatchLine
 from .domain_models.self_service import SelfServiceRequest
 from .domain_models.sso import SsoConfiguration, SsoGroupRoleMapping, SsoFallbackAdmin
+from .domain_models.mobile_sync import SyncQueue
 
 
 target_metadata = ModelBase.metadata

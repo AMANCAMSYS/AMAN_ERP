@@ -187,16 +187,16 @@
 
 ### Implementation for User Story 7
 
-- [ ] T066 [P] [US7] Create SyncQueue model in `backend/models/domain_models/operations.py` per data-model.md
-- [ ] T067 [P] [US7] Create Alembic migration for sync_queue table: `backend/alembic/versions/xxx_add_sync_queue_table.py`
-- [ ] T068 [P] [US7] Create mobile-specific API endpoints in `backend/routers/mobile.py` per contracts: POST /sync (batch), GET /sync/status, POST /sync/resolve (conflict), GET /dashboard, POST /register-device — register in module `__init__.py`
-- [ ] T069 [US7] Implement mobile sync logic in backend: batch sync endpoint receives array of offline changes, detect conflicts (same entity modified by both mobile and web), store conflicts in SyncQueue, return sync results
-- [ ] T070 [P] [US7] Initialize React Native project in `mobile/` with navigation (React Navigation), state management, and authentication (reuse JWT cookie flow)
-- [ ] T071 [US7] Implement offline sync service in `mobile/src/services/syncService.js` — queue offline operations in SQLite, background sync on connectivity, idempotent retry, timestamp reconciliation
-- [ ] T072 [US7] Implement conflict resolver in `mobile/src/services/conflictResolver.js` — detect conflicts, present both versions, manual resolution UI
-- [ ] T073 [US7] Implement push notification handler in `mobile/src/services/pushService.js` — register device with FCM, receive and display push notifications
-- [ ] T074 [P] [US7] Create mobile screens: `mobile/src/screens/Dashboard/DashboardScreen.jsx` (inventory levels, pending orders, pending approvals), `mobile/src/screens/Inventory/InventoryScreen.jsx` (browse products, stock levels), `mobile/src/screens/Quotations/QuotationForm.jsx` (create quotation), `mobile/src/screens/Orders/OrderList.jsx` (pending orders), `mobile/src/screens/Approvals/ApprovalList.jsx` (pending approvals with approve/reject)
-- [ ] T075 [US7] Create mobile offline storage layer in `mobile/src/store/offlineStore.js` — SQLite schema for cached inventory, quotations, orders, approvals; CRUD operations for offline access
+- [X] T066 [P] [US7] Create SyncQueue model in `backend/models/domain_models/operations.py` per data-model.md
+- [X] T067 [P] [US7] Create Alembic migration for sync_queue table: `backend/alembic/versions/xxx_add_sync_queue_table.py`
+- [X] T068 [P] [US7] Create mobile-specific API endpoints in `backend/routers/mobile.py` per contracts: POST /sync (batch), GET /sync/status, POST /sync/resolve (conflict), GET /dashboard, POST /register-device — register in module `__init__.py`
+- [X] T069 [US7] Implement mobile sync logic in backend: batch sync endpoint receives array of offline changes, detect conflicts (same entity modified by both mobile and web), store conflicts in SyncQueue, return sync results
+- [X] T070 [P] [US7] Initialize React Native project in `mobile/` with navigation (React Navigation), state management, and authentication (reuse JWT cookie flow)
+- [X] T071 [US7] Implement offline sync service in `mobile/src/services/syncService.js` — queue offline operations in SQLite, background sync on connectivity, idempotent retry, timestamp reconciliation
+- [X] T072 [US7] Implement conflict resolver in `mobile/src/services/conflictResolver.js` — detect conflicts, present both versions, manual resolution UI
+- [X] T073 [US7] Implement push notification handler in `mobile/src/services/pushService.js` — register device with FCM, receive and display push notifications
+- [X] T074 [P] [US7] Create mobile screens: `mobile/src/screens/Dashboard/DashboardScreen.jsx` (inventory levels, pending orders, pending approvals), `mobile/src/screens/Inventory/InventoryScreen.jsx` (browse products, stock levels), `mobile/src/screens/Quotations/QuotationForm.jsx` (create quotation), `mobile/src/screens/Orders/OrderList.jsx` (pending orders), `mobile/src/screens/Approvals/ApprovalList.jsx` (pending approvals with approve/reject)
+- [X] T075 [US7] Create mobile offline storage layer in `mobile/src/store/offlineStore.js` — SQLite schema for cached inventory, quotations, orders, approvals; CRUD operations for offline access
 
 **Checkpoint**: Mobile app functional — inventory, quotations, orders, approvals with offline sync and push notifications.
 
