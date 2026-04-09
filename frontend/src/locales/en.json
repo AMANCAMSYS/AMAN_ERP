@@ -9355,5 +9355,80 @@
     "change_result": "Change Result",
     "old_method": "Old Method",
     "layers_created": "Layers Created"
+  },
+  "subscription": {
+    "title": "Subscriptions",
+    "home_subtitle": "Manage subscription plans and customer enrollments",
+    "plans_title": "Subscription Plans",
+    "plans_subtitle": "Manage recurring billing plans",
+    "enrollments_title": "Subscriptions",
+    "enrollments_subtitle": "Manage customer subscription enrollments",
+    "enrollment_detail": "Subscription Detail",
+    "new_plan": "New Plan",
+    "edit_plan": "Edit Plan",
+    "new_enrollment": "New Enrollment",
+    "enroll_btn": "Enroll Subscription",
+    "enrollment_info": "Enrollment Information",
+    "customer_id_placeholder": "Customer ID",
+    "no_plans": "No subscription plans found",
+    "plans_empty_desc": "Create your first subscription plan",
+    "no_enrollments": "No enrollments found",
+    "enrollments_empty_desc": "Enroll your first customer in a subscription plan",
+    "no_invoices": "No invoices generated yet",
+    "invoices_empty_desc": "Invoices will appear here after billing",
+    "not_found": "Subscription not found",
+    "confirm_pause": "Are you sure you want to pause this subscription?",
+    "cancel_reason": "Enter cancellation reason (optional):",
+    "billing_history": "Billing History",
+    "table": {
+      "name": "Plan Name",
+      "frequency": "Billing Frequency",
+      "amount": "Amount",
+      "trial_days": "Trial Days",
+      "status": "Status",
+      "customer": "Customer",
+      "plan": "Plan",
+      "enrolled": "Enrolled",
+      "next_billing": "Next Billing",
+      "period_start": "Period Start",
+      "period_end": "Period End",
+      "prorated": "Prorated",
+      "invoice_id": "Invoice #"
+    },
+    "form": {
+      "basic_info": "Plan Information",
+      "billing_info": "Billing",
+      "name": "Plan Name",
+      "description": "Description",
+      "billing_frequency": "Billing Frequency",
+      "base_amount": "Base Amount",
+      "currency": "Currency",
+      "trial_period_days": "Trial Period (Days)",
+      "auto_renewal": "Auto Renewal"
+    },
+    "frequency": {
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "annual": "Annual"
+    },
+    "status": {
+      "trial": "Trial",
+      "active": "Active",
+      "paused": "Paused",
+      "cancelled": "Cancelled",
+      "at_risk": "At Risk"
+    },
+    "action": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Cancel"
+    },
+    "detail": {
+      "status": "Status",
+      "enrolled": "Enrolled Date",
+      "next_billing": "Next Billing Date",
+      "trial_end": "Trial End Date",
+      "failed_payments": "Failed Payments"
+    }
   }
 }

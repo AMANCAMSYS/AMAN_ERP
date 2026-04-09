@@ -2,6 +2,7 @@
 from sqlalchemy import text
 from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
+from contextlib import nullcontext
 
 # FIN-FIX: Precision constants for costing calculations
 _D4 = Decimal('0.0001')
@@ -20,7 +21,7 @@ class CostingService:
         current_cost: float,
         new_qty: float,
         new_price: float
-    ) -> float:
+    ) -> Decimal:
         """Standard WAC Formula using Decimal for precision."""
         d_curr_qty = _dec(current_qty)
         d_curr_cost = _dec(current_cost)
@@ -34,11 +35,10 @@ class CostingService:
 
         total_qty = d_curr_qty + d_new_qty
         if total_qty <= 0:
-            return float(d_new_price)
+            return d_new_price.quantize(_D4, ROUND_HALF_UP)
 
         total_value = (d_curr_qty * d_curr_cost) + (d_new_qty * d_new_price)
-        result = (total_value / total_qty).quantize(_D4, ROUND_HALF_UP)
-        return float(result)
+        return (total_value / total_qty).quantize(_D4, ROUND_HALF_UP)
 
 
     @staticmethod
@@ -53,76 +53,84 @@ class CostingService:
         Updates product cost based on the active policy.
         CALLED BEFORE INVENTORY QUANTITY UPDATE (to use current stock stats).
         """
-        policy_type = CostingService.get_active_policy(db)
-        
-        # 1. Global WAC Strategy
-        if policy_type == 'global_wac':
-            # Calculate Global Stock
-            current_stats = db.execute(text("""
-                SELECT cost_price, 
-                       (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = :pid) as total_qty
-                FROM products WHERE id = :pid
-            """), {"pid": product_id}).fetchone()
-            
-            curr_qty = float(current_stats.total_qty or 0)
-            curr_cost = float(current_stats.cost_price or 0)
-            
-            new_wac = CostingService.calculate_new_cost(curr_qty, curr_cost, new_qty, new_price)
-            
-            # Update Product Master (Global Cost)
-            db.execute(text("UPDATE products SET cost_price = :cost, last_purchase_price = :last WHERE id = :pid"), 
-                       {"cost": new_wac, "last": new_price, "pid": product_id})
-            
-            # Sync with inventory rows if they exist (for future per-wh compatibility)
-            db.execute(text("UPDATE inventory SET average_cost = :cost WHERE product_id = :pid"),
-                       {"cost": new_wac, "pid": product_id})
-            
-        # 2. Per-Warehouse WAC Strategy
-        elif policy_type == 'per_warehouse_wac':
-            # Calculate Warehouse Stock
-            current_stats = db.execute(text("""
-                SELECT average_cost, quantity 
-                FROM inventory WHERE product_id = :pid AND warehouse_id = :wh
-            """), {"pid": product_id, "wh": warehouse_id}).fetchone()
-            
-            curr_cost = float(current_stats.average_cost or 0) if current_stats else 0
-            curr_qty = float(current_stats.quantity or 0) if current_stats else 0
-            
-            new_wac = CostingService.calculate_new_cost(curr_qty, curr_cost, new_qty, new_price)
-            
-            # Update Inventory Cost (Warehouse Specific)
-            exists = db.execute(text("SELECT 1 FROM inventory WHERE product_id=:pid AND warehouse_id=:wh"), 
-                                     {"pid": product_id, "wh": warehouse_id}).scalar()
-            
-            if exists:
-                db.execute(text("""
-                    UPDATE inventory SET average_cost = :cost, last_costing_update = CURRENT_TIMESTAMP
-                    WHERE product_id = :pid AND warehouse_id = :wh
-                """), {"cost": new_wac, "pid": product_id, "wh": warehouse_id})
-            else:
-                db.execute(text("""
-                    INSERT INTO inventory (product_id, warehouse_id, quantity, average_cost, last_costing_update)
-                    VALUES (:pid, :wh, 0, :cost, CURRENT_TIMESTAMP)
-                """), {"pid": product_id, "wh": warehouse_id, "cost": new_wac})
-                
-            # Update Product Master for reporting (simple weighted average of all warehouse costs)
-            # The warehouse row was ALREADY updated above, so just compute from existing inventory rows
-            all_inventory = db.execute(text("""
-                SELECT SUM(quantity * average_cost) as total_val, SUM(quantity) as total_qty
-                FROM inventory WHERE product_id = :pid AND quantity > 0
-            """), {"pid": product_id}).fetchone()
-            
-            cur_total_val = float(all_inventory.total_val or 0)
-            cur_total_qty = float(all_inventory.total_qty or 0)
-            
-            # The inventory table already reflects the new cost; just compute the weighted average
-            global_wac = cur_total_val / cur_total_qty if cur_total_qty > 0 else new_price
-            
-            db.execute(text("UPDATE products SET cost_price = :cost, last_purchase_price = :last WHERE id = :pid"),
-                       {"cost": global_wac, "last": new_price, "pid": product_id})
+        if hasattr(db, "in_transaction") and hasattr(db, "begin") and hasattr(db, "begin_nested"):
+            tx_context = db.begin_nested() if db.in_transaction() else db.begin()
+        elif hasattr(db, "begin"):
+            tx_context = db.begin()
+        else:
+            tx_context = nullcontext()
 
-        # Create Snapshot after update
-        CostingService.create_snapshot(db, warehouse_id, product_id)
+        with tx_context:
+            policy_type = CostingService.get_active_policy(db)
+        
+            # 1. Global WAC Strategy
+            if policy_type == 'global_wac':
+                # Calculate Global Stock
+                current_stats = db.execute(text("""
+                    SELECT cost_price, 
+                           (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = :pid) as total_qty
+                    FROM products WHERE id = :pid
+                """), {"pid": product_id}).fetchone()
+                
+                curr_qty = _dec(current_stats.total_qty or 0)
+                curr_cost = _dec(current_stats.cost_price or 0)
+                
+                new_wac = CostingService.calculate_new_cost(curr_qty, curr_cost, new_qty, new_price)
+                
+                # Update Product Master (Global Cost)
+                db.execute(text("UPDATE products SET cost_price = :cost, last_purchase_price = :last WHERE id = :pid"), 
+                           {"cost": new_wac, "last": new_price, "pid": product_id})
+                
+                # Sync with inventory rows if they exist (for future per-wh compatibility)
+                db.execute(text("UPDATE inventory SET average_cost = :cost WHERE product_id = :pid"),
+                           {"cost": new_wac, "pid": product_id})
+                
+            # 2. Per-Warehouse WAC Strategy
+            elif policy_type == 'per_warehouse_wac':
+                # Calculate Warehouse Stock
+                current_stats = db.execute(text("""
+                    SELECT average_cost, quantity 
+                    FROM inventory WHERE product_id = :pid AND warehouse_id = :wh
+                """), {"pid": product_id, "wh": warehouse_id}).fetchone()
+                
+                curr_cost = _dec(current_stats.average_cost or 0) if current_stats else Decimal('0')
+                curr_qty = _dec(current_stats.quantity or 0) if current_stats else Decimal('0')
+                
+                new_wac = CostingService.calculate_new_cost(curr_qty, curr_cost, new_qty, new_price)
+                
+                # Update Inventory Cost (Warehouse Specific)
+                exists = db.execute(text("SELECT 1 FROM inventory WHERE product_id=:pid AND warehouse_id=:wh"), 
+                                         {"pid": product_id, "wh": warehouse_id}).scalar()
+                
+                if exists:
+                    db.execute(text("""
+                        UPDATE inventory SET average_cost = :cost, last_costing_update = CURRENT_TIMESTAMP
+                        WHERE product_id = :pid AND warehouse_id = :wh
+                    """), {"cost": new_wac, "pid": product_id, "wh": warehouse_id})
+                else:
+                    db.execute(text("""
+                        INSERT INTO inventory (product_id, warehouse_id, quantity, average_cost, last_costing_update)
+                        VALUES (:pid, :wh, 0, :cost, CURRENT_TIMESTAMP)
+                    """), {"pid": product_id, "wh": warehouse_id, "cost": new_wac})
+                    
+                # Update Product Master for reporting (simple weighted average of all warehouse costs)
+                # The warehouse row was ALREADY updated above, so just compute from existing inventory rows
+                all_inventory = db.execute(text("""
+                    SELECT SUM(quantity * average_cost) as total_val, SUM(quantity) as total_qty
+                    FROM inventory WHERE product_id = :pid AND quantity > 0
+                """), {"pid": product_id}).fetchone()
+                
+                cur_total_val = _dec(all_inventory.total_val or 0)
+                cur_total_qty = _dec(all_inventory.total_qty or 0)
+                
+                # The inventory table already reflects the new cost; just compute the weighted average
+                global_wac = (cur_total_val / cur_total_qty).quantize(_D4, ROUND_HALF_UP) if cur_total_qty > 0 else _dec(new_price)
+                
+                db.execute(text("UPDATE products SET cost_price = :cost, last_purchase_price = :last WHERE id = :pid"),
+                           {"cost": global_wac, "last": new_price, "pid": product_id})
+
+            # Create Snapshot after update
+            CostingService.create_snapshot(db, warehouse_id, product_id)
 
     @staticmethod
     def get_cogs_cost(db, product_id: int, warehouse_id: Optional[int] = None) -> float:

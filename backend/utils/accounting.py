@@ -52,24 +52,11 @@ def validate_je_lines(je_lines: List[Dict], source: str = "auto") -> List[Dict]:
     diff = abs(total_debit - total_credit)
 
     if diff > 0.01:
-        # Try to auto-fix small rounding differences (up to 0.05)
-        if diff <= 0.05:
-            # Adjust the largest debit or credit line by the small difference
-            if total_debit > total_credit:
-                # Need more credit - add to largest credit line
-                max_credit_line = max(valid, key=lambda l: l.get("credit", 0))
-                max_credit_line["credit"] = round(max_credit_line["credit"] + diff, 2)
-            else:
-                # Need more debit - add to largest debit line
-                max_debit_line = max(valid, key=lambda l: l.get("debit", 0))
-                max_debit_line["debit"] = round(max_debit_line["debit"] + diff, 2)
-            logger.info(f"JE ({source}): Auto-fixed rounding diff of {diff:.4f}")
-        else:
-            logger.error(f"JE validation ({source}): Unbalanced D={total_debit:.2f} C={total_credit:.2f} diff={diff:.2f}")
-            raise HTTPException(
-                400,
-                f"القيد غير متوازن: مدين={total_debit:.2f} دائن={total_credit:.2f} فرق={diff:.2f}"
-            )
+        logger.error(f"JE validation ({source}): Unbalanced D={total_debit:.2f} C={total_credit:.2f} diff={diff:.2f}")
+        raise HTTPException(
+            400,
+            f"القيد غير متوازن: مدين={total_debit:.2f} دائن={total_credit:.2f} فرق={diff:.2f}"
+        )
 
     return valid
 
@@ -99,16 +86,18 @@ def get_mapped_account_id(db, mapping_key: str) -> Optional[int]:
     """
     Retrieves the account ID mapped to a specific system role from company_settings.
     """
-    try:
-        result = db.execute(
-            text("SELECT setting_value FROM company_settings WHERE setting_key = :key"),
-            {"key": mapping_key}
-        ).fetchone()
-        
-        if result and result[0]:
-            return int(result[0])
+    result = db.execute(
+        text("SELECT setting_value FROM company_settings WHERE setting_key = :key"),
+        {"key": mapping_key}
+    ).fetchone()
+
+    if not result or not result[0]:
         return None
-    except Exception:
+
+    try:
+        return int(result[0])
+    except (TypeError, ValueError):
+        logger.error("Invalid mapped account id for key '%s': %s", mapping_key, result[0])
         return None
 
 def get_account_id_legacy(db, account_code: str) -> Optional[int]:
@@ -161,11 +150,11 @@ def update_account_balance(db, account_id: int, debit_base, credit_base, debit_c
     # 3. Always update base balance
     db.execute(text("""
         UPDATE accounts SET balance = balance + :change WHERE id = :id
-    """), {"change": float(change_base), "id": account_id})
+    """), {"change": change_base, "id": account_id})
     
     # 4. Update foreign balance only if currency matches
     if acct_currency and change_curr != 0:
         db.execute(text("""
             UPDATE accounts SET balance_currency = balance_currency + :change WHERE id = :id
-        """), {"change": float(change_curr), "id": account_id})
+        """), {"change": change_curr, "id": account_id})
 

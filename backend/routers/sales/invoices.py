@@ -8,9 +8,67 @@ import logging
 import uuid
 
 _D2 = Decimal('0.01')
+_D6 = Decimal('0.000001')
+_MAX_RATE_AGE_DAYS = 31
 def _dec(v) -> Decimal:
     """Convert any numeric value to Decimal safely."""
     return Decimal(str(v)) if v is not None else Decimal('0')
+
+
+def _prefetch_costing_methods(db, product_ids: List[int], warehouse_id: int) -> dict[int, str]:
+    """Return costing method per product using bulk lookups (warehouse-first, then global)."""
+    if not product_ids:
+        return {}
+
+    methods = {pid: "wac" for pid in product_ids}
+    wh_rows = db.execute(text("""
+        SELECT DISTINCT ON (product_id) product_id, costing_method
+        FROM cost_layers
+        WHERE warehouse_id = :wid
+          AND product_id = ANY(:pids)
+          AND is_exhausted = FALSE
+        ORDER BY product_id, id DESC
+    """), {"wid": warehouse_id, "pids": product_ids}).fetchall()
+    for row in wh_rows:
+        methods[int(row.product_id)] = row.costing_method or "wac"
+
+    missing = [pid for pid, method in methods.items() if method == "wac"]
+    if missing:
+        global_rows = db.execute(text("""
+            SELECT DISTINCT ON (product_id) product_id, costing_method
+            FROM cost_layers
+            WHERE product_id = ANY(:pids)
+              AND is_exhausted = FALSE
+            ORDER BY product_id, id DESC
+        """), {"pids": missing}).fetchall()
+        for row in global_rows:
+            methods[int(row.product_id)] = row.costing_method or "wac"
+
+    return methods
+
+
+def _prefetch_product_costs(db, product_ids: List[int], warehouse_id: int, policy_type: str) -> dict[int, float]:
+    """Return WAC/fallback unit cost map in one query set."""
+    if not product_ids:
+        return {}
+
+    if policy_type == 'per_warehouse_wac':
+        rows = db.execute(text("""
+            SELECT p.id AS product_id, COALESCE(i.average_cost, p.cost_price, 0) AS unit_cost
+            FROM products p
+            LEFT JOIN inventory i
+              ON i.product_id = p.id
+             AND i.warehouse_id = :wid
+            WHERE p.id = ANY(:pids)
+        """), {"wid": warehouse_id, "pids": product_ids}).fetchall()
+    else:
+        rows = db.execute(text("""
+            SELECT id AS product_id, COALESCE(cost_price, 0) AS unit_cost
+            FROM products
+            WHERE id = ANY(:pids)
+        """), {"pids": product_ids}).fetchall()
+
+    return {int(row.product_id): _dec(row.unit_cost or 0) for row in rows}
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -107,15 +165,16 @@ def create_sales_invoice(
         base_currency = base_currency_row[0] if base_currency_row else "SYP"
 
         inv_currency = invoice.currency or base_currency
-        exchange_rate = float(invoice.exchange_rate or 1.0)
+        exchange_rate = _dec(invoice.exchange_rate or 1)
 
         def conversion_rate_needed(rate_val):
-            return rate_val is None or rate_val == 0 or rate_val == 1.0
+            d_rate = _dec(rate_val)
+            return rate_val is None or d_rate <= 0 or d_rate == Decimal('1')
 
         # If currency is different from base and no rate provided, fetch latest rate
         if inv_currency != base_currency and conversion_rate_needed(invoice.exchange_rate):
              rate_row = db.execute(text("""
-                SELECT rate FROM exchange_rates 
+                SELECT rate_date, rate FROM exchange_rates 
                 WHERE currency_id = (SELECT id FROM currencies WHERE code = :code) 
                 AND rate_date <= :date 
                 ORDER BY rate_date DESC LIMIT 1
@@ -123,10 +182,16 @@ def create_sales_invoice(
 
              if not rate_row:
                  raise HTTPException(status_code=400, detail=f"No exchange rate found for {inv_currency}")
-             exchange_rate = float(rate_row.rate)
+             age_days = (invoice.invoice_date - rate_row.rate_date).days if rate_row.rate_date else 0
+             if age_days > _MAX_RATE_AGE_DAYS:
+                 raise HTTPException(status_code=400, detail=f"Exchange rate for {inv_currency} is expired ({age_days} days old)")
+             exchange_rate = _dec(rate_row.rate)
+
+        if inv_currency != base_currency and exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="Exchange rate must be greater than zero")
 
         def to_base(amount):
-            return round(float(amount) * exchange_rate, 2)
+            return (_dec(amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # --- 1. Generate Sequential Invoice Number ---
         from utils.accounting import generate_sequential_number
@@ -136,9 +201,8 @@ def create_sales_invoice(
         check_fiscal_period_open(db, invoice.invoice_date)
 
         # --- UOM Validation: Discrete units must have integer quantities ---
-        from utils.quantity_validation import validate_quantity_for_product
-        for item in invoice.items:
-            validate_quantity_for_product(db, item.product_id, item.quantity)
+        from utils.quantity_validation import validate_quantities_for_products
+        validate_quantities_for_products(db, invoice.items)
 
         # --- 2. Calculate Totals (using Decimal for precision) ---
         subtotal = Decimal('0')
@@ -159,7 +223,7 @@ def create_sales_invoice(
 
             items_to_save.append({
                 **item.model_dump(),
-                "total": float(line_total)
+                "total": line_total
             })
 
         grand_total = subtotal - total_discount + total_tax
@@ -206,8 +270,8 @@ def create_sales_invoice(
         customer = db.execute(text("SELECT credit_limit, current_balance FROM parties WHERE id = :id FOR UPDATE"), {"id": invoice.customer_id}).fetchone()
         if customer and customer.credit_limit > 0:
             # Check in BASE currency
-            new_balance = float(customer.current_balance or 0) + remaining_gl
-            if new_balance > float(customer.credit_limit):
+            new_balance = _dec(customer.current_balance or 0) + remaining_gl
+            if new_balance > _dec(customer.credit_limit):
                 raise HTTPException(
                     status_code=400,
                     detail=f"تجاوز الحد الائتماني. الحد: {customer.credit_limit}, الرصيد الحالي: {customer.current_balance}, المطلوب: {remaining_gl}"
@@ -254,7 +318,7 @@ def create_sales_invoice(
         optional_header_map = {
             "payment_method": ("pay_method", invoice.payment_method),
             "currency": ("currency", inv_currency),
-            "exchange_rate": ("exchange_rate", exchange_rate),
+            "exchange_rate": ("exchange_rate", exchange_rate.quantize(_D6, ROUND_HALF_UP)),
             "cost_center_id": ("cc_id", invoice.cost_center_id),
             "sales_order_id": ("so_id", invoice.sales_order_id),
             "effect_type": ("effect_type", invoice.effect_type),
@@ -281,13 +345,18 @@ def create_sales_invoice(
             db.execute(text("UPDATE sales_orders SET status = 'invoiced' WHERE id = :id"), {"id": invoice.sales_order_id})
 
         # --- 6. Save Invoice Lines + Deduct Stock ---
-        total_cogs = 0
+        total_cogs = Decimal('0')
         wh_id = invoice.warehouse_id
         if not wh_id:
             wh_id = db.execute(text("SELECT id FROM warehouses WHERE is_default = TRUE LIMIT 1")).scalar() or 1
 
         from services.costing_service import CostingService
         costing_service = CostingService
+
+        product_ids = sorted({int(item["product_id"]) for item in items_to_save})
+        costing_methods = _prefetch_costing_methods(db, product_ids, wh_id)
+        policy_type = costing_service.get_active_policy(db)
+        prefetched_unit_costs = _prefetch_product_costs(db, product_ids, wh_id, policy_type)
 
         invoice_line_cols = {
             row.column_name
@@ -330,7 +399,7 @@ def create_sales_invoice(
                 FOR UPDATE
             """), {"pid": item["product_id"], "wh": wh_id}).fetchone()
 
-            if inv_row and float(inv_row.quantity) < float(item["quantity"]):
+            if inv_row and _dec(inv_row.quantity) < _dec(item["quantity"]):
                 prod_name = item.get("description", str(item["product_id"]))
                 raise HTTPException(
                     status_code=400,
@@ -354,31 +423,29 @@ def create_sales_invoice(
 
             # Calculate COGS using costing service
             try:
-                method = costing_service._get_product_costing_method(db, item["product_id"], wh_id)
+                qty = _dec(item["quantity"])
+                method = costing_methods.get(int(item["product_id"]), "wac")
                 if method in ("fifo", "lifo"):
                     # FIFO/LIFO: consume cost layers and get precise COGS
-                    item_cogs = float(costing_service.consume_layers(
+                    item_cogs = _dec(costing_service.consume_layers(
                         db,
                         product_id=item["product_id"],
                         warehouse_id=wh_id,
-                        quantity=float(item["quantity"]),
+                        quantity=float(qty),
                         sale_document_type="sales_invoice",
                         sale_document_id=invoice_id,
                         costing_method=method,
                     ))
-                    unit_cost = item_cogs / float(item["quantity"]) if item["quantity"] else 0
+                    unit_cost = (item_cogs / qty).quantize(_D6, ROUND_HALF_UP) if qty else Decimal('0')
                 else:
-                    unit_cost = costing_service.get_cogs_cost(
-                        db,
-                        product_id=item["product_id"],
-                        warehouse_id=wh_id,
-                    )
-                    item_cogs = unit_cost * item["quantity"]
+                    unit_cost = _dec(prefetched_unit_costs.get(int(item["product_id"]), 0))
+                    item_cogs = (unit_cost * qty).quantize(_D2, ROUND_HALF_UP)
             except Exception:
                 # Fallback: use product cost_price
-                cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"),
-                                        {"id": item["product_id"]}).scalar() or 0
-                item_cogs = float(cost_price) * float(item["quantity"])
+                qty = _dec(item["quantity"])
+                fallback_cost = _dec(prefetched_unit_costs.get(int(item["product_id"]), 0))
+                unit_cost = fallback_cost
+                item_cogs = (fallback_cost * qty).quantize(_D2, ROUND_HALF_UP)
 
             total_cogs += item_cogs
 
@@ -396,8 +463,8 @@ def create_sales_invoice(
             """), {
                 "pid": item["product_id"], "wh": wh_id,
                 "ref_id": invoice_id, "ref_doc": inv_num,
-                "qty": -float(item["quantity"]),
-                "cost": item_cogs / float(item["quantity"]) if item["quantity"] else 0,
+                "qty": -float(_dec(item["quantity"])),
+                "cost": float(unit_cost),
                 "total_cost": item_cogs,
                 "user": current_user.id
             })
@@ -482,7 +549,7 @@ def create_sales_invoice(
                     "amount_currency": paid_amount, "currency": inv_currency
                 })
 
-        if remaining_gl > 0.01:
+        if remaining_gl > _D2:
              je_lines.append({
                  "account_id": acc_ar, "debit": remaining_gl, "credit": 0,
                  "description": f"Sales Credit - {inv_num}",
@@ -720,11 +787,13 @@ def cancel_invoice(
             raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
         if inv.status == 'cancelled':
             raise HTTPException(status_code=400, detail="الفاتورة ملغاة بالفعل")
-        if float(inv.paid_amount or 0) > 0:
+        if _dec(inv.paid_amount or 0) > _D2:
             raise HTTPException(status_code=400, detail="لا يمكن إلغاء فاتورة تم السداد عليها. قم بإنشاء مرتجع بدلاً من ذلك")
 
-        exchange_rate = float(inv.exchange_rate or 1)
-        total_base = round(float(inv.total) * exchange_rate, 2)
+        exchange_rate = _dec(inv.exchange_rate or 1)
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف غير صالح")
+        total_base = (_dec(inv.total) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 2. Reverse customer balance
         db.execute(text("""
@@ -734,7 +803,7 @@ def cancel_invoice(
         if inv.currency and inv.currency != base_currency:
             db.execute(text("""
                 UPDATE parties SET balance_currency = COALESCE(balance_currency, 0) - :amt WHERE id = :id
-            """), {"amt": float(inv.total), "id": inv.party_id})
+            """), {"amt": _dec(inv.total), "id": inv.party_id})
 
         # 3. Reverse inventory (add back the items)
         inv_lines = db.execute(text("""
@@ -769,10 +838,10 @@ def cancel_invoice(
                     update_account_balance(
                         db,
                         account_id=jl.account_id,
-                        debit_base=float(jl.credit),
-                        credit_base=float(jl.debit),
-                        debit_curr=float(jl.amount_currency or 0) if float(jl.credit) > 0 else 0,
-                        credit_curr=float(jl.amount_currency or 0) if float(jl.debit) > 0 else 0,
+                        debit_base=_dec(jl.credit),
+                        credit_base=_dec(jl.debit),
+                        debit_curr=_dec(jl.amount_currency or 0) if _dec(jl.credit) > 0 else 0,
+                        credit_curr=_dec(jl.amount_currency or 0) if _dec(jl.debit) > 0 else 0,
                         currency=jl.currency
                     )
 

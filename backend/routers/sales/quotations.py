@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -13,6 +14,12 @@ from .schemas import QuotationCreate
 
 quotations_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 @quotations_router.get("/quotations", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -101,27 +108,27 @@ def create_quotation(quotation: QuotationCreate, current_user: dict = Depends(ge
         sq_num = f"SQ-{year}-{new_seq:04d}"
 
         # Calculate Totals
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
+        total_discount = Decimal('0')
         items_to_save = []
 
         for item in quotation.items:
-            line_subtotal = float(item.quantity) * float(item.unit_price)
-            taxable = line_subtotal - float(item.discount)
-            line_tax = taxable * (float(item.tax_rate) / 100)
-            line_total = taxable + line_tax
+            line_subtotal = _dec(item.quantity) * _dec(item.unit_price)
+            taxable = line_subtotal - _dec(item.discount)
+            line_tax = taxable * (_dec(item.tax_rate) / Decimal('100'))
+            line_total = (taxable + line_tax).quantize(_D2, ROUND_HALF_UP)
 
             subtotal += line_subtotal
             total_tax += line_tax
-            total_discount += item.discount
+            total_discount += _dec(item.discount)
 
             items_to_save.append({
                 **item.model_dump(),
                 "total": line_total
             })
 
-        grand_total = subtotal - total_discount + total_tax
+        grand_total = (subtotal - total_discount + total_tax).quantize(_D2, ROUND_HALF_UP)
 
         # Save Header
         res = db.execute(text("""
@@ -170,7 +177,7 @@ def create_quotation(quotation: QuotationCreate, current_user: dict = Depends(ge
             action="sales.quotation.create",
             resource_type="sales_quotation",
             resource_id=str(sq_id),
-            details={"sq_number": sq_num, "total": grand_total, "customer_id": quotation.customer_id, "customer_name": cust_name},
+            details={"sq_number": sq_num, "total": float(grand_total), "customer_id": quotation.customer_id, "customer_name": cust_name},
             request=None
         )
         return {"id": sq_id, "sq_number": sq_num}

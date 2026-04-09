@@ -8,6 +8,7 @@ from routers.auth import get_current_user
 import logging
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
@@ -20,6 +21,13 @@ from utils.cache import cache
 
 router = APIRouter(prefix="/accounting", tags=["المحاسبة"])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal("0.01")
+_D4 = Decimal("0.0001")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal("0")
 
 @router.get("/summary", dependencies=[Depends(require_permission("accounting.view"))])
 def get_accounting_summary(
@@ -422,7 +430,7 @@ async def delete_account(
 
         # 3. Check for balance
         balance_row = db.execute(text("SELECT balance FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
-        if balance_row and abs(float(balance_row[0])) > 0.01:
+        if balance_row and _dec(balance_row[0]).copy_abs() > _D2:
             raise HTTPException(status_code=400, detail="لا يمكن حذف الحساب لأن رصيده غير صفري")
 
         db.execute(text("DELETE FROM accounts WHERE id = :id"), {"id": account_id})
@@ -541,7 +549,7 @@ async def create_journal_entry(
             reference=entry_data.get("reference"),
             status=entry_status,
             currency=entry_data.get("currency"),
-            exchange_rate=float(entry_data.get("exchange_rate", 1.0)),
+            exchange_rate=_dec(entry_data.get("exchange_rate", 1)),
             source="Manual",
             source_id=None
         )
@@ -777,12 +785,12 @@ async def post_journal_entry(
         """), {"id": entry_id}).fetchall()
 
         # Get the exchange rate from the journal entry
-        je_rate = float(entry.exchange_rate or 1.0)
+        je_rate = _dec(entry.exchange_rate or 1)
 
         from utils.accounting import update_account_balance
         for line in lines:
-            debit_base = float(line.debit)
-            credit_base = float(line.credit)
+            debit_base = _dec(line.debit)
+            credit_base = _dec(line.credit)
             # Reverse the base amounts to get original currency amounts
             if je_rate != 0:
                 debit_curr = debit_base / je_rate
@@ -886,10 +894,10 @@ async def void_journal_entry(
         for line in lines:
             rev_lines.append({
                 "account_id": line.account_id,
-                "debit": float(line.credit or 0),
-                "credit": float(line.debit or 0),
+                "debit": _dec(line.credit or 0),
+                "credit": _dec(line.debit or 0),
                 "description": f"عكس: {line.description or ''}",
-                "amount_currency": float(line.amount_currency or 0),
+                "amount_currency": _dec(line.amount_currency or 0),
                 "currency": line.currency,
                 "cost_center_id": line.cost_center_id,
             })
@@ -904,7 +912,7 @@ async def void_journal_entry(
             branch_id=original.branch_id,
             reference=original.entry_number,
             currency=original.currency,
-            exchange_rate=float(original.exchange_rate or 1),
+            exchange_rate=_dec(original.exchange_rate or 1),
             source="journal_void",
             source_id=entry_id,
         )
@@ -947,23 +955,6 @@ async def void_journal_entry(
 # ============================================================
 # Fiscal Year Management & Year-End Closing (ACC-001)
 # ============================================================
-
-def _generate_sequential_number(db, prefix: str, table: str, column: str) -> str:
-    """Generate sequential number like JE-2025-00001."""
-    last = db.execute(text(f"""
-        SELECT {column} FROM {table}
-        WHERE {column} LIKE :prefix
-        ORDER BY {column} DESC LIMIT 1
-    """), {"prefix": f"{prefix}%"}).scalar()
-    if last:
-        try:
-            num = int(last.split('-')[-1]) + 1
-        except (ValueError, IndexError):
-            num = 1
-    else:
-        num = 1
-    return f"{prefix}-{num:05d}"
-
 
 @router.get("/fiscal-years", dependencies=[Depends(require_permission("accounting.view"))])
 def list_fiscal_years(current_user: dict = Depends(get_current_user)):
@@ -1137,9 +1128,9 @@ def preview_year_end_closing(
             ORDER BY a.account_number
         """), {"start": fy.start_date, "end": fy.end_date}).fetchall()
 
-        total_revenue = sum(float(r.balance) for r in revenue_accounts)
-        total_expenses = sum(float(r.balance) for r in expense_accounts)
-        net_income = total_revenue - total_expenses
+        total_revenue = sum(_dec(r.balance) for r in revenue_accounts)
+        total_expenses = sum(_dec(r.balance) for r in expense_accounts)
+        net_income = (total_revenue - total_expenses).quantize(_D4, ROUND_HALF_UP)
 
         # Get retained earnings account
         re_acc = None
@@ -1154,17 +1145,17 @@ def preview_year_end_closing(
             "end_date": str(fy.end_date),
             "revenue_accounts": [
                 {"id": r.id, "account_number": r.account_number, "name": r.name,
-                 "name_en": r.name_en, "balance": float(r.balance)}
+                 "name_en": r.name_en, "balance": float(_dec(r.balance).quantize(_D4, ROUND_HALF_UP))}
                 for r in revenue_accounts
             ],
             "expense_accounts": [
                 {"id": r.id, "account_number": r.account_number, "name": r.name,
-                 "name_en": r.name_en, "balance": float(r.balance)}
+                 "name_en": r.name_en, "balance": float(_dec(r.balance).quantize(_D4, ROUND_HALF_UP))}
                 for r in expense_accounts
             ],
-            "total_revenue": total_revenue,
-            "total_expenses": total_expenses,
-            "net_income": net_income,
+            "total_revenue": float(total_revenue.quantize(_D4, ROUND_HALF_UP)),
+            "total_expenses": float(total_expenses.quantize(_D4, ROUND_HALF_UP)),
+            "net_income": float(net_income.quantize(_D4, ROUND_HALF_UP)),
             "retained_earnings_account": {
                 "id": re_acc.id, "account_number": re_acc.account_number,
                 "name": re_acc.name, "name_en": re_acc.name_en
@@ -1232,9 +1223,9 @@ def close_fiscal_year(
             HAVING COALESCE(SUM(jl.debit - jl.credit), 0) != 0
         """), {"start": fy.start_date, "end": fy.end_date}).fetchall()
 
-        total_revenue = sum(float(r.balance) for r in revenue_data)
-        total_expenses = sum(float(r.balance) for r in expense_data)
-        net_income = round(total_revenue - total_expenses, 4)
+        total_revenue = sum(_dec(r.balance) for r in revenue_data)
+        total_expenses = sum(_dec(r.balance) for r in expense_data)
+        net_income = (total_revenue - total_expenses).quantize(_D4, ROUND_HALF_UP)
 
         if not revenue_data and not expense_data:
             raise HTTPException(status_code=400,
@@ -1245,7 +1236,7 @@ def close_fiscal_year(
 
         # A) Close revenue accounts (debit revenue to zero it out)
         for rev in revenue_data:
-            balance = float(rev.balance)
+            balance = _dec(rev.balance).quantize(_D4, ROUND_HALF_UP)
             closing_lines.append({
                 "account_id": rev.id,
                 "debit": abs(balance),
@@ -1255,7 +1246,7 @@ def close_fiscal_year(
 
         # B) Close expense accounts (credit expense to zero it out)
         for exp in expense_data:
-            balance = float(exp.balance)
+            balance = _dec(exp.balance).quantize(_D4, ROUND_HALF_UP)
             closing_lines.append({
                 "account_id": exp.id,
                 "debit": 0,
@@ -1321,7 +1312,7 @@ def close_fiscal_year(
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="accounting.fiscal_year.close",
                      resource_type="fiscal_year", resource_id=str(fy.id),
-                     details={"year": year, "net_income": float(net_income)})
+                     details={"year": year, "net_income": float(net_income.quantize(_D4, ROUND_HALF_UP))})
 
         return {
             "success": True,
@@ -1377,8 +1368,8 @@ def reopen_fiscal_year(
             for line in closing_lines:
                 rev_lines.append({
                     "account_id": line.account_id,
-                    "debit": float(line.credit or 0),
-                    "credit": float(line.debit or 0),
+                    "debit": _dec(line.credit or 0),
+                    "credit": _dec(line.debit or 0),
                     "description": f"عكس إقفال {year}",
                 })
 
@@ -1392,7 +1383,7 @@ def reopen_fiscal_year(
                 branch_id=closing_entry.branch_id if closing_entry else None,
                 reference=f"Reversal of Year-End Closing {year}",
                 currency=closing_entry.currency if closing_entry else None,
-                exchange_rate=float(closing_entry.exchange_rate or 1) if closing_entry else 1,
+                exchange_rate=_dec(closing_entry.exchange_rate or 1) if closing_entry else Decimal("1"),
                 source="fiscal_year_reopen",
                 source_id=fy.id,
             )
@@ -1584,9 +1575,9 @@ def create_recurring_template(data: dict = Body(...), current_user: dict = Depen
         if not lines or len(lines) < 2:
             raise HTTPException(status_code=400, detail="يجب إضافة سطرين على الأقل")
 
-        total_debit = sum(float(l.get("debit", 0)) for l in lines)
-        total_credit = sum(float(l.get("credit", 0)) for l in lines)
-        if round(total_debit, 4) != round(total_credit, 4):
+        total_debit = sum(_dec(l.get("debit", 0)) for l in lines)
+        total_credit = sum(_dec(l.get("credit", 0)) for l in lines)
+        if (total_debit - total_credit).copy_abs() > _D4:
             raise HTTPException(status_code=400, detail=f"القيد غير متوازن: مدين={total_debit} دائن={total_credit}")
 
         result = db.execute(text("""
@@ -1611,7 +1602,7 @@ def create_recurring_template(data: dict = Body(...), current_user: dict = Depen
             "auto_post": data.get("auto_post", False),
             "branch_id": data.get("branch_id") or getattr(current_user, "branch_id", None),
             "currency": data.get("currency", get_base_currency(db)),
-            "exchange_rate": data.get("exchange_rate", 1.0),
+            "exchange_rate": _dec(data.get("exchange_rate", 1)),
             "max_runs": data.get("max_runs"),
             "created_by": current_user.id,
         })
@@ -1625,8 +1616,8 @@ def create_recurring_template(data: dict = Body(...), current_user: dict = Depen
             """), {
                 "tid": template_id,
                 "account_id": line["account_id"],
-                "debit": float(line.get("debit", 0)),
-                "credit": float(line.get("credit", 0)),
+                "debit": _dec(line.get("debit", 0)),
+                "credit": _dec(line.get("credit", 0)),
                 "desc": line.get("description", ""),
                 "cc": line.get("cost_center_id"),
             })
@@ -1692,9 +1683,9 @@ def update_recurring_template(template_id: int, data: dict = Body(...), current_
         if lines is not None:
             if len(lines) < 2:
                 raise HTTPException(status_code=400, detail="يجب إضافة سطرين على الأقل")
-            total_debit = sum(float(l.get("debit", 0)) for l in lines)
-            total_credit = sum(float(l.get("credit", 0)) for l in lines)
-            if round(total_debit, 4) != round(total_credit, 4):
+            total_debit = sum(_dec(l.get("debit", 0)) for l in lines)
+            total_credit = sum(_dec(l.get("credit", 0)) for l in lines)
+            if (total_debit - total_credit).copy_abs() > _D4:
                 raise HTTPException(status_code=400, detail=f"القيد غير متوازن: مدين={total_debit} دائن={total_credit}")
 
             db.execute(text("DELETE FROM recurring_journal_lines WHERE template_id = :tid"), {"tid": template_id})
@@ -1706,8 +1697,8 @@ def update_recurring_template(template_id: int, data: dict = Body(...), current_
                 """), {
                     "tid": template_id,
                     "account_id": line["account_id"],
-                    "debit": float(line.get("debit", 0)),
-                    "credit": float(line.get("credit", 0)),
+                    "debit": _dec(line.get("debit", 0)),
+                    "credit": _dec(line.get("credit", 0)),
                     "desc": line.get("description", ""),
                     "cc": line.get("cost_center_id"),
                 })
@@ -1843,8 +1834,8 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
     for line in lines:
         je_lines.append({
             "account_id": line.account_id,
-            "debit": float(line.debit or 0),
-            "credit": float(line.credit or 0),
+            "debit": _dec(line.debit or 0),
+            "credit": _dec(line.credit or 0),
             "description": line.description or "",
             "cost_center_id": line.cost_center_id,
         })
@@ -1860,7 +1851,7 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
         reference=tmpl.reference or f"REC-{tmpl.id}",
         status=entry_status,
         currency=tmpl.currency or get_base_currency(db),
-        exchange_rate=float(tmpl.exchange_rate or 1),
+        exchange_rate=_dec(tmpl.exchange_rate or 1),
         source="recurring_template",
         source_id=tmpl.id,
     )
@@ -1930,7 +1921,7 @@ def get_opening_balances(
                 WHERE journal_entry_id = :eid
             """), {"eid": ob_entry.id}).fetchall()
 
-        ob_map = {l.account_id: {"debit": float(l.debit or 0), "credit": float(l.credit or 0)} for l in ob_lines}
+        ob_map = {l.account_id: {"debit": _dec(l.debit or 0), "credit": _dec(l.credit or 0)} for l in ob_lines}
 
         result = []
         for a in accounts:
@@ -1960,12 +1951,12 @@ def save_opening_balances(
         entry_date = data.get("date", str(date.today()))
 
         # Filter to only lines with actual values
-        valid_lines = [l for l in lines if float(l.get("debit", 0)) != 0 or float(l.get("credit", 0)) != 0]
+        valid_lines = [l for l in lines if _dec(l.get("debit", 0)) != 0 or _dec(l.get("credit", 0)) != 0]
         if not valid_lines:
             raise HTTPException(status_code=400, detail="لا توجد أرصدة لحفظها")
 
-        total_debit = sum(float(l.get("debit", 0)) for l in valid_lines)
-        total_credit = sum(float(l.get("credit", 0)) for l in valid_lines)
+        total_debit = sum(_dec(l.get("debit", 0)) for l in valid_lines)
+        total_credit = sum(_dec(l.get("credit", 0)) for l in valid_lines)
 
         # Find existing opening balance entry
         existing = db.execute(text("""
@@ -1985,16 +1976,27 @@ def save_opening_balances(
                 for ol in old_lines:
                     # Reverse: swap debit/credit to undo original effect
                     _uab(db, account_id=ol.account_id,
-                         debit_base=float(ol.credit or 0),
-                         credit_base=float(ol.debit or 0))
+                        debit_base=_dec(ol.credit or 0),
+                        credit_base=_dec(ol.debit or 0))
 
             # Replace old opening balance entry with a fresh centralized one
             db.execute(text("DELETE FROM journal_entries WHERE id = :eid"), {"eid": existing.id})
 
-        # If not balanced, add a suspense line (difference to equity - opening balance equity)
-        if round(total_debit, 4) != round(total_credit, 4):
-            diff = total_debit - total_credit
-            # Find or use a suspense/equity account
+        # Default behavior is strict: reject imbalanced opening balances.
+        # Admin can explicitly allow suspense adjustment by passing allow_auto_balance=true.
+        diff = (total_debit - total_credit).quantize(_D4, ROUND_HALF_UP)
+        if diff.copy_abs() > _D4:
+            allow_auto_balance = bool(data.get("allow_auto_balance", False))
+            if not allow_auto_balance:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "الأرصدة الافتتاحية غير متوازنة. "
+                        f"الفرق الحالي: {diff}. "
+                        "صحّح الأرصدة أو أعد الطلب مع allow_auto_balance=true للموازنة الاستثنائية."
+                    ),
+                )
+
             suspense = db.execute(text(
                 "SELECT id FROM accounts WHERE account_number = '3100' OR (account_type = 'equity' AND name LIKE '%افتتا%') LIMIT 1"
             )).fetchone()
@@ -2002,20 +2004,22 @@ def save_opening_balances(
                 suspense = db.execute(text(
                     "SELECT id FROM accounts WHERE account_type = 'equity' ORDER BY account_number LIMIT 1"
                 )).fetchone()
-            if suspense:
-                valid_lines.append({
-                    "account_id": suspense.id,
-                    "debit": max(-diff, 0),
-                    "credit": max(diff, 0),
-                    "description": "فرق الأرصدة الافتتاحية / Opening Balance Difference"
-                })
+            if not suspense:
+                raise HTTPException(status_code=400, detail="لا يوجد حساب حقوق ملكية لتعويض فرق الأرصدة الافتتاحية")
+
+            valid_lines.append({
+                "account_id": suspense.id,
+                "debit": max(-diff, Decimal("0")).quantize(_D4, ROUND_HALF_UP),
+                "credit": max(diff, Decimal("0")).quantize(_D4, ROUND_HALF_UP),
+                "description": "فرق الأرصدة الافتتاحية / Opening Balance Difference"
+            })
 
         gl_lines = []
         for line in valid_lines:
             gl_lines.append({
                 "account_id": int(line["account_id"]),
-                "debit": float(line.get("debit", 0)),
-                "credit": float(line.get("credit", 0)),
+                "debit": _dec(line.get("debit", 0)),
+                "credit": _dec(line.get("credit", 0)),
                 "description": line.get("description", "رصيد افتتاحي"),
             })
 
@@ -2105,17 +2109,17 @@ def preview_closing_entries(
             "SELECT id, account_number, name FROM accounts WHERE account_number IN ('RET', '3100') OR name LIKE '%أرباح مبقاة%' OR name LIKE '%Retained%' ORDER BY account_number LIMIT 1"
         )).fetchone()
 
-        total_revenue = sum(float(r.balance) for r in revenues)
-        total_expense = sum(float(r.balance) for r in expenses)
-        net_income = total_revenue - total_expense
+        total_revenue = sum(_dec(r.balance) for r in revenues)
+        total_expense = sum(_dec(r.balance) for r in expenses)
+        net_income = (total_revenue - total_expense).quantize(_D4, ROUND_HALF_UP)
 
         return {
             "period": {"start": str(start_date), "end": str(end_date)},
             "revenues": [dict(r._mapping) for r in revenues],
             "expenses": [dict(r._mapping) for r in expenses],
-            "total_revenue": total_revenue,
-            "total_expense": total_expense,
-            "net_income": net_income,
+            "total_revenue": float(total_revenue.quantize(_D4, ROUND_HALF_UP)),
+            "total_expense": float(total_expense.quantize(_D4, ROUND_HALF_UP)),
+            "net_income": float(net_income.quantize(_D4, ROUND_HALF_UP)),
             "income_summary_account": dict(income_summary._mapping) if income_summary else None,
             "retained_earnings_account": dict(retained_earnings._mapping) if retained_earnings else None,
         }
@@ -2178,9 +2182,9 @@ def generate_closing_entries(
             HAVING COALESCE(SUM(jl.debit - jl.credit), 0) != 0
         """), params).fetchall()
 
-        total_revenue = sum(float(r.balance) for r in revenues)
-        total_expense = sum(float(r.balance) for r in expenses)
-        net_income = total_revenue - total_expense
+        total_revenue = sum(_dec(r.balance) for r in revenues)
+        total_expense = sum(_dec(r.balance) for r in expenses)
+        net_income = (total_revenue - total_expense).quantize(_D4, ROUND_HALF_UP)
 
         created_entries = []
         target_account_id = income_summary_id if use_income_summary else retained_earnings_id
@@ -2190,7 +2194,7 @@ def generate_closing_entries(
             lines1 = []
 
             for rev in revenues:
-                bal = float(rev.balance)
+                bal = _dec(rev.balance).quantize(_D4, ROUND_HALF_UP)
                 lines1.append({
                     "account_id": rev.id,
                     "debit": bal,
@@ -2224,7 +2228,7 @@ def generate_closing_entries(
             lines2 = []
 
             for exp in expenses:
-                bal = float(exp.balance)
+                bal = _dec(exp.balance).quantize(_D4, ROUND_HALF_UP)
                 lines2.append({
                     "account_id": exp.id,
                     "debit": 0,
@@ -2356,18 +2360,18 @@ def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depend
             lines=[
                 {
                     "account_id": acc_bad_debt_exp,
-                    "debit": float(req.amount),
+                    "debit": _dec(req.amount),
                     "credit": 0,
                     "description": "مصروف ديون معدومة",
-                    "amount_currency": float(req.amount),
+                    "amount_currency": _dec(req.amount),
                     "currency": base_currency,
                 },
                 {
                     "account_id": acc_prov_doubtful,
                     "debit": 0,
-                    "credit": float(req.amount),
+                    "credit": _dec(req.amount),
                     "description": "مخصص الديون المعدومة",
-                    "amount_currency": float(req.amount),
+                    "amount_currency": _dec(req.amount),
                     "currency": base_currency,
                 },
             ],
@@ -2418,18 +2422,18 @@ def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(g
             lines=[
                 {
                     "account_id": acc_leave_exp,
-                    "debit": float(req.amount),
+                    "debit": _dec(req.amount),
                     "credit": 0,
                     "description": "مصروف الإجازات",
-                    "amount_currency": float(req.amount),
+                    "amount_currency": _dec(req.amount),
                     "currency": base_currency,
                 },
                 {
                     "account_id": acc_leave_prov,
                     "debit": 0,
-                    "credit": float(req.amount),
+                    "credit": _dec(req.amount),
                     "description": "مخصص الإجازات",
-                    "amount_currency": float(req.amount),
+                    "amount_currency": _dec(req.amount),
                     "currency": base_currency,
                 },
             ],
@@ -2500,16 +2504,18 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
             return {"success": True, "message": "لا توجد أرصدة بهذه العملة", "adjustments": []}
 
         adjustments = []
-        total_diff = 0.0
+        total_diff = Decimal("0")
         je_lines = []
+
+        new_rate = _dec(req.new_rate)
 
         for bal in balances:
             m = bal._mapping
-            fc = float(m["fc_balance"])
-            old_base = float(m["base_balance"])
-            new_base = fc * req.new_rate
-            diff = new_base - old_base
-            if abs(diff) < 0.01:
+            fc = _dec(m["fc_balance"])
+            old_base = _dec(m["base_balance"])
+            new_base = (fc * new_rate).quantize(_D2, ROUND_HALF_UP)
+            diff = (new_base - old_base).quantize(_D2, ROUND_HALF_UP)
+            if diff.copy_abs() < _D2:
                 continue
 
             total_diff += diff
@@ -2534,8 +2540,10 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
 
             adjustments.append({
                 "account_id": m["account_id"], "account_number": m["account_number"], "name": m["name"],
-                "fc_balance": round(fc, 2), "old_base": round(old_base, 2), "new_base": round(new_base, 2),
-                "difference": round(diff, 2),
+                "fc_balance": float(fc.quantize(_D2, ROUND_HALF_UP)),
+                "old_base": float(old_base.quantize(_D2, ROUND_HALF_UP)),
+                "new_base": float(new_base.quantize(_D2, ROUND_HALF_UP)),
+                "difference": float(diff.quantize(_D2, ROUND_HALF_UP)),
             })
 
         # Post the offsetting FX gain/loss
@@ -2578,7 +2586,7 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
         return {
             "success": True, "journal_entry": je_num,
             "currency": req.currency_code, "new_rate": req.new_rate,
-            "total_adjustment": round(total_diff, 2),
+            "total_adjustment": float(total_diff.quantize(_D2, ROUND_HALF_UP)),
             "adjustments": adjustments,
         }
     except HTTPException:

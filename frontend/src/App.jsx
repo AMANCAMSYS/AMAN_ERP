@@ -224,6 +224,14 @@ const ForecastList = React.lazy(() => import('./pages/CashFlow/ForecastList'))
 const ForecastGenerate = React.lazy(() => import('./pages/CashFlow/ForecastGenerate'))
 const ForecastDetail = React.lazy(() => import('./pages/CashFlow/ForecastDetail'))
 
+// Subscription Billing
+const SubscriptionHome = React.lazy(() => import('./pages/Subscription/SubscriptionHome'))
+const SubscriptionPlanList = React.lazy(() => import('./pages/Subscription/PlanList'))
+const SubscriptionPlanForm = React.lazy(() => import('./pages/Subscription/PlanForm'))
+const SubscriptionEnrollmentList = React.lazy(() => import('./pages/Subscription/EnrollmentList'))
+const SubscriptionEnrollmentDetail = React.lazy(() => import('./pages/Subscription/EnrollmentDetail'))
+const SubscriptionEnrollmentForm = React.lazy(() => import('./pages/Subscription/EnrollmentForm'))
+
 // HR
 const HRHome = React.lazy(() => import('./pages/HR/HRHome'))
 const Employees = React.lazy(() => import('./pages/HR/Employees'))
@@ -487,6 +495,13 @@ function App() {
                 <Route path="/accounting/intercompany/transactions/new" element={<PrivateRoute permission="accounting.edit"><IntercompanyTransactionForm /></PrivateRoute>} />
                 <Route path="/accounting/intercompany/consolidation" element={<PrivateRoute permission="accounting.view"><ConsolidationView /></PrivateRoute>} />
                 <Route path="/accounting/intercompany/mappings" element={<PrivateRoute permission="accounting.view"><IntercompanyAccountMappings /></PrivateRoute>} />
+
+                {/* Legacy intercompany aliases */}
+                <Route path="/intercompany/transactions" element={<Navigate to="/accounting/intercompany/transactions" replace />} />
+                <Route path="/intercompany/transactions/new" element={<Navigate to="/accounting/intercompany/transactions/new" replace />} />
+                <Route path="/intercompany/entities" element={<Navigate to="/accounting/intercompany/entities" replace />} />
+                <Route path="/intercompany/consolidation" element={<Navigate to="/accounting/intercompany/consolidation" replace />} />
+                <Route path="/intercompany/mappings" element={<Navigate to="/accounting/intercompany/mappings" replace />} />
                 <Route path="/stock/valuation-report" element={<PrivateRoute permission="reports.view"><InventoryValuation /></PrivateRoute>} />
                 <Route path="/admin/companies" element={<PrivateRoute role="system_admin"><CompanyList /></PrivateRoute>} />
                 <Route path="/admin/audit-logs" element={<PrivateRoute permission="audit.view"><AuditLogs /></PrivateRoute>} />
@@ -660,6 +675,15 @@ function App() {
                 <Route path="/finance/cashflow" element={<PrivateRoute permission="finance.cashflow_view"><ForecastList /></PrivateRoute>} />
                 <Route path="/finance/cashflow/generate" element={<PrivateRoute permission="finance.cashflow_generate"><ForecastGenerate /></PrivateRoute>} />
                 <Route path="/finance/cashflow/:id" element={<PrivateRoute permission="finance.cashflow_view"><ForecastDetail /></PrivateRoute>} />
+
+                {/* Subscription Billing */}
+                <Route path="/finance/subscriptions" element={<PrivateRoute permission="finance.subscription_view"><SubscriptionHome /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/plans" element={<PrivateRoute permission="finance.subscription_view"><SubscriptionPlanList /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/plans/new" element={<PrivateRoute permission="finance.subscription_manage"><SubscriptionPlanForm /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/plans/:id/edit" element={<PrivateRoute permission="finance.subscription_manage"><SubscriptionPlanForm /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/enrollments" element={<PrivateRoute permission="finance.subscription_view"><SubscriptionEnrollmentList /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/enrollments/:id" element={<PrivateRoute permission="finance.subscription_view"><SubscriptionEnrollmentDetail /></PrivateRoute>} />
+                <Route path="/finance/subscriptions/enroll" element={<PrivateRoute permission="finance.subscription_manage"><SubscriptionEnrollmentForm /></PrivateRoute>} />
 
                 {/* Other Modules */}
                 <Route path="/reports" element={<PrivateRoute permission="reports.view"><ReportCenter /></PrivateRoute>} />

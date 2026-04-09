@@ -253,6 +253,7 @@ from .domain_models.matching import MatchTolerance, ThreeWayMatch, ThreeWayMatch
 from .domain_models.self_service import SelfServiceRequest
 from .domain_models.sso import SsoConfiguration, SsoGroupRoleMapping, SsoFallbackAdmin
 from .domain_models.mobile_sync import SyncQueue
+from .domain_models.finance_subscriptions import SubscriptionPlan, SubscriptionEnrollment, SubscriptionInvoice
 
 
 target_metadata = ModelBase.metadata
@@ -515,6 +516,9 @@ __all__ = [
     "SsoGroupRoleMapping",
     "ThreeWayMatch",
     "ThreeWayMatchLine",
+    "SubscriptionPlan",
+    "SubscriptionEnrollment",
+    "SubscriptionInvoice",
     "target_metadata",
     "MODELED_TABLES",
 ]

@@ -40,3 +40,42 @@ def validate_quantity_for_product(db, product_id: int, quantity: float) -> None:
                 status_code=400,
                 detail=f"الكمية يجب أن تكون عدداً صحيحاً للمنتج بوحدة '{row.unit_name}'. القيمة المدخلة: {quantity}"
             )
+
+
+def validate_quantities_for_products(db, items) -> None:
+    """
+    Batch version of quantity validation.
+    `items` is an iterable of objects/dicts with product_id and quantity.
+    """
+    normalized = []
+    for item in items:
+        if isinstance(item, dict):
+            pid = item.get("product_id")
+            qty = item.get("quantity")
+        else:
+            pid = getattr(item, "product_id", None)
+            qty = getattr(item, "quantity", None)
+        if pid is not None and qty is not None:
+            normalized.append((int(pid), qty))
+
+    if not normalized:
+        return
+
+    product_ids = sorted({pid for pid, _ in normalized})
+    rows = db.execute(text("""
+        SELECT p.id AS product_id, u.unit_name
+        FROM products p
+        LEFT JOIN product_units u ON p.unit_id = u.id
+        WHERE p.id = ANY(:pids)
+    """), {"pids": product_ids}).fetchall()
+
+    units_by_product = {row.product_id: row.unit_name for row in rows}
+    for product_id, quantity in normalized:
+        unit_name = units_by_product.get(product_id)
+        if not unit_name:
+            continue
+        if is_discrete_unit(unit_name) and quantity != int(quantity):
+            raise HTTPException(
+                status_code=400,
+                detail=f"الكمية يجب أن تكون عدداً صحيحاً للمنتج بوحدة '{unit_name}'. القيمة المدخلة: {quantity}"
+            )

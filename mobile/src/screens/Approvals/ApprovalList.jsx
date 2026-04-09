@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert, TextInput,
+  RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { useNetwork } from '../../../App';
 import { approvalAPI } from '../../services/api';
@@ -23,11 +23,10 @@ export default function ApprovalList() {
     try {
       if (isConnected) {
         const res = await approvalAPI.list({ status: 'pending', limit: 50 });
-        setApprovals(res.items || res || []);
+        setApprovals(Array.isArray(res) ? res : []);
       }
       setCurrencyCode(await getMobileCurrencyCode());
     } catch {
-      // keep existing list
       setCurrencyCode(await getMobileCurrencyCode());
     } finally {
       setLoading(false);
@@ -46,8 +45,8 @@ export default function ApprovalList() {
         await enqueue('approval', item.id, 'update', { action: 'approve' });
       }
       setApprovals((prev) => prev.filter((a) => a.id !== item.id));
-      Alert.alert('تم', 'تمت الموافقة بنجاح');
-    } catch (err) {
+      Alert.alert('تمت الموافقة', 'تمت الموافقة على الطلب بنجاح');
+    } catch {
       await enqueue('approval', item.id, 'update', { action: 'approve' });
       setApprovals((prev) => prev.filter((a) => a.id !== item.id));
       Alert.alert('تم الحفظ', 'ستُرسل الموافقة عند الاتصال');
@@ -57,18 +56,14 @@ export default function ApprovalList() {
   };
 
   const handleReject = (item) => {
-    Alert.prompt
-      ? Alert.prompt('سبب الرفض', 'أدخل سبب الرفض', async (reason) => {
-          await doReject(item, reason);
-        })
-      : doRejectWithConfirm(item);
-  };
-
-  const doRejectWithConfirm = (item) => {
-    Alert.alert('رفض', 'هل أنت متأكد من رفض هذا الطلب؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      { text: 'رفض', style: 'destructive', onPress: () => doReject(item, 'مرفوض من الجوال') },
-    ]);
+    Alert.alert(
+      'تأكيد الرفض',
+      'هل أنت متأكد من رفض هذا الطلب؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'رفض', style: 'destructive', onPress: () => doReject(item, 'مرفوض من الجوال') },
+      ]
+    );
   };
 
   const doReject = async (item, reason) => {
@@ -90,75 +85,138 @@ export default function ApprovalList() {
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.type}>{item.entity_type || item.type || 'طلب'}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.typeBadge}>
+          <Text style={styles.typeText}>{item.entity_type || item.type || 'طلب'}</Text>
+        </View>
         <Text style={styles.ref}>{item.reference || `#${item.id}`}</Text>
       </View>
-      <Text style={styles.desc}>{item.description || item.notes || ''}</Text>
-      {item.amount != null && (
-        <Text style={styles.amount}>{formatAmount(item.amount, item.currency || item.currency_code || currencyCode)}</Text>
+
+      {!!item.description && (
+        <Text style={styles.desc}>{item.description || item.notes}</Text>
       )}
-      <Text style={styles.requester}>مقدم الطلب: {item.requester_name || '—'}</Text>
+
+      {item.amount != null && (
+        <Text style={styles.amount}>
+          {formatAmount(item.amount, item.currency || item.currency_code || currencyCode)}
+        </Text>
+      )}
+
+      <View style={styles.requesterRow}>
+        <Text style={styles.requesterLabel}>مقدم الطلب</Text>
+        <Text style={styles.requesterName}>{item.requester_name || '—'}</Text>
+      </View>
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.approveBtn, actionLoading === item.id && styles.disabled]}
+          style={[styles.rejectBtn, actionLoading === item.id && styles.btnDisabled]}
+          onPress={() => handleReject(item)}
+          disabled={actionLoading === item.id}
+        >
+          <Text style={styles.rejectBtnText}>✗ رفض</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.approveBtn, actionLoading === item.id && styles.btnDisabled]}
           onPress={() => handleApprove(item)}
           disabled={actionLoading === item.id}
         >
           {actionLoading === item.id ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.btnText}>✓ موافقة</Text>
+            <Text style={styles.approveBtnText}>✓ موافقة</Text>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.rejectBtn, actionLoading === item.id && styles.disabled]}
-          onPress={() => handleReject(item)}
-          disabled={actionLoading === item.id}
-        >
-          <Text style={styles.btnText}>✗ رفض</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#1976d2" /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1976d2" />
+        <Text style={styles.loadingText}>جارٍ تحميل الموافقات...</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       {!isConnected && (
-        <View style={styles.offlineBanner}><Text style={styles.offlineText}>⚡ وضع عدم الاتصال</Text></View>
+        <View style={styles.offlineBanner}>
+          <Text style={styles.bannerText}>⚡ وضع عدم الاتصال</Text>
+        </View>
       )}
       <FlatList
         data={approvals}
         keyExtractor={(item) => String(item.id)}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-        ListEmptyComponent={<Text style={styles.empty}>لا توجد موافقات معلقة</Text>}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor="#1976d2"
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyIcon}>✅</Text>
+            <Text style={styles.empty}>لا توجد موافقات معلقة</Text>
+          </View>
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  offlineBanner: { backgroundColor: '#ff9800', padding: 8, alignItems: 'center' },
-  offlineText: { color: '#fff', fontWeight: 'bold' },
-  card: { backgroundColor: '#fff', borderRadius: 8, marginHorizontal: 12, marginTop: 8, padding: 14, elevation: 1 },
-  header: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 4 },
-  type: { fontSize: 14, fontWeight: '700', color: '#1976d2', textAlign: 'right' },
-  ref: { fontSize: 13, color: '#999' },
-  desc: { fontSize: 14, color: '#555', textAlign: 'right', marginBottom: 4 },
-  amount: { fontSize: 16, fontWeight: '600', color: '#333', textAlign: 'right', marginBottom: 4 },
-  requester: { fontSize: 12, color: '#888', textAlign: 'right', marginBottom: 10 },
-  actions: { flexDirection: 'row-reverse', gap: 8 },
-  approveBtn: { flex: 1, backgroundColor: '#4caf50', borderRadius: 8, padding: 10, alignItems: 'center' },
-  rejectBtn: { flex: 1, backgroundColor: '#f44336', borderRadius: 8, padding: 10, alignItems: 'center' },
-  disabled: { opacity: 0.5 },
-  btnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  empty: { textAlign: 'center', padding: 40, color: '#999', fontSize: 16 },
+  container: { flex: 1, backgroundColor: '#f0f4f8' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8' },
+  loadingText: { marginTop: 12, color: '#546e7a', fontSize: 15 },
+
+  offlineBanner: { backgroundColor: '#e65100', padding: 10, alignItems: 'center' },
+  bannerText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+
+  list: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 20 },
+
+  card: {
+    backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, padding: 16,
+    elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row-reverse', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 10,
+  },
+  typeBadge: { backgroundColor: '#e3f2fd', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  typeText: { fontSize: 12, fontWeight: '700', color: '#1565c0' },
+  ref: { fontSize: 13, color: '#90a4ae' },
+
+  desc: { fontSize: 14, color: '#546e7a', textAlign: 'right', marginBottom: 8 },
+  amount: { fontSize: 20, fontWeight: '700', color: '#1a2332', textAlign: 'right', marginBottom: 8 },
+
+  requesterRow: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 6,
+    marginBottom: 14, paddingVertical: 8,
+    borderTopWidth: 1, borderTopColor: '#f0f4f8',
+  },
+  requesterLabel: { fontSize: 12, color: '#90a4ae' },
+  requesterName: { fontSize: 13, fontWeight: '600', color: '#546e7a' },
+
+  actions: { flexDirection: 'row-reverse', gap: 10 },
+  approveBtn: {
+    flex: 1, backgroundColor: '#2e7d32', borderRadius: 10,
+    paddingVertical: 13, alignItems: 'center',
+  },
+  approveBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  rejectBtn: {
+    flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center',
+    borderWidth: 2, borderColor: '#ef9a9a',
+  },
+  rejectBtnText: { color: '#c62828', fontWeight: '700', fontSize: 15 },
+  btnDisabled: { opacity: 0.5 },
+
+  emptyWrap: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
+  empty: { color: '#90a4ae', fontSize: 16 },
 });

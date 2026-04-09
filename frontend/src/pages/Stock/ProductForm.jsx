@@ -8,6 +8,37 @@ import { getStep } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
+const formatApiError = (detail, fallback) => {
+    if (!detail) return fallback
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail)) {
+        return detail
+            .map((entry) => {
+                if (typeof entry === 'string') return entry
+                if (entry?.msg) {
+                    const field = Array.isArray(entry.loc) ? entry.loc.at(-1) : null
+                    return field ? `${field}: ${entry.msg}` : entry.msg
+                }
+                return null
+            })
+            .filter(Boolean)
+            .join('، ') || fallback
+    }
+    return fallback
+}
+
+const normalizeOptionalNumber = (value, defaultValue = 0) => {
+    if (value === '' || value === null || value === undefined) return defaultValue
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : defaultValue
+}
+
+const normalizeOptionalInteger = (value, defaultValue = 0) => {
+    if (value === '' || value === null || value === undefined) return defaultValue
+    const parsed = parseInt(value, 10)
+    return Number.isFinite(parsed) ? parsed : defaultValue
+}
+
 function ProductForm() {
     const { t } = useTranslation()
     const navigate = useNavigate()
@@ -34,6 +65,32 @@ function ProductForm() {
         expiry_alert_days: 30
     })
     const [categories, setCategories] = useState([])
+
+    const buildPayload = () => {
+        const isTrackedProduct = formData.item_type === 'product'
+        const hasExpiryTracking = isTrackedProduct && !!formData.has_expiry_tracking
+
+        return {
+            item_code: formData.item_code.trim(),
+            item_name: formData.item_name.trim(),
+            item_name_en: formData.item_name_en?.trim() || null,
+            item_type: formData.item_type,
+            unit: formData.unit || t('stock.products.unit_piece'),
+            selling_price: normalizeOptionalNumber(formData.selling_price, 0),
+            buying_price: normalizeOptionalNumber(formData.buying_price, 0),
+            last_buying_price: normalizeOptionalNumber(formData.last_buying_price ?? formData.buying_price, 0),
+            tax_rate: normalizeOptionalNumber(formData.tax_rate, 15),
+            description: formData.description?.trim() || null,
+            category_id: formData.category_id === '' ? null : normalizeOptionalInteger(formData.category_id, 0),
+            is_active: formData.is_active ?? true,
+            has_batch_tracking: isTrackedProduct && !!formData.has_batch_tracking,
+            has_serial_tracking: isTrackedProduct && !!formData.has_serial_tracking,
+            has_expiry_tracking: hasExpiryTracking,
+            shelf_life_days: hasExpiryTracking ? normalizeOptionalInteger(formData.shelf_life_days, 0) : 0,
+            expiry_alert_days: hasExpiryTracking ? normalizeOptionalInteger(formData.expiry_alert_days, 30) : 30,
+        }
+    }
+
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -86,14 +143,15 @@ function ProductForm() {
         setError(null)
 
         try {
+            const payload = buildPayload()
             if (id) {
-                await inventoryAPI.updateProduct(id, formData)
+                await inventoryAPI.updateProduct(id, payload)
             } else {
-                await inventoryAPI.createProduct(formData)
+                await inventoryAPI.createProduct(payload)
             }
             navigate('/stock/products')
         } catch (err) {
-            setError(err.response?.data?.detail || t('stock.products.validation.error_save'))
+            setError(formatApiError(err.response?.data?.detail, t('stock.products.validation.error_save')))
         } finally {
             setLoading(false)
         }

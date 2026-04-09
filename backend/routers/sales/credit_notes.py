@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from sqlalchemy import text
 from typing import Optional, List
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
@@ -21,12 +22,20 @@ from utils.accounting import (
     generate_sequential_number,
     update_account_balance,
     get_base_currency,
+    validate_je_lines,
 )
 import logging
 
 logger = logging.getLogger(__name__)
 
 credit_notes_router = APIRouter()
+
+_D2 = Decimal("0.01")
+_D4 = Decimal("0.0001")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal("0")
 
 
 # ==================== CREDIT NOTES (إشعار دائن) ====================
@@ -180,23 +189,25 @@ def create_sales_credit_note(
         inv_date = data.get("invoice_date", str(date.today()))
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
-        exchange_rate = float(data.get("exchange_rate", 1.0))
+        exchange_rate = _dec(data.get("exchange_rate", 1))
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
         branch_id = validate_branch_access(current_user, data.get("branch_id"))
 
-        subtotal = 0
-        tax_total = 0
-        discount_total = 0
+        subtotal = Decimal("0")
+        tax_total = Decimal("0")
+        discount_total = Decimal("0")
         computed_lines = []
 
         for line in lines:
-            qty = float(line.get("quantity", 1))
-            price = float(line.get("unit_price", 0))
-            tax_rate = float(line.get("tax_rate", 0))
-            disc = float(line.get("discount", 0))
+            qty = _dec(line.get("quantity", 1))
+            price = _dec(line.get("unit_price", 0))
+            tax_rate = _dec(line.get("tax_rate", 0))
+            disc = _dec(line.get("discount", 0))
             line_gross = qty * price
             line_net = line_gross - disc
-            line_tax = round(line_net * tax_rate / 100, 4)
-            line_total = round(line_net + line_tax, 4)
+            line_tax = (line_net * tax_rate / Decimal("100")).quantize(_D4, ROUND_HALF_UP)
+            line_total = (line_net + line_tax).quantize(_D4, ROUND_HALF_UP)
 
             subtotal += line_net
             tax_total += line_tax
@@ -211,7 +222,7 @@ def create_sales_credit_note(
                 "total": line_total,
             })
 
-        total = round(subtotal + tax_total, 4)
+        total = (subtotal + tax_total).quantize(_D4, ROUND_HALF_UP)
 
         # Generate number & insert
         inv_num = generate_sequential_number(db, "SCN", "invoices", "invoice_number")
@@ -258,9 +269,9 @@ def create_sales_credit_note(
         if not acc_ar or not acc_sales:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AR / Sales Revenue)")
 
-        gl_sub = round(subtotal * exchange_rate, 4)
-        gl_tax = round(tax_total * exchange_rate, 4)
-        gl_total = round(total * exchange_rate, 4)
+        gl_sub = (subtotal * exchange_rate).quantize(_D4, ROUND_HALF_UP)
+        gl_tax = (tax_total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
+        gl_total = (total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
 
         je_lines = []
         # Debit: Sales Revenue
@@ -286,7 +297,6 @@ def create_sales_credit_note(
 
         je_num = f"JE-SCN-{inv_num}"
         # Validate JE lines
-        from utils.accounting import validate_je_lines
         valid_lines = validate_je_lines(je_lines, source=f"SCN-{inv_num}")
 
         je_id = db.execute(text("""
@@ -338,7 +348,7 @@ def create_sales_credit_note(
             """), {"amt": total, "id": related_invoice_id})
 
         # Update customer balance (credit note REDUCES what customer owes)
-        gl_total_base = round(total * exchange_rate, 4)
+        gl_total_base = (total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
         db.execute(text("""
             UPDATE parties SET current_balance = current_balance - :amt
             WHERE id = :pid
@@ -512,23 +522,25 @@ def create_sales_debit_note(
         inv_date = data.get("invoice_date", str(date.today()))
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
-        exchange_rate = float(data.get("exchange_rate", 1.0))
+        exchange_rate = _dec(data.get("exchange_rate", 1))
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
         branch_id = validate_branch_access(current_user, data.get("branch_id"))
 
-        subtotal = 0
-        tax_total = 0
-        discount_total = 0
+        subtotal = Decimal("0")
+        tax_total = Decimal("0")
+        discount_total = Decimal("0")
         computed_lines = []
 
         for line in lines:
-            qty = float(line.get("quantity", 1))
-            price = float(line.get("unit_price", 0))
-            tax_rate = float(line.get("tax_rate", 0))
-            disc = float(line.get("discount", 0))
+            qty = _dec(line.get("quantity", 1))
+            price = _dec(line.get("unit_price", 0))
+            tax_rate = _dec(line.get("tax_rate", 0))
+            disc = _dec(line.get("discount", 0))
             line_gross = qty * price
             line_net = line_gross - disc
-            line_tax = round(line_net * tax_rate / 100, 4)
-            line_total = round(line_net + line_tax, 4)
+            line_tax = (line_net * tax_rate / Decimal("100")).quantize(_D4, ROUND_HALF_UP)
+            line_total = (line_net + line_tax).quantize(_D4, ROUND_HALF_UP)
 
             subtotal += line_net
             tax_total += line_tax
@@ -541,7 +553,7 @@ def create_sales_debit_note(
                 "total": line_total,
             })
 
-        total = round(subtotal + tax_total, 4)
+        total = (subtotal + tax_total).quantize(_D4, ROUND_HALF_UP)
 
         inv_num = generate_sequential_number(db, "SDN", "invoices", "invoice_number")
         result = db.execute(text("""
@@ -585,9 +597,9 @@ def create_sales_debit_note(
         if not acc_ar or not acc_sales:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AR / Sales Revenue)")
 
-        gl_sub = round(subtotal * exchange_rate, 4)
-        gl_tax = round(tax_total * exchange_rate, 4)
-        gl_total = round(total * exchange_rate, 4)
+        gl_sub = (subtotal * exchange_rate).quantize(_D4, ROUND_HALF_UP)
+        gl_tax = (tax_total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
+        gl_total = (total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
 
         je_lines = []
         # Debit: AR
@@ -652,7 +664,7 @@ def create_sales_debit_note(
             )
 
         # Update customer balance (debit note INCREASES what customer owes)
-        gl_total_base = round(total * exchange_rate, 4)
+        gl_total_base = (total * exchange_rate).quantize(_D4, ROUND_HALF_UP)
         db.execute(text("""
             UPDATE parties SET current_balance = current_balance + :amt
             WHERE id = :pid

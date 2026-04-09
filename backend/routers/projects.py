@@ -9,6 +9,7 @@ import os
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
@@ -22,6 +23,11 @@ from services.gl_service import create_journal_entry as gl_create_journal_entry
 import logging
 
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+_D4 = Decimal('0.0001')
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 router = APIRouter(prefix="/projects", tags=["المشاريع"], dependencies=[Depends(require_module("projects"))])
 from schemas.projects import (
@@ -185,16 +191,17 @@ async def get_project(project_id: int, current_user: dict = Depends(get_current_
         project_data["revenues"] = [dict(rv._mapping) for rv in revenues]
 
         # Financial summary
-        total_exp = sum(float(ex.get("amount", 0)) for ex in project_data["expenses"] if ex.get("status") != "rejected")
-        total_rev = sum(float(rv.get("amount", 0)) for rv in project_data["revenues"] if rv.get("status") != "rejected")
-        planned = float(project_data.get("planned_budget") or 0)
+        total_exp = sum(_dec(ex.get("amount", 0)) for ex in project_data["expenses"] if ex.get("status") != "rejected")
+        total_rev = sum(_dec(rv.get("amount", 0)) for rv in project_data["revenues"] if rv.get("status") != "rejected")
+        planned = _dec(project_data.get("planned_budget") or 0)
+        budget_consumed_pct = ((total_exp / planned) * Decimal('100')).quantize(_D2, ROUND_HALF_UP) if planned > 0 else Decimal('0')
 
         project_data["financial_summary"] = {
-            "planned_budget": planned,
-            "total_expenses": total_exp,
-            "total_revenues": total_rev,
-            "profit_loss": total_rev - total_exp,
-            "budget_consumed_pct": round(total_exp / planned * 100, 2) if planned > 0 else 0,
+            "planned_budget": float(planned),
+            "total_expenses": float(total_exp),
+            "total_revenues": float(total_rev),
+            "profit_loss": float(total_rev - total_exp),
+            "budget_consumed_pct": float(budget_consumed_pct),
         }
 
         return project_data
@@ -519,7 +526,7 @@ async def create_project_expense(
             raise HTTPException(status_code=404, detail="المشروع غير موجود")
 
         base_currency = get_base_currency(db)
-        amount = float(expense.amount)
+        amount = _dec(expense.amount).quantize(_D2, ROUND_HALF_UP)
 
         # Determine expense account
         expense_acc = expense.expense_account_id
@@ -577,7 +584,7 @@ async def create_project_expense(
             reference=None,
             status="posted",
             currency=base_currency,
-            exchange_rate=1.0,
+            exchange_rate=Decimal('1'),
             lines=[
                 {
                     "account_id": expense_acc,
@@ -617,7 +624,7 @@ async def create_project_expense(
             db, user_id=current_user.id, username=current_user.username,
             action="project.expense", resource_type="project_expense",
             resource_id=str(exp_id),
-            details={"project_id": project_id, "amount": amount, "type": expense.expense_type},
+            details={"project_id": project_id, "amount": float(amount), "type": expense.expense_type},
             request=request
         )
 
@@ -673,7 +680,7 @@ async def create_project_revenue(
             raise HTTPException(status_code=404, detail="المشروع غير موجود")
 
         base_currency = get_base_currency(db)
-        amount = float(revenue.amount)
+        amount = _dec(revenue.amount).quantize(_D2, ROUND_HALF_UP)
 
         # Revenue account
         revenue_acc = get_mapped_account_id(db, "acc_map_sales_rev")
@@ -834,37 +841,37 @@ async def get_project_financials(project_id: int, current_user: dict = Depends(g
             ORDER BY d.month
         """), {"pid": project_id}).fetchall()
 
-        total_exp = sum(float(e._mapping["total"]) for e in expenses_by_type)
-        total_rev = sum(float(r._mapping["total"]) for r in revenues_by_type)
-        planned = float(p.get("planned_budget") or 0)
+        total_exp = sum((_dec(e._mapping["total"]) for e in expenses_by_type), Decimal('0'))
+        total_rev = sum((_dec(r._mapping["total"]) for r in revenues_by_type), Decimal('0'))
+        planned = _dec(p.get("planned_budget") or 0)
         
         # Calculate Indirect Costs (Overhead) - For now, assume a fixed 15% of Labor if not explicitly recorded
         # In a real scenario, this might come from a specific 'overhead' expense type
-        labor_cost = next((float(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] == 'labor'), 0)
-        direct_materials = next((float(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] == 'materials'), 0)
+        labor_cost = next((_dec(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] == 'labor'), Decimal('0'))
+        direct_materials = next((_dec(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] == 'materials'), Decimal('0'))
         
         # If no explicit 'overhead' expense type exists, we can estimate or just list what's there.
         # Let's just categorize existing expenses into Direct (Labor, Materials) and Indirect (Others)
         direct_types = ['labor', 'materials']
-        indirect_cost = sum(float(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] not in direct_types)
+        indirect_cost = sum((_dec(e._mapping["total"]) for e in expenses_by_type if e._mapping["expense_type"] not in direct_types), Decimal('0'))
 
         net_profit = total_rev - total_exp
-        margin = (net_profit / total_rev * 100) if total_rev > 0 else 0
+        margin = (net_profit / total_rev * Decimal('100')) if total_rev > 0 else Decimal('0')
 
         return {
             "project_id": project_id,
             "project_name": p["project_name"],
-            "planned_budget": planned,
-            "total_expenses": total_exp,
-            "total_revenues": total_rev,
-            "net_profit": net_profit,
-            "margin_pct": round(margin, 2),
-            "budget_remaining": planned - total_exp,
-            "budget_consumed_pct": round(total_exp / planned * 100, 2) if planned > 0 else 0,
+            "planned_budget": float(planned.quantize(_D2)),
+            "total_expenses": float(total_exp.quantize(_D2)),
+            "total_revenues": float(total_rev.quantize(_D2)),
+            "net_profit": float(net_profit.quantize(_D2)),
+            "margin_pct": float(margin.quantize(_D2)),
+            "budget_remaining": float((planned - total_exp).quantize(_D2)),
+            "budget_consumed_pct": float(((total_exp / planned) * Decimal('100')).quantize(_D2)) if planned > 0 else 0,
             "cost_breakdown": {
-                "labor": labor_cost,
-                "materials": direct_materials,
-                "indirect_overhead": indirect_cost,
+                "labor": float(labor_cost.quantize(_D2)),
+                "materials": float(direct_materials.quantize(_D2)),
+                "indirect_overhead": float(indirect_cost.quantize(_D2)),
                 "details": [dict(e._mapping) for e in expenses_by_type]
             },
             "revenues_by_type": [dict(r._mapping) for r in revenues_by_type],
@@ -939,11 +946,11 @@ async def get_resource_allocation(
             if days_count <= 0: days_count = 1
             
             # Simple linear distribution: hours / days
-            daily_hours = float(task.planned_hours or 0) / days_count
+            daily_hours = _dec(task.planned_hours or 0) / _dec(days_count)
 
             for single_date in daterange(t_start, t_end):
                 d_str = single_date.isoformat()
-                allocation[emp_id]["daily_load"][d_str] = allocation[emp_id]["daily_load"].get(d_str, 0) + daily_hours
+                allocation[emp_id]["daily_load"][d_str] = allocation[emp_id]["daily_load"].get(d_str, Decimal('0')) + daily_hours
 
         # Format for frontend
         result = []
@@ -952,7 +959,7 @@ async def get_resource_allocation(
                 "id": data["id"],
                 "name": data["name"],
                 "projects": list(data["projects"]),
-                "daily_load": [{"date": d, "hours": float(f"{float(h):.2f}")} for d, h in data["daily_load"].items()]
+                "daily_load": [{"date": d, "hours": float(_dec(h).quantize(_D2, ROUND_HALF_UP))} for d, h in data["daily_load"].items()]
             })
 
         return result
@@ -1059,8 +1066,8 @@ async def update_timesheet(
              raise HTTPException(status_code=403, detail="غير مصرح لك بتعديل هذا السجل")
 
         # Calculate difference in hours if updating hours/task
-        old_hours = float(existing.hours)
-        new_hours = entry.hours if entry.hours is not None else old_hours
+        old_hours = _dec(existing.hours)
+        new_hours = _dec(entry.hours) if entry.hours is not None else old_hours
         diff = new_hours - old_hours
         
         old_task = existing.task_id
@@ -1082,7 +1089,7 @@ async def update_timesheet(
             db.execute(text(f"UPDATE project_timesheets SET {', '.join(updates)} WHERE id = :id"), params)
 
             # Update actual hours on task(s)
-            if old_task == new_task and diff != 0 and old_task:
+              if old_task == new_task and diff != 0 and old_task:
                  db.execute(text("UPDATE project_tasks SET actual_hours = actual_hours + :diff WHERE id = :tid"), 
                             {"diff": diff, "tid": old_task})
             
@@ -1167,12 +1174,12 @@ async def approve_timesheets(
                 continue
 
             # Calculate Rate
-            rate = float(ts.hourly_cost or 0)
+            rate = _dec(ts.hourly_cost or 0)
             if rate == 0:
                 # Fallback: Monthly Salary / 176 hours
-                rate = float(ts.salary or 0) / 176.0
+                rate = _dec(ts.salary or 0) / Decimal('176')
             
-            total_cost = round(rate * float(ts.hours), 2)
+            total_cost = (rate * _dec(ts.hours)).quantize(_D2, ROUND_HALF_UP)
 
             if total_cost > 0:
                 # A. Create Project Expense Record
@@ -1732,11 +1739,11 @@ async def close_project(
         if p["status"] == "completed":
             raise HTTPException(status_code=400, detail="المشروع مغلق بالفعل")
 
-        total_expenses = float(db.execute(text(
+        total_expenses = _dec(db.execute(text(
             "SELECT COALESCE(SUM(amount), 0) FROM project_expenses WHERE project_id = :pid AND status != 'rejected'"
         ), {"pid": project_id}).scalar())
 
-        total_revenues = float(db.execute(text(
+        total_revenues = _dec(db.execute(text(
             "SELECT COALESCE(SUM(amount), 0) FROM project_revenues WHERE project_id = :pid AND status != 'rejected'"
         ), {"pid": project_id}).scalar())
 
@@ -1745,7 +1752,7 @@ async def close_project(
         close_date = close_data.close_date or date.today()
 
         je_id = None
-        if abs(net_profit_loss) > 0.01:
+        if abs(net_profit_loss) > Decimal('0.01'):
             pl_acc = get_mapped_account_id(db, "acc_map_project_pl")
             if not pl_acc:
                 pl_acc = db.execute(text(
@@ -1812,9 +1819,9 @@ async def close_project(
             db, user_id=current_user.id, username=current_user.username,
             action="project.close", resource_type="project",
             resource_id=str(project_id),
-            details={"net_profit_loss": net_profit_loss,
-                     "total_expenses": total_expenses,
-                     "total_revenues": total_revenues},
+            details={"net_profit_loss": float(net_profit_loss.quantize(_D2)),
+                     "total_expenses": float(total_expenses.quantize(_D2)),
+                     "total_revenues": float(total_revenues.quantize(_D2))},
             request=request
         )
 
@@ -1822,9 +1829,9 @@ async def close_project(
             "success": True,
             "message": "تم إغلاق المشروع بنجاح",
             "summary": {
-                "total_expenses": total_expenses,
-                "total_revenues": total_revenues,
-                "net_profit_loss": net_profit_loss,
+                "total_expenses": float(total_expenses.quantize(_D2)),
+                "total_revenues": float(total_revenues.quantize(_D2)),
+                "net_profit_loss": float(net_profit_loss.quantize(_D2)),
                 "journal_entry_id": je_id,
             }
         }
@@ -1924,7 +1931,7 @@ async def generate_retainer_invoices(
         
         for proj in projects:
             p = proj._mapping
-            amount = float(p["retainer_amount"])
+            amount = _dec(p["retainer_amount"])
             if amount <= 0:
                 continue
             
@@ -2058,31 +2065,33 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
             raise HTTPException(status_code=404, detail="المشروع غير موجود")
 
         p = project._mapping
-        bac = float(p.get("planned_budget") or 0)
-        progress = float(p.get("progress_percentage") or 0) / 100.0
+        bac = _dec(p.get("planned_budget") or 0)
+        progress = _dec(p.get("progress_percentage") or 0) / Decimal('100')
 
         start_dt = p.get("start_date")
         end_dt = p.get("end_date")
         today = date.today()
 
-        schedule_progress = 0.0
+        schedule_progress = Decimal('0')
         if start_dt and end_dt and end_dt > start_dt:
             total_days = (end_dt - start_dt).days
             elapsed_days = min((today - start_dt).days, total_days)
-            schedule_progress = max(0.0, elapsed_days / total_days) if total_days > 0 else 0.0
+            schedule_progress = (
+                max(Decimal('0'), _dec(elapsed_days) / _dec(total_days)) if total_days > 0 else Decimal('0')
+            )
 
         pv = bac * schedule_progress          # Planned Value
         ev = bac * progress                    # Earned Value
-        ac = float(db.execute(text(
+        ac = _dec(db.execute(text(
             "SELECT COALESCE(SUM(amount), 0) FROM project_expenses WHERE project_id = :pid AND status != 'rejected'"
         ), {"pid": project_id}).scalar())
 
-        spi = ev / pv if pv > 0 else 0.0
-        cpi = ev / ac if ac > 0 else 0.0
+        spi = ev / pv if pv > 0 else Decimal('0')
+        cpi = ev / ac if ac > 0 else Decimal('0')
         sv = ev - pv
         cv = ev - ac
-        eac = bac / cpi if cpi > 0 else bac * 2
-        etc = max(0.0, eac - ac)
+        eac = bac / cpi if cpi > 0 else bac * Decimal('2')
+        etc = max(Decimal('0'), eac - ac)
         vac = bac - eac
 
         remaining_work = bac - ev
@@ -2093,24 +2102,24 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
             "project_id": project_id,
             "project_name": p["project_name"],
             "metrics": {
-                "BAC": round(bac, 2),
-                "PV": round(pv, 2),
-                "EV": round(ev, 2),
-                "AC": round(ac, 2),
-                "SV": round(sv, 2),
-                "CV": round(cv, 2),
-                "SPI": round(spi, 4),
-                "CPI": round(cpi, 4),
-                "EAC": round(eac, 2),
-                "ETC": round(etc, 2),
-                "VAC": round(vac, 2),
-                "TCPI": round(tcpi, 4) if tcpi is not None else None,
+                "BAC": float(bac.quantize(_D2)),
+                "PV": float(pv.quantize(_D2)),
+                "EV": float(ev.quantize(_D2)),
+                "AC": float(ac.quantize(_D2)),
+                "SV": float(sv.quantize(_D2)),
+                "CV": float(cv.quantize(_D2)),
+                "SPI": float(spi.quantize(_D4)),
+                "CPI": float(cpi.quantize(_D4)),
+                "EAC": float(eac.quantize(_D2)),
+                "ETC": float(etc.quantize(_D2)),
+                "VAC": float(vac.quantize(_D2)),
+                "TCPI": float(tcpi.quantize(_D4)) if tcpi is not None else None,
             },
             "interpretation": {
                 "schedule": "ahead" if spi > 1 else ("on_track" if spi == 1 else "behind"),
                 "cost": "under_budget" if cpi > 1 else ("on_budget" if cpi == 1 else "over_budget"),
-                "schedule_progress_pct": round(schedule_progress * 100, 2),
-                "completion_pct": round(progress * 100, 2),
+                "schedule_progress_pct": float((schedule_progress * Decimal('100')).quantize(_D2)),
+                "completion_pct": float((progress * Decimal('100')).quantize(_D2)),
             }
         }
     except HTTPException:
@@ -2162,15 +2171,15 @@ async def report_project_profitability(
         """), params).fetchall()
 
         projects_list = []
-        total_revenue_sum = 0.0
-        total_expense_sum = 0.0
+        total_revenue_sum = Decimal('0')
+        total_expense_sum = Decimal('0')
         for r in rows:
             m = r._mapping
-            rev = float(m["total_revenues"] or 0)
-            exp = float(m["total_expenses"] or 0)
+            rev = _dec(m["total_revenues"] or 0)
+            exp = _dec(m["total_expenses"] or 0)
             net = rev - exp
-            margin = (net / rev * 100) if rev > 0 else 0.0
-            budget = float(m["planned_budget"] or 0)
+            margin = (net / rev * Decimal('100')) if rev > 0 else Decimal('0')
+            budget = _dec(m["planned_budget"] or 0)
             budget_var = budget - exp
 
             projects_list.append({
@@ -2178,28 +2187,28 @@ async def report_project_profitability(
                 "project_code": m["project_code"],
                 "project_name": m["project_name"],
                 "status": m["status"],
-                "planned_budget": budget,
-                "total_expenses": round(exp, 2),
-                "total_revenues": round(rev, 2),
-                "net_profit": round(net, 2),
-                "margin_pct": round(margin, 2),
-                "budget_variance": round(budget_var, 2),
+                "planned_budget": float(budget.quantize(_D2)),
+                "total_expenses": float(exp.quantize(_D2)),
+                "total_revenues": float(rev.quantize(_D2)),
+                "net_profit": float(net.quantize(_D2)),
+                "margin_pct": float(margin.quantize(_D2)),
+                "budget_variance": float(budget_var.quantize(_D2)),
                 "progress": float(m["progress_percentage"] or 0),
             })
             total_revenue_sum += rev
             total_expense_sum += exp
 
         total_net = total_revenue_sum - total_expense_sum
-        avg_margin = (total_net / total_revenue_sum * 100) if total_revenue_sum > 0 else 0.0
+        avg_margin = (total_net / total_revenue_sum * Decimal('100')) if total_revenue_sum > 0 else Decimal('0')
 
         return {
             "report_name": "تقرير ربحية المشاريع",
             "projects": projects_list,
             "totals": {
-                "total_revenue": round(total_revenue_sum, 2),
-                "total_expense": round(total_expense_sum, 2),
-                "total_profit": round(total_net, 2),
-                "avg_margin_pct": round(avg_margin, 2),
+                "total_revenue": float(total_revenue_sum.quantize(_D2)),
+                "total_expense": float(total_expense_sum.quantize(_D2)),
+                "total_profit": float(total_net.quantize(_D2)),
+                "avg_margin_pct": float(avg_margin.quantize(_D2)),
                 "project_count": len(projects_list),
             }
         }
@@ -2242,13 +2251,13 @@ async def report_project_variance(current_user: dict = Depends(get_current_user)
         projects_list = []
         for r in rows:
             m = r._mapping
-            budget = float(m["planned_budget"] or 0)
-            actual = float(m["actual_expenses"] or 0)
+            budget = _dec(m["planned_budget"] or 0)
+            actual = _dec(m["actual_expenses"] or 0)
             cost_var = budget - actual
-            cost_var_pct = (cost_var / budget * 100) if budget > 0 else 0.0
+            cost_var_pct = (cost_var / budget * Decimal('100')) if budget > 0 else Decimal('0')
 
-            planned_h = float(m["planned_hours"] or 0)
-            actual_h = float(m["actual_hours"] or 0)
+            planned_h = _dec(m["planned_hours"] or 0)
+            actual_h = _dec(m["actual_hours"] or 0)
             hour_var = planned_h - actual_h
 
             schedule_var_days = None
@@ -2260,13 +2269,13 @@ async def report_project_variance(current_user: dict = Depends(get_current_user)
                 "project_code": m["project_code"],
                 "project_name": m["project_name"],
                 "status": m["status"],
-                "planned_budget": budget,
-                "actual_cost": round(actual, 2),
-                "cost_variance": round(cost_var, 2),
-                "cost_variance_pct": round(cost_var_pct, 2),
-                "planned_hours": planned_h,
-                "actual_hours": actual_h,
-                "hours_variance": round(hour_var, 2),
+                "planned_budget": float(budget.quantize(_D2)),
+                "actual_cost": float(actual.quantize(_D2)),
+                "cost_variance": float(cost_var.quantize(_D2)),
+                "cost_variance_pct": float(cost_var_pct.quantize(_D2)),
+                "planned_hours": float(planned_h.quantize(_D2)),
+                "actual_hours": float(actual_h.quantize(_D2)),
+                "hours_variance": float(hour_var.quantize(_D2)),
                 "progress": float(m["progress_percentage"] or 0),
                 "schedule_days_remaining": schedule_var_days,
                 "is_over_budget": actual > budget if budget > 0 else False,
@@ -2324,19 +2333,19 @@ async def report_resource_utilization(
         resources = []
         for r in rows:
             m = r._mapping
-            total_h = float(m["total_hours"] or 0)
+            total_h = _dec(m["total_hours"] or 0)
             working_days = int(m["working_days"] or 1)
-            standard_hours = working_days * 8
-            utilization = (total_h / standard_hours * 100) if standard_hours > 0 else 0.0
+            standard_hours = _dec(working_days * 8)
+            utilization = (total_h / standard_hours * Decimal('100')) if standard_hours > 0 else Decimal('0')
 
             resources.append({
                 "user_id": m["user_id"],
                 "name": m["full_name"],
                 "projects_count": m["projects_count"],
-                "total_hours": round(total_h, 2),
+                "total_hours": float(total_h.quantize(_D2)),
                 "avg_daily_hours": round(float(m["avg_daily_hours"] or 0), 2),
                 "working_days": working_days,
-                "utilization_pct": round(utilization, 2),
+                "utilization_pct": float(utilization.quantize(_D2)),
             })
 
         return {
@@ -2545,9 +2554,9 @@ def create_project_risk(project_id: int, risk: dict, current_user=Depends(get_cu
     """إضافة خطر"""
     db = get_db_connection(current_user.company_id)
     try:
-        prob = float(risk.get("probability", 0.5))
-        impact = float(risk.get("impact", 0.5))
-        score = round(prob * impact, 4)
+        prob = _dec(risk.get("probability", 0.5)).quantize(_D4, ROUND_HALF_UP)
+        impact = _dec(risk.get("impact", 0.5)).quantize(_D4, ROUND_HALF_UP)
+        score = (prob * impact).quantize(_D4, ROUND_HALF_UP)
         result = db.execute(text("""
             INSERT INTO project_risks (project_id, title, description, probability,
                 impact, risk_score, status, mitigation_plan, owner_id, due_date)
@@ -2574,9 +2583,9 @@ def update_project_risk(risk_id: int, risk: dict, current_user=Depends(get_curre
     """تحديث خطر"""
     db = get_db_connection(current_user.company_id)
     try:
-        prob = float(risk.get("probability", 0.5))
-        impact = float(risk.get("impact", 0.5))
-        score = round(prob * impact, 4)
+        prob = _dec(risk.get("probability", 0.5)).quantize(_D4, ROUND_HALF_UP)
+        impact = _dec(risk.get("impact", 0.5)).quantize(_D4, ROUND_HALF_UP)
+        score = (prob * impact).quantize(_D4, ROUND_HALF_UP)
         db.execute(text("""
             UPDATE project_risks SET title = :t, description = :d, probability = :p,
                 impact = :i, risk_score = :s, status = :st, mitigation_plan = :mp,

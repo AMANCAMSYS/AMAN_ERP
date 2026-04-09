@@ -14,6 +14,7 @@ from pydantic import BaseModel, EmailStr
 import logging
 import secrets
 import hashlib
+import ipaddress
 
 from database import get_system_db, verify_password, get_db_connection, hash_password, engine as system_engine
 from config import settings
@@ -54,10 +55,69 @@ def _get_rate_redis():
 _login_attempts = {}
 _username_attempts = {}
 
+_trusted_proxy_networks_cache = None
+_trusted_proxy_raw_cache = None
+
+
+def _get_trusted_proxy_networks():
+    """Parse configured trusted proxy IPs/CIDRs once per config value."""
+    global _trusted_proxy_networks_cache, _trusted_proxy_raw_cache
+    raw = (getattr(settings, "TRUSTED_PROXIES", "") or "").strip()
+    if raw == _trusted_proxy_raw_cache and _trusted_proxy_networks_cache is not None:
+        return _trusted_proxy_networks_cache
+
+    networks = []
+    if raw:
+        for item in raw.split(","):
+            val = item.strip()
+            if not val:
+                continue
+            try:
+                networks.append(ipaddress.ip_network(val, strict=False))
+            except ValueError:
+                logger.warning(f"Ignoring invalid TRUSTED_PROXIES entry: {val}")
+
+    _trusted_proxy_raw_cache = raw
+    _trusted_proxy_networks_cache = networks
+    return networks
+
+
+def _is_trusted_proxy(client_ip: str) -> bool:
+    if not client_ip:
+        return False
+    networks = _get_trusted_proxy_networks()
+    if not networks:
+        return False
+    try:
+        ip = ipaddress.ip_address(client_ip)
+    except ValueError:
+        return False
+    return any(ip in net for net in networks)
+
 
 def _get_client_ip(request: Request) -> str:
+    client_ip = request.client.host if request.client else "unknown"
     xff = request.headers.get("X-Forwarded-For", "")
-    return xff.split(",")[0].strip() if xff else (request.client.host if request.client else "unknown")
+
+    if not xff:
+        return client_ip
+
+    if not _is_trusted_proxy(client_ip):
+        logger.warning(
+            f"Rejected X-Forwarded-For from untrusted source: client_ip={client_ip}, xff={xff}"
+        )
+        return client_ip
+
+    forwarded_ip = xff.split(",")[0].strip()
+    try:
+        ipaddress.ip_address(forwarded_ip)
+    except ValueError:
+        logger.warning(
+            f"Rejected malformed X-Forwarded-For value from trusted proxy {client_ip}: {xff}"
+        )
+        return client_ip
+
+    return forwarded_ip
 
 
 def check_rate_limit(request: Request, username: str = None):

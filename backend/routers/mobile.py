@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.permissions import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,13 @@ class DashboardResponse(BaseModel):
     recent_quotations: list
     currency_code: str
     currency_symbol: str
+    sales: float = 0
+    expenses: float = 0
+    profit: float = 0
+    cash: float = 0
+    total_customers: int = 0
+    total_suppliers: int = 0
+    total_invoices: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +102,8 @@ def _get_company_id(current_user) -> str:
 # POST /mobile/sync  — Batch sync offline changes
 # ---------------------------------------------------------------------------
 
-@router.post("/sync", response_model=SyncBatchResponse)
+@router.post("/sync", response_model=SyncBatchResponse,
+             dependencies=[Depends(require_permission("mobile.sync"))])
 async def batch_sync(
     body: SyncBatchRequest,
     current_user=Depends(get_current_user),
@@ -190,7 +199,8 @@ async def batch_sync(
 # GET /mobile/sync/status  — get sync status for device
 # ---------------------------------------------------------------------------
 
-@router.get("/sync/status", response_model=SyncStatusResponse)
+@router.get("/sync/status", response_model=SyncStatusResponse,
+            dependencies=[Depends(require_permission("mobile.sync"))])
 async def sync_status(
     device_id: str,
     current_user=Depends(get_current_user),
@@ -221,7 +231,8 @@ async def sync_status(
 # POST /mobile/sync/resolve  — resolve a sync conflict
 # ---------------------------------------------------------------------------
 
-@router.post("/sync/resolve")
+@router.post("/sync/resolve",
+             dependencies=[Depends(require_permission("mobile.sync"))])
 async def resolve_conflict(
     body: ConflictResolveRequest,
     current_user=Depends(get_current_user),
@@ -274,7 +285,8 @@ async def resolve_conflict(
 # GET /mobile/dashboard  — aggregated dashboard for mobile
 # ---------------------------------------------------------------------------
 
-@router.get("/dashboard", response_model=DashboardResponse)
+@router.get("/dashboard", response_model=DashboardResponse,
+            dependencies=[Depends(require_permission("mobile.dashboard"))])
 async def mobile_dashboard(current_user=Depends(get_current_user)):
     company_id = _get_company_id(current_user)
     conn = get_db_connection(company_id)
@@ -306,9 +318,10 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
 
         # Inventory summary
         inv_row = conn.execute(text("""
-            SELECT COUNT(*) AS total_products,
-                   COALESCE(SUM(quantity_on_hand), 0) AS total_stock
-            FROM products
+            SELECT COUNT(DISTINCT p.id) AS total_products,
+                   COALESCE(SUM(i.quantity), 0) AS total_stock
+            FROM products p
+            LEFT JOIN inventory i ON i.product_id = p.id
         """)).mappings().first()
         inventory_summary = {
             "total_products": inv_row["total_products"] if inv_row else 0,
@@ -324,17 +337,79 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
         # Pending approvals for current user
         pending_approvals_row = conn.execute(text("""
             SELECT COUNT(*) AS cnt FROM approval_requests
-            WHERE approver_id = :uid AND status = 'pending'
+            WHERE current_approver_id = :uid AND status = 'pending'
         """), {"uid": current_user.id}).mappings().first()
         pending_approvals = pending_approvals_row["cnt"] if pending_approvals_row else 0
 
         # Recent quotations
         quot_rows = conn.execute(text("""
-            SELECT id, quotation_number, customer_name, total_amount, status, created_at
-            FROM quotations
-            ORDER BY created_at DESC LIMIT 10
+            SELECT sq.id, sq.sq_number, p.name AS customer_name,
+                   sq.total AS total_amount, sq.status, sq.created_at
+            FROM sales_quotations sq
+            LEFT JOIN parties p ON p.id = sq.party_id
+            ORDER BY sq.created_at DESC LIMIT 10
         """)).mappings().all()
         recent_quotations = [dict(r) for r in quot_rows]
+
+        # Financial stats: sales = revenue, expenses, profit, cash
+        sales = 0.0
+        expenses = 0.0
+        cash = 0.0
+        try:
+            rev_row = conn.execute(text("""
+                SELECT COALESCE(SUM(jl.credit - jl.debit), 0) AS total
+                FROM journal_lines jl
+                JOIN accounts a ON jl.account_id = a.id
+                WHERE a.account_type = 'revenue'
+            """)).mappings().first()
+            sales = float(rev_row["total"]) if rev_row else 0.0
+
+            exp_row = conn.execute(text("""
+                SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS total
+                FROM journal_lines jl
+                JOIN accounts a ON jl.account_id = a.id
+                WHERE a.account_type = 'expense'
+            """)).mappings().first()
+            expenses = float(exp_row["total"]) if exp_row else 0.0
+
+            # Cash from treasury accounts or BOX/BNK accounts
+            cash_row = conn.execute(text("""
+                SELECT COALESCE(SUM(a.balance), 0) AS total
+                FROM accounts a
+                WHERE a.id IN (
+                    SELECT gl_account_id FROM treasury_accounts WHERE is_active = true
+                    UNION
+                    SELECT id FROM accounts WHERE account_code LIKE 'BOX%%' OR account_code LIKE 'BNK%%'
+                )
+            """)).mappings().first()
+            cash = float(cash_row["total"]) if cash_row else 0.0
+        except Exception:
+            conn.rollback()  # reset transaction state after error
+
+        profit = sales - expenses
+
+        # Counts
+        total_customers = 0
+        total_suppliers = 0
+        total_invoices = 0
+        try:
+            cust_row = conn.execute(text("""
+                SELECT COUNT(*) AS cnt FROM parties
+                WHERE party_type = 'customer' OR is_customer = true
+            """)).mappings().first()
+            total_customers = cust_row["cnt"] if cust_row else 0
+
+            supp_row = conn.execute(text("""
+                SELECT COUNT(*) AS cnt FROM parties WHERE is_supplier = true
+            """)).mappings().first()
+            total_suppliers = supp_row["cnt"] if supp_row else 0
+
+            inv_cnt_row = conn.execute(text("""
+                SELECT COUNT(*) AS cnt FROM invoices
+            """)).mappings().first()
+            total_invoices = inv_cnt_row["cnt"] if inv_cnt_row else 0
+        except Exception:
+            conn.rollback()
     finally:
         conn.close()
 
@@ -345,6 +420,13 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
         recent_quotations=recent_quotations,
         currency_code=currency_code,
         currency_symbol=currency_symbol,
+        sales=sales,
+        expenses=expenses,
+        profit=profit,
+        cash=cash,
+        total_customers=total_customers,
+        total_suppliers=total_suppliers,
+        total_invoices=total_invoices,
     )
 
 
@@ -352,7 +434,8 @@ async def mobile_dashboard(current_user=Depends(get_current_user)):
 # POST /mobile/register-device  — register device for push notifications
 # ---------------------------------------------------------------------------
 
-@router.post("/register-device", status_code=201)
+@router.post("/register-device", status_code=201,
+             dependencies=[Depends(require_permission("mobile.sync"))])
 async def register_device(
     body: DeviceRegisterRequest,
     current_user=Depends(get_current_user),
@@ -361,24 +444,38 @@ async def register_device(
     conn = get_db_connection(company_id)
     try:
         with conn.begin():
-            # Upsert device registration (store in sync_queue metadata or dedicated table)
-            # For now, store as a special sync_queue entry with entity_type='device_registration'
+            # Ensure push_devices table exists
             conn.execute(text("""
-                INSERT INTO sync_queue
-                    (device_id, user_id, entity_type, entity_id, operation,
-                     payload, device_timestamp, server_timestamp, sync_status,
-                     created_at, updated_at)
+                CREATE TABLE IF NOT EXISTS push_devices (
+                    id SERIAL PRIMARY KEY,
+                    device_id VARCHAR(255) NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    platform VARCHAR(10) NOT NULL CHECK (platform IN ('ios', 'android')),
+                    fcm_token VARCHAR(500) NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    last_seen_at TIMESTAMPTZ DEFAULT NOW(),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(device_id, user_id)
+                )
+            """))
+            # Upsert device registration into dedicated push_devices table
+            conn.execute(text("""
+                INSERT INTO push_devices
+                    (device_id, user_id, platform, fcm_token, is_active, last_seen_at, created_at, updated_at)
                 VALUES
-                    (:device_id, :user_id, 'device_registration', NULL, 'create',
-                     :payload::jsonb, now(), now(), 'synced', now(), now())
-                ON CONFLICT DO NOTHING
+                    (:device_id, :user_id, :platform, :fcm_token, TRUE, NOW(), NOW(), NOW())
+                ON CONFLICT (device_id, user_id) DO UPDATE SET
+                    fcm_token = EXCLUDED.fcm_token,
+                    platform = EXCLUDED.platform,
+                    is_active = TRUE,
+                    last_seen_at = NOW(),
+                    updated_at = NOW()
             """), {
                 "device_id": body.device_id,
                 "user_id": current_user.id,
-                "payload": _json_dumps({
-                    "platform": body.platform,
-                    "fcm_token": body.fcm_token,
-                }),
+                "platform": body.platform,
+                "fcm_token": body.fcm_token,
             })
     finally:
         conn.close()
@@ -399,7 +496,7 @@ def _json_dumps(obj) -> str:
 
 # Entity table mapping for conflict detection & sync application
 _ENTITY_TABLE_MAP = {
-    "quotation": {"table": "quotations", "id_col": "id"},
+    "quotation": {"table": "sales_quotations", "id_col": "id"},
     "sales_order": {"table": "sales_orders", "id_col": "id"},
     "approval": {"table": "approval_requests", "id_col": "id"},
     "inventory_adjustment": {"table": "stock_adjustments", "id_col": "id"},

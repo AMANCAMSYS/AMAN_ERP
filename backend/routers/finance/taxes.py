@@ -17,11 +17,19 @@ from utils.accounting import (
     update_account_balance,
     get_base_currency
 )
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 router = APIRouter(prefix="/taxes", tags=["الضرائب"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
 from schemas.taxes import TaxRateCreate, TaxRateUpdate, TaxGroupCreate, TaxReturnCreate, TaxPaymentCreate
+
+_D2 = Decimal("0.01")
+_D4 = Decimal("0.0001")
+
+
+def _dec(v: Any) -> Decimal:
+    return Decimal(str(v or 0))
 
 # ==================== TAX RATES CRUD ====================
 
@@ -200,7 +208,8 @@ def list_tax_groups(current_user: dict = Depends(get_current_user)):
                 if placeholders:
                     taxes = db.execute(text(f"SELECT id, tax_name, rate_value FROM tax_rates WHERE id IN ({placeholders})")).fetchall()
                     item["taxes"] = [dict(t._mapping) for t in taxes]
-                    item["combined_rate"] = sum(float(t.rate_value) for t in taxes)
+                    combined_rate = sum((_dec(t.rate_value) for t in taxes), Decimal("0"))
+                    item["combined_rate"] = float(combined_rate.quantize(_D4, ROUND_HALF_UP))
                 else:
                     item["taxes"] = []
                     item["combined_rate"] = 0
@@ -330,8 +339,10 @@ def get_tax_return(return_id: int, current_user: dict = Depends(get_current_user
             ORDER BY tp.payment_date DESC
         """), {"id": return_id}).fetchall()
         result["payments"] = [dict(p._mapping) for p in payments]
-        result["paid_amount"] = sum(float(p.amount) for p in payments if p.status == "confirmed")
-        result["remaining_amount"] = float(result.get("total_amount", 0)) - result["paid_amount"]
+        paid_amount = sum((_dec(p.amount) for p in payments if p.status == "confirmed"), Decimal("0"))
+        remaining_amount = _dec(result.get("total_amount", 0)) - paid_amount
+        result["paid_amount"] = float(paid_amount.quantize(_D2, ROUND_HALF_UP))
+        result["remaining_amount"] = float(remaining_amount.quantize(_D2, ROUND_HALF_UP))
 
         return result
     finally:
@@ -421,9 +432,9 @@ def create_tax_return(
             AND i.invoice_date >= :start AND i.invoice_date < :end {branch_filter}
         """), params).fetchone()
 
-        net_output_vat = float(output.vat or 0) - float(output_returns.vat or 0)
-        net_input_vat = float(input_vat.vat or 0) - float(input_returns.vat or 0)
-        taxable_amount = float(output.taxable or 0) - float(output_returns.taxable or 0)
+        net_output_vat = _dec(output.vat) - _dec(output_returns.vat)
+        net_input_vat = _dec(input_vat.vat) - _dec(input_returns.vat)
+        taxable_amount = _dec(output.taxable) - _dec(output_returns.taxable)
         tax_amount = net_output_vat - net_input_vat
 
         return_number = generate_sequential_number(db, "TR", "tax_returns", "return_number")
@@ -447,7 +458,9 @@ def create_tax_return(
             RETURNING id
         """), {
             "num": return_number, "period": period, "type": data.tax_type,
-            "taxable": taxable_amount, "tax": tax_amount, "total": tax_amount,
+            "taxable": float(taxable_amount.quantize(_D2, ROUND_HALF_UP)),
+            "tax": float(tax_amount.quantize(_D2, ROUND_HALF_UP)),
+            "total": float(tax_amount.quantize(_D2, ROUND_HALF_UP)),
             "due": data.due_date, "notes": data.notes, "user": current_user.id,
             "bid": branch_id, "jc": jurisdiction_code
         })
@@ -457,15 +470,17 @@ def create_tax_return(
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="taxes.return.create", resource_type="tax_return",
                      resource_id=str(new_id),
-                     details={"period": period, "tax_amount": tax_amount, "return_number": return_number},
+                     details={"period": period, "tax_amount": float(tax_amount.quantize(_D2, ROUND_HALF_UP)), "return_number": return_number},
                      request=request)
 
         return {
             "success": True, "id": new_id, "return_number": return_number,
             "message": "تم إنشاء الإقرار الضريبي بنجاح",
             "summary": {
-                "output_vat": net_output_vat, "input_vat": net_input_vat,
-                "net_payable": tax_amount, "taxable_amount": taxable_amount
+                "output_vat": float(net_output_vat.quantize(_D2, ROUND_HALF_UP)),
+                "input_vat": float(net_input_vat.quantize(_D2, ROUND_HALF_UP)),
+                "net_payable": float(tax_amount.quantize(_D2, ROUND_HALF_UP)),
+                "taxable_amount": float(taxable_amount.quantize(_D2, ROUND_HALF_UP))
             }
         }
     except HTTPException:
@@ -493,24 +508,24 @@ def file_tax_return(
         if row.status != "draft":
             raise HTTPException(status_code=400, detail="لا يمكن تقديم إقرار غير في حالة مسودة")
 
-        penalty = float((body or {}).get("penalty_amount", 0))
-        interest = float((body or {}).get("interest_amount", 0))
-        total = float(row.tax_amount) + penalty + interest
+        penalty = _dec((body or {}).get("penalty_amount", 0)).quantize(_D2, ROUND_HALF_UP)
+        interest = _dec((body or {}).get("interest_amount", 0)).quantize(_D2, ROUND_HALF_UP)
+        total = (_dec(row.tax_amount) + penalty + interest).quantize(_D2, ROUND_HALF_UP)
 
         db.execute(text("""
             UPDATE tax_returns SET status = 'filed', filed_date = CURRENT_DATE,
                 penalty_amount = :penalty, interest_amount = :interest, total_amount = :total
             WHERE id = :id
-        """), {"id": return_id, "penalty": penalty, "interest": interest, "total": total})
+        """), {"id": return_id, "penalty": float(penalty), "interest": float(interest), "total": float(total)})
         db.commit()
 
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="taxes.return.file", resource_type="tax_return",
                      resource_id=str(return_id),
-                     details={"return_number": row.return_number, "total": total},
+                     details={"return_number": row.return_number, "total": float(total)},
                      request=request)
 
-        return {"success": True, "message": "تم تقديم الإقرار الضريبي بنجاح", "total_amount": total}
+        return {"success": True, "message": "تم تقديم الإقرار الضريبي بنجاح", "total_amount": float(total)}
     except HTTPException:
         raise
     except Exception as e:
@@ -620,9 +635,10 @@ def create_tax_payment(
         paid = db.execute(text(
             "SELECT COALESCE(SUM(amount), 0) FROM tax_payments WHERE tax_return_id = :id AND status = 'confirmed'"
         ), {"id": data.tax_return_id}).scalar()
-        remaining = float(tr.total_amount) - float(paid)
-        if data.amount > remaining + 0.01:
-            raise HTTPException(status_code=400, detail=f"المبلغ يتجاوز المتبقي ({remaining:.2f})")
+        remaining = (_dec(tr.total_amount) - _dec(paid)).quantize(_D2, ROUND_HALF_UP)
+        amount_dec = _dec(data.amount).quantize(_D2, ROUND_HALF_UP)
+        if amount_dec > (remaining + _D2):
+            raise HTTPException(status_code=400, detail=f"المبلغ يتجاوز المتبقي ({float(remaining):.2f})")
 
         payment_number = generate_sequential_number(db, "TP", "tax_payments", "payment_number")
 
@@ -664,11 +680,11 @@ def create_tax_payment(
             
             je_lines = [
                 {
-                    "account_id": vat_account_id, "debit": float(data.amount), "credit": 0,
+                    "account_id": vat_account_id, "debit": float(amount_dec), "credit": 0,
                     "description": f"دفع ضريبة — {tr.tax_period}"
                 },
                 {
-                    "account_id": bank_account_id, "debit": 0, "credit": float(data.amount),
+                    "account_id": bank_account_id, "debit": 0, "credit": float(amount_dec),
                     "description": f"دفع ضريبة — {tr.tax_period}"
                 }
             ]
@@ -690,8 +706,8 @@ def create_tax_payment(
             )
 
         # Update return status if fully paid
-        new_paid = float(paid) + data.amount
-        if new_paid >= float(tr.total_amount) - 0.01:
+        new_paid = (_dec(paid) + amount_dec).quantize(_D2, ROUND_HALF_UP)
+        if new_paid >= (_dec(tr.total_amount).quantize(_D2, ROUND_HALF_UP) - _D2):
             db.execute(text("UPDATE tax_returns SET status = 'paid' WHERE id = :id"), {"id": data.tax_return_id})
 
         db.commit()
@@ -769,16 +785,17 @@ def get_vat_report(
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).fetchone()
 
-        net_output_taxable = float(output_vat.taxable_amount or 0) - float(output_vat_returns.taxable_amount or 0)
-        net_output_vat = float(output_vat.vat_amount or 0) - float(output_vat_returns.vat_amount or 0)
-        net_input_taxable = float(input_vat.taxable_amount or 0) - float(input_vat_returns.taxable_amount or 0)
-        net_input_vat = float(input_vat.vat_amount or 0) - float(input_vat_returns.vat_amount or 0)
+        net_output_taxable = (_dec(output_vat.taxable_amount) - _dec(output_vat_returns.taxable_amount)).quantize(_D2, ROUND_HALF_UP)
+        net_output_vat = (_dec(output_vat.vat_amount) - _dec(output_vat_returns.vat_amount)).quantize(_D2, ROUND_HALF_UP)
+        net_input_taxable = (_dec(input_vat.taxable_amount) - _dec(input_vat_returns.taxable_amount)).quantize(_D2, ROUND_HALF_UP)
+        net_input_vat = (_dec(input_vat.vat_amount) - _dec(input_vat_returns.vat_amount)).quantize(_D2, ROUND_HALF_UP)
+        net_vat_payable = (net_output_vat - net_input_vat).quantize(_D2, ROUND_HALF_UP)
 
         return {
             "period": {"start": start_date, "end": end_date},
-            "output_vat": {"taxable": net_output_taxable, "vat": net_output_vat},
-            "input_vat": {"taxable": net_input_taxable, "vat": net_input_vat},
-            "net_vat_payable": net_output_vat - net_input_vat
+            "output_vat": {"taxable": float(net_output_taxable), "vat": float(net_output_vat)},
+            "input_vat": {"taxable": float(net_input_taxable), "vat": float(net_input_vat)},
+            "net_vat_payable": float(net_vat_payable)
         }
     finally:
         db.close()
@@ -935,7 +952,7 @@ def get_tax_summary(
             "current_period": {
                 "output_vat": float(current_vat.output_vat or 0),
                 "input_vat": float(current_vat.input_vat or 0),
-                "net_vat": float(current_vat.output_vat or 0) - float(current_vat.input_vat or 0)
+                "net_vat": float((_dec(current_vat.output_vat) - _dec(current_vat.input_vat)).quantize(_D2, ROUND_HALF_UP))
             },
             "overdue_returns": overdue,
             "employee_taxes": emp_tax,
@@ -982,7 +999,9 @@ def create_tax_settlement(
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).scalar() or 0
 
-        net = float(output) - float(input_v)
+        output_dec = _dec(output).quantize(_D2, ROUND_HALF_UP)
+        input_dec = _dec(input_v).quantize(_D2, ROUND_HALF_UP)
+        net = (output_dec - input_dec).quantize(_D2, ROUND_HALF_UP)
 
         vat_out_id = get_mapped_account_id(db, "acc_map_vat_out")
         vat_in_id = get_mapped_account_id(db, "acc_map_vat_in")
@@ -991,17 +1010,17 @@ def create_tax_settlement(
             raise HTTPException(status_code=400, detail="حسابات ضريبة المدخلات/المخرجات غير معينة في الإعدادات")
 
         base_currency = get_base_currency(db)
-        settle_amount = min(float(output), float(input_v))
+        settle_amount = min(output_dec, input_dec)
         
         entry_number = None
-        if settle_amount > 0:
+        if settle_amount > Decimal("0"):
             je_lines = [
                 {
-                    "account_id": vat_out_id, "debit": settle_amount, "credit": 0,
+                    "account_id": vat_out_id, "debit": float(settle_amount), "credit": 0,
                     "description": "تسوية ضريبة المخرجات"
                 },
                 {
-                    "account_id": vat_in_id, "debit": 0, "credit": settle_amount,
+                    "account_id": vat_in_id, "debit": 0, "credit": float(settle_amount),
                     "description": "تسوية ضريبة المدخلات مع المخرجات"
                 }
             ]
@@ -1026,15 +1045,15 @@ def create_tax_settlement(
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="taxes.settlement.create", resource_type="tax_settlement",
                      resource_id=entry_number,
-                     details={"period": f"{start} - {end}", "net": net, "je": entry_number},
+                     details={"period": f"{start} - {end}", "net": float(net), "je": entry_number},
                      request=request)
 
         return {
             "success": True, "message": "تم إنشاء التسوية الضريبية بنجاح",
             "journal_entry": entry_number,
-            "output_vat": float(output), "input_vat": float(input_v),
-            "net_amount": net,
-            "settlement_type": "payable" if net >= 0 else "refundable"
+            "output_vat": float(output_dec), "input_vat": float(input_dec),
+            "net_amount": float(net),
+            "settlement_type": "payable" if net >= Decimal("0") else "refundable"
         }
     except HTTPException:
         raise
@@ -1121,13 +1140,13 @@ def get_branch_tax_analysis(
         ret_map = {r.branch_id: dict(r._mapping) for r in returns_by_branch}
 
         result = []
-        grand_output = 0
-        grand_input = 0
+        grand_output = Decimal("0")
+        grand_input = Decimal("0")
 
         for r in rows:
-            out = float(r.output_vat or 0)
-            inp = float(r.input_vat or 0)
-            net = out - inp
+            out = _dec(r.output_vat).quantize(_D2, ROUND_HALF_UP)
+            inp = _dec(r.input_vat).quantize(_D2, ROUND_HALF_UP)
+            net = (out - inp).quantize(_D2, ROUND_HALF_UP)
             grand_output += out
             grand_input += inp
             ret_info = ret_map.get(r.branch_id, {})
@@ -1137,9 +1156,9 @@ def get_branch_tax_analysis(
                 "branch_name": r.branch_name,
                 "branch_name_en": r.branch_name_en,
                 "jurisdiction": r.jurisdiction or "SA",
-                "output_vat": out,
-                "input_vat": inp,
-                "net_vat": net,
+                "output_vat": float(out),
+                "input_vat": float(inp),
+                "net_vat": float(net),
                 "taxable_sales": float(r.taxable_sales or 0),
                 "taxable_purchases": float(r.taxable_purchases or 0),
                 "invoice_count": r.invoice_count,
@@ -1153,9 +1172,9 @@ def get_branch_tax_analysis(
             "period": {"start": start_date, "end": end_date},
             "branches": result,
             "totals": {
-                "output_vat": grand_output,
-                "input_vat": grand_input,
-                "net_vat": grand_output - grand_input,
+                "output_vat": float(grand_output.quantize(_D2, ROUND_HALF_UP)),
+                "input_vat": float(grand_input.quantize(_D2, ROUND_HALF_UP)),
+                "net_vat": float((grand_output - grand_input).quantize(_D2, ROUND_HALF_UP)),
                 "branch_count": len(result)
             }
         }
@@ -1234,30 +1253,30 @@ def get_employee_tax_obligations(
         )).fetchone()
 
         employee_list = []
-        total_gosi_emp = 0
-        total_gosi_empr = 0
-        total_gross_all = 0
+        total_gosi_emp = Decimal("0")
+        total_gosi_empr = Decimal("0")
+        total_gross_all = Decimal("0")
 
         for emp in employees:
-            gosi_emp = float(emp.total_gosi_employee or 0)
-            gosi_empr = float(emp.total_gosi_employer or 0)
-            gross = float(emp.total_gross or 0)
+            gosi_emp = _dec(emp.total_gosi_employee).quantize(_D2, ROUND_HALF_UP)
+            gosi_empr = _dec(emp.total_gosi_employer).quantize(_D2, ROUND_HALF_UP)
+            gross = _dec(emp.total_gross).quantize(_D2, ROUND_HALF_UP)
             total_gosi_emp += gosi_emp
             total_gosi_empr += gosi_empr
             total_gross_all += gross
 
             # Compute income tax for employee's jurisdiction
             jurisdiction = emp.jurisdiction or "SA"
-            tax_due = 0
-            tax_rate = 0
+            tax_due = Decimal("0")
+            tax_rate_dec = Decimal("0")
             if jurisdiction != "SA":
                 # SA doesn't have personal income tax; other countries do
                 regime = db.execute(text(
                     "SELECT default_rate FROM tax_regimes WHERE country_code = :cc AND tax_type = 'salary_tax' AND is_active = TRUE LIMIT 1"
                 ), {"cc": jurisdiction}).fetchone()
                 if regime:
-                    tax_rate = float(regime.default_rate)
-                    tax_due = gross * (tax_rate / 100)
+                    tax_rate_dec = _dec(regime.default_rate)
+                    tax_due = (gross * (tax_rate_dec / Decimal("100"))).quantize(_D2, ROUND_HALF_UP)
 
             employee_list.append({
                 "employee_id": emp.employee_id,
@@ -1270,13 +1289,13 @@ def get_employee_tax_obligations(
                 "jurisdiction": jurisdiction,
                 "department_name": emp.department_name,
                 "payslip_count": emp.payslip_count,
-                "total_gross": gross,
+                "total_gross": float(gross),
                 "total_basic": float(emp.total_basic or 0),
                 "total_allowances": float(emp.total_housing or 0) + float(emp.total_transport or 0) + float(emp.total_other_allowances or 0),
-                "gosi_employee": gosi_emp,
-                "gosi_employer": gosi_empr,
-                "income_tax_rate": tax_rate,
-                "income_tax_due": tax_due,
+                "gosi_employee": float(gosi_emp),
+                "gosi_employer": float(gosi_empr),
+                "income_tax_rate": float(tax_rate_dec),
+                "income_tax_due": float(tax_due),
                 "total_deductions": float(emp.total_deductions or 0),
                 "total_net": float(emp.total_net or 0),
             })
@@ -1287,10 +1306,10 @@ def get_employee_tax_obligations(
             "employees": employee_list,
             "summary": {
                 "total_employees": len(employee_list),
-                "total_gross": total_gross_all,
-                "total_gosi_employee": total_gosi_emp,
-                "total_gosi_employer": total_gosi_empr,
-                "total_gosi_combined": total_gosi_emp + total_gosi_empr,
+                "total_gross": float(total_gross_all.quantize(_D2, ROUND_HALF_UP)),
+                "total_gosi_employee": float(total_gosi_emp.quantize(_D2, ROUND_HALF_UP)),
+                "total_gosi_employer": float(total_gosi_empr.quantize(_D2, ROUND_HALF_UP)),
+                "total_gosi_combined": float((total_gosi_emp + total_gosi_empr).quantize(_D2, ROUND_HALF_UP)),
             },
             "gosi_settings": {
                 "employee_pct": float(gosi.employee_share_pct) if gosi else 0,

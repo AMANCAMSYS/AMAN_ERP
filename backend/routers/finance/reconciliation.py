@@ -7,6 +7,7 @@ from pydantic import BaseModel
 import csv
 import io
 import re
+from decimal import Decimal, ROUND_HALF_UP
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -14,6 +15,12 @@ from utils.permissions import require_permission, require_module
 from schemas.reconciliation import ReconciliationCreate, StatementLineCreate, MatchRequest, UnmatchRequest
 
 router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"], dependencies=[Depends(require_module("accounting"))])
+
+_D2 = Decimal("0.01")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v or 0))
 
 # --- Endpoints ---
 
@@ -123,12 +130,12 @@ def get_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
         matched_lines = [l for l in all_lines if l.get('is_reconciled')]
         unmatched_lines = [l for l in all_lines if not l.get('is_reconciled')]
 
-        matched_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in matched_lines)
-        unmatched_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in unmatched_lines)
-        total_net = sum(float(l.get('credit', 0) or 0) - float(l.get('debit', 0) or 0) for l in all_lines)
-        
-        calculated_end = float(rec.start_balance) + total_net
-        difference = calculated_end - float(rec.end_balance)
+        matched_net = sum((_dec(l.get('credit', 0)) - _dec(l.get('debit', 0)) for l in matched_lines), Decimal("0"))
+        unmatched_net = sum((_dec(l.get('credit', 0)) - _dec(l.get('debit', 0)) for l in unmatched_lines), Decimal("0"))
+        total_net = sum((_dec(l.get('credit', 0)) - _dec(l.get('debit', 0)) for l in all_lines), Decimal("0"))
+
+        calculated_end = _dec(rec.start_balance) + total_net
+        difference = calculated_end - _dec(rec.end_balance)
 
         return {
             "header": dict(rec._mapping),
@@ -137,12 +144,12 @@ def get_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
                 "total_lines": len(all_lines),
                 "matched_count": len(matched_lines),
                 "unmatched_count": len(unmatched_lines),
-                "matched_net": round(matched_net, 2),
-                "unmatched_net": round(unmatched_net, 2),
-                "total_net": round(total_net, 2),
-                "calculated_end_balance": round(calculated_end, 2),
-                "target_end_balance": float(rec.end_balance),
-                "difference": round(difference, 2),
+                "matched_net": float(matched_net.quantize(_D2, ROUND_HALF_UP)),
+                "unmatched_net": float(unmatched_net.quantize(_D2, ROUND_HALF_UP)),
+                "total_net": float(total_net.quantize(_D2, ROUND_HALF_UP)),
+                "calculated_end_balance": float(calculated_end.quantize(_D2, ROUND_HALF_UP)),
+                "target_end_balance": float(_dec(rec.end_balance).quantize(_D2, ROUND_HALF_UP)),
+                "difference": float(difference.quantize(_D2, ROUND_HALF_UP)),
             }
         }
     finally:
@@ -164,11 +171,11 @@ def add_statement_lines(id: int, lines: List[StatementLineCreate], current_user:
             WHERE reconciliation_id = :id ORDER BY id DESC LIMIT 1
         """), {"id": id}).scalar()
         
-        running_balance = float(last_balance) if last_balance is not None else float(rec.start_balance)
+        running_balance = _dec(last_balance) if last_balance is not None else _dec(rec.start_balance)
 
         added = []
         for line in lines:
-            running_balance = running_balance + float(line.credit) - float(line.debit)
+            running_balance = running_balance + _dec(line.credit) - _dec(line.debit)
             
             result = db.execute(text("""
                 INSERT INTO bank_statement_lines (
@@ -178,7 +185,8 @@ def add_statement_lines(id: int, lines: List[StatementLineCreate], current_user:
                 RETURNING id
             """), {
                 "rid": id, "date": line.transaction_date, "desc": line.description,
-                "ref": line.reference, "deb": line.debit, "cred": line.credit, "bal": running_balance
+                "ref": line.reference, "deb": line.debit, "cred": line.credit,
+                "bal": float(running_balance.quantize(_D2, ROUND_HALF_UP))
             })
             added.append(result.scalar())
             
@@ -233,13 +241,13 @@ def _detect_csv_columns(headers: List[str]) -> dict:
     return mapping
 
 
-def _parse_amount(val) -> float:
+def _parse_amount(val) -> Decimal:
     """Parse amount string handling commas, parentheses (negative), Arabic digits."""
     if val is None:
-        return 0.0
+        return Decimal("0")
     s = str(val).strip()
     if not s or s in ('-', '—', '–', ''):
-        return 0.0
+        return Decimal("0")
     # Arabic digits
     arabic_digits = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'}
     for ar, en in arabic_digits.items():
@@ -251,10 +259,10 @@ def _parse_amount(val) -> float:
     s = s.replace(',', '').replace(' ', '')
     s = re.sub(r'[^\d.\-]', '', s)
     try:
-        v = float(s)
+        v = Decimal(s)
         return -v if negative else v
-    except ValueError:
-        return 0.0
+    except Exception:
+        return Decimal("0")
 
 
 @router.post("/{id}/import-preview", dependencies=[Depends(require_permission("reconciliation.create"))])
@@ -349,8 +357,8 @@ async def preview_import(
             desc = row[col_mapping['description']] if 'description' in col_mapping and col_mapping['description'] < len(row) else ''
             ref = row[col_mapping['reference']] if 'reference' in col_mapping and col_mapping['reference'] < len(row) else ''
 
-            debit_val = 0.0
-            credit_val = 0.0
+            debit_val = Decimal("0")
+            credit_val = Decimal("0")
 
             if 'debit' in col_mapping and 'credit' in col_mapping:
                 debit_val = _parse_amount(row[col_mapping['debit']] if col_mapping['debit'] < len(row) else '')
@@ -374,8 +382,8 @@ async def preview_import(
                 "transaction_date": parsed_date,
                 "description": desc.strip(),
                 "reference": ref.strip(),
-                "debit": round(debit_val, 2),
-                "credit": round(credit_val, 2),
+                "debit": float(debit_val.quantize(_D2, ROUND_HALF_UP)),
+                "credit": float(credit_val.quantize(_D2, ROUND_HALF_UP)),
             })
 
         return {
@@ -415,11 +423,11 @@ def confirm_import(id: int, lines: List[StatementLineCreate], current_user: dict
             WHERE reconciliation_id = :id ORDER BY id DESC LIMIT 1
         """), {"id": id}).scalar()
 
-        running_balance = float(last_balance) if last_balance is not None else float(rec.start_balance)
+        running_balance = _dec(last_balance) if last_balance is not None else _dec(rec.start_balance)
 
         added = []
         for line in lines:
-            running_balance = running_balance + float(line.credit) - float(line.debit)
+            running_balance = running_balance + _dec(line.credit) - _dec(line.debit)
             result = db.execute(text("""
                 INSERT INTO bank_statement_lines (
                     reconciliation_id, transaction_date, description, reference, 
@@ -428,7 +436,8 @@ def confirm_import(id: int, lines: List[StatementLineCreate], current_user: dict
                 RETURNING id
             """), {
                 "rid": id, "date": line.transaction_date, "desc": line.description,
-                "ref": line.reference, "deb": line.debit, "cred": line.credit, "bal": running_balance
+                "ref": line.reference, "deb": line.debit, "cred": line.credit,
+                "bal": float(running_balance.quantize(_D2, ROUND_HALF_UP))
             })
             added.append(result.scalar())
 
@@ -485,16 +494,16 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
             if sl.id in matched_stmt_ids:
                 continue
 
-            sl_debit = float(sl.debit or 0)
-            sl_credit = float(sl.credit or 0)
+            sl_debit = _dec(sl.debit)
+            sl_credit = _dec(sl.credit)
             sl_date = sl.transaction_date
 
             for jl in ledger:
                 if jl.id in matched_jl_ids:
                     continue
 
-                jl_debit = float(jl.debit or 0)
-                jl_credit = float(jl.credit or 0)
+                jl_debit = _dec(jl.debit)
+                jl_credit = _dec(jl.credit)
                 jl_date = jl.entry_date
 
                 # Check date tolerance
@@ -510,9 +519,9 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
 
                 # Amount matching: bank debit=withdrawal matches GL credit, bank credit=deposit matches GL debit
                 amount_match = False
-                if sl_debit > 0 and jl_credit > 0 and abs(sl_debit - jl_credit) < 0.01:
+                if sl_debit > 0 and jl_credit > 0 and abs(sl_debit - jl_credit) <= _D2:
                     amount_match = True
-                elif sl_credit > 0 and jl_debit > 0 and abs(sl_credit - jl_debit) < 0.01:
+                elif sl_credit > 0 and jl_debit > 0 and abs(sl_credit - jl_debit) <= _D2:
                     amount_match = True
 
                 if amount_match:
@@ -534,7 +543,7 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
                     matches.append({
                         "statement_line_id": sl.id,
                         "journal_line_id": jl.id,
-                        "amount": sl_debit if sl_debit > 0 else sl_credit,
+                        "amount": float((sl_debit if sl_debit > 0 else sl_credit).quantize(_D2, ROUND_HALF_UP)),
                     })
                     break  # Move to next statement line
 
@@ -643,24 +652,24 @@ def match_transaction(id: int, match: MatchRequest, current_user: dict = Depends
         if jl.is_reconciled:
             raise HTTPException(status_code=400, detail="القيد المحاسبي مطابق بالفعل في تسوية أخرى")
              
-        sl_debit = float(sl.debit or 0)
-        sl_credit = float(sl.credit or 0)
-        jl_debit = float(jl.debit or 0)
-        jl_credit = float(jl.credit or 0)
+        sl_debit = _dec(sl.debit)
+        sl_credit = _dec(sl.credit)
+        jl_debit = _dec(jl.debit)
+        jl_credit = _dec(jl.credit)
         
         # Bank withdrawal (debit) matches GL credit (asset decrease)
         # Bank deposit (credit) matches GL debit (asset increase)
         if sl_debit > 0:
-            if abs(sl_debit - jl_credit) > 0.01:
+            if abs(sl_debit - jl_credit) > _D2:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"المبالغ غير متطابقة. سحب بنكي: {sl_debit:,.2f} ≠ قيد دائن: {jl_credit:,.2f}"
+                    detail=f"المبالغ غير متطابقة. سحب بنكي: {float(sl_debit):,.2f} ≠ قيد دائن: {float(jl_credit):,.2f}"
                 )
         elif sl_credit > 0:
-            if abs(sl_credit - jl_debit) > 0.01:
+            if abs(sl_credit - jl_debit) > _D2:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"المبالغ غير متطابقة. إيداع بنكي: {sl_credit:,.2f} ≠ قيد مدين: {jl_debit:,.2f}"
+                    detail=f"المبالغ غير متطابقة. إيداع بنكي: {float(sl_credit):,.2f} ≠ قيد مدين: {float(jl_debit):,.2f}"
                 )
         else:
             raise HTTPException(status_code=400, detail="سطر الكشف البنكي لا يحتوي على مبلغ")
@@ -785,12 +794,12 @@ def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_us
             WHERE reconciliation_id = :id AND is_reconciled = TRUE
         """), {"id": id}).scalar() or 0
         
-        calculated_end = float(rec.start_balance) + float(calc)
-        
-        if abs(calculated_end - float(rec.end_balance)) > 0.01:
+        calculated_end = _dec(rec.start_balance) + _dec(calc)
+
+        if abs(calculated_end - _dec(rec.end_balance)) > _D2:
              raise HTTPException(
                 status_code=400, 
-                detail=f"خطأ في توازن التسوية. الرصيد المحسوب: {calculated_end:,.2f}, الرصيد المدخل: {float(rec.end_balance):,.2f}"
+            detail=f"خطأ في توازن التسوية. الرصيد المحسوب: {float(calculated_end):,.2f}, الرصيد المدخل: {float(_dec(rec.end_balance)):,.2f}"
             )
              
         db.execute(text("""

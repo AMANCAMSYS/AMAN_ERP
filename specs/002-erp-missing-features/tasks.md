@@ -210,16 +210,16 @@
 
 ### Implementation for User Story 8
 
-- [ ] T076 [P] [US8] Create SubscriptionPlan, SubscriptionEnrollment, and SubscriptionInvoice models in `backend/models/domain_models/finance.py` per data-model.md (include trial_period_days on plan, trial_end_date and failed_payment_count on enrollment, status enum with "trial" state)
-- [ ] T077 [P] [US8] Create Alembic migration for subscription tables: `backend/alembic/versions/xxx_add_subscription_tables.py`
-- [ ] T078 [P] [US8] Create Pydantic schemas in `backend/schemas/subscription.py` (PlanCreate, PlanRead, EnrollmentCreate, EnrollmentRead, PlanChangeRequest, SubscriptionInvoiceRead)
-- [ ] T079 [US8] Implement subscription_service.py in `backend/services/subscription_service.py` — enroll_customer (set trial_end_date if trial_period_days > 0, status = "trial"), generate_invoice (create invoice via existing invoicing, link via SubscriptionInvoice, all amounts Decimal with ROUND_HALF_UP), prorate_plan_change (credit unused + charge new prorated), cancel (generate final prorated invoice if applicable), handle_failed_payment (increment counter, flag at_risk after 3), check_trial_expirations (auto-convert trial → active)
-- [ ] T080 [US8] Add scheduled jobs to `backend/services/scheduler.py` — daily: check_billing_due (generate invoices for enrollments where next_billing_date <= today), check_trial_expirations, retry_failed_payments — dispatch notifications via notification_service for each event
-- [ ] T081 [US8] Create subscription router in `backend/routers/finance/subscriptions.py` per contracts: GET+POST /plans, PUT /plans/{id}, POST /enroll, GET /enrollments, GET /enrollments/{id}, POST /enrollments/{id}/pause|resume|cancel|change-plan
-- [ ] T082 [US8] Register subscription router in module `__init__.py`
-- [ ] T083 [P] [US8] Create subscription frontend pages in `frontend/src/pages/Subscription/PlanList.jsx` (DataTable), `frontend/src/pages/Subscription/PlanForm.jsx` (FormField with trial_period_days), `frontend/src/pages/Subscription/EnrollmentList.jsx` (DataTable with status badges), `frontend/src/pages/Subscription/EnrollmentDetail.jsx` (billing history, plan change, pause/resume/cancel actions)
-- [ ] T084 [US8] Add AR+EN i18n keys for subscription pages in `frontend/src/locales/en.json` and `frontend/src/locales/ar.json`
-- [ ] T085 [US8] Add subscription routes to `frontend/src/App.jsx` and finance navigation
+- [x] T076 [P] [US8] Create SubscriptionPlan, SubscriptionEnrollment, and SubscriptionInvoice models in `backend/models/domain_models/finance.py` per data-model.md (include trial_period_days on plan, trial_end_date and failed_payment_count on enrollment, status enum with "trial" state)
+- [x] T077 [P] [US8] Create Alembic migration for subscription tables: `backend/alembic/versions/xxx_add_subscription_tables.py`
+- [x] T078 [P] [US8] Create Pydantic schemas in `backend/schemas/subscription.py` (PlanCreate, PlanRead, EnrollmentCreate, EnrollmentRead, PlanChangeRequest, SubscriptionInvoiceRead)
+- [x] T079 [US8] Implement subscription_service.py in `backend/services/subscription_service.py` — enroll_customer (set trial_end_date if trial_period_days > 0, status = "trial"), generate_invoice (create invoice via existing invoicing, link via SubscriptionInvoice, all amounts Decimal with ROUND_HALF_UP), prorate_plan_change (credit unused + charge new prorated), cancel (generate final prorated invoice if applicable), handle_failed_payment (increment counter, flag at_risk after 3), check_trial_expirations (auto-convert trial → active)
+- [x] T080 [US8] Add scheduled jobs to `backend/services/scheduler.py` — daily: check_billing_due (generate invoices for enrollments where next_billing_date <= today), check_trial_expirations, retry_failed_payments — dispatch notifications via notification_service for each event
+- [x] T081 [US8] Create subscription router in `backend/routers/finance/subscriptions.py` per contracts: GET+POST /plans, PUT /plans/{id}, POST /enroll, GET /enrollments, GET /enrollments/{id}, POST /enrollments/{id}/pause|resume|cancel|change-plan
+- [x] T082 [US8] Register subscription router in module `__init__.py`
+- [x] T083 [P] [US8] Create subscription frontend pages in `frontend/src/pages/Subscription/PlanList.jsx` (DataTable), `frontend/src/pages/Subscription/PlanForm.jsx` (FormField with trial_period_days), `frontend/src/pages/Subscription/EnrollmentList.jsx` (DataTable with status badges), `frontend/src/pages/Subscription/EnrollmentDetail.jsx` (billing history, plan change, pause/resume/cancel actions)
+- [x] T084 [US8] Add AR+EN i18n keys for subscription pages in `frontend/src/locales/en.json` and `frontend/src/locales/ar.json`
+- [x] T085 [US8] Add subscription routes to `frontend/src/App.jsx` and finance navigation
 
 **Checkpoint**: Subscription billing functional — plans, trials, enrollment, recurring invoices, proration, cancellation.
 

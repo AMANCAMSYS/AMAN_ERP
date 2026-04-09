@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 import os
 import uuid
@@ -19,6 +20,10 @@ from utils.permissions import require_permission, require_module
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/services", tags=["Services"], dependencies=[Depends(require_module("services"))])
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "uploads", "documents")
 try:
@@ -271,9 +276,9 @@ def add_service_cost(request_id: int, data: dict, current_user: UserResponse = D
         if not existing:
             raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
 
-        qty = float(data.get("quantity", 1))
-        unit = float(data.get("unit_cost", 0))
-        total = round(qty * unit, 2)
+        qty = _dec(data.get("quantity", 1))
+        unit = _dec(data.get("unit_cost", 0))
+        total = (qty * unit).quantize(_D2, ROUND_HALF_UP)
 
         db.execute(text("""
             INSERT INTO service_request_costs (service_request_id, cost_type, description, quantity, unit_cost, total_cost)

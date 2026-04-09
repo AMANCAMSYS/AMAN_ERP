@@ -61,51 +61,71 @@ export default function ConflictScreen() {
 
   const renderConflictSummary = ({ item }) => (
     <View style={styles.card}>
-      <Text style={styles.title}>تعارضات غير محلولة</Text>
-      <Text style={styles.count}>{item.count}</Text>
+      <View style={styles.cardTop}>
+        <Text style={styles.warningIcon}>⚠️</Text>
+        <View style={styles.cardTitles}>
+          <Text style={styles.title}>تعارضات غير محلولة</Text>
+          <Text style={styles.subtitle}>معرّف الجهاز: {item.device_id?.slice(0, 8) || '—'}</Text>
+        </View>
+      </View>
+      <View style={styles.countBadge}>
+        <Text style={styles.count}>{item.count}</Text>
+        <Text style={styles.countLabel}>تعارض</Text>
+      </View>
       <Text style={styles.hint}>
         تم تعديل بيانات على الجهاز والخادم في نفس الوقت.
-        يرجى مراجعة التعارضات وحلها.
+        اختر الإصدار الذي تريد الاحتفاظ به لحل هذه التعارضات.
       </Text>
       <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.serverBtn}
-          onPress={() => Alert.alert(
-            'حل جميع التعارضات',
-            'اختر الإصدار المطلوب',
-            [
-              { text: 'إلغاء', style: 'cancel' },
-              { text: 'الاحتفاظ بالخادم', onPress: () => handleResolve(item, 'keep_server') },
-              { text: 'الاحتفاظ بالجهاز', onPress: () => handleResolve(item, 'keep_device') },
-            ]
-          )}
+          style={styles.deviceBtn}
+          onPress={() => handleResolve(item, 'keep_device')}
         >
-          <Text style={styles.btnText}>حل التعارضات</Text>
+          <Text style={styles.deviceBtnText}>📱 الجهاز</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.serverBtn}
+          onPress={() => handleResolve(item, 'keep_server')}
+        >
+          <Text style={styles.btnText}>☁️ الخادم</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#1976d2" /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1976d2" />
+        <Text style={styles.loadingText}>جارٍ تحميل التعارضات...</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       {!isConnected && (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>⚡ يتطلب اتصال بالإنترنت لحل التعارضات</Text>
+          <Text style={styles.bannerText}>⚡ يتطلب اتصال بالإنترنت لحل التعارضات</Text>
         </View>
       )}
       <FlatList
         data={conflicts}
         keyExtractor={(_, idx) => String(idx)}
         renderItem={renderConflictSummary}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor="#1976d2"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>✅</Text>
             <Text style={styles.emptyText}>لا توجد تعارضات</Text>
+            <Text style={styles.emptySubText}>جميع البيانات متزامنة</Text>
           </View>
         }
       />
@@ -114,21 +134,54 @@ export default function ConflictScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  offlineBanner: { backgroundColor: '#ff9800', padding: 8, alignItems: 'center' },
-  offlineText: { color: '#fff', fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: '#f0f4f8' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f4f8' },
+  loadingText: { marginTop: 12, color: '#546e7a', fontSize: 15 },
+
+  offlineBanner: { backgroundColor: '#e65100', padding: 10, alignItems: 'center' },
+  bannerText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+
+  list: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 20 },
+
   card: {
-    backgroundColor: '#fff', borderRadius: 8, margin: 12, padding: 16, elevation: 2,
-    borderLeftWidth: 4, borderLeftColor: '#ff9800',
+    backgroundColor: '#fff', borderRadius: 12, padding: 20, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 4,
+    borderLeftWidth: 4, borderLeftColor: '#e65100',
   },
-  title: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 8 },
-  count: { fontSize: 36, fontWeight: 'bold', textAlign: 'center', color: '#ff9800', marginVertical: 8 },
-  hint: { fontSize: 14, color: '#666', textAlign: 'right', lineHeight: 22, marginBottom: 12 },
-  actions: { flexDirection: 'row-reverse' },
-  serverBtn: { flex: 1, backgroundColor: '#1976d2', borderRadius: 8, padding: 12, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  emptyContainer: { alignItems: 'center', padding: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 18, color: '#4caf50', fontWeight: '600' },
+  cardTop: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 14 },
+  warningIcon: { fontSize: 28, marginLeft: 12 },
+  cardTitles: { flex: 1 },
+  title: { fontSize: 17, fontWeight: '700', color: '#1a2332', textAlign: 'right' },
+  subtitle: { fontSize: 13, color: '#90a4ae', textAlign: 'right', marginTop: 2 },
+
+  countBadge: {
+    backgroundColor: '#fff3e0', borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 14,
+  },
+  count: { fontSize: 42, fontWeight: '700', color: '#e65100' },
+  countLabel: { fontSize: 13, color: '#e65100', marginTop: 2 },
+
+  hint: {
+    fontSize: 14, color: '#546e7a', textAlign: 'right', lineHeight: 22,
+    marginBottom: 16, backgroundColor: '#f8fafc', borderRadius: 8, padding: 12,
+    borderRightWidth: 3, borderRightColor: '#90a4ae',
+  },
+
+  actions: { flexDirection: 'row-reverse', gap: 10 },
+  serverBtn: {
+    flex: 1, backgroundColor: '#1976d2', borderRadius: 10,
+    paddingVertical: 13, alignItems: 'center',
+  },
+  deviceBtn: {
+    flex: 1, borderWidth: 2, borderColor: '#1976d2', borderRadius: 10,
+    paddingVertical: 13, alignItems: 'center',
+  },
+  deviceBtnText: { color: '#1976d2', fontWeight: '700', fontSize: 14 },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  emptyContainer: { alignItems: 'center', paddingVertical: 80 },
+  emptyIcon: { fontSize: 56, marginBottom: 16 },
+  emptyText: { fontSize: 18, color: '#2e7d32', fontWeight: '700', marginBottom: 8 },
+  emptySubText: { fontSize: 14, color: '#90a4ae' },
 });

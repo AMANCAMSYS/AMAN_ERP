@@ -48,10 +48,10 @@ export const accountingAPI = {
     createLeaveProvision: (data) => api.post('/accounting/provisions/leave', data),
 
     // Intercompany Transactions (IC-001) — legacy v1
-    listIntercompanyTransactions: (params) => api.get('/accounting/intercompany/transactions', { params }),
-    createIntercompanyTransaction: (data) => api.post('/accounting/intercompany/transactions', data),
-    processIntercompanyTransaction: (id) => api.post(`/accounting/intercompany/transactions/${id}/process`),
-    getIntercompanyEliminationReport: () => api.get('/accounting/intercompany/elimination-report'),
+    listIntercompanyTransactions: (params) => api.get('/accounting/intercompany-v1/transactions', { params }),
+    createIntercompanyTransaction: (data) => api.post('/accounting/intercompany-v1/transactions', data),
+    processIntercompanyTransaction: (id) => api.post(`/accounting/intercompany-v1/transactions/${id}/process`),
+    getIntercompanyEliminationReport: () => api.get('/accounting/intercompany-v1/elimination-report'),
 
     // Intercompany v2 — Entity Groups, Transactions, Consolidation, Mappings
     listEntityGroups: () => api.get('/accounting/intercompany/entities'),

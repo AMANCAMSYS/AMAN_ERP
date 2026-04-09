@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -13,6 +14,12 @@ from .schemas import SOCreate
 
 orders_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 @orders_router.get("/orders", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -91,27 +98,27 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
         so_num = generate_sequential_number(db, f"SO-{datetime.now().year}", "sales_orders", "so_number")
 
         # 2. Calculate Totals
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
+        total_discount = Decimal('0')
         items_to_save = []
 
         for item in data.items:
-            line_subtotal = float(item.quantity) * float(item.unit_price)
-            taxable = line_subtotal - float(item.discount)
-            line_tax = taxable * (float(item.tax_rate) / 100)
-            line_total = taxable + line_tax
+            line_subtotal = _dec(item.quantity) * _dec(item.unit_price)
+            taxable = line_subtotal - _dec(item.discount)
+            line_tax = taxable * (_dec(item.tax_rate) / Decimal('100'))
+            line_total = (taxable + line_tax).quantize(_D2, ROUND_HALF_UP)
 
             subtotal += line_subtotal
             total_tax += line_tax
-            total_discount += item.discount
+            total_discount += _dec(item.discount)
 
             items_to_save.append({
                 **item.model_dump(),
                 "total": line_total
             })
 
-        grand_total = subtotal - total_discount + total_tax
+        grand_total = (subtotal - total_discount + total_tax).quantize(_D2, ROUND_HALF_UP)
 
         # 3. Save Header
         res = db.execute(text("""
@@ -164,14 +171,14 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
                         INSERT INTO inventory (product_id, warehouse_id, quantity, reserved_quantity, available_quantity)
                         VALUES (:pid, :wid, 0, 0, 0) RETURNING id
                     """), {"pid": line["product_id"], "wid": data.warehouse_id}).scalar()
-                    current_qty = 0
-                    current_reserved = 0
+                    current_qty = Decimal('0')
+                    current_reserved = Decimal('0')
                 else:
                     inv_id = inv.id
-                    current_qty = float(inv.quantity)
-                    current_reserved = float(inv.reserved_quantity)
+                    current_qty = _dec(inv.quantity)
+                    current_reserved = _dec(inv.reserved_quantity)
 
-                new_reserved = current_reserved + float(line["quantity"])
+                new_reserved = current_reserved + _dec(line["quantity"])
                 new_available = current_qty - new_reserved
 
                 db.execute(text("""
@@ -194,7 +201,7 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
                     "wid": data.warehouse_id,
                     "ref_id": so_id,
                     "ref_doc": so_num,
-                    "qty": float(line["quantity"]),
+                    "qty": _dec(line["quantity"]),
                     "notes": "Reservation for Sales Order",
                     "user": current_user.id
                 })
@@ -214,7 +221,7 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
             action="sales.order.create",
             resource_type="sales_order",
             resource_id=str(so_id),
-            details={"so_number": so_num, "total": grand_total, "customer_id": data.customer_id, "customer_name": cust_name},
+            details={"so_number": so_num, "total": float(grand_total), "customer_id": data.customer_id, "customer_name": cust_name},
             request=request,
             branch_id=data.branch_id
         )

@@ -73,6 +73,18 @@ class InvoiceLineItem(BaseModel):
             raise ValueError("الخصم لا يمكن أن يكون سالباً")
         return v
 
+    @validator("quantity", "unit_price", "discount", "markup")
+    def values_must_be_within_max_limit(cls, v):
+        if abs(v) > 1_000_000_000:
+            raise ValueError("القيمة تتجاوز الحد الأقصى المسموح")
+        return v
+
+    @validator("tax_rate")
+    def tax_rate_must_be_valid(cls, v):
+        if v < 0 or v > 100:
+            raise ValueError("نسبة الضريبة يجب أن تكون بين 0 و 100")
+        return v
+
 
 class InvoiceCreate(BaseModel):
     customer_id: int
@@ -95,6 +107,24 @@ class InvoiceCreate(BaseModel):
     effect_type: str = "discount"
     effect_percentage: float = 0.0
     markup_amount: float = 0.0
+
+    @validator("paid_amount", "effect_percentage", "markup_amount")
+    def invoice_amounts_must_be_non_negative(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("القيم المالية لا يمكن أن تكون سالبة")
+        if v is not None and abs(v) > 1_000_000_000_000:
+            raise ValueError("القيمة تتجاوز الحد الأقصى المسموح")
+        return v
+
+    @validator("exchange_rate")
+    def invoice_exchange_rate_must_be_valid(cls, v):
+        if v is None:
+            return v
+        if v <= 0:
+            raise ValueError("سعر الصرف يجب أن يكون أكبر من صفر")
+        if v > 1_000_000:
+            raise ValueError("سعر الصرف يتجاوز الحد الأقصى")
+        return v
 
 
 class InvoiceResponse(BaseModel):
@@ -157,8 +187,32 @@ class SalesReturnLineItem(BaseModel):
     description: Optional[str] = None
     quantity: float
     unit_price: float
-    tax_rate: Optional[float] = 15.0
+    tax_rate: Optional[float] = 0.0
     reason: Optional[str] = None
+
+    @validator("quantity")
+    def return_quantity_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("الكمية المرتجعة يجب أن تكون أكبر من صفر")
+        if v > 1_000_000_000:
+            raise ValueError("الكمية تتجاوز الحد الأقصى المسموح")
+        return v
+
+    @validator("unit_price")
+    def return_price_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("سعر الوحدة لا يمكن أن يكون سالباً")
+        if v > 1_000_000_000:
+            raise ValueError("سعر الوحدة يتجاوز الحد الأقصى المسموح")
+        return v
+
+    @validator("tax_rate")
+    def return_tax_rate_must_be_valid(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("نسبة الضريبة يجب أن تكون بين 0 و 100")
+        return v
 
 
 class SalesReturnCreate(BaseModel):
@@ -176,6 +230,24 @@ class SalesReturnCreate(BaseModel):
     warehouse_id: Optional[int] = None
     currency: Optional[str] = None
     exchange_rate: Optional[float] = 1.0
+
+    @validator("refund_amount")
+    def refund_amount_must_be_non_negative(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("مبلغ الاسترداد لا يمكن أن يكون سالباً")
+        if v is not None and v > 1_000_000_000_000:
+            raise ValueError("مبلغ الاسترداد يتجاوز الحد الأقصى المسموح")
+        return v
+
+    @validator("exchange_rate")
+    def return_exchange_rate_must_be_valid(cls, v):
+        if v is None:
+            return v
+        if v <= 0:
+            raise ValueError("سعر الصرف يجب أن يكون أكبر من صفر")
+        if v > 1_000_000:
+            raise ValueError("سعر الصرف يتجاوز الحد الأقصى")
+        return v
 
 
 # --- Payment Vouchers ---

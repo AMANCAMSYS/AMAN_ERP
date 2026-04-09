@@ -45,7 +45,7 @@ function TransactionForm() {
                 exchange_rate: parseFloat(form.exchange_rate),
             })
             showToast(t('intercompany.transaction_created'), 'success')
-            navigate('/intercompany/transactions')
+            navigate('/accounting/intercompany/transactions')
         } catch (e) {
             showToast(e.response?.data?.detail || t('intercompany.create_error'), 'error')
         } finally {
@@ -123,7 +123,7 @@ function TransactionForm() {
                         {loading ? t('common.saving') : t('intercompany.create_transaction')}
                     </button>
                     <button type="button" className="btn btn-secondary" style={{ marginInlineEnd: 8 }}
-                        onClick={() => navigate('/intercompany/transactions')}>
+                        onClick={() => navigate('/accounting/intercompany/transactions')}>
                         {t('common.cancel')}
                     </button>
                 </div>

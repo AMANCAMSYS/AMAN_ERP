@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -14,6 +15,12 @@ from .schemas import CustomerReceiptCreate, CustomerPaymentCreate
 
 vouchers_router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal("0.01")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal("0")
 
 
 # --- Customer Receipts (Payment Vouchers) ---
@@ -29,8 +36,10 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
 
         # Currency & Exchange Rate
         currency = data.currency or base_currency
-        exchange_rate = float(data.exchange_rate or 1.0)
-        amount_base = round(data.amount * exchange_rate, 2)
+        exchange_rate = _dec(data.exchange_rate or 1)
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+        amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 1. Insert Voucher Header
         result = db.execute(text("""
@@ -58,21 +67,35 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
         voucher_id = result[0]
 
         # 2. Process Allocations
+        total_allocated = Decimal("0")
         for alloc in data.allocations:
-            # Verify allocation doesn't exceed invoice remaining balance
+            alloc_amt = _dec(alloc.allocated_amount).quantize(_D2, ROUND_HALF_UP)
+            if alloc_amt <= 0:
+                raise HTTPException(status_code=400, detail="مبلغ التخصيص يجب أن يكون أكبر من صفر")
+
+            # Lock invoice row to prevent concurrent over-allocation
             inv_info = db.execute(text("""
-                SELECT total, COALESCE(paid_amount, 0) as paid_amount FROM invoices WHERE id = :iid
+                SELECT party_id, total, COALESCE(paid_amount, 0) AS paid_amount
+                FROM invoices
+                WHERE id = :iid
+                FOR UPDATE
             """), {"iid": alloc.invoice_id}).fetchone()
-            if inv_info:
-                remaining = float(inv_info.total) - float(inv_info.paid_amount)
-                if alloc.allocated_amount > remaining + 0.01:
-                    raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({alloc.allocated_amount:.2f}) يتجاوز المتبقي على الفاتورة ({remaining:.2f})")
+            if not inv_info:
+                raise HTTPException(status_code=404, detail=f"الفاتورة {alloc.invoice_id} غير موجودة")
+            if int(inv_info.party_id) != int(data.customer_id):
+                raise HTTPException(status_code=400, detail=f"الفاتورة {alloc.invoice_id} لا تتبع العميل المحدد")
+
+            remaining = (_dec(inv_info.total) - _dec(inv_info.paid_amount)).quantize(_D2, ROUND_HALF_UP)
+            if alloc_amt > remaining + _D2:
+                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({float(alloc_amt):.2f}) يتجاوز المتبقي على الفاتورة ({float(remaining):.2f})")
+
+            total_allocated = (total_allocated + alloc_amt).quantize(_D2, ROUND_HALF_UP)
 
             # Insert allocation record
             db.execute(text("""
                 INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
                 VALUES (:vid, :iid, :amt)
-            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc.allocated_amount})
+            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc_amt})
 
             # Update invoice paid_amount and status
             db.execute(text("""
@@ -84,7 +107,10 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
                         ELSE status
                     END
                 WHERE id = :iid
-            """), {"amt": alloc.allocated_amount, "iid": alloc.invoice_id})
+            """), {"amt": alloc_amt, "iid": alloc.invoice_id})
+
+        if total_allocated > (_dec(data.amount) + _D2):
+            raise HTTPException(status_code=400, detail="إجمالي التخصيصات أكبر من مبلغ السند")
 
         # 3. Update Customer Balance (reduce receivables in Base Currency)
         db.execute(text("""
@@ -159,8 +185,8 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
                     account_id=line["account_id"],
                     debit_base=line["debit"],
                     credit_base=line["credit"],
-                    debit_curr=data.amount if line["debit"] > 0 else 0,
-                    credit_curr=data.amount if line["credit"] > 0 else 0,
+                    debit_curr=_dec(data.amount) if line["debit"] > 0 else 0,
+                    credit_curr=_dec(data.amount) if line["credit"] > 0 else 0,
                     currency=currency
                 )
 
@@ -175,7 +201,7 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
 
             if treas_info and treas_info.currency_code and treas_info.currency_code != base_currency:
                 # FC treasury: add in foreign currency
-                treas_amount = data.amount
+                treas_amount = _dec(data.amount)
             else:
                 # SAR treasury: add in base currency
                 treas_amount = amount_base
@@ -237,8 +263,10 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
 
         # Currency & Exchange Rate
         currency = data.currency or base_currency
-        exchange_rate = float(data.exchange_rate or 1.0)
-        amount_base = round(data.amount * exchange_rate, 2)
+        exchange_rate = _dec(data.exchange_rate or 1)
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+        amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 1. Insert Voucher Header
         result = db.execute(text("""
@@ -256,7 +284,7 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         """), {
             "vnum": voucher_num, "vdate": data.voucher_date, "cust": data.customer_id,
             "amt": data.amount, "method": data.payment_method, "bank": data.bank_account_id,
-            "treasury": data.bank_account_id,
+            "treasury": getattr(data, 'treasury_id', None) or data.bank_account_id,
             "check_num": data.check_number, "check_date": data.check_date,
             "ref": data.reference, "notes": data.notes, "user": current_user.id,
             "bid": data.branch_id,
@@ -266,18 +294,40 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         voucher_id = result[0]
 
         # 1.5 Process Allocations (if any)
+        total_allocated = Decimal("0")
         for alloc in data.allocations:
+            alloc_amt = _dec(alloc.allocated_amount).quantize(_D2, ROUND_HALF_UP)
+            if alloc_amt <= 0:
+                raise HTTPException(status_code=400, detail="مبلغ التخصيص يجب أن يكون أكبر من صفر")
+
+            inv_info = db.execute(text("""
+                SELECT party_id, total, COALESCE(paid_amount, 0) AS paid_amount
+                FROM invoices
+                WHERE id = :iid
+                FOR UPDATE
+            """), {"iid": alloc.invoice_id}).fetchone()
+            if not inv_info:
+                raise HTTPException(status_code=404, detail=f"الفاتورة {alloc.invoice_id} غير موجودة")
+            if int(inv_info.party_id) != int(data.customer_id):
+                raise HTTPException(status_code=400, detail=f"الفاتورة {alloc.invoice_id} لا تتبع العميل المحدد")
+
+            remaining = (_dec(inv_info.total) - _dec(inv_info.paid_amount)).quantize(_D2, ROUND_HALF_UP)
+            if alloc_amt > remaining + _D2:
+                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({float(alloc_amt):.2f}) يتجاوز المتبقي على الفاتورة ({float(remaining):.2f})")
+
+            total_allocated = (total_allocated + alloc_amt).quantize(_D2, ROUND_HALF_UP)
+
             db.execute(text("""
                 INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
                 VALUES (:vid, :iid, :amt)
-            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc.allocated_amount})
+            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc_amt})
 
             # Update invoice paid_amount
             db.execute(text("""
                 UPDATE invoices
                 SET paid_amount = COALESCE(paid_amount, 0) + :amt
                 WHERE id = :iid
-            """), {"amt": alloc.allocated_amount, "iid": alloc.invoice_id})
+            """), {"amt": alloc_amt, "iid": alloc.invoice_id})
 
             # Update status
             db.execute(text("""
@@ -288,6 +338,9 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
                 END
                 WHERE id = :iid
             """), {"iid": alloc.invoice_id})
+
+        if total_allocated > (_dec(data.amount) + _D2):
+            raise HTTPException(status_code=400, detail="إجمالي التخصيصات أكبر من مبلغ السند")
 
         # 2. Update Customer Balance (increase because we're paying them)
         db.execute(text("""
@@ -365,8 +418,8 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
                 account_id=line["account_id"],
                 debit_base=line["debit"],
                 credit_base=line["credit"],
-                debit_curr=data.amount if line["debit"] > 0 else 0,
-                credit_curr=data.amount if line["credit"] > 0 else 0,
+                    debit_curr=_dec(data.amount) if line["debit"] > 0 else 0,
+                    credit_curr=_dec(data.amount) if line["credit"] > 0 else 0,
                 currency=currency
             )
 

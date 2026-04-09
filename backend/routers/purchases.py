@@ -8,6 +8,7 @@ import logging
 from pydantic import BaseModel
 
 _D2 = Decimal('0.01')
+_D4 = Decimal('0.0001')
 def _dec(v) -> Decimal:
     """Convert any numeric value to Decimal safely."""
     return Decimal(str(v)) if v is not None else Decimal('0')
@@ -393,15 +394,15 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
             "id": r.id, 
             "invoice_number": r.invoice_number,
             "date": r.invoice_date,
-            "total": float(r.total), 
-            "paid": float(r.paid_amount or 0),
+            "total": float(_dec(r.total)), 
+            "paid": float(_dec(r.paid_amount or 0)),
             "status": r.status,
             "currency": r.currency or base_currency,
-            "exchange_rate": float(r.exchange_rate or 1.0)
+            "exchange_rate": float(_dec(r.exchange_rate or 1.0))
         } for r in invoices_res]
         
         # Calculate total purchases in Base Currency
-        total_purchases = sum(float(r.total) * float(r.exchange_rate or 1.0) for r in invoices_res)
+        total_purchases = sum((_dec(r.total) * _dec(r.exchange_rate or 1.0) for r in invoices_res), Decimal('0')).quantize(_D2, ROUND_HALF_UP)
         
         # 2. Fetch Payments (Vouchers)
         # Note: payment_vouchers table has currency field
@@ -450,25 +451,25 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
         supplier = db.execute(text("SELECT name as supplier_name, current_balance, currency FROM parties WHERE id = :id"), {"id": id}).fetchone()
         
         supplier_currency = supplier.currency if supplier and supplier.currency else base_currency
-        balance = float(supplier.current_balance or 0) if supplier else 0
-        exchange_rate = 1.0
+        balance = _dec(supplier.current_balance or 0) if supplier else Decimal('0')
+        exchange_rate = Decimal('1')
         
         if supplier_currency != base_currency:
              # Fetch current exchange rate
              rate_row = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": supplier_currency}).scalar()
              if rate_row:
-                  exchange_rate = float(rate_row)
-        
-        balance_bc = balance * exchange_rate
+                   exchange_rate = _dec(rate_row)
+
+        balance_bc = (balance * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         return {
             "supplier": {
                 "name": supplier.supplier_name if supplier else "Unknown",
-                "balance": balance,
-                "balance_bc": balance_bc,
+                "balance": float(balance.quantize(_D2, ROUND_HALF_UP)),
+                "balance_bc": float(balance_bc),
                 "currency": supplier_currency,
-                "exchange_rate": exchange_rate,
-                "total_purchases": total_purchases
+                "exchange_rate": float(exchange_rate),
+                "total_purchases": float(total_purchases)
             },
             "invoices": invoices,
             "payments": payments,
@@ -499,9 +500,9 @@ def create_purchase_order(
         lines_data = []
         for item in po.items:
             # Validate quantities and prices
-            if float(item.quantity) <= 0:
+            if _dec(item.quantity) <= 0:
                 raise HTTPException(status_code=400, detail=f"الكمية يجب أن تكون أكبر من صفر: {item.description}")
-            if float(item.unit_price) < 0:
+            if _dec(item.unit_price) < 0:
                 raise HTTPException(status_code=400, detail=f"سعر الوحدة لا يمكن أن يكون سالباً: {item.description}")
 
             line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
@@ -744,8 +745,8 @@ def receive_purchase_order(
         total_received = 0
         total_expected = 0
         receipt_details = []
-        receipt_value_base = 0
-        exchange_rate = float(po.exchange_rate or 1.0)
+        receipt_value_base = Decimal('0')
+        exchange_rate = _dec(po.exchange_rate or 1)
         
         for item in receive_data.items:
             line = lines_map.get(item.line_id)
@@ -753,9 +754,9 @@ def receive_purchase_order(
                 raise HTTPException(status_code=400, detail=f"البند {item.line_id} غير موجود في أمر الشراء")
             
             # Defensive quantity casting
-            line_qty = float(line.quantity or 0)
-            line_received = float(line.received_quantity or 0)
-            item_qty = float(item.received_quantity or 0)
+            line_qty = _dec(line.quantity or 0)
+            line_received = _dec(line.received_quantity or 0)
+            item_qty = _dec(item.received_quantity or 0)
             
             remaining = line_qty - line_received
             if item_qty > remaining:
@@ -779,6 +780,7 @@ def receive_purchase_order(
                     existing = db.execute(text("""
                         SELECT id, quantity FROM inventory 
                         WHERE product_id = :pid AND warehouse_id = :wid
+                        FOR UPDATE
                     """), {"pid": line.product_id, "wid": receive_data.warehouse_id}).fetchone()
                     
                     if existing:
@@ -793,7 +795,7 @@ def receive_purchase_order(
                         """), {"pid": line.product_id, "wid": receive_data.warehouse_id, "qty": item_qty})
                     
                     # Create inventory transaction (replacing non-existent stock_movements)
-                    unit_price = float(line.unit_price or 0)
+                    unit_price = _dec(line.unit_price or 0)
                     db.execute(text("""
                         INSERT INTO inventory_transactions (
                             product_id, warehouse_id, transaction_type, 
@@ -811,18 +813,18 @@ def receive_purchase_order(
                         "po_id": id,
                         "po_num": po.po_number,
                         "cost": unit_price,
-                        "total_cost": item_qty * unit_price,
+                        "total_cost": _dec(item_qty) * unit_price,
                         "uid": int(current_user.get("id") if isinstance(current_user, dict) else current_user.id)
                     })
                 
                 receipt_details.append({
                     "product": line.product_name,
-                    "received": item_qty
+                    "received": float(item_qty)
                 })
                 
                 # Calculate accrual value
-                unit_price_base = float(line.unit_price or 0) * exchange_rate
-                receipt_value_base += item_qty * unit_price_base
+                unit_price_base = (_dec(line.unit_price or 0) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
+                receipt_value_base += (_dec(item_qty) * unit_price_base).quantize(_D2, ROUND_HALF_UP)
         
         # Calculate new total received vs expected
         updated_lines = db.execute(text("""
@@ -830,13 +832,13 @@ def receive_purchase_order(
             FROM purchase_order_lines WHERE po_id = :po_id
         """), {"po_id": id}).fetchone()
         
-        total_expected = float(updated_lines.total_qty or 0)
-        total_received = float(updated_lines.total_received or 0)
+        total_expected_dec = _dec(updated_lines.total_qty or 0)
+        total_received_dec = _dec(updated_lines.total_received or 0)
         
         # Determine new status
-        if total_received >= total_expected:
+        if total_received_dec >= total_expected_dec:
             new_status = 'received'
-        elif total_received > 0:
+        elif total_received_dec > 0:
             new_status = 'partial'
         else:
             new_status = po.status
@@ -847,14 +849,14 @@ def receive_purchase_order(
         """), {"status": new_status, "id": id})
         
         # --- ACCOUNTING ENTRY (ACCRUAL) ---
-        if receipt_value_base > 0.01:
+        if receipt_value_base > _D2:
             acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
             acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
             
             if acc_inventory and acc_unbilled:
                 je_lines = [
-                    {"account_id": acc_inventory, "debit": receipt_value_base, "credit": 0, "description": f"Inventory Receipt - {po.po_number}", "amount_currency": receipt_value_base / exchange_rate if exchange_rate else receipt_value_base, "currency": po.currency},
-                    {"account_id": acc_unbilled, "debit": 0, "credit": receipt_value_base, "description": f"Unbilled Accrual - {po.po_number}", "amount_currency": receipt_value_base / exchange_rate if exchange_rate else receipt_value_base, "currency": po.currency}
+                    {"account_id": acc_inventory, "debit": receipt_value_base, "credit": 0, "description": f"Inventory Receipt - {po.po_number}", "amount_currency": (receipt_value_base / exchange_rate).quantize(_D2, ROUND_HALF_UP) if exchange_rate else receipt_value_base, "currency": po.currency},
+                    {"account_id": acc_unbilled, "debit": 0, "credit": receipt_value_base, "description": f"Unbilled Accrual - {po.po_number}", "amount_currency": (receipt_value_base / exchange_rate).quantize(_D2, ROUND_HALF_UP) if exchange_rate else receipt_value_base, "currency": po.currency}
                 ]
                 
                 gl_create_journal_entry(
@@ -895,9 +897,9 @@ def receive_purchase_order(
             "message": "تم استلام البضاعة بنجاح",
             "id": int(id),
             "status": str(new_status),
-            "total_expected": float(total_expected),
-            "total_received": float(total_received),
-            "remaining": float(total_expected) - float(total_received)
+            "total_expected": float(total_expected_dec),
+            "total_received": float(total_received_dec),
+            "remaining": float(total_expected_dec - total_received_dec)
         }
     except HTTPException:
         raise
@@ -1059,7 +1061,7 @@ def get_purchase_invoice(
             GROUP BY il.product_id
         """), {"id": id}).fetchall()
         
-        returned_map = {row.product_id: float(row.returned_qty or 0) for row in returned_stats}
+        returned_map = {row.product_id: _dec(row.returned_qty or 0) for row in returned_stats}
         
         # 3. Construct Response
         return {
@@ -1088,8 +1090,8 @@ def get_purchase_invoice(
                 "tax_rate": l.tax_rate,
                 "discount": l.discount,
                 "total": l.total,
-                "returned_quantity": returned_map.get(l.product_id, 0),
-                "remaining_quantity": max(0, float(l.quantity) - returned_map.get(l.product_id, 0))
+                "returned_quantity": float(returned_map.get(l.product_id, Decimal('0'))),
+                "remaining_quantity": float(max(Decimal('0'), _dec(l.quantity) - returned_map.get(l.product_id, Decimal('0'))))
             } for l in lines]
         }
     finally:
@@ -1114,10 +1116,11 @@ async def create_purchase_invoice(
         base_currency = base_currency_row[0] if base_currency_row else "SAR"
 
         inv_currency = invoice.currency or base_currency
-        exchange_rate = float(invoice.exchange_rate or 1.0)
+        exchange_rate = _dec(invoice.exchange_rate or 1)
 
         def conversion_rate_needed(rate_val):
-            return rate_val is None or rate_val == 0 or rate_val == 1.0
+            d_rate = _dec(rate_val)
+            return rate_val is None or d_rate <= 0 or d_rate == Decimal('1')
 
         # If currency is different from base and no rate provided, fetch latest rate
         if inv_currency != base_currency and conversion_rate_needed(invoice.exchange_rate):
@@ -1130,10 +1133,13 @@ async def create_purchase_invoice(
              
              if not rate_row:
                  raise HTTPException(status_code=400, detail=f"No exchange rate found for {inv_currency}")
-             exchange_rate = float(rate_row.rate)
+             exchange_rate = _dec(rate_row.rate)
+
+        if inv_currency != base_currency and exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="Exchange rate must be greater than zero")
              
         def to_base(amount):
-            return round(float(amount) * exchange_rate, 2)
+            return (_dec(amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
         # 1. Generate Sequential Invoice Number
         from utils.accounting import generate_sequential_number
         inv_num = generate_sequential_number(db, f"PINV-{datetime.now().year}", "invoices", "invoice_number")
@@ -1161,20 +1167,20 @@ async def create_purchase_invoice(
                 WHERE po_id = :po_id
             """), {"po_id": invoice.original_invoice_id}).fetchall()
             for pol in po_lines:
-                po_received_map[pol.product_id] = float(pol.received_quantity or 0)
+                po_received_map[pol.product_id] = _dec(pol.received_quantity or 0)
 
         # 3. Calculate Totals
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
+        subtotal = Decimal('0')
+        total_tax = Decimal('0')
+        total_discount = Decimal('0')
         
         lines_data = []
         for item in invoice.items:
-            line_total = float(item.quantity) * float(item.unit_price)
-            line_discount = float(item.discount)
-            taxable = line_total - line_discount
-            line_tax = taxable * (float(item.tax_rate) / 100)
-            final_total = taxable + line_tax
+            line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+            line_discount = _dec(item.discount)
+            taxable = (line_total - line_discount).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            final_total = (taxable + line_tax).quantize(_D2, ROUND_HALF_UP)
             
             subtotal += line_total
             total_discount += line_discount
@@ -1191,18 +1197,18 @@ async def create_purchase_invoice(
                 "total": final_total
             })
 
-        grand_total = subtotal - total_discount + total_tax
+        grand_total = (subtotal - total_discount + total_tax).quantize(_D2, ROUND_HALF_UP)
         
         # 3. Handle Payment & Debt
-        paid_amount = invoice.paid_amount
+        paid_amount = _dec(invoice.paid_amount)
         if invoice.payment_method in ["cash", "bank"] and paid_amount == 0:
-             paid_amount = grand_total
+            paid_amount = grand_total
              
         remaining_balance = grand_total - paid_amount
         
         # Determine Status
         inv_status = "paid"
-        if remaining_balance > 0.01:
+        if remaining_balance > _D2:
             inv_status = "partial" if paid_amount > 0 else "unpaid"
 
         # 4. Insert Invoice Header
@@ -1244,7 +1250,7 @@ async def create_purchase_invoice(
         invoice_id = result[0]
         
         # 5. Insert Invoice Lines & Update Stock
-        receipt_accrual_reversal_base = 0.0
+        receipt_accrual_reversal_base = Decimal('0')
 
         for line in lines_data:
             db.execute(text("""
@@ -1272,14 +1278,14 @@ async def create_purchase_invoice(
                 from services.costing_service import CostingService
                 
                 # We need to pass the base currency price
-                new_price_fc = float(line["unit_price"])
+                new_price_fc = _dec(line["unit_price"])
                 new_price_bc = to_base(new_price_fc)
                 
                 CostingService.update_cost(
                     db, 
                     product_id=line["product_id"], 
                     warehouse_id=wh_id, 
-                    new_qty=float(line["quantity"]), 
+                    new_qty=float(_dec(line["quantity"])), 
                     new_price=new_price_bc
                 )
 
@@ -1291,7 +1297,7 @@ async def create_purchase_invoice(
                             db,
                             product_id=line["product_id"],
                             warehouse_id=wh_id,
-                            quantity=float(line["quantity"]),
+                            quantity=float(_dec(line["quantity"])),
                             unit_cost=new_price_bc,
                             source_document_type="purchase_invoice",
                             source_document_id=invoice_id,
@@ -1303,11 +1309,11 @@ async def create_purchase_invoice(
 
                 # 2. Update Inventory Quantity (Avoid double counting if already received via PO)
                 received_qty = po_received_map.get(line["product_id"], 0)
-                invoice_qty = float(line["quantity"])
+                invoice_qty = _dec(line["quantity"])
                 
                 # The quantity to actually ADD to inventory now
                 qty_to_add = invoice_qty
-                qty_already_received = 0
+                qty_already_received = Decimal('0')
                 
                 if invoice.original_invoice_id:
                     # If we already received some, only add the difference
@@ -1355,7 +1361,7 @@ async def create_purchase_invoice(
                 })
 
         # 6. Update Supplier Balance (base + currency)
-        if remaining_balance > 0.01:
+        if remaining_balance > _D2:
             gl_remaining = to_base(remaining_balance)
             db.execute(text("""
                 UPDATE parties 
@@ -1439,10 +1445,10 @@ async def create_purchase_invoice(
         
         # FC equivalents for amount_currency
         fc_net_purchases = subtotal - total_discount
-        fc_accrual_reversal = round(receipt_accrual_reversal_base / exchange_rate, 2) if exchange_rate != 0 else 0
+        fc_accrual_reversal = (receipt_accrual_reversal_base / exchange_rate).quantize(_D2, ROUND_HALF_UP) if exchange_rate != 0 else Decimal('0')
         fc_inventory_debit = fc_net_purchases - fc_accrual_reversal
         
-        if gl_inventory_debit > 0.01:
+        if gl_inventory_debit > _D2:
             je_lines.append({
                 "account_id": acc_inventory, "debit": gl_inventory_debit, "credit": 0, 
                 "description": f"Purchase Stock - {inv_num}",
@@ -1450,7 +1456,7 @@ async def create_purchase_invoice(
                 "currency": inv_currency
             })
         
-        if receipt_accrual_reversal_base > 0.01:
+        if receipt_accrual_reversal_base > _D2:
             acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
             if acc_unbilled:
                 je_lines.append({
@@ -1513,7 +1519,7 @@ async def create_purchase_invoice(
                   })
         
         remaining_gl = gl_total - gl_paid     
-        if remaining_gl > 0.01:
+        if remaining_gl > _D2:
              je_lines.append({
                  "account_id": acc_ap, "debit": 0, "credit": remaining_gl, 
                  "description": f"Purchase Credit - {inv_num}",
@@ -1729,9 +1735,9 @@ def create_purchase_return(
 
         # 3. Create Invoice Record (Type: purchase_return)
         # Calculate totals (including line discounts)
-        subtotal = sum(float(item.quantity) * float(item.unit_price) - float(getattr(item, 'discount', 0) or 0) for item in invoice.items)
-        tax_total = sum((float(item.quantity) * float(item.unit_price) - float(getattr(item, 'discount', 0) or 0)) * (float(item.tax_rate) / 100) for item in invoice.items)
-        total = subtotal + tax_total
+        subtotal = sum((_dec(item.quantity) * _dec(item.unit_price) - _dec(getattr(item, 'discount', 0) or 0)).quantize(_D2, ROUND_HALF_UP) for item in invoice.items)
+        tax_total = sum(((_dec(item.quantity) * _dec(item.unit_price) - _dec(getattr(item, 'discount', 0) or 0)).quantize(_D2, ROUND_HALF_UP) * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP) for item in invoice.items)
+        total = (subtotal + tax_total).quantize(_D2, ROUND_HALF_UP)
 
         # Determine warehouse: Use original invoice's warehouse if possible
         wh_id = invoice.warehouse_id
@@ -1814,7 +1820,7 @@ def create_purchase_return(
 
         # 4. Add Items & Update Stock (DEDUCT)
         for item in invoice.items:
-            item_total = float(item.quantity) * float(item.unit_price) * (1 + float(item.tax_rate) / 100)
+            item_total = ((_dec(item.quantity) * _dec(item.unit_price)) * (Decimal('1') + _dec(item.tax_rate) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
             db.execute(text("""
                 INSERT INTO invoice_lines (
                     invoice_id, product_id, description, quantity, unit_price,
@@ -1853,9 +1859,11 @@ def create_purchase_return(
             })
 
         # 5. Update Supplier Balance (Logic: Return reduces balance)
-        exchange_rate = float(invoice.exchange_rate or 1.0)
+        exchange_rate = _dec(invoice.exchange_rate or 1)
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
         def to_base(amount):
-            return round(float(amount) * exchange_rate, 2)
+            return (_dec(amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         gl_total = to_base(total)
         gl_subtotal = to_base(subtotal)
@@ -2006,14 +2014,20 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         
         # Check supplier balance (total owed)
         supplier_balance = db.execute(text("""
-            SELECT COALESCE(current_balance, 0) as balance FROM parties WHERE id = :sid
+            SELECT COALESCE(current_balance, 0) as balance
+            FROM parties
+            WHERE id = :sid
+            FOR UPDATE
         """), {"sid": data.supplier_id}).fetchone()
         if not supplier_balance:
             raise HTTPException(status_code=404, detail="المورد غير موجود")
         
         # For payments (not refunds), warn if paying more than owed
-        amount_base = round(data.amount * float(data.exchange_rate or 1.0), 2)
-        if data.voucher_type != 'refund' and amount_base > float(supplier_balance.balance) + 0.01:
+        voucher_rate = _dec(data.exchange_rate or 1)
+        if voucher_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+        amount_base = (_dec(data.amount) * voucher_rate).quantize(_D2, ROUND_HALF_UP)
+        if data.voucher_type != 'refund' and amount_base > (_dec(supplier_balance.balance) + _D2):
             # Allow overpayment but log warning (some businesses prepay)
             logger.warning(f"Supplier payment {data.amount} exceeds balance {supplier_balance.balance} for supplier {data.supplier_id}")
         
@@ -2045,8 +2059,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         voucher_id = result[0]
         
         # 2. Process Allocations
-        voucher_rate = float(data.exchange_rate or 1.0)
-        total_allocated = 0.0
+        total_allocated = Decimal('0')
         for alloc in data.allocations:
             if alloc.allocated_amount is None or alloc.allocated_amount <= 0:
                 raise HTTPException(status_code=400, detail="قيمة التخصيص يجب أن تكون أكبر من صفر")
@@ -2056,6 +2069,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                        currency, exchange_rate
                 FROM invoices
                 WHERE id = :id
+                FOR UPDATE
             """), {"id": alloc.invoice_id}).fetchone()
             if not inv_row:
                 raise HTTPException(status_code=404, detail=f"الفاتورة {alloc.invoice_id} غير موجودة")
@@ -2064,22 +2078,25 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
             if inv_row.invoice_type != 'purchase':
                 raise HTTPException(status_code=400, detail=f"التخصيص مسموح لفواتير الشراء فقط. الفاتورة {alloc.invoice_id} نوعها {inv_row.invoice_type}")
 
-            total_allocated = round(total_allocated + float(alloc.allocated_amount), 4)
+            alloc_amount = _dec(alloc.allocated_amount)
+            total_allocated = (total_allocated + alloc_amount).quantize(_D4, ROUND_HALF_UP)
 
             db.execute(text("""
                 INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
                 VALUES (:vid, :iid, :amt)
-            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc.allocated_amount})
+            """), {"vid": voucher_id, "iid": alloc.invoice_id, "amt": alloc_amount})
             
             inv_curr = inv_row.currency or base_currency
-            inv_rate = float(inv_row.exchange_rate or 1.0)
+            inv_rate = _dec(inv_row.exchange_rate or 1)
+            if inv_rate <= 0:
+                raise HTTPException(status_code=400, detail=f"سعر صرف الفاتورة {alloc.invoice_id} غير صالح")
 
             # if voucher is SYP (rate 1) and invoice is USD (rate 3.75)
             # allocated 375 SYP -> debt reduction = 375 / 3.75 = 100 USD
-            reduction = round(float(alloc.allocated_amount) * (voucher_rate / inv_rate), 4)
+            reduction = (alloc_amount * (voucher_rate / inv_rate)).quantize(_D4, ROUND_HALF_UP)
 
-            remaining = round(float(inv_row.total or 0) - float(inv_row.paid_amount or 0), 4)
-            if reduction > remaining + 0.01:
+            remaining = (_dec(inv_row.total or 0) - _dec(inv_row.paid_amount or 0)).quantize(_D4, ROUND_HALF_UP)
+            if reduction > remaining + _D2:
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -2093,13 +2110,13 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                 SET paid_amount = LEAST(total, COALESCE(paid_amount, 0) + :amt),
                     status = CASE
                         WHEN LEAST(total, COALESCE(paid_amount, 0) + :amt) >= total - 0.01 THEN 'paid'
-                        WHEN LEAST(total, COALESCE(paid_amount, 0) + :amt) > 0.1 THEN 'partial'
+                        WHEN LEAST(total, COALESCE(paid_amount, 0) + :amt) > 0.01 THEN 'partial'
                         ELSE status
                     END
                 WHERE id = :iid
             """), {"amt": reduction, "iid": alloc.invoice_id})
 
-        if total_allocated > float(data.amount) + 0.01:
+        if total_allocated > (_dec(data.amount) + _D2):
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -2108,7 +2125,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
             )
         
         # 3. Update Supplier Balance (Base + Currency)
-        amount_base = round(data.amount * (data.exchange_rate or 1.0), 2)
+        amount_base = (_dec(data.amount) * voucher_rate).quantize(_D2, ROUND_HALF_UP)
         balance_change = amount_base if data.voucher_type != 'refund' else -amount_base
         
         # Update base currency balance
@@ -2119,7 +2136,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         """), {"change": balance_change, "sid": data.supplier_id})
         
         # Update foreign currency balance if applicable
-        balance_change_fc = data.amount if data.voucher_type != 'refund' else -data.amount
+        balance_change_fc = _dec(data.amount) if data.voucher_type != 'refund' else -_dec(data.amount)
         if data.currency and data.currency != base_currency:
             db.execute(text("""
                 UPDATE parties
@@ -2132,8 +2149,8 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         treasury_id = data.treasury_account_id or data.bank_account_id
         cash_acc = None
         treasury_curr = data.currency
-        treasury_rate = float(data.exchange_rate or 1.0)
-        amount_treasury_curr = data.amount
+        treasury_rate = voucher_rate
+        amount_treasury_curr = _dec(data.amount)
         
         if treasury_id:
             # Fetch treasury account details
@@ -2143,20 +2160,20 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                 treasury_curr = treasury.currency or data.currency
                 
                 # Fetch current rate for treasury currency
-                treasury_rate = 1.0
+                treasury_rate = Decimal('1')
                 if treasury_curr != base_currency:
                      # Try to get rate from currencies table
                      curr_data = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": treasury_curr}).fetchone()
                      if curr_data:
-                         treasury_rate = float(curr_data.current_rate or 1.0)
+                         treasury_rate = _dec(curr_data.current_rate or 1)
                 
                 # Calculate amount in treasury's currency
                 if data.transaction_rate and data.transaction_rate > 0:
-                    amount_treasury_curr = round(data.amount * data.transaction_rate, 4)
+                    amount_treasury_curr = (_dec(data.amount) * _dec(data.transaction_rate)).quantize(_D4, ROUND_HALF_UP)
                 else:
-                    amount_treasury_curr = round(data.amount * (voucher_rate / treasury_rate), 4)
+                    amount_treasury_curr = (_dec(data.amount) * (voucher_rate / treasury_rate)).quantize(_D4, ROUND_HALF_UP)
                 
-                amount_base_cash = round(amount_treasury_curr * treasury_rate, 2)
+                amount_base_cash = (amount_treasury_curr * treasury_rate).quantize(_D2, ROUND_HALF_UP)
                 
                 # Update Treasury account specific balance
                 # Payment decreases balance (Credit Asset), Refund increases balance (Debit Asset)
@@ -2193,8 +2210,8 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
                 je_lines.append({"account_id": cash_acc, "debit": 0, "credit": amount_base_cash, "description": "من خزينة", "amount_currency": amount_treasury_curr, "currency": treasury_curr})
             
             # 5. Handle Exchange Difference to Balance the JE
-            diff = round(amount_base - amount_base_cash, 2)
-            if abs(diff) > 0.01:
+            diff = (amount_base - amount_base_cash).quantize(_D2, ROUND_HALF_UP)
+            if diff.copy_abs() > _D2:
                 fx_acc = get_mapped_account_id(db, "acc_map_fx_difference") or get_mapped_account_id(db, "acc_map_expense_other")
                 if fx_acc:
                     # Logic: If diff (AP-Cash) is +ve, we need More Credit (if Payment) or More Debit (if Refund)
@@ -2514,22 +2531,24 @@ def create_purchase_credit_note(
         inv_date = data.get("invoice_date", str(date.today()))
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
-        exchange_rate = float(data.get("exchange_rate", 1.0))
+        exchange_rate = _dec(data.get("exchange_rate", 1))
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
         branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
-        subtotal = 0
-        tax_total = 0
-        discount_total = 0
+        subtotal = Decimal('0')
+        tax_total = Decimal('0')
+        discount_total = Decimal('0')
         computed_lines = []
 
         for line in lines:
-            qty = float(line.get("quantity", 1))
-            price = float(line.get("unit_price", 0))
-            tax_rate = float(line.get("tax_rate", 0))
-            disc = float(line.get("discount", 0))
-            line_net = qty * price - disc
-            line_tax = round(line_net * tax_rate / 100, 4)
-            line_total = round(line_net + line_tax, 4)
+            qty = _dec(line.get("quantity", 1))
+            price = _dec(line.get("unit_price", 0))
+            tax_rate = _dec(line.get("tax_rate", 0))
+            disc = _dec(line.get("discount", 0))
+            line_net = (qty * price - disc).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_net * tax_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            line_total = (line_net + line_tax).quantize(_D2, ROUND_HALF_UP)
             subtotal += line_net
             tax_total += line_tax
             discount_total += disc
@@ -2540,7 +2559,7 @@ def create_purchase_credit_note(
                 "tax_rate": tax_rate, "discount": disc, "total": line_total,
             })
 
-        total = round(subtotal + tax_total, 4)
+        total = (subtotal + tax_total).quantize(_D2, ROUND_HALF_UP)
 
         inv_num = generate_sequential_number(db, "PCN", "invoices", "invoice_number")
         result = db.execute(text("""
@@ -2578,9 +2597,9 @@ def create_purchase_credit_note(
         if not acc_ap or not acc_inv:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
 
-        gl_sub = round(subtotal * exchange_rate, 4)
-        gl_tax = round(tax_total * exchange_rate, 4)
-        gl_total = round(total * exchange_rate, 4)
+        gl_sub = (_dec(subtotal) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
+        gl_tax = (_dec(tax_total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
+        gl_total = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
 
         je_lines = []
         # Debit: AP (reduces payable)
@@ -2622,7 +2641,7 @@ def create_purchase_credit_note(
             """), {"amt": total, "id": related_invoice_id})
 
         # Update supplier balance (credit note REDUCES what we owe supplier)
-        gl_total_base = round(total * exchange_rate, 4)
+        gl_total_base = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         db.execute(text("""
             UPDATE parties SET current_balance = current_balance - :amt
             WHERE id = :pid
@@ -2769,22 +2788,24 @@ def create_purchase_debit_note(
         inv_date = data.get("invoice_date", str(date.today()))
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
-        exchange_rate = float(data.get("exchange_rate", 1.0))
+        exchange_rate = _dec(data.get("exchange_rate", 1))
+        if exchange_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
         branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
-        subtotal = 0
-        tax_total = 0
-        discount_total = 0
+        subtotal = Decimal('0')
+        tax_total = Decimal('0')
+        discount_total = Decimal('0')
         computed_lines = []
 
         for line in lines:
-            qty = float(line.get("quantity", 1))
-            price = float(line.get("unit_price", 0))
-            tax_rate = float(line.get("tax_rate", 0))
-            disc = float(line.get("discount", 0))
-            line_net = qty * price - disc
-            line_tax = round(line_net * tax_rate / 100, 4)
-            line_total = round(line_net + line_tax, 4)
+            qty = _dec(line.get("quantity", 1))
+            price = _dec(line.get("unit_price", 0))
+            tax_rate = _dec(line.get("tax_rate", 0))
+            disc = _dec(line.get("discount", 0))
+            line_net = (qty * price - disc).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_net * tax_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            line_total = (line_net + line_tax).quantize(_D2, ROUND_HALF_UP)
             subtotal += line_net
             tax_total += line_tax
             discount_total += disc
@@ -2795,7 +2816,7 @@ def create_purchase_debit_note(
                 "tax_rate": tax_rate, "discount": disc, "total": line_total,
             })
 
-        total = round(subtotal + tax_total, 4)
+        total = (subtotal + tax_total).quantize(_D2, ROUND_HALF_UP)
 
         inv_num = generate_sequential_number(db, "PDN", "invoices", "invoice_number")
         result = db.execute(text("""
@@ -2833,9 +2854,9 @@ def create_purchase_debit_note(
         if not acc_ap or not acc_inv:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
 
-        gl_sub = round(subtotal * exchange_rate, 4)
-        gl_tax = round(tax_total * exchange_rate, 4)
-        gl_total = round(total * exchange_rate, 4)
+        gl_sub = (_dec(subtotal) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
+        gl_tax = (_dec(tax_total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
+        gl_total = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
 
         je_lines = []
         # Debit: Inventory/Expense
@@ -2869,7 +2890,7 @@ def create_purchase_debit_note(
         )
 
         # Update supplier balance (debit note INCREASES what we owe supplier)
-        gl_total_base = round(total * exchange_rate, 4)
+        gl_total_base = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         db.execute(text("""
             UPDATE parties SET current_balance = current_balance + :amt
             WHERE id = :pid
@@ -3078,11 +3099,11 @@ def supplier_rating_summary(supplier_id: int, current_user=Depends(get_current_u
 def rate_supplier(data: dict, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        q = float(data.get("quality_score", 0))
-        d = float(data.get("delivery_score", 0))
-        p = float(data.get("price_score", 0))
-        s = float(data.get("service_score", 0))
-        overall = round((q + d + p + s) / 4, 1)
+        q = _dec(data.get("quality_score", 0)).quantize(Decimal('0.1'), ROUND_HALF_UP)
+        d = _dec(data.get("delivery_score", 0)).quantize(Decimal('0.1'), ROUND_HALF_UP)
+        p = _dec(data.get("price_score", 0)).quantize(Decimal('0.1'), ROUND_HALF_UP)
+        s = _dec(data.get("service_score", 0)).quantize(Decimal('0.1'), ROUND_HALF_UP)
+        overall = ((q + d + p + s) / Decimal('4')).quantize(Decimal('0.1'), ROUND_HALF_UP)
         result = db.execute(text("""
             INSERT INTO supplier_ratings (supplier_id, po_id, quality_score, delivery_score,
                 price_score, service_score, overall_score, comments, rated_by)
@@ -3139,7 +3160,8 @@ def create_agreement(data: dict, current_user=Depends(get_current_user)):
     try:
         import uuid
         agr_num = f"PA-{uuid.uuid4().hex[:8].upper()}"
-        total = sum(float(l.get("unit_price", 0)) * float(l.get("quantity", 0)) for l in data.get("lines", []))
+        total = sum((_dec(l.get("unit_price", 0)) * _dec(l.get("quantity", 0))) for l in data.get("lines", []))
+        total = total.quantize(_D2, ROUND_HALF_UP)
         agr = db.execute(text("""
             INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title,
                 start_date, end_date, total_amount, status, branch_id, created_by)
@@ -3185,13 +3207,16 @@ def create_call_off(agr_id: int, data: dict, current_user=Depends(get_current_us
         agr = db.execute(text("SELECT * FROM purchase_agreements WHERE id = :id AND status = 'active'"), {"id": agr_id}).fetchone()
         if not agr:
             raise HTTPException(status_code=404, detail="Active agreement not found")
-        amount = float(data.get("amount", 0))
-        if float(agr.consumed_amount) + amount > float(agr.total_amount):
+        amount = _dec(data.get("amount", 0))
+        consumed_amount = _dec(agr.consumed_amount)
+        total_amount = _dec(agr.total_amount)
+        if consumed_amount + amount > total_amount:
             raise HTTPException(status_code=400, detail="Call-off exceeds agreement total")
         db.execute(text("UPDATE purchase_agreements SET consumed_amount = consumed_amount + :amt WHERE id = :id"),
                    {"amt": amount, "id": agr_id})
         db.commit()
-        return {"message": f"Call-off of {amount} created", "remaining": float(agr.total_amount) - float(agr.consumed_amount) - amount}
+        remaining = (total_amount - consumed_amount - amount).quantize(_D2, ROUND_HALF_UP)
+        return {"message": f"Call-off of {float(amount)} created", "remaining": float(remaining)}
     except HTTPException:
         raise
     except Exception as e:

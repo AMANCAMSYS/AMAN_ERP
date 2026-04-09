@@ -6,8 +6,10 @@ AMAN ERP - Security Tests: Injection Attacks
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from main import app
 from conftest import admin_token, admin_headers
+from routers import auth as auth_router
 
 client = TestClient(app)
 
@@ -280,3 +282,38 @@ class TestInjectionSecurity:
             # يجب أن يُعالج بشكل آمن
             assert response.status_code != 500
             assert response.status_code in [200, 400, 404, 422]
+
+
+class TestForwardedForSecurity:
+    """اختبارات منع انتحال IP عبر X-Forwarded-For"""
+
+    @staticmethod
+    def _make_request(client_ip: str, xff: str | None = None) -> Request:
+        headers = []
+        if xff is not None:
+            headers.append((b"x-forwarded-for", xff.encode("utf-8")))
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": headers,
+            "client": (client_ip, 12345),
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
+        return Request(scope)
+
+    def test_untrusted_source_cannot_override_client_ip(self, monkeypatch):
+        monkeypatch.setattr(auth_router.settings, "TRUSTED_PROXIES", "10.0.0.10")
+        req = self._make_request("198.51.100.10", "203.0.113.200")
+        assert auth_router._get_client_ip(req) == "198.51.100.10"
+
+    def test_trusted_proxy_allows_forwarded_ip(self, monkeypatch):
+        monkeypatch.setattr(auth_router.settings, "TRUSTED_PROXIES", "10.0.0.10,127.0.0.1")
+        req = self._make_request("10.0.0.10", "203.0.113.200, 10.0.0.10")
+        assert auth_router._get_client_ip(req) == "203.0.113.200"
+
+    def test_malformed_forwarded_ip_falls_back_to_proxy_ip(self, monkeypatch):
+        monkeypatch.setattr(auth_router.settings, "TRUSTED_PROXIES", "10.0.0.10")
+        req = self._make_request("10.0.0.10", "not-an-ip")
+        assert auth_router._get_client_ip(req) == "10.0.0.10"

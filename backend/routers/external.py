@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from pydantic import BaseModel, Field
 import hashlib
 import secrets
@@ -28,6 +29,10 @@ from utils.webhooks import WEBHOOK_EVENTS
 
 router = APIRouter(prefix="/external", tags=["التكامل الخارجي"])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 # ======================== Schemas ========================
@@ -400,12 +405,14 @@ def calculate_wht(data: WHTTransactionCreate, current_user=Depends(get_current_u
         if not rate_row:
             raise HTTPException(404, "معدل الاستقطاع غير موجود")
         
-        wht_amount = round(data.gross_amount * float(rate_row.rate) / 100, 2)
-        net_amount = round(data.gross_amount - wht_amount, 2)
+        wht_rate = _dec(rate_row.rate)
+        gross_amount = _dec(data.gross_amount)
+        wht_amount = (gross_amount * wht_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+        net_amount = (gross_amount - wht_amount).quantize(_D2, ROUND_HALF_UP)
         
         return {
             "gross_amount": data.gross_amount,
-            "wht_rate": float(rate_row.rate),
+            "wht_rate": float(wht_rate),
             "wht_amount": wht_amount,
             "net_amount": net_amount
         }
@@ -424,9 +431,10 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
         if not rate_row:
             raise HTTPException(404, "معدل الاستقطاع غير موجود")
         
-        wht_rate = float(rate_row.rate)
-        wht_amount = round(data.gross_amount * wht_rate / 100, 2)
-        net_amount = round(data.gross_amount - wht_amount, 2)
+        wht_rate = _dec(rate_row.rate)
+        gross_amount = _dec(data.gross_amount)
+        wht_amount = (gross_amount * wht_rate / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+        net_amount = (gross_amount - wht_amount).quantize(_D2, ROUND_HALF_UP)
         
         # Generate certificate number
         cert_num = f"WHT-{datetime.now().year}-{datetime.now().strftime('%m%d%H%M%S')}"
@@ -444,7 +452,7 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
         """), {
             "inv": data.invoice_id, "pay": data.payment_id,
             "sup": data.supplier_id, "rate_id": data.wht_rate_id,
-            "gross": data.gross_amount, "rate": wht_rate,
+            "gross": gross_amount, "rate": wht_rate,
             "wht": wht_amount, "net": net_amount,
             "cert": cert_num, "period": datetime.now().date(),
             "user": current_user.id

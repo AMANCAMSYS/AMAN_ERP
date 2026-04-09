@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user
 from pydantic import BaseModel
@@ -13,6 +14,13 @@ from utils.fiscal_lock import check_fiscal_period_open
 from schemas.assets import AssetCreate, AssetUpdate, AssetDisposal
 
 router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"], dependencies=[Depends(require_module("assets"))])
+
+_D2 = Decimal("0.01")
+_D4 = Decimal("0.0001")
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal("0")
 
 # ============================================================
 # ❗️ IMPORTANT: Static routes MUST come before /{asset_id}
@@ -48,7 +56,7 @@ def create_asset_transfer(data: dict, current_user: dict = Depends(get_current_u
         dep_sum = conn.execute(text(
             "SELECT COALESCE(SUM(amount),0) FROM asset_depreciation_schedule WHERE asset_id = :id AND posted = true"
         ), {"id": data["asset_id"]}).scalar()
-        book_value = float(asset.cost) - float(dep_sum or 0)
+        book_value = (_dec(asset.cost) - _dec(dep_sum or 0)).quantize(_D2, ROUND_HALF_UP)
 
         result = conn.execute(text("""
             INSERT INTO asset_transfers (asset_id, from_branch_id, to_branch_id, transfer_date,
@@ -121,9 +129,9 @@ def create_revaluation(data: dict, current_user: dict = Depends(get_current_user
         dep_sum = conn.execute(text(
             "SELECT COALESCE(SUM(amount),0) FROM asset_depreciation_schedule WHERE asset_id = :id AND posted = true"
         ), {"id": data["asset_id"]}).scalar()
-        old_value = float(asset.cost) - float(dep_sum or 0)
-        new_value = float(data["new_value"])
-        diff = round(new_value - old_value, 2)
+        old_value = (_dec(asset.cost) - _dec(dep_sum or 0)).quantize(_D2, ROUND_HALF_UP)
+        new_value = _dec(data["new_value"]).quantize(_D2, ROUND_HALF_UP)
+        diff = (new_value - old_value).quantize(_D2, ROUND_HALF_UP)
 
         result = conn.execute(text("""
             INSERT INTO asset_revaluations (asset_id, revaluation_date, old_value, new_value, difference, reason, created_by)
@@ -262,25 +270,27 @@ def asset_depreciation_summary(
 
         items = []
         for r in rows:
-            cost = float(r.cost or 0)
-            total_depr = float(r.total_depreciation)
+            cost = _dec(r.cost or 0)
+            total_depr = _dec(r.total_depreciation or 0)
+            net_book_value = (cost - total_depr).quantize(_D2, ROUND_HALF_UP)
+            depreciation_pct = ((total_depr / cost) * Decimal('100')).quantize(Decimal('0.1'), ROUND_HALF_UP) if cost > 0 else Decimal('0')
             items.append({
                 "id": r.id,
                 "code": r.code,
                 "name": r.name,
                 "category": r.type,
-                "cost": cost,
-                "residual_value": float(r.residual_value or 0),
+                "cost": float(cost.quantize(_D2, ROUND_HALF_UP)),
+                "residual_value": float(_dec(r.residual_value or 0).quantize(_D2, ROUND_HALF_UP)),
                 "life_years": r.life_years,
                 "depreciation_method": r.depreciation_method,
-                "annual_depreciation": float(r.annual_depreciation),
-                "total_depreciation": total_depr,
-                "accumulated_depreciation": total_depr,
-                "net_book_value": cost - total_depr,
-                "nbv": cost - total_depr,
+                "annual_depreciation": float(_dec(r.annual_depreciation or 0).quantize(_D2, ROUND_HALF_UP)),
+                "total_depreciation": float(total_depr.quantize(_D2, ROUND_HALF_UP)),
+                "accumulated_depreciation": float(total_depr.quantize(_D2, ROUND_HALF_UP)),
+                "net_book_value": float(net_book_value),
+                "nbv": float(net_book_value),
                 "periods_posted": r.periods_posted,
                 "currency": r.currency,
-                "depreciation_pct": round(total_depr / cost * 100, 1) if cost > 0 else 0,
+                "depreciation_pct": float(depreciation_pct),
             })
 
         return {"items": items, "count": len(items)}
@@ -320,20 +330,20 @@ def asset_net_book_value_report(
 
         items = []
         for r in rows:
-            cost = float(r.cost or 0)
-            acc_depr = float(r.accumulated_depreciation)
-            nbv = float(r.net_book_value)
+            cost = _dec(r.cost or 0).quantize(_D2, ROUND_HALF_UP)
+            acc_depr = _dec(r.accumulated_depreciation or 0).quantize(_D2, ROUND_HALF_UP)
+            nbv = _dec(r.net_book_value or 0).quantize(_D2, ROUND_HALF_UP)
             items.append({
                 "id": r.id,
                 "code": r.code,
                 "name": r.name,
                 "category": r.type,
-                "original_cost": cost,
-                "cost": cost,
-                "accumulated_depreciation": acc_depr,
-                "total_depreciation": acc_depr,
-                "net_book_value": nbv,
-                "nbv": nbv,
+                "original_cost": float(cost),
+                "cost": float(cost),
+                "accumulated_depreciation": float(acc_depr),
+                "total_depreciation": float(acc_depr),
+                "net_book_value": float(nbv),
+                "nbv": float(nbv),
                 "status": r.status,
                 "currency": r.currency,
                 "purchase_date": str(r.purchase_date) if r.purchase_date else None,
@@ -409,18 +419,18 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
         
         # Calculate Depreciation Schedule (Straight Line)
         if asset.life_years > 0 and asset.depreciation_method == 'straight_line':
-            depreciable_amount = asset.cost - asset.residual_value
-            annual_depreciation = depreciable_amount / asset.life_years
+            depreciable_amount = (_dec(asset.cost) - _dec(asset.residual_value)).quantize(_D2, ROUND_HALF_UP)
+            annual_depreciation = (depreciable_amount / _dec(asset.life_years)).quantize(_D4, ROUND_HALF_UP)
             
             # Partial first year based on purchase month
-            current_accumulated = 0
+            current_accumulated = Decimal('0')
             purchase_year = asset.purchase_date.year
             purchase_month = asset.purchase_date.month
             
             # Calculate first year fraction (remaining months / 12)
             remaining_months_first_year = 12 - purchase_month + 1  # Include purchase month
-            first_year_fraction = remaining_months_first_year / 12
-            first_year_amount = round(annual_depreciation * first_year_fraction, 2)
+            first_year_fraction = _dec(remaining_months_first_year) / Decimal('12')
+            first_year_amount = (annual_depreciation * first_year_fraction).quantize(_D2, ROUND_HALF_UP)
             
             total_years = asset.life_years
             # If partial first year, we need an extra year at the end for the remainder
@@ -435,20 +445,20 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
                 elif i == schedule_years and has_partial_first_year:
                     # Last year — remainder from first year's partial amount
                     year = purchase_year + i - 1
-                    amount = round(depreciable_amount - current_accumulated, 2)
+                    amount = (depreciable_amount - current_accumulated).quantize(_D2, ROUND_HALF_UP)
                 else:
                     # Full intermediate years
                     year = purchase_year + i - 1
-                    amount = annual_depreciation
+                    amount = annual_depreciation.quantize(_D2, ROUND_HALF_UP)
                 
                 # Safety: ensure we don't exceed depreciable amount
                 if current_accumulated + amount > depreciable_amount:
-                    amount = round(depreciable_amount - current_accumulated, 2)
+                    amount = (depreciable_amount - current_accumulated).quantize(_D2, ROUND_HALF_UP)
                 if amount <= 0:
                     break
                 
-                current_accumulated = round(current_accumulated + amount, 2)
-                book_val = round(asset.cost - current_accumulated, 2)
+                current_accumulated = (current_accumulated + amount).quantize(_D2, ROUND_HALF_UP)
+                book_val = (_dec(asset.cost) - current_accumulated).quantize(_D2, ROUND_HALF_UP)
                 
                 conn.execute(text("""
                     INSERT INTO asset_depreciation_schedule (
@@ -507,14 +517,14 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
     conn = get_db_connection(current_user.company_id)
     try:
         # Calculate right-of-use value using present value of payments
-        monthly = float(lease.get("monthly_payment", 0))
-        total = float(lease.get("total_payments", 0))
-        rate = float(lease.get("discount_rate", 5)) / 100 / 12
+        monthly = _dec(lease.get("monthly_payment", 0)).quantize(_D2, ROUND_HALF_UP)
+        total = int(_dec(lease.get("total_payments", 0)))
+        rate = (_dec(lease.get("discount_rate", 5)) / Decimal('100') / Decimal('12')).quantize(_D4, ROUND_HALF_UP)
         if rate > 0 and total > 0:
-            rou_value = monthly * (1 - (1 + rate) ** -total) / rate
+            one = Decimal('1')
+            rou_value = (monthly * (one - (one + rate) ** (-total)) / rate).quantize(_D2, ROUND_HALF_UP)
         else:
-            rou_value = monthly * total
-        rou_value = round(rou_value, 2)
+            rou_value = (monthly * Decimal(total)).quantize(_D2, ROUND_HALF_UP)
 
         result = conn.execute(text("""
             INSERT INTO lease_contracts (asset_id, description, lessor_name, lease_type,
@@ -526,7 +536,7 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
             "aid": lease.get("asset_id"), "desc": lease.get("description"),
             "ln": lease.get("lessor_name"), "lt": lease.get("lease_type", "operating"),
             "sd": lease["start_date"], "ed": lease["end_date"],
-            "mp": monthly, "tp": total, "dr": lease.get("discount_rate", 5),
+            "mp": monthly, "tp": total, "dr": _dec(lease.get("discount_rate", 5)).quantize(_D4, ROUND_HALF_UP),
             "rou": rou_value, "ll": rou_value, "st": lease.get("status", "active")
         })
         lid = result.fetchone()[0]
@@ -548,11 +558,11 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
                 
                 je_lines = [
                     {
-                        "account_id": rou_acc.id, "debit": float(rou_value), "credit": 0,
+                        "account_id": rou_acc.id, "debit": rou_value, "credit": 0,
                         "description": f"أصل حق الاستخدام - {lease.get('description', '')}"
                     },
                     {
-                        "account_id": liability_acc.id, "debit": 0, "credit": float(rou_value),
+                        "account_id": liability_acc.id, "debit": 0, "credit": rou_value,
                         "description": f"التزام إيجار - {lease.get('description', '')}"
                     }
                 ]
@@ -576,7 +586,7 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
 
         conn.commit()
         return {
-            "id": lid, "right_of_use_value": rou_value,
+            "id": lid, "right_of_use_value": float(rou_value),
             "journal_entry_id": journal_entry_id,
             "message": "تم إنشاء عقد الإيجار بنجاح" + (" مع قيد محاسبي" if journal_entry_id else "")
         }
@@ -597,18 +607,21 @@ def get_lease_schedule(lease_id: int, current_user: dict = Depends(get_current_u
         if not row:
             raise HTTPException(404, "Lease not found")
         lc = dict(row._mapping)
-        monthly = float(lc.get("monthly_payment", 0))
+        monthly = _dec(lc.get("monthly_payment", 0)).quantize(_D2, ROUND_HALF_UP)
         total = int(lc.get("total_payments", 0))
-        rate = float(lc.get("discount_rate", 5)) / 100 / 12
-        balance = float(lc.get("lease_liability", 0))
+        rate = (_dec(lc.get("discount_rate", 5)) / Decimal('100') / Decimal('12')).quantize(_D4, ROUND_HALF_UP)
+        balance = _dec(lc.get("lease_liability", 0)).quantize(_D2, ROUND_HALF_UP)
         schedule = []
         for i in range(1, total + 1):
-            interest = round(balance * rate, 2)
-            principal = round(monthly - interest, 2)
-            balance = round(balance - principal, 2)
+            interest = (balance * rate).quantize(_D2, ROUND_HALF_UP)
+            principal = (monthly - interest).quantize(_D2, ROUND_HALF_UP)
+            balance = (balance - principal).quantize(_D2, ROUND_HALF_UP)
             schedule.append({
-                "period": i, "payment": monthly, "interest": interest,
-                "principal": principal, "balance": max(balance, 0)
+                "period": i,
+                "payment": float(monthly),
+                "interest": float(interest),
+                "principal": float(principal),
+                "balance": float(max(balance, Decimal('0')))
             })
         return {"lease": lc, "schedule": schedule}
     finally:
@@ -707,11 +720,11 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
         # Create Header
         je_lines = [
             {
-                "account_id": exp_acc_id, "debit": float(item.amount), "credit": 0,
+                "account_id": exp_acc_id, "debit": _dec(item.amount).quantize(_D2, ROUND_HALF_UP), "credit": 0,
                 "description": "Depreciation Expense"
             },
             {
-                "account_id": acc_depr_id, "debit": 0, "credit": float(item.amount),
+                "account_id": acc_depr_id, "debit": 0, "credit": _dec(item.amount).quantize(_D2, ROUND_HALF_UP),
                 "description": "Accumulated Depreciation"
             }
         ]
@@ -776,8 +789,8 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         if disposal.payment_method == 'bank':
             acc_cash = get_mapped_account_id(conn, "acc_map_bank")
             
-        book_value = float(asset.cost) - float(acc_depr_recorded)
-        gain_loss = float(disposal.disposal_price) - book_value
+        book_value = (_dec(asset.cost) - _dec(acc_depr_recorded)).quantize(_D2, ROUND_HALF_UP)
+        gain_loss = (_dec(disposal.disposal_price) - book_value).quantize(_D2, ROUND_HALF_UP)
         
         # Use UUID OR simple generation
         import uuid
@@ -794,29 +807,29 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         je_lines = []
         if disposal.disposal_price > 0:
             je_lines.append({
-                "account_id": acc_cash, "debit": float(disposal.disposal_price), "credit": 0,
+                "account_id": acc_cash, "debit": _dec(disposal.disposal_price), "credit": 0,
                 "description": 'ثمن بيع أصل'
             })
             
         if acc_depr_recorded > 0:
             je_lines.append({
-                "account_id": acc_acc_depr, "debit": float(acc_depr_recorded), "credit": 0,
+                "account_id": acc_acc_depr, "debit": _dec(acc_depr_recorded), "credit": 0,
                 "description": 'استبعاد إهلاك متراكم'
             })
             
         je_lines.append({
-            "account_id": acc_fixed_assets, "debit": 0, "credit": float(asset.cost),
+            "account_id": acc_fixed_assets, "debit": 0, "credit": _dec(asset.cost),
             "description": 'استبعاد تكلفة أصل تاريخية'
         })
         
         if gain_loss > 0:
             je_lines.append({
-                "account_id": acc_gain, "debit": 0, "credit": float(gain_loss),
+                "account_id": acc_gain, "debit": 0, "credit": _dec(gain_loss),
                 "description": 'أرباح بيع أصول'
             })
         elif gain_loss < 0:
             je_lines.append({
-                "account_id": acc_loss, "debit": abs(float(gain_loss)), "credit": 0,
+                "account_id": acc_loss, "debit": abs(_dec(gain_loss)), "credit": 0,
                 "description": 'خسائر بيع أصول'
             })
             
@@ -831,7 +844,7 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
             branch_id=asset.branch_id,
             reference=f"ASSET-DISP-{asset_id}",
             currency=asset.currency or base_currency,
-            exchange_rate=1.0,
+            exchange_rate=Decimal("1"),
             source="asset_disposal",
             source_id=asset_id
         )
@@ -881,7 +894,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
         if not acc_inter:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حساب بين الفروع (acc_map_intercompany)")
 
-        cost = float(asset.cost)
+        cost = _dec(asset.cost).quantize(_D2, ROUND_HALF_UP)
 
         check_fiscal_period_open(conn, date.today())
         # Create 2 JEs — one for sending branch, one for receiving
@@ -896,7 +909,12 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
             ]),
         ]:
             je_lines_formatted = [
-                {"account_id": row[0], "debit": float(row[1]), "credit": float(row[2]), "description": row[3]}
+                {
+                    "account_id": row[0],
+                    "debit": _dec(row[1]).quantize(_D2, ROUND_HALF_UP),
+                    "credit": _dec(row[2]).quantize(_D2, ROUND_HALF_UP),
+                    "description": row[3]
+                }
                 for row in lines
             ]
             
@@ -955,14 +973,14 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         if not asset or asset.status == 'disposed':
             raise HTTPException(status_code=400, detail="الأصل غير موجود أو مستبعد")
 
-        acc_depr_recorded = float(conn.execute(text("""
+        acc_depr_recorded = _dec(conn.execute(text("""
             SELECT COALESCE(SUM(amount), 0) FROM asset_depreciation_schedule WHERE asset_id = :id AND posted = TRUE
         """), {"id": asset_id}).scalar())
 
-        old_book = float(asset.cost) - acc_depr_recorded
-        diff = reval.new_value - old_book
+        old_book = (_dec(asset.cost) - acc_depr_recorded).quantize(_D2, ROUND_HALF_UP)
+        diff = (_dec(reval.new_value) - old_book).quantize(_D2, ROUND_HALF_UP)
 
-        if abs(diff) < 0.01:
+        if diff.copy_abs() < _D2:
             return {"success": True, "message": "لا يوجد فرق في القيمة"}
 
         base_currency = get_base_currency(conn)
@@ -980,13 +998,13 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         je_lines = []
         if diff > 0:
             je_lines.extend([
-                {"account_id": acc_fixed, "debit": float(abs(diff)), "credit": 0, "description": f"زيادة قيمة أصل #{asset_id}"},
-                {"account_id": acc_reval, "debit": 0, "credit": float(abs(diff)), "description": "احتياطي إعادة تقييم"}
+                {"account_id": acc_fixed, "debit": abs(diff), "credit": 0, "description": f"زيادة قيمة أصل #{asset_id}"},
+                {"account_id": acc_reval, "debit": 0, "credit": abs(diff), "description": "احتياطي إعادة تقييم"}
             ])
         else:
             je_lines.extend([
-                {"account_id": acc_loss, "debit": float(abs(diff)), "credit": 0, "description": f"انخفاض قيمة أصل #{asset_id}"},
-                {"account_id": acc_fixed, "debit": 0, "credit": float(abs(diff)), "description": f"تخفيض أصل #{asset_id}"}
+                {"account_id": acc_loss, "debit": abs(diff), "credit": 0, "description": f"انخفاض قيمة أصل #{asset_id}"},
+                {"account_id": acc_fixed, "debit": 0, "credit": abs(diff), "description": f"تخفيض أصل #{asset_id}"}
             ])
             
         from services.gl_service import create_journal_entry as gl_create_journal_entry
@@ -1000,7 +1018,7 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
             branch_id=asset.branch_id,
             reference=f"ASSET-REVAL-{asset_id}",
             currency=base_currency,
-            exchange_rate=1.0,
+            exchange_rate=Decimal("1"),
             source="asset_revaluation",
             source_id=asset_id
         )
@@ -1012,8 +1030,8 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         trans.commit()
         return {
             "success": True, "asset_id": asset_id,
-            "old_book_value": round(old_book, 2), "new_value": reval.new_value,
-            "difference": round(diff, 2), "journal_entry": je_num,
+            "old_book_value": float(old_book.quantize(_D2, ROUND_HALF_UP)), "new_value": float(_dec(reval.new_value).quantize(_D2, ROUND_HALF_UP)),
+            "difference": float(diff.quantize(_D2, ROUND_HALF_UP)), "journal_entry": je_num,
         }
     except HTTPException:
         trans.rollback()
@@ -1039,21 +1057,21 @@ def calc_declining_balance(asset_id: int, data: dict = {}, current_user: dict = 
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": asset_id}).fetchone()
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
-        cost = float(asset.cost)
-        residual = float(asset.residual_value or 0)
+        cost = _dec(asset.cost)
+        residual = _dec(asset.residual_value or 0)
         life = int(asset.life_years or 5)
-        rate = data.get("rate", 2.0 / life)  # Double declining by default
+        rate = _dec(data.get("rate", Decimal('2') / _dec(life)))  # Double declining by default
         schedule = []
         book_value = cost
         for year in range(1, life + 1):
-            dep = round(book_value * rate, 2)
+            dep = (book_value * rate).quantize(_D2, ROUND_HALF_UP)
             if book_value - dep < residual:
-                dep = round(book_value - residual, 2)
+                dep = (book_value - residual).quantize(_D2, ROUND_HALF_UP)
             book_value -= dep
-            schedule.append({"year": year, "depreciation": dep, "book_value": round(book_value, 2)})
+            schedule.append({"year": year, "depreciation": float(dep), "book_value": float(book_value.quantize(_D2, ROUND_HALF_UP))})
             if book_value <= residual:
                 break
-        return {"asset_id": asset_id, "method": "declining_balance", "rate": rate, "schedule": schedule}
+        return {"asset_id": asset_id, "method": "declining_balance", "rate": float(rate), "schedule": schedule}
     finally:
         conn.close()
 
@@ -1066,20 +1084,20 @@ def calc_units_of_production(asset_id: int, data: dict, current_user: dict = Dep
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": asset_id}).fetchone()
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
-        cost = float(asset.cost)
-        residual = float(asset.residual_value or 0)
-        total_units = float(data.get("total_units") or asset.total_units or 1)
-        units_used = float(data.get("units_used", 0))
+        cost = _dec(asset.cost)
+        residual = _dec(asset.residual_value or 0)
+        total_units = _dec(data.get("total_units") or asset.total_units or 1)
+        units_used = _dec(data.get("units_used", 0))
         dep_per_unit = (cost - residual) / total_units
-        depreciation = round(dep_per_unit * units_used, 2)
+        depreciation = (dep_per_unit * units_used).quantize(_D2, ROUND_HALF_UP)
         # Update used units
         conn.execute(text("UPDATE assets SET used_units = COALESCE(used_units,0) + :u WHERE id = :id"),
                      {"u": units_used, "id": asset_id})
         conn.commit()
         return {
             "asset_id": asset_id, "method": "units_of_production",
-            "dep_per_unit": round(dep_per_unit, 4),
-            "units_used": units_used, "depreciation": depreciation,
+            "dep_per_unit": float(dep_per_unit.quantize(_D4, ROUND_HALF_UP)),
+            "units_used": float(units_used), "depreciation": float(depreciation),
         }
     finally:
         conn.close()
@@ -1093,16 +1111,16 @@ def calc_sum_of_years_digits(asset_id: int, current_user: dict = Depends(get_cur
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": asset_id}).fetchone()
         if not asset:
             raise HTTPException(status_code=404, detail="Asset not found")
-        cost = float(asset.cost)
-        residual = float(asset.residual_value or 0)
+        cost = _dec(asset.cost)
+        residual = _dec(asset.residual_value or 0)
         life = int(asset.life_years or 5)
         depreciable = cost - residual
-        syd = life * (life + 1) / 2
+        syd = _dec(life * (life + 1)) / Decimal('2')
         schedule = []
         for year in range(1, life + 1):
-            fraction = (life - year + 1) / syd
-            dep = round(depreciable * fraction, 2)
-            schedule.append({"year": year, "fraction": round(fraction, 4), "depreciation": dep})
+            fraction = _dec(life - year + 1) / syd
+            dep = (depreciable * fraction).quantize(_D2, ROUND_HALF_UP)
+            schedule.append({"year": year, "fraction": float(fraction.quantize(_D4, ROUND_HALF_UP)), "depreciation": float(dep)})
         return {"asset_id": asset_id, "method": "sum_of_years_digits", "schedule": schedule}
     finally:
         conn.close()
@@ -1239,9 +1257,9 @@ def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Dep
             raise HTTPException(404, "Asset not found")
         asset = dict(asset._mapping)
 
-        carrying = float(asset.get("current_value") or asset.get("purchase_cost", 0))
-        recoverable = float(test_data.get("recoverable_amount", 0))
-        impairment_loss = max(carrying - recoverable, 0)
+        carrying = _dec(asset.get("current_value") or asset.get("purchase_cost", 0)).quantize(_D2, ROUND_HALF_UP)
+        recoverable = _dec(test_data.get("recoverable_amount", 0)).quantize(_D2, ROUND_HALF_UP)
+        impairment_loss = max(carrying - recoverable, Decimal('0')).quantize(_D2, ROUND_HALF_UP)
 
         result = conn.execute(text("""
             INSERT INTO asset_impairments (asset_id, test_date, carrying_amount,
@@ -1275,11 +1293,11 @@ def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Dep
                 
                 je_lines = [
                     {
-                        "account_id": imp_loss_acc.id, "debit": float(impairment_loss), "credit": 0,
+                        "account_id": imp_loss_acc.id, "debit": impairment_loss, "credit": 0,
                         "description": f"خسارة انخفاض قيمة - {asset.get('name', '')}"
                     },
                     {
-                        "account_id": acc_imp_acc.id, "debit": 0, "credit": float(impairment_loss),
+                        "account_id": acc_imp_acc.id, "debit": 0, "credit": impairment_loss,
                         "description": f"مجمع انخفاض قيمة - {asset.get('name', '')}"
                     }
                 ]

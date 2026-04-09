@@ -28,6 +28,7 @@ from .intercompany import rev_router as revenue_recognition_router
 from .intercompany_v2 import router as intercompany_v2_router
 from .advanced_workflow import router as advanced_workflow_router
 from .cashflow import router as cashflow_router
+from .subscriptions import router as subscriptions_router
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
@@ -49,3 +50,4 @@ router.include_router(intercompany_v2_router)
 router.include_router(revenue_recognition_router)
 router.include_router(advanced_workflow_router)
 router.include_router(cashflow_router)
+router.include_router(subscriptions_router)

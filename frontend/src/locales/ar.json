@@ -9356,5 +9356,80 @@
     "change_result": "نتيجة التغيير",
     "old_method": "الطريقة القديمة",
     "layers_created": "الطبقات المنشأة"
+  },
+  "subscription": {
+    "title": "الاشتراكات",
+    "home_subtitle": "إدارة خطط الاشتراك وتسجيل العملاء",
+    "plans_title": "خطط الاشتراك",
+    "plans_subtitle": "إدارة خطط الفوترة المتكررة",
+    "enrollments_title": "الاشتراكات",
+    "enrollments_subtitle": "إدارة اشتراكات العملاء",
+    "enrollment_detail": "تفاصيل الاشتراك",
+    "new_plan": "خطة جديدة",
+    "edit_plan": "تعديل الخطة",
+    "new_enrollment": "اشتراك جديد",
+    "enroll_btn": "تسجيل الاشتراك",
+    "enrollment_info": "معلومات الاشتراك",
+    "customer_id_placeholder": "رقم العميل",
+    "no_plans": "لا توجد خطط اشتراك",
+    "plans_empty_desc": "أنشئ أول خطة اشتراك",
+    "no_enrollments": "لا توجد اشتراكات",
+    "enrollments_empty_desc": "سجّل أول عميل في خطة اشتراك",
+    "no_invoices": "لم يتم إنشاء فواتير بعد",
+    "invoices_empty_desc": "ستظهر الفواتير هنا بعد الفوترة",
+    "not_found": "الاشتراك غير موجود",
+    "confirm_pause": "هل أنت متأكد من إيقاف هذا الاشتراك مؤقتاً؟",
+    "cancel_reason": "أدخل سبب الإلغاء (اختياري):",
+    "billing_history": "سجل الفوترة",
+    "table": {
+      "name": "اسم الخطة",
+      "frequency": "دورة الفوترة",
+      "amount": "المبلغ",
+      "trial_days": "أيام التجربة",
+      "status": "الحالة",
+      "customer": "العميل",
+      "plan": "الخطة",
+      "enrolled": "تاريخ الاشتراك",
+      "next_billing": "الفوترة القادمة",
+      "period_start": "بداية الفترة",
+      "period_end": "نهاية الفترة",
+      "prorated": "نسبي",
+      "invoice_id": "رقم الفاتورة"
+    },
+    "form": {
+      "basic_info": "معلومات الخطة",
+      "billing_info": "الفوترة",
+      "name": "اسم الخطة",
+      "description": "الوصف",
+      "billing_frequency": "دورة الفوترة",
+      "base_amount": "المبلغ الأساسي",
+      "currency": "العملة",
+      "trial_period_days": "فترة التجربة (أيام)",
+      "auto_renewal": "تجديد تلقائي"
+    },
+    "frequency": {
+      "monthly": "شهري",
+      "quarterly": "ربع سنوي",
+      "annual": "سنوي"
+    },
+    "status": {
+      "trial": "تجربة",
+      "active": "نشط",
+      "paused": "متوقف مؤقتاً",
+      "cancelled": "ملغى",
+      "at_risk": "معرّض للخطر"
+    },
+    "action": {
+      "pause": "إيقاف مؤقت",
+      "resume": "استئناف",
+      "cancel": "إلغاء"
+    },
+    "detail": {
+      "status": "الحالة",
+      "enrolled": "تاريخ الاشتراك",
+      "next_billing": "تاريخ الفوترة القادمة",
+      "trial_end": "تاريخ انتهاء التجربة",
+      "failed_payments": "المدفوعات الفاشلة"
+    }
   }
 }

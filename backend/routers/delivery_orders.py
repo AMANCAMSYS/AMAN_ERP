@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
+from decimal import Decimal, ROUND_HALF_UP
 from pydantic import BaseModel
 import logging
 
@@ -21,6 +22,10 @@ from utils.accounting import (
 
 router = APIRouter(prefix="/sales/delivery-orders", tags=["أوامر التسليم"])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 # ─── Schemas ───────────────────────────────────────────────────────────────────
@@ -196,14 +201,14 @@ def create_delivery_order(body: DeliveryOrderCreate, current_user: dict = Depend
                     WHERE dol.so_line_id = :slid AND do2.status != 'cancelled'
                 """), {"slid": sl.id}).scalar() or 0
 
-                remaining = float(sl.quantity) - float(already_delivered)
+                remaining = _dec(sl.quantity) - _dec(already_delivered)
                 if remaining > 0:
                     lines.append(DeliveryLineCreate(
                         product_id=sl.product_id,
                         so_line_id=sl.id,
                         description=getattr(sl, 'description', ''),
-                        ordered_qty=remaining,
-                        delivered_qty=remaining,
+                        ordered_qty=float(remaining),
+                        delivered_qty=float(remaining),
                         unit=getattr(sl, 'unit', None)
                     ))
 
@@ -286,7 +291,8 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
         warehouse_id = order.warehouse_id
 
         for line in lines:
-            if not line.product_id or float(line.delivered_qty) <= 0:
+            delivered_qty = _dec(line.delivered_qty)
+            if not line.product_id or delivered_qty <= 0:
                 continue
 
             # Check stock
@@ -295,8 +301,8 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
                 WHERE product_id = :pid AND warehouse_id = :wid
             """), {"pid": line.product_id, "wid": warehouse_id}).fetchone()
 
-            available = float(stock.quantity) if stock else 0
-            if available < float(line.delivered_qty):
+            available = _dec(stock.quantity) if stock else Decimal('0')
+            if available < delivered_qty:
                 product = db.execute(text("SELECT product_name FROM products WHERE id = :id"), {"id": line.product_id}).fetchone()
                 pname = product.product_name if product else f"#{line.product_id}"
                 raise HTTPException(400, f"المخزون غير كافٍ للمنتج {pname}: متوفر {available}, مطلوب {line.delivered_qty}")
@@ -305,7 +311,7 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
             db.execute(text("""
                 UPDATE inventory SET quantity = quantity - :qty, updated_at = CURRENT_TIMESTAMP
                 WHERE product_id = :pid AND warehouse_id = :wid
-            """), {"qty": float(line.delivered_qty), "pid": line.product_id, "wid": warehouse_id})
+            """), {"qty": delivered_qty, "pid": line.product_id, "wid": warehouse_id})
 
             # Record inventory transaction
             db.execute(text("""
@@ -318,7 +324,7 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
                 )
             """), {
                 "pid": line.product_id, "wid": warehouse_id,
-                "qty": -float(line.delivered_qty), "doid": do_id,
+                "qty": -delivered_qty, "doid": do_id,
                 "notes": f"تسليم بموجب {order.delivery_number}", "uid": user_id
             })
 
@@ -400,11 +406,11 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
         base_currency = get_base_currency(db)
 
         # Calculate totals
-        subtotal = 0
-        tax_total = 0
+        subtotal = Decimal('0')
+        tax_total = Decimal('0')
         for line in lines:
-            line_total = float(line.delivered_qty) * float(line.selling_price or 0)
-            line_tax = line_total * float(line.tax_rate or 0) / 100
+            line_total = (_dec(line.delivered_qty) * _dec(line.selling_price or 0)).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_total * _dec(line.tax_rate or 0) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             subtotal += line_total
             tax_total += line_tax
 
@@ -433,8 +439,8 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
 
         # Create invoice lines
         for line in lines:
-            line_total = float(line.delivered_qty) * float(line.selling_price or 0)
-            line_tax = line_total * float(line.tax_rate or 0) / 100
+            line_total = (_dec(line.delivered_qty) * _dec(line.selling_price or 0)).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_total * _dec(line.tax_rate or 0) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             db.execute(text("""
                 INSERT INTO invoice_lines (
                     invoice_id, product_id, description, quantity,
@@ -442,9 +448,9 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
                 ) VALUES (:iid, :pid, :desc, :qty, :up, :tr, :ta, :lt)
             """), {
                 "iid": inv_id, "pid": line.product_id,
-                "desc": line.product_name, "qty": float(line.delivered_qty),
-                "up": float(line.selling_price or 0),
-                "tr": float(line.tax_rate or 0),
+                "desc": line.product_name, "qty": _dec(line.delivered_qty),
+                "up": _dec(line.selling_price or 0),
+                "tr": _dec(line.tax_rate or 0),
                 "ta": line_tax, "lt": line_total + line_tax
             })
 
@@ -499,7 +505,7 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
             update_account_balance(db, vat_out_account, 0, tax_total)
 
         # COGS JE: Dr: COGS, Cr: Inventory
-        total_cogs = sum(float(l.delivered_qty) * float(l.cost_price or 0) for l in lines)
+        total_cogs = sum((_dec(l.delivered_qty) * _dec(l.cost_price or 0)).quantize(_D2, ROUND_HALF_UP) for l in lines)
         if cogs_account and inventory_account and total_cogs > 0:
             db.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
@@ -568,12 +574,13 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
             ), {"doid": do_id}).fetchall()
 
             for line in lines:
-                if not line.product_id or float(line.delivered_qty) <= 0:
+                delivered_qty = _dec(line.delivered_qty)
+                if not line.product_id or delivered_qty <= 0:
                     continue
                 db.execute(text("""
                     UPDATE inventory SET quantity = quantity + :qty
                     WHERE product_id = :pid AND warehouse_id = :wid
-                """), {"qty": float(line.delivered_qty), "pid": line.product_id, "wid": order.warehouse_id})
+                """), {"qty": delivered_qty, "pid": line.product_id, "wid": order.warehouse_id})
 
                 db.execute(text("""
                     INSERT INTO inventory_transactions (
@@ -582,7 +589,7 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
                     ) VALUES (:pid, :wid, 'delivery_cancel', :qty, 'delivery_order', :doid, :notes, :uid)
                 """), {
                     "pid": line.product_id, "wid": order.warehouse_id,
-                    "qty": float(line.delivered_qty), "doid": do_id,
+                    "qty": delivered_qty, "doid": do_id,
                     "notes": f"إلغاء أمر تسليم {order.delivery_number}", "uid": user_id
                 })
 

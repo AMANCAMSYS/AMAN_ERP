@@ -152,7 +152,59 @@ def check_scheduled_reports():
         except Exception as e:
             logger.error(f"❌ Error checking DB {db_name}: {e}")
 
+
+def check_subscription_billing():
+    """Check all company databases for subscription billing due, trial expirations, and retries."""
+    logger.info("⏰ Checking subscription billing...")
+    sys_engine = get_system_engine()
+
+    databases = []
+    try:
+        with sys_engine.connect() as conn:
+            result = conn.execute(text("SELECT datname FROM pg_database WHERE datname LIKE 'aman_%'"))
+            databases = [row[0] for row in result.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ Failed to list DBs for subscription billing: {e}")
+        return
+
+    from services.subscription_service import check_billing_due, check_trial_expirations
+
+    for db_name in databases:
+        try:
+            base_url = settings.DATABASE_URL.rsplit('/', 1)[0]
+            company_url = f"{base_url}/{db_name}"
+            engine = get_company_engine(company_url)
+
+            with engine.connect() as conn:
+                # Check if subscription tables exist
+                has_table = conn.execute(
+                    text("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'subscription_enrollments')")
+                ).scalar()
+                if not has_table:
+                    continue
+
+                # 1. Check trial expirations
+                try:
+                    converted = check_trial_expirations(conn)
+                    if converted > 0:
+                        logger.info(f"✅ Converted {converted} trials in {db_name}")
+                except Exception as e:
+                    logger.error(f"❌ Trial check failed in {db_name}: {e}")
+
+                # 2. Generate due invoices
+                try:
+                    results = check_billing_due(conn, user="system")
+                    if results:
+                        logger.info(f"✅ Generated {len(results)} subscription invoices in {db_name}")
+                except Exception as e:
+                    logger.error(f"❌ Billing check failed in {db_name}: {e}")
+
+        except Exception as e:
+            logger.error(f"❌ Error checking subscription billing in {db_name}: {e}")
+
+
 def start_scheduler():
     scheduler.add_job(check_scheduled_reports, 'interval', minutes=5) # Run every 5 mins
+    scheduler.add_job(check_subscription_billing, 'interval', hours=24, id='subscription_billing')  # Daily
     scheduler.start()
     logger.info("🚀 Scheduler started.")

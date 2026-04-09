@@ -15,11 +15,18 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.audit import log_activity
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 import json
 
 router = APIRouter(prefix="/tax-compliance", tags=["الامتثال الضريبي"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal("0.01")
+
+
+def _dec(v: Any) -> Decimal:
+    return Decimal(str(v or 0))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Pydantic Schemas
@@ -460,9 +467,13 @@ def saudi_vat_return_report(
             AND i.invoice_date BETWEEN :start AND :end {branch_filter}
         """), params).fetchone()
 
-        total_output = float(box1.tax or 0) - float(box6.tax or 0)
-        total_input = float(box4.tax or 0) - float(box7.tax or 0)
-        net_vat = total_output - total_input
+        box1_vat = _dec(box1.tax)
+        box4_vat = _dec(box4.tax)
+        box6_vat = _dec(box6.tax)
+        box7_vat = _dec(box7.tax)
+        total_output = (box1_vat - box6_vat).quantize(_D2, ROUND_HALF_UP)
+        total_input = (box4_vat - box7_vat).quantize(_D2, ROUND_HALF_UP)
+        net_vat = (total_output - total_input).quantize(_D2, ROUND_HALF_UP)
 
         # Company tax info
         company_tax = db.execute(text(
@@ -481,7 +492,7 @@ def saudi_vat_return_report(
                     "label_en": "Standard Rated Sales",
                     "amount": float(box1.amount or 0),
                     "adjustment": float(box6.amount or 0),
-                    "vat": float(box1.tax or 0) - float(box6.tax or 0)
+                    "vat": float((box1_vat - box6_vat).quantize(_D2, ROUND_HALF_UP))
                 },
                 "box_2": {
                     "label_ar": "المبيعات الخاضعة لنسبة صفرية",
@@ -500,7 +511,7 @@ def saudi_vat_return_report(
                     "label_en": "Standard Rated Purchases",
                     "amount": float(box4.amount or 0),
                     "adjustment": float(box7.amount or 0),
-                    "vat": float(box4.tax or 0) - float(box7.tax or 0)
+                    "vat": float((box4_vat - box7_vat).quantize(_D2, ROUND_HALF_UP))
                 },
                 "box_5": {
                     "label_ar": "الاستيراد الخاضع لآلية الاحتساب العكسي",
@@ -522,11 +533,11 @@ def saudi_vat_return_report(
                 },
             },
             "totals": {
-                "total_sales": float(box1.amount or 0) + float(box2.amount or 0) + float(box3.amount or 0),
-                "total_output_vat": total_output,
-                "total_input_vat": total_input,
-                "net_vat_due": net_vat,
-                "status": "payable" if net_vat >= 0 else "refundable"
+                "total_sales": float((_dec(box1.amount) + _dec(box2.amount) + _dec(box3.amount)).quantize(_D2, ROUND_HALF_UP)),
+                "total_output_vat": float(total_output),
+                "total_input_vat": float(total_input),
+                "net_vat_due": float(net_vat),
+                "status": "payable" if net_vat >= Decimal("0") else "refundable"
             }
         }
     finally:
@@ -596,18 +607,22 @@ def syrian_income_tax_report(
             AND je.entry_date BETWEEN :start AND :end {branch_filter}
         """), params).scalar() or 0
 
-        gross_profit = float(revenue) - float(cogs)
-        net_profit = gross_profit - float(op_expenses)
+        revenue_dec = _dec(revenue).quantize(_D2, ROUND_HALF_UP)
+        cogs_dec = _dec(cogs).quantize(_D2, ROUND_HALF_UP)
+        op_expenses_dec = _dec(op_expenses).quantize(_D2, ROUND_HALF_UP)
+        gross_profit = (revenue_dec - cogs_dec).quantize(_D2, ROUND_HALF_UP)
+        net_profit = (gross_profit - op_expenses_dec).quantize(_D2, ROUND_HALF_UP)
 
         # Syrian income tax rate = 22% for commercial/industrial activities 
-        tax_rate = 22.0
+        tax_rate_dec = Decimal("22")
         regime = db.execute(text(
             "SELECT default_rate FROM tax_regimes WHERE country_code = 'SY' AND tax_type = 'income_tax' LIMIT 1"
         )).fetchone()
         if regime:
-            tax_rate = float(regime.default_rate)
+            tax_rate_dec = _dec(regime.default_rate)
 
-        income_tax = max(0, net_profit * (tax_rate / 100))
+        tax_rate = float(tax_rate_dec)
+        income_tax = max(Decimal("0"), (net_profit * (tax_rate_dec / Decimal("100"))).quantize(_D2, ROUND_HALF_UP))
 
         # Salary tax summary for the year
         salary_expenses = db.execute(text(f"""
@@ -626,23 +641,23 @@ def syrian_income_tax_report(
             "fiscal_year": fiscal_year,
             "period": {"start": start_date, "end": end_date},
             "income_statement": {
-                "total_revenue": {"label_ar": "إجمالي الإيرادات", "label_en": "Total Revenue", "amount": float(revenue)},
-                "cost_of_sales": {"label_ar": "تكلفة البضاعة المباعة", "label_en": "Cost of Goods Sold", "amount": float(cogs)},
-                "gross_profit": {"label_ar": "مجمل الربح", "label_en": "Gross Profit", "amount": gross_profit},
-                "operating_expenses": {"label_ar": "المصروفات التشغيلية", "label_en": "Operating Expenses", "amount": float(op_expenses)},
-                "net_profit_before_tax": {"label_ar": "صافي الربح قبل الضريبة", "label_en": "Net Profit Before Tax", "amount": net_profit},
+                "total_revenue": {"label_ar": "إجمالي الإيرادات", "label_en": "Total Revenue", "amount": float(revenue_dec)},
+                "cost_of_sales": {"label_ar": "تكلفة البضاعة المباعة", "label_en": "Cost of Goods Sold", "amount": float(cogs_dec)},
+                "gross_profit": {"label_ar": "مجمل الربح", "label_en": "Gross Profit", "amount": float(gross_profit)},
+                "operating_expenses": {"label_ar": "المصروفات التشغيلية", "label_en": "Operating Expenses", "amount": float(op_expenses_dec)},
+                "net_profit_before_tax": {"label_ar": "صافي الربح قبل الضريبة", "label_en": "Net Profit Before Tax", "amount": float(net_profit)},
             },
             "tax_computation": {
-                "taxable_income": {"label_ar": "الدخل الخاضع للضريبة", "label_en": "Taxable Income", "amount": max(0, net_profit)},
+                "taxable_income": {"label_ar": "الدخل الخاضع للضريبة", "label_en": "Taxable Income", "amount": float(max(Decimal("0"), net_profit))},
                 "tax_rate": {"label_ar": f"نسبة الضريبة ({tax_rate}%)", "label_en": f"Tax Rate ({tax_rate}%)", "rate": tax_rate},
-                "income_tax_due": {"label_ar": "ضريبة الدخل المستحقة", "label_en": "Income Tax Due", "amount": income_tax},
+                "income_tax_due": {"label_ar": "ضريبة الدخل المستحقة", "label_en": "Income Tax Due", "amount": float(income_tax)},
             },
             "supplementary": {
                 "total_salaries": {"label_ar": "إجمالي الرواتب والأجور", "label_en": "Total Salaries & Wages", "amount": float(salary_expenses)},
             },
             "totals": {
-                "net_profit": net_profit,
-                "tax_due": income_tax,
+                "net_profit": float(net_profit),
+                "tax_due": float(income_tax),
             }
         }
     finally:
@@ -719,8 +734,9 @@ def uae_vat_return_report(
             AND i.invoice_date BETWEEN :start AND :end {bf}
         """), params).fetchone()
 
-        total_output = float(standard.tax or 0)
-        total_input = float(purchases.tax or 0)
+        total_output = _dec(standard.tax).quantize(_D2, ROUND_HALF_UP)
+        total_input = _dec(purchases.tax).quantize(_D2, ROUND_HALF_UP)
+        net_vat_due = (total_output - total_input).quantize(_D2, ROUND_HALF_UP)
 
         return {
             "report_type": "ae_vat_return",
@@ -736,10 +752,10 @@ def uae_vat_return_report(
                 "standard_rated_purchases": {"label_ar": "مشتريات خاضعة للنسبة الأساسية", "amount": float(purchases.amount or 0), "vat": float(purchases.tax or 0)},
             },
             "totals": {
-                "total_output_vat": total_output,
-                "total_input_vat": total_input,
-                "net_vat_due": total_output - total_input,
-                "status": "payable" if (total_output - total_input) >= 0 else "refundable"
+                "total_output_vat": float(total_output),
+                "total_input_vat": float(total_input),
+                "net_vat_due": float(net_vat_due),
+                "status": "payable" if net_vat_due >= Decimal("0") else "refundable"
             }
         }
     finally:
@@ -813,10 +829,13 @@ def egypt_vat_return_report(
             AND (p.product_type = 'service' OR p.id IS NULL)
             AND i.invoice_date BETWEEN :start AND :end {bf}
         """), params).fetchone()
-        stamp_duty = float(services.amount or 0) * 0.009  # 0.9%
+        service_revenue = _dec(services.amount).quantize(_D2, ROUND_HALF_UP)
+        stamp_duty = (service_revenue * Decimal("0.009")).quantize(_D2, ROUND_HALF_UP)  # 0.9%
 
-        total_output = float(output.tax or 0)
-        total_input = float(input_v.tax or 0)
+        total_output = _dec(output.tax).quantize(_D2, ROUND_HALF_UP)
+        total_input = _dec(input_v.tax).quantize(_D2, ROUND_HALF_UP)
+        net_vat_due = (total_output - total_input).quantize(_D2, ROUND_HALF_UP)
+        total_tax_due = (net_vat_due + stamp_duty).quantize(_D2, ROUND_HALF_UP)
 
         return {
             "report_type": "eg_vat_return",
@@ -824,22 +843,22 @@ def egypt_vat_return_report(
             "report_name_en": "VAT Return — ETA Format",
             "period": {"start": period_start, "end": period_end},
             "output": {
-                "taxable_sales": {"label_ar": "مبيعات خاضعة للضريبة (14%)", "amount": float(output.amount or 0), "vat": total_output},
+                "taxable_sales": {"label_ar": "مبيعات خاضعة للضريبة (14%)", "amount": float(output.amount or 0), "vat": float(total_output)},
             },
             "input": {
-                "taxable_purchases": {"label_ar": "مشتريات خاضعة للضريبة", "amount": float(input_v.amount or 0), "vat": total_input},
+                "taxable_purchases": {"label_ar": "مشتريات خاضعة للضريبة", "amount": float(input_v.amount or 0), "vat": float(total_input)},
             },
             "stamp_duty": {
-                "service_revenue": float(services.amount or 0),
-                "stamp_duty_amount": stamp_duty
+                "service_revenue": float(service_revenue),
+                "stamp_duty_amount": float(stamp_duty)
             },
             "totals": {
-                "total_output_vat": total_output,
-                "total_input_vat": total_input,
-                "net_vat_due": total_output - total_input,
-                "stamp_duty": stamp_duty,
-                "total_tax_due": (total_output - total_input) + stamp_duty,
-                "status": "payable" if (total_output - total_input) >= 0 else "refundable"
+                "total_output_vat": float(total_output),
+                "total_input_vat": float(total_input),
+                "net_vat_due": float(net_vat_due),
+                "stamp_duty": float(stamp_duty),
+                "total_tax_due": float(total_tax_due),
+                "status": "payable" if net_vat_due >= Decimal("0") else "refundable"
             }
         }
     finally:
@@ -888,7 +907,9 @@ def generic_income_tax_report(
             AND je.entry_date BETWEEN :start AND :end {bf}
         """), params).scalar() or 0
 
-        net_profit = float(revenue) - float(expenses)
+        revenue_dec = _dec(revenue).quantize(_D2, ROUND_HALF_UP)
+        expenses_dec = _dec(expenses).quantize(_D2, ROUND_HALF_UP)
+        net_profit = (revenue_dec - expenses_dec).quantize(_D2, ROUND_HALF_UP)
 
         # Get tax rate from regimes
         regime = db.execute(text("""
@@ -897,11 +918,12 @@ def generic_income_tax_report(
             LIMIT 1
         """), {"cc": country_code.upper()}).fetchone()
 
-        tax_rate = float(regime.default_rate) if regime else 20.0
+        tax_rate_dec = _dec(regime.default_rate) if regime else Decimal("20")
+        tax_rate = float(tax_rate_dec)
         tax_name_ar = regime.name_ar if regime else "ضريبة الدخل"
         tax_name_en = regime.name_en if regime else "Income Tax"
 
-        income_tax = max(0, net_profit * (tax_rate / 100))
+        income_tax = max(Decimal("0"), (net_profit * (tax_rate_dec / Decimal("100"))).quantize(_D2, ROUND_HALF_UP))
 
         country_info = COUNTRY_META.get(country_code.upper(), {})
 
@@ -913,11 +935,11 @@ def generic_income_tax_report(
             "fiscal_year": fiscal_year,
             "period": {"start": start_date, "end": end_date},
             "summary": {
-                "total_revenue": float(revenue),
-                "total_expenses": float(expenses),
-                "net_profit": net_profit,
+                "total_revenue": float(revenue_dec),
+                "total_expenses": float(expenses_dec),
+                "net_profit": float(net_profit),
                 "tax_rate": tax_rate,
-                "tax_due": income_tax,
+                "tax_due": float(income_tax),
             }
         }
     finally:

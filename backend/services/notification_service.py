@@ -236,7 +236,21 @@ class NotificationService:
             logger.warning("Push notification failed for user %s: %s", recipient_id, exc)
 
     def _get_fcm_token(self, db, user_id: int) -> Optional[str]:
-        """Look up the FCM device token for a user (if stored)."""
+        """Look up the FCM device token for a user.
+
+        Priority: push_devices table (mobile app) → company_users.fcm_token (legacy).
+        """
+        try:
+            row = db.execute(
+                text("""SELECT fcm_token FROM push_devices
+                        WHERE user_id = :uid AND is_active = TRUE
+                        ORDER BY last_seen_at DESC LIMIT 1"""),
+                {"uid": user_id},
+            ).fetchone()
+            if row and row[0]:
+                return row[0]
+        except Exception:
+            pass  # table may not exist yet in all tenant DBs
         row = db.execute(
             text("SELECT fcm_token FROM company_users WHERE id = :uid LIMIT 1"),
             {"uid": user_id},

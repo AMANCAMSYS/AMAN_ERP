@@ -8,6 +8,7 @@ from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -21,6 +22,14 @@ from utils.accounting import (
 
 router = APIRouter(prefix="/purchases/landed-costs", tags=["التكاليف المُضافة"], dependencies=[Depends(require_module("landed_costs"))])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+_D4 = Decimal('0.0001')
+_D6 = Decimal('0.000001')
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 def _u(current_user, key, default=None):
@@ -132,7 +141,7 @@ def create_landed_cost(body: LandedCostCreate, current_user: dict = Depends(get_
 
         year = datetime.now().year
         lc_number = generate_sequential_number(db, f"LC-{year}", "landed_costs", "lc_number")
-        total = sum(item.amount for item in body.cost_items)
+        total = sum((_dec(item.amount) for item in body.cost_items), Decimal('0'))
 
         result = db.execute(text("""
             INSERT INTO landed_costs (
@@ -200,7 +209,7 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
         if lc.status == 'posted':
             raise HTTPException(400, "تم ترحيل هذه التكلفة بالفعل")
 
-        total_cost = float(lc.total_amount)
+        total_cost = _dec(lc.total_amount)
         method = lc.allocation_method
 
         # Get purchase order lines
@@ -234,13 +243,13 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
 
         # Calculate allocation basis
         if method == 'by_value':
-            total_basis = sum(float(l.line_total or 0) for l in po_lines)
+            total_basis = sum((_dec(l.line_total or 0) for l in po_lines), Decimal('0'))
         elif method == 'by_quantity':
-            total_basis = sum(float(l.quantity or 0) for l in po_lines)
+            total_basis = sum((_dec(l.quantity or 0) for l in po_lines), Decimal('0'))
         elif method == 'by_weight':
-            total_basis = sum(float(l.weight_kg or 0) * float(l.quantity or 0) for l in po_lines)
+            total_basis = sum((_dec(l.weight_kg or 0) * _dec(l.quantity or 0) for l in po_lines), Decimal('0'))
         else:  # equal
-            total_basis = len(po_lines)
+            total_basis = _dec(len(po_lines))
 
         if total_basis <= 0:
             raise HTTPException(400, "لا يمكن التوزيع: الأساس صفر")
@@ -251,17 +260,18 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
         allocations_data = []
         for line in po_lines:
             if method == 'by_value':
-                basis = float(line.line_total or 0)
+                basis = _dec(line.line_total or 0)
             elif method == 'by_quantity':
-                basis = float(line.quantity or 0)
+                basis = _dec(line.quantity or 0)
             elif method == 'by_weight':
-                basis = float(line.weight_kg or 0) * float(line.quantity or 0)
+                basis = _dec(line.weight_kg or 0) * _dec(line.quantity or 0)
             else:
-                basis = 1
+                basis = Decimal('1')
 
             share = (basis / total_basis) * total_cost
-            qty = float(line.quantity or 1)
-            per_unit = share / qty if qty > 0 else 0
+            qty = _dec(line.quantity or 1)
+            per_unit = share / qty if qty > 0 else Decimal('0')
+            new_cost = (_dec(line.cost_price or 0) + per_unit).quantize(_D4, ROUND_HALF_UP)
 
             db.execute(text("""
                 INSERT INTO landed_cost_allocations (
@@ -272,22 +282,22 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
             """), {
                 "lcid": lc_id, "pid": line.product_id,
                 "lid": line.line_id,
-                "oc": float(line.cost_price or 0),
-                "aa": round(share, 2),
-                "nc": round(float(line.cost_price or 0) + per_unit, 4),
-                "ab": round(basis, 4),
-                "ash": round(basis / total_basis, 6)
+                "oc": _dec(line.cost_price or 0).quantize(_D4, ROUND_HALF_UP),
+                "aa": share.quantize(_D2, ROUND_HALF_UP),
+                "nc": new_cost,
+                "ab": basis.quantize(_D4, ROUND_HALF_UP),
+                "ash": (basis / total_basis).quantize(_D6, ROUND_HALF_UP)
             })
 
             allocations_data.append({
                 "product_id": line.product_id,
-                "allocated": round(share, 2),
-                "new_cost": round(float(line.cost_price or 0) + per_unit, 4)
+                "allocated": float(share.quantize(_D2, ROUND_HALF_UP)),
+                "new_cost": float(new_cost)
             })
 
         db.commit()
         return {
-            "message": f"تم توزيع {total_cost} {method}",
+            "message": f"تم توزيع {total_cost.quantize(_D2, ROUND_HALF_UP)} {method}",
             "allocations": allocations_data
         }
     except HTTPException:
@@ -327,16 +337,16 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
             db.execute(text("""
                 UPDATE products SET cost_price = :new_cost, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :pid
-            """), {"new_cost": float(alloc.new_cost), "pid": alloc.product_id})
+            """), {"new_cost": _dec(alloc.new_cost), "pid": alloc.product_id})
 
             # Sync inventory average_cost for all warehouses holding this product
             db.execute(text("""
                 UPDATE inventory SET average_cost = :new_cost
                 WHERE product_id = :pid
-            """), {"new_cost": float(alloc.new_cost), "pid": alloc.product_id})
+            """), {"new_cost": _dec(alloc.new_cost), "pid": alloc.product_id})
 
         # Create Journal Entry
-        total_cost = float(lc.total_amount)
+        total_cost = _dec(lc.total_amount)
         base_currency = get_base_currency(db)
         year = datetime.now().year
         je_number = generate_sequential_number(db, f"JE-LC-{year}", "journal_entries", "entry_number")
@@ -378,10 +388,10 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                         VALUES (:jeid, :aid, 0, :amt, :desc)
                     """), {
                         "jeid": je_id, "aid": ap_account,
-                        "amt": float(item.amount),
+                        "amt": _dec(item.amount),
                         "desc": f"{item.cost_type}: {item.description or ''}"
                     })
-                    update_account_balance(db, ap_account, 0, float(item.amount))
+                    update_account_balance(db, ap_account, 0, _dec(item.amount))
 
                 # Party transaction
                 db.execute(text("""
@@ -390,7 +400,7 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                         reference_type, reference_id, description, created_by
                     ) VALUES (:pid, 'landed_cost', 0, :amt, -:amt, 'landed_cost', :lcid, :desc, :uid)
                 """), {
-                    "pid": item.vendor_id, "amt": float(item.amount),
+                    "pid": item.vendor_id, "amt": _dec(item.amount),
                     "lcid": lc_id, "desc": f"تكلفة مُضافة: {item.cost_type}",
                     "uid": user_id
                 })
@@ -409,10 +419,10 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                         VALUES (:jeid, :aid, 0, :amt, :desc)
                     """), {
                         "jeid": je_id, "aid": exp_account,
-                        "amt": float(item.amount),
+                        "amt": _dec(item.amount),
                         "desc": f"{item.cost_type}: {item.description or ''}"
                     })
-                    update_account_balance(db, exp_account, 0, float(item.amount))
+                    update_account_balance(db, exp_account, 0, _dec(item.amount))
 
         # Update LC status
         db.execute(text("""
@@ -425,7 +435,7 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
         return {
             "message": "تم ترحيل التكاليف المُضافة وتحديث تكلفة المنتجات",
             "journal_entry_id": je_id,
-            "total_allocated": total_cost
+            "total_allocated": float(total_cost.quantize(_D2, ROUND_HALF_UP))
         }
     except HTTPException:
         raise

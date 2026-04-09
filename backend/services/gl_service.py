@@ -3,10 +3,16 @@ from sqlalchemy import text
 from fastapi import HTTPException
 from datetime import datetime
 from typing import List, Dict, Optional, Any
+from decimal import Decimal, ROUND_HALF_UP
 
 from utils.accounting import generate_sequential_number, update_account_balance
 
 logger = logging.getLogger(__name__)
+_D2 = Decimal("0.01")
+
+
+def _dec(v: Any) -> Decimal:
+    return Decimal(str(v or 0))
 
 def create_journal_entry(
     db,
@@ -44,12 +50,12 @@ def create_journal_entry(
     if not lines:
         raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
 
-    total_debit = 0.0
-    total_credit = 0.0
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
 
     for i, line in enumerate(lines):
-        d = float(line.get("debit", 0))
-        c = float(line.get("credit", 0))
+        d = _dec(line.get("debit", 0)).quantize(_D2, ROUND_HALF_UP)
+        c = _dec(line.get("credit", 0)).quantize(_D2, ROUND_HALF_UP)
         if d < 0 or c < 0:
             raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن إدخال مبالغ سالبة")
         if d > 0 and c > 0:
@@ -60,7 +66,7 @@ def create_journal_entry(
     if total_debit == 0 and total_credit == 0:
         raise HTTPException(status_code=400, detail="لا يمكن إنشاء قيد بمبالغ صفرية")
 
-    if abs(total_debit - total_credit) > 0.01:
+    if abs(total_debit - total_credit) > _D2:
         raise HTTPException(status_code=400, detail="القيود غير موزونة (المدين لا يساوي الدائن)")
 
     if status not in ("draft", "posted"):
@@ -103,7 +109,7 @@ def create_journal_entry(
         "branch_id": branch_id,
         "user": user_id,
         "curr": currency,
-        "rate": exchange_rate,
+        "rate": float(_dec(exchange_rate).quantize(Decimal("0.000001"), ROUND_HALF_UP)),
         "posted_at": datetime.now() if status == "posted" else None,
         "source": source,
         "s_id": source_id
@@ -113,20 +119,22 @@ def create_journal_entry(
 
     # 3. Lines
     for line in lines:
-        input_debit = float(line.get("debit", 0))
-        input_credit = float(line.get("credit", 0))
+        input_debit = _dec(line.get("debit", 0)).quantize(_D2, ROUND_HALF_UP)
+        input_credit = _dec(line.get("credit", 0)).quantize(_D2, ROUND_HALF_UP)
         
-        line_rate = float(line.get("exchange_rate", exchange_rate))
-        debit_base = input_debit * line_rate
-        credit_base = input_credit * line_rate
+        line_rate = _dec(line.get("exchange_rate", exchange_rate))
+        if line_rate <= 0:
+            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+        debit_base = (input_debit * line_rate).quantize(_D2, ROUND_HALF_UP)
+        credit_base = (input_credit * line_rate).quantize(_D2, ROUND_HALF_UP)
         
         account_id = line["account_id"]
         line_currency = line.get("currency") or currency
         
         if line.get("amount_currency"):
-            line_amount_currency = float(line["amount_currency"])
+            line_amount_currency = _dec(line["amount_currency"]).quantize(_D2, ROUND_HALF_UP)
         else:
-            line_amount_currency = input_debit + input_credit
+            line_amount_currency = (input_debit + input_credit).quantize(_D2, ROUND_HALF_UP)
 
         db.execute(text("""
             INSERT INTO journal_lines 
@@ -136,11 +144,11 @@ def create_journal_entry(
         """), {
             "jid": journal_id,
             "aid": account_id,
-            "deb": debit_base,
-            "cred": credit_base,
+            "deb": float(debit_base),
+            "cred": float(credit_base),
             "desc": line.get("description", description),
             "cc_id": line.get("cost_center_id"),
-            "amt_curr": line_amount_currency,
+            "amt_curr": float(line_amount_currency),
             "curr": line_currency
         })
         
@@ -148,10 +156,10 @@ def create_journal_entry(
             update_account_balance(
                 db, 
                 account_id=account_id, 
-                debit_base=debit_base, 
-                credit_base=credit_base, 
-                debit_curr=input_debit, 
-                credit_curr=input_credit, 
+                debit_base=float(debit_base), 
+                credit_base=float(credit_base), 
+                debit_curr=float(input_debit), 
+                credit_curr=float(input_credit), 
                 currency=line_currency
             )
 

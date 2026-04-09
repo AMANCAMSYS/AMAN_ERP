@@ -63,6 +63,15 @@ uploads/
 venv/
 .venv/
 
+# Mobile (React Native & Android)
+mobile/node_modules/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/build/
+
 # Runtime / temp files
 last_error.txt
 *.pid

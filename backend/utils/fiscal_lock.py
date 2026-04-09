@@ -31,6 +31,7 @@ def check_fiscal_period_open(db, entry_date, raise_error=True):
             FROM fiscal_period_locks
             WHERE :entry_date BETWEEN period_start AND period_end
             AND is_locked = true
+            FOR UPDATE
             LIMIT 1
         """), {"entry_date": entry_date}).fetchone()
 

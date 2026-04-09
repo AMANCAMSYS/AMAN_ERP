@@ -72,9 +72,14 @@ function TransactionList() {
                         <h1 className="workspace-title">{t('intercompany.transactions_title')}</h1>
                         <p className="workspace-subtitle">{t('intercompany.transactions_subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary" onClick={() => navigate('/intercompany/transactions/new')}>
-                        {t('intercompany.new_transaction')}
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn btn-secondary" onClick={() => navigate('/accounting/intercompany/entities')}>
+                            🏢 {t('intercompany.add_entity')}
+                        </button>
+                        <button className="btn btn-primary" onClick={() => navigate('/accounting/intercompany/transactions/new')}>
+                            {t('intercompany.new_transaction')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -101,7 +106,7 @@ function TransactionList() {
                 loading={loading}
                 emptyIcon="🔄"
                 emptyTitle={t('intercompany.no_transactions')}
-                onRowClick={(txn) => navigate(`/intercompany/transactions/${txn.id}`)}
+                onRowClick={(txn) => navigate(`/accounting/intercompany/transactions/${txn.id}`)}
                 rowKey="id"
             />
         </div>

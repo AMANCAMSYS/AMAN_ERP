@@ -8,6 +8,7 @@ from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 import json
 import uuid
@@ -17,8 +18,14 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 
-router = APIRouter(prefix="/accounting/intercompany", tags=["المعاملات بين الشركات"])
+router = APIRouter(prefix="/accounting/intercompany-v1", tags=["المعاملات بين الشركات (v1)"])
 logger = logging.getLogger(__name__)
+
+_D2 = Decimal('0.01')
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal('0')
 
 
 def _normalize_company_uuid(company_identifier: str) -> str:
@@ -142,17 +149,18 @@ def process_intercompany_transaction(txn_id: int, current_user=Depends(get_curre
         if not ic_receivable or not ic_revenue:
             raise HTTPException(400, "يجب إعداد حسابات المعاملات بين الشركات أولاً")
 
+        txn_amount = _dec(txn["amount"]).quantize(_D2, ROUND_HALF_UP)
         je_lines = [
             {
                 "account_id": ic_receivable,
-                "debit": float(txn["amount"]),
+                "debit": txn_amount,
                 "credit": 0,
                 "description": txn["description"],
             },
             {
                 "account_id": ic_revenue,
                 "debit": 0,
-                "credit": float(txn["amount"]),
+                "credit": txn_amount,
                 "description": txn["description"],
             },
         ]
@@ -268,30 +276,32 @@ def create_revenue_schedule(data: RevenueScheduleCreate, current_user=Depends(ge
                 periods += 1
             if periods == 0:
                 periods = 1
-            monthly_amount = round(data.total_amount / periods, 2)
+            total_amount = _dec(data.total_amount)
+            monthly_amount = (total_amount / _dec(periods)).quantize(_D2, ROUND_HALF_UP)
             for i in range(periods):
                 period_start = start + relativedelta(months=i)
                 period_end = min(start + relativedelta(months=i + 1) - relativedelta(days=1), end)
-                amt = monthly_amount if i < periods - 1 else round(data.total_amount - monthly_amount * (periods - 1), 2)
+                amt = monthly_amount if i < periods - 1 else (total_amount - (monthly_amount * _dec(periods - 1))).quantize(_D2, ROUND_HALF_UP)
                 lines.append({
                     "period": period_start.strftime("%Y-%m"),
                     "start_date": period_start.isoformat(),
                     "end_date": period_end.isoformat(),
-                    "amount": amt, "recognized": False
+                    "amount": float(amt), "recognized": False
                 })
         elif data.method == "percentage_completion":
+            total_amount = _dec(data.total_amount)
             for i in range(4):
                 lines.append({
                     "milestone": f"مرحلة {i + 1}",
                     "percentage": (i + 1) * 25,
-                    "amount": round(data.total_amount * 0.25, 2),
+                    "amount": float((total_amount * Decimal('0.25')).quantize(_D2, ROUND_HALF_UP)),
                     "recognized": False
                 })
         else:
             lines.append({
                 "milestone": "إنجاز كامل",
                 "percentage": 100,
-                "amount": data.total_amount,
+                "amount": float(_dec(data.total_amount).quantize(_D2, ROUND_HALF_UP)),
                 "recognized": False
             })
 
@@ -357,7 +367,7 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
         if period.get("recognized"):
             raise HTTPException(400, "تم الاعتراف بهذه الفترة مسبقاً")
 
-        amount = float(period["amount"])
+        amount = _dec(period["amount"]).quantize(_D2, ROUND_HALF_UP)
 
         # Create journal entry: Deferred Revenue (Dr) → Revenue (Cr)
         deferred_acc = db.execute(text("SELECT id FROM accounts WHERE account_code LIKE '22%' LIMIT 1")).scalar()
@@ -372,14 +382,14 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
                 lines=[
                     {
                         "account_id": deferred_acc,
-                        "debit": float(amount),
+                        "debit": amount,
                         "credit": 0,
                         "description": "اعتراف بإيرادات مؤجلة",
                     },
                     {
                         "account_id": revenue_acc,
                         "debit": 0,
-                        "credit": float(amount),
+                        "credit": amount,
                         "description": "إيرادات معترف بها",
                     },
                 ],
@@ -392,8 +402,8 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
         # Update schedule
         lines[period_index]["recognized"] = True
         lines[period_index]["recognized_at"] = datetime.now().isoformat()
-        existing_recognized = float(schedule.get("recognized_amount") or 0)
-        total_amount = float(schedule.get("total_amount") or 0)
+        existing_recognized = _dec(schedule.get("recognized_amount") or 0)
+        total_amount = _dec(schedule.get("total_amount") or 0)
         new_recognized = existing_recognized + amount
         new_deferred = total_amount - new_recognized
         new_status = "completed" if new_deferred <= 0 else "active"
@@ -404,14 +414,14 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
                 schedule_lines = :lines, status = :status
             WHERE id = :id
         """), {
-            "rec": new_recognized, "def": max(new_deferred, 0),
+            "rec": new_recognized.quantize(_D2, ROUND_HALF_UP), "def": max(new_deferred, Decimal('0')).quantize(_D2, ROUND_HALF_UP),
             "lines": json.dumps(lines), "status": new_status, "id": schedule_id
         })
         db.commit()
         return {
-            "message": f"تم الاعتراف بمبلغ {amount}",
-            "recognized_total": new_recognized,
-            "remaining": max(new_deferred, 0), "status": new_status
+            "message": f"تم الاعتراف بمبلغ {float(amount):.2f}",
+            "recognized_total": float(new_recognized.quantize(_D2, ROUND_HALF_UP)),
+            "remaining": float(max(new_deferred, Decimal('0')).quantize(_D2, ROUND_HALF_UP)), "status": new_status
         }
     except HTTPException:
         raise

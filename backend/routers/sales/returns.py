@@ -15,6 +15,12 @@ from .schemas import SalesReturnCreate
 
 returns_router = APIRouter()
 logger = logging.getLogger(__name__)
+_D2 = Decimal('0.01')
+_MAX_RATE_AGE_DAYS = 31
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v or 0))
 
 
 @returns_router.get("/returns", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -96,15 +102,13 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
             validate_quantity_for_product(db, item.product_id, item.quantity)
 
         # FIN-FIX: Calculate totals using Decimal for precision (was using float)
-        _D2 = Decimal('0.01')
-        _dec = lambda v: Decimal(str(v or 0))
         subtotal = Decimal('0')
         total_tax = Decimal('0')
         lines_to_save = []
 
         for item in data.items:
             line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
-            line_tax = (line_total * _dec(item.tax_rate or 15) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
+            line_tax = (line_total * _dec(item.tax_rate or 0) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             final_total = line_total + line_tax
 
             subtotal += line_total
@@ -112,10 +116,35 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
 
             lines_to_save.append({
                 **item.model_dump(),
-                "total": float(final_total)
+                "total": final_total
             })
 
         grand_total = subtotal + total_tax
+
+        # Validate effective exchange-rate record for foreign currency returns.
+        base_currency_row = db.execute(text("SELECT code FROM currencies WHERE is_base = TRUE LIMIT 1")).fetchone()
+        if not base_currency_row:
+            base_currency_row = db.execute(text("SELECT setting_value as code FROM company_settings WHERE setting_key = 'default_currency'")) .fetchone()
+        base_currency = base_currency_row[0] if base_currency_row else "SYP"
+
+        ret_currency = data.currency or base_currency
+        ret_rate = _dec(data.exchange_rate or 1)
+        if ret_currency != base_currency:
+            if ret_rate <= 0:
+                raise HTTPException(status_code=400, detail="Exchange rate must be greater than zero")
+            latest_rate_row = db.execute(text("""
+                SELECT rate_date
+                FROM exchange_rates
+                WHERE currency_id = (SELECT id FROM currencies WHERE code = :code)
+                  AND rate_date <= :date
+                ORDER BY rate_date DESC
+                LIMIT 1
+            """), {"code": ret_currency, "date": data.return_date}).fetchone()
+            if not latest_rate_row:
+                raise HTTPException(status_code=400, detail=f"No exchange rate found for {ret_currency}")
+            age_days = (data.return_date - latest_rate_row.rate_date).days if latest_rate_row.rate_date else 0
+            if age_days > _MAX_RATE_AGE_DAYS:
+                raise HTTPException(status_code=400, detail=f"Exchange rate for {ret_currency} is expired ({age_days} days old)")
 
         # Save Header
         res = db.execute(text("""
@@ -132,13 +161,13 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
             ) RETURNING id
         """), {
             "num": ret_num, "cust": data.customer_id, "inv": data.invoice_id,
-            "rdate": data.return_date, "sub": float(subtotal), "tax": float(total_tax),
-            "total": float(grand_total), "notes": data.notes, "user": current_user.id,
+            "rdate": data.return_date, "sub": subtotal, "tax": total_tax,
+            "total": grand_total, "notes": data.notes, "user": current_user.id,
             "rmethod": data.refund_method, "ramount": data.refund_amount,
             "rbank": data.bank_account_id, "treasury": data.bank_account_id,
             "rcheck": data.check_number,
             "rcheckdate": data.check_date, "bid": branch_id, "wh_id": data.warehouse_id,
-            "currency": data.currency, "exchange_rate": data.exchange_rate
+            "currency": ret_currency, "exchange_rate": ret_rate
         }).fetchone()
 
         ret_id = res[0]
@@ -216,11 +245,11 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
             # Fallback to default warehouse
             wh_id = db.execute(text("SELECT id FROM warehouses WHERE is_default = TRUE")).scalar() or 1
 
-        total_cost_reversal = 0
+        total_cost_reversal = Decimal('0')
         for line in lines:
             if line.product_id:
                 # Calculate cost to reverse from COGS FIRST (before logging transaction)
-                cost_price = 0
+                cost_price = Decimal('0')
                 if header.invoice_id:
                     historical_cost = db.execute(text("""
                         SELECT unit_cost FROM inventory_transactions 
@@ -231,12 +260,12 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
                     """), {"pid": line.product_id, "inv_id": header.invoice_id}).scalar()
 
                     if historical_cost is not None:
-                         cost_price = float(historical_cost)
+                        cost_price = _dec(historical_cost)
 
                 # Fallback to current product cost if historical not found
                 if cost_price == 0:
-                     cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": line.product_id}).scalar() or 0
-                     cost_price = float(cost_price)
+                    cost_price = db.execute(text("SELECT cost_price FROM products WHERE id = :id"), {"id": line.product_id}).scalar() or 0
+                    cost_price = _dec(cost_price)
 
                 # Update Inventory
                 db.execute(text("""
@@ -261,18 +290,33 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
                     "doc_num": header.return_number,
                     "qty": line.quantity,
                     "cost": cost_price,
-                    "total_cost": float(cost_price) * float(line.quantity),
+                    "total_cost": (cost_price * _dec(line.quantity)).quantize(_D2, ROUND_HALF_UP),
                     "user": current_user.id if not isinstance(current_user, dict) else current_user.get("id")
                 })
 
-                total_cost_reversal += (float(cost_price) * float(line.quantity))
+                total_cost_reversal += (cost_price * _dec(line.quantity)).quantize(_D2, ROUND_HALF_UP)
 
         # 3. Update Status
         db.execute(text("UPDATE sales_returns SET status = 'approved' WHERE id = :id"), {"id": return_id})
 
-        exchange_rate = float(header.exchange_rate or 1.0)
+        exchange_rate = _dec(header.exchange_rate or 1)
+        if header.currency and header.currency != base_currency:
+            rate_row = db.execute(text("""
+                SELECT rate_date
+                FROM exchange_rates
+                WHERE currency_id = (SELECT id FROM currencies WHERE code = :code)
+                  AND rate_date <= :date
+                ORDER BY rate_date DESC
+                LIMIT 1
+            """), {"code": header.currency, "date": header.return_date}).fetchone()
+            if not rate_row:
+                raise HTTPException(status_code=400, detail=f"No exchange rate found for {header.currency}")
+            age_days = (header.return_date - rate_row.rate_date).days if rate_row.rate_date else 0
+            if age_days > _MAX_RATE_AGE_DAYS:
+                raise HTTPException(status_code=400, detail=f"Exchange rate for {header.currency} is expired ({age_days} days old)")
+
         def to_base(amount):
-            return round(float(amount) * exchange_rate, 2)
+            return (_dec(amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 4. Update Customer Balance (Reduction in Base AND Currency)
         gl_total = to_base(header.total)
@@ -286,7 +330,7 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
             db.execute(text("""
                 UPDATE parties SET balance_currency = COALESCE(balance_currency, 0) - :amt
                 WHERE id = :id
-            """), {"amt": float(header.total), "id": header.party_id})
+            """), {"amt": _dec(header.total), "id": header.party_id})
 
         # 4.5 Update Original Invoice Status (Treat return as payment/settlement)
         if header.invoice_id:
@@ -375,9 +419,9 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
                 """), {"id": header.treasury_id}).fetchone()
 
                 if treas_info and treas_info.currency_code and treas_info.currency_code != base_currency:
-                    treas_refund = header.refund_amount  # FC amount
+                    treas_refund = _dec(header.refund_amount)  # FC amount
                 else:
-                    treas_refund = gl_refund  # SAR amount
+                    treas_refund = gl_refund  # Base amount
 
                 db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"),
                            {"amt": treas_refund, "id": header.treasury_id})
@@ -405,7 +449,7 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
 
         from utils.accounting import update_account_balance as uab_return
         for line in valid_lines:
-            amt_curr = round((line["debit"] + line["credit"]) / exchange_rate, 2) if exchange_rate else 0
+            amt_curr = (((_dec(line["debit"]) + _dec(line["credit"])) / exchange_rate).quantize(_D2, ROUND_HALF_UP)) if exchange_rate else Decimal('0')
             db.execute(text("""
                 INSERT INTO journal_lines (
                     journal_entry_id, account_id, debit, credit, description,
@@ -428,8 +472,8 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
                 account_id=line["account_id"],
                 debit_base=line["debit"],
                 credit_base=line["credit"],
-                debit_curr=amt_curr if line["debit"] > 0 else 0,
-                credit_curr=amt_curr if line["credit"] > 0 else 0,
+                debit_curr=amt_curr if _dec(line["debit"]) > 0 else Decimal('0'),
+                credit_curr=amt_curr if _dec(line["credit"]) > 0 else Decimal('0'),
                 currency=header.currency
             )
 

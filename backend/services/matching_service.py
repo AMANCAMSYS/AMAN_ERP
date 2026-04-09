@@ -83,6 +83,7 @@ def perform_match(db, invoice_id: int, po_id: int, supplier_id: int | None = Non
         SELECT id, product_id, quantity, unit_price
         FROM invoice_lines
         WHERE invoice_id = :inv_id
+        FOR UPDATE
     """), {"inv_id": invoice_id}).fetchall()
 
     # Build invoice lines map by product_id for matching

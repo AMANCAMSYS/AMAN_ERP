@@ -4,7 +4,8 @@
  */
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -15,6 +16,12 @@ import QuotationForm from './src/screens/Quotations/QuotationForm';
 import OrderList from './src/screens/Orders/OrderList';
 import ApprovalList from './src/screens/Approvals/ApprovalList';
 import ConflictScreen from './src/screens/Sync/ConflictScreen';
+import CustomersScreen from './src/screens/Customers/CustomersScreen';
+import InvoicesScreen from './src/screens/Invoices/InvoicesScreen';
+import EmployeesScreen from './src/screens/HR/EmployeesScreen';
+import ReportsScreen from './src/screens/Reports/ReportsScreen';
+import PurchaseInvoicesScreen from './src/screens/Purchases/PurchaseInvoicesScreen';
+import SuppliersScreen from './src/screens/Suppliers/SuppliersScreen';
 
 // ── Auth Context ──────────────────────────────────────────────────────────────
 export const AuthContext = createContext(null);
@@ -28,7 +35,7 @@ export function useNetwork() {
   return useContext(NetworkContext);
 }
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -80,6 +87,7 @@ export default function App() {
   if (isLoading) return null; // splash screen placeholder
 
   return (
+    <SafeAreaProvider>
     <AuthContext.Provider value={authActions}>
       <NetworkContext.Provider value={{ isConnected }}>
         <NavigationContainer>
@@ -128,11 +136,42 @@ export default function App() {
                   component={ConflictScreen}
                   options={{ title: 'حل التعارضات' }}
                 />
+                <Stack.Screen
+                  name="Customers"
+                  component={CustomersScreen}
+                  options={{ title: 'العملاء (مبيعات)' }}
+                />
+                <Stack.Screen
+                  name="Invoices"
+                  component={InvoicesScreen}
+                  options={{ title: 'فواتير المبيعات' }}
+                />
+                <Stack.Screen
+                  name="PurchaseInvoices"
+                  component={PurchaseInvoicesScreen}
+                  options={{ title: 'فواتير المشتريات' }}
+                />
+                <Stack.Screen
+                  name="Suppliers"
+                  component={SuppliersScreen}
+                  options={{ title: 'الموردون' }}
+                />
+                <Stack.Screen
+                  name="Employees"
+                  component={EmployeesScreen}
+                  options={{ title: 'الموظفون' }}
+                />
+                <Stack.Screen
+                  name="Reports"
+                  component={ReportsScreen}
+                  options={{ title: 'التقارير' }}
+                />
               </>
             )}
           </Stack.Navigator>
         </NavigationContainer>
       </NetworkContext.Provider>
     </AuthContext.Provider>
+    </SafeAreaProvider>
   );
 }

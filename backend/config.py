@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "postgres"
     
     REDIS_URL: Optional[str] = "redis://localhost:6379/0"
+    # Comma-separated trusted proxy IPs/CIDRs allowed to set X-Forwarded-For.
+    # Example: "127.0.0.1,10.0.0.0/8,172.16.0.0/12"
+    TRUSTED_PROXIES: str = ""
     
     SECRET_KEY: str
     ALGORITHM: str = "HS256"

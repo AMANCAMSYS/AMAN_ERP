@@ -44,13 +44,23 @@ function AccountingHome() {
 
     const sections = [
         {
-            title: t('accounting.home.sections.masters'),
+            title: i18n.language === 'ar' ? 'السجلات الرئيسية' : 'Master Data',
             items: [
                 { label: t('accounting.home.links.coa'), path: '/accounting/coa', icon: '🌳', permission: 'accounting.view' },
                 { label: t('accounting.home.links.cost_centers'), path: '/accounting/cost-centers', icon: '🎯', permission: 'accounting.view' },
-                { label: t('accounting.home.links.currencies'), path: '/accounting/currencies', icon: '💱', permission: 'accounting.view' }, // Placeholder
+                { label: t('accounting.home.links.currencies'), path: '/accounting/currencies', icon: '💱', permission: 'accounting.view' }
+            ]
+        },
+        {
+            title: i18n.language === 'ar' ? 'الموازنات والتخطيط' : 'Budgeting & Planning',
+            items: [
                 { label: t('accounting.budgets.title'), path: '/accounting/budgets', icon: '📊', permission: 'accounting.budgets.view' },
-                { label: i18n.language === 'ar' ? 'الموازنات المتقدمة' : 'Advanced Budgets', path: '/accounting/budgets/advanced', icon: '📈', permission: 'accounting.budgets.view' },
+                { label: i18n.language === 'ar' ? 'الموازنات المتقدمة' : 'Advanced Budgets', path: '/accounting/budgets/advanced', icon: '📈', permission: 'accounting.budgets.view' }
+            ]
+        },
+        {
+            title: i18n.language === 'ar' ? 'الإغلاق والسنوات المالية' : 'Periods & Closing',
+            items: [
                 { label: i18n.language === 'ar' ? 'السنوات المالية' : 'Fiscal Years', path: '/accounting/fiscal-years', icon: '📅', permission: 'accounting.view' },
                 { label: i18n.language === 'ar' ? 'القيود المتكررة' : 'Recurring Entries', path: '/accounting/recurring-templates', icon: '🔄', permission: 'accounting.view' },
                 { label: i18n.language === 'ar' ? 'الأرصدة الافتتاحية' : 'Opening Balances', path: '/accounting/opening-balances', icon: '📋', permission: 'accounting.manage' },
@@ -69,28 +79,44 @@ function AccountingHome() {
         {
             title: i18n.language === 'ar' ? 'المحاسبة المتقدمة' : 'Advanced Accounting',
             items: [
-                { label: t('accounting.intercompany', 'المعاملات بين الشركات'), path: '/accounting/intercompany', icon: '🏢', permission: 'accounting.view' },
+                { label: t('accounting.intercompany', 'المعاملات بين الشركات'), path: '/accounting/intercompany/transactions', icon: '🏢', permission: 'accounting.view', highlight: true, color: '#0f766e' },
                 { label: t('accounting.revenue_recognition', 'الاعتراف بالإيراد'), path: '/accounting/revenue-recognition', icon: '📊', permission: 'accounting.view' },
                 { label: t('zakat.title', 'حاسبة الزكاة'), path: '/accounting/zakat', icon: '🕌', permission: 'accounting.view' }
             ]
         },
         {
-            title: t('accounting.home.sections.reports'),
+            title: i18n.language === 'ar' ? 'التقارير الأساسية' : 'Core Reports',
             items: [
-                { label: i18n.language === 'ar' ? 'مؤشرات الأداء المالي' : 'Financial KPI Dashboard', path: '/accounting/kpi', icon: '📈', permission: 'accounting.view', highlight: true, color: '#2563eb' },
                 { label: t('accounting.home.links.general_ledger'), path: '/accounting/general-ledger', icon: '📚', permission: 'accounting.view' },
                 { label: t('accounting.home.links.trial_balance'), path: '/accounting/trial-balance', icon: '⚖️', permission: 'accounting.view' },
-                { label: t('accounting.home.links.vat_report'), path: '/accounting/vat-report', icon: '🧾', permission: 'accounting.view' },
                 { label: t('accounting.home.links.income_statement'), path: '/accounting/income-statement', icon: '📈', permission: 'accounting.view' },
                 { label: t('accounting.home.links.balance_sheet'), path: '/accounting/balance-sheet', icon: '🏦', permission: 'accounting.view' },
+                { label: t('accounting.home.links.cashflow_report'), path: '/accounting/cashflow', icon: '🌊', permission: 'accounting.view' }
+            ]
+        },
+        {
+            title: i18n.language === 'ar' ? 'الضرائب والامتثال' : 'Tax & Compliance',
+            items: [
+                { label: t('accounting.home.links.vat_report'), path: '/accounting/vat-report', icon: '🧾', permission: 'accounting.view' },
                 { label: t('accounting.home.links.tax_audit'), path: '/accounting/tax-audit', icon: '🔍', permission: 'accounting.view' },
-                { label: t('accounting.home.links.cashflow_report'), path: '/accounting/cashflow', icon: '🌊', permission: 'accounting.view' },
+                { label: t('zakat.title', 'حاسبة الزكاة'), path: '/accounting/zakat', icon: '🕌', permission: 'accounting.view' }
+            ]
+        },
+        {
+            title: i18n.language === 'ar' ? 'تحليل الأداء' : 'Performance Analytics',
+            items: [
+                { label: i18n.language === 'ar' ? 'مؤشرات الأداء المالي' : 'Financial KPI Dashboard', path: '/accounting/kpi', icon: '📈', permission: 'accounting.view', highlight: true, color: '#2563eb' },
                 { label: t('accounting.home.links.inventory_valuation'), path: '/stock/valuation-report', icon: '📦', permission: 'reports.view' },
                 { label: i18n.language === 'ar' ? 'مقارنة الفترات' : 'Period Comparison', path: '/accounting/period-comparison', icon: '📊', permission: 'accounting.view' },
+                { label: t('reports.detailed_pl.title', 'الربح والخسارة التفصيلي'), path: '/reports/detailed-pl', icon: '📋', permission: 'accounting.view' }
+            ]
+        },
+        {
+            title: i18n.language === 'ar' ? 'التقارير المتقدمة والتوحيد' : 'Advanced & Consolidation',
+            items: [
                 { label: t('cashflow_ias7.title', 'التدفق النقدي IAS 7'), path: '/reports/cashflow-ias7', icon: '💧', permission: 'accounting.view' },
                 { label: t('fx_report.title', 'أرباح/خسائر العملات'), path: '/reports/fx-gain-loss', icon: '💱', permission: 'accounting.view' },
-                { label: t('consolidation.title', 'التقارير الموحدة'), path: '/reports/consolidation', icon: '🏢', permission: 'accounting.view' },
-                { label: t('reports.detailed_pl.title', 'الربح والخسارة التفصيلي'), path: '/reports/detailed-pl', icon: '📋', permission: 'accounting.view' }
+                { label: t('consolidation.title', 'التقارير الموحدة'), path: '/reports/consolidation', icon: '🏢', permission: 'accounting.view' }
             ]
         }
     ]
