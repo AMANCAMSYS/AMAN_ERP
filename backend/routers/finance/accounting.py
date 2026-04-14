@@ -8,6 +8,7 @@ from routers.auth import get_current_user
 import logging
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
+from utils.cache import invalidate_company_cache
 from decimal import Decimal, ROUND_HALF_UP
 
 from utils.permissions import require_permission, validate_branch_access
@@ -18,20 +19,20 @@ from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 from schemas.accounting import AccountCreate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
 from utils.cache import cache
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/accounting", tags=["المحاسبة"])
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal("0.01")
 _D4 = Decimal("0.0001")
-
-
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
 
 @router.get("/summary", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def get_accounting_summary(
-    branch_id: Optional[int] = None,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب ملخص إحصائيات المحاسبة"""
@@ -104,8 +105,6 @@ def get_accounting_summary(
         }
     finally:
         db.close()
-
-
 # ── MODULE-001: Map account_code to the module it belongs to ──
 # Used to show module tags in COA and for module-based filtering
 _ACCOUNT_MODULE_MAP = {
@@ -176,11 +175,10 @@ def _account_code_to_module(code: str) -> str | None:
             if m:
                 return m
     return None
-
-
 @router.get("/accounts", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 async def get_chart_of_accounts(
-    branch_id: Optional[int] = None,
+    request: Request,
     search: Optional[str] = None,
     account_type: Optional[str] = None,
     page: Optional[int] = None,
@@ -333,6 +331,7 @@ async def get_chart_of_accounts(
         db.close()
 
 @router.post("/accounts", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("accounting.edit"))])
+@limiter.limit("100/minute")
 async def create_account(
     request: Request,
     account: AccountCreate,
@@ -386,7 +385,8 @@ async def create_account(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating account: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         # Invalidate cache
         try:
@@ -396,7 +396,9 @@ async def create_account(
         db.close()
 
 @router.delete("/accounts/{account_id}", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 async def delete_account(
+    request: Request,
     account_id: int,
     current_user: dict = Depends(get_current_user)
 ):
@@ -433,8 +435,17 @@ async def delete_account(
         if balance_row and _dec(balance_row[0]).copy_abs() > _D2:
             raise HTTPException(status_code=400, detail="لا يمكن حذف الحساب لأن رصيده غير صفري")
 
+        # Capture account info before delete
+        acct = db.execute(text("SELECT account_code, name FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
+        
         db.execute(text("DELETE FROM accounts WHERE id = :id"), {"id": account_id})
         db.commit()
+        
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="accounting.account.delete",
+                     resource_type="account", resource_id=str(account_id),
+                     details={"account_code": acct[0] if acct else None, "name": acct[1] if acct else None},
+                     request=request)
         
         # Invalidate cache
         try:
@@ -448,14 +459,17 @@ async def delete_account(
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting account: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 @router.put("/accounts/{account_id}", dependencies=[Depends(require_permission("accounting.edit"))])
+@limiter.limit("100/minute")
 async def update_account(
+    request: Request,
     account_id: int,
-    account_data: dict,
+    account_data: dict,  # TODO(FIN-007): Replace raw dict with a Pydantic schema for input validation
     current_user: dict = Depends(get_current_user)
 ):
     """Update account details"""
@@ -496,6 +510,12 @@ async def update_account(
         })
         db.commit()
         
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="accounting.account.update",
+                     resource_type="account", resource_id=str(account_id),
+                     details={"fields": list(account_data.keys())},
+                     request=request)
+        
         # Invalidate cache
         try:
             cache.delete(f"chart_of_accounts:{current_user.company_id}")
@@ -508,11 +528,13 @@ async def update_account(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating account: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 @router.post("/journal-entries", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("accounting.edit"))])
+@limiter.limit("100/minute")
 async def create_journal_entry(
     request: Request,
     entry_data: dict,
@@ -531,9 +553,21 @@ async def create_journal_entry(
             {"account_id": 2, "debit": 0, "credit": 100, "description": "Line desc"}
         ]
     }
+    Supports Idempotency-Key header to prevent duplicate entries on retries.
     """
     db = get_db_connection(current_user.company_id)
     try:
+        # Idempotency check (Constitution XXIII)
+        idempotency_key = request.headers.get("Idempotency-Key")
+        if idempotency_key:
+            existing = db.execute(text("""
+                SELECT id, entry_number, status FROM journal_entries
+                WHERE idempotency_key = :key
+                LIMIT 1
+            """), {"key": idempotency_key}).fetchone()
+            if existing:
+                return {"success": True, "message": "قيد موجود مسبقاً (مفتاح تكرار)", "entry_number": existing.entry_number, "entry_id": existing.id, "status": existing.status, "idempotent": True}
+
         from services.gl_service import create_journal_entry as gl_create_journal_entry
         
         entry_status = entry_data.get("status", "posted")
@@ -551,10 +585,14 @@ async def create_journal_entry(
             currency=entry_data.get("currency"),
             exchange_rate=_dec(entry_data.get("exchange_rate", 1)),
             source="Manual",
-            source_id=None
+            source_id=None,
+            username=current_user.username,
+            idempotency_key=idempotency_key,
         )
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         # AUDIT LOG
         log_activity(
@@ -597,31 +635,43 @@ async def create_journal_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating journal: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 
 # ============================================================
 # Journal Entries Listing & Draft Workflow (ACC-002)
 # ============================================================
 
 @router.get("/journal-entries", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def list_journal_entries(
-    status_filter: Optional[str] = None,
+    request: Request,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     search: Optional[str] = None,
+    branch_id: Optional[int] = None,
     page: int = 1,
     limit: int = 50,
     current_user: dict = Depends(get_current_user)
 ):
     """قائمة القيود اليومية مع فلترة"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         conditions = []
         params = {}
+
+        # Branch filtering
+        if branch_id:
+            conditions.append("je.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+        else:
+            allowed_branches = getattr(current_user, 'allowed_branches', [])
+            if allowed_branches and "*" not in getattr(current_user, 'permissions', []):
+                conditions.append("je.branch_id = ANY(:allowed_branches)")
+                params["allowed_branches"] = allowed_branches
 
         if status_filter and status_filter in ('draft', 'posted', 'voided'):
             conditions.append("je.status = :status")
@@ -694,11 +744,10 @@ def list_journal_entries(
         }
     finally:
         db.close()
-
-
 @router.get("/journal-entries/{entry_id}", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def get_journal_entry(
-    entry_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب تفاصيل قيد يومي"""
@@ -712,6 +761,10 @@ def get_journal_entry(
         """), {"id": entry_id}).fetchone()
         if not entry:
             raise HTTPException(status_code=404, detail="القيد غير موجود")
+
+        # Branch access check
+        if entry.branch_id:
+            validate_branch_access(current_user, entry.branch_id)
 
         lines = db.execute(text("""
             SELECT jl.*, a.account_number, a.name AS account_name, a.name_en AS account_name_en
@@ -751,9 +804,8 @@ def get_journal_entry(
         }
     finally:
         db.close()
-
-
 @router.post("/journal-entries/{entry_id}/post", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 async def post_journal_entry(
     entry_id: int,
     request: Request,
@@ -815,6 +867,8 @@ async def post_journal_entry(
         """), {"id": entry_id})
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         log_activity(
             db,
@@ -852,12 +906,12 @@ async def post_journal_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error posting journal entry: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.post("/journal-entries/{entry_id}/void", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 async def void_journal_entry(
     entry_id: int,
     request: Request,
@@ -947,17 +1001,17 @@ async def void_journal_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error voiding journal entry: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ============================================================
 # Fiscal Year Management & Year-End Closing (ACC-001)
 # ============================================================
 
 @router.get("/fiscal-years", dependencies=[Depends(require_permission("accounting.view"))])
-def list_fiscal_years(current_user: dict = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_fiscal_years(request: Request, current_user: dict = Depends(get_current_user)):
     """قائمة السنوات المالية"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1000,11 +1054,10 @@ def list_fiscal_years(current_user: dict = Depends(get_current_user)):
         return result
     finally:
         db.close()
-
-
 @router.post("/fiscal-years", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def create_fiscal_year(
-    data: FiscalYearCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء سنة مالية جديدة"""
@@ -1078,14 +1131,14 @@ def create_fiscal_year(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating fiscal year: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.get("/fiscal-years/{year}/preview-closing", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("200/minute")
 def preview_year_end_closing(
-    year: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """معاينة قيد الإقفال قبل التنفيذ - عرض الإيرادات والمصاريف"""
@@ -1164,11 +1217,10 @@ def preview_year_end_closing(
         }
     finally:
         db.close()
-
-
 @router.post("/fiscal-years/{year}/close", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def close_fiscal_year(
-    year: int,
+    request: Request,
     data: FiscalYearClose = FiscalYearClose(),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1330,14 +1382,14 @@ def close_fiscal_year(
     except Exception as e:
         db.rollback()
         logger.error(f"Error closing fiscal year {year}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.post("/fiscal-years/{year}/reopen", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def reopen_fiscal_year(
-    year: int,
+    request: Request,
     data: FiscalYearReopen = FiscalYearReopen(),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1427,14 +1479,14 @@ def reopen_fiscal_year(
     except Exception as e:
         db.rollback()
         logger.error(f"Error reopening fiscal year {year}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.get("/fiscal-years/{year}/periods", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def list_fiscal_periods(
-    year: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب الفترات المحاسبية لسنة مالية"""
@@ -1465,11 +1517,10 @@ def list_fiscal_periods(
         } for r in rows]
     finally:
         db.close()
-
-
 @router.post("/fiscal-periods/{period_id}/toggle-close", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def toggle_fiscal_period(
-    period_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """فتح/إغلاق فترة محاسبية"""
@@ -1499,21 +1550,33 @@ def toggle_fiscal_period(
 
         db.commit()
         action = "إغلاق" if new_status else "فتح"
+
+        # Audit log for fiscal period lock/unlock (FR-024)
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action=f"fiscal_period.{'lock' if new_status else 'unlock'}",
+            resource_type="fiscal_period",
+            resource_id=str(period_id),
+            details={"period_name": period.name, "new_status": "locked" if new_status else "unlocked"},
+        )
+
         return {"success": True, "message": f"تم {action} الفترة {period.name}", "is_closed": new_status}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ==================== ACC-003: Recurring Journal Templates ====================
 
 @router.get("/recurring-templates", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def list_recurring_templates(
-    is_active: Optional[bool] = None,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """قائمة قوالب القيود المتكررة"""
@@ -1535,10 +1598,9 @@ def list_recurring_templates(
         return [dict(r._mapping) for r in rows]
     finally:
         db.close()
-
-
 @router.get("/recurring-templates/{template_id}", dependencies=[Depends(require_permission("accounting.view"))])
-def get_recurring_template(template_id: int, current_user: dict = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_recurring_template(request: Request, template_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل قالب قيد متكرر مع بنوده"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1564,10 +1626,9 @@ def get_recurring_template(template_id: int, current_user: dict = Depends(get_cu
         return result
     finally:
         db.close()
-
-
 @router.post("/recurring-templates", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("accounting.edit"))])
-def create_recurring_template(data: dict = Body(...), current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_recurring_template(request: Request, data: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """إنشاء قالب قيد متكرر جديد"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1632,13 +1693,13 @@ def create_recurring_template(data: dict = Body(...), current_user: dict = Depen
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.put("/recurring-templates/{template_id}", dependencies=[Depends(require_permission("accounting.edit"))])
-def update_recurring_template(template_id: int, data: dict = Body(...), current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def update_recurring_template(request: Request, template_id: int, data: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """تعديل قالب قيد متكرر"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1713,13 +1774,13 @@ def update_recurring_template(template_id: int, data: dict = Body(...), current_
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.delete("/recurring-templates/{template_id}", dependencies=[Depends(require_permission("accounting.manage"))])
-def delete_recurring_template(template_id: int, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def delete_recurring_template(request: Request, template_id: int, current_user: dict = Depends(get_current_user)):
     """حذف قالب قيد متكرر"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1740,13 +1801,13 @@ def delete_recurring_template(template_id: int, current_user: dict = Depends(get
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.post("/recurring-templates/{template_id}/generate", dependencies=[Depends(require_permission("accounting.edit"))])
-def generate_from_template(template_id: int, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def generate_from_template(request: Request, template_id: int, current_user: dict = Depends(get_current_user)):
     """توليد قيد يومي من قالب متكرر يدوياً"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1770,13 +1831,13 @@ def generate_from_template(template_id: int, current_user: dict = Depends(get_cu
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.post("/recurring-templates/generate-due", dependencies=[Depends(require_permission("accounting.manage"))])
-def generate_all_due_templates(current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def generate_all_due_templates(request: Request, current_user: dict = Depends(get_current_user)):
     """توليد القيود المستحقة لجميع القوالب النشطة (يُستخدم بالجدولة)"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -1815,11 +1876,10 @@ def generate_all_due_templates(current_user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 def _create_entry_from_template(db, tmpl, lines, current_user):
     """Helper: إنشاء قيد يومي من قالب متكرر"""
     from dateutil.relativedelta import relativedelta
@@ -1886,13 +1946,12 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
     })
 
     return entry_id
-
-
 # ==================== ACC-005: Opening Balances ====================
 
 @router.get("/opening-balances", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def get_opening_balances(
-    current_user: dict = Depends(get_current_user)
+    request: Request,
 ):
     """جلب الأرصدة الافتتاحية - آخر قيد أرصدة افتتاحية مع أرصدة جميع الحسابات"""
     db = get_db_connection(current_user.company_id)
@@ -1937,11 +1996,10 @@ def get_opening_balances(
         }
     finally:
         db.close()
-
-
 @router.post("/opening-balances", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def save_opening_balances(
-    data: dict = Body(...),
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """حفظ الأرصدة الافتتاحية (ينشئ أو يحدث قيد الأرصدة الافتتاحية)"""
@@ -2046,16 +2104,16 @@ def save_opening_balances(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ==================== ACC-006: Automatic Closing Entries ====================
 
 @router.get("/closing-entries/preview", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("200/minute")
 def preview_closing_entries(
-    start_date: Optional[date] = None,
+    request: Request,
     end_date: Optional[date] = None,
     branch_id: Optional[int] = None,
     current_user: dict = Depends(get_current_user)
@@ -2125,11 +2183,10 @@ def preview_closing_entries(
         }
     finally:
         db.close()
-
-
 @router.post("/closing-entries/generate", dependencies=[Depends(require_permission("accounting.manage"))])
+@limiter.limit("100/minute")
 def generate_closing_entries(
-    data: dict = Body(...),
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """توليد قيود الإقفال التلقائي: إقفال الإيرادات والمصاريف → ملخص الدخل → أرباح مبقاة"""
@@ -2323,11 +2380,10 @@ def generate_closing_entries(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ═══════════════════════════════════════════════════════════
 # GL-004: Bad Debt Provision (مخصص ديون معدومة)
 # ═══════════════════════════════════════════════════════════
@@ -2338,7 +2394,8 @@ class ProvisionRequest(BaseModel):
     branch_id: Optional[int] = None
 
 @router.post("/provisions/bad-debt", dependencies=[Depends(require_permission("accounting.manage"))])
-def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_bad_debt_provision(request: Request, req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
     """إنشاء قيد مخصص ديون معدومة — Dr مصروف ديون معدومة / Cr مخصص الديون المعدومة"""
     from utils.accounting import get_mapped_account_id, get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
@@ -2390,17 +2447,17 @@ def create_bad_debt_provision(req: ProvisionRequest, current_user: dict = Depend
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ═══════════════════════════════════════════════════════════
 # GL-005: Leave Provision (مخصص إجازات)
 # ═══════════════════════════════════════════════════════════
 
 @router.post("/provisions/leave", dependencies=[Depends(require_permission("accounting.manage"))])
-def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_leave_provision(request: Request, req: ProvisionRequest, current_user: dict = Depends(get_current_user)):
     """إنشاء قيد مخصص إجازات — Dr مصروف إجازات / Cr مخصص الإجازات"""
     from utils.accounting import get_mapped_account_id, get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
@@ -2452,11 +2509,10 @@ def create_leave_provision(req: ProvisionRequest, current_user: dict = Depends(g
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ═══════════════════════════════════════════════════════════
 # GL-006: FX Revaluation (تسوية العملات الأجنبية)
 # ═══════════════════════════════════════════════════════════
@@ -2467,7 +2523,8 @@ class FXRevaluationRequest(BaseModel):
     branch_id: Optional[int] = None
 
 @router.post("/fx-revaluation", dependencies=[Depends(require_permission("accounting.manage"))])
-def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def fx_revaluation(request: Request, req: FXRevaluationRequest, current_user: dict = Depends(get_current_user)):
     """إعادة تقييم أرصدة العملات الأجنبية — الفروقات تسجل كربح/خسارة غير محققة"""
     from utils.accounting import get_base_currency
     branch_id = validate_branch_access(current_user, req.branch_id)
@@ -2594,6 +2651,7 @@ def fx_revaluation(req: FXRevaluationRequest, current_user: dict = Depends(get_c
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

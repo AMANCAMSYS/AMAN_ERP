@@ -6,6 +6,7 @@ from typing import List, Dict, Optional, Any
 from decimal import Decimal, ROUND_HALF_UP
 
 from utils.accounting import generate_sequential_number, update_account_balance
+from utils.audit import log_activity
 
 logger = logging.getLogger(__name__)
 _D2 = Decimal("0.01")
@@ -28,6 +29,8 @@ def create_journal_entry(
     exchange_rate: float = 1.0,
     source: str = "Manual",
     source_id: Optional[int] = None,
+    username: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
 ) -> tuple[int, str]:
     """
     Centralized function to create a journal entry, validate it, insert lines, 
@@ -96,9 +99,9 @@ def create_journal_entry(
     # Insert header
     res = db.execute(text("""
         INSERT INTO journal_entries 
-        (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id)
+        (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id, idempotency_key)
         VALUES 
-        (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id)
+        (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id, :idem_key)
         RETURNING id
     """), {
         "num": entry_number,
@@ -112,7 +115,8 @@ def create_journal_entry(
         "rate": float(_dec(exchange_rate).quantize(Decimal("0.000001"), ROUND_HALF_UP)),
         "posted_at": datetime.now() if status == "posted" else None,
         "source": source,
-        "s_id": source_id
+        "s_id": source_id,
+        "idem_key": idempotency_key
     }).fetchone()
     
     journal_id = res[0]
@@ -162,5 +166,19 @@ def create_journal_entry(
                 credit_curr=float(input_credit), 
                 currency=line_currency
             )
+
+    # Audit logging — internal to GL service for 100% coverage (FR-017)
+    try:
+        log_activity(
+            db,
+            user_id=user_id,
+            username=username or "system",
+            action="create_journal_entry",
+            resource_type="journal_entry",
+            resource_id=str(journal_id),
+            details={"entry_number": entry_number, "source": source, "lines": len(lines), "status": status}
+        )
+    except Exception:
+        logger.warning("Failed to log audit activity for JE %s", entry_number)
 
     return journal_id, entry_number

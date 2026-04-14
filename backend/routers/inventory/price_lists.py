@@ -73,7 +73,8 @@ def create_price_list(data: PriceListCreate, current_user: dict = Depends(get_cu
         return {"id": result[0], "message": "تم إنشاء القائمة بنجاح", "currency": company_currency}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -116,7 +117,8 @@ def update_price_list(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -164,7 +166,8 @@ def delete_price_list(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -218,6 +221,7 @@ def update_price_list_items(
         return {"message": "تم تحديث الأسعار بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

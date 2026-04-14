@@ -23,11 +23,11 @@ export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, curre
 export { reportsAPI, customReportsAPI, scheduledReportsAPI } from './reports'
 
 // Sales & Purchases
-export { salesAPI, deliveryOrdersAPI } from './sales'
+export { salesAPI, deliveryOrdersAPI, cpqAPI } from './sales'
 export { purchasesAPI, landedCostsAPI } from './purchases'
 
 // Inventory & Costing
-export { inventoryAPI, costingPolicyAPI } from './inventory'
+export { inventoryAPI, costingPolicyAPI, demandForecastAPI } from './inventory'
 
 // HR
 export { hrAPI, hrAdvancedAPI, hrImprovementsAPI, attendanceAPI, wpsAPI } from './hr'
@@ -39,7 +39,7 @@ export { assetsAPI } from './assets'
 export { treasuryAPI, reconciliationAPI } from './treasury'
 
 // Manufacturing
-export { manufacturingAPI } from './manufacturing'
+export { manufacturingAPI, shopFloorAPI, routingAPI } from './manufacturing'
 
 // Contracts
 export { contractsAPI } from './contracts'
@@ -48,7 +48,7 @@ export { contractsAPI } from './contracts'
 export { taxesAPI } from './taxes'
 
 // Projects
-export { projectsAPI } from './projects'
+export { projectsAPI, timesheetAPI, resourceAPI } from './projects'
 
 // Notifications
 export { notificationsAPI } from './notifications'

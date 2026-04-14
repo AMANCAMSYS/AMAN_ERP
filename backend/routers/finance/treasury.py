@@ -15,7 +15,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import update_account_balance, validate_je_lines
 from utils.fiscal_lock import check_fiscal_period_open
@@ -38,7 +38,7 @@ def list_treasury_accounts(branch_id: Optional[int] = None, current_user = Depen
     """عرض حسابات الخزينة والبنوك مع فلترة حسب الفرع"""
     if not current_user.company_id:
          raise HTTPException(status_code=400, detail="يجب تحديد الشركة أولاً")
-         
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         query = """
@@ -60,6 +60,11 @@ def list_treasury_accounts(branch_id: Optional[int] = None, current_user = Depen
         if branch_id:
             query += " AND ta.branch_id = :branch_id"
             params["branch_id"] = branch_id
+        else:
+            allowed_branches = getattr(current_user, 'allowed_branches', [])
+            if allowed_branches and "*" not in getattr(current_user, 'permissions', []):
+                query += " AND ta.branch_id = ANY(:allowed_branches)"
+                params["allowed_branches"] = allowed_branches
         query += " ORDER BY ta.id"
         
         result = db.execute(text(query), params).fetchall()
@@ -72,7 +77,7 @@ def list_transactions(branch_id: Optional[int] = None, limit: int = 50, current_
     """عرض سجل العمليات الأخيرة"""
     if not current_user.company_id:
          raise HTTPException(status_code=400, detail="يجب تحديد الشركة أولاً")
-         
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -97,6 +102,11 @@ def list_transactions(branch_id: Optional[int] = None, limit: int = 50, current_
         if branch_id:
             query_str += " AND (ta.branch_id = :bid OR t.branch_id = :bid)"
             params["bid"] = branch_id
+        else:
+            allowed_branches = getattr(current_user, 'allowed_branches', [])
+            if allowed_branches and "*" not in getattr(current_user, 'permissions', []):
+                query_str += " AND (ta.branch_id = ANY(:allowed_branches) OR t.branch_id = ANY(:allowed_branches))"
+                params["allowed_branches"] = allowed_branches
             
         query_str += " ORDER BY t.transaction_date DESC, t.id DESC LIMIT :limit"
         
@@ -111,6 +121,8 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
     إنشاء حساب خزينة جديد
     يقوم تلقائياً بإنشاء حساب في دليل الحسابات (GL Account) تحت الأصول المتداولة
     """
+    if hasattr(account, 'branch_id') and account.branch_id:
+        validate_branch_access(current_user, account.branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         from utils.accounting import get_base_currency
@@ -267,7 +279,8 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating treasury account: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -353,7 +366,8 @@ def update_treasury_account(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating treasury account: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -412,7 +426,8 @@ def delete_treasury_account(
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting treasury account: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -528,7 +543,8 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
     except Exception as e:
         db.rollback()
         logger.error(f"Expense Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -656,7 +672,8 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
     except Exception as e:
         db.rollback()
         logger.error(f"Transfer Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -769,7 +786,8 @@ def get_treasury_balances_report(
         raise
     except Exception as e:
         logger.error(f"Treasury balances report error: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -873,6 +891,7 @@ def get_treasury_cashflow_report(
         raise
     except Exception as e:
         logger.error(f"Treasury cashflow report error: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()

@@ -3,7 +3,7 @@ AMAN ERP - Advanced Workflow Engine
 سير العمل المتقدم: شروط، SLA، تصعيد، موافقة تلقائية
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from typing import Optional
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ import json
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/workflow", tags=["سير العمل المتقدم"])
 logger = logging.getLogger(__name__)
@@ -26,7 +27,8 @@ class WorkflowSLAUpdate(BaseModel):
 
 
 @router.get("/advanced/{workflow_id}", dependencies=[Depends(require_permission("approvals.view"))])
-def get_advanced_workflow(workflow_id: int, current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_advanced_workflow(request: Request, workflow_id: int, current_user=Depends(get_current_user)):
     """عرض سير العمل المتقدم مع الشروط وSLA"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -53,8 +55,9 @@ def get_advanced_workflow(workflow_id: int, current_user=Depends(get_current_use
 
 @router.put("/advanced/{workflow_id}/conditions",
             dependencies=[Depends(require_permission("approvals.edit"))])
+@limiter.limit("100/minute")
 def update_workflow_conditions(
-    workflow_id: int,
+    request: Request,
     conditions: list,
     current_user=Depends(get_current_user)
 ):
@@ -72,8 +75,9 @@ def update_workflow_conditions(
 
 @router.put("/advanced/{workflow_id}/sla",
             dependencies=[Depends(require_permission("approvals.edit"))])
+@limiter.limit("100/minute")
 def update_workflow_sla(
-    workflow_id: int,
+    request: Request,
     data: WorkflowSLAUpdate,
     current_user=Depends(get_current_user)
 ):
@@ -97,7 +101,8 @@ def update_workflow_sla(
 
 
 @router.post("/check-escalation", dependencies=[Depends(require_permission("approvals.view"))])
-def check_sla_escalations(current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def check_sla_escalations(request: Request, current_user=Depends(get_current_user)):
     """فحص الطلبات المتأخرة وتصعيدها"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -131,13 +136,15 @@ def check_sla_escalations(current_user=Depends(get_current_user)):
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.post("/auto-approve", dependencies=[Depends(require_permission("approvals.edit"))])
-def auto_approve_below_threshold(current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def auto_approve_below_threshold(request: Request, current_user=Depends(get_current_user)):
     """الموافقة التلقائية على الطلبات تحت الحد الأدنى"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -160,13 +167,15 @@ def auto_approve_below_threshold(current_user=Depends(get_current_user)):
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.get("/analytics", dependencies=[Depends(require_permission("approvals.view"))])
-def workflow_analytics(current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def workflow_analytics(request: Request, current_user=Depends(get_current_user)):
     """تحليلات سير العمل"""
     db = get_db_connection(current_user.company_id)
     try:

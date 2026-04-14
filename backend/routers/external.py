@@ -20,12 +20,13 @@ import logging
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.audit import log_activity
 from utils.zatca import (
     generate_zatca_qr_base64, build_zatca_tlv, decode_zatca_tlv,
     compute_invoice_hash, sign_invoice, verify_invoice_signature,
     generate_rsa_keypair, process_invoice_for_zatca
 )
-from utils.webhooks import WEBHOOK_EVENTS
+from utils.webhooks import WEBHOOK_EVENTS, validate_webhook_url, encrypt_webhook_secret
 
 router = APIRouter(prefix="/external", tags=["التكامل الخارجي"])
 logger = logging.getLogger(__name__)
@@ -123,6 +124,12 @@ def create_api_key(data: APIKeyCreate, current_user=Depends(get_current_user)):
         }).scalar()
         db.commit()
         
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="create", resource_type="api_keys",
+            resource_id=str(row), details={"name": data.name, "prefix": key_prefix}
+        )
+        
         return {
             "id": row,
             "api_key": raw_key,
@@ -139,6 +146,11 @@ def revoke_api_key(key_id: int, current_user=Depends(get_current_user)):
     try:
         db.execute(text("UPDATE api_keys SET is_active = FALSE WHERE id = :id"), {"id": key_id})
         db.commit()
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="revoke", resource_type="api_keys",
+            resource_id=str(key_id), details={}
+        )
         return {"message": "تم إلغاء المفتاح"}
     finally:
         db.close()
@@ -168,10 +180,16 @@ def create_webhook(data: WebhookCreate, current_user=Depends(get_current_user)):
     invalid = [e for e in data.events if e not in WEBHOOK_EVENTS]
     if invalid:
         raise HTTPException(400, f"أحداث غير معروفة: {invalid}")
-    
+
+    try:
+        validate_webhook_url(data.url)
+    except ValueError:
+        raise HTTPException(400, "عنوان URL غير مسموح به")
+
     db = get_db_connection(current_user.company_id)
     try:
         auto_secret = data.secret or secrets.token_hex(32)
+        encrypted_secret = encrypt_webhook_secret(auto_secret)
         row = db.execute(text("""
             INSERT INTO webhooks (name, url, secret, events, retry_count, timeout_seconds, created_by)
             VALUES (:name, :url, :secret, :events, :retry, :timeout, :user)
@@ -179,13 +197,18 @@ def create_webhook(data: WebhookCreate, current_user=Depends(get_current_user)):
         """), {
             "name": data.name,
             "url": data.url,
-            "secret": auto_secret,
+            "secret": encrypted_secret,
             "events": json.dumps(data.events),
             "retry": data.retry_count,
             "timeout": data.timeout_seconds,
             "user": current_user.id
         }).scalar()
         db.commit()
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="create", resource_type="webhook",
+            resource_id=str(row), details={"name": data.name, "url": data.url}
+        )
         return {"id": row, "secret": auto_secret, "message": "تم إنشاء الـ webhook"}
     finally:
         db.close()
@@ -193,6 +216,11 @@ def create_webhook(data: WebhookCreate, current_user=Depends(get_current_user)):
 
 @router.put("/webhooks/{webhook_id}", dependencies=[Depends(require_permission(["settings.manage", "admin"]))])
 def update_webhook(webhook_id: int, data: WebhookUpdate, current_user=Depends(get_current_user)):
+    if data.url is not None:
+        try:
+            validate_webhook_url(data.url)
+        except ValueError:
+            raise HTTPException(400, "عنوان URL غير مسموح به")
     db = get_db_connection(current_user.company_id)
     try:
         updates = {}
@@ -210,6 +238,11 @@ def update_webhook(webhook_id: int, data: WebhookUpdate, current_user=Depends(ge
         updates["id"] = webhook_id
         db.execute(text(f"UPDATE webhooks SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="update", resource_type="webhook",
+            resource_id=str(webhook_id), details={k: v for k, v in updates.items() if k != "id"}
+        )
         return {"message": "تم التحديث"}
     finally:
         db.close()
@@ -221,6 +254,11 @@ def delete_webhook(webhook_id: int, current_user=Depends(get_current_user)):
     try:
         db.execute(text("DELETE FROM webhooks WHERE id = :id"), {"id": webhook_id})
         db.commit()
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="delete", resource_type="webhook",
+            resource_id=str(webhook_id), details={}
+        )
         return {"message": "تم الحذف"}
     finally:
         db.close()
@@ -300,8 +338,8 @@ def generate_qr_code(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"ZATCA QR generation failed: {e}")
-        raise HTTPException(500, f"خطأ في توليد QR: {str(e)}")
+        logger.exception("ZATCA QR generation failed")
+        raise HTTPException(500, "خطأ في توليد QR")
     finally:
         db.close()
 
@@ -472,7 +510,8 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Error creating WHT transaction")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

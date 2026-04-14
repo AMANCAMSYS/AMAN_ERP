@@ -92,7 +92,7 @@ const ComplianceSettings = ({ settings, handleSettingChange }) => {
                             className="form-input"
                             value={settings.zatca_csr_common_name || ''}
                             onChange={(e) => handleSettingChange('zatca_csr_common_name', e.target.value)}
-                            placeholder="e.g. Aman Trading Est."
+                            placeholder={t('settings.compliance.company_name_placeholder')}
                         />
                     </div>
                     <div className="form-group">

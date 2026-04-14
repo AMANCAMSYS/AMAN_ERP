@@ -1,0 +1,54 @@
+{
+  "transitions": [
+    {
+      "step": "plan",
+      "substep": null,
+      "from": null,
+      "by": "extension",
+      "at": "2026-04-14T16:46:38.093Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "from": {
+        "step": "plan",
+        "substep": null
+      },
+      "by": "extension",
+      "at": "2026-04-14T16:47:00.792Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "from": {
+        "step": "tasks",
+        "substep": null
+      },
+      "by": "extension",
+      "at": "2026-04-14T16:47:56.025Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "from": {
+        "step": "plan",
+        "substep": null
+      },
+      "by": "extension",
+      "at": "2026-04-14T16:47:57.975Z"
+    }
+  ],
+  "currentStep": "tasks",
+  "stepHistory": {
+    "plan": {
+      "startedAt": "2026-04-14T16:46:38.092Z",
+      "completedAt": "2026-04-14T16:47:00.791Z"
+    },
+    "tasks": {
+      "startedAt": "2026-04-14T16:47:00.791Z",
+      "completedAt": "2026-04-14T16:47:56.025Z"
+    }
+  },
+  "status": "active",
+  "specName": "Audit Accounting"
+}

@@ -30,7 +30,7 @@ services:
       - db_data:/var/lib/postgresql/data
       - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     ports:
-      - "5432:5432"          # Remove in production (not exposed externally)
+      - "127.0.0.1:5432:5432"   # Bind to localhost only (not exposed externally)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aman}"]
       interval: 10s
@@ -48,7 +48,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"          # Remove in production
+      - "127.0.0.1:6379:6379"   # Bind to localhost only
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -131,7 +131,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: http://localhost:3000
     volumes:

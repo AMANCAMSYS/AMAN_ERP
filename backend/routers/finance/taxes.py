@@ -116,7 +116,8 @@ def create_tax_rate(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating tax rate: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -155,7 +156,8 @@ def update_tax_rate(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating tax rate: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -182,7 +184,8 @@ def delete_tax_rate(rate_id: int, request: Request, current_user: dict = Depends
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -204,9 +207,11 @@ def list_tax_groups(current_user: dict = Depends(get_current_user)):
             item = dict(r._mapping)
             tax_ids = item.get("tax_ids") or []
             if tax_ids:
-                placeholders = ",".join([str(tid) for tid in tax_ids if isinstance(tid, int)])
-                if placeholders:
-                    taxes = db.execute(text(f"SELECT id, tax_name, rate_value FROM tax_rates WHERE id IN ({placeholders})")).fetchall()
+                safe_ids = [tid for tid in tax_ids if isinstance(tid, int)]
+                if safe_ids:
+                    placeholders = ",".join([f":tid_{i}" for i in range(len(safe_ids))])
+                    id_params = {f"tid_{i}": tid for i, tid in enumerate(safe_ids)}
+                    taxes = db.execute(text(f"SELECT id, tax_name, rate_value FROM tax_rates WHERE id IN ({placeholders})"), id_params).fetchall()
                     item["taxes"] = [dict(t._mapping) for t in taxes]
                     combined_rate = sum((_dec(t.rate_value) for t in taxes), Decimal("0"))
                     item["combined_rate"] = float(combined_rate.quantize(_D4, ROUND_HALF_UP))
@@ -254,7 +259,8 @@ def create_tax_group(request: Request, data: TaxGroupCreate, current_user: dict 
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -327,6 +333,8 @@ def get_tax_return(return_id: int, current_user: dict = Depends(get_current_user
         """), {"id": return_id}).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+        if row.branch_id:
+            validate_branch_access(current_user, row.branch_id)
 
         result = dict(row._mapping)
 
@@ -488,7 +496,8 @@ def create_tax_return(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating tax return: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -505,6 +514,8 @@ def file_tax_return(
         row = db.execute(text("SELECT * FROM tax_returns WHERE id = :id"), {"id": return_id}).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+        if row.branch_id:
+            validate_branch_access(current_user, row.branch_id)
         if row.status != "draft":
             raise HTTPException(status_code=400, detail="لا يمكن تقديم إقرار غير في حالة مسودة")
 
@@ -530,7 +541,8 @@ def file_tax_return(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -543,6 +555,8 @@ def cancel_tax_return(return_id: int, request: Request, current_user: dict = Dep
         row = db.execute(text("SELECT * FROM tax_returns WHERE id = :id"), {"id": return_id}).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+        if row.branch_id:
+            validate_branch_access(current_user, row.branch_id)
         if row.status == "paid":
             raise HTTPException(status_code=400, detail="لا يمكن إلغاء إقرار مدفوع")
 
@@ -565,7 +579,8 @@ def cancel_tax_return(return_id: int, request: Request, current_user: dict = Dep
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -725,7 +740,8 @@ def create_tax_payment(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating tax payment: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1060,7 +1076,8 @@ def create_tax_settlement(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating tax settlement: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1433,13 +1450,15 @@ def get_tax_calendar_item(
         raise
     except Exception as e:
         logger.error(f"Error: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.post("/calendar")
 def create_tax_calendar_item(
+    request: Request,
     data: TaxCalendarCreate,
     current_user=Depends(require_permission(["taxes.manage"]))
 ):
@@ -1461,11 +1480,16 @@ def create_tax_calendar_item(
             "user_id": current_user.id
         }).fetchone()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="taxes.calendar.create", resource_type="tax_calendar",
+                     resource_id=str(row.id), details={"title": data.title},
+                     request=request)
         return dict(row._mapping)
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating calendar item: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1473,6 +1497,7 @@ def create_tax_calendar_item(
 @router.put("/calendar/{item_id}")
 def update_tax_calendar_item(
     item_id: int,
+    request: Request,
     data: TaxCalendarUpdate,
     current_user=Depends(require_permission(["taxes.manage"]))
 ):
@@ -1498,13 +1523,18 @@ def update_tax_calendar_item(
         if not row:
             raise HTTPException(404, "Calendar item not found")
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="taxes.calendar.update", resource_type="tax_calendar",
+                     resource_id=str(item_id), details={"fields": list(params.keys())},
+                     request=request)
         return dict(row._mapping)
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating calendar item: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1512,6 +1542,7 @@ def update_tax_calendar_item(
 @router.delete("/calendar/{item_id}")
 def delete_tax_calendar_item(
     item_id: int,
+    request: Request,
     current_user=Depends(require_permission(["taxes.manage"]))
 ):
     db = get_db_connection(current_user.company_id)
@@ -1520,12 +1551,17 @@ def delete_tax_calendar_item(
         if result.rowcount == 0:
             raise HTTPException(404, "Calendar item not found")
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="taxes.calendar.delete", resource_type="tax_calendar",
+                     resource_id=str(item_id), details={},
+                     request=request)
         return {"message": "Deleted"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1533,6 +1569,7 @@ def delete_tax_calendar_item(
 @router.put("/calendar/{item_id}/complete")
 def complete_tax_calendar_item(
     item_id: int,
+    request: Request,
     current_user=Depends(require_permission(["taxes.manage"]))
 ):
     """Mark a tax calendar item as completed, optionally creating next recurrence"""
@@ -1571,12 +1608,17 @@ def complete_tax_calendar_item(
             new_id = next_row[0] if next_row else None
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="taxes.calendar.complete", resource_type="tax_calendar",
+                     resource_id=str(item_id), details={"next_recurrence_id": new_id},
+                     request=request)
         return {"message": "Completed", "next_recurrence_id": new_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error completing calendar item: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()

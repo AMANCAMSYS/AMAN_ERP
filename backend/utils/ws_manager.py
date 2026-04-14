@@ -14,6 +14,8 @@ logger = logging.getLogger("aman.ws")
 class ConnectionManager:
     """يدير اتصالات WebSocket لكل مستخدم"""
 
+    MAX_CONNECTIONS_PER_USER = 3
+
     def __init__(self):
         # { "company_id:user_id": [WebSocket, ...] }
         self._connections: Dict[str, List[WebSocket]] = {}
@@ -22,12 +24,18 @@ class ConnectionManager:
         return f"{company_id}:{user_id}"
 
     async def connect(self, ws: WebSocket, company_id: str, user_id: int):
-        await ws.accept()
         key = self._key(company_id, user_id)
+        current_count = len(self._connections.get(key, []))
+        if current_count >= self.MAX_CONNECTIONS_PER_USER:
+            await ws.close(code=4008, reason="Too many connections")
+            logger.warning(f"WS connection rejected (limit reached): {key}")
+            return False
+        await ws.accept()
         if key not in self._connections:
             self._connections[key] = []
         self._connections[key].append(ws)
         logger.info(f"WS connected: {key} (total={len(self._connections[key])})")
+        return True
 
     def disconnect(self, ws: WebSocket, company_id: str, user_id: int):
         key = self._key(company_id, user_id)

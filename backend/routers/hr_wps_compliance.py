@@ -12,13 +12,15 @@ from pydantic import BaseModel
 import io, csv, logging
 
 from database import get_db_connection
-from routers.auth import get_current_user
-from utils.permissions import require_permission
+from routers.auth import get_current_user, get_current_user_company
+from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     update_account_balance, get_base_currency
 )
+from services.gl_service import create_journal_entry as gl_create_journal_entry
+import logging
 
 router = APIRouter(prefix="/hr", tags=["HR - WPS & Compliance"])
 logger = logging.getLogger(__name__)
@@ -181,11 +183,10 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
 
         # Log export
         user_id = current_user.get("user_id") if isinstance(current_user, dict) else current_user.id
-        log_activity(db, user_id, "wps.export", f"تصدير WPS للفترة {period.name}", {
-            "period_id": body.period_id,
-            "records": record_count,
-            "total": float(total_amount)
-        })
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(db, user_id=user_id, username=username, action="wps.export",
+                     resource_type="payroll_period", resource_id=body.period_id,
+                     details={"period_name": period.name, "records": record_count, "total": float(total_amount)})
 
         return Response(
             content=csv_content,
@@ -196,7 +197,8 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
         raise
     except Exception as e:
         logger.error(f"WPS export error: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -262,6 +264,8 @@ def saudization_dashboard(branch_id: Optional[int] = None, current_user=Depends(
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     db = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         branch_filter = ""
         params = {}
         if branch_id:
@@ -373,7 +377,8 @@ def saudization_dashboard(branch_id: Optional[int] = None, current_user=Depends(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -510,63 +515,63 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
 
         total_settlement = eos_amount + vacation_amount + pending_salary - _dec(body.additional_deductions)
 
-        # ── Create Journal Entry ──
+        # ── Create Journal Entry via centralized GL service ──
         base_currency = get_base_currency(db)
-        year = datetime.now().year
-        je_number = generate_sequential_number(db, f"JE-EOS-{year}", "journal_entries", "entry_number")
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description,
-                status, currency, created_by
-            ) VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :curr, :uid)
-            RETURNING id
-        """), {
-            "num": je_number,
-            "ref": f"EOS-{body.employee_id}",
-            "desc": f"تسوية نهاية خدمة: {emp.employee_name}",
-            "curr": base_currency, "uid": user_id
-        })
-        je_id = je.fetchone()[0]
+        lines = []
 
         # Dr: EOS Expense
         eos_exp = get_mapped_account_id(db, "acc_map_eos_expense")
         if eos_exp and eos_amount > 0:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, :desc)
-            """), {"jeid": je_id, "aid": eos_exp, "amt": eos_amount, "desc": "مكافأة نهاية خدمة"})
-            update_account_balance(db, eos_exp, eos_amount, 0)
+            lines.append({
+                "account_id": eos_exp, "debit": eos_amount, "credit": 0,
+                "description": "مكافأة نهاية خدمة"
+            })
 
         # Dr: Salary Expense (for vacation + pending)
         salary_exp = get_mapped_account_id(db, "acc_map_salary_expense")
         remaining_amount = vacation_amount + pending_salary
         if salary_exp and remaining_amount > 0:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, :desc)
-            """), {"jeid": je_id, "aid": salary_exp, "amt": remaining_amount,
-                   "desc": f"رصيد إجازات {vacation_amount} + راتب مستحق {pending_salary}"})
-            update_account_balance(db, salary_exp, remaining_amount, 0)
+            lines.append({
+                "account_id": salary_exp, "debit": remaining_amount, "credit": 0,
+                "description": f"رصيد إجازات {vacation_amount} + راتب مستحق {pending_salary}"
+            })
 
         # Cr: EOS Provision (reverse)
         eos_prov = get_mapped_account_id(db, "acc_map_eos_provision")
         if eos_prov and eos_amount > 0:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, :desc)
-            """), {"jeid": je_id, "aid": eos_prov, "amt": eos_amount, "desc": "عكس مخصص نهاية خدمة"})
-            update_account_balance(db, eos_prov, 0, eos_amount)
+            lines.append({
+                "account_id": eos_prov, "debit": 0, "credit": eos_amount,
+                "description": "عكس مخصص نهاية خدمة"
+            })
 
         # Cr: Cash/Bank
         cash_account = get_mapped_account_id(db, "acc_map_cash")
-        if cash_account:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, :desc)
-            """), {"jeid": je_id, "aid": cash_account, "amt": total_settlement,
-                   "desc": "صرف تسوية نهاية خدمة"})
-            update_account_balance(db, cash_account, 0, total_settlement)
+        if cash_account and total_settlement > 0:
+            lines.append({
+                "account_id": cash_account, "debit": 0, "credit": total_settlement,
+                "description": "صرف تسوية نهاية خدمة"
+            })
+
+        je_id = None
+        je_number = None
+        if lines:
+            je_result = gl_create_journal_entry(
+                db=db,
+                company_id=company_id,
+                date=date.today(),
+                reference=f"EOS-{body.employee_id}",
+                description=f"تسوية نهاية خدمة: {emp.employee_name}",
+                status="posted",
+                currency=base_currency,
+                exchange_rate=1.0,
+                source="eos_settlement",
+                source_id=body.employee_id,
+                lines=lines,
+                user_id=user_id
+            )
+            je_id = je_result.get("id") if isinstance(je_result, dict) else je_result
+            je_number = je_result.get("entry_number") if isinstance(je_result, dict) else None
 
         # Update employee status
         db.execute(text("""
@@ -577,6 +582,12 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         """), {"eos": total_settlement, "eid": body.employee_id})
 
         db.commit()
+
+        # Audit log
+        log_activity(db, user_id=user_id, username=current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", ""),
+                     action="eos.settle", resource_type="employee", resource_id=body.employee_id,
+                     details={"total_settlement": float(total_settlement), "service_years": round(total_years, 2),
+                              "termination_reason": body.termination_reason, "journal_entry_id": je_id})
 
         return {
             "employee_id": body.employee_id,
@@ -596,6 +607,7 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()

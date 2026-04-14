@@ -25,11 +25,11 @@ export { accountingAPI, costCentersAPI, budgetsAPI, budgetImprovementsAPI, curre
 export { reportsAPI, customReportsAPI, scheduledReportsAPI, detailedReportsAPI, reportSharingAPI } from '../services/reports'
 
 // Sales & Purchases
-export { salesAPI, deliveryOrdersAPI } from '../services/sales'
+export { salesAPI, deliveryOrdersAPI, cpqAPI } from '../services/sales'
 export { purchasesAPI, landedCostsAPI } from '../services/purchases'
 
 // Inventory & Costing
-export { inventoryAPI, costingPolicyAPI } from '../services/inventory'
+export { inventoryAPI, costingPolicyAPI, demandForecastAPI } from '../services/inventory'
 export { costingLayerAPI } from '../services/costing'
 
 // HR
@@ -42,7 +42,7 @@ export { assetsAPI } from '../services/assets'
 export { treasuryAPI, reconciliationAPI } from '../services/treasury'
 
 // Manufacturing
-export { manufacturingAPI } from '../services/manufacturing'
+export { manufacturingAPI, shopFloorAPI, routingAPI } from '../services/manufacturing'
 
 // Contracts
 export { contractsAPI } from '../services/contracts'
@@ -51,7 +51,7 @@ export { contractsAPI } from '../services/contracts'
 export { taxesAPI, taxComplianceAPI } from '../services/taxes'
 
 // Projects
-export { projectsAPI } from '../services/projects'
+export { projectsAPI, timesheetAPI, resourceAPI } from '../services/projects'
 
 // Notifications
 export { notificationsAPI } from '../services/notifications'

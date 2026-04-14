@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional, List
@@ -9,17 +9,22 @@ from datetime import datetime
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
+from utils.audit import log_activity
+from utils.limiter import limiter
 
 
 from services.costing_service import CostingService
 import json
 
 from schemas.costing_policies import CostingPolicySet, CostingPolicyHistoryResponse
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/costing-policies", tags=["Costing Policies"], dependencies=[Depends(require_module("costing"))])
 
 @router.get("/current", dependencies=[Depends(require_permission("settings.view"))])
-def get_current_policy(current_user: dict = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_current_policy(request: Request, current_user: dict = Depends(get_current_user)):
     """Get the currently active costing policy"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -43,7 +48,8 @@ def get_current_policy(current_user: dict = Depends(get_current_user)):
         db.close()
 
 @router.post("/set", dependencies=[Depends(require_permission("settings.edit"))])
-def set_costing_policy(policy_data: CostingPolicySet, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def set_costing_policy(request: Request, policy_data: CostingPolicySet, current_user: dict = Depends(get_current_user)):
     """Change the costing policy with impact analysis"""
     if policy_data.policy_type not in ['global_wac', 'per_warehouse_wac', 'hybrid', 'smart']:
         raise HTTPException(status_code=400, detail="Invalid policy type")
@@ -107,17 +113,38 @@ def set_costing_policy(policy_data: CostingPolicySet, current_user: dict = Depen
         
         # 7. Create Full System Snapshot (V2)
         CostingService.create_snapshot(db)
+
+        # 8. Audit log
+        try:
+            log_activity(
+                db,
+                user_id=current_user.id,
+                username=getattr(current_user, 'username', 'system'),
+                action="switch_costing_policy",
+                resource_type="costing_policies",
+                resource_id=str(policy_data.policy_type),
+                details={
+                    "old_policy": current_policy,
+                    "new_policy": policy_data.policy_type,
+                    "affected_products": impact["affected_products_count"],
+                    "cost_impact": float(impact["total_cost_impact"]) if impact["total_cost_impact"] else 0,
+                }
+            )
+        except Exception:
+            logger.warning("Failed to log costing policy change activity")
              
         db.commit()
         return {"message": f"Policy updated to {new_name}", "status": "success", "impact": impact}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 @router.get("/history", response_model=List[CostingPolicyHistoryResponse], dependencies=[Depends(require_permission("settings.view"))])
-def get_policy_history(current_user: dict = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_policy_history(request: Request, current_user: dict = Depends(get_current_user)):
     """Get history of policy changes with impact metrics"""
     db = get_db_connection(current_user.company_id)
     try:

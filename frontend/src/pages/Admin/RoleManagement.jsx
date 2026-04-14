@@ -46,7 +46,7 @@ const RoleManagement = () => {
 
     // Get display label for a permission key
     const getPermLabel = (key) => {
-        if (key === '*') return isRTL ? 'جميع الصلاحيات' : 'All Permissions';
+        if (key === '*') return t('admin.all_permissions');
         const entry = permLabelMap[key];
         if (entry) return isRTL ? entry.ar : entry.en;
         const sectionKey = key.split('.')[0];
@@ -371,7 +371,7 @@ const RoleManagement = () => {
                                     <div className="perm-preview">
                                         {isFull ? (
                                             <span className="perm-tag perm-tag-full">
-                                                {isRTL ? 'جميع الوحدات' : 'All Modules'}
+                                                {t('admin.all_modules')}
                                             </span>
                                         ) : (
                                             <>
@@ -436,7 +436,7 @@ const RoleManagement = () => {
                                         value={formData.role_name}
                                         onChange={handleInputChange}
                                         required
-                                        placeholder="e.g. sales_manager"
+                                        placeholder={t('admin.roles.code_placeholder')}
                                     />
                                 </div>
                                 <div className="form-group">

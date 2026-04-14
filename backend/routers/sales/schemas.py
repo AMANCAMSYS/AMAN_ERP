@@ -1,7 +1,8 @@
 """Sales module Pydantic schemas."""
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, validator, field_validator
 from typing import List, Optional
 from datetime import date
+import re
 
 
 # --- Customer Groups ---
@@ -14,6 +15,13 @@ class CustomerGroupCreate(BaseModel):
     application_scope: str = "total"
     payment_days: int = 30
     status: str = "active"
+
+    @field_validator('discount_percentage')
+    @classmethod
+    def discount_must_be_valid(cls, v):
+        if v < 0 or v > 100:
+            raise ValueError("نسبة الخصم يجب أن تكون بين 0 و 100")
+        return v
 
 
 # --- Customer ---
@@ -35,6 +43,29 @@ class CustomerCreate(BaseModel):
     branch_id: Optional[int] = None
     currency: Optional[str] = None
     status: str = "active"
+
+    @field_validator('credit_limit')
+    @classmethod
+    def credit_limit_must_be_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("حد الائتمان لا يمكن أن يكون سالباً")
+        return v
+
+    @field_validator('email')
+    @classmethod
+    def email_must_be_valid(cls, v):
+        if v is not None and v != '':
+            if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
+                raise ValueError("صيغة البريد الإلكتروني غير صحيحة")
+        return v
+
+    @field_validator('tax_number')
+    @classmethod
+    def tax_number_must_be_valid(cls, v):
+        if v is not None and v != '':
+            if not re.match(r'^[\d\-]{5,20}$', v):
+                raise ValueError("الرقم الضريبي يجب أن يكون أرقام فقط (5-20 خانة)")
+        return v
 
 
 class CustomerResponse(BaseModel):

@@ -141,7 +141,8 @@ def update_own_profile(
     except Exception as e:
         conn.rollback()
         logger.error("profile update error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -385,7 +386,8 @@ def submit_leave_request(
     except Exception as e:
         conn.rollback()
         logger.error("leave request error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -513,7 +515,8 @@ def approve_leave_request(
     except Exception as e:
         conn.rollback()
         logger.error("approve error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -573,6 +576,7 @@ def reject_leave_request(
     except Exception as e:
         conn.rollback()
         logger.error("reject error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()

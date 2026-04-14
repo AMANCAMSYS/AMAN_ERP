@@ -59,14 +59,14 @@ const SecurityEvents = () => {
                     <div>
                         <h1 className="workspace-title">
                             <Shield size={24} className="me-2" />
-                            {isRTL ? 'سجل الأحداث الأمنية' : 'Security Events Log'}
+                            {t('security_events.title')}
                         </h1>
                         <p className="workspace-subtitle">
-                            {isRTL ? 'مراقبة الأحداث الأمنية وحماية النظام من الاختراق' : 'Monitor security events and brute force protection'}
+                            {t('security_events.subtitle')}
                         </p>
                     </div>
                     <button className="btn btn-outline-primary" onClick={fetchData}>
-                        <RefreshCw size={16} className="me-1" /> {isRTL ? 'تحديث' : 'Refresh'}
+                        <RefreshCw size={16} className="me-1" /> {t('security_events.refresh')}
                     </button>
                 </div>
             </div>
@@ -77,21 +77,21 @@ const SecurityEvents = () => {
                     <div className="metric-icon" style={{ background: '#e3f2fd' }}><Activity size={22} color="#1976d2" /></div>
                     <div className="metric-info">
                         <span className="metric-value">{summary.total_events || 0}</span>
-                        <span className="metric-label">{isRTL ? 'إجمالي الأحداث' : 'Total Events'}</span>
+                        <span className="metric-label">{t('security_events.total_events')}</span>
                     </div>
                 </div>
                 <div className="metric-card">
                     <div className="metric-icon" style={{ background: '#fff3e0' }}><AlertTriangle size={22} color="#ef6c00" /></div>
                     <div className="metric-info">
                         <span className="metric-value">{summary.last_24h || 0}</span>
-                        <span className="metric-label">{isRTL ? 'آخر 24 ساعة' : 'Last 24 Hours'}</span>
+                        <span className="metric-label">{t('security_events.last_24h')}</span>
                     </div>
                 </div>
                 <div className="metric-card">
                     <div className="metric-icon" style={{ background: '#fce4ec' }}><Lock size={22} color="#c62828" /></div>
                     <div className="metric-info">
                         <span className="metric-value">{blockedIPs.length || 0}</span>
-                        <span className="metric-label">{isRTL ? 'عناوين محظورة' : 'Blocked IPs'}</span>
+                        <span className="metric-label">{t('security_events.blocked_ips')}</span>
                     </div>
                 </div>
             </div>
@@ -99,9 +99,9 @@ const SecurityEvents = () => {
             {/* Tabs */}
             <div className="tabs mb-3">
                 {[
-                    { key: 'events', label: isRTL ? 'الأحداث الأمنية' : 'Security Events', icon: <Eye size={16} /> },
-                    { key: 'attempts', label: isRTL ? 'محاولات الدخول' : 'Login Attempts', icon: <Lock size={16} /> },
-                    { key: 'blocked', label: isRTL ? 'عناوين محظورة' : 'Blocked IPs', icon: <AlertTriangle size={16} /> },
+                    { key: 'events', label: t('security_events.tab_events'), icon: <Eye size={16} /> },
+                    { key: 'attempts', label: t('security_events.tab_attempts'), icon: <Lock size={16} /> },
+                    { key: 'blocked', label: t('security_events.tab_blocked'), icon: <AlertTriangle size={16} /> },
                 ].map(tab => (
                     <button key={tab.key}
                         className={`tab ${activeTab === tab.key ? 'active' : ''}`}
@@ -116,14 +116,14 @@ const SecurityEvents = () => {
                 <div className="d-flex gap-2 mb-3">
                     <select className="form-input" style={{ maxWidth: 200 }}
                         value={filter.severity} onChange={e => setFilter(p => ({ ...p, severity: e.target.value }))}>
-                        <option value="">{isRTL ? 'كل مستويات الخطورة' : 'All Severities'}</option>
+                        <option value="">{t('security_events.all_severities')}</option>
                         {['critical', 'high', 'medium', 'low', 'info'].map(s => (
                             <option key={s} value={s}>{s}</option>
                         ))}
                     </select>
                     <select className="form-input" style={{ maxWidth: 200 }}
                         value={filter.event_type} onChange={e => setFilter(p => ({ ...p, event_type: e.target.value }))}>
-                        <option value="">{isRTL ? 'كل الأنواع' : 'All Types'}</option>
+                        <option value="">{t('security_events.all_types')}</option>
                         {(summary.by_type || []).map(t => (
                             <option key={t.event_type} value={t.event_type}>{t.event_type} ({t.cnt})</option>
                         ))}
@@ -139,16 +139,16 @@ const SecurityEvents = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{isRTL ? 'التاريخ' : 'Date'}</th>
-                                    <th>{isRTL ? 'النوع' : 'Type'}</th>
-                                    <th>{isRTL ? 'الخطورة' : 'Severity'}</th>
-                                    <th>{isRTL ? 'عنوان IP' : 'IP Address'}</th>
-                                    <th>{isRTL ? 'التفاصيل' : 'Details'}</th>
+                                    <th>{t('security_events.date')}</th>
+                                    <th>{t('security_events.type')}</th>
+                                    <th>{t('security_events.severity')}</th>
+                                    <th>{t('security_events.ip_address')}</th>
+                                    <th>{t('security_events.details')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {events.length === 0 ? (
-                                    <tr><td colSpan={5} className="text-center p-4">{isRTL ? 'لا توجد أحداث' : 'No events'}</td></tr>
+                                    <tr><td colSpan={5} className="text-center p-4">{t('security_events.no_events')}</td></tr>
                                 ) : events.map(ev => (
                                     <tr key={ev.id}>
                                         <td style={{ whiteSpace: 'nowrap' }}>{formatDate(ev.created_at)}</td>
@@ -172,15 +172,15 @@ const SecurityEvents = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{isRTL ? 'التاريخ' : 'Date'}</th>
-                                    <th>{isRTL ? 'عنوان IP' : 'IP Address'}</th>
-                                    <th>{isRTL ? 'اسم المستخدم' : 'Username'}</th>
-                                    <th>{isRTL ? 'النتيجة' : 'Result'}</th>
+                                    <th>{t('security_events.date')}</th>
+                                    <th>{t('security_events.ip_address')}</th>
+                                    <th>{t('security_events.username')}</th>
+                                    <th>{t('security_events.result')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loginAttempts.length === 0 ? (
-                                    <tr><td colSpan={4} className="text-center p-4">{isRTL ? 'لا توجد محاولات' : 'No attempts'}</td></tr>
+                                    <tr><td colSpan={4} className="text-center p-4">{t('security_events.no_attempts')}</td></tr>
                                 ) : loginAttempts.map(la => (
                                     <tr key={la.id}>
                                         <td>{formatDate(la.attempted_at)}</td>
@@ -188,7 +188,7 @@ const SecurityEvents = () => {
                                         <td>{la.username || '—'}</td>
                                         <td>
                                             <span className={`badge ${la.success ? 'bg-success' : 'bg-danger'}`}>
-                                                {la.success ? (isRTL ? 'نجاح' : 'Success') : (isRTL ? 'فشل' : 'Failed')}
+                                                {la.success ? t('security_events.success') : t('security_events.failed')}
                                             </span>
                                         </td>
                                     </tr>
@@ -201,14 +201,14 @@ const SecurityEvents = () => {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{isRTL ? 'عنوان IP' : 'IP Address'}</th>
-                                    <th>{isRTL ? 'المحاولات الفاشلة' : 'Failed Attempts'}</th>
-                                    <th>{isRTL ? 'آخر محاولة' : 'Last Attempt'}</th>
+                                    <th>{t('security_events.ip_address')}</th>
+                                    <th>{t('security_events.failed_attempts')}</th>
+                                    <th>{t('security_events.last_attempt')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {blockedIPs.length === 0 ? (
-                                    <tr><td colSpan={3} className="text-center p-4">{isRTL ? 'لا توجد عناوين محظورة' : 'No blocked IPs'}</td></tr>
+                                    <tr><td colSpan={3} className="text-center p-4">{t('security_events.no_blocked_ips')}</td></tr>
                                 ) : blockedIPs.map((ip, i) => (
                                     <tr key={i}>
                                         <td><code>{ip.ip_address}</code></td>

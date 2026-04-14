@@ -1,4 +1,5 @@
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import ModelBase
@@ -64,6 +65,42 @@ class PerformanceReview(ModelBase):
     self_comments: Mapped[str | None] = mapped_column(Text)
     manager_comments: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(20), default="draft")
+    # US12 cycle-based fields
+    cycle_id: Mapped[int | None] = mapped_column(ForeignKey("review_cycles.id", ondelete="SET NULL"))
+    self_assessment: Mapped[dict | None] = mapped_column(JSONB)
+    manager_assessment: Mapped[dict | None] = mapped_column(JSONB)
+    composite_score: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    final_comments: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReviewCycle(ModelBase):
+    """Review cycle defining the period and deadlines for performance reviews."""
+    __tablename__ = "review_cycles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    period_start: Mapped[Date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[Date] = mapped_column(Date, nullable=False)
+    self_assessment_deadline: Mapped[Date | None] = mapped_column(Date)
+    manager_review_deadline: Mapped[Date | None] = mapped_column(Date)
+    status: Mapped[str | None] = mapped_column(String(20), default="draft")
+    created_by: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PerformanceGoal(ModelBase):
+    """Individual goal within a performance review with weight and target."""
+    __tablename__ = "performance_goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    review_id: Mapped[int] = mapped_column(ForeignKey("performance_reviews.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    target: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -72,4 +109,6 @@ __all__ = [
     "LeaveCarryover",
     "OvertimeRequest",
     "PerformanceReview",
+    "ReviewCycle",
+    "PerformanceGoal",
 ]

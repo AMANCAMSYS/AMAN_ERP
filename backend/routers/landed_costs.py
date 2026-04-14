@@ -3,7 +3,7 @@ AMAN ERP — Landed Costs Router
 التكاليف المُضافة (الشحن، الجمارك، التأمين) وتوزيعها على أصناف الشراء
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -13,12 +13,14 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     update_account_balance, get_base_currency
 )
+from utils.fiscal_lock import check_fiscal_period_open
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 router = APIRouter(prefix="/purchases/landed-costs", tags=["التكاليف المُضافة"], dependencies=[Depends(require_module("landed_costs"))])
 logger = logging.getLogger(__name__)
@@ -68,6 +70,9 @@ def list_landed_costs(
     company_id = _u(current_user, "company_id")
     db = get_db_connection(company_id)
     try:
+        # Branch access enforcement
+        allowed = _u(current_user, "allowed_branches") or []
+
         query = """
             SELECT lc.*, po.po_number,
                    cu.full_name as created_by_name
@@ -80,6 +85,9 @@ def list_landed_costs(
         if status_filter:
             query += " AND lc.status = :st"
             params["st"] = status_filter
+        if allowed:
+            query += " AND (lc.branch_id = ANY(:branches) OR lc.branch_id IS NULL)"
+            params["branches"] = allowed
 
         query += " ORDER BY lc.id DESC"
         rows = db.execute(text(query), params).fetchall()
@@ -103,6 +111,8 @@ def get_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": lc_id}).fetchone()
         if not lc:
             raise HTTPException(404, "التكلفة المُضافة غير موجودة")
+
+        validate_branch_access(current_user, lc._mapping.get("branch_id"))
 
         items = db.execute(text("""
             SELECT lci.*, p.name as vendor_name
@@ -131,7 +141,7 @@ def get_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user)):
 # ─── CREATE ────────────────────────────────────────────────────────────────────
 
 @router.post("", status_code=201, dependencies=[Depends(require_permission("purchases.create"))])
-def create_landed_cost(body: LandedCostCreate, current_user: dict = Depends(get_current_user)):
+def create_landed_cost(body: LandedCostCreate, request: Request, current_user: dict = Depends(get_current_user)):
     company_id = _u(current_user, "company_id")
     user_id = _u(current_user, "user_id")
     db = get_db_connection(company_id)
@@ -175,14 +185,21 @@ def create_landed_cost(body: LandedCostCreate, current_user: dict = Depends(get_
 
         db.commit()
 
-        log_activity(db, user_id, "landed_cost.create", f"تكلفة مُضافة {lc_number}", {"id": lc_id})
+        log_activity(db, user_id=user_id,
+                     username=_u(current_user, "username"),
+                     action="landed_cost.create",
+                     resource_type="landed_cost",
+                     resource_id=lc_number,
+                     details={"id": lc_id, "total": float(total)},
+                     request=request)
 
         return {"id": lc_id, "lc_number": lc_number, "total_amount": total}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -190,7 +207,7 @@ def create_landed_cost(body: LandedCostCreate, current_user: dict = Depends(get_
 # ─── ALLOCATE & POST ──────────────────────────────────────────────────────────
 
 @router.post("/{lc_id}/allocate", dependencies=[Depends(require_permission("purchases.create"))])
-def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user)):
+def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """
     توزيع التكاليف المُضافة على أصناف أمر الشراء / استلام البضاعة
     Allocation methods:
@@ -296,6 +313,15 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
             })
 
         db.commit()
+
+        log_activity(db, user_id=user_id,
+                     username=_u(current_user, "username"),
+                     action="landed_cost.allocate",
+                     resource_type="landed_cost",
+                     resource_id=str(lc_id),
+                     details={"method": method, "total_cost": float(total_cost.quantize(_D2, ROUND_HALF_UP))},
+                     request=request)
+
         return {
             "message": f"تم توزيع {total_cost.quantize(_D2, ROUND_HALF_UP)} {method}",
             "allocations": allocations_data
@@ -304,19 +330,20 @@ def allocate_landed_cost(lc_id: int, current_user: dict = Depends(get_current_us
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.post("/{lc_id}/post", dependencies=[Depends(require_permission("purchases.create"))])
-def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user)):
+def post_landed_cost(lc_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """
     ترحيل التكاليف المُضافة — تحديث تكلفة المنتجات + قيد محاسبي
     JE: Dr: Inventory (landed costs) → Cr: AP or Expense
     """
     company_id = _u(current_user, "company_id")
-    user_id = _u(current_user, "user_id")
+    user_id = _u(current_user, "user_id") or _u(current_user, "id")
     db = get_db_connection(company_id)
     try:
         lc = db.execute(text("SELECT * FROM landed_costs WHERE id = :id"), {"id": lc_id}).fetchone()
@@ -324,6 +351,10 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
             raise HTTPException(404, "التكلفة المُضافة غير موجودة")
         if lc.status == 'posted':
             raise HTTPException(400, "تم ترحيل هذه التكلفة بالفعل")
+
+        # Fiscal period check
+        post_date = str(lc.lc_date or datetime.now().date())
+        check_fiscal_period_open(db, post_date)
 
         allocations = db.execute(text(
             "SELECT * FROM landed_cost_allocations WHERE landed_cost_id = :lcid"
@@ -339,39 +370,26 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                 WHERE id = :pid
             """), {"new_cost": _dec(alloc.new_cost), "pid": alloc.product_id})
 
-            # Sync inventory average_cost for all warehouses holding this product
             db.execute(text("""
                 UPDATE inventory SET average_cost = :new_cost
                 WHERE product_id = :pid
             """), {"new_cost": _dec(alloc.new_cost), "pid": alloc.product_id})
 
-        # Create Journal Entry
+        # Build GL journal entry lines via GL service
         total_cost = _dec(lc.total_amount)
         base_currency = get_base_currency(db)
-        year = datetime.now().year
-        je_number = generate_sequential_number(db, f"JE-LC-{year}", "journal_entries", "entry_number")
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description,
-                status, currency, created_by
-            ) VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :curr, :uid)
-            RETURNING id
-        """), {
-            "num": je_number, "ref": lc.lc_number,
-            "desc": f"تكاليف مُضافة {lc.lc_number}",
-            "curr": base_currency, "uid": user_id
-        })
-        je_id = je.fetchone()[0]
+        je_lines = []
 
         # Dr: Inventory
         inv_account = get_mapped_account_id(db, "acc_map_inventory")
         if inv_account:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, 'تكاليف مُضافة - مخزون')
-            """), {"jeid": je_id, "aid": inv_account, "amt": total_cost})
-            update_account_balance(db, inv_account, total_cost, 0)
+            je_lines.append({
+                "account_id": inv_account,
+                "debit": total_cost,
+                "credit": 0,
+                "description": "تكاليف مُضافة - مخزون"
+            })
 
         # Cr: Per cost type (group by vendor or expense type)
         cost_items = db.execute(text(
@@ -379,19 +397,15 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
         ), {"lcid": lc_id}).fetchall()
 
         for item in cost_items:
-            # If vendor specified, credit AP; else credit expense
             if item.vendor_id:
                 ap_account = get_mapped_account_id(db, "acc_map_ap")
                 if ap_account:
-                    db.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:jeid, :aid, 0, :amt, :desc)
-                    """), {
-                        "jeid": je_id, "aid": ap_account,
-                        "amt": _dec(item.amount),
-                        "desc": f"{item.cost_type}: {item.description or ''}"
+                    je_lines.append({
+                        "account_id": ap_account,
+                        "debit": 0,
+                        "credit": _dec(item.amount),
+                        "description": f"{item.cost_type}: {item.description or ''}"
                     })
-                    update_account_balance(db, ap_account, 0, _dec(item.amount))
 
                 # Party transaction
                 db.execute(text("""
@@ -405,7 +419,6 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                     "uid": user_id
                 })
             else:
-                # Map cost_type to account
                 acc_key = {
                     "freight": "acc_map_freight",
                     "customs": "acc_map_customs",
@@ -414,15 +427,26 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
                 }.get(item.cost_type, "acc_map_landed_costs")
                 exp_account = get_mapped_account_id(db, acc_key)
                 if exp_account:
-                    db.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                        VALUES (:jeid, :aid, 0, :amt, :desc)
-                    """), {
-                        "jeid": je_id, "aid": exp_account,
-                        "amt": _dec(item.amount),
-                        "desc": f"{item.cost_type}: {item.description or ''}"
+                    je_lines.append({
+                        "account_id": exp_account,
+                        "debit": 0,
+                        "credit": _dec(item.amount),
+                        "description": f"{item.cost_type}: {item.description or ''}"
                     })
-                    update_account_balance(db, exp_account, 0, _dec(item.amount))
+
+        # Create JE via GL service (validates balance, sequential numbering, closed period)
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=company_id,
+            date=post_date,
+            description=f"تكاليف مُضافة {lc.lc_number}",
+            reference=lc.lc_number,
+            lines=je_lines,
+            user_id=user_id,
+            currency=base_currency,
+            source="landed_cost",
+            source_id=lc_id
+        )
 
         # Update LC status
         db.execute(text("""
@@ -431,6 +455,14 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
         """), {"jeid": je_id, "id": lc_id})
 
         db.commit()
+
+        log_activity(db, user_id=user_id,
+                     username=_u(current_user, "username"),
+                     action="landed_cost.post",
+                     resource_type="landed_cost",
+                     resource_id=str(lc_id),
+                     details={"journal_entry_id": je_id, "total": float(total_cost.quantize(_D2, ROUND_HALF_UP))},
+                     request=request)
 
         return {
             "message": "تم ترحيل التكاليف المُضافة وتحديث تكلفة المنتجات",
@@ -441,6 +473,7 @@ def post_landed_cost(lc_id: int, current_user: dict = Depends(get_current_user))
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()

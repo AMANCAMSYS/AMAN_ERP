@@ -84,3 +84,15 @@ export const deliveryOrdersAPI = {
     createInvoice: (id) => api.post(`/sales/delivery-orders/${id}/create-invoice`),
     cancel: (id) => api.post(`/sales/delivery-orders/${id}/cancel`),
 }
+
+// CPQ
+export const cpqAPI = {
+    listProducts: (params) => api.get('/sales/cpq/products', { params }),
+    getConfiguration: (id) => api.get(`/sales/cpq/products/${id}/configure`),
+    validateConfig: (data) => api.post('/sales/cpq/validate', data),
+    calculatePrice: (data) => api.post('/sales/cpq/price', data),
+    createQuote: (data) => api.post('/sales/cpq/quotes', data),
+    getQuote: (id) => api.get(`/sales/cpq/quotes/${id}`),
+    generatePdf: (id) => api.post(`/sales/cpq/quotes/${id}/generate-pdf`),
+    convertQuote: (id) => api.post(`/sales/cpq/quotes/${id}/convert`),
+}

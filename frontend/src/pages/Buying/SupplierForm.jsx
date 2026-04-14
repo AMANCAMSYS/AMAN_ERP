@@ -141,7 +141,7 @@ function SupplierForm() {
                                     <input
                                         type="text" name="name_en" className="form-input"
                                         value={formData.name_en} onChange={handleChange}
-                                        placeholder="e.g. Al-Noor Trading"
+                                        placeholder={t('buying.suppliers.name_placeholder')}
                                     />
                                 </FormField>
                             </div>

@@ -24,7 +24,7 @@ const InvoicingSettings = ({ settings, handleSettingChange }) => {
                             className="form-input font-mono"
                             value={settings.invoice_prefix || 'INV-'}
                             onChange={(e) => handleSettingChange('invoice_prefix', e.target.value)}
-                            placeholder="e.g. INV-"
+                            placeholder={t('settings.invoicing.invoice_prefix_placeholder')}
                         />
                         <p className="text-xs text-base-content/40 mt-1">
                             {t('settings.invoicing.prefix_hint')}
@@ -41,7 +41,7 @@ const InvoicingSettings = ({ settings, handleSettingChange }) => {
                             className="form-input font-mono"
                             value={settings.quotation_prefix || 'QTN-'}
                             onChange={(e) => handleSettingChange('quotation_prefix', e.target.value)}
-                            placeholder="e.g. QTN-"
+                            placeholder={t('settings.invoicing.quotation_prefix_placeholder')}
                         />
                     </div>
                 </div>

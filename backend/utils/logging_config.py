@@ -15,6 +15,29 @@ from starlette.requests import Request
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
 
 
+# ── Log injection sanitization ────────────────────────────────────────────────
+import re
+
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _sanitize_log_value(value: str) -> str:
+    """Strip newlines, null bytes, and control characters from a log value."""
+    value = value.replace("\n", " ").replace("\r", " ")
+    return _CONTROL_CHAR_RE.sub("", value)
+
+
+def _sanitize_extra_data(data: dict) -> dict:
+    """Sanitize all string values in extra_data dict for log injection prevention."""
+    sanitized = {}
+    for key, value in data.items():
+        if isinstance(value, str):
+            sanitized[key] = _sanitize_log_value(value)
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
 # ── JSON Formatter ────────────────────────────────────────────────────────────
 class JSONFormatter(logging.Formatter):
     """Emit each log record as a single JSON line (ECS-like)."""
@@ -33,7 +56,7 @@ class JSONFormatter(logging.Formatter):
         if record.exc_info and record.exc_info[0] is not None:
             payload["exception"] = self.formatException(record.exc_info)
         if hasattr(record, "extra_data"):
-            payload.update(record.extra_data)
+            payload.update(_sanitize_extra_data(record.extra_data))
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 

@@ -149,7 +149,7 @@ const Employees = () => {
             resetForm();
             toastEmitter.emit(isEditMode ? t("hr.employees.update_success") : t("hr.employees.add_success"), "success");
         } catch (error) {
-            toastEmitter.emit("Error saving employee: " + (error.response?.data?.detail || error.message), 'error');
+            toastEmitter.emit(t('hr.employees.error_saving') + (error.response?.data?.detail || error.message), 'error');
         }
     };
 

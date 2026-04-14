@@ -202,13 +202,13 @@ function JournalEntryList() {
             {totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem', gap: '0.5rem' }}>
                     <button className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                        {isRTL ? '\u2192' : '\u2190'}
+                        {t('accounting.u2190')}
                     </button>
                     <span style={{ padding: '0.25rem 1rem', lineHeight: '32px' }}>
                         {page} / {totalPages}
                     </span>
                     <button className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                        {isRTL ? '\u2190' : '\u2192'}
+                        {t('accounting.u2192')}
                     </button>
                 </div>
             )}

@@ -304,7 +304,8 @@ def create_product(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating product: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -438,7 +439,7 @@ def update_product(id: int, product: ProductCreate, request: Request, current_us
             resource_id=str(id),
             details={"name": product.item_name, "changes": product.model_dump()},
             request=request,
-            branch_id=product.branch_id
+            branch_id=getattr(product, 'branch_id', None)
         )
 
         return {**product.model_dump(), "id": id, "category_name": cat_name, "current_stock": stock, "created_at": datetime.now()}
@@ -446,7 +447,8 @@ def update_product(id: int, product: ProductCreate, request: Request, current_us
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -510,6 +512,7 @@ def delete_product(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

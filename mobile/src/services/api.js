@@ -145,7 +145,34 @@ async function request(method, path, { body, params } = {}) {
   });
 
   if (res.status === 401) {
+    // Attempt token refresh before giving up
+    const refreshToken = await AsyncStorage.getItem('refresh_token');
+    if (refreshToken && !path.includes('/auth/')) {
+      try {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json();
+          await AsyncStorage.setItem('auth_token', data.access_token);
+          if (data.refresh_token) {
+            await AsyncStorage.setItem('refresh_token', data.refresh_token);
+          }
+          // Retry the original request with new token
+          headers['Authorization'] = `Bearer ${data.access_token}`;
+          const retryRes = await fetch(url, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+          });
+          if (retryRes.ok) return retryRes.json();
+        }
+      } catch { /* refresh failed, fall through to logout */ }
+    }
     await AsyncStorage.removeItem('auth_token');
+    await AsyncStorage.removeItem('refresh_token');
     throw new Error('Unauthorized');
   }
   if (!res.ok) {

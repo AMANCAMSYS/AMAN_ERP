@@ -84,7 +84,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
             setData(res.data);
         } catch (err) {
             console.error('Dashboard fetch error:', err);
-            setError(err?.response?.data?.detail || (isRTL ? 'خطأ في تحميل البيانات' : 'Error loading data'));
+            setError(err?.response?.data?.detail || (t('kpi.error_loading_data')));
         } finally {
             setLoading(false);
         }
@@ -138,7 +138,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                         </h1>
                         {data?.industry && (
                             <p className="workspace-subtitle" style={{ marginTop: 4 }}>
-                                {isRTL ? 'القطاع:' : 'Industry:'} {data.industry}
+                                {t('kpi.industry')} {data.industry}
                             </p>
                         )}
                     </div>
@@ -155,7 +155,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                                 }}
                             >
                                 {isRTL ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
-                                {isRTL ? 'رجوع' : 'Back'}
+                                {t('kpi.back')}
                             </button>
                         )}
 
@@ -171,7 +171,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                                 }}
                             >
                                 <BarChart3 size={14} />
-                                {isRTL ? 'لوحات أخرى' : 'Switch'}
+                                {t('kpi.switch')}
                                 <ChevronDown size={12} />
                             </button>
                             {showMenu && (
@@ -213,7 +213,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                             }}
                         >
                             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                            {t('dashboard.refresh') || (isRTL ? 'تحديث' : 'Refresh')}
+                            {t('dashboard.refresh') || (t('kpi.refresh'))}
                         </button>
                     </div>
                 </div>
@@ -310,7 +310,7 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                         borderBottom: '2px solid var(--border-color)',
                         display: 'flex', alignItems: 'center', gap: '0.4rem',
                     }}>
-                        🏢 {isRTL ? 'مؤشرات القطاع' : 'Industry KPIs'}
+                        🏢 {t('kpi.industry_kpis')}
                         {data.industry && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>— {data.industry}</span>}
                     </h2>
                     <div style={{

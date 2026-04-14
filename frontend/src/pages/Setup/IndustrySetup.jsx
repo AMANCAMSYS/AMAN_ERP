@@ -22,7 +22,7 @@ function IndustrySetup() {
 
   const handleNext = () => {
     if (!selected) {
-      setError(isRTL ? 'الرجاء اختيار نوع النشاط التجاري' : 'Please select a business type')
+      setError(t('setup.please_select_a_business_type'))
       return
     }
     setError('')
@@ -40,7 +40,7 @@ function IndustrySetup() {
     if (success) {
       window.location.href = '/setup/modules'
     } else {
-      setError(isRTL ? 'حدث خطأ أثناء الحفظ، حاول مرة أخرى' : 'Failed to save, please try again')
+      setError(t('setup.failed_to_save_please_try_again'))
     }
   }
 
@@ -376,7 +376,7 @@ function IndustrySetup() {
         {/* Language Toggle */}
         <div className="setup-lang-btn">
           <button className="btn btn-outline btn-sm" onClick={toggleLanguage}>
-            🌐 {isRTL ? 'English' : 'عربي'}
+            🌐 {t('setup.عربي')}
           </button>
         </div>
 
@@ -388,13 +388,13 @@ function IndustrySetup() {
             </div>
             <h1>
               {step === 1
-                ? (isRTL ? 'اختر نوع نشاطك التجاري' : 'Choose Your Business Type')
-                : (isRTL ? 'مراجعة الوحدات المفعّلة' : 'Review Enabled Modules')
+                ? (t('setup.choose_your_business_type'))
+                : (t('setup.review_enabled_modules'))
               }
             </h1>
             <p>
               {step === 1
-                ? (isRTL ? 'سيتم تخصيص النظام تلقائياً ليناسب احتياجات نشاطك' : 'The system will be automatically customized for your business needs')
+                ? (t('setup.the_system_will_be_automatically_customized_for_yo'))
                 : (isRTL
                   ? `الوحدات التي ستُفعّل لـ "${selectedIndustry?.nameAr}"`
                   : `Modules enabled for "${selectedIndustry?.nameEn}"`)
@@ -412,14 +412,14 @@ function IndustrySetup() {
                 {step > 1 ? '✓' : '1'}
               </div>
               <span className={`setup-step-label ${step === 1 ? 'active' : ''}`}>
-                {isRTL ? 'اختيار النشاط' : 'Select Industry'}
+                {t('setup.select_industry')}
               </span>
             </div>
             <div className="setup-step-line" style={{ background: step >= 2 ? 'var(--primary, #2563eb)' : '#e2e8f0' }} />
             <div className="setup-step">
               <div className={`setup-step-num ${step >= 2 ? 'active' : 'inactive'}`}>2</div>
               <span className={`setup-step-label ${step === 2 ? 'active' : ''}`}>
-                {isRTL ? 'تأكيد الوحدات' : 'Confirm Modules'}
+                {t('setup.confirm_modules')}
               </span>
             </div>
           </div>
@@ -479,7 +479,7 @@ function IndustrySetup() {
 
               {/* Specialized Modules */}
               <div className="setup-section-label">
-                {isRTL ? 'الوحدات المتخصصة (تختلف حسب النشاط)' : 'Specialized Modules (vary by industry)'}
+                {t('setup.specialized_modules_vary_by_industry')}
               </div>
               <div className="setup-module-grid">
                 {variableModulesOnly.map(([key, label]) => {
@@ -496,7 +496,7 @@ function IndustrySetup() {
 
               {/* Core Modules */}
               <div className="setup-section-label">
-                {isRTL ? 'الوحدات الأساسية (مفعّلة دائماً)' : 'Core Modules (always enabled)'}
+                {t('setup.core_modules_always_enabled')}
               </div>
               <div className="setup-module-grid" style={{ marginBottom: '20px' }}>
                 {alwaysModulesOnly.map(([key, label]) => (
@@ -510,7 +510,7 @@ function IndustrySetup() {
 
               {/* Note */}
               <div className="setup-note">
-                💡 {isRTL ? 'يمكنك تعديل الوحدات المفعّلة لاحقاً من الإعدادات' : 'You can modify enabled modules later from Settings'}
+                💡 {t('setup.you_can_modify_enabled_modules_later_from_settings')}
               </div>
 
               {/* Actions */}
@@ -525,8 +525,8 @@ function IndustrySetup() {
                   style={{ flex: 2 }}
                 >
                   {loading
-                    ? (isRTL ? '⏳ جاري الحفظ...' : '⏳ Saving...')
-                    : (isRTL ? '✓ تأكيد وبدء العمل' : '✓ Confirm & Start')
+                    ? (t('setup.saving'))
+                    : (t('setup.confirm_start'))
                   }
                 </button>
               </div>

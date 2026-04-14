@@ -16,6 +16,10 @@ export const crmAPI = {
     createCampaign: (data) => api.post('/crm/campaigns', data),
     updateCampaign: (id, data) => api.put(`/crm/campaigns/${id}`, data),
     deleteCampaign: (id) => api.delete(`/crm/campaigns/${id}`),
+    executeCampaign: (id) => api.post(`/crm/campaigns/${id}/execute`),
+    getCampaignRecipients: (id, params) => api.get(`/crm/campaigns/${id}/recipients`, { params }),
+    getCampaignMetrics: (id) => api.get(`/crm/campaigns/${id}/metrics`),
+    attributeLead: (campaignId, leadId) => api.post(`/crm/campaigns/${campaignId}/attribute-lead`, null, { params: { lead_id: leadId } }),
     // Knowledge Base
     listArticles: (params) => api.get('/crm/knowledge-base', { params }),
     getArticle: (id) => api.get(`/crm/knowledge-base/${id}`),

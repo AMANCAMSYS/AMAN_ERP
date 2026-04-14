@@ -56,6 +56,23 @@ const WorkOrderStatusReport = React.lazy(() => import('./pages/Manufacturing/Wor
 const ManufacturingCosting = React.lazy(() => import('./pages/Manufacturing/ManufacturingCosting'))
 const CapacityPlanning = React.lazy(() => import('./pages/Manufacturing/CapacityPlanning'))
 
+// Shop Floor Control
+const ShopFloorDashboard = React.lazy(() => import('./pages/ShopFloor/ShopFloorDashboard'))
+const OperationEntry = React.lazy(() => import('./pages/ShopFloor/OperationEntry'))
+
+// Routing Management
+const RoutingList = React.lazy(() => import('./pages/Routing/RoutingList'))
+const RoutingForm = React.lazy(() => import('./pages/Routing/RoutingForm'))
+
+// Time Tracking
+const TimesheetWeek = React.lazy(() => import('./pages/TimeTracking/TimesheetWeek'))
+const TeamTimesheets = React.lazy(() => import('./pages/TimeTracking/TeamTimesheets'))
+const ProjectProfitability = React.lazy(() => import('./pages/TimeTracking/ProjectProfitability'))
+
+// Resource Planning
+const AvailabilityCalendar = React.lazy(() => import('./pages/ResourcePlanning/AvailabilityCalendar'))
+const AllocationForm = React.lazy(() => import('./pages/ResourcePlanning/AllocationForm'))
+const ProjectResources = React.lazy(() => import('./pages/ResourcePlanning/ProjectResources'))
 
 // Accounting
 const AccountingHome = React.lazy(() => import('./pages/Accounting/AccountingHome'))
@@ -149,6 +166,15 @@ const ContractAmendments = React.lazy(() => import('./pages/Sales/ContractAmendm
 const DeliveryOrders = React.lazy(() => import('./pages/Sales/DeliveryOrders'))
 const DeliveryOrderForm = React.lazy(() => import('./pages/Sales/DeliveryOrderForm'))
 const DeliveryOrderDetails = React.lazy(() => import('./pages/Sales/DeliveryOrderDetails'))
+const ConfigurableProducts = React.lazy(() => import('./pages/CPQ/ConfigurableProducts'))
+const Configurator = React.lazy(() => import('./pages/CPQ/Configurator'))
+const QuoteList = React.lazy(() => import('./pages/CPQ/QuoteList'))
+const QuoteDetail = React.lazy(() => import('./pages/CPQ/QuoteDetail'))
+
+// Demand Forecast
+const DemandForecastList = React.lazy(() => import('./pages/Forecast/ForecastList'))
+const DemandForecastGenerate = React.lazy(() => import('./pages/Forecast/ForecastGenerate'))
+const DemandForecastDetail = React.lazy(() => import('./pages/Forecast/ForecastDetail'))
 
 // Stock
 const StockHome = React.lazy(() => import('./pages/Stock/StockHome'))
@@ -197,6 +223,11 @@ const PurchaseDebitNotes = React.lazy(() => import('./pages/Buying/PurchaseDebit
 const RFQList = React.lazy(() => import('./pages/Buying/RFQList'))
 const SupplierRatings = React.lazy(() => import('./pages/Buying/SupplierRatings'))
 const PurchaseAgreements = React.lazy(() => import('./pages/Buying/PurchaseAgreements'))
+
+// Blanket Purchase Orders
+const BlanketPOList = React.lazy(() => import('./pages/BlanketPO/BlanketPOList'))
+const BlanketPOForm = React.lazy(() => import('./pages/BlanketPO/BlanketPOForm'))
+const BlanketPODetail = React.lazy(() => import('./pages/BlanketPO/BlanketPODetail'))
 
 // Landed Costs
 const LandedCosts = React.lazy(() => import('./pages/Buying/LandedCosts'))
@@ -252,6 +283,13 @@ const OvertimeRequests = React.lazy(() => import('./pages/HR/OvertimeRequests'))
 const GOSISettings = React.lazy(() => import('./pages/HR/GOSISettings'))
 const EmployeeDocuments = React.lazy(() => import('./pages/HR/EmployeeDocuments'))
 const PerformanceReviews = React.lazy(() => import('./pages/HR/PerformanceReviews'))
+const CycleList = React.lazy(() => import('./pages/Performance/CycleList'))
+const CycleForm = React.lazy(() => import('./pages/Performance/CycleForm'))
+const MyReviews = React.lazy(() => import('./pages/Performance/MyReviews'))
+const TeamReviews = React.lazy(() => import('./pages/Performance/TeamReviews'))
+const SelfAssessment = React.lazy(() => import('./pages/Performance/SelfAssessment'))
+const ManagerReview = React.lazy(() => import('./pages/Performance/ManagerReview'))
+const ReviewResult = React.lazy(() => import('./pages/Performance/ReviewResult'))
 const TrainingPrograms = React.lazy(() => import('./pages/HR/TrainingPrograms'))
 const Violations = React.lazy(() => import('./pages/HR/Violations'))
 const CustodyManagement = React.lazy(() => import('./pages/HR/CustodyManagement'))
@@ -310,6 +348,9 @@ const CRMHome = React.lazy(() => import('./pages/CRM/CRMHome'))
 const Opportunities = React.lazy(() => import('./pages/CRM/Opportunities'))
 const SupportTickets = React.lazy(() => import('./pages/CRM/SupportTickets'))
 const MarketingCampaigns = React.lazy(() => import('./pages/CRM/MarketingCampaigns'))
+const CampaignList = React.lazy(() => import('./pages/Campaign/CampaignList'))
+const CampaignForm = React.lazy(() => import('./pages/Campaign/CampaignForm'))
+const CampaignReport = React.lazy(() => import('./pages/Campaign/CampaignReport'))
 const KnowledgeBase = React.lazy(() => import('./pages/CRM/KnowledgeBase'))
 const CRMDashboard = React.lazy(() => import('./pages/CRM/CRMDashboard'))
 const LeadScoring = React.lazy(() => import('./pages/CRM/LeadScoring'))
@@ -347,6 +388,11 @@ const IndustryReport = React.lazy(() => import('./pages/Reports/IndustryReport')
 // Consolidation Reports
 const ConsolidationReports = React.lazy(() => import('./pages/Reports/ConsolidationReports'))
 const KPIDashboard = React.lazy(() => import('./pages/Reports/KPIDashboard'))
+
+// BI Analytics Dashboards (US9)
+const AnalyticsDashboardList = React.lazy(() => import('./pages/Analytics/DashboardList'))
+const AnalyticsDashboardView = React.lazy(() => import('./pages/Analytics/DashboardView'))
+const AnalyticsDashboardEditor = React.lazy(() => import('./pages/Analytics/DashboardEditor'))
 
 // Role-Based KPI Dashboards
 const KPIHub = React.lazy(() => import('./pages/KPI/KPIHub'))
@@ -562,6 +608,12 @@ function App() {
                 <Route path="/sales/delivery-orders/new" element={<PrivateRoute permission="sales.create"><DeliveryOrderForm /></PrivateRoute>} />
                 <Route path="/sales/delivery-orders/:id" element={<PrivateRoute permission="sales.view"><DeliveryOrderDetails /></PrivateRoute>} />
 
+                {/* CPQ */}
+                <Route path="/sales/cpq/products" element={<PrivateRoute permission="sales.view"><ConfigurableProducts /></PrivateRoute>} />
+                <Route path="/sales/cpq/configure/:configId" element={<PrivateRoute permission="sales.view"><Configurator /></PrivateRoute>} />
+                <Route path="/sales/cpq/quotes" element={<PrivateRoute permission="sales.view"><QuoteList /></PrivateRoute>} />
+                <Route path="/sales/cpq/quotes/:quoteId" element={<PrivateRoute permission="sales.view"><QuoteDetail /></PrivateRoute>} />
+
                 {/* Manufacturing Routes */}
                 <Route path="/manufacturing" element={<PrivateRoute permission="manufacturing.view"><ManufacturingHome /></PrivateRoute>} />
                 <Route path="/manufacturing/work-centers" element={<PrivateRoute permission="manufacturing.view"><WorkCenters /></PrivateRoute>} />
@@ -579,6 +631,23 @@ function App() {
                 <Route path="/manufacturing/reports/work-orders" element={<PrivateRoute permission="manufacturing.view"><WorkOrderStatusReport /></PrivateRoute>} />
                 <Route path="/manufacturing/costing" element={<PrivateRoute permission="manufacturing.view"><ManufacturingCosting /></PrivateRoute>} />
                 <Route path="/manufacturing/capacity" element={<PrivateRoute permission="manufacturing.view"><CapacityPlanning /></PrivateRoute>} />
+                <Route path="/manufacturing/shopfloor" element={<PrivateRoute permission="manufacturing.view"><ShopFloorDashboard /></PrivateRoute>} />
+                <Route path="/manufacturing/shopfloor/work-order/:id" element={<PrivateRoute permission="manufacturing.view"><OperationEntry /></PrivateRoute>} />
+                <Route path="/manufacturing/routing" element={<PrivateRoute permission="manufacturing.view"><RoutingList /></PrivateRoute>} />
+                <Route path="/manufacturing/routing/new" element={<PrivateRoute permission="manufacturing.view"><RoutingForm /></PrivateRoute>} />
+                <Route path="/manufacturing/routing/:id" element={<PrivateRoute permission="manufacturing.view"><RoutingForm /></PrivateRoute>} />
+                <Route path="/manufacturing/routing/:id/edit" element={<PrivateRoute permission="manufacturing.view"><RoutingForm /></PrivateRoute>} />
+
+                {/* Time Tracking Routes */}
+                <Route path="/projects/timetracking" element={<PrivateRoute permission="projects.time_view"><TimesheetWeek /></PrivateRoute>} />
+                <Route path="/projects/timetracking/team" element={<PrivateRoute permission="projects.time_approve"><TeamTimesheets /></PrivateRoute>} />
+                <Route path="/projects/timetracking/profitability" element={<PrivateRoute permission="projects.time_view"><ProjectProfitability /></PrivateRoute>} />
+
+                {/* Resource Planning Routes */}
+                <Route path="/projects/resources/availability" element={<PrivateRoute permission="projects.resource_view"><AvailabilityCalendar /></PrivateRoute>} />
+                <Route path="/projects/resources/allocate" element={<PrivateRoute permission="projects.resource_manage"><AllocationForm /></PrivateRoute>} />
+                <Route path="/projects/resources/allocate/:id" element={<PrivateRoute permission="projects.resource_manage"><AllocationForm /></PrivateRoute>} />
+                <Route path="/projects/resources/project/:projectId" element={<PrivateRoute permission="projects.resource_view"><ProjectResources /></PrivateRoute>} />
 
                 {/* Stock Routes */}
                 <Route path="/stock" element={<PrivateRoute permission="stock.view"><StockHome /></PrivateRoute>} />
@@ -614,6 +683,11 @@ function App() {
                 <Route path="/stock/costing-method" element={<PrivateRoute permission="stock.view"><CostingMethodForm /></PrivateRoute>} />
                 <Route path="/stock/costing-valuation" element={<PrivateRoute permission="stock.reports"><ValuationReport /></PrivateRoute>} />
 
+                {/* Demand Forecasting */}
+                <Route path="/inventory/forecast" element={<PrivateRoute permission="inventory.forecast_view"><DemandForecastList /></PrivateRoute>} />
+                <Route path="/inventory/forecast/generate" element={<PrivateRoute permission="inventory.forecast_generate"><DemandForecastGenerate /></PrivateRoute>} />
+                <Route path="/inventory/forecast/:id" element={<PrivateRoute permission="inventory.forecast_view"><DemandForecastDetail /></PrivateRoute>} />
+
                 {/* Buying Routes */}
                 <Route path="/buying" element={<PrivateRoute permission="buying.view"><BuyingHome /></PrivateRoute>} />
                 <Route path="/buying/suppliers" element={<PrivateRoute permission="buying.view"><SupplierList /></PrivateRoute>} />
@@ -643,6 +717,11 @@ function App() {
                 <Route path="/buying/rfq" element={<PrivateRoute permission="buying.view"><RFQList /></PrivateRoute>} />
                 <Route path="/buying/supplier-ratings" element={<PrivateRoute permission="buying.view"><SupplierRatings /></PrivateRoute>} />
                 <Route path="/buying/agreements" element={<PrivateRoute permission="buying.view"><PurchaseAgreements /></PrivateRoute>} />
+
+                {/* Blanket Purchase Orders */}
+                <Route path="/buying/blanket-po" element={<PrivateRoute permission="buying.view"><BlanketPOList /></PrivateRoute>} />
+                <Route path="/buying/blanket-po/new" element={<PrivateRoute permission="buying.create"><BlanketPOForm /></PrivateRoute>} />
+                <Route path="/buying/blanket-po/:id" element={<PrivateRoute permission="buying.view"><BlanketPODetail /></PrivateRoute>} />
 
                 {/* Landed Costs */}
                 <Route path="/buying/landed-costs" element={<PrivateRoute permission="buying.view"><LandedCosts /></PrivateRoute>} />
@@ -697,6 +776,11 @@ function App() {
                 <Route path="/reports/cashflow-ias7" element={<PrivateRoute permission="accounting.view"><CashFlowIAS7 /></PrivateRoute>} />
                 <Route path="/reports/industry/:reportType" element={<PrivateRoute permission="reports.view"><IndustryReport /></PrivateRoute>} />
 
+                {/* BI Analytics Dashboards (US9) */}
+                <Route path="/analytics" element={<PrivateRoute permission="dashboard.analytics_view"><AnalyticsDashboardList /></PrivateRoute>} />
+                <Route path="/analytics/new" element={<PrivateRoute permission="dashboard.analytics_manage"><AnalyticsDashboardEditor /></PrivateRoute>} />
+                <Route path="/analytics/:id" element={<PrivateRoute permission="dashboard.analytics_view"><AnalyticsDashboardView /></PrivateRoute>} />
+
                 {/* HR Routes */}
                 <Route path="/hr" element={<PrivateRoute permission="hr.view"><HRHome /></PrivateRoute>} />
                 <Route path="/hr/employees" element={<PrivateRoute permission="hr.view"><Employees /></PrivateRoute>} />
@@ -717,6 +801,13 @@ function App() {
                 <Route path="/hr/gosi" element={<PrivateRoute permission="hr.view"><GOSISettings /></PrivateRoute>} />
                 <Route path="/hr/documents" element={<PrivateRoute permission="hr.view"><EmployeeDocuments /></PrivateRoute>} />
                 <Route path="/hr/performance" element={<PrivateRoute permission="hr.view"><PerformanceReviews /></PrivateRoute>} />
+                <Route path="/hr/performance/cycles" element={<PrivateRoute permission="hr.view"><CycleList /></PrivateRoute>} />
+                <Route path="/hr/performance/cycle-new" element={<PrivateRoute permission="hr.view"><CycleForm /></PrivateRoute>} />
+                <Route path="/hr/performance/my-reviews" element={<PrivateRoute permission="hr.view"><MyReviews /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/self" element={<PrivateRoute permission="hr.view"><SelfAssessment /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/manager" element={<PrivateRoute permission="hr.view"><ManagerReview /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/result" element={<PrivateRoute permission="hr.view"><ReviewResult /></PrivateRoute>} />
+                <Route path="/hr/performance/team-reviews" element={<PrivateRoute permission="hr.view"><TeamReviews /></PrivateRoute>} />
                 <Route path="/hr/training" element={<PrivateRoute permission="hr.view"><TrainingPrograms /></PrivateRoute>} />
                 <Route path="/hr/violations" element={<PrivateRoute permission="hr.view"><Violations /></PrivateRoute>} />
                 <Route path="/hr/custody" element={<PrivateRoute permission="hr.view"><CustodyManagement /></PrivateRoute>} />
@@ -779,7 +870,11 @@ function App() {
                 <Route path="/crm" element={<PrivateRoute permission="sales.view"><CRMHome /></PrivateRoute>} />
                 <Route path="/crm/opportunities" element={<PrivateRoute permission="sales.view"><Opportunities /></PrivateRoute>} />
                 <Route path="/crm/tickets" element={<PrivateRoute permission="sales.view"><SupportTickets /></PrivateRoute>} />
-                <Route path="/crm/campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
+                <Route path="/crm/campaigns" element={<PrivateRoute permission="crm.campaign_view"><CampaignList /></PrivateRoute>} />
+                <Route path="/crm/campaign-new" element={<PrivateRoute permission="crm.campaign_manage"><CampaignForm /></PrivateRoute>} />
+                <Route path="/crm/campaigns/:id" element={<PrivateRoute permission="crm.campaign_view"><CampaignReport /></PrivateRoute>} />
+                <Route path="/crm/campaigns/:id/report" element={<PrivateRoute permission="crm.campaign_view"><CampaignReport /></PrivateRoute>} />
+                <Route path="/crm/legacy-campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
                 <Route path="/crm/knowledge-base" element={<PrivateRoute permission="sales.view"><KnowledgeBase /></PrivateRoute>} />
                 <Route path="/crm/dashboard" element={<PrivateRoute permission="sales.view"><CRMDashboard /></PrivateRoute>} />
                 <Route path="/crm/lead-scoring" element={<PrivateRoute permission="sales.view"><LeadScoring /></PrivateRoute>} />

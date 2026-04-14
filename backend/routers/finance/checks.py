@@ -14,6 +14,8 @@ from services.gl_service import create_journal_entry as gl_create_journal_entry
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from typing import Optional
+import logging
+logger = logging.getLogger(__name__)
 
 _D2 = Decimal('0.01')
 
@@ -114,7 +116,8 @@ def list_checks_receivable(
 
         return {"items": items, "total": total, "page": page}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -148,7 +151,8 @@ def checks_receivable_stats(branch_id: Optional[int] = None, current_user=Depend
             "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -192,7 +196,8 @@ def get_check_receivable(check_id: int, current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -276,17 +281,15 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
         }).fetchone()
 
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "create", "checks_receivable", str(result.id),
-                         {"check_number": data["check_number"], "amount": float(amount)})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "create", "checks_receivable", str(result.id),
+                     {"check_number": data["check_number"], "amount": float(amount)})
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -356,17 +359,15 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
             WHERE id = :id
         """), {"id": check_id, "cdate": collection_date, "je_id": coll_je_id, "treasury_id": treasury_id})
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "collect", "checks_receivable", str(check_id),
-                         {"collection_date": collection_date})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "collect", "checks_receivable", str(check_id),
+                     {"collection_date": collection_date})
         return {"message": "تم تحصيل الشيك بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -457,17 +458,15 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
             WHERE id = :id
         """), {"id": check_id, "bdate": bounce_date, "reason": bounce_reason, "je_id": bounce_je_id})
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "bounce", "checks_receivable", str(check_id),
-                         {"bounce_reason": bounce_reason})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "bounce", "checks_receivable", str(check_id),
+                     {"bounce_reason": bounce_reason})
         return {"message": "تم تسجيل الشيك كمرتجع"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -539,7 +538,8 @@ def list_checks_payable(
 
         return {"items": items, "total": total, "page": page}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -573,7 +573,8 @@ def checks_payable_stats(branch_id: Optional[int] = None, current_user=Depends(g
             "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -617,7 +618,8 @@ def get_check_payable(check_id: int, current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -701,17 +703,15 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
         }).fetchone()
 
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "create", "checks_payable", str(result.id),
-                         {"check_number": data["check_number"], "amount": float(amount)})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "create", "checks_payable", str(result.id),
+                     {"check_number": data["check_number"], "amount": float(amount)})
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -788,17 +788,15 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
             WHERE id = :id
         """), {"id": check_id, "cdate": clearance_date, "je_id": clear_je_id, "treasury_id": treasury_id})
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "clear", "checks_payable", str(check_id),
-                         {"clearance_date": clearance_date})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "clear", "checks_payable", str(check_id),
+                     {"clearance_date": clearance_date})
         return {"message": "تم صرف الشيك بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -910,17 +908,15 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
             WHERE id = :id
         """), {"id": check_id, "bdate": bounce_date, "reason": bounce_reason, "je_id": bounce_je_id})
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "bounce", "checks_payable", str(check_id),
-                         {"bounce_reason": bounce_reason})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "bounce", "checks_payable", str(check_id),
+                     {"bounce_reason": bounce_reason})
         return {"message": "تم تسجيل الشيك كمرتجع"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -971,7 +967,8 @@ def get_due_checks_alerts(days_ahead: int = Query(7, ge=1, le=90), branch_id: Op
         alerts.sort(key=lambda x: x["due_date"])
         return {"alerts": alerts, "total": len(alerts)}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1079,7 +1076,8 @@ def checks_aging_report(
             "bucket_summary": bucket_summary,
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1100,7 +1098,8 @@ def get_check_status_log(check_type: str, check_id: int, current_user=Depends(ge
         """), {"ct": check_type, "cid": check_id}).fetchall()
         return [dict(r._mapping) for r in rows]
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1119,6 +1118,7 @@ def check_status_summary(current_user=Depends(get_current_user)):
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         conn.close()

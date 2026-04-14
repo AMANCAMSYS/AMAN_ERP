@@ -5,13 +5,12 @@ INV-102: Serial Numbers
 INV-103: Expiry Date tracking
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 import logging
-import random
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -258,6 +257,7 @@ def get_batch(batch_id: int, current_user: dict = Depends(get_current_user)):
 @batches_router.post("/batches", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
 def create_batch(
     batch: BatchCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء دفعة جديدة"""
@@ -366,6 +366,15 @@ def create_batch(
 
         db.commit()
 
+        # INV-L01: Audit log for batch creation
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="batch.create", resource_type="product_batch",
+            resource_id=str(result.id),
+            details={"batch_number": batch.batch_number, "product_id": batch.product_id, "warehouse_id": batch.warehouse_id, "quantity": batch.quantity},
+            request=request
+        )
+
         return {
             "id": result.id,
             "batch_number": batch.batch_number,
@@ -376,7 +385,8 @@ def create_batch(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating batch: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -420,7 +430,8 @@ def update_batch(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -609,6 +620,7 @@ def lookup_serial(serial_number: str, current_user: dict = Depends(get_current_u
 @batches_router.post("/serials", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
 def create_serial(
     serial: SerialCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء رقم تسلسلي واحد"""
@@ -670,13 +682,22 @@ def create_serial(
         db.execute(text("UPDATE products SET has_serial_tracking = TRUE WHERE id = :pid"), {"pid": serial.product_id})
 
         db.commit()
+        # INV-L01: Audit log for serial creation
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="serial.create", resource_type="product_serial",
+            resource_id=str(result.id),
+            details={"serial_number": serial.serial_number, "product_id": serial.product_id, "warehouse_id": serial.warehouse_id},
+            request=request
+        )
         return {"id": result.id, "serial_number": serial.serial_number, "message": "تم إنشاء الرقم التسلسلي بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating serial: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -754,7 +775,8 @@ def create_serials_bulk(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -798,7 +820,8 @@ def update_serial(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -850,7 +873,8 @@ def update_product_tracking(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1009,7 +1033,8 @@ def create_quality_inspection(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating QI: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1070,7 +1095,8 @@ def complete_quality_inspection(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1242,7 +1268,8 @@ def create_cycle_count(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating cycle count: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1268,7 +1295,8 @@ def start_cycle_count(count_id: int, current_user: dict = Depends(get_current_us
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1378,6 +1406,7 @@ def complete_cycle_count(
     except Exception as e:
         db.rollback()
         logger.error(f"Error completing cycle count: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

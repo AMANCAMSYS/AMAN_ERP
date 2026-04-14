@@ -261,7 +261,7 @@ def create_delivery_order(body: DeliveryOrderCreate, current_user: dict = Depend
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating delivery order: {e}")
-        raise HTTPException(500, f"خطأ في إنشاء أمر التسليم: {str(e)}")
+        raise HTTPException(500, "حدث خطأ في إنشاء أمر التسليم")
     finally:
         db.close()
 
@@ -343,7 +343,8 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -545,7 +546,8 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating invoice from DO: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -601,7 +603,8 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

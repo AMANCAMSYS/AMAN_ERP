@@ -88,3 +88,20 @@ export const manufacturingAPI = {
     createCapacityPlan: (data) => api.post('/manufacturing/capacity-plans', data),
     updateCapacityPlan: (id, data) => api.put(`/manufacturing/capacity-plans/${id}`, data),
 }
+
+export const shopFloorAPI = {
+    getDashboard: () => api.get('/manufacturing/shopfloor/dashboard'),
+    startOperation: (data) => api.post('/manufacturing/shopfloor/start', data),
+    completeOperation: (data) => api.post('/manufacturing/shopfloor/complete', data),
+    pauseOperation: (data) => api.post('/manufacturing/shopfloor/pause', data),
+    getWorkOrderProgress: (id) => api.get(`/manufacturing/shopfloor/work-order/${id}`),
+}
+
+export const routingAPI = {
+    list: () => api.get('/manufacturing/routing'),
+    get: (id) => api.get(`/manufacturing/routing/${id}`),
+    create: (data) => api.post('/manufacturing/routing', data),
+    update: (id, data) => api.put(`/manufacturing/routing/${id}`, data),
+    getByProduct: (productId) => api.get(`/manufacturing/routing/product/${productId}`),
+    getEstimate: (id, qty) => api.get(`/manufacturing/routing/${id}/estimate`, { params: { quantity: qty } }),
+}

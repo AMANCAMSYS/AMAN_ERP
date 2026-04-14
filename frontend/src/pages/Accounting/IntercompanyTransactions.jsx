@@ -116,7 +116,7 @@ function IntercompanyTransactions() {
                                 <label className="form-label">{t('accounting.target_company', 'الشركة المستهدفة (ID)')} *</label>
                                 <input className="form-input" required value={form.target_company_id}
                                     onChange={e => setForm({ ...form, target_company_id: e.target.value })}
-                                    placeholder="e.g. fcfa5fae" />
+                                    placeholder={t('intercompany.company_id_placeholder')} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('accounting.transaction_type', 'النوع')}</label>

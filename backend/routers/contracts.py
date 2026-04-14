@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/contracts", tags=["Contracts"])
 @router.post("", response_model=ContractResponse, dependencies=[Depends(require_permission("contracts.create"))])
 def create_contract(
     contract: ContractCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     db = get_db_connection(current_user.company_id)
@@ -96,12 +97,13 @@ def create_contract(
         db.commit()
 
         # Audit log
-        try:
-            log_activity(db, current_user.id, current_user.username, "create",
-                         "contracts", str(contract_id),
-                         {"contract_number": contract.contract_number, "total": final_total})
-        except Exception:
-            pass
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.create", resource_type="contracts",
+            resource_id=str(contract_id),
+            details={"contract_number": contract.contract_number, "total": final_total},
+            request=request
+        )
 
         # Notify about new contract
         try:
@@ -125,7 +127,8 @@ def create_contract(
         return get_contract(contract_id, current_user)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating contract: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -205,6 +208,7 @@ def get_contract(
 def update_contract(
     contract_id: int,
     data: ContractCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     db = get_db_connection(current_user.company_id)
@@ -242,11 +246,12 @@ def update_contract(
         trans.commit()
 
         # Audit log
-        try:
-            log_activity(db, current_user.id, current_user.username, "update",
-                         "contracts", str(contract_id), {"action": "update_contract"})
-        except Exception:
-            pass
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.update", resource_type="contracts",
+            resource_id=str(contract_id),
+            details={"action": "update_contract"}, request=request
+        )
 
         return get_contract(contract_id, current_user)
     except HTTPException:
@@ -254,7 +259,8 @@ def update_contract(
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating contract: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -262,6 +268,7 @@ def update_contract(
 @router.post("/{contract_id}/renew", response_model=ContractResponse, dependencies=[Depends(require_permission("contracts.manage"))])
 def renew_contract(
     contract_id: int,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """تجديد العقد - ينشئ فترة جديدة بناءً على فترة الفوترة"""
@@ -313,18 +320,21 @@ def renew_contract(
         db.commit()
 
         # Audit log
-        try:
-            log_activity(db, current_user.id, current_user.username, "renew",
-                         "contracts", str(contract_id), {"new_start": str(new_start), "new_end": str(new_end)})
-        except Exception:
-            pass
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.renew", resource_type="contracts",
+            resource_id=str(contract_id),
+            details={"new_start": str(new_start), "new_end": str(new_end)},
+            request=request
+        )
 
         return get_contract(contract_id, current_user)
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error renewing contract: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -332,6 +342,7 @@ def renew_contract(
 @router.post("/{contract_id}/generate-invoice", dependencies=[Depends(require_permission("contracts.manage"))])
 def generate_contract_invoice(
     contract_id: int,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """إنشاء فاتورة من العقد"""
@@ -395,19 +406,21 @@ def generate_contract_invoice(
         db.commit()
 
         # Audit log
-        try:
-            log_activity(db, current_user.id, current_user.username, "generate_invoice",
-                         "contracts", str(contract_id),
-                         {"invoice_id": inv_id, "invoice_number": inv_num, "total": total})
-        except Exception:
-            pass
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.generate_invoice", resource_type="contracts",
+            resource_id=str(contract_id),
+            details={"invoice_id": inv_id, "invoice_number": inv_num, "total": total},
+            request=request
+        )
 
         return {"success": True, "invoice_id": inv_id, "invoice_number": inv_num, "total": total}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error generating contract invoice: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -415,6 +428,7 @@ def generate_contract_invoice(
 @router.post("/{contract_id}/cancel", dependencies=[Depends(require_permission("contracts.manage"))])
 def cancel_contract(
     contract_id: int,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """إلغاء عقد نشط"""
@@ -438,12 +452,13 @@ def cancel_contract(
         db.commit()
 
         # Audit log
-        try:
-            log_activity(db, current_user.id, current_user.username, "cancel",
-                         "contracts", str(contract_id),
-                         {"contract_number": contract.contract_number})
-        except Exception:
-            pass
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.cancel", resource_type="contracts",
+            resource_id=str(contract_id),
+            details={"contract_number": contract.contract_number},
+            request=request
+        )
 
         return {"message": "تم إلغاء العقد بنجاح", "id": contract_id}
     except HTTPException:
@@ -451,7 +466,7 @@ def cancel_contract(
     except Exception as e:
         db.rollback()
         logger.error(f"Error cancelling contract {contract_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -499,7 +514,7 @@ def get_expiring_contracts(
         }
     except Exception as e:
         logger.error(f"Error fetching expiring contracts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -534,14 +549,14 @@ def get_contracts_summary(
         }
     except Exception as e:
         logger.error(f"Error fetching contract stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 # ===================== C2: Contract Amendments =====================
 
-@router.get("/{contract_id}/amendments")
+@router.get("/{contract_id}/amendments", dependencies=[Depends(require_permission("contracts.view"))])
 def list_amendments(contract_id: int, current_user=Depends(get_current_user)):
     """سجل تعديلات العقد"""
     db = get_db_connection(current_user.company_id)
@@ -558,8 +573,8 @@ def list_amendments(contract_id: int, current_user=Depends(get_current_user)):
         db.close()
 
 
-@router.post("/{contract_id}/amendments")
-def create_amendment(contract_id: int, amendment: dict, current_user=Depends(get_current_user)):
+@router.post("/{contract_id}/amendments", dependencies=[Depends(require_permission("contracts.edit"))])
+def create_amendment(contract_id: int, amendment: dict, request: Request, current_user=Depends(get_current_user)):
     """إنشاء تعديل عقد"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -576,15 +591,23 @@ def create_amendment(contract_id: int, amendment: dict, current_user=Depends(get
         })
         aid = result.fetchone()[0]
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="contract.amendment_create", resource_type="contract_amendment",
+            resource_id=str(aid),
+            details={"contract_id": contract_id, "type": amendment.get("amendment_type", "modification")},
+            request=request
+        )
         return {"id": aid, "message": "تم إنشاء التعديل بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating amendment: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.get("/{contract_id}/kpis")
+@router.get("/{contract_id}/kpis", dependencies=[Depends(require_permission("contracts.view"))])
 def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
     """مؤشرات أداء العقد"""
     db = get_db_connection(current_user.company_id)
@@ -631,6 +654,7 @@ def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error fetching contract KPIs: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()

@@ -12,6 +12,8 @@ from utils.permissions import require_permission, validate_branch_access, requir
 from utils.accounting import get_mapped_account_id
 from utils.fiscal_lock import check_fiscal_period_open
 from schemas.assets import AssetCreate, AssetUpdate, AssetDisposal
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"], dependencies=[Depends(require_module("assets"))])
 
@@ -74,7 +76,8 @@ def create_asset_transfer(data: dict, current_user: dict = Depends(get_current_u
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -96,7 +99,8 @@ def approve_transfer(transfer_id: int, current_user: dict = Depends(get_current_
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -148,7 +152,8 @@ def create_revaluation(data: dict, current_user: dict = Depends(get_current_user
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -479,7 +484,8 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
         return {"id": asset_id, "message": "Asset created successfully"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -592,7 +598,8 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
         }
     except Exception as e:
         conn.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -680,7 +687,8 @@ def update_asset(asset_id: int, data: dict = Body(...), current_user: dict = Dep
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -756,7 +764,8 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
         
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 @router.post("/{asset_id}/dispose", dependencies=[Depends(require_permission("assets.manage"))])
@@ -856,8 +865,9 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         raise
     except Exception as e:
         trans.rollback()
-        print(f"Error disposing asset: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Operation failed")
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -948,7 +958,8 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1038,7 +1049,8 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1161,7 +1173,8 @@ def add_insurance(asset_id: int, data: dict, current_user: dict = Depends(get_cu
         return dict(result._mapping)
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1198,7 +1211,8 @@ def add_maintenance(asset_id: int, data: dict, current_user: dict = Depends(get_
         return dict(result._mapping)
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1332,6 +1346,7 @@ def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Dep
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         conn.close()

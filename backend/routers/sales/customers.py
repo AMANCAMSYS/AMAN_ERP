@@ -26,7 +26,7 @@ def get_sales_summary(branch_id: Optional[int] = None, current_user: dict = Depe
             branch_filter = "AND branch_id = :branch_id"
             params["branch_id"] = branch_id
 
-        total_customers = db.execute(text(f"SELECT COUNT(*) FROM parties WHERE party_type = 'customer' {branch_filter}"), params).scalar()
+        total_customers = db.execute(text(f"SELECT COUNT(*) FROM parties WHERE is_customer = TRUE {branch_filter}"), params).scalar()
         total_invoices = db.execute(text(f"SELECT COUNT(*) FROM invoices WHERE invoice_type = 'sales' {branch_filter}"), params).scalar()
         total_revenue = db.execute(text(f"SELECT COALESCE(SUM(total), 0) FROM invoices WHERE invoice_type = 'sales' AND status != 'cancelled' {branch_filter}"), params).scalar()
         total_receivables = db.execute(text(f"SELECT COALESCE(SUM((total - COALESCE(paid_amount, 0)) * COALESCE(exchange_rate, 1)), 0) FROM invoices WHERE invoice_type = 'sales' AND status IN ('unpaid', 'partial') {branch_filter}"), params).scalar()
@@ -75,6 +75,14 @@ def list_customers(branch_id: Optional[int] = None, current_user: dict = Depends
         if branch_id:
             query += " AND p.branch_id = :branch_id"
             params["branch_id"] = branch_id
+        else:
+            # PTY-005: Enforce allowed_branches when no branch_id specified
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND p.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         query += " ORDER BY p.name"
         result = db.execute(text(query), params).fetchall()
@@ -88,6 +96,17 @@ def get_customer_transactions(customer_id: int, current_user: dict = Depends(get
     """كشف حساب عميل"""
     db = get_db_connection(current_user.company_id)
     try:
+        # PTY-008: Check branch access for the customer before returning transactions
+        customer_branch = db.execute(text(
+            "SELECT branch_id FROM parties WHERE id = :cid AND (party_type = 'customer' OR is_customer = TRUE)"
+        ), {"cid": customer_id}).fetchone()
+        if not customer_branch:
+            raise HTTPException(status_code=404, detail="العميل غير موجود")
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if customer_branch.branch_id and customer_branch.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك الوصول لبيانات عميل خارج فروعك")
+
         result = db.execute(text("""
             SELECT 'invoice' as type, invoice_number as reference, 
                    invoice_date as date, total as amount, status
@@ -162,7 +181,8 @@ def create_customer(request: Request, customer: CustomerCreate, current_user: di
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating customer: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -182,20 +202,32 @@ def get_customer(customer_id: int, current_user: dict = Depends(get_current_user
         if not customer:
             raise HTTPException(status_code=404, detail="العميل غير موجود")
 
+        # PTY-001: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if customer.branch_id and customer.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك الوصول لبيانات عميل خارج فروعك")
+
         return dict(customer._mapping)
     finally:
         db.close()
 
 
 @customers_router.put("/customers/{customer_id}", response_model=dict, dependencies=[Depends(require_permission("sales.edit"))])
-def update_customer(customer_id: int, customer: CustomerCreate, current_user: dict = Depends(get_current_user)):
+def update_customer(customer_id: int, customer: CustomerCreate, request: Request, current_user: dict = Depends(get_current_user)):
     """تحديث عميل"""
     db = get_db_connection(current_user.company_id)
     try:
         # Check if exists
-        existing = db.execute(text("SELECT id FROM parties WHERE id = :id AND (party_type = 'customer' OR is_customer = TRUE)"), {"id": customer_id}).fetchone()
+        existing = db.execute(text("SELECT id, branch_id FROM parties WHERE id = :id AND (party_type = 'customer' OR is_customer = TRUE)"), {"id": customer_id}).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="العميل غير موجود")
+
+        # PTY-002: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if existing.branch_id and existing.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك تعديل عميل خارج فروعك")
 
         db.execute(text("""
             UPDATE parties 
@@ -216,14 +248,27 @@ def update_customer(customer_id: int, customer: CustomerCreate, current_user: di
 
         db.commit()
 
-        # Log Activity (Assuming `log_activity` exists, we can skip it for a simple PUT unless requested, but let's just return success)
+        # PTY-009: Log activity for customer update
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="sales.customer.update",
+            resource_type="customer",
+            resource_id=str(customer_id),
+            details={"name": customer.name},
+            request=request,
+            branch_id=customer.branch_id
+        )
+
         return {"success": True, "id": customer_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating customer: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -256,7 +301,8 @@ def get_customer_outstanding_invoices(
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error fetching outstanding invoices: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -312,12 +358,13 @@ def create_customer_group(
         return {"id": result[0], "group_name": group.group_name}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@customers_router.put("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.create"))])
+@customers_router.put("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.edit"))])
 def update_customer_group(
     group_id: int, 
     group: CustomerGroupCreate, 
@@ -354,12 +401,13 @@ def update_customer_group(
         return {"success": True}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@customers_router.delete("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.create"))])
+@customers_router.delete("/customer-groups/{group_id}", dependencies=[Depends(require_permission("sales.delete"))])
 def delete_customer_group(
     group_id: int, 
     request: Request,
@@ -391,6 +439,7 @@ def delete_customer_group(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

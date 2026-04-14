@@ -439,7 +439,7 @@ function OnboardingWizard() {
                 <div className="form-group">
                   <label className="form-label">{t('auth.company_name_en', 'اسم الشركة (إنجليزي)')}</label>
                   <input type="text" name="company_name_en" className="form-input"
-                    placeholder="e.g. Company Name" value={companyInfo.company_name_en} onChange={handleCompanyInfoChange} />
+                    placeholder={t('onboarding.company_name_en_placeholder')} value={companyInfo.company_name_en} onChange={handleCompanyInfoChange} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('auth.phone', 'الهاتف')}</label>

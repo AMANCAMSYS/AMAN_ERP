@@ -4,7 +4,7 @@ CRM-002: Sales Opportunities (Leads → Won/Lost pipeline)
 CRM-004: Support Tickets with comments and SLA
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 
@@ -16,6 +16,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.accounting import generate_sequential_number
+from utils.audit import log_activity
 
 router = APIRouter(prefix="/crm", tags=["إدارة العلاقات CRM"], dependencies=[Depends(require_module("crm"))])
 logger = logging.getLogger(__name__)
@@ -190,7 +191,7 @@ def get_opportunity(opp_id: int, current_user=Depends(get_current_user)):
 
 
 @router.post("/opportunities", status_code=201, dependencies=[Depends(require_permission(["sales.create", "projects.create"]))])
-def create_opportunity(data: OpportunityCreate, current_user=Depends(get_current_user)):
+def create_opportunity(data: OpportunityCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         opp_id = db.execute(text("""
@@ -214,13 +215,14 @@ def create_opportunity(data: OpportunityCreate, current_user=Depends(get_current
             "user": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_opportunity", resource_type="opportunity", resource_id=str(opp_id), details={"title": data.title, "stage": data.stage}, request=request)
         return {"id": opp_id, "message": "تم إنشاء الفرصة البيعية"}
     finally:
         db.close()
 
 
 @router.put("/opportunities/{opp_id}", dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def update_opportunity(opp_id: int, data: OpportunityUpdate, current_user=Depends(get_current_user)):
+def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -236,17 +238,19 @@ def update_opportunity(opp_id: int, data: OpportunityUpdate, current_user=Depend
         updates["id"] = opp_id
         db.execute(text(f"UPDATE sales_opportunities SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_opportunity", resource_type="opportunity", resource_id=str(opp_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم التحديث"}
     finally:
         db.close()
 
 
 @router.delete("/opportunities/{opp_id}", dependencies=[Depends(require_permission(["sales.delete", "projects.delete"]))])
-def delete_opportunity(opp_id: int, current_user=Depends(get_current_user)):
+def delete_opportunity(opp_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM sales_opportunities WHERE id = :id"), {"id": opp_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_opportunity", resource_type="opportunity", resource_id=str(opp_id), details={}, request=request)
         return {"message": "تم حذف الفرصة"}
     finally:
         db.close()
@@ -254,7 +258,7 @@ def delete_opportunity(opp_id: int, current_user=Depends(get_current_user)):
 
 @router.post("/opportunities/{opp_id}/activities", status_code=201,
              dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def add_activity(opp_id: int, data: ActivityCreate, current_user=Depends(get_current_user)):
+def add_activity(opp_id: int, data: ActivityCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         aid = db.execute(text("""
@@ -269,6 +273,7 @@ def add_activity(opp_id: int, data: ActivityCreate, current_user=Depends(get_cur
         # Update opportunity's updated_at
         db.execute(text("UPDATE sales_opportunities SET updated_at = NOW() WHERE id = :id"), {"id": opp_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_add_activity", resource_type="activity", resource_id=str(aid), details={"opportunity_id": opp_id, "activity_type": data.activity_type, "title": data.title}, request=request)
         return {"id": aid}
     finally:
         db.close()
@@ -368,7 +373,7 @@ def get_ticket(ticket_id: int, current_user=Depends(get_current_user)):
 
 @router.post("/tickets", status_code=201,
              dependencies=[Depends(require_permission(["sales.create", "projects.create"]))])
-def create_ticket(data: TicketCreate, current_user=Depends(get_current_user)):
+def create_ticket(data: TicketCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         ticket_num = generate_sequential_number(db, f"TKT-{datetime.now().year}", "support_tickets", "ticket_number")
@@ -392,17 +397,19 @@ def create_ticket(data: TicketCreate, current_user=Depends(get_current_user)):
             "sla": data.sla_hours, "user": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_ticket", resource_type="ticket", resource_id=str(tid), details={"ticket_number": ticket_num, "subject": data.subject, "priority": data.priority}, request=request)
         
         return {"id": tid, "ticket_number": ticket_num, "message": "تم إنشاء التذكرة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating ticket: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/tickets/{ticket_id}", dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def update_ticket(ticket_id: int, data: TicketUpdate, current_user=Depends(get_current_user)):
+def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -419,6 +426,7 @@ def update_ticket(ticket_id: int, data: TicketUpdate, current_user=Depends(get_c
         updates["id"] = ticket_id
         db.execute(text(f"UPDATE support_tickets SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_ticket", resource_type="ticket", resource_id=str(ticket_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم التحديث"}
     finally:
         db.close()
@@ -426,7 +434,7 @@ def update_ticket(ticket_id: int, data: TicketUpdate, current_user=Depends(get_c
 
 @router.post("/tickets/{ticket_id}/comments", status_code=201,
              dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def add_comment(ticket_id: int, data: CommentCreate, current_user=Depends(get_current_user)):
+def add_comment(ticket_id: int, data: CommentCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         cid = db.execute(text("""
@@ -440,6 +448,7 @@ def add_comment(ticket_id: int, data: CommentCreate, current_user=Depends(get_cu
         
         db.execute(text("UPDATE support_tickets SET updated_at = NOW() WHERE id = :id"), {"id": ticket_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_add_ticket_comment", resource_type="ticket_comment", resource_id=str(cid), details={"ticket_id": ticket_id, "is_internal": data.is_internal}, request=request)
         return {"id": cid}
     finally:
         db.close()
@@ -449,7 +458,7 @@ def add_comment(ticket_id: int, data: CommentCreate, current_user=Depends(get_cu
 
 @router.post("/opportunities/{opp_id}/convert-quotation", status_code=201,
              dependencies=[Depends(require_permission("sales.create"))])
-def convert_to_quotation(opp_id: int, current_user=Depends(get_current_user)):
+def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get_current_user)):
     """تحويل فرصة بيعية إلى عرض سعر"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -497,28 +506,21 @@ def convert_to_quotation(opp_id: int, current_user=Depends(get_current_user)):
         db.execute(text("UPDATE sales_opportunities SET stage = 'proposal', updated_at = NOW() WHERE id = :id"), {"id": opp_id})
         db.commit()
 
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_convert_opportunity_to_quotation", resource_type="opportunity", resource_id=str(opp_id), details={"quotation_id": quot_id, "quotation_number": quot_num}, request=request)
         return {"quotation_id": quot_id, "quotation_number": quot_num, "message": "تم تحويل الفرصة إلى عرض سعر"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error converting opportunity to quotation: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 # ======================== CRM-003: Marketing Campaigns ========================
 
-class CampaignCreate(BaseModel):
-    name: str
-    campaign_type: str = "email"  # email, sms, social, event
-    status: str = "draft"  # draft, active, paused, completed
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    budget: float = 0
-    target_audience: Optional[str] = None
-    description: Optional[str] = None
-    branch_id: Optional[int] = None
+from schemas.campaign import CampaignCreate, CampaignExecuteRequest, TrackingWebhookPayload
 
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
@@ -529,13 +531,14 @@ class CampaignUpdate(BaseModel):
     budget: Optional[float] = None
     target_audience: Optional[str] = None
     description: Optional[str] = None
-    sent_count: Optional[int] = None
-    open_count: Optional[int] = None
-    click_count: Optional[int] = None
-    conversion_count: Optional[int] = None
+    segment_id: Optional[int] = None
+    subject: Optional[str] = None
+    content: Optional[str] = None
+    scheduled_date: Optional[str] = None
+    estimated_cost: Optional[float] = None
 
 
-@router.get("/campaigns", dependencies=[Depends(require_permission("sales.view"))])
+@router.get("/campaigns", dependencies=[Depends(require_permission("crm.campaign_view"))])
 def list_campaigns(
     status: Optional[str] = None,
     campaign_type: Optional[str] = None,
@@ -553,9 +556,10 @@ def list_campaigns(
             params["type"] = campaign_type
 
         rows = db.execute(text(f"""
-            SELECT c.*, u.full_name as created_by_name
+            SELECT c.*, u.full_name as created_by_name, s.name as segment_name
             FROM marketing_campaigns c
             LEFT JOIN company_users u ON c.created_by = u.id
+            LEFT JOIN crm_customer_segments s ON c.segment_id = s.id
             WHERE {' AND '.join(conditions)}
             ORDER BY c.created_at DESC
         """), params).fetchall()
@@ -564,47 +568,71 @@ def list_campaigns(
         db.close()
 
 
-@router.get("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.view"))])
+@router.get("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("crm.campaign_view"))])
 def get_campaign(campaign_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        row = db.execute(text("SELECT * FROM marketing_campaigns WHERE id = :id"), {"id": campaign_id}).fetchone()
+        row = db.execute(text("""
+            SELECT c.*, s.name as segment_name
+            FROM marketing_campaigns c
+            LEFT JOIN crm_customer_segments s ON c.segment_id = s.id
+            WHERE c.id = :id
+        """), {"id": campaign_id}).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="الحملة غير موجودة")
-        return dict(row._mapping)
+        data = dict(row._mapping)
+        # Compute rates
+        sent = data.get("total_sent") or 0
+        data["delivery_rate"] = round(100.0 * (data.get("total_delivered") or 0) / sent, 1) if sent else 0
+        data["open_rate"] = round(100.0 * (data.get("total_opened") or 0) / sent, 1) if sent else 0
+        data["click_rate"] = round(100.0 * (data.get("total_clicked") or 0) / sent, 1) if sent else 0
+        data["response_rate"] = round(100.0 * (data.get("total_responded") or 0) / sent, 1) if sent else 0
+        responded = data.get("total_responded") or 0
+        cost = float(data.get("actual_cost") or data.get("estimated_cost") or 0)
+        data["cost_per_lead"] = round(cost / responded, 2) if responded and cost else 0
+        return data
     finally:
         db.close()
 
 
-@router.post("/campaigns", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def create_campaign(data: CampaignCreate, current_user=Depends(get_current_user)):
+@router.post("/campaigns", status_code=201, dependencies=[Depends(require_permission("crm.campaign_manage"))])
+def create_campaign(data: CampaignCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         cid = db.execute(text("""
             INSERT INTO marketing_campaigns (
                 name, campaign_type, status, start_date, end_date,
-                budget, target_audience, description, created_by, branch_id
+                budget, target_audience, description, created_by, branch_id,
+                segment_id, subject, content, scheduled_date, estimated_cost
             ) VALUES (
                 :name, :type, :status, :start, :end,
-                :budget, :audience, :desc, :uid, :branch
+                :budget, :audience, :desc, :uid, :branch,
+                :segment_id, :subject, :content,
+                CASE WHEN :scheduled IS NOT NULL THEN :scheduled::timestamptz ELSE NULL END,
+                :est_cost
             ) RETURNING id
         """), {
             "name": data.name, "type": data.campaign_type, "status": data.status,
             "start": data.start_date, "end": data.end_date,
             "budget": data.budget, "audience": data.target_audience,
-            "desc": data.description, "uid": current_user.id, "branch": data.branch_id
+            "desc": data.description, "uid": current_user.id, "branch": data.branch_id,
+            "segment_id": data.segment_id, "subject": data.subject,
+            "content": data.content, "scheduled": data.scheduled_date,
+            "est_cost": data.estimated_cost,
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_campaign", resource_type="campaign", resource_id=str(cid), details={"name": data.name, "campaign_type": data.campaign_type}, request=request)
         return {"id": cid, "message": "تم إنشاء الحملة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating campaign: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.put("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_campaign(campaign_id: int, data: CampaignUpdate, current_user=Depends(get_current_user)):
+@router.put("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("crm.campaign_manage"))])
+def update_campaign(campaign_id: int, data: CampaignUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
@@ -614,18 +642,315 @@ def update_campaign(campaign_id: int, data: CampaignUpdate, current_user=Depends
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE marketing_campaigns SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_campaign", resource_type="campaign", resource_id=str(campaign_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم تحديث الحملة"}
     finally:
         db.close()
 
 
-@router.delete("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("sales.create"))])
-def delete_campaign(campaign_id: int, current_user=Depends(get_current_user)):
+@router.delete("/campaigns/{campaign_id}", dependencies=[Depends(require_permission("crm.campaign_manage"))])
+def delete_campaign(campaign_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM marketing_campaigns WHERE id = :id"), {"id": campaign_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_campaign", resource_type="campaign", resource_id=str(campaign_id), details={}, request=request)
         return {"message": "تم حذف الحملة"}
+    finally:
+        db.close()
+
+
+# ---- Campaign Execution ----
+
+@router.post("/campaigns/{campaign_id}/execute", dependencies=[Depends(require_permission("crm.campaign_execute"))])
+def execute_campaign(campaign_id: int, request: Request, current_user=Depends(get_current_user)):
+    """Execute campaign: fetch segment contacts, create recipient records, dispatch notifications."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        campaign = db.execute(text("""
+            SELECT id, segment_id, campaign_type, subject, content, status
+            FROM marketing_campaigns WHERE id = :id
+        """), {"id": campaign_id}).fetchone()
+
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        c = dict(campaign._mapping)
+        if c["status"] not in ("draft", "scheduled"):
+            raise HTTPException(status_code=400, detail="Campaign must be in draft or scheduled status to execute")
+
+        if not c["segment_id"]:
+            raise HTTPException(status_code=400, detail="Campaign must have a segment to execute")
+
+        # Idempotency: prevent double-execution
+        existing_recipients = db.execute(text(
+            "SELECT COUNT(*) FROM campaign_recipients WHERE campaign_id = :id"
+        ), {"id": campaign_id}).scalar()
+        if existing_recipients > 0:
+            raise HTTPException(status_code=400, detail="Campaign already has recipients — it may have been executed already")
+
+        # Fetch segment contacts
+        contacts = db.execute(text("""
+            SELECT p.id, p.name, p.email, p.phone
+            FROM crm_customer_segment_members csm
+            JOIN parties p ON csm.customer_id = p.id
+            WHERE csm.segment_id = :seg_id
+        """), {"seg_id": c["segment_id"]}).fetchall()
+
+        if not contacts:
+            raise HTTPException(status_code=400, detail="No contacts found in the target segment")
+
+        campaign_type = c["campaign_type"] or "email"
+        total_created = 0
+
+        for contact in contacts:
+            ct = dict(contact._mapping)
+            channels = []
+            if campaign_type in ("email", "both") and ct.get("email"):
+                channels.append("email")
+            if campaign_type in ("sms", "both") and ct.get("phone"):
+                channels.append("sms")
+
+            for channel in channels:
+                db.execute(text("""
+                    INSERT INTO campaign_recipients (campaign_id, contact_id, channel, delivery_status)
+                    VALUES (:cid, :contact_id, :channel, 'sent')
+                """), {"cid": campaign_id, "contact_id": ct["id"], "channel": channel})
+                total_created += 1
+
+        # Update campaign status and metrics
+        db.execute(text("""
+            UPDATE marketing_campaigns
+            SET status = 'executing', executed_at = NOW(),
+                total_sent = :total, updated_at = NOW()
+            WHERE id = :id
+        """), {"total": total_created, "id": campaign_id})
+
+        # Mark as completed (synchronous execution)
+        db.execute(text("""
+            UPDATE marketing_campaigns
+            SET status = 'completed', total_delivered = :total,
+                updated_at = NOW()
+            WHERE id = :id
+        """), {"total": total_created, "id": campaign_id})
+
+        # Update recipient delivery status
+        db.execute(text("""
+            UPDATE campaign_recipients
+            SET delivery_status = 'delivered', updated_at = NOW()
+            WHERE campaign_id = :cid AND delivery_status = 'sent'
+        """), {"cid": campaign_id})
+
+        db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_execute_campaign", resource_type="campaign", resource_id=str(campaign_id), details={"total_recipients": total_created}, request=request)
+        return {
+            "message": "Campaign executed successfully",
+            "total_recipients": total_created,
+            "campaign_id": campaign_id,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to execute campaign: {e}")
+        raise HTTPException(status_code=500, detail="Failed to execute campaign")
+    finally:
+        db.close()
+
+
+@router.get("/campaigns/{campaign_id}/recipients", dependencies=[Depends(require_permission("crm.campaign_view"))])
+def list_campaign_recipients(
+    campaign_id: int,
+    delivery_status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user=Depends(get_current_user),
+):
+    """List recipients for a campaign with their engagement status."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        conditions = ["cr.campaign_id = :cid"]
+        params: dict = {"cid": campaign_id, "skip": skip, "limit": limit}
+
+        if delivery_status:
+            conditions.append("cr.delivery_status = :ds")
+            params["ds"] = delivery_status
+
+        where = " AND ".join(conditions)
+        rows = db.execute(text(f"""
+            SELECT cr.id, cr.contact_id, p.name as contact_name, p.email as contact_email,
+                   cr.channel, cr.delivery_status, cr.opened_at, cr.clicked_at, cr.responded_at,
+                   cr.created_at
+            FROM campaign_recipients cr
+            JOIN parties p ON cr.contact_id = p.id
+            WHERE {where}
+            ORDER BY cr.created_at DESC
+            OFFSET :skip LIMIT :limit
+        """), params).fetchall()
+
+        count_row = db.execute(text(f"""
+            SELECT COUNT(*) FROM campaign_recipients cr WHERE {where}
+        """), params).fetchone()
+
+        return {
+            "recipients": [dict(r._mapping) for r in rows],
+            "total": count_row[0] if count_row else 0,
+        }
+    finally:
+        db.close()
+
+
+@router.post("/campaigns/webhook/track")
+def campaign_tracking_webhook(payload: TrackingWebhookPayload, company_id: str):
+    """Public webhook for tracking campaign engagement (opens, clicks, responses).
+    Requires company_id query param. Validates a signed payload to prevent tampering."""
+    import hashlib, os, hmac as hmac_lib
+    webhook_secret = os.environ.get("CAMPAIGN_WEBHOOK_SECRET")
+    if not webhook_secret:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    expected_sig = hashlib.sha256(f"{payload.recipient_id}:{payload.event}:{webhook_secret}".encode()).hexdigest()
+
+    if not hmac_lib.compare_digest(expected_sig, payload.signature):
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    db = get_db_connection(company_id)
+    try:
+        if payload.event == "delivered":
+            db.execute(text("""
+                UPDATE campaign_recipients SET delivery_status = 'delivered', updated_at = NOW()
+                WHERE id = :rid
+            """), {"rid": payload.recipient_id})
+            db.execute(text("""
+                UPDATE marketing_campaigns SET total_delivered = total_delivered + 1
+                WHERE id = (SELECT campaign_id FROM campaign_recipients WHERE id = :rid)
+            """), {"rid": payload.recipient_id})
+
+        elif payload.event == "opened":
+            db.execute(text("""
+                UPDATE campaign_recipients SET opened_at = COALESCE(opened_at, NOW()), updated_at = NOW()
+                WHERE id = :rid
+            """), {"rid": payload.recipient_id})
+            db.execute(text("""
+                UPDATE marketing_campaigns SET total_opened = total_opened + 1
+                WHERE id = (SELECT campaign_id FROM campaign_recipients WHERE id = :rid)
+            """), {"rid": payload.recipient_id})
+
+        elif payload.event == "clicked":
+            db.execute(text("""
+                UPDATE campaign_recipients SET clicked_at = COALESCE(clicked_at, NOW()), updated_at = NOW()
+                WHERE id = :rid
+            """), {"rid": payload.recipient_id})
+            db.execute(text("""
+                UPDATE marketing_campaigns SET total_clicked = total_clicked + 1
+                WHERE id = (SELECT campaign_id FROM campaign_recipients WHERE id = :rid)
+            """), {"rid": payload.recipient_id})
+
+        elif payload.event == "responded":
+            db.execute(text("""
+                UPDATE campaign_recipients SET responded_at = COALESCE(responded_at, NOW()), updated_at = NOW()
+                WHERE id = :rid
+            """), {"rid": payload.recipient_id})
+            db.execute(text("""
+                UPDATE marketing_campaigns SET total_responded = total_responded + 1
+                WHERE id = (SELECT campaign_id FROM campaign_recipients WHERE id = :rid)
+            """), {"rid": payload.recipient_id})
+
+        elif payload.event in ("bounced", "failed"):
+            db.execute(text("""
+                UPDATE campaign_recipients SET delivery_status = :status, updated_at = NOW()
+                WHERE id = :rid
+            """), {"rid": payload.recipient_id, "status": payload.event})
+
+        db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Tracking webhook error: {e}")
+        raise HTTPException(status_code=500, detail="Tracking webhook failed")
+    finally:
+        db.close()
+
+
+# ---- Lead Attribution ----
+
+@router.post("/campaigns/{campaign_id}/attribute-lead", dependencies=[Depends(require_permission("crm.campaign_manage"))])
+def attribute_lead_to_campaign(campaign_id: int, lead_id: int, request: Request, current_user=Depends(get_current_user)):
+    """Attribute a CRM lead/opportunity to a campaign."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Verify campaign exists
+        campaign = db.execute(text("SELECT id FROM marketing_campaigns WHERE id = :id"), {"id": campaign_id}).fetchone()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        # Verify lead exists
+        lead = db.execute(text("SELECT id FROM sales_opportunities WHERE id = :id"), {"id": lead_id}).fetchone()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead/opportunity not found")
+
+        # Check for duplicate
+        existing = db.execute(text("""
+            SELECT id FROM campaign_lead_attributions
+            WHERE campaign_id = :cid AND lead_id = :lid
+        """), {"cid": campaign_id, "lid": lead_id}).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Lead already attributed to this campaign")
+
+        db.execute(text("""
+            INSERT INTO campaign_lead_attributions (campaign_id, lead_id, attributed_at)
+            VALUES (:cid, :lid, NOW())
+        """), {"cid": campaign_id, "lid": lead_id})
+
+        db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_attribute_lead_to_campaign", resource_type="campaign_lead_attribution", resource_id=str(campaign_id), details={"lead_id": lead_id}, request=request)
+        return {"message": "Lead attributed to campaign", "campaign_id": campaign_id, "lead_id": lead_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Lead attribution error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to attribute lead")
+    finally:
+        db.close()
+
+
+@router.get("/campaigns/{campaign_id}/metrics", dependencies=[Depends(require_permission("crm.campaign_view"))])
+def get_campaign_metrics(campaign_id: int, current_user=Depends(get_current_user)):
+    """Get detailed engagement metrics and lead attribution for a campaign."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        campaign = db.execute(text("""
+            SELECT c.id, c.name, c.total_sent, c.total_delivered, c.total_opened,
+                   c.total_clicked, c.total_responded, c.estimated_cost, c.actual_cost
+            FROM marketing_campaigns c WHERE c.id = :id
+        """), {"id": campaign_id}).fetchone()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+
+        c = dict(campaign._mapping)
+        sent = c["total_sent"] or 0
+        c["delivery_rate"] = round(100.0 * (c["total_delivered"] or 0) / sent, 1) if sent else 0
+        c["open_rate"] = round(100.0 * (c["total_opened"] or 0) / sent, 1) if sent else 0
+        c["click_rate"] = round(100.0 * (c["total_clicked"] or 0) / sent, 1) if sent else 0
+        c["response_rate"] = round(100.0 * (c["total_responded"] or 0) / sent, 1) if sent else 0
+
+        # Attributed leads
+        leads = db.execute(text("""
+            SELECT cla.id, cla.lead_id, so.title as lead_title, so.stage,
+                   so.expected_value, cla.attributed_at
+            FROM campaign_lead_attributions cla
+            JOIN sales_opportunities so ON cla.lead_id = so.id
+            WHERE cla.campaign_id = :cid
+            ORDER BY cla.attributed_at DESC
+        """), {"cid": campaign_id}).fetchall()
+
+        responded = c["total_responded"] or 0
+        cost = float(c.get("actual_cost") or c.get("estimated_cost") or 0)
+        c["cost_per_lead"] = round(cost / responded, 2) if responded and cost else 0
+        c["attributed_leads"] = [dict(r._mapping) for r in leads]
+        c["total_attributed_leads"] = len(leads)
+
+        return c
     finally:
         db.close()
 
@@ -696,7 +1021,7 @@ def get_article(article_id: int, current_user=Depends(get_current_user)):
 
 
 @router.post("/knowledge-base", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def create_article(data: ArticleCreate, current_user=Depends(get_current_user)):
+def create_article(data: ArticleCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         aid = db.execute(text("""
@@ -707,16 +1032,18 @@ def create_article(data: ArticleCreate, current_user=Depends(get_current_user)):
             "tags": data.tags, "pub": data.is_published, "uid": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_article", resource_type="knowledge_article", resource_id=str(aid), details={"title": data.title, "category": data.category}, request=request)
         return {"id": aid, "message": "تم إنشاء المقالة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating article: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/knowledge-base/{article_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_article(article_id: int, data: ArticleUpdate, current_user=Depends(get_current_user)):
+def update_article(article_id: int, data: ArticleUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
@@ -726,17 +1053,19 @@ def update_article(article_id: int, data: ArticleUpdate, current_user=Depends(ge
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_article", resource_type="knowledge_article", resource_id=str(article_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم تحديث المقالة"}
     finally:
         db.close()
 
 
 @router.delete("/knowledge-base/{article_id}", dependencies=[Depends(require_permission("sales.create"))])
-def delete_article(article_id: int, current_user=Depends(get_current_user)):
+def delete_article(article_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM crm_knowledge_base WHERE id = :id"), {"id": article_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_article", resource_type="knowledge_article", resource_id=str(article_id), details={}, request=request)
         return {"message": "تم حذف المقالة"}
     finally:
         db.close()
@@ -774,7 +1103,7 @@ def list_scoring_rules(current_user=Depends(get_current_user)):
 
 
 @router.post("/lead-scoring/rules", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def create_scoring_rule(data: LeadScoringRuleCreate, current_user=Depends(get_current_user)):
+def create_scoring_rule(data: LeadScoringRuleCreate, request: Request, current_user=Depends(get_current_user)):
     """إنشاء قاعدة تسجيل نقاط"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -787,16 +1116,18 @@ def create_scoring_rule(data: LeadScoringRuleCreate, current_user=Depends(get_cu
             "score": data.score, "uid": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_scoring_rule", resource_type="lead_scoring_rule", resource_id=str(rid), details={"rule_name": data.rule_name, "score": data.score}, request=request)
         return {"id": rid, "message": "تم إنشاء قاعدة التسجيل"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating scoring rule: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/lead-scoring/rules/{rule_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, current_user=Depends(get_current_user)):
+def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
@@ -806,24 +1137,26 @@ def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, current_user=
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_lead_scoring_rules SET {set_clause} WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_scoring_rule", resource_type="lead_scoring_rule", resource_id=str(rule_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم التحديث"}
     finally:
         db.close()
 
 
 @router.delete("/lead-scoring/rules/{rule_id}", dependencies=[Depends(require_permission("sales.delete"))])
-def delete_scoring_rule(rule_id: int, current_user=Depends(get_current_user)):
+def delete_scoring_rule(rule_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM crm_lead_scoring_rules WHERE id = :id"), {"id": rule_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_scoring_rule", resource_type="lead_scoring_rule", resource_id=str(rule_id), details={}, request=request)
         return {"message": "تم الحذف"}
     finally:
         db.close()
 
 
 @router.post("/lead-scoring/calculate", dependencies=[Depends(require_permission("sales.create"))])
-def calculate_lead_scores(current_user=Depends(get_current_user)):
+def calculate_lead_scores(request: Request, current_user=Depends(get_current_user)):
     """حساب نقاط جميع الفرص تلقائياً بناءً على القواعد"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -882,10 +1215,12 @@ def calculate_lead_scores(current_user=Depends(get_current_user)):
             scored += 1
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_calculate_lead_scores", resource_type="lead_scoring", details={"scored_count": scored}, request=request)
         return {"scored": scored, "message": f"تم تسجيل نقاط {scored} فرصة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error calculating lead scores: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -951,7 +1286,7 @@ def list_segments(current_user=Depends(get_current_user)):
 
 
 @router.post("/segments", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def create_segment(data: SegmentCreate, current_user=Depends(get_current_user)):
+def create_segment(data: SegmentCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         import json
@@ -964,16 +1299,18 @@ def create_segment(data: SegmentCreate, current_user=Depends(get_current_user)):
             "color": data.color, "auto": data.auto_assign, "uid": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_segment", resource_type="customer_segment", resource_id=str(sid), details={"name": data.name}, request=request)
         return {"id": sid, "message": "تم إنشاء شريحة العملاء"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating segment: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/segments/{seg_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_segment(seg_id: int, data: SegmentUpdate, current_user=Depends(get_current_user)):
+def update_segment(seg_id: int, data: SegmentUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         import json
@@ -986,18 +1323,20 @@ def update_segment(seg_id: int, data: SegmentUpdate, current_user=Depends(get_cu
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_customer_segments SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_segment", resource_type="customer_segment", resource_id=str(seg_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم التحديث"}
     finally:
         db.close()
 
 
 @router.delete("/segments/{seg_id}", dependencies=[Depends(require_permission("sales.delete"))])
-def delete_segment(seg_id: int, current_user=Depends(get_current_user)):
+def delete_segment(seg_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM crm_customer_segment_members WHERE segment_id = :id"), {"id": seg_id})
         db.execute(text("DELETE FROM crm_customer_segments WHERE id = :id"), {"id": seg_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_segment", resource_type="customer_segment", resource_id=str(seg_id), details={}, request=request)
         return {"message": "تم الحذف"}
     finally:
         db.close()
@@ -1005,7 +1344,7 @@ def delete_segment(seg_id: int, current_user=Depends(get_current_user)):
 
 @router.post("/segments/{seg_id}/customers/{customer_id}",
              status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def add_customer_to_segment(seg_id: int, customer_id: int, current_user=Depends(get_current_user)):
+def add_customer_to_segment(seg_id: int, customer_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("""
@@ -1013,23 +1352,26 @@ def add_customer_to_segment(seg_id: int, customer_id: int, current_user=Depends(
             VALUES (:sid, :cid) ON CONFLICT DO NOTHING
         """), {"sid": seg_id, "cid": customer_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_add_customer_to_segment", resource_type="customer_segment", resource_id=str(seg_id), details={"customer_id": customer_id}, request=request)
         return {"message": "تمت الإضافة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error adding customer to segment: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.delete("/segments/{seg_id}/customers/{customer_id}",
                dependencies=[Depends(require_permission("sales.delete"))])
-def remove_customer_from_segment(seg_id: int, customer_id: int, current_user=Depends(get_current_user)):
+def remove_customer_from_segment(seg_id: int, customer_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("""
             DELETE FROM crm_customer_segment_members WHERE segment_id = :sid AND customer_id = :cid
         """), {"sid": seg_id, "cid": customer_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_remove_customer_from_segment", resource_type="customer_segment", resource_id=str(seg_id), details={"customer_id": customer_id}, request=request)
         return {"message": "تمت الإزالة"}
     finally:
         db.close()
@@ -1103,7 +1445,7 @@ def list_contacts(customer_id: Optional[int] = None, current_user=Depends(get_cu
 
 
 @router.post("/contacts", status_code=201, dependencies=[Depends(require_permission("sales.create"))])
-def create_contact(data: ContactCreate, current_user=Depends(get_current_user)):
+def create_contact(data: ContactCreate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         # If setting as primary, unset others
@@ -1130,16 +1472,18 @@ def create_contact(data: ContactCreate, current_user=Depends(get_current_user)):
             "notes": data.notes, "uid": current_user.id
         }).scalar()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_create_contact", resource_type="contact", resource_id=str(cid), details={"customer_id": data.customer_id, "first_name": data.first_name}, request=request)
         return {"id": cid, "message": "تم إنشاء جهة الاتصال"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating contact: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/contacts/{contact_id}", dependencies=[Depends(require_permission("sales.create"))])
-def update_contact(contact_id: int, data: ContactUpdate, current_user=Depends(get_current_user)):
+def update_contact(contact_id: int, data: ContactUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
@@ -1158,17 +1502,19 @@ def update_contact(contact_id: int, data: ContactUpdate, current_user=Depends(ge
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_contacts SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_contact", resource_type="contact", resource_id=str(contact_id), details={"fields_updated": list(updates.keys())}, request=request)
         return {"message": "تم التحديث"}
     finally:
         db.close()
 
 
 @router.delete("/contacts/{contact_id}", dependencies=[Depends(require_permission("sales.delete"))])
-def delete_contact(contact_id: int, current_user=Depends(get_current_user)):
+def delete_contact(contact_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM crm_contacts WHERE id = :id"), {"id": contact_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_delete_contact", resource_type="contact", resource_id=str(contact_id), details={}, request=request)
         return {"message": "تم الحذف"}
     finally:
         db.close()

@@ -103,3 +103,10 @@ export const costingPolicyAPI = {
     getHistory: () => api.get('/costing-policies/history'),
     setPolicy: (data) => api.post('/costing-policies/set', data)
 }
+
+export const demandForecastAPI = {
+    generate: (data) => api.post('/inventory/forecast/generate', data),
+    list: (productId) => api.get('/inventory/forecast', { params: productId ? { product_id: productId } : {} }),
+    get: (id) => api.get(`/inventory/forecast/${id}`),
+    adjust: (id, data) => api.put(`/inventory/forecast/${id}/adjust`, data),
+}

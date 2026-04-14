@@ -6,6 +6,9 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from schemas import BranchCreate, BranchResponse
 from utils.permissions import require_permission
+from utils.audit import log_activity
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/branches",
@@ -76,7 +79,7 @@ def list_branches(
             })
         return branches
     except Exception as e:
-        print(f"Error listing branches: {e}")
+        logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         conn.close()
@@ -145,6 +148,18 @@ def create_branch(
             
         conn.commit()
         
+        # Audit log
+        if user_id:
+            try:
+                username = current_user.get('username', '') if isinstance(current_user, dict) else getattr(current_user, 'username', '')
+                log_activity(conn, user_id, username, "create",
+                             resource_type="branch", resource_id=str(branch_id),
+                             details={"branch_code": branch.branch_code, "branch_name": branch.branch_name},
+                             branch_id=branch_id)
+                conn.commit()
+            except Exception:
+                logger.warning("Failed to write branch create audit log")
+        
         # Construct response
         response_data = branch.model_dump()
         response_data["id"] = branch_id
@@ -157,7 +172,7 @@ def create_branch(
         raise
     except Exception as e:
         conn.rollback()
-        print(f"Error creating branch: {e}")
+        logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         conn.close()
@@ -224,6 +239,19 @@ def update_branch(
         result = conn.execute(query, params).fetchone()
         conn.commit()
         
+        # Audit log
+        try:
+            user_id = current_user.get('id') if isinstance(current_user, dict) else getattr(current_user, 'id', None)
+            username = current_user.get('username', '') if isinstance(current_user, dict) else getattr(current_user, 'username', '')
+            if user_id:
+                log_activity(conn, user_id, username, "update",
+                             resource_type="branch", resource_id=str(branch_id),
+                             details={"branch_code": branch.branch_code, "branch_name": branch.branch_name},
+                             branch_id=branch_id)
+                conn.commit()
+        except Exception:
+            logger.warning("Failed to write branch update audit log")
+        
         response_data = branch.model_dump()
         response_data["id"] = result.id
         response_data["created_at"] = result.created_at
@@ -235,7 +263,7 @@ def update_branch(
         raise
     except Exception as e:
         conn.rollback()
-        print(f"Error updating branch: {e}")
+        logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         conn.close()
@@ -260,27 +288,46 @@ def delete_branch(
             
         if check.is_default:
             raise HTTPException(status_code=400, detail="Cannot delete the default branch")
+        
+        # T011: Check for dependent transactions before deletion
+        for table_name in ("invoices", "journal_entries", "inventory_movements"):
+            count = conn.execute(
+                text(f"SELECT COUNT(*) FROM {table_name} WHERE branch_id = :bid"),
+                {"bid": branch_id}
+            ).scalar() or 0
+            if count > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail="لا يمكن حذف الفرع لوجود عمليات مرتبطة به"
+                )
             
-        # Check usage (e.g. invoices, users)
-        # For now, simplistic check or just prevent delete if used
-        # We'll just define it as restricted if used.
-        
-        # Let's delete if no heavy dependencies, or better, just deactivate? 
-        # User asked for delete likely.
-        
         conn.execute(
             text("DELETE FROM branches WHERE id = :id"),
             {"id": branch_id}
         )
+        
+        # Audit log
+        try:
+            user_id = current_user.get('id') if isinstance(current_user, dict) else getattr(current_user, 'id', None)
+            username = current_user.get('username', '') if isinstance(current_user, dict) else getattr(current_user, 'username', '')
+            if user_id:
+                log_activity(conn, user_id, username, "delete",
+                             resource_type="branch", resource_id=str(branch_id),
+                             details={"branch_id": branch_id})
+        except Exception:
+            logger.warning("Failed to write branch delete audit log")
+        
         conn.commit()
         return {"success": True, "message": "Branch deleted"}
         
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         # Postgres Foreign Key violation will raise IntegrityError
         if "foreign key constraint" in str(e).lower():
             raise HTTPException(status_code=400, detail="Cannot delete branch because it is used by other records (Invoices, Users, etc.)")
-        print(f"Error deleting branch: {e}")
+        logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         conn.close()

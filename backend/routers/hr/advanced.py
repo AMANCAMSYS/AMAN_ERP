@@ -3,7 +3,7 @@ Advanced HR Router - Phase 4
 الموارد البشرية المتقدمة: هياكل الرواتب، مكونات الراتب، العمل الإضافي، GOSI، المستندات، تقييم الأداء، التدريب، المخالفات، العهد
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, datetime
@@ -12,8 +12,11 @@ from database import get_db_connection
 from routers.auth import get_current_user, UserResponse, get_current_user_company
 from utils.permissions import require_permission, require_module
 from utils.exports import generate_excel, generate_pdf, create_export_response
+from utils.audit import log_activity
 
 from schemas.hr_advanced import (
+import logging
+logger = logging.getLogger(__name__)
     SalaryStructureCreate, SalaryStructureUpdate, SalaryStructureResponse,
     SalaryComponentCreate, SalaryComponentUpdate, SalaryComponentResponse,
     EmployeeSalaryComponentCreate, EmployeeSalaryComponentResponse,
@@ -50,21 +53,27 @@ def list_salary_structures(company_id: str = Depends(get_current_user_company)):
 
 
 @router.post("/salary-structures", dependencies=[Depends(require_permission("hr.manage"))])
-def create_salary_structure(data: SalaryStructureCreate, company_id: str = Depends(get_current_user_company)):
+def create_salary_structure(data: SalaryStructureCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
             INSERT INTO salary_structures (name, name_en, description, base_type)
             VALUES (:name, :name_en, :desc, :base_type) RETURNING id
         """), {"name": data.name, "name_en": data.name_en, "desc": data.description, "base_type": data.base_type})
+        sid = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.salary_structure.create", resource_type="salary_structure",
+            resource_id=str(sid), details={"name": data.name}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم إنشاء هيكل الراتب بنجاح"}
+        return {"id": sid, "message": "تم إنشاء هيكل الراتب بنجاح"}
     finally:
         conn.close()
 
 
 @router.put("/salary-structures/{structure_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_salary_structure(structure_id: int, data: SalaryStructureUpdate, company_id: str = Depends(get_current_user_company)):
+def update_salary_structure(structure_id: int, data: SalaryStructureUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": structure_id}
@@ -77,6 +86,11 @@ def update_salary_structure(structure_id: int, data: SalaryStructureUpdate, comp
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE salary_structures SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.salary_structure.update", resource_type="salary_structure",
+            resource_id=str(structure_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم التحديث بنجاح"}
     finally:
@@ -84,10 +98,15 @@ def update_salary_structure(structure_id: int, data: SalaryStructureUpdate, comp
 
 
 @router.delete("/salary-structures/{structure_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def delete_salary_structure(structure_id: int, company_id: str = Depends(get_current_user_company)):
+def delete_salary_structure(structure_id: int, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         conn.execute(text("DELETE FROM salary_structures WHERE id = :id"), {"id": structure_id})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.salary_structure.delete", resource_type="salary_structure",
+            resource_id=str(structure_id), details={}, request=request
+        )
         conn.commit()
         return {"message": "تم الحذف بنجاح"}
     finally:
@@ -115,7 +134,7 @@ def list_salary_components(structure_id: Optional[int] = None, company_id: str =
 
 
 @router.post("/salary-components", dependencies=[Depends(require_permission("hr.manage"))])
-def create_salary_component(data: SalaryComponentCreate, company_id: str = Depends(get_current_user_company)):
+def create_salary_component(data: SalaryComponentCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
@@ -128,14 +147,20 @@ def create_salary_component(data: SalaryComponentCreate, company_id: str = Depen
             "formula": data.formula, "tax": data.is_taxable, "gosi": data.is_gosi_applicable,
             "sort": data.sort_order, "sid": data.structure_id
         })
+        cid = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.salary_component.create", resource_type="salary_component",
+            resource_id=str(cid), details={"name": data.name}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم إنشاء مكون الراتب بنجاح"}
+        return {"id": cid, "message": "تم إنشاء مكون الراتب بنجاح"}
     finally:
         conn.close()
 
 
 @router.put("/salary-components/{component_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_salary_component(component_id: int, data: SalaryComponentUpdate, company_id: str = Depends(get_current_user_company)):
+def update_salary_component(component_id: int, data: SalaryComponentUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": component_id}
@@ -147,6 +172,11 @@ def update_salary_component(component_id: int, data: SalaryComponentUpdate, comp
         if not fields:
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         conn.execute(text(f"UPDATE salary_components SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.salary_component.update", resource_type="salary_component",
+            resource_id=str(component_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم التحديث بنجاح"}
     finally:
@@ -174,7 +204,7 @@ def get_employee_salary_components(employee_id: int, company_id: str = Depends(g
 
 
 @router.post("/employee-salary-components", dependencies=[Depends(require_permission("hr.manage"))])
-def assign_salary_component(data: EmployeeSalaryComponentCreate, company_id: str = Depends(get_current_user_company)):
+def assign_salary_component(data: EmployeeSalaryComponentCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         conn.execute(text("""
@@ -182,6 +212,11 @@ def assign_salary_component(data: EmployeeSalaryComponentCreate, company_id: str
             VALUES (:eid, :cid, :amt, :active, :date)
             ON CONFLICT (employee_id, component_id) DO UPDATE SET amount = :amt, is_active = :active, effective_date = :date
         """), {"eid": data.employee_id, "cid": data.component_id, "amt": data.amount, "active": data.is_active, "date": data.effective_date})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.employee_salary_component.assign", resource_type="employee_salary_component",
+            resource_id=str(data.employee_id), details={"component_id": data.component_id, "amount": float(data.amount) if data.amount else 0}, request=request
+        )
         conn.commit()
         return {"message": "تم تعيين مكون الراتب بنجاح"}
     finally:
@@ -217,7 +252,7 @@ def list_overtime_requests(employee_id: Optional[int] = None, status: Optional[s
 
 
 @router.post("/overtime", dependencies=[Depends(require_permission("hr.manage"))])
-def create_overtime_request(data: OvertimeRequestCreate, company_id: str = Depends(get_current_user_company)):
+def create_overtime_request(data: OvertimeRequestCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         # Calculate amount: (salary / 30 / 8) * hours * multiplier
@@ -238,14 +273,20 @@ def create_overtime_request(data: OvertimeRequestCreate, company_id: str = Depen
             "otype": data.overtime_type, "mult": float(multiplier), "amt": amount,
             "reason": data.reason, "bid": data.branch_id
         })
+        ot_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.overtime.create", resource_type="overtime_request",
+            resource_id=str(ot_id), details={"employee_id": data.employee_id, "hours": data.hours}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "calculated_amount": amount, "message": "تم إنشاء طلب العمل الإضافي"}
+        return {"id": ot_id, "calculated_amount": amount, "message": "تم إنشاء طلب العمل الإضافي"}
     finally:
         conn.close()
 
 
 @router.put("/overtime/{overtime_id}/approve", dependencies=[Depends(require_permission("hr.manage"))])
-def approve_overtime(overtime_id: int, data: OvertimeRequestUpdate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+def approve_overtime(overtime_id: int, data: OvertimeRequestUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get("id")
@@ -253,6 +294,11 @@ def approve_overtime(overtime_id: int, data: OvertimeRequestUpdate, current_user
             UPDATE overtime_requests SET status = :status, approved_by = :uid, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {"status": data.status, "uid": user_id, "id": overtime_id})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.overtime.approve", resource_type="overtime_request",
+            resource_id=str(overtime_id), details={"status": data.status}, request=request
+        )
         conn.commit()
         return {"message": "تم تحديث حالة الطلب"}
     finally:
@@ -276,7 +322,7 @@ def get_gosi_settings(company_id: str = Depends(get_current_user_company)):
 
 
 @router.post("/gosi-settings", dependencies=[Depends(require_permission("hr.manage"))])
-def save_gosi_settings(data: GOSISettingsCreate, company_id: str = Depends(get_current_user_company)):
+def save_gosi_settings(data: GOSISettingsCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         # Deactivate old
@@ -289,8 +335,14 @@ def save_gosi_settings(data: GOSISettingsCreate, company_id: str = Depends(get_c
             "occ_pct": data.occupational_hazard_percentage, "max_sal": data.max_contributable_salary,
             "eff_date": data.effective_date or date.today()
         })
+        gosi_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.gosi_settings.save", resource_type="gosi_settings",
+            resource_id=str(gosi_id), details={"employee_share": data.employee_share_percentage, "employer_share": data.employer_share_percentage}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم حفظ إعدادات GOSI"}
+        return {"id": gosi_id, "message": "تم حفظ إعدادات GOSI"}
     finally:
         conn.close()
 
@@ -470,7 +522,7 @@ def list_documents(employee_id: Optional[int] = None, expiring_soon: Optional[bo
 
 
 @router.post("/documents", dependencies=[Depends(require_permission("hr.manage"))])
-def create_document(data: EmployeeDocumentCreate, company_id: str = Depends(get_current_user_company)):
+def create_document(data: EmployeeDocumentCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         # Determine status based on expiry
@@ -489,14 +541,20 @@ def create_document(data: EmployeeDocumentCreate, company_id: str = Depends(get_
             "issue": data.issue_date, "expiry": data.expiry_date, "auth": data.issuing_authority,
             "url": data.file_url, "notes": data.notes, "alert": data.alert_days, "status": doc_status
         })
+        doc_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.document.create", resource_type="employee_document",
+            resource_id=str(doc_id), details={"employee_id": data.employee_id, "type": data.document_type}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم إضافة المستند"}
+        return {"id": doc_id, "message": "تم إضافة المستند"}
     finally:
         conn.close()
 
 
 @router.put("/documents/{doc_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_document(doc_id: int, data: EmployeeDocumentUpdate, company_id: str = Depends(get_current_user_company)):
+def update_document(doc_id: int, data: EmployeeDocumentUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": doc_id}
@@ -509,6 +567,11 @@ def update_document(doc_id: int, data: EmployeeDocumentUpdate, company_id: str =
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_documents SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.document.update", resource_type="employee_document",
+            resource_id=str(doc_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم التحديث"}
     finally:
@@ -516,10 +579,15 @@ def update_document(doc_id: int, data: EmployeeDocumentUpdate, company_id: str =
 
 
 @router.delete("/documents/{doc_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def delete_document(doc_id: int, company_id: str = Depends(get_current_user_company)):
+def delete_document(doc_id: int, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         conn.execute(text("DELETE FROM employee_documents WHERE id = :id"), {"id": doc_id})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.document.delete", resource_type="employee_document",
+            resource_id=str(doc_id), details={}, request=request
+        )
         conn.commit()
         return {"message": "تم الحذف"}
     finally:
@@ -555,7 +623,7 @@ def list_performance_reviews(employee_id: Optional[int] = None, company_id: str 
 
 
 @router.post("/performance-reviews", dependencies=[Depends(require_permission("hr.manage"))])
-def create_performance_review(data: PerformanceReviewCreate, company_id: str = Depends(get_current_user_company)):
+def create_performance_review(data: PerformanceReviewCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
@@ -566,14 +634,20 @@ def create_performance_review(data: PerformanceReviewCreate, company_id: str = D
             "rdate": data.review_date, "rtype": data.review_type, "rating": data.overall_rating,
             "strengths": data.strengths, "weaknesses": data.weaknesses, "goals": data.goals
         })
+        pr_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.performance_review.create", resource_type="performance_review",
+            resource_id=str(pr_id), details={"employee_id": data.employee_id}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم إنشاء التقييم"}
+        return {"id": pr_id, "message": "تم إنشاء التقييم"}
     finally:
         conn.close()
 
 
 @router.put("/performance-reviews/{review_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_performance_review(review_id: int, data: PerformanceReviewUpdate, company_id: str = Depends(get_current_user_company)):
+def update_performance_review(review_id: int, data: PerformanceReviewUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": review_id}
@@ -586,6 +660,11 @@ def update_performance_review(review_id: int, data: PerformanceReviewUpdate, com
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE performance_reviews SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.performance_review.update", resource_type="performance_review",
+            resource_id=str(review_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم تحديث التقييم"}
     finally:
@@ -613,7 +692,7 @@ def list_training_programs(company_id: str = Depends(get_current_user_company)):
 
 
 @router.post("/training", dependencies=[Depends(require_permission("hr.manage"))])
-def create_training_program(data: TrainingProgramCreate, company_id: str = Depends(get_current_user_company)):
+def create_training_program(data: TrainingProgramCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
@@ -624,14 +703,20 @@ def create_training_program(data: TrainingProgramCreate, company_id: str = Depen
             "trainer": data.trainer, "loc": data.location, "start": data.start_date,
             "end": data.end_date, "max": data.max_participants, "cost": data.cost
         })
+        tp_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.training.create", resource_type="training_program",
+            resource_id=str(tp_id), details={"name": data.name}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم إنشاء البرنامج التدريبي"}
+        return {"id": tp_id, "message": "تم إنشاء البرنامج التدريبي"}
     finally:
         conn.close()
 
 
 @router.put("/training/{training_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_training_program(training_id: int, data: TrainingProgramUpdate, company_id: str = Depends(get_current_user_company)):
+def update_training_program(training_id: int, data: TrainingProgramUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": training_id}
@@ -643,6 +728,11 @@ def update_training_program(training_id: int, data: TrainingProgramUpdate, compa
         if not fields:
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         conn.execute(text(f"UPDATE training_programs SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.training.update", resource_type="training_program",
+            resource_id=str(training_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم التحديث"}
     finally:
@@ -650,19 +740,25 @@ def update_training_program(training_id: int, data: TrainingProgramUpdate, compa
 
 
 @router.post("/training/{training_id}/participants", dependencies=[Depends(require_permission("hr.manage"))])
-def add_training_participant(training_id: int, data: TrainingParticipantCreate, company_id: str = Depends(get_current_user_company)):
+def add_training_participant(training_id: int, data: TrainingParticipantCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         conn.execute(text("""
             INSERT INTO training_participants (training_id, employee_id)
             VALUES (:tid, :eid)
         """), {"tid": training_id, "eid": data.employee_id})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.training.add_participant", resource_type="training_participant",
+            resource_id=str(training_id), details={"employee_id": data.employee_id}, request=request
+        )
         conn.commit()
         return {"message": "تم تسجيل المشارك"}
     except Exception as e:
         if "unique" in str(e).lower() or "duplicate" in str(e).lower():
             raise HTTPException(status_code=400, detail="المشارك مسجل مسبقاً")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -684,7 +780,7 @@ def list_training_participants(training_id: int, company_id: str = Depends(get_c
 
 
 @router.put("/training/participants/{participant_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_training_participant(participant_id: int, data: TrainingParticipantUpdate, company_id: str = Depends(get_current_user_company)):
+def update_training_participant(participant_id: int, data: TrainingParticipantUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": participant_id}
@@ -696,6 +792,11 @@ def update_training_participant(participant_id: int, data: TrainingParticipantUp
         if not fields:
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         conn.execute(text(f"UPDATE training_participants SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.training.update_participant", resource_type="training_participant",
+            resource_id=str(participant_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم التحديث"}
     finally:
@@ -728,7 +829,7 @@ def list_violations(employee_id: Optional[int] = None, company_id: str = Depends
 
 
 @router.post("/violations", dependencies=[Depends(require_permission("hr.manage"))])
-def create_violation(data: ViolationCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
+def create_violation(data: ViolationCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get("id")
@@ -741,14 +842,20 @@ def create_violation(data: ViolationCreate, current_user: UserResponse = Depends
             "penalty": data.penalty_amount, "deduct": data.deduct_from_salary,
             "reported": data.reported_by or user_id
         })
+        v_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.violation.create", resource_type="employee_violation",
+            resource_id=str(v_id), details={"employee_id": data.employee_id, "type": data.violation_type}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم تسجيل المخالفة"}
+        return {"id": v_id, "message": "تم تسجيل المخالفة"}
     finally:
         conn.close()
 
 
 @router.put("/violations/{violation_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_violation(violation_id: int, data: ViolationUpdate, company_id: str = Depends(get_current_user_company)):
+def update_violation(violation_id: int, data: ViolationUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": violation_id}
@@ -761,6 +868,11 @@ def update_violation(violation_id: int, data: ViolationUpdate, company_id: str =
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_violations SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.violation.update", resource_type="employee_violation",
+            resource_id=str(violation_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم تحديث المخالفة"}
     finally:
@@ -796,7 +908,7 @@ def list_custody(employee_id: Optional[int] = None, status_filter: Optional[str]
 
 
 @router.post("/custody", dependencies=[Depends(require_permission("hr.manage"))])
-def create_custody(data: CustodyCreate, company_id: str = Depends(get_current_user_company)):
+def create_custody(data: CustodyCreate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
@@ -807,14 +919,20 @@ def create_custody(data: CustodyCreate, company_id: str = Depends(get_current_us
             "serial": data.serial_number, "date": data.assigned_date,
             "condition": data.condition_on_assign, "value": data.value, "notes": data.notes
         })
+        c_id = result.scalar()
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.custody.create", resource_type="employee_custody",
+            resource_id=str(c_id), details={"employee_id": data.employee_id, "item": data.item_name}, request=request
+        )
         conn.commit()
-        return {"id": result.scalar(), "message": "تم تسليم العهدة"}
+        return {"id": c_id, "message": "تم تسليم العهدة"}
     finally:
         conn.close()
 
 
 @router.put("/custody/{custody_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def update_custody(custody_id: int, data: CustodyUpdate, company_id: str = Depends(get_current_user_company)):
+def update_custody(custody_id: int, data: CustodyUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         fields, params = [], {"id": custody_id}
@@ -827,6 +945,11 @@ def update_custody(custody_id: int, data: CustodyUpdate, company_id: str = Depen
             raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_custody SET {', '.join(fields)} WHERE id = :id"), params)
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.custody.update", resource_type="employee_custody",
+            resource_id=str(custody_id), details={"fields": list(params.keys())}, request=request
+        )
         conn.commit()
         return {"message": "تم تحديث العهدة"}
     finally:
@@ -834,7 +957,7 @@ def update_custody(custody_id: int, data: CustodyUpdate, company_id: str = Depen
 
 
 @router.put("/custody/{custody_id}/return", dependencies=[Depends(require_permission("hr.manage"))])
-def return_custody(custody_id: int, data: CustodyUpdate, company_id: str = Depends(get_current_user_company)):
+def return_custody(custody_id: int, data: CustodyUpdate, request: Request, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         conn.execute(text("""
@@ -842,6 +965,11 @@ def return_custody(custody_id: int, data: CustodyUpdate, company_id: str = Depen
             condition_on_return = :condition, notes = :notes, updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {"condition": data.condition_on_return or "good", "notes": data.notes, "id": custody_id})
+        log_activity(
+            conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="hr.custody.return", resource_type="employee_custody",
+            resource_id=str(custody_id), details={}, request=request
+        )
         conn.commit()
         return {"message": "تم استلام العهدة"}
     finally:

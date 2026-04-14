@@ -1,19 +1,24 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
+from utils.audit import log_activity
+from utils.limiter import limiter
 from schemas.cost_centers import CostCenterCreate, CostCenterUpdate, CostCenterResponse
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cost-centers", tags=["مراكز التكلفة"], dependencies=[Depends(require_module("cost_centers"))])
 
 # --- Endpoints ---
 
 @router.get("/", response_model=List[CostCenterResponse], dependencies=[Depends(require_permission("accounting.cost_centers.view"))])
-def list_cost_centers(current_user: dict = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_cost_centers(request: Request, current_user: dict = Depends(get_current_user)):
     """List all cost centers"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -27,7 +32,8 @@ def list_cost_centers(current_user: dict = Depends(get_current_user)):
         conn.close()
 
 @router.post("/", response_model=CostCenterResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("accounting.cost_centers.manage"))])
-def create_cost_center(cc: CostCenterCreate, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_cost_center(request: Request, cc: CostCenterCreate, current_user: dict = Depends(get_current_user)):
     """Create a new cost center"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -50,17 +56,23 @@ def create_cost_center(cc: CostCenterCreate, current_user: dict = Depends(get_cu
             "active": cc.is_active
         }).fetchone()
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_cost_center", resource_type="cost_center",
+                     resource_id=str(result._mapping["id"]),
+                     details={"code": cc.center_code, "name": cc.center_name}, request=request)
         return dict(result._mapping)
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.put("/{cc_id}", response_model=CostCenterResponse, dependencies=[Depends(require_permission("accounting.cost_centers.manage"))])
-def update_cost_center(cc_id: int, cc: CostCenterUpdate, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def update_cost_center(request: Request, cc_id: int, cc: CostCenterUpdate, current_user: dict = Depends(get_current_user)):
     """Update a cost center"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -106,17 +118,23 @@ def update_cost_center(cc_id: int, cc: CostCenterUpdate, current_user: dict = De
         
         result = conn.execute(text(sql), params).fetchone()
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_cost_center", resource_type="cost_center",
+                     resource_id=str(cc_id),
+                     details={"fields": list(params.keys())}, request=request)
         return dict(result._mapping)
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.delete("/{cc_id}", dependencies=[Depends(require_permission("accounting.cost_centers.manage"))])
-def delete_cost_center(cc_id: int, current_user: dict = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def delete_cost_center(request: Request, cc_id: int, current_user: dict = Depends(get_current_user)):
     """Delete a cost center (if unused)"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -130,11 +148,16 @@ def delete_cost_center(cc_id: int, current_user: dict = Depends(get_current_user
              raise HTTPException(status_code=404, detail="Cost center not found")
              
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_cost_center", resource_type="cost_center",
+                     resource_id=str(cc_id),
+                     details={}, request=request)
         return {"message": "Cost center deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()

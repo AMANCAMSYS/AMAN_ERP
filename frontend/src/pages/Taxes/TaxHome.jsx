@@ -446,7 +446,7 @@ function TaxHome() {
                                 <label className="form-label">{t('taxes.tax_name_en')}</label>
                                 <input className="form-input" value={rateForm.tax_name_en}
                                     onChange={e => setRateForm({...rateForm, tax_name_en: e.target.value})}
-                                    placeholder="e.g. VAT" />
+                                    placeholder={t('taxes.tax_name_placeholder')} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('taxes.rate_value')} *</label>

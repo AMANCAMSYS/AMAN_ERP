@@ -134,7 +134,8 @@ async def preview_import(
     try:
         rows = _parse_file(content, filename)
     except Exception as e:
-        raise HTTPException(400, f"خطأ في قراءة الملف: {str(e)}")
+        logger.exception("Error parsing import file")
+        raise HTTPException(400, "خطأ في قراءة الملف")
 
     if not rows:
         raise HTTPException(400, "الملف فارغ")
@@ -181,7 +182,7 @@ async def preview_import(
 async def execute_import(
     file: UploadFile = File(...),
     entity_type: str = Query(...),
-    skip_errors: bool = Query(False),
+    skip_errors: bool = Query(True),
     current_user=Depends(get_current_user)
 ):
     """
@@ -202,7 +203,8 @@ async def execute_import(
     try:
         rows = _parse_file(content, filename)
     except Exception as e:
-        raise HTTPException(400, f"خطأ في قراءة الملف: {str(e)}")
+        logger.exception("Error parsing import file")
+        raise HTTPException(400, "خطأ في قراءة الملف")
 
     if not rows:
         raise HTTPException(400, "الملف فارغ")
@@ -272,9 +274,11 @@ async def execute_import(
             except Exception as e:
                 if skip_errors:
                     skipped += 1
-                    errors.append(f"سطر {i + 2}: {str(e)}")
+                    errors.append(f"سطر {i + 2}: خطأ في البيانات")
+                    logger.warning(f"Import row {i + 2} error", exc_info=True)
                 else:
-                    raise HTTPException(400, f"خطأ في السطر {i + 2}: {str(e)}")
+                    logger.exception(f"Import error at row {i + 2}")
+                    raise HTTPException(400, f"خطأ في السطر {i + 2}")
 
         db.commit()
 
@@ -297,7 +301,8 @@ async def execute_import(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -352,7 +357,8 @@ def export_data(
                 headers={"Content-Disposition": f"attachment; filename={entity_type}_export_{datetime.now().strftime('%Y%m%d')}.csv"}
             )
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

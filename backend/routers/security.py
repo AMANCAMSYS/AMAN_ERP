@@ -42,6 +42,22 @@ class PasswordPolicySchema(BaseModel):
     max_age_days: int = 90
     prevent_reuse: int = 5
 
+    @classmethod
+    def __get_validators__(cls):
+        yield from super().__get_validators__()
+
+    def model_post_init(self, __context):
+        if self.min_length < 1:
+            raise ValueError("min_length must be at least 1")
+        if self.min_length > 128:
+            raise ValueError("min_length must not exceed 128")
+        if self.max_age_days < 0:
+            raise ValueError("max_age_days must be non-negative")
+        if self.prevent_reuse < 0:
+            raise ValueError("prevent_reuse must be non-negative")
+        if self.prevent_reuse > 50:
+            raise ValueError("prevent_reuse must not exceed 50")
+
 
 # ===================== 2FA Setup & Verification =====================
 
@@ -91,7 +107,8 @@ def setup_2fa(current_user=Depends(get_current_user)):
         raise HTTPException(500, "مكتبة pyotp غير مثبتة. قم بتشغيل: pip install pyotp")
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -132,11 +149,8 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
         """), {"uid": current_user.id, "codes": ",".join(hashed_codes)})
         db.commit()
 
-        try:
-            log_activity(db, current_user.id, current_user.username, "enable_2fa",
-                         "security", str(current_user.id), {})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "enable_2fa",
+                     "security", str(current_user.id), {})
 
         return {
             "message": "تم تفعيل المصادقة الثنائية بنجاح",
@@ -147,7 +161,8 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -176,18 +191,16 @@ def disable_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user)
         """), {"uid": current_user.id})
         db.commit()
 
-        try:
-            log_activity(db, current_user.id, current_user.username, "disable_2fa",
-                         "security", str(current_user.id), {})
-        except Exception:
-            pass
+        log_activity(db, current_user.id, current_user.username, "disable_2fa",
+                     "security", str(current_user.id), {})
 
         return {"message": "تم تعطيل المصادقة الثنائية"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -306,18 +319,31 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
 
         db.commit()
 
+        # SEC-FIX-012: Invalidate all other tokens/sessions for this user (mandatory)
+        from routers.auth import invalidate_user_tokens
         try:
-            log_activity(db, current_user.id, current_user.username, "change_password",
-                         "security", str(current_user.id), {})
-        except Exception:
-            pass
+            invalidate_user_tokens(company_id, current_user.username, reason="password_change")
+        except Exception as inv_err:
+            logger.error(f"Token invalidation after password change failed: {inv_err}")
+            # Fallback: deactivate all sessions in DB directly
+            try:
+                db.execute(text("""
+                    UPDATE user_sessions SET is_active = FALSE WHERE user_id = :uid
+                """), {"uid": current_user.id})
+                db.commit()
+            except Exception:
+                logger.exception("Session deactivation fallback also failed")
+
+        log_activity(db, current_user.id, current_user.username, "change_password",
+                     "security", str(current_user.id), {})
 
         return {"message": "تم تغيير كلمة المرور بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -354,7 +380,8 @@ def update_password_policy(data: PasswordPolicySchema, current_user=Depends(get_
         return {"message": "تم تحديث سياسة كلمات المرور"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -409,7 +436,8 @@ def terminate_session(session_id: int, current_user=Depends(get_current_user)):
         return {"message": "تم إنهاء الجلسة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -431,7 +459,8 @@ def terminate_all_sessions(current_user=Depends(get_current_user)):
         return {"message": "تم إنهاء جميع الجلسات"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

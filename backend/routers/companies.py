@@ -22,6 +22,7 @@ from database import (
 from schemas import CompanyCreateRequest, CompanyCreateResponse, CompanyListResponse, CompanyListItem, CompanyUpdateRequest
 from utils.permissions import require_permission
 from utils.limiter import limiter
+from utils.audit import log_activity
 
 router = APIRouter(prefix="/companies", tags=["إدارة الشركات"])
 logger = logging.getLogger(__name__)
@@ -91,7 +92,8 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 db.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
                 db.execute(text(f'DROP USER IF EXISTS {db_user}'))
                 db.commit()
-                raise HTTPException(status_code=500, detail=f"فشل إنشاء الجداول: {message}")
+                logger.error("Failed to create company tables: %s", message)
+                raise HTTPException(status_code=500, detail="فشل إنشاء الجداول")
             
             # Initialize default data
             success, message = initialize_company_default_data(
@@ -177,6 +179,26 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
             
             logger.info(f"✅ Created company: {request_body.company_name} (ID: {company_id})")
             
+            # Audit log for company creation (system-level)
+            try:
+                sys_db = get_system_db()
+                try:
+                    sys_db.execute(text("""
+                        INSERT INTO system_activity_log (company_id, action_type, action_description, performed_by, ip_address, created_at)
+                        VALUES (:cid, :action, :desc, :user, :ip, NOW())
+                    """), {
+                        "cid": company_id,
+                        "action": "company_created",
+                        "desc": f"Company '{request_body.company_name}' created",
+                        "user": request_body.admin_username,
+                        "ip": request.client.host if request else None,
+                    })
+                    sys_db.commit()
+                finally:
+                    sys_db.close()
+            except Exception:
+                logger.warning("Failed to write company creation audit log")
+            
             return CompanyCreateResponse(
                 success=True,
                 company_id=company_id,
@@ -189,8 +211,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
             
         except Exception as e:
             import traceback
-            error_details = traceback.format_exc()
-            logger.error(f"❌ Error in register_new_company: {str(e)}\nTraceback:\n{error_details}")
+            logger.exception("Error in register_new_company")
             
             # SEC-FIX-009/010: Don't write errors to file in web root, don't leak details to client
             db.rollback()
@@ -320,7 +341,7 @@ def get_enabled_modules(current_user=Depends(get_current_user)):
         db.close()
 
 
-@router.put("/modules")
+@router.put("/modules", dependencies=[Depends(require_permission("settings.manage"))])
 def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_current_user)):
     """تحديث الوحدات المفعّلة — يقبل list أو dict"""
     import json
@@ -336,7 +357,8 @@ def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_cu
         sys_db.commit()
     except Exception as e:
         sys_db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         sys_db.close()
     
@@ -360,6 +382,18 @@ def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_cu
         db.rollback()
     finally:
         db.close()
+    
+    # Audit log for module update
+    try:
+        audit_db = get_db_connection(current_user.company_id)
+        try:
+            log_activity(audit_db, current_user.id, current_user.username, "update_modules",
+                         resource_type="company", details={"modules": modules})
+            audit_db.commit()
+        finally:
+            audit_db.close()
+    except Exception:
+        logger.warning("Failed to write module update audit log")
     
     return {"message": "تم تحديث الوحدات بنجاح", "modules": modules}
 
@@ -406,15 +440,18 @@ def get_company(
             "activated_at": result[10],
             "logo_url": result[11]
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in get_company {company_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        logger.exception(f"Error in get_company {company_id}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-@router.put("/update/{company_id}")
+@router.put("/update/{company_id}", dependencies=[Depends(require_permission("settings.manage"))])
 def update_company(
     company_id: str,
     request: CompanyUpdateRequest,
+    req: Request = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """Update company details"""
@@ -456,15 +493,33 @@ def update_company(
         )
         db.commit()
         
+        # Audit log
+        try:
+            db.execute(text("""
+                INSERT INTO system_activity_log (company_id, action_type, action_description, performed_by, ip_address, created_at)
+                VALUES (:cid, :action, :desc, :user, :ip, NOW())
+            """), {
+                "cid": company_id,
+                "action": "company_updated",
+                "desc": f"Company updated: {', '.join(request.dict(exclude_unset=True).keys())}",
+                "user": current_user.username,
+                "ip": req.client.host if req else None,
+            })
+            db.commit()
+        except Exception:
+            logger.warning("Failed to write company update audit log")
+        
         return {"success": True, "message": "Company updated successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error updating company {company_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        logger.exception(f"Error updating company {company_id}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
-@router.post("/upload-logo/{company_id}")
+@router.post("/upload-logo/{company_id}", dependencies=[Depends(require_permission("settings.edit"))])
 async def upload_company_logo(
     company_id: str,
     file: UploadFile = File(...),
@@ -520,11 +575,21 @@ async def upload_company_logo(
 
             # Commit to company db
             db.commit()
+            
+            # Audit log
+            try:
+                log_activity(db, current_user.id, current_user.username, "upload_logo",
+                             resource_type="company", resource_id=company_id,
+                             details={"logo_url": logo_url})
+                db.commit()
+            except Exception:
+                logger.warning("Failed to write logo upload audit log")
+            
             return {"success": True, "logo_url": logo_url}
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"Error uploading logo: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload: {str(e)}")
+        logger.exception("Error uploading logo")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
 

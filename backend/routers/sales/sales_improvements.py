@@ -5,7 +5,7 @@ Phase 8.12 Sales Improvements:
   SALES-003: Partial invoicing
   SALES-004: Smart credit limit
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from typing import Optional
 from datetime import date
@@ -88,7 +88,8 @@ def convert_quotation_to_order(sq_id: int, current_user=Depends(get_current_user
     except Exception as e:
         db.rollback()
         logger.error(f"Quotation conversion error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -127,7 +128,8 @@ def create_commission_rule(data: dict, current_user=Depends(get_current_user)):
         return dict(result._mapping)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -265,7 +267,8 @@ def calculate_commission(data: dict, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -376,7 +379,8 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -436,7 +440,8 @@ def create_partial_invoice(order_id: int, data: dict, current_user=Depends(get_c
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -468,12 +473,23 @@ def get_credit_status(party_id: int, current_user=Depends(get_current_user)):
 
 
 @sales_improvements_router.put("/customers/{party_id}/credit-limit", dependencies=[Depends(require_permission("sales.create"))])
-def update_credit_limit(party_id: int, data: dict, current_user=Depends(get_current_user)):
+def update_credit_limit(party_id: int, data: dict, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
+        old_limit = db.execute(text("SELECT credit_limit FROM parties WHERE id = :id"), {"id": party_id}).scalar()
         db.execute(text("UPDATE parties SET credit_limit = :lim WHERE id = :id"),
                    {"lim": data["credit_limit"], "id": party_id})
         db.commit()
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="sales.credit_limit.update",
+            resource_type="party",
+            resource_id=str(party_id),
+            details={"old_limit": float(old_limit or 0), "new_limit": data["credit_limit"]},
+            request=request
+        )
         return {"message": "Credit limit updated", "credit_limit": data["credit_limit"]}
     finally:
         db.close()

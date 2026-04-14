@@ -68,6 +68,7 @@ def generate_sequential_number(db, prefix: str, table: str, column: str) -> str:
     
     Uses MAX extraction of trailing digits from existing numbers to determine next.
     table and column are developer-defined constants (not user input).
+    Uses FOR UPDATE to prevent race conditions under concurrent access.
     """
     # SEC-003: Validate table/column identifiers to prevent SQL injection
     from utils.sql_safety import validate_sql_identifier
@@ -77,6 +78,7 @@ def generate_sequential_number(db, prefix: str, table: str, column: str) -> str:
     result = db.execute(text(f"""
         SELECT MAX(CAST(SUBSTRING({column} FROM '[0-9]+$') AS INTEGER))
         FROM {table} WHERE {column} LIKE :pattern
+        FOR UPDATE
     """), {"pattern": f"{prefix}-%"}).scalar()
     next_num = (result or 0) + 1
     return f"{prefix}-{str(next_num).zfill(5)}"

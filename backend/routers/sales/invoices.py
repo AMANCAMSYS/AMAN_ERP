@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import uuid
+from utils.cache import invalidate_company_cache
 
 _D2 = Decimal('0.01')
 _D6 = Decimal('0.000001')
@@ -13,8 +14,6 @@ _MAX_RATE_AGE_DAYS = 31
 def _dec(v) -> Decimal:
     """Convert any numeric value to Decimal safely."""
     return Decimal(str(v)) if v is not None else Decimal('0')
-
-
 def _prefetch_costing_methods(db, product_ids: List[int], warehouse_id: int) -> dict[int, str]:
     """Return costing method per product using bulk lookups (warehouse-first, then global)."""
     if not product_ids:
@@ -45,8 +44,6 @@ def _prefetch_costing_methods(db, product_ids: List[int], warehouse_id: int) -> 
             methods[int(row.product_id)] = row.costing_method or "wac"
 
     return methods
-
-
 def _prefetch_product_costs(db, product_ids: List[int], warehouse_id: int, policy_type: str) -> dict[int, float]:
     """Return WAC/fallback unit cost map in one query set."""
     if not product_ids:
@@ -80,8 +77,6 @@ from .schemas import InvoiceCreate, InvoiceResponse
 
 invoices_router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
 @invoices_router.get("/invoices", dependencies=[Depends(require_permission("sales.view"))])
 def list_invoices(
     branch_id: Optional[int] = None,
@@ -144,8 +139,6 @@ def list_invoices(
         }
     finally:
         db.close()
-
-
 @invoices_router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED,
                        dependencies=[Depends(require_permission("sales.create"))])
 def create_sales_invoice(
@@ -520,8 +513,6 @@ def create_sales_invoice(
                     INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
                     VALUES (:vid, :iid, :amt)
                 """), {"vid": pv_id, "iid": invoice_id, "amt": paid_amount})
-
-
         # --- 7. GL Entry ---
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
         acc_bank = get_mapped_account_id(db, "acc_map_bank")
@@ -644,6 +635,8 @@ def create_sales_invoice(
              })
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         cust_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": invoice.customer_id}).scalar()
 
@@ -707,11 +700,10 @@ def create_sales_invoice(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating invoice: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @invoices_router.get("/invoices/{invoice_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
 def get_invoice(
     invoice_id: int,
@@ -757,8 +749,6 @@ def get_invoice(
         }
     finally:
         db.close()
-
-
 @invoices_router.post("/invoices/{invoice_id}/cancel", dependencies=[Depends(require_permission("sales.create"))])
 def cancel_invoice(
     invoice_id: int,
@@ -852,6 +842,8 @@ def cancel_invoice(
         db.execute(text("UPDATE invoices SET status = 'cancelled' WHERE id = :id"), {"id": invoice_id})
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         log_activity(
             db,
@@ -871,11 +863,10 @@ def cancel_invoice(
     except Exception as e:
         db.rollback()
         logger.error(f"Error cancelling invoice: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @invoices_router.get("/invoices/{invoice_id}/payment-history", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(get_current_user)):
     """سجل الدفعات لفاتورة معينة"""
@@ -898,6 +889,7 @@ def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(ge
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error getting payment history: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

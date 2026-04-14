@@ -12,9 +12,11 @@ from fastapi import APIRouter
 from .core import router as hr_router
 from .advanced import router as hr_advanced_router
 from .self_service import router as self_service_router
+from .performance import router as performance_router
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
 router.include_router(hr_router)
 router.include_router(hr_advanced_router)
 router.include_router(self_service_router)
+router.include_router(performance_router)

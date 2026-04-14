@@ -252,7 +252,7 @@ function Register() {
                             <div className="form-group">
                                 <label className="form-label" htmlFor="company_name_en">{t('auth.company_name_en')}</label>
                                 <input type="text" name="company_name_en" id="company_name_en" className="form-input"
-                                    placeholder="e.g. Aman Trading"
+                                    placeholder={t('auth.register.company_name_placeholder')}
                                     value={formData.company_name_en} onChange={handleChange} autoComplete="off" />
                             </div>
                         </div>
@@ -305,12 +305,12 @@ function Register() {
                             <div className="form-group">
                                 <label className="form-label" htmlFor="timezone">{t('auth.timezone')}</label>
                                 <select name="timezone" id="timezone" className="form-input" value={formData.timezone} onChange={handleChange}>
-                                    <option value="Asia/Damascus">دمشق (GMT+3)</option>
-                                    <option value="Asia/Riyadh">الرياض (GMT+3)</option>
-                                    <option value="Asia/Dubai">دبي (GMT+4)</option>
-                                    <option value="Africa/Cairo">القاهرة (GMT+2)</option>
-                                    <option value="Asia/Kuwait">الكويت (GMT+3)</option>
-                                    <option value="Europe/Istanbul">إسطنبول (GMT+3)</option>
+                                    <option value="Asia/Damascus">{t('timezones.damascus_gmt')}</option>
+                                    <option value="Asia/Riyadh">{t('timezones.riyadh_gmt')}</option>
+                                    <option value="Asia/Dubai">{t('timezones.dubai_gmt')}</option>
+                                    <option value="Africa/Cairo">{t('timezones.cairo_gmt')}</option>
+                                    <option value="Asia/Kuwait">{t('timezones.kuwait_gmt')}</option>
+                                    <option value="Europe/Istanbul">{t('timezones.istanbul_gmt')}</option>
                                     <option value="UTC">UTC</option>
                                 </select>
                             </div>

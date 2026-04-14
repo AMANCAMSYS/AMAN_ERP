@@ -66,3 +66,29 @@ export const projectsAPI = {
     createTaskDependency: (projectId, data) => api.post(`/projects/${projectId}/task-dependencies`, data),
     deleteTaskDependency: (depId) => api.delete(`/projects/task-dependencies/${depId}`),
 }
+
+// US17 — Time Tracking API
+export const timesheetAPI = {
+    // Employee: log / list / update / submit
+    logEntry: (data) => api.post('/projects/timetracking', data),
+    listOwn: (params) => api.get('/projects/timetracking', { params }),
+    updateEntry: (id, data) => api.put(`/projects/timetracking/${id}`, data),
+    submitWeek: (data) => api.post('/projects/timetracking/submit-week', data),
+
+    // Manager: team view + approve / reject
+    listTeam: (params) => api.get('/projects/timetracking/team', { params }),
+    approve: (id) => api.post(`/projects/timetracking/${id}/approve`),
+    reject: (id, data) => api.post(`/projects/timetracking/${id}/reject`, data),
+
+    // Profitability report
+    getProfitability: (projectId) => api.get(`/projects/timetracking/profitability/${projectId}`),
+}
+
+// US18 — Resource Planning API
+export const resourceAPI = {
+    getAvailability: (params) => api.get('/projects/resources/availability', { params }),
+    allocate: (data) => api.post('/projects/resources/allocate', data),
+    updateAllocation: (id, data) => api.put(`/projects/resources/allocate/${id}`, data),
+    deleteAllocation: (id) => api.delete(`/projects/resources/allocate/${id}`),
+    getProjectResources: (projectId) => api.get(`/projects/resources/project/${projectId}`),
+}

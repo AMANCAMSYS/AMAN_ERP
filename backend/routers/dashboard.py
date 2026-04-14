@@ -31,7 +31,7 @@ def get_user_company_id(user):
     return cid
 
 @router.get("/stats", response_model=Dict[str, Any], dependencies=[Depends(require_permission("dashboard.view"))])
-@cached("dashboard_stats", expire=120)
+@cached("dashboard_stats", expire=60)
 def get_dashboard_stats(
     branch_id: int = None,
     current_user: dict = Depends(get_current_user)
@@ -230,15 +230,13 @@ def get_dashboard_stats(
             "reserved_stock": reserved_stock_list
         }
     except Exception as e:
-        import traceback
-        print(f"DASHBOARD ERROR: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Dashboard calculation error: {str(e)}")
+        logger.exception("Dashboard calculation error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 @router.get("/charts/financial", response_model=List[Dict[str, Any]], dependencies=[Depends(require_permission("dashboard.view"))])
-@cached("dashboard_charts_financial", expire=180)
+@cached("dashboard_charts_financial", expire=60)
 def get_financial_chart(
     days: int = 30,
     branch_id: int = None,
@@ -540,7 +538,8 @@ def save_dashboard_layout(data: LayoutCreate, current_user=Depends(get_current_u
         return {"id": layout_id, "message": "تم حفظ التخطيط بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, f"فشل في حفظ التخطيط: {str(e)}")
+        logger.exception("Failed to save dashboard layout")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -561,7 +560,8 @@ def update_dashboard_layout(layout_id: int, data: LayoutUpdate, current_user=Dep
         return {"message": "تم تحديث التخطيط بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -579,7 +579,8 @@ def delete_dashboard_layout(layout_id: int, current_user=Depends(get_current_use
         return {"message": "تم حذف التخطيط"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -677,7 +678,8 @@ def widget_sales_summary(
             "previous_total": prev_total
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -728,7 +730,8 @@ def widget_top_products(
             for r in result
         ]}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -780,7 +783,8 @@ def widget_low_stock(
             for r in result
         ]}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -872,7 +876,8 @@ def widget_pending_tasks(
 
         return {"tasks": tasks[:limit]}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -945,7 +950,8 @@ def widget_cash_flow(
 
         return {"data": result}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1091,5 +1097,361 @@ def get_company_coa_summary(current_user = Depends(get_current_user)):
         from services.industry_coa_templates import get_industry_coa_summary, normalize_industry_key
         industry_type = normalize_industry_key(industry_type)
         return get_industry_coa_summary(industry_type)
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════
+# BI Analytics Dashboard Endpoints (US9)
+# ═══════════════════════════════════════════════════════
+
+class WidgetCreate(BaseModel):
+    widget_type: str
+    title: str
+    data_source: str
+    filters: Optional[dict] = None
+    position: Optional[dict] = None
+    sort_order: Optional[int] = 0
+
+class DashboardCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    access_roles: Optional[List[str]] = None
+    branch_scope: Optional[str] = "all"
+    refresh_interval_minutes: Optional[int] = 15
+    widgets: Optional[List[WidgetCreate]] = None
+
+class DashboardUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    access_roles: Optional[List[str]] = None
+    branch_scope: Optional[str] = None
+    refresh_interval_minutes: Optional[int] = None
+    widgets: Optional[List[WidgetCreate]] = None
+
+
+VALID_WIDGET_TYPES = {"kpi_card", "bar_chart", "line_chart", "pie_chart", "table", "gauge"}
+VALID_DATA_SOURCES = {"revenue", "expenses", "cash_position", "top_customers", "inventory_turnover", "ar_aging", "ap_aging", "sales_pipeline", "custom_query"}
+
+MV_MAP = {
+    "revenue": "mv_revenue_summary",
+    "expenses": "mv_expense_summary",
+    "cash_position": "mv_cash_position",
+    "top_customers": "mv_top_customers",
+    "inventory_turnover": "mv_inventory_turnover",
+    "ar_aging": "mv_ar_aging",
+    "ap_aging": "mv_ap_aging",
+    "sales_pipeline": "mv_sales_pipeline",
+}
+
+
+def _query_widget_data(db, data_source: str, filters: dict = None):
+    """Query materialized view for widget data, applying optional filters."""
+    mv_name = MV_MAP.get(data_source)
+    if not mv_name:
+        return []
+
+    conditions = []
+    params = {}
+
+    if filters and filters.get("branch_id"):
+        conditions.append("branch_id = :branch_id")
+        params["branch_id"] = filters["branch_id"]
+
+    # Date filters apply to revenue/expenses views that have a period column
+    if data_source in ("revenue", "expenses") and filters:
+        if filters.get("date_from"):
+            conditions.append("period >= :date_from")
+            params["date_from"] = filters["date_from"]
+        if filters.get("date_to"):
+            conditions.append("period <= :date_to")
+            params["date_to"] = filters["date_to"]
+
+    where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    if data_source == "revenue":
+        query = f"SELECT period, branch_id, total_revenue FROM {mv_name}{where_clause} ORDER BY period"
+    elif data_source == "expenses":
+        query = f"SELECT period, branch_id, total_expenses FROM {mv_name}{where_clause} ORDER BY period"
+    elif data_source == "cash_position":
+        query = f"SELECT account_id, account_name, account_number, balance FROM {mv_name} ORDER BY balance DESC"
+    elif data_source == "top_customers":
+        query = f"SELECT party_id, customer_name, invoice_count, total_amount FROM {mv_name} ORDER BY total_amount DESC LIMIT 20"
+    elif data_source == "ar_aging":
+        query = f"SELECT party_id, customer_name, current_bucket, days_31_60, days_61_90, days_over_90 FROM {mv_name}"
+    elif data_source == "ap_aging":
+        query = f"SELECT party_id, supplier_name, current_bucket, days_31_60, days_61_90, days_over_90 FROM {mv_name}"
+    elif data_source == "inventory_turnover":
+        query = f"SELECT product_id, product_name, total_sold, current_stock, turnover_ratio FROM {mv_name} ORDER BY turnover_ratio DESC LIMIT 20"
+    elif data_source == "sales_pipeline":
+        query = f"SELECT stage, deal_count, total_value, avg_probability FROM {mv_name}"
+    else:
+        return []
+
+    try:
+        rows = db.execute(text(query), params).fetchall()
+        return [dict(row._mapping) for row in rows]
+    except Exception as e:
+        logger.warning(f"Widget data query failed for {data_source}: {e}")
+        return []
+
+
+@router.get("/analytics", dependencies=[Depends(require_permission("dashboard.analytics_view"))])
+def list_analytics_dashboards(current_user: dict = Depends(get_current_user)):
+    """List available analytics dashboards filtered by user role + branch."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        user_role = current_user.get("role", "")
+        rows = db.execute(text("""
+            SELECT id, name, description, is_system, access_roles, branch_scope,
+                   refresh_interval_minutes, created_at, created_by
+            FROM analytics_dashboards
+            ORDER BY is_system DESC, name
+        """)).fetchall()
+
+        dashboards = []
+        for row in rows:
+            d = dict(row._mapping)
+            roles = d.get("access_roles") or []
+            # System admins see everything; others see dashboards matching their role
+            if user_role == "system_admin" or not roles or user_role in roles:
+                dashboards.append(d)
+
+        return {"dashboards": dashboards}
+    finally:
+        db.close()
+
+
+@router.get("/analytics/widget-data/{widget_id}", dependencies=[Depends(require_permission("dashboard.analytics_view"))])
+def get_widget_data(widget_id: int, current_user: dict = Depends(get_current_user)):
+    """Refresh data for a single widget."""
+    company_id = get_user_company_id(current_user)
+    branch_id = validate_branch_access(current_user, None)
+    db = get_db_connection(company_id)
+    try:
+        widget = db.execute(text("""
+            SELECT id, widget_type, title, data_source, filters
+            FROM analytics_dashboard_widgets WHERE id = :id
+        """), {"id": widget_id}).fetchone()
+
+        if not widget:
+            raise HTTPException(status_code=404, detail="Widget not found")
+
+        wd = dict(widget._mapping)
+        widget_filters = wd.get("filters") or {}
+        if branch_id:
+            widget_filters["branch_id"] = branch_id
+
+        return {
+            "widget_id": widget_id,
+            "data": _query_widget_data(db, wd["data_source"], widget_filters)
+        }
+    finally:
+        db.close()
+
+
+@router.get("/analytics/{dashboard_id}", dependencies=[Depends(require_permission("dashboard.analytics_view"))])
+def get_analytics_dashboard(dashboard_id: int, current_user: dict = Depends(get_current_user)):
+    """Get a dashboard with its widget data queried from materialized views."""
+    company_id = get_user_company_id(current_user)
+    branch_id = validate_branch_access(current_user, None)
+    db = get_db_connection(company_id)
+    try:
+        dashboard = db.execute(text("""
+            SELECT id, name, description, is_system, access_roles, branch_scope,
+                   refresh_interval_minutes, created_at, created_by
+            FROM analytics_dashboards WHERE id = :id
+        """), {"id": dashboard_id}).fetchone()
+
+        if not dashboard:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
+
+        d = dict(dashboard._mapping)
+        # Check role access
+        user_role = current_user.get("role", "")
+        roles = d.get("access_roles") or []
+        if user_role != "system_admin" and roles and user_role not in roles:
+            raise HTTPException(status_code=403, detail="Access denied for this dashboard")
+
+        # Load widgets
+        widgets = db.execute(text("""
+            SELECT id, widget_type, title, data_source, filters, position, sort_order
+            FROM analytics_dashboard_widgets
+            WHERE dashboard_id = :dashboard_id
+            ORDER BY sort_order
+        """), {"dashboard_id": dashboard_id}).fetchall()
+
+        widget_list = []
+        for w in widgets:
+            wd = dict(w._mapping)
+            widget_filters = wd.get("filters") or {}
+            if branch_id:
+                widget_filters["branch_id"] = branch_id
+            wd["data"] = _query_widget_data(db, wd["data_source"], widget_filters)
+            widget_list.append(wd)
+
+        d["widgets"] = widget_list
+        return d
+    finally:
+        db.close()
+
+
+@router.post("/analytics", dependencies=[Depends(require_permission("dashboard.analytics_manage"))])
+def create_analytics_dashboard(payload: DashboardCreate, current_user: dict = Depends(get_current_user)):
+    """Create a custom analytics dashboard."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        username = current_user.get("username", "unknown")
+        result = db.execute(text("""
+            INSERT INTO analytics_dashboards (name, description, access_roles, branch_scope, refresh_interval_minutes, created_by)
+            VALUES (:name, :desc, :roles::jsonb, :scope, :interval, :created_by)
+            RETURNING id
+        """), {
+            "name": payload.name,
+            "desc": payload.description,
+            "roles": json.dumps(payload.access_roles or []),
+            "scope": payload.branch_scope or "all",
+            "interval": payload.refresh_interval_minutes or 15,
+            "created_by": username,
+        })
+        dashboard_id = result.fetchone()[0]
+
+        # Create widgets if provided
+        if payload.widgets:
+            for w in payload.widgets:
+                if w.widget_type not in VALID_WIDGET_TYPES:
+                    raise HTTPException(status_code=400, detail=f"Invalid widget_type: {w.widget_type}")
+                if w.data_source not in VALID_DATA_SOURCES:
+                    raise HTTPException(status_code=400, detail=f"Invalid data_source: {w.data_source}")
+                db.execute(text("""
+                    INSERT INTO analytics_dashboard_widgets
+                        (dashboard_id, widget_type, title, data_source, filters, position, sort_order, created_by)
+                    VALUES (:did, :wt, :title, :ds, :filters::jsonb, :pos::jsonb, :so, :cb)
+                """), {
+                    "did": dashboard_id,
+                    "wt": w.widget_type,
+                    "title": w.title,
+                    "ds": w.data_source,
+                    "filters": json.dumps(w.filters or {}),
+                    "pos": json.dumps(w.position or {}),
+                    "so": w.sort_order or 0,
+                    "cb": username,
+                })
+
+        db.commit()
+        return {"id": dashboard_id, "message": "Dashboard created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create analytics dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create dashboard")
+    finally:
+        db.close()
+
+
+@router.put("/analytics/{dashboard_id}", dependencies=[Depends(require_permission("dashboard.analytics_manage"))])
+def update_analytics_dashboard(dashboard_id: int, payload: DashboardUpdate, current_user: dict = Depends(get_current_user)):
+    """Update dashboard layout and/or widgets."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        # Verify dashboard exists
+        dashboard = db.execute(text(
+            "SELECT id, is_system FROM analytics_dashboards WHERE id = :id"
+        ), {"id": dashboard_id}).fetchone()
+
+        if not dashboard:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
+
+        username = current_user.get("username", "unknown")
+
+        # Update dashboard metadata
+        updates = []
+        params = {"id": dashboard_id, "updated_by": username}
+        if payload.name is not None:
+            updates.append("name = :name")
+            params["name"] = payload.name
+        if payload.description is not None:
+            updates.append("description = :desc")
+            params["desc"] = payload.description
+        if payload.access_roles is not None:
+            updates.append("access_roles = :roles::jsonb")
+            params["roles"] = json.dumps(payload.access_roles)
+        if payload.branch_scope is not None:
+            updates.append("branch_scope = :scope")
+            params["scope"] = payload.branch_scope
+        if payload.refresh_interval_minutes is not None:
+            updates.append("refresh_interval_minutes = :interval")
+            params["interval"] = payload.refresh_interval_minutes
+
+        if updates:
+            updates.append("updated_by = :updated_by")
+            updates.append("updated_at = NOW()")
+            db.execute(text(f"UPDATE analytics_dashboards SET {', '.join(updates)} WHERE id = :id"), params)
+
+        # Replace widgets if provided
+        if payload.widgets is not None:
+            db.execute(text("DELETE FROM analytics_dashboard_widgets WHERE dashboard_id = :did"), {"did": dashboard_id})
+            for w in payload.widgets:
+                if w.widget_type not in VALID_WIDGET_TYPES:
+                    raise HTTPException(status_code=400, detail=f"Invalid widget_type: {w.widget_type}")
+                if w.data_source not in VALID_DATA_SOURCES:
+                    raise HTTPException(status_code=400, detail=f"Invalid data_source: {w.data_source}")
+                db.execute(text("""
+                    INSERT INTO analytics_dashboard_widgets
+                        (dashboard_id, widget_type, title, data_source, filters, position, sort_order, created_by)
+                    VALUES (:did, :wt, :title, :ds, :filters::jsonb, :pos::jsonb, :so, :cb)
+                """), {
+                    "did": dashboard_id,
+                    "wt": w.widget_type,
+                    "title": w.title,
+                    "ds": w.data_source,
+                    "filters": json.dumps(w.filters or {}),
+                    "pos": json.dumps(w.position or {}),
+                    "so": w.sort_order or 0,
+                    "cb": username,
+                })
+
+        db.commit()
+        return {"message": "Dashboard updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update analytics dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update dashboard")
+    finally:
+        db.close()
+
+
+@router.delete("/analytics/{dashboard_id}", dependencies=[Depends(require_permission("dashboard.analytics_manage"))])
+def delete_analytics_dashboard(dashboard_id: int, current_user: dict = Depends(get_current_user)):
+    """Delete a custom analytics dashboard. System dashboards cannot be deleted."""
+    company_id = get_user_company_id(current_user)
+    db = get_db_connection(company_id)
+    try:
+        dashboard = db.execute(text(
+            "SELECT id, is_system FROM analytics_dashboards WHERE id = :id"
+        ), {"id": dashboard_id}).fetchone()
+
+        if not dashboard:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
+
+        if dashboard._mapping.get("is_system"):
+            raise HTTPException(status_code=403, detail="System dashboards cannot be deleted")
+
+        # Widgets cascade-deleted via FK constraint
+        db.execute(text("DELETE FROM analytics_dashboards WHERE id = :id"), {"id": dashboard_id})
+        db.commit()
+        return {"message": "Dashboard deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to delete analytics dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete dashboard")
     finally:
         db.close()

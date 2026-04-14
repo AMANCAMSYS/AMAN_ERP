@@ -22,4 +22,12 @@ export const dashboardAPI = {
     createLayout: (data) => api.post('/dashboard/layouts', data),
     updateLayout: (id, data) => api.put(`/dashboard/layouts/${id}`, data),
     deleteLayout: (id) => api.delete(`/dashboard/layouts/${id}`),
+
+    // BI Analytics Dashboards (US9)
+    listAnalyticsDashboards: () => api.get('/dashboard/analytics'),
+    getAnalyticsDashboard: (id) => api.get(`/dashboard/analytics/${id}`),
+    createAnalyticsDashboard: (data) => api.post('/dashboard/analytics', data),
+    updateAnalyticsDashboard: (id, data) => api.put(`/dashboard/analytics/${id}`, data),
+    deleteAnalyticsDashboard: (id) => api.delete(`/dashboard/analytics/${id}`),
+    getWidgetData: (widgetId) => api.get(`/dashboard/analytics/widget-data/${widgetId}`),
 }

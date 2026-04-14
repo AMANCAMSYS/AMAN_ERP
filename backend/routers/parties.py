@@ -9,6 +9,8 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
 from schemas.parties import PartyResponse
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/parties", tags=["الجهات (العملاء والموردين)"])
 
@@ -36,6 +38,14 @@ async def get_customers(
         if search:
             query += " AND (name ILIKE :search OR phone LIKE :search)"
             params["search"] = f"%{search}%"
+
+        # PTY-007: Enforce branch filtering
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+            query += f" AND branch_id IN ({branch_placeholders})"
+            for i, bid in enumerate(allowed):
+                params[f"_ab_{i}"] = bid
             
         query += " ORDER BY name ASC LIMIT :limit OFFSET :offset"
         
@@ -46,7 +56,8 @@ async def get_customers(
              
         return {"items": parties}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -74,6 +85,14 @@ async def get_suppliers(
         if search:
             query += " AND (name ILIKE :search OR phone LIKE :search)"
             params["search"] = f"%{search}%"
+
+        # PTY-007: Enforce branch filtering
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+            query += f" AND branch_id IN ({branch_placeholders})"
+            for i, bid in enumerate(allowed):
+                params[f"_ab_{i}"] = bid
             
         query += " ORDER BY name ASC LIMIT :limit OFFSET :offset"
         
@@ -84,6 +103,7 @@ async def get_suppliers(
              
         return {"items": parties}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

@@ -170,8 +170,8 @@ def create_company_database(company_id: str, admin_password: str) -> Tuple[bool,
         return True, "تم إنشاء قاعدة البيانات", db_name, db_user
         
     except Exception as e:
-        logger.error(f"❌ Error: {str(e)}")
-        return False, str(e), "", ""
+        logger.exception("Failed to create company database")
+        return False, "حدث خطأ أثناء إنشاء قاعدة البيانات", "", ""
 
 
 def get_all_table_sql() -> str:
@@ -921,6 +921,10 @@ def get_additional_tables_sql() -> str:
         link VARCHAR(255),
         is_read BOOLEAN DEFAULT FALSE,
         type VARCHAR(20) DEFAULT 'info',
+        delivery_status VARCHAR DEFAULT 'pending',
+        retry_count INTEGER DEFAULT 0,
+        last_retry_at TIMESTAMPTZ,
+        delivery_channel VARCHAR,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -1280,6 +1284,8 @@ def get_organization_tables_sql() -> str:
         details JSONB,
         ip_address VARCHAR(50),
         branch_id INTEGER REFERENCES branches(id),
+        is_archived BOOLEAN DEFAULT FALSE,
+        archived_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
         
@@ -1477,6 +1483,11 @@ def get_organization_tables_sql() -> str:
         self_comments TEXT,
         manager_comments TEXT,
         status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'self_review', 'manager_review', 'completed')),
+        cycle_id INTEGER,
+        self_assessment JSONB,
+        manager_assessment JSONB,
+        composite_score DECIMAL(5, 2),
+        final_comments TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -3492,7 +3503,8 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 get_performance_indexes_sql(),        # 14: Performance Indexes (Phase 7.5)
                 get_cashflow_forecast_tables_sql(),   # 15: Cash Flow Forecast (US5)
                 get_phase_features_tables_sql(),      # 16: Matching, SSO, Costing, Intercompany, Notifications
-                get_system_completion_tables_sql()     # 17: System Completion (Phase 9)
+                get_system_completion_tables_sql(),    # 17: System Completion (Phase 9)
+                get_extended_features_tables_sql()     # 18: Extended Features (US6-US18)
             ]
             
             deferred_statements = []
@@ -4683,6 +4695,18 @@ def get_security_tables_sql() -> str:
         click_count INT DEFAULT 0,
         conversion_count INT DEFAULT 0,
         branch_id INT,
+        segment_id INTEGER REFERENCES crm_customer_segments(id),
+        subject VARCHAR(500),
+        content TEXT,
+        scheduled_date TIMESTAMPTZ,
+        executed_at TIMESTAMPTZ,
+        total_sent INTEGER DEFAULT 0,
+        total_delivered INTEGER DEFAULT 0,
+        total_opened INTEGER DEFAULT 0,
+        total_clicked INTEGER DEFAULT 0,
+        total_responded INTEGER DEFAULT 0,
+        estimated_cost DECIMAL(18,4) DEFAULT 0,
+        actual_cost DECIMAL(18,4) DEFAULT 0,
         created_by INT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -5463,6 +5487,511 @@ def get_system_completion_tables_sql() -> str:
     """
 
 
+def get_extended_features_tables_sql() -> str:
+    """Returns SQL for extended feature tables (US6-US18: Subscriptions, Self-Service, Analytics,
+    Mobile, Blanket POs, Shop Floor, Timesheets, Resource Planning, Performance Cycles,
+    CPQ, Demand Forecast, Campaigns)"""
+    return """
+    -- ===== EXTENDED FEATURES TABLES (US6-US18) =====
+
+    -- ========== US7: Subscription Management ==========
+    CREATE TABLE IF NOT EXISTS subscription_plans (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        billing_frequency VARCHAR(20) NOT NULL DEFAULT 'monthly',
+        base_amount DECIMAL(18, 4) NOT NULL DEFAULT 0,
+        currency VARCHAR(3) DEFAULT 'SAR',
+        trial_period_days INTEGER DEFAULT 0,
+        auto_renewal BOOLEAN DEFAULT TRUE,
+        is_active BOOLEAN DEFAULT TRUE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_enrollments (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES parties(id),
+        plan_id INTEGER REFERENCES subscription_plans(id),
+        start_date DATE NOT NULL,
+        end_date DATE,
+        next_billing_date DATE,
+        status VARCHAR(20) DEFAULT 'active',
+        failed_payment_count INTEGER DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_invoices (
+        id SERIAL PRIMARY KEY,
+        enrollment_id INTEGER REFERENCES subscription_enrollments(id),
+        invoice_id INTEGER REFERENCES invoices(id),
+        billing_period_start DATE,
+        billing_period_end DATE,
+        amount DECIMAL(18, 4) DEFAULT 0,
+        is_prorated BOOLEAN DEFAULT FALSE,
+        proration_details JSONB,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_sub_enrollments_customer ON subscription_enrollments(customer_id);
+    CREATE INDEX IF NOT EXISTS ix_sub_enrollments_plan ON subscription_enrollments(plan_id);
+    CREATE INDEX IF NOT EXISTS ix_sub_invoices_enrollment ON subscription_invoices(enrollment_id);
+
+    -- ========== US6: Employee Self-Service ==========
+    CREATE TABLE IF NOT EXISTS self_service_requests (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id),
+        request_type VARCHAR(30) NOT NULL,
+        details JSONB,
+        status VARCHAR(20) DEFAULT 'pending',
+        approver_id INTEGER REFERENCES employees(id),
+        approved_at TIMESTAMPTZ,
+        rejection_reason TEXT,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_self_service_employee ON self_service_requests(employee_id);
+
+    -- ========== US9: Analytics / BI Dashboard ==========
+    CREATE TABLE IF NOT EXISTS analytics_dashboards (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        description TEXT,
+        is_system BOOLEAN DEFAULT FALSE,
+        access_roles JSONB DEFAULT '[]',
+        branch_scope INTEGER,
+        refresh_interval_minutes INTEGER DEFAULT 60,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS analytics_dashboard_widgets (
+        id SERIAL PRIMARY KEY,
+        dashboard_id INTEGER REFERENCES analytics_dashboards(id) ON DELETE CASCADE,
+        widget_type VARCHAR(50) NOT NULL,
+        title VARCHAR(200),
+        data_source VARCHAR(100),
+        filters JSONB DEFAULT '{}',
+        position JSONB DEFAULT '{}',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_dashboard_widgets_dashboard ON analytics_dashboard_widgets(dashboard_id);
+
+    -- Materialized Views for BI Dashboard
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_revenue_summary AS
+        SELECT date_trunc('month', invoice_date) AS month,
+               SUM(total_amount) AS total_revenue,
+               COUNT(*) AS invoice_count
+        FROM invoices
+        WHERE invoice_type = 'sale' AND status = 'posted'
+        GROUP BY date_trunc('month', invoice_date);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_revenue_month ON mv_revenue_summary(month);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_expense_summary AS
+        SELECT date_trunc('month', invoice_date) AS month,
+               SUM(total_amount) AS total_expenses,
+               COUNT(*) AS invoice_count
+        FROM invoices
+        WHERE invoice_type = 'purchase' AND status = 'posted'
+        GROUP BY date_trunc('month', invoice_date);
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_expense_month ON mv_expense_summary(month);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_cash_position AS
+        SELECT ta.id AS account_id,
+               ta.account_name,
+               COALESCE(SUM(tt.amount), 0) AS balance
+        FROM treasury_accounts ta
+        LEFT JOIN treasury_transactions tt ON tt.account_id = ta.id AND tt.status = 'completed'
+        GROUP BY ta.id, ta.account_name;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_cash_account ON mv_cash_position(account_id);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_top_customers AS
+        SELECT i.party_id,
+               p.name AS customer_name,
+               SUM(i.total_amount) AS total_revenue,
+               COUNT(*) AS order_count
+        FROM invoices i
+        JOIN parties p ON p.id = i.party_id
+        WHERE i.invoice_type = 'sale' AND i.status = 'posted'
+        GROUP BY i.party_id, p.name;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_top_cust_party ON mv_top_customers(party_id);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ar_aging AS
+        SELECT party_id,
+               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN balance_due ELSE 0 END) AS current_bucket,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN balance_due ELSE 0 END) AS bucket_30,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_60,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_90_plus
+        FROM invoices
+        WHERE invoice_type = 'sale' AND status IN ('posted', 'partially_paid')
+        GROUP BY party_id;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_ar_aging_party ON mv_ar_aging(party_id);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ap_aging AS
+        SELECT party_id,
+               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN balance_due ELSE 0 END) AS current_bucket,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN balance_due ELSE 0 END) AS bucket_30,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_60,
+               SUM(CASE WHEN NOW() - due_date > INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_90_plus
+        FROM invoices
+        WHERE invoice_type = 'purchase' AND status IN ('posted', 'partially_paid')
+        GROUP BY party_id;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_ap_aging_party ON mv_ap_aging(party_id);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inventory_turnover AS
+        SELECT product_id,
+               SUM(CASE WHEN movement_type = 'out' THEN quantity ELSE 0 END) AS total_sold,
+               AVG(quantity) AS avg_stock
+        FROM inventory_movements
+        GROUP BY product_id;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_inv_turn_product ON mv_inventory_turnover(product_id);
+
+    CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sales_pipeline AS
+        SELECT stage,
+               COUNT(*) AS deal_count,
+               SUM(expected_revenue) AS total_value
+        FROM sales_opportunities
+        GROUP BY stage;
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_pipeline_stage ON mv_sales_pipeline(stage);
+
+    -- ========== US10: Mobile Push Devices & Sync ==========
+    CREATE TABLE IF NOT EXISTS push_devices (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL,
+        user_id INTEGER NOT NULL,
+        platform VARCHAR(10) NOT NULL CHECK (platform IN ('ios', 'android')),
+        fcm_token TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        last_seen_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(device_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_push_devices_user ON push_devices(user_id);
+    CREATE INDEX IF NOT EXISTS ix_push_devices_active ON push_devices(is_active) WHERE is_active = TRUE;
+
+    CREATE TABLE IF NOT EXISTS sync_queue (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL,
+        user_id INTEGER NOT NULL,
+        entity_type VARCHAR(50) NOT NULL,
+        entity_id INTEGER NOT NULL,
+        operation VARCHAR(10) NOT NULL,
+        payload JSONB,
+        device_timestamp TIMESTAMPTZ,
+        server_timestamp TIMESTAMPTZ DEFAULT NOW(),
+        sync_status VARCHAR(20) DEFAULT 'pending',
+        conflict_resolution JSONB,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_sync_queue_device_status ON sync_queue(device_id, sync_status);
+
+    -- ========== US11: Blanket Purchase Orders ==========
+    CREATE TABLE IF NOT EXISTS blanket_purchase_orders (
+        id SERIAL PRIMARY KEY,
+        supplier_id INTEGER REFERENCES parties(id),
+        agreement_number VARCHAR(50) NOT NULL UNIQUE,
+        total_quantity DECIMAL(18, 4) DEFAULT 0,
+        unit_price DECIMAL(18, 4) DEFAULT 0,
+        total_amount DECIMAL(18, 4) DEFAULT 0,
+        released_quantity DECIMAL(18, 4) DEFAULT 0,
+        released_amount DECIMAL(18, 4) DEFAULT 0,
+        valid_from DATE,
+        valid_to DATE,
+        status VARCHAR(20) DEFAULT 'draft',
+        price_amendment_history JSONB DEFAULT '[]',
+        branch_id INTEGER REFERENCES branches(id),
+        currency VARCHAR(3) DEFAULT 'SAR',
+        notes TEXT,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS blanket_po_release_orders (
+        id SERIAL PRIMARY KEY,
+        blanket_po_id INTEGER REFERENCES blanket_purchase_orders(id) ON DELETE CASCADE,
+        purchase_order_id INTEGER REFERENCES purchase_orders(id),
+        release_quantity DECIMAL(18, 4) DEFAULT 0,
+        release_amount DECIMAL(18, 4) DEFAULT 0,
+        release_date DATE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_blanket_po_supplier ON blanket_purchase_orders(supplier_id);
+    CREATE INDEX IF NOT EXISTS ix_blanket_po_status ON blanket_purchase_orders(status);
+    CREATE INDEX IF NOT EXISTS ix_blanket_po_release_bpo ON blanket_po_release_orders(blanket_po_id);
+
+    -- ========== US13: Shop Floor Logging ==========
+    CREATE TABLE IF NOT EXISTS shop_floor_logs (
+        id SERIAL PRIMARY KEY,
+        work_order_id INTEGER REFERENCES production_orders(id),
+        routing_operation_id INTEGER REFERENCES manufacturing_operations(id),
+        operator_id INTEGER REFERENCES employees(id),
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        output_quantity DECIMAL(18, 4) DEFAULT 0,
+        scrap_quantity DECIMAL(18, 4) DEFAULT 0,
+        downtime_minutes INTEGER DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'in_progress',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_shopfloor_work_order ON shop_floor_logs(work_order_id);
+    CREATE INDEX IF NOT EXISTS ix_shopfloor_operator ON shop_floor_logs(operator_id);
+
+    -- ========== US14: Timesheet Entries ==========
+    CREATE TABLE IF NOT EXISTS timesheet_entries (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id),
+        project_id INTEGER REFERENCES projects(id),
+        task_id INTEGER REFERENCES project_tasks(id),
+        date DATE NOT NULL,
+        hours DECIMAL(5, 2) NOT NULL CHECK (hours > 0 AND hours <= 24),
+        is_billable BOOLEAN DEFAULT FALSE,
+        billing_rate DECIMAL(18, 4) DEFAULT 0,
+        description TEXT,
+        status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'approved', 'rejected')),
+        approved_by INTEGER REFERENCES employees(id),
+        rejection_reason TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_timesheet_employee ON timesheet_entries(employee_id);
+    CREATE INDEX IF NOT EXISTS ix_timesheet_project ON timesheet_entries(project_id);
+    CREATE INDEX IF NOT EXISTS ix_timesheet_date ON timesheet_entries(date);
+
+    -- ========== US15: Resource Allocations ==========
+    CREATE TABLE IF NOT EXISTS resource_allocations (
+        id SERIAL PRIMARY KEY,
+        employee_id INTEGER REFERENCES employees(id),
+        project_id INTEGER REFERENCES projects(id),
+        role VARCHAR(50),
+        allocation_percent DECIMAL(5, 2) DEFAULT 100 CHECK (allocation_percent > 0 AND allocation_percent <= 100),
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL CHECK (end_date >= start_date),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_resource_alloc_employee ON resource_allocations(employee_id);
+    CREATE INDEX IF NOT EXISTS ix_resource_alloc_project ON resource_allocations(project_id);
+    CREATE INDEX IF NOT EXISTS ix_resource_alloc_dates ON resource_allocations(start_date, end_date);
+
+    -- ========== US16: Performance Review Cycles & Goals ==========
+    CREATE TABLE IF NOT EXISTS review_cycles (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        self_assessment_deadline DATE,
+        manager_review_deadline DATE,
+        status VARCHAR(20) DEFAULT 'draft',
+        created_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS performance_goals (
+        id SERIAL PRIMARY KEY,
+        review_id INTEGER REFERENCES performance_reviews(id) ON DELETE CASCADE,
+        title VARCHAR(300) NOT NULL,
+        description TEXT,
+        weight DECIMAL(5, 2) DEFAULT 0,
+        target VARCHAR(200),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_perf_goals_review ON performance_goals(review_id);
+
+    -- Add FK from performance_reviews to review_cycles (deferred, will succeed after review_cycles exists)
+    ALTER TABLE performance_reviews ADD CONSTRAINT IF NOT EXISTS fk_perf_reviews_cycle
+        FOREIGN KEY (cycle_id) REFERENCES review_cycles(id);
+
+    -- ========== US17: CPQ (Configure-Price-Quote) ==========
+    CREATE TABLE IF NOT EXISTS product_configurations (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id),
+        name VARCHAR(200) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS config_option_groups (
+        id SERIAL PRIMARY KEY,
+        configuration_id INTEGER REFERENCES product_configurations(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        is_required BOOLEAN DEFAULT FALSE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS config_options (
+        id SERIAL PRIMARY KEY,
+        group_id INTEGER REFERENCES config_option_groups(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        price_adjustment DECIMAL(18, 4) DEFAULT 0,
+        is_default BOOLEAN DEFAULT FALSE,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS config_validation_rules (
+        id SERIAL PRIMARY KEY,
+        configuration_id INTEGER REFERENCES product_configurations(id) ON DELETE CASCADE,
+        rule_type VARCHAR(30) NOT NULL,
+        source_option_id INTEGER REFERENCES config_options(id),
+        target_option_id INTEGER REFERENCES config_options(id),
+        error_message TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS cpq_pricing_rules (
+        id SERIAL PRIMARY KEY,
+        configuration_id INTEGER REFERENCES product_configurations(id) ON DELETE CASCADE,
+        rule_type VARCHAR(30) NOT NULL,
+        min_quantity DECIMAL(18, 4),
+        max_quantity DECIMAL(18, 4),
+        discount_percent DECIMAL(5, 2) DEFAULT 0,
+        discount_amount DECIMAL(18, 4) DEFAULT 0,
+        customer_group_id INTEGER,
+        priority INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS cpq_quotes (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES parties(id),
+        quotation_id INTEGER,
+        total_amount DECIMAL(18, 4) DEFAULT 0,
+        discount_amount DECIMAL(18, 4) DEFAULT 0,
+        final_amount DECIMAL(18, 4) DEFAULT 0,
+        pdf_path TEXT,
+        status VARCHAR(20) DEFAULT 'draft',
+        valid_until DATE,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS cpq_quote_lines (
+        id SERIAL PRIMARY KEY,
+        quote_id INTEGER REFERENCES cpq_quotes(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        selected_options JSONB DEFAULT '[]',
+        quantity DECIMAL(18, 4) DEFAULT 1,
+        base_unit_price DECIMAL(18, 4) DEFAULT 0,
+        option_adjustments DECIMAL(18, 4) DEFAULT 0,
+        discount_applied DECIMAL(18, 4) DEFAULT 0,
+        final_unit_price DECIMAL(18, 4) DEFAULT 0,
+        line_total DECIMAL(18, 4) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_cpq_config_product ON product_configurations(product_id);
+    CREATE INDEX IF NOT EXISTS ix_cpq_quotes_customer ON cpq_quotes(customer_id);
+    CREATE INDEX IF NOT EXISTS ix_cpq_quote_lines_quote ON cpq_quote_lines(quote_id);
+
+    -- ========== US17: Demand Forecast ==========
+    CREATE TABLE IF NOT EXISTS demand_forecasts (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id),
+        warehouse_id INTEGER,
+        forecast_method VARCHAR(30) DEFAULT 'moving_average',
+        generated_date DATE NOT NULL,
+        generated_by INTEGER REFERENCES company_users(id),
+        history_months_used INTEGER DEFAULT 12,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS demand_forecast_periods (
+        id SERIAL PRIMARY KEY,
+        forecast_id INTEGER REFERENCES demand_forecasts(id) ON DELETE CASCADE,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        projected_quantity DECIMAL(18, 4) DEFAULT 0,
+        confidence_lower DECIMAL(18, 4) DEFAULT 0,
+        confidence_upper DECIMAL(18, 4) DEFAULT 0,
+        manual_adjustment DECIMAL(18, 4),
+        adjusted_quantity DECIMAL(18, 4),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_demand_forecast_product ON demand_forecasts(product_id);
+    CREATE INDEX IF NOT EXISTS ix_demand_forecast_date ON demand_forecasts(generated_date);
+    CREATE INDEX IF NOT EXISTS ix_demand_periods_forecast ON demand_forecast_periods(forecast_id);
+
+    -- ========== US18: Campaign Recipients & Lead Attribution ==========
+    CREATE TABLE IF NOT EXISTS campaign_recipients (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+        contact_id INTEGER REFERENCES parties(id) ON DELETE CASCADE,
+        channel VARCHAR(30) DEFAULT 'email',
+        delivery_status VARCHAR(20) DEFAULT 'pending',
+        opened_at TIMESTAMPTZ,
+        clicked_at TIMESTAMPTZ,
+        responded_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_lead_attributions (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER REFERENCES marketing_campaigns(id) ON DELETE CASCADE,
+        lead_id INTEGER REFERENCES sales_opportunities(id) ON DELETE CASCADE,
+        attributed_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_campaign_recipients_campaign ON campaign_recipients(campaign_id);
+    CREATE INDEX IF NOT EXISTS ix_campaign_recipients_contact ON campaign_recipients(contact_id);
+    CREATE INDEX IF NOT EXISTS ix_campaign_lead_attr_campaign ON campaign_lead_attributions(campaign_id);
+    """
+
+
 def get_performance_indexes_sql() -> str:
     """Returns SQL for performance optimization indexes (Phase 7.5)"""
     return """
@@ -5491,6 +6020,8 @@ def get_performance_indexes_sql() -> str:
     -- Audit Log - most recent activity
     CREATE INDEX IF NOT EXISTS idx_audit_user_date ON audit_logs(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_logs(resource_type, resource_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_live ON audit_logs(created_at DESC) WHERE NOT is_archived;
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_archival ON audit_logs(created_at) WHERE is_archived = TRUE;
 
     -- Parties - name search
     CREATE INDEX IF NOT EXISTS idx_parties_name ON parties(name);
@@ -5508,6 +6039,7 @@ def get_performance_indexes_sql() -> str:
 
     -- Notifications
     CREATE INDEX IF NOT EXISTS idx_notif_user_read ON notifications(user_id, is_read);
+    CREATE INDEX IF NOT EXISTS idx_notifications_retry ON notifications(last_retry_at) WHERE delivery_status = 'failed' AND retry_count < 3;
 
     -- Phase 1 Hardening: Missing FK and query indexes
     CREATE INDEX IF NOT EXISTS idx_parties_party_code ON parties(party_code);

@@ -34,7 +34,7 @@ const NotFound = () => {
                 color: 'var(--text-primary, #333)',
                 marginBottom: '0.5rem'
             }}>
-                {isRTL ? 'الصفحة غير موجودة' : 'Page Not Found'}
+                {t('common.page_not_found')}
             </h2>
             <p style={{
                 color: 'var(--text-secondary, #666)',
@@ -60,7 +60,7 @@ const NotFound = () => {
                 onMouseOver={(e) => { e.target.style.opacity = '0.9'; e.target.style.transform = 'translateY(-1px)'; }}
                 onMouseOut={(e) => { e.target.style.opacity = '1'; e.target.style.transform = 'translateY(0)'; }}
             >
-                {isRTL ? '🏠 العودة للوحة التحكم' : '🏠 Back to Dashboard'}
+                {t('common.back_to_dashboard')}
             </button>
         </div>
     );

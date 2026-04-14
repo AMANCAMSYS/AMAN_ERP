@@ -18,6 +18,7 @@ from utils.accounting import (
     get_base_currency, update_account_balance
 )
 from utils.audit import log_activity
+from utils.fiscal_lock import check_fiscal_period_open
 from sqlalchemy import text
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 import logging
@@ -102,7 +103,7 @@ async def get_projects(
         return [dict(r._mapping) for r in result]
     except Exception as e:
         logger.error(f"Error fetching projects: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -209,7 +210,7 @@ async def get_project(project_id: int, current_user: dict = Depends(get_current_
         raise
     except Exception as e:
         logger.error(f"Error fetching project {project_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -261,7 +262,7 @@ async def create_project(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -323,7 +324,8 @@ async def update_project(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating project: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -369,7 +371,8 @@ async def delete_project(project_id: int, request: Request, current_user: dict =
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error deleting project: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -398,7 +401,7 @@ async def get_project_tasks(project_id: int, current_user: dict = Depends(get_cu
 
 @router.post("/{project_id}/tasks", status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(require_permission("projects.edit"))])
-async def create_task(project_id: int, task: TaskCreate, current_user: dict = Depends(get_current_user)):
+async def create_task(project_id: int, task: TaskCreate, request: Request, current_user: dict = Depends(get_current_user)):
     """إضافة مهمة للمشروع"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -426,18 +429,28 @@ async def create_task(project_id: int, task: TaskCreate, current_user: dict = De
         })
         task_id = result.scalar()
         db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.task.create", resource_type="project_task",
+            resource_id=str(task_id),
+            details={"project_id": project_id, "task_name": task.task_name},
+            request=request
+        )
+
         return {"success": True, "id": task_id, "message": "تم إضافة المهمة"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating task: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.put("/{project_id}/tasks/{task_id}", dependencies=[Depends(require_permission("projects.edit"))])
-async def update_task(project_id: int, task_id: int, data: TaskUpdate, current_user: dict = Depends(get_current_user)):
+async def update_task(project_id: int, task_id: int, data: TaskUpdate, request: Request, current_user: dict = Depends(get_current_user)):
     """تحديث مهمة"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -478,18 +491,28 @@ async def update_task(project_id: int, task_id: int, data: TaskUpdate, current_u
         """), {"pid": project_id})
 
         db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.task.update", resource_type="project_task",
+            resource_id=str(task_id),
+            details={"project_id": project_id},
+            request=request
+        )
+
         return {"success": True, "message": "تم تحديث المهمة"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating task: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @router.delete("/{project_id}/tasks/{task_id}", dependencies=[Depends(require_permission("projects.edit"))])
-async def delete_task(project_id: int, task_id: int, current_user: dict = Depends(get_current_user)):
+async def delete_task(project_id: int, task_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """حذف مهمة"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -498,6 +521,15 @@ async def delete_task(project_id: int, task_id: int, current_user: dict = Depend
             {"tid": task_id, "pid": project_id}
         )
         db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.task.delete", resource_type="project_task",
+            resource_id=str(task_id),
+            details={"project_id": project_id},
+            request=request
+        )
+
         return {"success": True, "message": "تم حذف المهمة"}
     finally:
         db.close()
@@ -527,6 +559,9 @@ async def create_project_expense(
 
         base_currency = get_base_currency(db)
         amount = _dec(expense.amount).quantize(_D2, ROUND_HALF_UP)
+
+        # Fiscal period check before GL entry
+        check_fiscal_period_open(db, expense.expense_date)
 
         # Determine expense account
         expense_acc = expense.expense_account_id
@@ -635,7 +670,7 @@ async def create_project_expense(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project expense: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -681,6 +716,9 @@ async def create_project_revenue(
 
         base_currency = get_base_currency(db)
         amount = _dec(revenue.amount).quantize(_D2, ROUND_HALF_UP)
+
+        # Fiscal period check before GL entry
+        check_fiscal_period_open(db, revenue.revenue_date)
 
         # Revenue account
         revenue_acc = get_mapped_account_id(db, "acc_map_sales_rev")
@@ -767,7 +805,7 @@ async def create_project_revenue(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project revenue: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -881,7 +919,7 @@ async def get_project_financials(project_id: int, current_user: dict = Depends(g
         raise
     except Exception as e:
         logger.error(f"Error fetching financials: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -966,7 +1004,7 @@ async def get_resource_allocation(
 
     except Exception as e:
         logger.error(f"Error fetching resource allocation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1040,7 +1078,7 @@ async def create_timesheet(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating timesheet: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1089,10 +1127,9 @@ async def update_timesheet(
             db.execute(text(f"UPDATE project_timesheets SET {', '.join(updates)} WHERE id = :id"), params)
 
             # Update actual hours on task(s)
-              if old_task == new_task and diff != 0 and old_task:
-                 db.execute(text("UPDATE project_tasks SET actual_hours = actual_hours + :diff WHERE id = :tid"), 
-                            {"diff": diff, "tid": old_task})
-            
+            if old_task == new_task and diff != 0 and old_task:
+                db.execute(text("UPDATE project_tasks SET actual_hours = actual_hours + :diff WHERE id = :tid"), 
+                           {"diff": diff, "tid": old_task})
             elif old_task != new_task:
                 if old_task:
                     db.execute(text("UPDATE project_tasks SET actual_hours = actual_hours - :hrs WHERE id = :tid"),
@@ -1105,7 +1142,8 @@ async def update_timesheet(
         return {"success": True, "message": "تم تحديث السجل"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating timesheet: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1132,7 +1170,8 @@ async def delete_timesheet(timesheet_id: int, current_user: dict = Depends(get_c
         return {"success": True, "message": "تم حذف السجل"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error deleting timesheet: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1238,11 +1277,12 @@ async def approve_timesheets(
             results.append(ts_id)
 
         trans.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username, action="approve_timesheets", resource_type="project_timesheet", resource_id=str(results), details={"approved_count": len(results), "project_id": project_id})
         return {"success": True, "approved_count": len(results), "message": f"تم اعتماد {len(results)} سجل(ات) بنجاح"}
     except Exception as e:
         trans.rollback()
         logger.error(f"Error approving timesheets: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1305,7 +1345,7 @@ async def create_project_document(
     except Exception as e:
         db.rollback()
         logger.error(f"Error uploading document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1346,7 +1386,8 @@ async def delete_project_document(project_id: int, doc_id: int, current_user: di
         return {"success": True, "message": "تم حذف المستند"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error deleting document: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1541,7 +1582,7 @@ async def create_project_invoice(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project invoice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1615,7 +1656,8 @@ async def create_change_order(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating change order: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1654,7 +1696,8 @@ async def update_change_order(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error updating change order: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1709,7 +1752,8 @@ async def approve_change_order(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error approving change order: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1750,6 +1794,9 @@ async def close_project(
         net_profit_loss = total_revenues - total_expenses
         base_currency = get_base_currency(db)
         close_date = close_data.close_date or date.today()
+
+        # Fiscal period check before GL entry
+        check_fiscal_period_open(db, close_date)
 
         je_id = None
         if abs(net_profit_loss) > Decimal('0.01'):
@@ -1840,7 +1887,7 @@ async def close_project(
     except Exception as e:
         db.rollback()
         logger.error(f"Error closing project: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1886,7 +1933,8 @@ async def setup_retainer(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error setting up retainer: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -2030,6 +2078,7 @@ async def generate_retainer_invoices(
             })
         
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username, action="generate_retainer_invoices", resource_type="project_invoice", resource_id=None, details={"generated_count": len(generated)})
         
         return {
             "success": True,
@@ -2042,7 +2091,7 @@ async def generate_retainer_invoices(
     except Exception as e:
         db.rollback()
         logger.error(f"Error generating retainer invoices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -2126,7 +2175,7 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
         raise
     except Exception as e:
         logger.error(f"Error calculating EVM: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -2532,7 +2581,7 @@ async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
 
 # ===================== B5: Project Risks =====================
 
-@router.get("/{project_id}/risks")
+@router.get("/{project_id}/risks", dependencies=[Depends(require_permission("projects.view"))])
 def list_project_risks(project_id: int, current_user=Depends(get_current_user)):
     """سجل المخاطر"""
     db = get_db_connection(current_user.company_id)
@@ -2549,8 +2598,8 @@ def list_project_risks(project_id: int, current_user=Depends(get_current_user)):
         db.close()
 
 
-@router.post("/{project_id}/risks")
-def create_project_risk(project_id: int, risk: dict, current_user=Depends(get_current_user)):
+@router.post("/{project_id}/risks", dependencies=[Depends(require_permission("projects.edit"))])
+def create_project_risk(project_id: int, risk: dict, request: Request, current_user=Depends(get_current_user)):
     """إضافة خطر"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -2570,16 +2619,24 @@ def create_project_risk(project_id: int, risk: dict, current_user=Depends(get_cu
         })
         risk_id = result.fetchone()[0]
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.risk_create", resource_type="project_risk",
+            resource_id=str(risk_id),
+            details={"project_id": project_id, "title": risk["title"]},
+            request=request
+        )
         return {"id": risk_id, "message": "تم إضافة الخطر بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating project risk: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.put("/risks/{risk_id}")
-def update_project_risk(risk_id: int, risk: dict, current_user=Depends(get_current_user)):
+@router.put("/risks/{risk_id}", dependencies=[Depends(require_permission("projects.edit"))])
+def update_project_risk(risk_id: int, risk: dict, request: Request, current_user=Depends(get_current_user)):
     """تحديث خطر"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -2598,32 +2655,48 @@ def update_project_risk(risk_id: int, risk: dict, current_user=Depends(get_curre
             "oid": risk.get("owner_id"), "dd": risk.get("due_date"), "id": risk_id
         })
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.risk_update", resource_type="project_risk",
+            resource_id=str(risk_id),
+            details={"risk_id": risk_id, "title": risk["title"]},
+            request=request
+        )
         return {"message": "تم تحديث الخطر بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error updating project risk: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.delete("/risks/{risk_id}")
-def delete_project_risk(risk_id: int, current_user=Depends(get_current_user)):
+@router.delete("/risks/{risk_id}", dependencies=[Depends(require_permission("projects.edit"))])
+def delete_project_risk(risk_id: int, request: Request, current_user=Depends(get_current_user)):
     """حذف خطر"""
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM project_risks WHERE id = :id"), {"id": risk_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.risk_delete", resource_type="project_risk",
+            resource_id=str(risk_id),
+            details={"risk_id": risk_id},
+            request=request
+        )
         return {"message": "تم حذف الخطر"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error deleting project risk: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
 # ===================== B5: Task Dependencies =====================
 
-@router.get("/{project_id}/task-dependencies")
+@router.get("/{project_id}/task-dependencies", dependencies=[Depends(require_permission("projects.view"))])
 def list_task_dependencies(project_id: int, current_user=Depends(get_current_user)):
     """تبعيات المهام"""
     db = get_db_connection(current_user.company_id)
@@ -2641,8 +2714,8 @@ def list_task_dependencies(project_id: int, current_user=Depends(get_current_use
         db.close()
 
 
-@router.post("/{project_id}/task-dependencies")
-def create_task_dependency(project_id: int, dep: dict, current_user=Depends(get_current_user)):
+@router.post("/{project_id}/task-dependencies", dependencies=[Depends(require_permission("projects.edit"))])
+def create_task_dependency(project_id: int, dep: dict, request: Request, current_user=Depends(get_current_user)):
     """إنشاء تبعية مهمة"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -2657,24 +2730,695 @@ def create_task_dependency(project_id: int, dep: dict, current_user=Depends(get_
         })
         dep_id = result.fetchone()[0]
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.dependency_create", resource_type="task_dependency",
+            resource_id=str(dep_id),
+            details={"project_id": project_id, "task_id": dep["task_id"], "depends_on": dep["depends_on_task_id"]},
+            request=request
+        )
         return {"id": dep_id, "message": "تم إنشاء التبعية بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating task dependency: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.delete("/task-dependencies/{dep_id}")
-def delete_task_dependency(dep_id: int, current_user=Depends(get_current_user)):
+@router.delete("/task-dependencies/{dep_id}", dependencies=[Depends(require_permission("projects.edit"))])
+def delete_task_dependency(dep_id: int, request: Request, current_user=Depends(get_current_user)):
     """حذف تبعية"""
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("DELETE FROM task_dependencies WHERE id = :id"), {"id": dep_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.dependency_delete", resource_type="task_dependency",
+            resource_id=str(dep_id),
+            details={"dep_id": dep_id},
+            request=request
+        )
         return {"message": "تم حذف التبعية"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error deleting task dependency: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════
+# US17 — Time Tracking  (/projects/timetracking/...)
+# ═══════════════════════════════════════════════════════════
+
+from schemas.timetracking import (
+    TimesheetEntryCreate, TimesheetEntryUpdate,
+    WeeklySubmitRequest, RejectRequest
+)
+
+
+def _fetch_timesheet_entry(db, entry_id: int) -> dict:
+    row = db.execute(text("""
+        SELECT te.*,
+               e.full_name  AS employee_name,
+               p.project_name,
+               pt.task_name,
+               ae.full_name AS approver_name
+        FROM   timesheet_entries te
+        LEFT JOIN employees e  ON e.id  = te.employee_id
+        LEFT JOIN projects  p  ON p.id  = te.project_id
+        LEFT JOIN project_tasks pt ON pt.id = te.task_id
+        LEFT JOIN employees ae ON ae.id = te.approved_by
+        WHERE  te.id = :id
+    """), {"id": entry_id}).fetchone()
+    return dict(row._mapping) if row else None
+
+
+@router.post("/timetracking", status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_permission("projects.time_log"))])
+async def log_time_entry(
+    entry: TimesheetEntryCreate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """تسجيل ساعات العمل على مشروع (US17)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        result = db.execute(text("""
+            INSERT INTO timesheet_entries
+                (employee_id, project_id, task_id, date, hours,
+                 is_billable, billing_rate, description, status, created_by)
+            VALUES
+                (:employee_id, :project_id, :task_id, :date, :hours,
+                 :is_billable, :billing_rate, :description, 'draft', :created_by)
+            RETURNING id
+        """), {
+            "employee_id": entry.employee_id,
+            "project_id":  entry.project_id,
+            "task_id":     entry.task_id,
+            "date":        entry.date,
+            "hours":       float(entry.hours),
+            "is_billable": entry.is_billable,
+            "billing_rate": float(entry.billing_rate) if entry.billing_rate else None,
+            "description": entry.description,
+            "created_by":  current_user.id,
+        })
+        entry_id = result.fetchone()[0]
+        db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.time_log", resource_type="timesheet_entry",
+            resource_id=str(entry_id),
+            details={"project_id": entry.project_id, "hours": float(entry.hours)},
+            request=request
+        )
+        return _fetch_timesheet_entry(db, entry_id)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error logging time entry: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.get("/timetracking", dependencies=[Depends(require_permission("projects.time_view"))])
+async def list_own_time_entries(
+    project_id: Optional[int] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    entry_status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب سجلات الوقت الخاصة بالمستخدم (قابلة للفلترة)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        filters = ["te.employee_id = (SELECT id FROM employees WHERE user_id = :uid LIMIT 1)"]
+        params: dict = {"uid": current_user.id}
+        if project_id:
+            filters.append("te.project_id = :project_id")
+            params["project_id"] = project_id
+        if date_from:
+            filters.append("te.date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            filters.append("te.date <= :date_to")
+            params["date_to"] = date_to
+        if entry_status:
+            filters.append("te.status = :entry_status")
+            params["entry_status"] = entry_status
+        where = " AND ".join(filters)
+        rows = db.execute(text(f"""
+            SELECT te.*,
+                   e.full_name  AS employee_name,
+                   p.project_name,
+                   pt.task_name,
+                   ae.full_name AS approver_name
+            FROM   timesheet_entries te
+            LEFT JOIN employees e  ON e.id  = te.employee_id
+            LEFT JOIN projects  p  ON p.id  = te.project_id
+            LEFT JOIN project_tasks pt ON pt.id = te.task_id
+            LEFT JOIN employees ae ON ae.id = te.approved_by
+            WHERE  {where}
+            ORDER BY te.date DESC
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.put("/timetracking/{entry_id}",
+            dependencies=[Depends(require_permission("projects.time_log"))])
+async def update_time_entry(
+    entry_id: int,
+    entry: TimesheetEntryUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """تعديل سجل وقت (draft فقط)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing = _fetch_timesheet_entry(db, entry_id)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+        if existing["status"] != "draft":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "Only draft entries can be edited")
+        updates, params = [], {"id": entry_id}
+        if entry.task_id is not None:
+            updates.append("task_id = :task_id"); params["task_id"] = entry.task_id
+        if entry.date is not None:
+            updates.append("date = :date"); params["date"] = entry.date
+        if entry.hours is not None:
+            updates.append("hours = :hours"); params["hours"] = float(entry.hours)
+        if entry.is_billable is not None:
+            updates.append("is_billable = :is_billable"); params["is_billable"] = entry.is_billable
+        if entry.billing_rate is not None:
+            updates.append("billing_rate = :billing_rate")
+            params["billing_rate"] = float(entry.billing_rate)
+        if entry.description is not None:
+            updates.append("description = :description"); params["description"] = entry.description
+        if not updates:
+            return existing
+        updates.append("updated_at = now()")
+        db.execute(text(f"UPDATE timesheet_entries SET {', '.join(updates)} WHERE id = :id"), params)
+        db.commit()
+        return _fetch_timesheet_entry(db, entry_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating time entry: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.post("/timetracking/submit-week",
+             dependencies=[Depends(require_permission("projects.time_log"))])
+async def submit_weekly_timesheet(
+    req: WeeklySubmitRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """رفع الجدول الزمني الأسبوعي للموافقة"""
+    from datetime import timedelta
+    db = get_db_connection(current_user.company_id)
+    try:
+        week_end = req.week_start + timedelta(days=6)
+        result = db.execute(text("""
+            UPDATE timesheet_entries
+               SET status = 'submitted', updated_at = now()
+             WHERE employee_id = :emp_id
+               AND date BETWEEN :ws AND :we
+               AND status = 'draft'
+            RETURNING id
+        """), {"emp_id": req.employee_id, "ws": req.week_start, "we": week_end})
+        updated_ids = [r[0] for r in result.fetchall()]
+        db.commit()
+        return {"submitted_count": len(updated_ids), "entry_ids": updated_ids}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error submitting weekly timesheet: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.get("/timetracking/team",
+            dependencies=[Depends(require_permission("projects.time_approve"))])
+async def list_team_time_entries(
+    project_id: Optional[int] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    entry_status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب سجلات وقت الفريق (للمدير)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        filters = ["1=1"]
+        params: dict = {}
+        if project_id:
+            filters.append("te.project_id = :project_id"); params["project_id"] = project_id
+        if date_from:
+            filters.append("te.date >= :date_from"); params["date_from"] = date_from
+        if date_to:
+            filters.append("te.date <= :date_to"); params["date_to"] = date_to
+        if entry_status:
+            filters.append("te.status = :entry_status"); params["entry_status"] = entry_status
+        where = " AND ".join(filters)
+        rows = db.execute(text(f"""
+            SELECT te.*,
+                   e.full_name  AS employee_name,
+                   p.project_name,
+                   pt.task_name,
+                   ae.full_name AS approver_name
+            FROM   timesheet_entries te
+            LEFT JOIN employees e  ON e.id  = te.employee_id
+            LEFT JOIN projects  p  ON p.id  = te.project_id
+            LEFT JOIN project_tasks pt ON pt.id = te.task_id
+            LEFT JOIN employees ae ON ae.id = te.approved_by
+            WHERE  {where}
+            ORDER BY te.date DESC, e.full_name
+        """), params).fetchall()
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
+@router.post("/timetracking/{entry_id}/approve",
+             dependencies=[Depends(require_permission("projects.time_approve"))])
+async def approve_time_entry(
+    entry_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """الموافقة على سجل وقت"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing = _fetch_timesheet_entry(db, entry_id)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+        if existing["status"] != "submitted":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "Only submitted entries can be approved")
+        approver_emp = db.execute(text(
+            "SELECT id FROM employees WHERE user_id = :uid LIMIT 1"
+        ), {"uid": current_user.id}).fetchone()
+        approver_id = approver_emp[0] if approver_emp else None
+        db.execute(text("""
+            UPDATE timesheet_entries
+               SET status = 'approved', approved_by = :approver, updated_at = now()
+             WHERE id = :id
+        """), {"approver": approver_id, "id": entry_id})
+        db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.time_approve", resource_type="timesheet_entry",
+            resource_id=str(entry_id),
+            details={"entry_id": entry_id},
+            request=request
+        )
+        return _fetch_timesheet_entry(db, entry_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error approving time entry: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.post("/timetracking/{entry_id}/reject",
+             dependencies=[Depends(require_permission("projects.time_approve"))])
+async def reject_time_entry(
+    entry_id: int,
+    req: RejectRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """رفض سجل وقت مع سبب"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing = _fetch_timesheet_entry(db, entry_id)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+        if existing["status"] != "submitted":
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "Only submitted entries can be rejected")
+        db.execute(text("""
+            UPDATE timesheet_entries
+               SET status = 'rejected',
+                   rejection_reason = :reason,
+                   updated_at = now()
+             WHERE id = :id
+        """), {"reason": req.rejection_reason, "id": entry_id})
+        db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.time_reject", resource_type="timesheet_entry",
+            resource_id=str(entry_id),
+            details={"entry_id": entry_id, "reason": req.rejection_reason},
+            request=request
+        )
+        return _fetch_timesheet_entry(db, entry_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error rejecting time entry: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.get("/timetracking/profitability/{project_id}",
+            dependencies=[Depends(require_permission("projects.time_view"))])
+async def get_project_profitability(
+    project_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير ربحية المشروع: ساعات قابلة للفوترة × السعر مقابل الميزانية"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        project = db.execute(text("""
+            SELECT id, project_name, planned_budget, actual_cost
+            FROM   projects WHERE id = :pid
+        """), {"pid": project_id}).fetchone()
+        if not project:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
+        ts = db.execute(text("""
+            SELECT
+                COALESCE(SUM(hours), 0)                                         AS total_hours,
+                COALESCE(SUM(CASE WHEN is_billable THEN hours ELSE 0 END), 0)   AS billable_hours,
+                COALESCE(SUM(CASE WHEN NOT is_billable THEN hours ELSE 0 END),0) AS non_billable_hours,
+                COALESCE(SUM(CASE WHEN is_billable
+                             THEN hours * COALESCE(billing_rate, 0)
+                             ELSE 0 END), 0)                                    AS billable_revenue
+            FROM timesheet_entries
+            WHERE project_id = :pid AND status = 'approved'
+        """), {"pid": project_id}).fetchone()
+
+        expenses = db.execute(text("""
+            SELECT COALESCE(SUM(amount), 0) AS total_expenses
+            FROM   project_expenses
+            WHERE  project_id = :pid
+        """), {"pid": project_id}).fetchone()
+
+        billable_revenue = float(ts.billable_revenue)
+        total_expenses = float(expenses.total_expenses)
+        total_cost = total_expenses + float(project.actual_cost or 0)
+        profit = billable_revenue - total_cost
+        planned_budget = float(project.planned_budget or 0)
+        margin_pct = (profit / billable_revenue * 100) if billable_revenue else 0
+
+        return {
+            "project_id":        project_id,
+            "project_name":      project.project_name,
+            "planned_budget":    planned_budget,
+            "total_hours":       float(ts.total_hours),
+            "billable_hours":    float(ts.billable_hours),
+            "non_billable_hours": float(ts.non_billable_hours),
+            "billable_revenue":  billable_revenue,
+            "total_expenses":    total_expenses,
+            "total_cost":        total_cost,
+            "profit":            profit,
+            "margin_pct":        round(margin_pct, 2),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating profitability: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════
+# US18 — Resource Planning  (/projects/resources/...)
+# ═══════════════════════════════════════════════════════════
+
+from schemas.resource import AllocationCreate, AllocationUpdate
+
+
+def _fetch_allocation(db, alloc_id: int) -> dict:
+    row = db.execute(text("""
+        SELECT ra.*,
+               e.full_name  AS employee_name,
+               p.project_name
+        FROM   resource_allocations ra
+        LEFT JOIN employees e ON e.id = ra.employee_id
+        LEFT JOIN projects  p ON p.id = ra.project_id
+        WHERE  ra.id = :id
+    """), {"id": alloc_id}).fetchone()
+    return dict(row._mapping) if row else None
+
+
+def _compute_total_allocation(db, employee_id: int, start_date, end_date, exclude_id=None):
+    """Sum allocation_percent for overlapping date ranges."""
+    params = {"eid": employee_id, "sd": start_date, "ed": end_date}
+    exclude_clause = ""
+    if exclude_id:
+        exclude_clause = "AND ra.id != :exclude_id"
+        params["exclude_id"] = exclude_id
+    row = db.execute(text(f"""
+        SELECT COALESCE(SUM(ra.allocation_percent), 0) AS total_pct
+        FROM   resource_allocations ra
+        WHERE  ra.employee_id = :eid
+          AND  ra.start_date <= :ed
+          AND  ra.end_date   >= :sd
+          {exclude_clause}
+    """), params).fetchone()
+    return float(row.total_pct)
+
+
+@router.get("/resources/availability",
+            dependencies=[Depends(require_permission("projects.resource_view"))])
+async def get_team_availability(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض تقويم توفر الفريق مع نسب التخصيص"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        if not date_from:
+            date_from = date.today()
+        if not date_to:
+            date_to = date_from + timedelta(days=90)
+
+        employees = db.execute(text("""
+            SELECT DISTINCT ra.employee_id, e.full_name AS employee_name
+            FROM   resource_allocations ra
+            JOIN   employees e ON e.id = ra.employee_id
+            WHERE  ra.start_date <= :ed AND ra.end_date >= :sd
+            ORDER  BY e.full_name
+        """), {"sd": date_from, "ed": date_to}).fetchall()
+
+        result = []
+        for emp in employees:
+            allocs = db.execute(text("""
+                SELECT ra.*,
+                       p.project_name
+                FROM   resource_allocations ra
+                LEFT JOIN projects p ON p.id = ra.project_id
+                WHERE  ra.employee_id = :eid
+                  AND  ra.start_date <= :ed
+                  AND  ra.end_date   >= :sd
+                ORDER  BY ra.start_date
+            """), {"eid": emp.employee_id, "sd": date_from, "ed": date_to}).fetchall()
+
+            total_alloc = sum(float(a.allocation_percent) for a in allocs)
+            result.append({
+                "employee_id": emp.employee_id,
+                "employee_name": emp.employee_name,
+                "total_allocation": total_alloc,
+                "is_over_allocated": total_alloc > 100,
+                "allocations": [dict(a._mapping) for a in allocs],
+            })
+        return {"employees": result}
+    finally:
+        db.close()
+
+
+@router.post("/resources/allocate", status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_permission("projects.resource_manage"))])
+async def allocate_resource(
+    alloc: AllocationCreate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """تخصيص مورد لمشروع مع تحذير عند التخصيص الزائد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing_total = _compute_total_allocation(
+            db, alloc.employee_id, alloc.start_date, alloc.end_date
+        )
+        new_total = existing_total + float(alloc.allocation_percent)
+        over_allocated = new_total > 100
+
+        result = db.execute(text("""
+            INSERT INTO resource_allocations
+                (employee_id, project_id, role, allocation_percent,
+                 start_date, end_date, created_by)
+            VALUES
+                (:employee_id, :project_id, :role, :allocation_percent,
+                 :start_date, :end_date, :created_by)
+            RETURNING id
+        """), {
+            "employee_id":      alloc.employee_id,
+            "project_id":       alloc.project_id,
+            "role":             alloc.role,
+            "allocation_percent": float(alloc.allocation_percent),
+            "start_date":       alloc.start_date,
+            "end_date":         alloc.end_date,
+            "created_by":       current_user.id,
+        })
+        alloc_id = result.fetchone()[0]
+        db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.resource_allocate", resource_type="resource_allocation",
+            resource_id=str(alloc_id),
+            details={"project_id": alloc.project_id, "employee_id": alloc.employee_id, "percent": float(alloc.allocation_percent)},
+            request=request
+        )
+
+        data = _fetch_allocation(db, alloc_id)
+        data["total_allocation"] = new_total
+        data["over_allocation_warning"] = over_allocated
+        if over_allocated:
+            data["warning_message"] = (
+                f"Employee is allocated at {new_total:.0f}% "
+                f"(exceeds 100%) for the overlapping period."
+            )
+        return data
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error allocating resource: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.put("/resources/allocate/{alloc_id}",
+            dependencies=[Depends(require_permission("projects.resource_manage"))])
+async def update_allocation(
+    alloc_id: int,
+    alloc: AllocationUpdate,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """تحديث تخصيص مورد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing = _fetch_allocation(db, alloc_id)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Allocation not found")
+
+        updates, params = [], {"id": alloc_id}
+        if alloc.role is not None:
+            updates.append("role = :role"); params["role"] = alloc.role
+        if alloc.allocation_percent is not None:
+            updates.append("allocation_percent = :pct")
+            params["pct"] = float(alloc.allocation_percent)
+        if alloc.start_date is not None:
+            updates.append("start_date = :sd"); params["sd"] = alloc.start_date
+        if alloc.end_date is not None:
+            updates.append("end_date = :ed"); params["ed"] = alloc.end_date
+        if not updates:
+            return existing
+
+        updates.append("updated_at = now()")
+        db.execute(text(
+            f"UPDATE resource_allocations SET {', '.join(updates)} WHERE id = :id"
+        ), params)
+        db.commit()
+
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.resource_update", resource_type="resource_allocation",
+            resource_id=str(alloc_id),
+            details={"alloc_id": alloc_id},
+            request=request
+        )
+
+        updated = _fetch_allocation(db, alloc_id)
+        # Compute new total for warning
+        new_sd = alloc.start_date or existing["start_date"]
+        new_ed = alloc.end_date or existing["end_date"]
+        total = _compute_total_allocation(
+            db, existing["employee_id"], new_sd, new_ed
+        )
+        updated["total_allocation"] = total
+        updated["over_allocation_warning"] = total > 100
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating allocation: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.delete("/resources/allocate/{alloc_id}",
+               dependencies=[Depends(require_permission("projects.resource_manage"))])
+async def delete_allocation(
+    alloc_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """حذف تخصيص مورد"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        existing = _fetch_allocation(db, alloc_id)
+        if not existing:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Allocation not found")
+        db.execute(text("DELETE FROM resource_allocations WHERE id = :id"),
+                   {"id": alloc_id})
+        db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="project.resource_delete", resource_type="resource_allocation",
+            resource_id=str(alloc_id),
+            details={"alloc_id": alloc_id},
+            request=request
+        )
+        return {"message": "Allocation removed", "id": alloc_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting allocation: {e}")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+    finally:
+        db.close()
+
+
+@router.get("/resources/project/{project_id}",
+            dependencies=[Depends(require_permission("projects.resource_view"))])
+async def get_project_resources(
+    project_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """عرض تخصيصات الموارد لمشروع معين"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT ra.*,
+                   e.full_name  AS employee_name,
+                   p.project_name
+            FROM   resource_allocations ra
+            LEFT JOIN employees e ON e.id = ra.employee_id
+            LEFT JOIN projects  p ON p.id = ra.project_id
+            WHERE  ra.project_id = :pid
+            ORDER  BY ra.start_date, e.full_name
+        """), {"pid": project_id}).fetchall()
+        return [dict(r._mapping) for r in rows]
     finally:
         db.close()

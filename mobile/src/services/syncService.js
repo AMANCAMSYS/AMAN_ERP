@@ -5,6 +5,8 @@
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { mobileAPI } from './api';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
 const QUEUE_KEY = '@aman_sync_queue';
 const DEVICE_ID_KEY = '@aman_device_id';
@@ -17,7 +19,7 @@ export async function getDeviceId() {
   if (_deviceId) return _deviceId;
   let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
-    id = `device_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    id = `device_${uuidv4()}`;
     await AsyncStorage.setItem(DEVICE_ID_KEY, id);
   }
   _deviceId = id;

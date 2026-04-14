@@ -102,7 +102,7 @@ const WorkflowEditor = () => {
 
     const removeStep = (index) => {
         if (formData.steps.length <= 1) {
-            showToast(isRTL ? "يجب أن يحتوي مسار العمل على خطوة واحدة على الأقل" : "Workflow must have at least one step", "warning");
+            showToast(t('approvals.workflow_min_steps'), "warning");
             return;
         }
         const newSteps = formData.steps.filter((_, i) => i !== index).map((step, i) => ({
@@ -218,7 +218,7 @@ const WorkflowEditor = () => {
                                     value={formData.name}
                                     onChange={handleChange}
                                     required
-                                    placeholder={isRTL ? "مثلاً: اعتماد أوامر الشراء الكبيرة" : "e.g. High Value Purchase Approvals"}
+                                    placeholder={t('approvals.workflow_name_placeholder')}
                                 />
                             </div>
 
@@ -231,7 +231,7 @@ const WorkflowEditor = () => {
                                     onChange={handleChange}
                                     required
                                 >
-                                    <option value="">{isRTL ? "اختر نوع المستند" : "Select Document Type"}</option>
+                                    <option value="">{t('approvals.select_document_type')}</option>
                                     {documentTypes.map(type => (
                                         <option key={type.value} value={type.value}>
                                             {isRTL ? (type.label_ar || type.label) : (type.label || type.label_ar)}
@@ -346,7 +346,7 @@ const WorkflowEditor = () => {
                                                     style={{ border: 'none', background: 'transparent', padding: '0' }}
                                                     value={step.label}
                                                     onChange={(e) => handleStepChange(index, 'label', e.target.value)}
-                                                    placeholder={isRTL ? "مثلاً: اعتماد المدير التقني" : "e.g. Tech Lead Approval"}
+                                                    placeholder={t('approvals.step_name_placeholder')}
                                                 />
                                             </td>
                                             <td className="text-center">

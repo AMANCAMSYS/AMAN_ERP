@@ -30,6 +30,12 @@ def list_categories(
         if branch_id:
             query += " AND (branch_id = :bid OR branch_id IS NULL)"
             params["bid"] = branch_id
+        else:
+            # INV-011: Enforce allowed_branches when no branch_id specified
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                query += " AND (branch_id IN :branches OR branch_id IS NULL)"
+                params["branches"] = tuple(allowed)
 
         query += " ORDER BY id"
         result = db.execute(text(query), params).fetchall()
@@ -97,7 +103,8 @@ def create_category(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -137,7 +144,8 @@ def update_category(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -150,6 +158,16 @@ def delete_category(
 ):
     db = get_db_connection(current_user.company_id)
     try:
+        # INV-008: Check existence
+        cat = db.execute(text("SELECT id FROM product_categories WHERE id = :id"), {"id": id}).fetchone()
+        if not cat:
+            raise HTTPException(status_code=404, detail="الفئة غير موجودة")
+
+        # INV-008: Check for linked products before deletion
+        product_count = db.execute(text("SELECT COUNT(*) FROM products WHERE category_id = :id"), {"id": id}).scalar()
+        if product_count and product_count > 0:
+            raise HTTPException(status_code=400, detail=f"لا يمكن حذف الفئة لأنها مرتبطة بـ {product_count} منتج")
+
         db.execute(text("DELETE FROM product_categories WHERE id = :id"), {"id": id})
         db.commit()
 
@@ -167,6 +185,7 @@ def delete_category(
         return {"message": "top deleted"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

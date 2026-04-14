@@ -10,17 +10,13 @@ function ForgotPassword() {
     const [loading, setLoading] = useState(false)
     const [sent, setSent] = useState(false)
     const [error, setError] = useState('')
-    const [devResetUrl, setDevResetUrl] = useState('')
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
         setError('')
         try {
-            const res = await passwordResetAPI.forgotPassword({ email })
-            if (res.data?.dev_reset_url) {
-                setDevResetUrl(res.data.dev_reset_url)
-            }
+            await passwordResetAPI.forgotPassword({ email })
             setSent(true)
         } catch (err) {
             const detail = err.response?.data?.detail
@@ -48,15 +44,7 @@ function ForgotPassword() {
                         <div className="alert alert-success">
                             ✅ {t('forgot_password.email_sent')}
                         </div>
-                        {devResetUrl ? (
-                            <div className="alert alert-warning mt-3" style={{ textAlign: 'left', wordBreak: 'break-all' }}>
-                                <strong>⚙️ وضع التطوير — SMTP غير مُهيأ</strong>
-                                <p className="mt-2" style={{ fontSize: '0.85rem' }}>انقر على الرابط أدناه لإعادة تعيين كلمة المرور:</p>
-                                <a href={devResetUrl} className="text-primary" style={{ fontSize: '0.8rem' }}>{devResetUrl}</a>
-                            </div>
-                        ) : (
-                            <p className="text-muted mt-3">{t('forgot_password.check_inbox')}</p>
-                        )}
+                        <p className="text-muted mt-3">{t('forgot_password.check_inbox')}</p>
                         <Link to="/login" className="btn btn-primary mt-4">{t('forgot_password.back_to_login')}</Link>
                     </div>
                 ) : (

@@ -439,7 +439,7 @@ export default function WithholdingTax() {
                                         value={rateForm.name}
                                         onChange={(e) => setRateForm({ ...rateForm, name: e.target.value })}
                                         required
-                                        placeholder="e.g. Services WHT"
+                                        placeholder={t('taxes.wht_name_placeholder')}
                                     />
                                 </div>
                                 <div className="form-group">

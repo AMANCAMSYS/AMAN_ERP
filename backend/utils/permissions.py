@@ -159,7 +159,7 @@ def require_sensitive_permission(permission: Union[str, List[str]]):
             user_perms = getattr(current_user, 'permissions', []) or []
             username = getattr(current_user, 'username', 'unknown')
             company_id = getattr(current_user, 'company_id', None)
-            user_id = getattr(current_user, 'user_id', None)
+            user_id = getattr(current_user, 'id', None)
 
         required_perms = [permission] if isinstance(permission, str) else permission
         has_permission = any(check_permission(user_perms, perm) for perm in required_perms)
@@ -307,7 +307,28 @@ DEFAULT_FIELD_RESTRICTIONS = {
     "warehouse_keeper": {
         "products": ["cost_price", "average_cost", "last_purchase_price", "selling_price"],
         "invoices": ["*"],
-    }
+    },
+    # SEC-FIX RT-009: Additional role field restrictions
+    "cashier": {
+        "products": ["cost_price", "average_cost", "last_purchase_price", "profit_margin"],
+        "invoice_lines": ["cost_price", "profit_margin"],
+        "suppliers": ["*"],
+        "purchase_orders": ["*"],
+        "inventory": ["unit_cost", "total_cost"],
+    },
+    "inventory": {
+        "products": ["selling_price", "profit_margin"],
+        "invoices": ["*"],
+        "journal_entries": ["*"],
+        "employees": ["*"],
+    },
+    "user": {
+        "products": ["cost_price", "average_cost", "last_purchase_price", "profit_margin"],
+        "invoice_lines": ["cost_price", "profit_margin"],
+        "inventory": ["unit_cost", "total_cost"],
+        "journal_entries": ["*"],
+        "employees": ["salary", "bank_account", "iban", "gosi_number"],
+    },
 }
 
 
@@ -446,8 +467,10 @@ def build_warehouse_filter(current_user, company_conn=None,
 
     col = f"{table_alias}.{warehouse_column}" if table_alias else warehouse_column
     # Use parameterized query with IN clause
-    placeholders = ", ".join(str(int(w)) for w in allowed)
-    return f" AND {col} IN ({placeholders})", {}
+    param_names = [f"_wh_{i}" for i in range(len(allowed))]
+    placeholders = ", ".join(f":{p}" for p in param_names)
+    params = {p: int(v) for p, v in zip(param_names, allowed)}
+    return f" AND {col} IN ({placeholders})", params
 
 
 # ===================== PERM-003: Cost-Center-Level Permissions =====================
@@ -501,8 +524,10 @@ def build_cost_center_filter(current_user, company_conn=None,
         return f" AND 1=0", {}
 
     col = f"{table_alias}.{cc_column}" if table_alias else cc_column
-    placeholders = ", ".join(str(int(c)) for c in allowed)
-    return f" AND {col} IN ({placeholders})", {}
+    param_names = [f"_cc_{i}" for i in range(len(allowed))]
+    placeholders = ", ".join(f":{p}" for p in param_names)
+    params = {p: int(c) for p, c in zip(param_names, allowed)}
+    return f" AND {col} IN ({placeholders})", params
 
 
 # ===================== PERM-004: Permission Audit Logging =====================

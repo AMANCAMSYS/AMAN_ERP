@@ -55,7 +55,8 @@ def generate_forecast(
     except Exception as e:
         db.rollback()
         logger.exception("Forecast generation failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -156,6 +157,7 @@ def delete_forecast(forecast_id: int, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Forecast deletion failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

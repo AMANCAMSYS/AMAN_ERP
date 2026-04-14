@@ -301,7 +301,7 @@ const BOMs = () => {
                                                 className="form-input"
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                placeholder="e.g. Standard Manufacture"
+                                                placeholder={t('manufacturing.bom_process_placeholder')}
                                             />
                                         </div>
                                         <div className="col-md-4 form-group">
@@ -311,7 +311,7 @@ const BOMs = () => {
                                                 className="form-input"
                                                 value={formData.code}
                                                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                                                placeholder="e.g. BOM-001"
+                                                placeholder={t('manufacturing.bom_code_placeholder')}
                                             />
                                         </div>
                                     </div>

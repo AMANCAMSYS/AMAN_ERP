@@ -48,6 +48,18 @@ def list_suppliers(
         """
         params = {"limit": limit, "skip": skip}
 
+        # PTY-006/019: Apply branch_id filter if provided, else enforce allowed_branches
+        if branch_id:
+            query += " AND p.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+        else:
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND p.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
+
         query += " ORDER BY p.created_at DESC LIMIT :limit OFFSET :skip"
         result = db.execute(text(query), params).fetchall()
 
@@ -94,6 +106,12 @@ def get_supplier(
 
         if not supplier:
             raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        # PTY-003: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if supplier.branch_id and supplier.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك الوصول لبيانات مورد خارج فروعك")
 
         return {
             "id": supplier.id,
@@ -180,7 +198,8 @@ def create_supplier(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating supplier: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -195,9 +214,15 @@ def update_supplier(
     db = get_db_connection(current_user.company_id)
     try:
         # Check existence
-        existing = db.execute(text("SELECT id, created_at, current_balance FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
+        existing = db.execute(text("SELECT id, created_at, current_balance, branch_id FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        # PTY-004: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if existing.branch_id and existing.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك تعديل مورد خارج فروعك")
 
         db.execute(text("""
             UPDATE parties SET
@@ -249,7 +274,8 @@ def update_supplier(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating supplier: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -264,9 +290,15 @@ def delete_supplier(
     db = get_db_connection(current_user.company_id)
     try:
         # Check existence
-        supplier = db.execute(text("SELECT id, name FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
+        supplier = db.execute(text("SELECT id, name, branch_id FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": id}).fetchone()
         if not supplier:
             raise HTTPException(status_code=404, detail="المورد غير موجود")
+
+        # PTY-003: Branch access enforcement for delete
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if supplier.branch_id and supplier.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك حذف مورد خارج فروعك")
 
         # Check if supplier has balance
         balance = db.execute(text("SELECT COALESCE(current_balance, 0) FROM parties WHERE id = :id"), {"id": id}).scalar()
@@ -308,6 +340,7 @@ def delete_supplier(
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting supplier: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

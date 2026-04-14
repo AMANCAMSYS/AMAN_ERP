@@ -6,6 +6,7 @@ from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 from pydantic import BaseModel
+from utils.cache import invalidate_company_cache
 
 _D2 = Decimal('0.01')
 _D4 = Decimal('0.0001')
@@ -25,8 +26,6 @@ from schemas.purchases import PurchaseLineItem, PurchaseCreate, SupplierGroupCre
 
 router = APIRouter(prefix="/buying", tags=["المشتريات"], dependencies=[Depends(require_module("buying"))])
 logger = logging.getLogger(__name__)
-
-
 
 # --- Endpoints ---
 
@@ -70,7 +69,8 @@ def list_supplier_groups(
 
 @router.post("/supplier-groups", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
 def create_supplier_group(
-    group: SupplierGroupCreate, 
+    group: SupplierGroupCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء مجموعة موردين جديدة"""
@@ -108,12 +108,13 @@ def create_supplier_group(
             action="buying.supplier_group.create",
             resource_type="supplier_group",
             details={"group_name": group.group_name},
-            request=None
+            request=request
         )
         return {"message": "تم إنشاء المجموعة بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -121,6 +122,7 @@ def create_supplier_group(
 def update_supplier_group(
     id: int,
     group: SupplierGroupCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """تحديث مجموعة موردين"""
@@ -164,20 +166,22 @@ def update_supplier_group(
             resource_type="supplier_group",
             resource_id=str(id),
             details={"group_name": group.group_name},
-            request=None
+            request=request
         )
         return {"message": "تم تحديث المجموعة بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 @router.delete("/supplier-groups/{id}", dependencies=[Depends(require_permission("buying.delete"))])
 def delete_supplier_group(
     id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """حذف مجموعة موردين"""
@@ -205,14 +209,15 @@ def delete_supplier_group(
             resource_type="supplier_group",
             resource_id=str(id),
             details=None,
-            request=None
+            request=request
         )
         return {"message": "تم حذف المجموعة بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -624,7 +629,8 @@ def create_purchase_order(
         return response
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -704,7 +710,8 @@ def approve_purchase_order(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -905,13 +912,12 @@ def receive_purchase_order(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 # === Purchases Summary ===
-
-
 @router.get("/summary", dependencies=[Depends(require_permission("buying.view"))], response_model=dict)
 def get_purchases_summary(
     branch_id: Optional[int] = None,
@@ -1037,6 +1043,9 @@ def get_purchase_invoice(
         
         if not invoice:
             raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+
+        from utils.permissions import validate_branch_access
+        validate_branch_access(current_user, invoice.branch_id)
 
         # Get base currency for fallback
         base_currency = get_base_currency(db)
@@ -1564,8 +1573,6 @@ async def create_purchase_invoice(
 
         db.commit()
 
-
-
         supp_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": invoice.supplier_id}).scalar()
         # AUDIT LOG
         log_activity(
@@ -1617,7 +1624,8 @@ async def create_purchase_invoice(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating purchase invoice: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1634,6 +1642,9 @@ def list_purchase_returns(
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     db = get_db_connection(company_id)
     try:
+        from utils.permissions import validate_branch_access
+        branch_id = validate_branch_access(current_user, branch_id)
+
         query_str = """
             SELECT i.id, i.invoice_number, p.name as supplier_name, 
                    i.invoice_date, i.total, i.status
@@ -1685,7 +1696,10 @@ def get_purchase_return(
         
         if not invoice:
             raise HTTPException(status_code=404, detail="مردود المشتريات غير موجود")
-            
+
+        from utils.permissions import validate_branch_access
+        validate_branch_access(current_user, invoice.branch_id)
+
         # Get Items
         items_query = """
             SELECT ii.*, p.product_name, p.product_code
@@ -2237,6 +2251,8 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
             )
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         supp_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": data.supplier_id}).scalar()
         log_activity(
@@ -2278,13 +2294,14 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
     finally:
         db.close()
         
-
-
 @router.get("/payments", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
 def list_supplier_payments(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """قائمة سندات الصرف"""
     db = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        branch_id = validate_branch_access(current_user, branch_id)
+
         query_str = """
             SELECT pv.id, pv.voucher_number, pv.voucher_date, pv.amount, pv.currency,
                    pv.payment_method, pv.status, p.name as supplier_name
@@ -2303,7 +2320,8 @@ def list_supplier_payments(branch_id: Optional[int] = None, current_user: dict =
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error listing payments: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -2321,7 +2339,10 @@ def get_payment_details(voucher_id: int, current_user: dict = Depends(get_curren
         
         if not header:
             raise HTTPException(status_code=404, detail="Payment not found")
-        
+
+        from utils.permissions import validate_branch_access
+        validate_branch_access(current_user, header._mapping.get("branch_id"))
+
         allocations = db.execute(text("""
             SELECT pa.*, i.invoice_number
             FROM payment_allocations pa
@@ -2337,7 +2358,8 @@ def get_payment_details(voucher_id: int, current_user: dict = Depends(get_curren
         raise
     except Exception as e:
         logger.error(f"Error getting payment: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -2370,7 +2392,8 @@ def get_supplier_outstanding_invoices(
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error fetching outstanding invoices: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 @router.get("/invoices/{invoice_id}/payment-history", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
@@ -2395,11 +2418,10 @@ def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(ge
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error getting payment history: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ==================== INV-003: Purchase Credit Notes (إشعار دائن مشتريات) ====================
 # Credit Note from Supplier: Reduces what we owe (e.g., supplier overcharged us, returns to supplier)
 # GL: Debit AP (reduce payable), Credit Inventory/Expense + VAT Input
@@ -2419,6 +2441,9 @@ def list_purchase_credit_notes(
     """قائمة إشعارات دائنة (مشتريات)"""
     db = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        branch_id = validate_branch_access(current_user, branch_id)
+
         conditions = ["i.invoice_type = 'purchase_credit_note'"]
         params = {}
         if party_id:
@@ -2467,8 +2492,6 @@ def list_purchase_credit_notes(
         }
     finally:
         db.close()
-
-
 @router.get("/credit-notes/{note_id}", dependencies=[Depends(require_permission("buying.view"))])
 def get_purchase_credit_note(note_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل إشعار دائن مشتريات"""
@@ -2487,6 +2510,9 @@ def get_purchase_credit_note(note_id: int, current_user: dict = Depends(get_curr
         if not note:
             raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
 
+        from utils.permissions import validate_branch_access
+        validate_branch_access(current_user, note._mapping.get("branch_id"))
+
         lines = db.execute(text("""
             SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
             FROM invoice_lines il LEFT JOIN products pr ON il.product_id = pr.id
@@ -2498,8 +2524,6 @@ def get_purchase_credit_note(note_id: int, current_user: dict = Depends(get_curr
         return result
     finally:
         db.close()
-
-
 @router.post("/credit-notes", status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(require_permission("buying.create"))])
 def create_purchase_credit_note(
@@ -2660,11 +2684,10 @@ def create_purchase_credit_note(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating purchase credit note: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ==================== INV-004: Purchase Debit Notes (إشعار مدين مشتريات) ====================
 # Debit Note to Supplier: Increases what we owe (e.g., undercharged, additional services)
 # GL: Debit Inventory/Expense + VAT Input, Credit AP
@@ -2684,6 +2707,9 @@ def list_purchase_debit_notes(
     """قائمة إشعارات مدينة (مشتريات)"""
     db = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        branch_id = validate_branch_access(current_user, branch_id)
+
         conditions = ["i.invoice_type = 'purchase_debit_note'"]
         params = {}
         if party_id:
@@ -2731,8 +2757,6 @@ def list_purchase_debit_notes(
         }
     finally:
         db.close()
-
-
 @router.get("/debit-notes/{note_id}", dependencies=[Depends(require_permission("buying.view"))])
 def get_purchase_debit_note(note_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل إشعار مدين مشتريات"""
@@ -2751,6 +2775,9 @@ def get_purchase_debit_note(note_id: int, current_user: dict = Depends(get_curre
         if not note:
             raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
 
+        from utils.permissions import validate_branch_access
+        validate_branch_access(current_user, note._mapping.get("branch_id"))
+
         lines = db.execute(text("""
             SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
             FROM invoice_lines il LEFT JOIN products pr ON il.product_id = pr.id
@@ -2762,8 +2789,6 @@ def get_purchase_debit_note(note_id: int, current_user: dict = Depends(get_curre
         return result
     finally:
         db.close()
-
-
 @router.post("/debit-notes", status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(require_permission("buying.create"))])
 def create_purchase_debit_note(
@@ -2909,11 +2934,10 @@ def create_purchase_debit_note(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating purchase debit note: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # =====================================================
 # 8.11 PURCHASES IMPROVEMENTS
 # =====================================================
@@ -2934,8 +2958,6 @@ def list_rfqs(status: Optional[str] = None, current_user=Depends(get_current_use
         return [dict(r._mapping) for r in rows]
     finally:
         db.close()
-
-
 @router.get("/rfq/{rfq_id}", dependencies=[Depends(require_permission("buying.view"))])
 def get_rfq(rfq_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
@@ -2952,10 +2974,8 @@ def get_rfq(rfq_id: int, current_user=Depends(get_current_user)):
         }
     finally:
         db.close()
-
-
 @router.post("/rfq", dependencies=[Depends(require_permission("buying.create"))])
-def create_rfq(data: dict, current_user=Depends(get_current_user)):
+def create_rfq(data: dict, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         import uuid
@@ -2975,29 +2995,38 @@ def create_rfq(data: dict, current_user=Depends(get_current_user)):
             """), {"rid": rfq.id, "pid": line.get("product_id"), "pname": line.get("product_name"),
                    "qty": line["quantity"], "unit": line.get("unit"), "specs": line.get("specifications")})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.rfq.create", resource_type="rfq",
+            resource_id=str(rfq.id), details={"rfq_number": rfq_num, "title": data["title"]},
+            request=request
+        )
         return dict(rfq._mapping)
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.put("/rfq/{rfq_id}/send", dependencies=[Depends(require_permission("buying.create"))])
-def send_rfq(rfq_id: int, current_user=Depends(get_current_user)):
+def send_rfq(rfq_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("UPDATE request_for_quotations SET status = 'sent', updated_at = NOW() WHERE id = :id"), {"id": rfq_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.rfq.send", resource_type="rfq",
+            resource_id=str(rfq_id), details={},
+            request=request
+        )
         return {"message": "RFQ sent to suppliers"}
     finally:
         db.close()
-
-
 @router.post("/rfq/{rfq_id}/responses", dependencies=[Depends(require_permission("buying.create"))])
-def add_rfq_response(rfq_id: int, data: dict, current_user=Depends(get_current_user)):
+def add_rfq_response(rfq_id: int, data: dict, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
@@ -3010,14 +3039,19 @@ def add_rfq_response(rfq_id: int, data: dict, current_user=Depends(get_current_u
             "days": data.get("delivery_days"), "notes": data.get("notes"),
         }).fetchone()
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.rfq.add_response", resource_type="rfq_response",
+            resource_id=str(result.id), details={"rfq_id": rfq_id, "supplier_id": data["supplier_id"]},
+            request=request
+        )
         return dict(result._mapping)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.post("/rfq/{rfq_id}/compare", dependencies=[Depends(require_permission("buying.view"))])
 def compare_rfq_responses(rfq_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
@@ -3030,10 +3064,8 @@ def compare_rfq_responses(rfq_id: int, current_user=Depends(get_current_user)):
         return {"responses": data, "recommended": best}
     finally:
         db.close()
-
-
 @router.post("/rfq/{rfq_id}/convert", dependencies=[Depends(require_permission("buying.create"))])
-def convert_rfq_to_po(rfq_id: int, data: dict, current_user=Depends(get_current_user)):
+def convert_rfq_to_po(rfq_id: int, data: dict, request: Request, current_user=Depends(get_current_user)):
     """Convert selected RFQ response to Purchase Order."""
     db = get_db_connection(current_user.company_id)
     try:
@@ -3045,16 +3077,21 @@ def convert_rfq_to_po(rfq_id: int, data: dict, current_user=Depends(get_current_
         db.execute(text("UPDATE rfq_responses SET is_selected = true WHERE id = :id"), {"id": response_id})
         db.execute(text("UPDATE request_for_quotations SET status = 'converted', updated_at = NOW() WHERE id = :id"), {"id": rfq_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.rfq.convert", resource_type="rfq",
+            resource_id=str(rfq_id), details={"response_id": response_id, "supplier_id": resp.supplier_id},
+            request=request
+        )
         return {"message": "RFQ converted. Create PO from supplier.", "supplier_id": resp.supplier_id, "total_price": float(resp.total_price)}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ---------- PUR-002: Supplier Ratings ----------
 
 @router.get("/supplier-ratings", dependencies=[Depends(require_permission("buying.view"))])
@@ -3071,8 +3108,6 @@ def list_supplier_ratings(supplier_id: Optional[int] = None, current_user=Depend
         return [dict(r._mapping) for r in rows]
     finally:
         db.close()
-
-
 @router.get("/supplier-ratings/summary/{supplier_id}", dependencies=[Depends(require_permission("buying.view"))])
 def supplier_rating_summary(supplier_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
@@ -3093,10 +3128,8 @@ def supplier_rating_summary(supplier_id: int, current_user=Depends(get_current_u
         return dict(row._mapping)
     finally:
         db.close()
-
-
 @router.post("/supplier-ratings", dependencies=[Depends(require_permission("buying.create"))])
-def rate_supplier(data: dict, current_user=Depends(get_current_user)):
+def rate_supplier(data: dict, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         q = _dec(data.get("quality_score", 0)).quantize(Decimal('0.1'), ROUND_HALF_UP)
@@ -3115,14 +3148,19 @@ def rate_supplier(data: dict, current_user=Depends(get_current_user)):
             "comments": data.get("comments"), "uid": current_user.id,
         }).fetchone()
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.supplier_rating.create", resource_type="supplier_rating",
+            resource_id=str(result.id), details={"supplier_id": data["supplier_id"], "overall_score": float(overall)},
+            request=request
+        )
         return dict(result._mapping)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 # ---------- PUR-003: Purchase Agreements (Blanket PO) ----------
 
 @router.get("/agreements", dependencies=[Depends(require_permission("buying.view"))])
@@ -3139,8 +3177,6 @@ def list_agreements(status: Optional[str] = None, current_user=Depends(get_curre
         return [dict(r._mapping) for r in rows]
     finally:
         db.close()
-
-
 @router.get("/agreements/{agr_id}", dependencies=[Depends(require_permission("buying.view"))])
 def get_agreement(agr_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
@@ -3152,10 +3188,8 @@ def get_agreement(agr_id: int, current_user=Depends(get_current_user)):
         return {"agreement": dict(agr._mapping), "lines": [dict(r._mapping) for r in lines]}
     finally:
         db.close()
-
-
 @router.post("/agreements", dependencies=[Depends(require_permission("buying.create"))])
-def create_agreement(data: dict, current_user=Depends(get_current_user)):
+def create_agreement(data: dict, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         import uuid
@@ -3180,27 +3214,36 @@ def create_agreement(data: dict, current_user=Depends(get_current_user)):
             """), {"aid": agr.id, "pid": line.get("product_id"), "pname": line.get("product_name"),
                    "qty": line.get("quantity", 0), "price": line.get("unit_price", 0)})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.agreement.create", resource_type="purchase_agreement",
+            resource_id=str(agr.id), details={"agreement_number": agr_num, "supplier_id": data["supplier_id"]},
+            request=request
+        )
         return dict(agr._mapping)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @router.put("/agreements/{agr_id}/activate", dependencies=[Depends(require_permission("buying.approve"))])
-def activate_agreement(agr_id: int, current_user=Depends(get_current_user)):
+def activate_agreement(agr_id: int, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("UPDATE purchase_agreements SET status = 'active' WHERE id = :id"), {"id": agr_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.agreement.activate", resource_type="purchase_agreement",
+            resource_id=str(agr_id), details={},
+            request=request
+        )
         return {"message": "Agreement activated"}
     finally:
         db.close()
-
-
 @router.post("/agreements/{agr_id}/call-off", dependencies=[Depends(require_permission("buying.create"))])
-def create_call_off(agr_id: int, data: dict, current_user=Depends(get_current_user)):
+def create_call_off(agr_id: int, data: dict, request: Request, current_user=Depends(get_current_user)):
     """Create a call-off (partial order) against a blanket agreement."""
     db = get_db_connection(current_user.company_id)
     try:
@@ -3215,12 +3258,349 @@ def create_call_off(agr_id: int, data: dict, current_user=Depends(get_current_us
         db.execute(text("UPDATE purchase_agreements SET consumed_amount = consumed_amount + :amt WHERE id = :id"),
                    {"amt": amount, "id": agr_id})
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="buying.agreement.call_off", resource_type="purchase_agreement",
+            resource_id=str(agr_id), details={"amount": float(amount)},
+            request=request
+        )
         remaining = (total_amount - consumed_amount - amount).quantize(_D2, ROUND_HALF_UP)
         return {"message": f"Call-off of {float(amount)} created", "remaining": float(remaining)}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+    finally:
+        db.close()
+# =====================================================================
+# Blanket Purchase Orders (US10)
+# =====================================================================
+
+from schemas.blanket_po import BlanketPOCreate, ReleaseOrderCreate, PriceAmendRequest
+
+BLANKET_PO_STATUSES = {"draft", "active", "expired", "completed", "cancelled"}
+@router.post("/blanket", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.blanket_manage"))])
+def create_blanket_po(payload: BlanketPOCreate, request: Request, current_user: dict = Depends(get_current_user)):
+    """Create a new blanket purchase order."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        username = current_user.get("username", "unknown") if isinstance(current_user, dict) else getattr(current_user, "username", "unknown")
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+
+        total_qty = _dec(payload.total_quantity)
+        unit_price = _dec(payload.unit_price)
+        total_amount = (total_qty * unit_price).quantize(_D4, ROUND_HALF_UP)
+
+        agr_number = generate_sequential_number(db, f"BPO-{datetime.now().year}", "blanket_purchase_orders", "agreement_number")
+
+        result = db.execute(text("""
+            INSERT INTO blanket_purchase_orders
+                (supplier_id, agreement_number, total_quantity, unit_price, total_amount,
+                 valid_from, valid_to, status, branch_id, currency, notes, created_by)
+            VALUES (:supplier_id, :agr_num, :total_qty, :unit_price, :total_amount,
+                    :valid_from, :valid_to, 'draft', :branch_id, :currency, :notes, :created_by)
+            RETURNING id
+        """), {
+            "supplier_id": payload.supplier_id,
+            "agr_num": agr_number,
+            "total_qty": float(total_qty),
+            "unit_price": float(unit_price),
+            "total_amount": float(total_amount),
+            "valid_from": payload.valid_from,
+            "valid_to": payload.valid_to,
+            "branch_id": payload.branch_id,
+            "currency": payload.currency or "SAR",
+            "notes": payload.notes,
+            "created_by": username,
+        })
+        bpo_id = result.fetchone()[0]
+
+        log_activity(db, user_id=user_id, username=username, action="blanket_po_created",
+                     resource_type="blanket_purchase_order", resource_id=str(bpo_id),
+                     details={"agreement_number": agr_number, "supplier_id": payload.supplier_id},
+                     request=request)
+        db.commit()
+        return {"id": bpo_id, "agreement_number": agr_number, "message": "Blanket PO created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create blanket PO: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create blanket PO")
+    finally:
+        db.close()
+@router.get("/blanket", dependencies=[Depends(require_permission("buying.blanket_view"))])
+def list_blanket_pos(
+    status_filter: Optional[str] = None,
+    supplier_id: Optional[int] = None,
+    branch_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user),
+):
+    """List blanket purchase orders with remaining balance."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        conditions = []
+        params = {"skip": skip, "limit": limit}
+
+        if status_filter and status_filter in BLANKET_PO_STATUSES:
+            conditions.append("b.status = :status")
+            params["status"] = status_filter
+        if supplier_id:
+            conditions.append("b.supplier_id = :supplier_id")
+            params["supplier_id"] = supplier_id
+        if branch_id:
+            conditions.append("b.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+
+        where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        rows = db.execute(text(f"""
+            SELECT b.*, p.name AS supplier_name
+            FROM blanket_purchase_orders b
+            LEFT JOIN parties p ON p.id = b.supplier_id
+            {where_clause}
+            ORDER BY b.created_at DESC
+            OFFSET :skip LIMIT :limit
+        """), params).fetchall()
+
+        result = []
+        for row in rows:
+            d = dict(row._mapping)
+            d["remaining_quantity"] = float(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
+            d["remaining_amount"] = float(_dec(d["total_amount"]) - _dec(d["released_amount"]))
+            result.append(d)
+
+        return {"blanket_pos": result}
+    finally:
+        db.close()
+@router.get("/blanket/{bpo_id}", dependencies=[Depends(require_permission("buying.blanket_view"))])
+def get_blanket_po(bpo_id: int, current_user: dict = Depends(get_current_user)):
+    """Get blanket PO details with release orders."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        bpo = db.execute(text("""
+            SELECT b.*, p.name AS supplier_name
+            FROM blanket_purchase_orders b
+            LEFT JOIN parties p ON p.id = b.supplier_id
+            WHERE b.id = :id
+        """), {"id": bpo_id}).fetchone()
+
+        if not bpo:
+            raise HTTPException(status_code=404, detail="Blanket PO not found")
+
+        d = dict(bpo._mapping)
+        d["remaining_quantity"] = float(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
+        d["remaining_amount"] = float(_dec(d["total_amount"]) - _dec(d["released_amount"]))
+
+        releases = db.execute(text("""
+            SELECT r.*, po.po_number
+            FROM blanket_po_release_orders r
+            LEFT JOIN purchase_orders po ON po.id = r.purchase_order_id
+            WHERE r.blanket_po_id = :bpo_id
+            ORDER BY r.release_date DESC
+        """), {"bpo_id": bpo_id}).fetchall()
+
+        d["releases"] = [dict(r._mapping) for r in releases]
+        return d
+    finally:
+        db.close()
+@router.put("/blanket/{bpo_id}/activate", dependencies=[Depends(require_permission("buying.blanket_manage"))])
+def activate_blanket_po(bpo_id: int, request: Request, current_user: dict = Depends(get_current_user)):
+    """Activate a draft blanket PO."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        bpo = db.execute(text(
+            "SELECT id, status FROM blanket_purchase_orders WHERE id = :id"
+        ), {"id": bpo_id}).fetchone()
+
+        if not bpo:
+            raise HTTPException(status_code=404, detail="Blanket PO not found")
+        if bpo._mapping["status"] != "draft":
+            raise HTTPException(status_code=400, detail="Only draft blanket POs can be activated")
+
+        db.execute(text(
+            "UPDATE blanket_purchase_orders SET status = 'active', updated_at = NOW() WHERE id = :id"
+        ), {"id": bpo_id})
+
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        username = current_user.get("username", "unknown") if isinstance(current_user, dict) else getattr(current_user, "username", "unknown")
+        log_activity(db, user_id=user_id, username=username, action="blanket_po_activated",
+                     resource_type="blanket_purchase_order", resource_id=str(bpo_id),
+                     details={"blanket_po_id": bpo_id}, request=request)
+        db.commit()
+        return {"message": "Blanket PO activated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+    finally:
+        db.close()
+@router.post("/blanket/{bpo_id}/release", dependencies=[Depends(require_permission("buying.blanket_release"))])
+def create_release_order(bpo_id: int, payload: ReleaseOrderCreate, request: Request, current_user: dict = Depends(get_current_user)):
+    """Create a release order against a blanket PO. Validates remaining quantity and warns if exceeds."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        bpo = db.execute(text("""
+            SELECT * FROM blanket_purchase_orders WHERE id = :id
+        """), {"id": bpo_id}).fetchone()
+
+        if not bpo:
+            raise HTTPException(status_code=404, detail="Blanket PO not found")
+
+        bpo_data = dict(bpo._mapping)
+        if bpo_data["status"] != "active":
+            raise HTTPException(status_code=400, detail="Blanket PO must be active to release orders")
+
+        release_qty = _dec(payload.release_quantity)
+        released_qty = _dec(bpo_data["released_quantity"])
+        total_qty = _dec(bpo_data["total_quantity"])
+        unit_price = _dec(bpo_data["unit_price"])
+
+        remaining_qty = total_qty - released_qty
+
+        if release_qty > remaining_qty:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Release quantity {float(release_qty)} exceeds remaining agreement quantity {float(remaining_qty)}"
+            )
+
+        release_amount = (release_qty * unit_price).quantize(_D4, ROUND_HALF_UP)
+        release_dt = payload.release_date or date.today()
+        username = current_user.get("username", "unknown") if isinstance(current_user, dict) else getattr(current_user, "username", "unknown")
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+
+        result = db.execute(text("""
+            INSERT INTO blanket_po_release_orders
+                (blanket_po_id, release_quantity, release_amount, release_date, created_by)
+            VALUES (:bpo_id, :qty, :amount, :rel_date, :created_by)
+            RETURNING id
+        """), {
+            "bpo_id": bpo_id,
+            "qty": float(release_qty),
+            "amount": float(release_amount),
+            "rel_date": release_dt,
+            "created_by": username,
+        })
+        release_id = result.fetchone()[0]
+
+        # Update blanket PO consumed totals
+        new_released_qty = released_qty + release_qty
+        new_released_amt = _dec(bpo_data["released_amount"]) + release_amount
+        new_status = "completed" if new_released_qty >= total_qty else "active"
+
+        db.execute(text("""
+            UPDATE blanket_purchase_orders
+            SET released_quantity = :rel_qty, released_amount = :rel_amt,
+                status = :status, updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "rel_qty": float(new_released_qty),
+            "rel_amt": float(new_released_amt),
+            "status": new_status,
+            "id": bpo_id,
+        })
+
+        log_activity(db, user_id=user_id, username=username, action="blanket_po_release",
+                     resource_type="blanket_po_release_order", resource_id=str(release_id),
+                     details={"blanket_po_id": bpo_id, "release_quantity": float(release_qty)},
+                     request=request)
+        db.commit()
+
+        response = {
+            "id": release_id,
+            "release_quantity": float(release_qty),
+            "release_amount": float(release_amount),
+            "remaining_quantity": float(total_qty - new_released_qty),
+            "remaining_amount": float(_dec(bpo_data["total_amount"]) - new_released_amt),
+            "message": "Release order created successfully",
+        }
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create release order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create release order")
+    finally:
+        db.close()
+@router.put("/blanket/{bpo_id}/amend-price", dependencies=[Depends(require_permission("buying.blanket_manage"))])
+def amend_blanket_po_price(bpo_id: int, payload: PriceAmendRequest, request: Request, current_user: dict = Depends(get_current_user)):
+    """Amend the unit price of a blanket PO with effective date tracking."""
+    company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    db = get_db_connection(company_id)
+    try:
+        bpo = db.execute(text("""
+            SELECT id, unit_price, total_quantity, released_quantity, released_amount,
+                   price_amendment_history, status
+            FROM blanket_purchase_orders WHERE id = :id
+        """), {"id": bpo_id}).fetchone()
+
+        if not bpo:
+            raise HTTPException(status_code=404, detail="Blanket PO not found")
+
+        bpo_data = dict(bpo._mapping)
+        if bpo_data["status"] not in ("draft", "active"):
+            raise HTTPException(status_code=400, detail="Cannot amend price on a completed/cancelled/expired blanket PO")
+
+        old_price = _dec(bpo_data["unit_price"])
+        new_price = _dec(payload.new_price)
+        total_qty = _dec(bpo_data["total_quantity"])
+        new_total_amount = (total_qty * new_price).quantize(_D4, ROUND_HALF_UP)
+
+        # Append to price amendment history
+        history = bpo_data.get("price_amendment_history") or []
+        history.append({
+            "effective_date": str(payload.effective_date),
+            "old_price": float(old_price),
+            "new_price": float(new_price),
+            "reason": payload.reason,
+            "amended_at": datetime.now().isoformat(),
+        })
+
+        import json
+        db.execute(text("""
+            UPDATE blanket_purchase_orders
+            SET unit_price = :new_price, total_amount = :new_total,
+                price_amendment_history = :history::jsonb, updated_at = NOW()
+            WHERE id = :id
+        """), {
+            "new_price": float(new_price),
+            "new_total": float(new_total_amount),
+            "history": json.dumps(history),
+            "id": bpo_id,
+        })
+
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        username = current_user.get("username", "unknown") if isinstance(current_user, dict) else getattr(current_user, "username", "unknown")
+        log_activity(db, user_id=user_id, username=username, action="blanket_po_price_amended",
+                     resource_type="blanket_purchase_order", resource_id=str(bpo_id),
+                     details={"old_price": float(old_price), "new_price": float(new_price)},
+                     request=request)
+        db.commit()
+
+        return {
+            "message": "Price amended successfully",
+            "old_price": float(old_price),
+            "new_price": float(new_price),
+            "new_total_amount": float(new_total_amount),
+            "remaining_amount": float(new_total_amount - _dec(bpo_data["released_amount"])),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to amend blanket PO price: {e}")
+        raise HTTPException(status_code=500, detail="Failed to amend price")
     finally:
         db.close()

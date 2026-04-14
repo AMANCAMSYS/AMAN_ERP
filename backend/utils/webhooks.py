@@ -3,18 +3,85 @@ AMAN ERP - Webhook Utilities
 API-002: Send webhooks with retry logic and logging.
 """
 
+import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
+import socket
 import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
+from cryptography.fernet import Fernet
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
+
+
+def _get_fernet() -> Fernet:
+    """Derive a Fernet key from SECRET_KEY for webhook secret encryption."""
+    from config import settings
+    key = base64.urlsafe_b64encode(
+        hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+    )
+    return Fernet(key)
+
+
+def encrypt_webhook_secret(plaintext: str) -> str:
+    """Encrypt a webhook secret for storage."""
+    return _get_fernet().encrypt(plaintext.encode()).decode()
+
+
+def decrypt_webhook_secret(ciphertext: str) -> str:
+    """Decrypt a stored webhook secret."""
+    return _get_fernet().decrypt(ciphertext.encode()).decode()
+
+# ── Private/reserved IP ranges blocked for SSRF protection ───────────────────
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def validate_webhook_url(url: str) -> None:
+    """
+    Validate a webhook URL is safe from SSRF attacks.
+
+    Checks:
+    - Only http/https schemes allowed
+    - Hostname resolves to a public (non-private/reserved) IP
+    - Blocks loopback, link-local, and private ranges
+
+    Raises ValueError if the URL is unsafe.
+    """
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Only http and https schemes are allowed")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL must include a hostname")
+
+    try:
+        addr_infos = socket.getaddrinfo(hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError("Could not resolve hostname")
+
+    for family, _, _, _, sockaddr in addr_infos:
+        ip = ipaddress.ip_address(sockaddr[0])
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                raise ValueError("URL resolves to a blocked IP range")
 
 
 # Supported events
@@ -43,6 +110,13 @@ def _send_single_webhook(webhook_id: int, url: str, secret: Optional[str],
                           event: str, payload: dict, timeout: int,
                           retry_count: int, db_factory):
     """Send webhook with retry logic (runs in background thread)."""
+    # Defense-in-depth SSRF check before dispatch (DNS rebinding protection)
+    try:
+        validate_webhook_url(url)
+    except ValueError as e:
+        logger.warning("Webhook %d blocked by SSRF check: %s - %s", webhook_id, url, e)
+        return
+
     payload_json = json.dumps(payload, default=str, ensure_ascii=False)
     
     headers = {
@@ -52,7 +126,12 @@ def _send_single_webhook(webhook_id: int, url: str, secret: Optional[str],
     }
     
     if secret:
-        headers["X-Webhook-Signature"] = _compute_signature(payload_json, secret)
+        try:
+            decrypted_secret = decrypt_webhook_secret(secret)
+        except Exception:
+            logger.warning("Webhook %d: failed to decrypt secret, using raw", webhook_id)
+            decrypted_secret = secret
+        headers["X-Webhook-Signature"] = _compute_signature(payload_json, decrypted_secret)
     
     for attempt in range(1, retry_count + 1):
         response_status = None

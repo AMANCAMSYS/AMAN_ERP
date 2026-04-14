@@ -62,10 +62,10 @@ def check_account_balances(conn, fix=False):
 
     if fix:
         conn.execute(text("""
-            UPDATE accounts a SET balance = COALESCE(sub.computed, 0)
+            UPDATE accounts a SET balance = CAST(COALESCE(sub.computed, 0) AS NUMERIC(18,4))
             FROM (
                 SELECT jl.account_id,
-                       SUM(jl.debit - jl.credit) AS computed
+                       CAST(SUM(jl.debit - jl.credit) AS NUMERIC(18,4)) AS computed
                 FROM journal_lines jl
                 JOIN journal_entries je ON je.id = jl.journal_entry_id
                 WHERE je.status = 'posted'
@@ -76,7 +76,7 @@ def check_account_balances(conn, fix=False):
         """))
         # Also zero out accounts with no journal lines
         conn.execute(text("""
-            UPDATE accounts SET balance = 0
+            UPDATE accounts SET balance = CAST(0 AS NUMERIC(18,4))
             WHERE balance != 0
               AND id NOT IN (
                   SELECT DISTINCT jl.account_id FROM journal_lines jl
@@ -126,12 +126,12 @@ def check_treasury_balances(conn, fix=False):
     if fix:
         conn.execute(text("""
             UPDATE treasury_accounts ta
-            SET current_balance = CASE
+            SET current_balance = CAST(CASE
                 WHEN ta.currency IS NOT NULL AND ta.currency != '' THEN
                     COALESCE(a.balance_currency, a.balance, 0)
                 ELSE
                     COALESCE(a.balance, 0)
-            END
+            END AS NUMERIC(18,4))
             FROM accounts a
             WHERE a.id = ta.gl_account_id
               AND ta.is_active = TRUE
@@ -179,10 +179,10 @@ def check_party_balances(conn, fix=False):
 
     if fix:
         conn.execute(text("""
-            UPDATE parties p SET current_balance = COALESCE(sub.computed, 0)
+            UPDATE parties p SET current_balance = CAST(COALESCE(sub.computed, 0) AS NUMERIC(18,4))
             FROM (
                 SELECT party_id,
-                       SUM(debit - credit) AS computed
+                       CAST(SUM(debit - credit) AS NUMERIC(18,4)) AS computed
                 FROM party_transactions
                 GROUP BY party_id
             ) sub

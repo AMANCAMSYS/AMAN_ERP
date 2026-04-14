@@ -212,7 +212,8 @@ def update_company_tax_settings(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating company tax settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -315,7 +316,8 @@ def update_branch_tax_setting(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating branch tax settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -403,6 +405,7 @@ def saudi_vat_return_report(
         else:
             period_start = date_cls(y, 1, 1)
             period_end = date_cls(y, 12, 31)
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"start": period_start, "end": period_end}
@@ -565,6 +568,7 @@ def syrian_income_tax_report(
     """
     from datetime import date as date_cls
     fy = fiscal_year or year or date_cls.today().year
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         start_date = f"{fy}-01-01"
@@ -688,6 +692,7 @@ def uae_vat_return_report(
         else:
             period_start = date_cls(y, 1, 1)
             period_end = date_cls(y, 12, 31)
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"start": period_start, "end": period_end}
@@ -791,6 +796,7 @@ def egypt_vat_return_report(
         else:
             period_start = date_cls(y, 1, 1)
             period_end = date_cls(y, 12, 31)
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"start": period_start, "end": period_end}
@@ -879,6 +885,7 @@ def generic_income_tax_report(
     """
     from datetime import date as date_cls
     fy = fiscal_year or year or date_cls.today().year
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         start_date = f"{fy}-01-01"

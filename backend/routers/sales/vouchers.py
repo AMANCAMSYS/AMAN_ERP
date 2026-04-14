@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+from utils.cache import invalidate_company_cache
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -17,12 +18,8 @@ vouchers_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal("0.01")
-
-
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal("0")
-
-
 # --- Customer Receipts (Payment Vouchers) ---
 
 @vouchers_router.post("/receipts", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
@@ -33,6 +30,10 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
         from utils.accounting import generate_sequential_number, get_base_currency
         base_currency = get_base_currency(db)
         voucher_num = generate_sequential_number(db, f"RCV-{datetime.now().year}", "payment_vouchers", "voucher_number")
+
+        # SLS-011: Prevent posting receipts to closed fiscal periods
+        from utils.accounting import check_fiscal_period_open
+        check_fiscal_period_open(db, data.voucher_date)
 
         # Currency & Exchange Rate
         currency = data.currency or base_currency
@@ -210,6 +211,8 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
                        {"amt": treas_amount, "id": data.treasury_id})
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         cust_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": data.customer_id}).scalar()
         # AUDIT LOG
@@ -247,11 +250,10 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating receipt: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @vouchers_router.post("/payments", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
 def create_customer_payment(request: Request, data: CustomerPaymentCreate, current_user: dict = Depends(get_current_user)):
     """إنشاء سند صرف لعميل (رد مبلغ)"""
@@ -260,6 +262,10 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         from utils.accounting import generate_sequential_number, get_base_currency
         base_currency = get_base_currency(db)
         voucher_num = generate_sequential_number(db, f"PAY-{datetime.now().year}", "payment_vouchers", "voucher_number")
+
+        # SLS-011: Prevent posting payments to closed fiscal periods
+        from utils.accounting import check_fiscal_period_open
+        check_fiscal_period_open(db, data.voucher_date)
 
         # Currency & Exchange Rate
         currency = data.currency or base_currency
@@ -424,6 +430,8 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
             )
 
         db.commit()
+        invalidate_company_cache(str(current_user.company_id))
+        
 
         cust_name = db.execute(text("SELECT name FROM parties WHERE id = :id"), {"id": data.customer_id}).scalar()
         # AUDIT LOG
@@ -442,14 +450,16 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating receipt: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @vouchers_router.get("/receipts", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def list_customer_receipts(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """قائمة سندات القبض"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -470,14 +480,16 @@ def list_customer_receipts(branch_id: Optional[int] = None, current_user: dict =
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error listing receipts: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @vouchers_router.get("/payments", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def list_customer_payments(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """قائمة سندات الصرف (العملاء)"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -498,11 +510,10 @@ def list_customer_payments(branch_id: Optional[int] = None, current_user: dict =
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error listing payments: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @vouchers_router.get("/payments/{voucher_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
 def get_payment_details(voucher_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل سند صرف"""
@@ -519,14 +530,18 @@ def get_payment_details(voucher_id: int, current_user: dict = Depends(get_curren
         if not header:
             raise HTTPException(status_code=404, detail="Payment not found")
 
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if header.branch_id:
+            validate_branch_access(current_user, header.branch_id)
+
         return dict(header._mapping)
     except Exception as e:
         logger.error(f"Error getting payment details: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
-
-
 @vouchers_router.get("/receipts/{voucher_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
 def get_receipt_details(voucher_id: int, current_user: dict = Depends(get_current_user)):
     """تفاصيل سند قبض"""
@@ -542,6 +557,11 @@ def get_receipt_details(voucher_id: int, current_user: dict = Depends(get_curren
 
         if not header:
             raise HTTPException(status_code=404, detail="Receipt not found")
+
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if header.branch_id:
+            validate_branch_access(current_user, header.branch_id)
 
         # Get Allocations
         allocations = db.execute(text("""
@@ -559,6 +579,7 @@ def get_receipt_details(voucher_id: int, current_user: dict = Depends(get_curren
         raise
     except Exception as e:
         logger.error(f"Error getting receipt: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

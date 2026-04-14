@@ -81,7 +81,7 @@ const AssetDetails = () => {
                 new_value: parseFloat(revalueData.new_value),
                 reason: revalueData.reason
             });
-            toastEmitter.emit(isRTL ? 'تم إعادة تقييم الأصل بنجاح' : 'Asset revalued successfully', 'success');
+            toastEmitter.emit(t('assets.asset_revalued_successfully'), 'success');
             setShowRevalueModal(false);
             setRevalueData({ new_value: '', reason: '' });
             fetchData();
@@ -109,7 +109,7 @@ const AssetDetails = () => {
                 to_branch_id: parseInt(transferData.to_branch_id),
                 notes: transferData.notes
             });
-            toastEmitter.emit(isRTL ? 'تم نقل الأصل بنجاح' : 'Asset transferred successfully', 'success');
+            toastEmitter.emit(t('assets.asset_transferred_successfully'), 'success');
             setShowTransferModal(false);
             setTransferData({ to_branch_id: '', notes: '' });
             fetchData();
@@ -142,11 +142,11 @@ const AssetDetails = () => {
                             <>
                                 <button className="btn btn-sm btn-outline-primary" onClick={() => setShowRevalueModal(true)}>
                                     <RefreshCw size={16} className="me-1" />
-                                    {isRTL ? 'إعادة تقييم' : 'Revalue'}
+                                    {t('assets.revalue')}
                                 </button>
                                 <button className="btn btn-sm btn-outline-secondary" onClick={openTransferModal}>
                                     <ArrowRightLeft size={16} className="me-1" />
-                                    {isRTL ? 'نقل لفرع' : 'Transfer'}
+                                    {t('assets.transfer')}
                                 </button>
                                 <button className="btn btn-sm btn-outline-danger" onClick={handleDispose}>
                                     <Trash2 size={16} className="me-1" />
@@ -260,24 +260,24 @@ const AssetDetails = () => {
                     <div className="card" style={{ minWidth: 420, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                         <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <RefreshCw size={20} className="text-primary" />
-                            {isRTL ? 'إعادة تقييم الأصل' : 'Revalue Asset'}
+                            {t('assets.revalue_asset')}
                         </h3>
                         <div className="mb-3">
-                            <label className="form-label">{isRTL ? 'القيمة العادلة الجديدة' : 'New Fair Value'}</label>
+                            <label className="form-label">{t('assets.new_fair_value')}</label>
                             <input type="number" className="form-input" value={revalueData.new_value}
                                 onChange={e => setRevalueData(p => ({ ...p, new_value: e.target.value }))}
-                                placeholder={isRTL ? 'أدخل القيمة الجديدة' : 'Enter new value'} />
+                                placeholder={t('assets.enter_new_value')} />
                         </div>
                         <div className="mb-4">
-                            <label className="form-label">{isRTL ? 'السبب' : 'Reason'}</label>
+                            <label className="form-label">{t('assets.reason')}</label>
                             <textarea className="form-input" rows={3} value={revalueData.reason}
                                 onChange={e => setRevalueData(p => ({ ...p, reason: e.target.value }))}
-                                placeholder={isRTL ? 'سبب إعادة التقييم' : 'Reason for revaluation'} />
+                                placeholder={t('assets.reason_for_revaluation')} />
                         </div>
                         <div className="d-flex gap-2 justify-content-end">
                             <button className="btn btn-ghost" onClick={() => setShowRevalueModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-primary" onClick={handleRevalue} disabled={revaluing || !revalueData.new_value}>
-                                {revaluing ? <span className="loading loading-spinner loading-sm"></span> : (isRTL ? 'تأكيد التقييم' : 'Confirm Revalue')}
+                                {revaluing ? <span className="loading loading-spinner loading-sm"></span> : (t('assets.confirm_revalue'))}
                             </button>
                         </div>
                     </div>
@@ -290,26 +290,26 @@ const AssetDetails = () => {
                     <div className="card" style={{ minWidth: 420, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                         <h3 className="section-title mb-4" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <ArrowRightLeft size={20} className="text-secondary" />
-                            {isRTL ? 'نقل الأصل إلى فرع آخر' : 'Transfer Asset to Branch'}
+                            {t('assets.transfer_asset_to_branch')}
                         </h3>
                         <div className="mb-3">
-                            <label className="form-label">{isRTL ? 'الفرع المستهدف' : 'Target Branch'}</label>
+                            <label className="form-label">{t('assets.target_branch')}</label>
                             <select className="form-input" value={transferData.to_branch_id}
                                 onChange={e => setTransferData(p => ({ ...p, to_branch_id: e.target.value }))}>
-                                <option value="">{isRTL ? 'اختر الفرع' : 'Select branch'}</option>
+                                <option value="">{t('assets.select_branch')}</option>
                                 {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
                         </div>
                         <div className="mb-4">
-                            <label className="form-label">{isRTL ? 'ملاحظات' : 'Notes'}</label>
+                            <label className="form-label">{t('assets.notes')}</label>
                             <textarea className="form-input" rows={2} value={transferData.notes}
                                 onChange={e => setTransferData(p => ({ ...p, notes: e.target.value }))}
-                                placeholder={isRTL ? 'ملاحظات إضافية (اختياري)' : 'Additional notes (optional)'} />
+                                placeholder={t('assets.additional_notes_optional')} />
                         </div>
                         <div className="d-flex gap-2 justify-content-end">
                             <button className="btn btn-ghost" onClick={() => setShowTransferModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-primary" onClick={handleTransfer} disabled={transferring || !transferData.to_branch_id}>
-                                {transferring ? <span className="loading loading-spinner loading-sm"></span> : (isRTL ? 'تأكيد النقل' : 'Confirm Transfer')}
+                                {transferring ? <span className="loading loading-spinner loading-sm"></span> : (t('assets.confirm_transfer'))}
                             </button>
                         </div>
                     </div>

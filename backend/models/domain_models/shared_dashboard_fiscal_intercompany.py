@@ -80,3 +80,38 @@ class LandedCostAllocation(ModelBase):
     allocation_basis: Mapped[float | None] = mapped_column(Numeric(15, 6), default=0)
     allocation_share: Mapped[float | None] = mapped_column(Numeric(15, 6), default=0)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AnalyticsDashboard(ModelBase):
+    """BI analytics dashboard with pre-built or custom KPI widgets."""
+    __tablename__ = "analytics_dashboards"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    access_roles: Mapped[list | None] = mapped_column(JSONB, default=list)
+    branch_scope: Mapped[str] = mapped_column(String(20), default="all", server_default="all")
+    refresh_interval_minutes: Mapped[int] = mapped_column(Integer, default=15, server_default="15")
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AnalyticsDashboardWidget(ModelBase):
+    """Individual widget on an analytics dashboard."""
+    __tablename__ = "analytics_dashboard_widgets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dashboard_id: Mapped[int] = mapped_column(ForeignKey("analytics_dashboards.id", ondelete="CASCADE"), nullable=False)
+    widget_type: Mapped[str] = mapped_column(String(30), nullable=False)  # kpi_card, bar_chart, line_chart, pie_chart, table, gauge
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    data_source: Mapped[str] = mapped_column(String(50), nullable=False)  # revenue, expenses, cash_position, top_customers, inventory_turnover, ar_aging, ap_aging, sales_pipeline, custom_query
+    filters: Mapped[dict | None] = mapped_column(JSONB, default=dict)
+    position: Mapped[dict | None] = mapped_column(JSONB, default=dict)  # {row, col, width, height}
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    updated_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

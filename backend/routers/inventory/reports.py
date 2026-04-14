@@ -34,7 +34,20 @@ def get_inventory_summary(
             """
             prod_count_params["branch_id"] = branch_id
         else:
-            prod_count_query = "SELECT COUNT(*) FROM products"
+            # INV-R01: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                prod_count_query = f"""
+                    SELECT COUNT(DISTINCT p.id) FROM products p
+                    JOIN inventory i ON p.id = i.product_id
+                    JOIN warehouses w ON i.warehouse_id = w.id
+                    WHERE w.branch_id IN ({branch_placeholders}) AND i.quantity > 0
+                """
+                for i, bid in enumerate(allowed):
+                    prod_count_params[f"_ab_{i}"] = bid
+            else:
+                prod_count_query = "SELECT COUNT(*) FROM products"
 
         product_count = db.execute(text(prod_count_query), prod_count_params).scalar() or 0
 
@@ -131,6 +144,14 @@ def get_warehouse_stock(
         if branch_id:
             query += " AND w.branch_id = :branch_id"
             params['branch_id'] = branch_id
+        else:
+            # INV-R01: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND w.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         query += " ORDER BY w.warehouse_name, p.product_name"
 
@@ -138,7 +159,8 @@ def get_warehouse_stock(
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error fetching warehouse stock: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -173,6 +195,14 @@ def get_stock_movements(
         if branch_id:
             query += " AND w.branch_id = :branch_id"
             params['branch_id'] = branch_id
+        else:
+            # INV-R01: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND w.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         if item_name:
             query += " AND (p.product_name ILIKE :item OR p.product_code ILIKE :item)"
@@ -247,6 +277,14 @@ def get_valuation_report(
         if branch_id:
             query += " AND w.branch_id = :bid"
             params["bid"] = branch_id
+        else:
+            # INV-R01: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND w.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
         if warehouse_id:
             query += " AND w.id = :wid"
             params["wid"] = warehouse_id

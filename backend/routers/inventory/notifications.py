@@ -44,8 +44,8 @@ def get_notifications(
         return notifications
     except Exception as e:
         import traceback
-        print(f"NOTIFICATION ERROR: {str(e)}")
-        print(traceback.format_exc())
+        logger.exception("Operation failed")
+        logger.exception("Unexpected error")
         raise HTTPException(status_code=500, detail=f"Failed to fetch notifications: {str(e)}")
     finally:
         db.close()
@@ -69,8 +69,8 @@ def get_unread_count(
         return {"count": count}
     except Exception as e:
         import traceback
-        print(f"UNREAD COUNT ERROR: {str(e)}")
-        print(traceback.format_exc())
+        logger.exception("Operation failed")
+        logger.exception("Unexpected error")
         raise HTTPException(status_code=500, detail=f"Failed to fetch unread count: {str(e)}")
     finally:
         db.close()

@@ -2,13 +2,14 @@
 Inventory Module - Warehouses CRUD + Current Stock
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.audit import log_activity
 from utils.permissions import require_permission
 from schemas import WarehouseCreate, WarehouseResponse
 
@@ -34,6 +35,14 @@ def list_warehouses(branch_id: Optional[int] = None, current_user: dict = Depend
         if branch_id:
             query += " AND w.branch_id = :bid"
             params["bid"] = branch_id
+        else:
+            # INV-002: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND w.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         query += " ORDER BY w.id"
         result = db.execute(text(query), params).fetchall()
@@ -52,7 +61,7 @@ def list_warehouses(branch_id: Optional[int] = None, current_user: dict = Depend
 
 
 @warehouses_router.post("/warehouses", response_model=WarehouseResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
-def create_warehouse(warehouse: WarehouseCreate, current_user: dict = Depends(get_current_user)):
+def create_warehouse(warehouse: WarehouseCreate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         # Check duplicate code
@@ -71,23 +80,38 @@ def create_warehouse(warehouse: WarehouseCreate, current_user: dict = Depends(ge
         if warehouse.branch_id:
             branch_name = db.execute(text("SELECT branch_name FROM branches WHERE id = :id"), {"id": warehouse.branch_id}).scalar()
 
+        # INV-012: Audit log
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="warehouse.create", resource_type="warehouse",
+            resource_id=str(result[0]), details={"name": warehouse.name, "code": warehouse.code},
+            request=request, branch_id=warehouse.branch_id
+        )
+
         return {**warehouse.model_dump(), "id": result[0], "branch_name": branch_name}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @warehouses_router.put("/warehouses/{id}", response_model=WarehouseResponse, dependencies=[Depends(require_permission("stock.manage"))])
-def update_warehouse(id: int, warehouse: WarehouseCreate, current_user: dict = Depends(get_current_user)):
+def update_warehouse(id: int, warehouse: WarehouseCreate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        exists = db.execute(text("SELECT id FROM warehouses WHERE id = :id"), {"id": id}).scalar()
-        if not exists:
+        existing = db.execute(text("SELECT id, branch_id FROM warehouses WHERE id = :id"), {"id": id}).fetchone()
+        if not existing:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
+
+        # INV-003: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if existing.branch_id and existing.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك تعديل مستودع خارج فروعك")
 
         db.execute(text("""
             UPDATE warehouses SET warehouse_name = :name, warehouse_code = :code, branch_id = :branch_id
@@ -100,26 +124,79 @@ def update_warehouse(id: int, warehouse: WarehouseCreate, current_user: dict = D
         if warehouse.branch_id:
             branch_name = db.execute(text("SELECT branch_name FROM branches WHERE id = :id"), {"id": warehouse.branch_id}).scalar()
 
+        # INV-012: Audit log
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="warehouse.update", resource_type="warehouse",
+            resource_id=str(id), details={"name": warehouse.name},
+            request=request, branch_id=warehouse.branch_id
+        )
+
         return {**warehouse.model_dump(), "id": id, "branch_name": branch_name}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @warehouses_router.delete("/warehouses/{id}", dependencies=[Depends(require_permission("stock.manage"))])
-def delete_warehouse(id: int, current_user: dict = Depends(get_current_user)):
+def delete_warehouse(id: int, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
+        # INV-001: Check existence
+        warehouse = db.execute(text("""
+            SELECT w.id, w.warehouse_name, w.branch_id, w.is_default
+            FROM warehouses w WHERE w.id = :id
+        """), {"id": id}).fetchone()
+        if not warehouse:
+            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+
+        # INV-001: Block deleting default warehouse
+        if getattr(warehouse, 'is_default', False):
+            raise HTTPException(status_code=400, detail="لا يمكن حذف المستودع الافتراضي")
+
+        # INV-003: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if warehouse.branch_id and warehouse.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك حذف مستودع خارج فروعك")
+
+        # INV-001: Check if warehouse has inventory
+        stock = db.execute(text(
+            "SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE warehouse_id = :id"
+        ), {"id": id}).scalar()
+        if stock and abs(float(stock)) > 0.01:
+            raise HTTPException(status_code=400, detail="لا يمكن حذف مستودع به رصيد مخزون")
+
+        # INV-001: Check pending transactions
+        txn_count = db.execute(text(
+            "SELECT COUNT(*) FROM inventory_transactions WHERE warehouse_id = :id"
+        ), {"id": id}).scalar()
+        if txn_count and txn_count > 0:
+            raise HTTPException(status_code=400, detail="لا يمكن حذف مستودع له حركات سابقة")
+
         db.execute(text("DELETE FROM warehouses WHERE id = :id"), {"id": id})
         db.commit()
-        return {"message": "deleted"}
+
+        # INV-012: Audit log
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="warehouse.delete", resource_type="warehouse",
+            resource_id=str(id), details={"name": warehouse.warehouse_name},
+            request=request, branch_id=warehouse.branch_id
+        )
+
+        return {"message": "تم حذف المستودع بنجاح"}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -138,6 +215,12 @@ def get_warehouse(id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": id}).fetchone()
         if not warehouse:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
+
+        # INV-003: Branch access enforcement
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if warehouse.branch_id and warehouse.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك الوصول لمستودع خارج فروعك")
 
         return {"id": warehouse.id, "name": warehouse.name, "code": warehouse.code, "branch_id": warehouse.branch_id, "branch_name": warehouse.branch_name}
     finally:

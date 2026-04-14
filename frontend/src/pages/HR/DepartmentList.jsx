@@ -42,7 +42,7 @@ const DepartmentList = () => {
             fetchDepartments();
             setFormData({ department_name: '' });
         } catch (err) {
-            toastEmitter.emit("Error creating department: " + (err.response?.data?.detail || err.message), 'error');
+            toastEmitter.emit(t('hr.departments.error_creating') + (err.response?.data?.detail || err.message), 'error');
         }
     };
 
@@ -52,7 +52,7 @@ const DepartmentList = () => {
             await hrAPI.deleteDepartment(id);
             fetchDepartments();
         } catch (err) {
-            toastEmitter.emit("Error deleting department: " + (err.response?.data?.detail || err.message), 'error');
+            toastEmitter.emit(t('hr.departments.error_deleting') + (err.response?.data?.detail || err.message), 'error');
         }
     };
 

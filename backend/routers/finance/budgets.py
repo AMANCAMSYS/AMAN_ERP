@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
@@ -7,6 +7,8 @@ from database import get_db_connection
 from schemas import UserResponse
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
+from utils.audit import log_activity
+from utils.limiter import limiter
 from schemas.budgets import BudgetItemBase, BudgetItemCreate, BudgetItemResponse, BudgetCreate, BudgetResponse, BudgetReportItem
 import logging
 
@@ -16,7 +18,8 @@ logger = logging.getLogger(__name__)
 # --- Endpoints ---
 
 @router.post("/", response_model=BudgetResponse, dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def create_budget(budget: BudgetCreate, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_budget(budget: BudgetCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         # Check if name exists
@@ -38,6 +41,11 @@ def create_budget(budget: BudgetCreate, current_user: UserResponse = Depends(get
         
         conn.commit()
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.create", resource_type="budget",
+                     resource_id=str(result.id), details={"name": budget.name},
+                     request=request)
+        
         return {
             "id": result.id,
             "name": budget.name,
@@ -52,12 +60,14 @@ def create_budget(budget: BudgetCreate, current_user: UserResponse = Depends(get
     except Exception as e:
         conn.rollback()
         logger.error(f"Error creating budget: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.get("/", response_model=List[BudgetResponse], dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def list_budgets(current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_budgets(request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         results = conn.execute(text("SELECT * FROM budgets ORDER BY created_at DESC")).fetchall()
@@ -77,7 +87,8 @@ def list_budgets(current_user: UserResponse = Depends(get_current_user)):
         conn.close()
 
 @router.delete("/{budget_id}", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def delete_budget(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def delete_budget(budget_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         # Verify budget exists
@@ -89,19 +100,26 @@ def delete_budget(budget_id: int, current_user: UserResponse = Depends(get_curre
             
         conn.execute(text("DELETE FROM budgets WHERE id = :id"), {"id": budget_id})
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.delete", resource_type="budget",
+                     resource_id=str(budget_id), details={},
+                     request=request)
         return {"message": "Budget deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.post("/{budget_id}/items", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
+@limiter.limit("100/minute")
 def set_budget_items(
     budget_id: int, 
     items: List[BudgetItemCreate], 
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     conn = get_db_connection(current_user.company_id)
@@ -134,16 +152,22 @@ def set_budget_items(
                 })
         
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.items.update", resource_type="budget",
+                     resource_id=str(budget_id), details={"items_count": len(items)},
+                     request=request)
         return {"message": "Budget items updated successfully"}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.get("/{budget_id}/report", response_model=List[BudgetReportItem], dependencies=[Depends(require_permission("accounting.budgets.view"))])
+@limiter.limit("200/minute")
 def get_budget_report(
-    budget_id: int, 
+    request: Request,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     branch_id: Optional[int] = None,
@@ -261,7 +285,8 @@ def get_budget_report(
         return report
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -269,7 +294,8 @@ def get_budget_report(
 # --- New Endpoints: Budget Lifecycle, Alerts, Stats ---
 
 @router.put("/{budget_id}", response_model=BudgetResponse, dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def update_budget(budget_id: int, budget: BudgetCreate, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def update_budget(budget_id: int, budget: BudgetCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Update budget details"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -293,6 +319,11 @@ def update_budget(budget_id: int, budget: BudgetCreate, current_user: UserRespon
         })
         conn.commit()
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.update", resource_type="budget",
+                     resource_id=str(budget_id), details={"name": budget.name},
+                     request=request)
+        
         updated = conn.execute(text("SELECT * FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
         return {
             "id": updated.id, "name": updated.name,
@@ -305,13 +336,15 @@ def update_budget(budget_id: int, budget: BudgetCreate, current_user: UserRespon
     except Exception as e:
         conn.rollback()
         logger.error(f"Error updating budget: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.post("/{budget_id}/activate", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def activate_budget(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def activate_budget(budget_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Activate a draft budget"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -328,18 +361,24 @@ def activate_budget(budget_id: int, current_user: UserResponse = Depends(get_cur
         
         conn.execute(text("UPDATE budgets SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = :id"), {"id": budget_id})
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.activate", resource_type="budget",
+                     resource_id=str(budget_id), details={},
+                     request=request)
         return {"message": "Budget activated successfully"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.post("/{budget_id}/close", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def close_budget(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def close_budget(budget_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Close an active budget"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -351,18 +390,24 @@ def close_budget(budget_id: int, current_user: UserResponse = Depends(get_curren
         
         conn.execute(text("UPDATE budgets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = :id"), {"id": budget_id})
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.close", resource_type="budget",
+                     resource_id=str(budget_id), details={},
+                     request=request)
         return {"message": "Budget closed successfully"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.get("/{budget_id}/items", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def get_budget_items(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_budget_items(request: Request, budget_id: int, current_user: UserResponse = Depends(get_current_user)):
     """Get all budget items with account details"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -396,8 +441,9 @@ def get_budget_items(budget_id: int, current_user: UserResponse = Depends(get_cu
 
 
 @router.get("/alerts/overruns", dependencies=[Depends(require_permission("accounting.budgets.view"))])
+@limiter.limit("200/minute")
 def get_budget_overrun_alerts(
-    threshold: float = 80.0,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """Get budget items that are at or over the threshold percentage of planned amount"""
@@ -474,13 +520,15 @@ def get_budget_overrun_alerts(
         return alerts
     except Exception as e:
         logger.error(f"Error fetching budget overrun alerts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.get("/stats/summary", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def get_budget_stats(current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_budget_stats(request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Get overall budget statistics"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -561,7 +609,8 @@ def get_budget_stats(current_user: UserResponse = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error fetching budget stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -573,7 +622,8 @@ def get_budget_stats(current_user: UserResponse = Depends(get_current_user)):
 # ---------- BDG-001: Budget by Cost Center ----------
 
 @router.get("/by-cost-center", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def list_all_cc_budgets(current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_all_cc_budgets(request: Request, current_user: UserResponse = Depends(get_current_user)):
     """List all budgets that have a cost center assigned."""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -587,13 +637,15 @@ def list_all_cc_budgets(current_user: UserResponse = Depends(get_current_user)):
         return [dict(r._mapping) for r in rows]
     except Exception as e:
         logger.error(f"Error listing cost center budgets: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.post("/by-cost-center", dependencies=[Depends(require_permission("accounting.budgets.manage"))])
-def create_budget_by_cost_center(data: dict, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_budget_by_cost_center(request: Request, data: dict, current_user: UserResponse = Depends(get_current_user)):
     """Create a budget allocated to a specific cost center."""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -619,13 +671,15 @@ def create_budget_by_cost_center(data: dict, current_user: UserResponse = Depend
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 @router.get("/by-cost-center/{cc_id}", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def list_budgets_by_cc(cc_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_budgets_by_cc(request: Request, cc_id: int, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         rows = conn.execute(text("""
@@ -643,8 +697,9 @@ def list_budgets_by_cc(cc_id: int, current_user: UserResponse = Depends(get_curr
 # ---------- BDG-002: Multi-Year & Quarterly Budgets ----------
 
 @router.get("/multi-year", dependencies=[Depends(require_permission("accounting.budgets.view"))])
+@limiter.limit("200/minute")
 def list_multi_year_budgets(
-    fiscal_year: Optional[int] = None,
+    request: Request,
     budget_type: Optional[str] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
@@ -666,8 +721,9 @@ def list_multi_year_budgets(
 
 
 @router.get("/comparison", dependencies=[Depends(require_permission("accounting.budgets.view"))])
+@limiter.limit("200/minute")
 def compare_budgets(
-    budget_ids: str,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """Compare multiple budgets side by side. budget_ids = comma-separated."""
@@ -691,14 +747,16 @@ def compare_budgets(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 
 # --- IMPORTANT: /{budget_id} must be LAST so it doesn't shadow static routes like /multi-year ---
 @router.get("/{budget_id}", dependencies=[Depends(require_permission("accounting.budgets.view"))])
-def get_budget_detail(budget_id: int, current_user: UserResponse = Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_budget_detail(request: Request, budget_id: int, current_user: UserResponse = Depends(get_current_user)):
     """Get budget with summary info"""
     conn = get_db_connection(current_user.company_id)
     try:

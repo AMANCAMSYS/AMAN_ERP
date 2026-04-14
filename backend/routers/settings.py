@@ -4,7 +4,7 @@ Handles dynamic key-value settings for each company.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Dict, Any, List, Optional
@@ -14,11 +14,150 @@ from database import get_company_db, get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission
 from schemas.settings import SettingsUpdateRequest
+from utils.audit import log_activity
 from utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["إعدادات الشركة"])
+
+# ── Settings Validation Map ──────────────────────────────────────────────────
+# Maps known setting keys to their expected type and constraints.
+# Keys not in this map are rejected (T013/T014).
+SETTINGS_VALIDATION_MAP = {
+    # Company identity
+    "company_name": {"type": "str"},
+    "company_name_en": {"type": "str"},
+    "company_logo": {"type": "str"},
+    "company_address": {"type": "str"},
+    "company_phone": {"type": "str"},
+    "company_email": {"type": "str"},
+    "company_website": {"type": "str"},
+    "company_tax_number": {"type": "str"},
+    "company_commercial_registry": {"type": "str"},
+    "default_currency": {"type": "str"},
+    "timezone": {"type": "str"},
+    "country": {"type": "str"},
+    "industry_type": {"type": "str"},
+    "fiscal_year_start": {"type": "str"},
+    "fiscal_year_end": {"type": "str"},
+    "date_format": {"type": "str"},
+    "language": {"type": "str", "allowed": ["ar", "en"]},
+    "enabled_modules": {"type": "json"},
+    # Financial / Accounting
+    "financial_decimal_places": {"type": "int", "min": 0, "max": 6},
+    "financial_rounding_method": {"type": "str", "allowed": ["round", "floor", "ceil"]},
+    "vat_rate": {"type": "float", "min": 0, "max": 100},
+    "vat_enabled": {"type": "bool"},
+    "accounting_method": {"type": "str", "allowed": ["accrual", "cash"]},
+    "fiscal_lock_date": {"type": "str"},
+    "fiscal_lock_enabled": {"type": "bool"},
+    "accounting_currency": {"type": "str"},
+    # HR / Payroll
+    "hr_attendance_enabled": {"type": "bool"},
+    "hr_leave_auto_approve": {"type": "bool"},
+    "hr_working_days_per_week": {"type": "int", "min": 1, "max": 7},
+    "hr_overtime_rate": {"type": "float", "min": 0, "max": 10},
+    "payroll_cycle": {"type": "str", "allowed": ["monthly", "biweekly", "weekly"]},
+    "payroll_auto_calculate": {"type": "bool"},
+    # Sales
+    "sales_tax_inclusive": {"type": "bool"},
+    "sales_default_payment_terms": {"type": "int", "min": 0, "max": 365},
+    "sales_auto_numbering": {"type": "bool"},
+    "sales_invoice_prefix": {"type": "str"},
+    "crm_enabled": {"type": "bool"},
+    # Purchases
+    "purchases_default_payment_terms": {"type": "int", "min": 0, "max": 365},
+    "purchases_auto_numbering": {"type": "bool"},
+    "purchases_approval_required": {"type": "bool"},
+    # Inventory
+    "inventory_valuation_method": {"type": "str", "allowed": ["fifo", "lifo", "average", "standard"]},
+    "inventory_negative_stock": {"type": "bool"},
+    "inventory_auto_reorder": {"type": "bool"},
+    "stock_valuation_method": {"type": "str"},
+    "stock_negative_allowed": {"type": "bool"},
+    # SMTP
+    "smtp_host": {"type": "str"},
+    "smtp_port": {"type": "int", "min": 1, "max": 65535},
+    "smtp_user": {"type": "str"},
+    "smtp_pass": {"type": "str"},
+    "smtp_from_email": {"type": "str"},
+    "smtp_from_name": {"type": "str"},
+    "smtp_encryption": {"type": "str", "allowed": ["tls", "ssl", "none"]},
+    # SMS
+    "sms_provider": {"type": "str"},
+    "sms_api_key": {"type": "str"},
+    "sms_sender_id": {"type": "str"},
+    # ZATCA
+    "zatca_enabled": {"type": "bool"},
+    "zatca_environment": {"type": "str", "allowed": ["sandbox", "production"]},
+    "zatca_otp": {"type": "str"},
+    "zatca_csr_common_name": {"type": "str"},
+    "zatca_private_key": {"type": "str"},
+    "zatca_certificate": {"type": "str"},
+    "zatca_csid": {"type": "str"},
+    "zatca_secret": {"type": "str"},
+    # Security
+    "security_password_expiry_days": {"type": "int", "min": 0, "max": 365},
+    "security_mfa_required": {"type": "bool"},
+    "security_session_timeout_minutes": {"type": "int", "min": 5, "max": 1440},
+    # Projects
+    "project_default_billing_method": {"type": "str", "allowed": ["fixed", "hourly", "milestone"]},
+    "project_time_tracking": {"type": "bool"},
+    # Expense
+    "expense_approval_required": {"type": "bool"},
+    "expense_auto_categorize": {"type": "bool"},
+    # Workflow
+    "workflow_approval_levels": {"type": "int", "min": 1, "max": 10},
+    # POS
+    "pos_enabled": {"type": "bool"},
+    "pos_print_receipt": {"type": "bool"},
+    "pos_default_payment_method": {"type": "str"},
+    # Audit
+    "audit_retention_years": {"type": "int", "min": 1, "max": 10},
+    # Multi-branch
+    "multi_branch_enabled": {"type": "bool"},
+    "branches_max_count": {"type": "int", "min": 1, "max": 100},
+}
+
+
+def _validate_setting_value(key: str, value: Any) -> None:
+    """Validate a setting value against SETTINGS_VALIDATION_MAP. Raises HTTPException on failure."""
+    spec = SETTINGS_VALIDATION_MAP.get(key)
+    if spec is None:
+        raise HTTPException(status_code=400, detail="مفتاح إعدادات غير معروف")
+
+    value_str = str(value) if value is not None else ""
+    expected_type = spec.get("type", "str")
+
+    if expected_type == "int":
+        try:
+            int_val = int(value_str)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+        if "min" in spec and int_val < spec["min"]:
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+        if "max" in spec and int_val > spec["max"]:
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+    elif expected_type == "float":
+        try:
+            float_val = float(value_str)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+        if "min" in spec and float_val < spec["min"]:
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+        if "max" in spec and float_val > spec["max"]:
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+    elif expected_type == "bool":
+        if value_str.lower() not in ("true", "false", "1", "0", "yes", "no"):
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+    elif expected_type == "json":
+        pass  # JSON values are stored as-is
+    # str type: no special validation needed
+
+    if "allowed" in spec:
+        if value_str.lower() not in [str(a).lower() for a in spec["allowed"]]:
+            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
 
 # Permission Mapping for Settings Keys
 # Keys starting with prefix -> require permission
@@ -112,7 +251,7 @@ def get_company_settings(
 
         return settings_dict
     except Exception as e:
-        print(f"Error fetching settings: {e}")
+        logger.exception("Operation failed")
         return {} 
     finally:
         db.close()
@@ -120,6 +259,7 @@ def get_company_settings(
 @router.post("/bulk", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("settings.manage"))])
 def update_settings_bulk(
     request: SettingsUpdateRequest,
+    req: Request = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -190,6 +330,10 @@ def update_settings_bulk(
     
     db = get_db_connection(company_id)
     try:
+        # Validate all setting keys and values before persisting (T013/T014)
+        for key, value in request.settings.items():
+            _validate_setting_value(key, value)
+
         # Upsert logic — atomic ON CONFLICT
         for key, value in request.settings.items():
             value_str = str(value) if value is not None else ""
@@ -214,11 +358,22 @@ def update_settings_bulk(
         # Invalidate cache
         cache.delete(f"company_settings:{company_id}")
         
+        # Audit log
+        try:
+            log_activity(db, current_user.id, current_user.username, "configure",
+                         resource_type="settings",
+                         details={"keys_updated": list(request.settings.keys())},
+                         request=req)
+            db.commit()
+        except Exception:
+            logger.warning("Failed to write settings update audit log")
+        
         return {"success": True, "message": "Settings updated successfully"}
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 @router.post("/test-email", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("settings.manage"))])
@@ -242,10 +397,6 @@ def test_email_connection(
         raise HTTPException(status_code=400, detail="Missing SMTP configuration")
         
     try:
-        # Simulate connection if it's a known fake host or just try real connection
-        if host == "smtp.example.com":
-             return {"success": True, "message": "Simulated connection successful"}
-             
         # Real connection attempt (with timeout)
         server = smtplib.SMTP(host, port, timeout=5)
         server.starttls()
@@ -254,7 +405,7 @@ def test_email_connection(
         
         return {"success": True, "message": "Connection successful"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Connection failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="فشل الاتصال بالخادم")
 
 @router.post("/generate-csid", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("settings.manage"))])
 def generate_csid(

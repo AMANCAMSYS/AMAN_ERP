@@ -25,6 +25,9 @@ def _dec(v) -> Decimal:
 @orders_router.get("/orders", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def list_sales_orders(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """عرض قائمة أوامر البيع"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -61,6 +64,11 @@ def get_sales_order(order_id: int, current_user: dict = Depends(get_current_user
         header_row = db.execute(text(query), {"id": order_id}).fetchone()
         if not header_row:
             raise HTTPException(status_code=404, detail="أمر البيع غير موجود")
+
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if header_row.branch_id:
+            validate_branch_access(current_user, header_row.branch_id)
 
         # Lines
         lines_query = """
@@ -229,6 +237,7 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating Sales Order: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

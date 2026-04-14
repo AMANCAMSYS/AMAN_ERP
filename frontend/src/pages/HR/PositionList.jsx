@@ -49,7 +49,7 @@ const PositionList = () => {
             fetchData();
             setFormData({ position_name: '', department_id: '' });
         } catch (err) {
-            toastEmitter.emit("Error creating position: " + (err.response?.data?.detail || err.message), 'error');
+            toastEmitter.emit(t('hr.positions.error_creating') + (err.response?.data?.detail || err.message), 'error');
         }
     };
 
@@ -59,7 +59,7 @@ const PositionList = () => {
             await hrAPI.deletePosition(id);
             fetchData();
         } catch (err) {
-            toastEmitter.emit("Error deleting position: " + (err.response?.data?.detail || err.message), 'error');
+            toastEmitter.emit(t('hr.positions.error_deleting') + (err.response?.data?.detail || err.message), 'error');
         }
     };
 

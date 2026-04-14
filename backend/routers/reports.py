@@ -4,6 +4,7 @@ from sqlalchemy import text
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import json
 import logging
 from database import get_db_connection
@@ -227,6 +228,7 @@ def get_sales_by_customer(
     current_user: dict = Depends(get_current_user)
 ):
     """أفضل العملاء"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"limit": limit}
@@ -276,6 +278,7 @@ def get_sales_by_product(
     current_user: dict = Depends(get_current_user)
 ):
     """المنتجات الأكثر مبيعاً"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"limit": limit}
@@ -331,6 +334,7 @@ def get_customer_statement(
     current_user: dict = Depends(get_current_user)
 ):
     """كشف حساب عميل تفصيلي"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         if not start_date:
@@ -469,6 +473,7 @@ def get_aging_report(
     current_user: dict = Depends(get_current_user)
 ):
     """تقرير أعمار الديون"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {}
@@ -552,6 +557,7 @@ def get_purchases_summary(
     current_user: dict = Depends(get_current_user)
 ):
     """ملخص المشتريات"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         if not start_date:
@@ -599,6 +605,7 @@ def get_purchases_trend(
     current_user: dict = Depends(get_current_user)
 ):
     """اتجاه المشتريات اليومي"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         start_date = date.today() - timedelta(days=days)
@@ -633,6 +640,7 @@ def get_purchases_by_supplier(
     current_user: dict = Depends(get_current_user)
 ):
     """أكبر الموردين"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {"limit": limit}
@@ -666,6 +674,7 @@ def get_purchases_aging_report(
     current_user: dict = Depends(get_current_user)
 ):
     """تقرير أعمار الذمم الدائنة (مستحقات الموردين)"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         params = {}
@@ -732,6 +741,7 @@ def get_supplier_statement(
     current_user: dict = Depends(get_current_user)
 ):
     """كشف حساب مورد تفصيلي"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         if not start_date:
@@ -1276,6 +1286,7 @@ def get_budget_report(
     current_user: dict = Depends(get_current_user)
 ):
     """مقارنة الميزانية التقديرية مع الفعلي"""
+    branch_id = validate_branch_access(current_user, branch_id)
     company_id = current_user.company_id if not isinstance(current_user, dict) else current_user.get("company_id")
     db = get_db_connection(company_id)
     try:
@@ -1353,6 +1364,7 @@ def get_cashflow_report(
     current_user: dict = Depends(get_current_user)
 ):
     """تقرير التدفقات النقدية (مبسط)"""
+    branch_id = validate_branch_access(current_user, branch_id)
     company_id = current_user.company_id if not isinstance(current_user, dict) else current_user.get("company_id")
     db = get_db_connection(company_id)
     try:
@@ -1432,9 +1444,9 @@ def get_cashflow_report(
             "period": {"start": start_date, "end": end_date},
             "inflows": [dict(r._mapping) for r in inflows],
             "outflows": [dict(r._mapping) for r in outflows],
-            "total_inflow": sum(float(r.amount) for r in inflows),
-            "total_outflow": sum(float(r.amount) for r in outflows),
-            "net_cash_flow": sum(float(r.amount) for r in inflows) - sum(float(r.amount) for r in outflows)
+            "total_inflow": float(sum(Decimal(str(r.amount or 0)) for r in inflows).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "total_outflow": float(sum(Decimal(str(r.amount or 0)) for r in outflows).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "net_cash_flow": float((sum(Decimal(str(r.amount or 0)) for r in inflows) - sum(Decimal(str(r.amount or 0)) for r in outflows)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
         }
     finally:
         db.close()
@@ -1451,6 +1463,7 @@ def get_cashflow_ias7(
     قائمة التدفقات النقدية حسب معيار IAS 7
     Cash Flow Statement — Operating / Investing / Financing
     """
+    branch_id = validate_branch_access(current_user, branch_id)
     company_id = current_user.company_id if not isinstance(current_user, dict) else current_user.get("company_id")
     db = get_db_connection(company_id)
     try:
@@ -1555,26 +1568,26 @@ def get_cashflow_ias7(
 
         # Build activities
         activities = {'operating': [], 'investing': [], 'financing': []}
-        totals = {'operating': 0.0, 'investing': 0.0, 'financing': 0.0}
+        totals = {'operating': Decimal('0'), 'investing': Decimal('0'), 'financing': Decimal('0')}
 
         for row in inflows:
             activity = classify(row.account_type, row.account_name)
-            amt = float(row.amount or 0)
+            amt = Decimal(str(row.amount or 0))
             activities[activity].append({
                 "description": row.account_name,
                 "account_type": row.account_type,
-                "amount": round(amt, 2),
+                "amount": float(amt.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
                 "direction": "inflow"
             })
             totals[activity] += amt
 
         for row in outflows:
             activity = classify(row.account_type, row.account_name)
-            amt = float(row.amount or 0)
+            amt = Decimal(str(row.amount or 0))
             activities[activity].append({
                 "description": row.account_name,
                 "account_type": row.account_type,
-                "amount": round(-amt, 2),
+                "amount": float((-amt).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
                 "direction": "outflow"
             })
             totals[activity] -= amt
@@ -1585,19 +1598,19 @@ def get_cashflow_ias7(
             "period": {"start": start_date, "end": end_date},
             "operating": {
                 "items": activities['operating'],
-                "total": round(totals['operating'], 2)
+                "total": float(totals['operating'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
             },
             "investing": {
                 "items": activities['investing'],
-                "total": round(totals['investing'], 2)
+                "total": float(totals['investing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
             },
             "financing": {
                 "items": activities['financing'],
-                "total": round(totals['financing'], 2)
+                "total": float(totals['financing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
             },
-            "net_change": round(net_change, 2),
-            "opening_cash": round(float(opening_cash), 2),
-            "closing_cash": round(float(opening_cash) + net_change, 2),
+            "net_change": float(net_change.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "opening_cash": float(Decimal(str(opening_cash)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "closing_cash": float((Decimal(str(opening_cash)) + net_change).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
         }
     finally:
         db.close()
@@ -2992,7 +3005,8 @@ async def preview_custom_report(
         return data
     except Exception as e:
         logger.error(f"Error previewing report: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3021,7 +3035,8 @@ async def create_custom_report(
     except Exception as e:
         db.rollback()
         logger.error(f"Error saving report: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3056,7 +3071,8 @@ async def get_custom_report(report_id: int, current_user: dict = Depends(get_cur
         return {"report": dict(report._mapping), "results": data}
     except Exception as e:
         logger.error(f"Error executing saved report: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3723,7 +3739,8 @@ async def food_cost_report(
         }
     except Exception as e:
         logger.error(f"Food cost report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3798,7 +3815,8 @@ async def production_cost_report(
         }
     except Exception as e:
         logger.error(f"Production cost report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3869,7 +3887,8 @@ async def progress_billing_report(
         }
     except Exception as e:
         logger.error(f"Progress billing report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -3950,7 +3969,8 @@ async def drug_expiry_report(
         }
     except Exception as e:
         logger.error(f"Drug expiry report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4019,7 +4039,8 @@ async def fleet_tracking_report(
         }
     except Exception as e:
         logger.error(f"Fleet tracking report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4088,7 +4109,8 @@ async def utilization_report(
         }
     except Exception as e:
         logger.error(f"Utilization report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4159,7 +4181,8 @@ async def workshop_revenue_report(
         }
     except Exception as e:
         logger.error(f"Workshop revenue report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4231,7 +4254,8 @@ async def ecom_returns_report(
         }
     except Exception as e:
         logger.error(f"E-com returns report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4307,7 +4331,8 @@ async def agent_performance_report(
         }
     except Exception as e:
         logger.error(f"Agent performance report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -4375,6 +4400,7 @@ async def crop_yield_report(
         }
     except Exception as e:
         logger.error(f"Crop yield report error: {e}")
-        raise HTTPException(500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, detail="حدث خطأ داخلي")
     finally:
         db.close()

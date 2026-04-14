@@ -39,7 +39,7 @@ from .domain_models.inventory_core import (
     ProductUnit,
     StockAdjustment,
 )
-from .domain_models.procurement_orders import PurchaseOrder, PurchaseOrderLine
+from .domain_models.procurement_orders import PurchaseOrder, PurchaseOrderLine, BlanketPurchaseOrder, BlanketPOReleaseOrder
 from .domain_models.finance_treasury_tax import (
     BankReconciliation,
     BankStatementLine,
@@ -97,6 +97,9 @@ from .domain_models.finance_currency_bank import BankImportBatch, BankImportLine
 from .domain_models.finance_fiscal_zakat import FiscalPeriodLock, FiscalYear, ZakatCalculation
 from .domain_models.projects_contracts_expenses import Contract, ContractItem, ExpensePolicy
 from .domain_models.projects_crm_advanced import (
+    Campaign,
+    CampaignLeadAttribution,
+    CampaignRecipient,
     CrmCustomerSegment,
     CrmCustomerSegmentMember,
     CrmLeadScore,
@@ -154,6 +157,8 @@ from .domain_models.finance_currency_transactions import CurrencyTransaction
 from .domain_models.security_admin_reporting import DocumentTemplate, DocumentType, FinancialReport
 from .domain_models.manufacturing_bom_capacity import BomComponent, CapacityPlan
 from .domain_models.shared_dashboard_fiscal_intercompany import (
+    AnalyticsDashboard,
+    AnalyticsDashboardWidget,
     DashboardLayout,
     FiscalPeriod,
     GosiSetting,
@@ -171,7 +176,7 @@ from .domain_models.finance_cashflow import (
 from .domain_models.finance_forecast import CashFlowForecast, CashFlowForecastLine
 from .domain_models.finance_recognition_tax import RevenueRecognitionSchedule, TaxCalendar, WhtRate, WhtTransaction
 from .domain_models.hr_training import TrainingParticipant, TrainingProgram
-from .domain_models.hr_workforce import LeaveCarryover, OvertimeRequest, PerformanceReview
+from .domain_models.hr_workforce import LeaveCarryover, OvertimeRequest, PerformanceReview, ReviewCycle, PerformanceGoal
 from .domain_models.inventory_transfers import StockShipment, StockShipmentItem, StockTransferLog
 from .domain_models.manufacturing_execution import (
     ManufacturingEquipment,
@@ -182,6 +187,7 @@ from .domain_models.manufacturing_execution import (
     MrpPlan,
     ProductionOrder,
     ProductionOrderOperation,
+    ShopFloorLog,
 )
 from .domain_models.manufacturing_resources import WorkCenter
 from .domain_models.operations_support import LeaseContract, MaintenanceLog, MarketingCampaign
@@ -236,6 +242,15 @@ from .domain_models.sales_rfq import (
     SalesReturnLine,
     SalesTarget,
 )
+from .domain_models.cpq import (
+    ProductConfiguration,
+    ConfigOptionGroup,
+    ConfigOption,
+    ConfigValidationRule,
+    CpqPricingRule,
+    CpqQuote,
+    CpqQuoteLine,
+)
 from .domain_models.security_comms import LoginAttempt, Message, Notification, PasswordHistory, PrintTemplate, ReportTemplate
 from .domain_models.security_reporting import (
     Role,
@@ -254,6 +269,7 @@ from .domain_models.self_service import SelfServiceRequest
 from .domain_models.sso import SsoConfiguration, SsoGroupRoleMapping, SsoFallbackAdmin
 from .domain_models.mobile_sync import SyncQueue
 from .domain_models.finance_subscriptions import SubscriptionPlan, SubscriptionEnrollment, SubscriptionInvoice
+from .domain_models.demand_forecast import DemandForecast, DemandForecastPeriod
 
 
 target_metadata = ModelBase.metadata
@@ -282,6 +298,8 @@ __all__ = [
     "StockAdjustment",
     "PurchaseOrder",
     "PurchaseOrderLine",
+    "BlanketPurchaseOrder",
+    "BlanketPOReleaseOrder",
     "PayrollPeriod",
     "Department",
     "EmployeePosition",
@@ -357,6 +375,9 @@ __all__ = [
     "CrmCustomerSegment",
     "CrmCustomerSegmentMember",
     "CrmSalesForecast",
+    "Campaign",
+    "CampaignRecipient",
+    "CampaignLeadAttribution",
     "ApiKey",
     "AuditLog",
     "BackupHistory",
@@ -438,6 +459,7 @@ __all__ = [
     "Payment",
     "PendingPayable",
     "PendingReceivable",
+    "PerformanceGoal",
     "PerformanceReview",
     "PosKitchenOrder",
     "PosLoyaltyPoint",
@@ -466,6 +488,7 @@ __all__ = [
     "ReportTemplate",
     "RequestForQuotation",
     "RevenueRecognitionSchedule",
+    "ReviewCycle",
     "RfqLine",
     "RfqResponse",
     "Role",
@@ -478,6 +501,13 @@ __all__ = [
     "SalesReturnLine",
     "SalesReturn",
     "SalesTarget",
+    "ProductConfiguration",
+    "ConfigOptionGroup",
+    "ConfigOption",
+    "ConfigValidationRule",
+    "CpqPricingRule",
+    "CpqQuote",
+    "CpqQuoteLine",
     "ScheduledReport",
     "SecurityEvent",
     "SharedReport",
@@ -519,6 +549,9 @@ __all__ = [
     "SubscriptionPlan",
     "SubscriptionEnrollment",
     "SubscriptionInvoice",
+    "DemandForecast",
+    "DemandForecastPeriod",
+    "ShopFloorLog",
     "target_metadata",
     "MODELED_TABLES",
 ]

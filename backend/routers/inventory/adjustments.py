@@ -12,6 +12,8 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
+from utils.fiscal_lock import check_fiscal_period_open
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 from .schemas import StockAdjustmentCreate
 
 adjustments_router = APIRouter()
@@ -42,6 +44,14 @@ def list_adjustments(
         if branch_id:
             query += " AND w.branch_id = :branch_id"
             params["branch_id"] = branch_id
+        else:
+            # INV-004: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND w.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         query += " ORDER BY sa.created_at DESC LIMIT :limit OFFSET :skip"
         result = db.execute(text(query), params).fetchall()
@@ -80,6 +90,13 @@ def create_adjustment(
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
         username = current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         company_id = current_user.company_id if hasattr(current_user, 'company_id') else current_user.get('company_id')
+
+        # INV-005: Check warehouse branch access
+        wh_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": data.warehouse_id}).scalar()
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if wh_branch and wh_branch not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك إجراء تسوية على مستودع خارج فروعك")
 
         # 1. Get Current Stock
         stock_query = """
@@ -167,8 +184,8 @@ def create_adjustment(
             "uid": user_id
         })
 
-        # 6. Create GL Journal Entry for Inventory Adjustment
-        from utils.accounting import get_mapped_account_id, update_account_balance
+        # 6. Create GL Journal Entry for Inventory Adjustment via GL Service
+        from utils.accounting import get_mapped_account_id
         acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
         acc_adjustment = get_mapped_account_id(db, "acc_map_inventory_adjustment")
 
@@ -177,41 +194,33 @@ def create_adjustment(
             adjustment_value = abs(difference) * float(cost_price)
 
             if adjustment_value > 0.01:
-                import uuid
-                je_num = f"JE-ADJ-{adj_number}"
+                # Fiscal lock check (T019 fix — was bypassing fiscal lock)
+                check_fiscal_period_open(db, datetime.now().date())
+
                 branch_id = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": data.warehouse_id}).scalar()
 
-                je_id = db.execute(text("""
-                    INSERT INTO journal_entries (
-                        entry_number, entry_date, description, reference, status, created_by, branch_id,
-                        currency, exchange_rate
-                    )
-                    VALUES (:num, NOW(), :desc, :ref, 'posted', :uid, :bid, :base_curr, 1.0) RETURNING id
-                """), {
-                    "num": je_num,
-                    "desc": f"Stock Adjustment - {adj_number}",
-                    "ref": adj_number,
-                    "uid": user_id,
-                    "bid": branch_id,
-                    "base_curr": base_currency
-                }).scalar()
-
                 if difference > 0:
-                    # Increase: Debit Inventory, Credit Adjustment (gain)
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": adjustment_value, "desc": f"Inventory Increase - {adj_number}"})
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, :desc)"),
-                              {"jid": je_id, "aid": acc_adjustment, "amt": adjustment_value, "desc": f"Adjustment Gain - {adj_number}"})
-                    update_account_balance(db, account_id=acc_inventory, debit_base=adjustment_value, credit_base=0)
-                    update_account_balance(db, account_id=acc_adjustment, debit_base=0, credit_base=adjustment_value)
+                    lines = [
+                        {"account_id": acc_inventory, "debit": adjustment_value, "credit": 0, "description": f"Inventory Increase - {adj_number}"},
+                        {"account_id": acc_adjustment, "debit": 0, "credit": adjustment_value, "description": f"Adjustment Gain - {adj_number}"},
+                    ]
                 else:
-                    # Decrease: Debit Adjustment (loss), Credit Inventory
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, :desc)"),
-                              {"jid": je_id, "aid": acc_adjustment, "amt": adjustment_value, "desc": f"Adjustment Loss - {adj_number}"})
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": adjustment_value, "desc": f"Inventory Decrease - {adj_number}"})
-                    update_account_balance(db, account_id=acc_adjustment, debit_base=adjustment_value, credit_base=0)
-                    update_account_balance(db, account_id=acc_inventory, debit_base=0, credit_base=adjustment_value)
+                    lines = [
+                        {"account_id": acc_adjustment, "debit": adjustment_value, "credit": 0, "description": f"Adjustment Loss - {adj_number}"},
+                        {"account_id": acc_inventory, "debit": 0, "credit": adjustment_value, "description": f"Inventory Decrease - {adj_number}"},
+                    ]
+
+                gl_create_journal_entry(
+                    db,
+                    company_id=company_id,
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    description=f"Stock Adjustment - {adj_number}",
+                    lines=lines,
+                    user_id=user_id,
+                    branch_id=branch_id,
+                    reference=adj_number,
+                    currency=base_currency,
+                )
 
         db.commit()
 

@@ -7,7 +7,7 @@ INV-109: FIFO/LIFO Costing Policies
 INV-110: Product Ledger
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
@@ -15,6 +15,9 @@ from datetime import date
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.audit import log_activity
+import logging
+logger = logging.getLogger(__name__)
 
 advanced_router = APIRouter(prefix="/advanced", tags=["Advanced Inventory Phase 2"])
 
@@ -124,13 +127,14 @@ async def list_variants(
     except Exception as e:
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.post("/variants")
-async def create_variant(data: ProductVariantCreate, current_user: dict = Depends(get_current_user)):
+async def create_variant(data: ProductVariantCreate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
@@ -151,16 +155,21 @@ async def create_variant(data: ProductVariantCreate, current_user: dict = Depend
             """), {"vid": variant_id, "attr": opt.attribute_name, "val": opt.option_value})
         
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="variant.create", resource_type="product_variant",
+                     resource_id=str(variant_id), details={"product_id": data.product_id, "sku": data.variant_sku}, request=request)
         return {"id": variant_id, "message": "Variant created successfully"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.put("/variants/{variant_id}")
-async def update_variant(variant_id: int, data: ProductVariantUpdate, current_user: dict = Depends(get_current_user)):
+async def update_variant(variant_id: int, data: ProductVariantUpdate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         fields = []
@@ -173,12 +182,17 @@ async def update_variant(variant_id: int, data: ProductVariantUpdate, current_us
         
         db.execute(text(f"UPDATE product_variants SET {', '.join(fields)} WHERE id = :vid"), params)
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="variant.update", resource_type="product_variant",
+                     resource_id=str(variant_id), details=data.dict(exclude_unset=True), request=request)
         return {"message": "Variant updated successfully"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -217,13 +231,14 @@ async def list_bins(
     except Exception as e:
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.post("/bins")
-async def create_bin(data: BinLocationCreate, current_user: dict = Depends(get_current_user)):
+async def create_bin(data: BinLocationCreate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
@@ -233,16 +248,21 @@ async def create_bin(data: BinLocationCreate, current_user: dict = Depends(get_c
         """), data.dict())
         bin_id = result.fetchone()[0]
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="bin.create", resource_type="bin_location",
+                     resource_id=str(bin_id), details={"warehouse_id": data.warehouse_id, "aisle": data.aisle, "rack": data.rack}, request=request)
         return {"id": bin_id, "message": "Bin location created successfully"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.put("/bins/{bin_id}")
-async def update_bin(bin_id: int, data: BinLocationUpdate, current_user: dict = Depends(get_current_user)):
+async def update_bin(bin_id: int, data: BinLocationUpdate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         fields = []
@@ -255,12 +275,17 @@ async def update_bin(bin_id: int, data: BinLocationUpdate, current_user: dict = 
         
         db.execute(text(f"UPDATE bin_locations SET {', '.join(fields)} WHERE id = :bid"), params)
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="bin.update", resource_type="bin_location",
+                     resource_id=str(bin_id), details=data.dict(exclude_unset=True), request=request)
         return {"message": "Bin location updated successfully"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -287,7 +312,8 @@ async def list_kits(
     except Exception as e:
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -320,13 +346,14 @@ async def get_kit(kit_id: int, current_user: dict = Depends(get_current_user)):
     except Exception as e:
         if "does not exist" in str(e):
             raise HTTPException(status_code=404, detail="Table not migrated yet")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.post("/kits")
-async def create_kit(data: ProductKitCreate, current_user: dict = Depends(get_current_user)):
+async def create_kit(data: ProductKitCreate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         result = db.execute(text("""
@@ -343,16 +370,21 @@ async def create_kit(data: ProductKitCreate, current_user: dict = Depends(get_cu
             """), {"kit_id": kit_id, "cpid": comp.component_product_id, "qty": comp.quantity})
         
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="kit.create", resource_type="product_kit",
+                     resource_id=str(kit_id), details={"kit_product_id": data.kit_product_id, "components": len(data.components)}, request=request)
         return {"id": kit_id, "message": "Kit created successfully"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @advanced_router.put("/kits/{kit_id}")
-async def update_kit(kit_id: int, data: ProductKitUpdate, current_user: dict = Depends(get_current_user)):
+async def update_kit(kit_id: int, data: ProductKitUpdate, request: Request, current_user: dict = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         fields = []
@@ -365,12 +397,17 @@ async def update_kit(kit_id: int, data: ProductKitUpdate, current_user: dict = D
         
         db.execute(text(f"UPDATE product_kits SET {', '.join(fields)} WHERE id = :kid"), params)
         db.commit()
+        # INV-L03: Audit log
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="kit.update", resource_type="product_kit",
+                     resource_id=str(kit_id), details=data.dict(exclude_unset=True), request=request)
         return {"message": "Kit updated successfully"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -453,6 +490,7 @@ async def get_product_ledger(
         
         return {"data": rows, "total": total}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

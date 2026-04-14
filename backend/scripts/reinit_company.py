@@ -95,7 +95,7 @@ def main():
         db.close()
     
     print(f"\n✅ Company {COMPANY_ID} re-initialized successfully!")
-    print(f"   Login: {ADMIN_USERNAME} / {ADMIN_PASSWORD}")
+    print(f"   Login: {ADMIN_USERNAME} / {'*' * len(ADMIN_PASSWORD)}")
     print(f"   Database: {db_name}")
 
 if __name__ == "__main__":

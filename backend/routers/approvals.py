@@ -2,7 +2,7 @@
 Approval Workflows Router - WF-001, WF-002, WF-003
 سلسلة اعتمادات متعددة المستويات
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -64,7 +64,8 @@ def list_workflows(
 
         return [dict(r._mapping) for r in rows]
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error listing workflows: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -81,7 +82,8 @@ def get_workflow(workflow_id: int, current_user=Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error getting workflow: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -118,17 +120,18 @@ def create_workflow(data: WorkflowCreateSchema, current_user=Depends(get_current
         }).fetchone()
 
         db.commit()
-        try:
-            log_activity(db, current_user.id, current_user.username, "create",
-                         "approval_workflows", str(result.id), {"name": data.name})
-        except Exception:
-            pass
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action="create", resource_type="approval_workflows",
+            resource_id=str(result.id), details={"name": data.name}
+        )
         return {"id": result.id, "message": "تم إنشاء سلسلة الاعتماد بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating workflow: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -173,7 +176,8 @@ def update_workflow(workflow_id: int, data: WorkflowCreateSchema, current_user=D
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error updating workflow: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -199,7 +203,8 @@ def delete_workflow(workflow_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error deleting workflow: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -232,8 +237,8 @@ def _create_notification(db, user_id: int, title: str, message: str, link: str =
             INSERT INTO notifications (user_id, title, message, link, is_read, type, created_at)
             VALUES (:uid, :title, :msg, :link, FALSE, 'approval', CURRENT_TIMESTAMP)
         """), {"uid": user_id, "title": title, "msg": message, "link": link})
-    except Exception:
-        pass  # Notifications are not critical
+    except Exception as e:
+        logger.warning("Failed to create notification: %s", e)  # Notifications are not critical
 
 
 @router.post("/requests", dependencies=[Depends(require_permission("approvals.create"))])
@@ -300,7 +305,8 @@ def create_approval_request(data: dict, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating approval request: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -354,7 +360,8 @@ def list_pending_approvals(
 
         return {"items": items, "total": total, "page": page}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error listing pending approvals: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -408,7 +415,8 @@ def list_all_requests(
 
         return {"items": items, "total": total, "page": page}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error listing approval requests: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -452,7 +460,8 @@ def get_approval_request(request_id: int, current_user=Depends(get_current_user)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error getting approval request: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -596,12 +605,12 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
 
         db.commit()
 
-        try:
-            log_activity(db, current_user.id, current_user.username, data.action,
-                         "approval_requests", str(request_id),
-                         {"action": data.action, "step": request.current_step, "notes": data.notes})
-        except Exception:
-            pass
+        log_activity(
+            db=db, user_id=current_user.id, username=current_user.username,
+            action=data.action, resource_type="approval_requests",
+            resource_id=str(request_id),
+            details={"action": data.action, "step": request.current_step, "notes": data.notes}
+        )
 
         action_label = {"approve": "اعتماد", "reject": "رفض", "return": "إرجاع"}.get(data.action, data.action)
         return {"message": f"تم {action_label} الطلب بنجاح"}
@@ -609,7 +618,8 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error taking approval action: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -639,7 +649,8 @@ def approval_stats(current_user=Depends(get_current_user)):
             "total": stats.total_count or 0
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error getting approval stats: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

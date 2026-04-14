@@ -41,6 +41,7 @@ def list_audit_logs(
     end_date: Optional[date] = None,
     branch_id: Optional[int] = None,
     company_id: Optional[str] = None,
+    include_archived: bool = False,
     current_user: Any = Depends(get_current_user)
 ):
     """عرض سجلات المراقبة مع فلترة"""
@@ -114,6 +115,10 @@ def list_audit_logs(
         """
         params = {"limit": limit, "skip": skip}
         
+        # T017: Filter out archived entries by default
+        if not include_archived:
+            query += " AND (al.is_archived IS NULL OR al.is_archived = FALSE)"
+        
         # Logic for Branch Scope
         permissions = getattr(current_user, 'permissions', []) or []
         is_admin = "*" in permissions or getattr(current_user, 'role', None) in ['admin', 'system_admin', 'superuser']
@@ -131,11 +136,10 @@ def list_audit_logs(
             if not is_admin:
                 allowed_branches = getattr(current_user, 'allowed_branches', []) or []
                 if allowed_branches:
-                    allowed_ids = tuple(allowed_branches)
-                    if len(allowed_ids) == 1:
-                        query += f" AND branch_id = {allowed_ids[0]}"
-                    else:
-                        query += f" AND branch_id IN {allowed_ids}"
+                    branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed_branches)))
+                    query += f" AND branch_id IN ({branch_placeholders})"
+                    for i, bid in enumerate(allowed_branches):
+                        params[f"_ab_{i}"] = bid
                 else:
                     return []
             
@@ -277,11 +281,10 @@ def get_audit_stats(
             if not is_admin:
                 allowed_branches = getattr(current_user, 'allowed_branches', []) or []
                 if allowed_branches:
-                    allowed_ids = tuple(allowed_branches)
-                    if len(allowed_ids) == 1:
-                        where_clause += f" AND branch_id = {allowed_ids[0]}"
-                    else:
-                        where_clause += f" AND branch_id IN {allowed_ids}"
+                    branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed_branches)))
+                    where_clause += f" AND branch_id IN ({branch_placeholders})"
+                    for i, bid in enumerate(allowed_branches):
+                        params[f"_ab_{i}"] = bid
                 else:
                     return {"total_logs": 0, "today_logs": 0, "top_actions": [], "top_users": []}
 

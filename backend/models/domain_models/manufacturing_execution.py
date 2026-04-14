@@ -27,11 +27,14 @@ class ManufacturingOperation(ModelBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     route_id: Mapped[int | None] = mapped_column(ForeignKey("manufacturing_routes.id", ondelete="CASCADE"))
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(255))
     work_center_id: Mapped[int | None] = mapped_column(ForeignKey("work_centers.id"))
     description: Mapped[str | None] = mapped_column(String(255))
-    setup_time: Mapped[float | None] = mapped_column(Numeric(8, 2), default=0)
-    cycle_time: Mapped[float | None] = mapped_column(Numeric(8, 2), default=0)
+    setup_time: Mapped[float | None] = mapped_column(Numeric(10, 2), default=0)
+    cycle_time: Mapped[float | None] = mapped_column(Numeric(10, 2), default=0)
+    labor_rate_per_hour: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ManufacturingRoute(ModelBase):
@@ -40,6 +43,8 @@ class ManufacturingRoute(ModelBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    bom_id: Mapped[int | None] = mapped_column(ForeignKey("bill_of_materials.id"))
+    is_default: Mapped[bool | None] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -147,6 +152,24 @@ class ProductionOrder(ModelBase):
     costing_status: Mapped[str | None] = mapped_column(String(20), default="pending")
 
 
+class ShopFloorLog(ModelBase):
+    __tablename__ = "shop_floor_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    work_order_id: Mapped[int] = mapped_column(ForeignKey("production_orders.id", ondelete="CASCADE"), nullable=False)
+    routing_operation_id: Mapped[int] = mapped_column(ForeignKey("manufacturing_operations.id"), nullable=False)
+    operator_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    started_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    output_quantity: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    scrap_quantity: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    downtime_minutes: Mapped[float | None] = mapped_column(Numeric(10, 2), default=0)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="in_progress")
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 __all__ = [
     "ManufacturingEquipment",
     "ManufacturingOperation",
@@ -156,4 +179,5 @@ __all__ = [
     "MrpItem",
     "ProductionOrderOperation",
     "ProductionOrder",
+    "ShopFloorLog",
 ]

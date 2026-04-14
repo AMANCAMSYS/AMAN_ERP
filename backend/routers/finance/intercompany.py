@@ -1,6 +1,10 @@
 """
-AMAN ERP - Intercompany Transactions & Revenue Recognition
+AMAN ERP - Intercompany Transactions & Revenue Recognition (DEPRECATED)
 المعاملات بين الشركات والاعتراف بالإيرادات (IFRS 15)
+
+WARNING: This module (v1) uses single-sided journal entries.
+Use intercompany_v2.py which creates reciprocal (dual-sided) JEs.
+This module will be removed in a future release.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -120,7 +124,8 @@ def create_intercompany_transaction(
         return {"id": tid, "reference": ref, "message": "تم إنشاء المعاملة بين الشركات"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -189,7 +194,8 @@ def process_intercompany_transaction(txn_id: int, current_user=Depends(get_curre
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -323,7 +329,8 @@ def create_revenue_schedule(data: RevenueScheduleCreate, current_user=Depends(ge
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -427,7 +434,8 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

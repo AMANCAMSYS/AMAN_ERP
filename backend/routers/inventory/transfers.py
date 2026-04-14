@@ -12,6 +12,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
+from services.gl_service import create_journal_entry as gl_create_journal_entry
 from .schemas import StockTransferSingleCreate, StockTransferCreate
 
 transfers_router = APIRouter()
@@ -47,6 +48,14 @@ def create_stock_transfer(
             raise HTTPException(status_code=404, detail="المستودع المصدر غير موجود")
         if not dst_wh:
             raise HTTPException(status_code=404, detail="المستودع الوجهة غير موجود")
+
+        # INV-006: Check branch access on both warehouses
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            src_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.source_warehouse_id}).scalar()
+            dst_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.destination_warehouse_id}).scalar()
+            if (src_branch and src_branch not in allowed) or (dst_branch and dst_branch not in allowed):
+                raise HTTPException(status_code=403, detail="لا يمكنك التحويل بين مستودعات خارج فروعك")
 
         # 3. Check product exists
         product = db.execute(text("SELECT product_name FROM products WHERE id = :id"),
@@ -160,68 +169,44 @@ def create_stock_transfer(
             "tcast_a": new_avg_cost
         })
 
-        # 9b. Create GL Journal Entry for warehouse transfer
+        # 9b. Create GL Journal Entry for warehouse transfer via GL service
         src_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.source_warehouse_id}).scalar()
         dst_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.destination_warehouse_id}).scalar()
 
         transfer_value = float(transfer.quantity) * float(source_cost)
         if transfer_value > 0.01:
-            from utils.accounting import get_mapped_account_id, update_account_balance
-            import uuid as uuid_mod
+            from utils.accounting import get_mapped_account_id
 
-            # Get inventory accounts
             acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
 
             if acc_inventory:
-                if src_branch and dst_branch and src_branch != dst_branch:
-                    # Inter-branch transfer needs GL entry via inter-branch clearing account
-                    acc_interco = get_mapped_account_id(db, "acc_map_intercompany") or acc_inventory
-
-                    je_num = f"JE-TRF-{uuid_mod.uuid4().hex[:6].upper()}"
-                    je_id = db.execute(text("""
-                        INSERT INTO journal_entries (
-                            entry_number, entry_date, description, reference, status, 
-                            created_by, branch_id, currency, exchange_rate
-                        ) VALUES (:num, CURRENT_DATE, :desc, :ref, 'posted', :uid, :bid, :base_curr, 1.0)
-                        RETURNING id
-                    """), {
-                        "num": je_num,
-                        "desc": f"Stock Transfer {src_wh.warehouse_name} → {dst_wh.warehouse_name}",
-                        "ref": je_num, "uid": user_id, "bid": src_branch,
-                        "base_curr": base_currency
-                    }).scalar()
-
-                    # Dr Destination Inventory, Cr Source Inventory
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": transfer_value, "desc": f"Transfer In - {dst_wh.warehouse_name}"})
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": transfer_value, "desc": f"Transfer Out - {src_wh.warehouse_name}"})
-                else:
-                    # Same-branch transfer: still create GL memo entry for audit trail
-                    je_num = f"JE-TRF-{uuid_mod.uuid4().hex[:6].upper()}"
-                    je_id = db.execute(text("""
-                        INSERT INTO journal_entries (
-                            entry_number, entry_date, description, reference, status, 
-                            created_by, branch_id, currency, exchange_rate
-                        ) VALUES (:num, CURRENT_DATE, :desc, :ref, 'posted', :uid, :bid, :base_curr, 1.0)
-                        RETURNING id
-                    """), {
-                        "num": je_num,
-                        "desc": f"تحويل مخزني: {src_wh.warehouse_name} → {dst_wh.warehouse_name}",
-                        "ref": je_num, "uid": user_id, "bid": src_branch or dst_branch,
-                        "base_curr": base_currency
-                    }).scalar()
-
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, :amt, 0, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": transfer_value, "desc": f"Transfer In - {dst_wh.warehouse_name}"})
-                    db.execute(text("INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description) VALUES (:jid, :aid, 0, :amt, :desc)"),
-                              {"jid": je_id, "aid": acc_inventory, "amt": transfer_value, "desc": f"Transfer Out - {src_wh.warehouse_name}"})
+                lines = [
+                    {"account_id": acc_inventory, "debit": transfer_value, "credit": 0, "description": f"Transfer In - {dst_wh.warehouse_name}"},
+                    {"account_id": acc_inventory, "debit": 0, "credit": transfer_value, "description": f"Transfer Out - {src_wh.warehouse_name}"},
+                ]
+                gl_create_journal_entry(
+                    db,
+                    company_id=current_user.company_id,
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    description=f"تحويل مخزني: {src_wh.warehouse_name} → {dst_wh.warehouse_name}",
+                    lines=lines,
+                    user_id=user_id,
+                    branch_id=src_branch or dst_branch,
+                    reference=f"TRF-{transfer.product_id}",
+                    currency=base_currency,
+                )
 
         # 10. Log activity
         log_activity(
-            db, user_id, "stock_transfer",
-            f"تحويل {transfer.quantity} من {product.product_name} من {src_wh.warehouse_name} إلى {dst_wh.warehouse_name}",
-            request
+            db,
+            user_id=user_id,
+            username=current_user.username if hasattr(current_user, 'username') else None,
+            action="stock.transfer",
+            resource_type="stock_transfer",
+            resource_id=str(transfer.product_id),
+            details={"product": product.product_name, "qty": transfer.quantity, "from": src_wh.warehouse_name, "to": dst_wh.warehouse_name},
+            request=request,
+            branch_id=src_branch
         )
 
         db.commit()
@@ -243,7 +228,8 @@ def create_stock_transfer(
     except Exception as e:
         db.rollback()
         logger.error(f"Stock transfer error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -267,26 +253,38 @@ def transfer_stock(
         if not src or not dst:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
 
-        import random
-        transfer_ref = f"TRF-{datetime.now().year}-{random.randint(10000, 99999)}"
+        # INV-006: Check branch access on both warehouses
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            src_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.source_warehouse_id}).scalar()
+            dst_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": transfer.destination_warehouse_id}).scalar()
+            if (src_branch and src_branch not in allowed) or (dst_branch and dst_branch not in allowed):
+                raise HTTPException(status_code=403, detail="لا يمكنك النقل بين مستودعات خارج فروعك")
+
+        transfer_ref = f"TRF-{datetime.now().strftime('%Y%m%d')}-{__import__('uuid').uuid4().hex[:8].upper()}"
+
+        # TODO [INV-L04]: Multi-item transfer does NOT create a GL journal entry
+        # (single-item transfer_stock does via gl_create_journal_entry).
+        # A GL entry should be created here aggregating all items' transfer values
+        # with debit/credit to acc_map_inventory, similar to create_stock_transfer above.
+        # Also add fiscal period validation before any GL operation.
 
         for item in transfer.items:
-            # Check source stock
-            current_qty = db.execute(text("""
-                SELECT quantity FROM inventory 
+            # INV-009: Check source stock with FOR UPDATE to prevent race conditions
+            src_inv = db.execute(text("""
+                SELECT quantity, average_cost FROM inventory 
                 WHERE product_id = :pid AND warehouse_id = :wh
-            """), {"pid": item.product_id, "wh": transfer.source_warehouse_id}).scalar() or 0
+                FOR UPDATE
+            """), {"pid": item.product_id, "wh": transfer.source_warehouse_id}).fetchone()
+
+            current_qty = float(src_inv.quantity) if src_inv else 0
 
             if current_qty < item.quantity:
                 prod_name = db.execute(text("SELECT product_name FROM products WHERE id = :pid"), {"pid": item.product_id}).scalar()
                 raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}")
 
             # 1. Get source cost for WAC calculation
-            source_inv = db.execute(text("""
-                SELECT average_cost FROM inventory 
-                WHERE product_id = :pid AND warehouse_id = :wh
-            """), {"pid": item.product_id, "wh": transfer.source_warehouse_id}).fetchone()
-            source_cost = float(source_inv.average_cost or 0) if source_inv else 0
+            source_cost = float(src_inv.average_cost or 0) if src_inv else 0
 
             # 2. Deduct from Source
             db.execute(text("""
@@ -371,6 +369,7 @@ def transfer_stock(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

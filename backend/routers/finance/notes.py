@@ -11,6 +11,9 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import get_base_currency, validate_je_lines
 from utils.fiscal_lock import check_fiscal_period_open
+from utils.audit import log_activity
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"], dependencies=[Depends(require_module("treasury"))])
 
@@ -225,12 +228,18 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
         }).scalar()
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.receivable.create",
+                     resource_type="note_receivable", resource_id=str(note_id),
+                     details={"note_number": data.note_number, "amount": amt},
+                     branch_id=data.branch_id)
         return {"id": note_id, "journal_entry_id": je_id, "message": "تم إنشاء ورقة القبض بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -303,12 +312,18 @@ def collect_note_receivable(note_id: int, data: dict = None,
         """), {"date": coll_date, "je": je_id, "tid": tid, "id": note_id})
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.receivable.collect",
+                     resource_type="note_receivable", resource_id=str(note_id),
+                     details={"note_number": note.note_number, "amount": amt},
+                     branch_id=note.branch_id)
         return {"message": "تم تحصيل ورقة القبض بنجاح", "journal_entry_id": je_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -371,12 +386,18 @@ def protest_note_receivable(note_id: int, data: dict = None,
         """), {"date": pdate, "reason": reason, "je": je_id, "id": note_id})
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.receivable.protest",
+                     resource_type="note_receivable", resource_id=str(note_id),
+                     details={"note_number": note.note_number, "reason": reason},
+                     branch_id=note.branch_id)
         return {"message": "تم رفض ورقة القبض", "journal_entry_id": je_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -527,12 +548,18 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
         }).scalar()
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.payable.create",
+                     resource_type="note_payable", resource_id=str(note_id),
+                     details={"note_number": data.note_number, "amount": amt},
+                     branch_id=data.branch_id)
         return {"id": note_id, "journal_entry_id": je_id, "message": "تم إنشاء ورقة الدفع بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -605,12 +632,18 @@ def pay_note_payable(note_id: int, data: dict = None,
         """), {"date": pay_date, "je": je_id, "tid": tid, "id": note_id})
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.payable.pay",
+                     resource_type="note_payable", resource_id=str(note_id),
+                     details={"note_number": note.note_number, "amount": amt},
+                     branch_id=note.branch_id)
         return {"message": "تم سداد ورقة الدفع بنجاح", "journal_entry_id": je_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -673,12 +706,18 @@ def protest_note_payable(note_id: int, data: dict = None,
         """), {"date": pdate, "reason": reason, "je": je_id, "id": note_id})
 
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="notes.payable.protest",
+                     resource_type="note_payable", resource_id=str(note_id),
+                     details={"note_number": note.note_number, "reason": reason},
+                     branch_id=note.branch_id)
         return {"message": "تم رفض ورقة الدفع", "journal_entry_id": je_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 

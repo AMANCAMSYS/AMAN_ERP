@@ -23,21 +23,21 @@ const KPIDashboard = () => {
             setKpiData(res.data);
             setLastRefresh(new Date());
         } catch (err) {
-            showToast(err.response?.data?.detail || (isRTL ? 'خطأ في تحميل المؤشرات' : 'Error loading KPIs'), 'error');
+            showToast(err.response?.data?.detail || (t('reports.error_loading_kpis')), 'error');
             console.error(err);
         } finally { setLoading(false); }
     };
 
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '—';
-        return new Intl.NumberFormat(isRTL ? 'ar-SA' : 'en-SA', {
+        return new Intl.NumberFormat(t('reports.ensa'), {
             style: 'currency', currency: 'SAR', maximumFractionDigits: 0
         }).format(val);
     };
 
     const formatNumber = (val) => {
         if (!val && val !== 0) return '—';
-        return new Intl.NumberFormat(isRTL ? 'ar-SA' : 'en-SA').format(val);
+        return new Intl.NumberFormat(t('reports.ensa')).format(val);
     };
 
     const changeIndicator = (val) => {
@@ -53,61 +53,61 @@ const KPIDashboard = () => {
 
     const kpiCards = kpiData ? [
         {
-            label: isRTL ? 'الإيرادات' : 'Revenue',
+            label: t('reports.revenue'),
             value: formatCurrency(kpiData.revenue),
             change: kpiData.revenue_change,
             icon: <DollarSign size={24} />,
             iconBg: '#e8f5e9', iconColor: '#2e7d32',
-            accounting: isRTL ? 'إجمالي الإيرادات المسجلة (دائن 4xxx)' : 'Total recognized revenue (Cr. 4xxx)'
+            accounting: t('reports.total_recognized_revenue_cr_4xxx')
         },
         {
-            label: isRTL ? 'المصروفات' : 'Expenses',
+            label: t('reports.expenses'),
             value: formatCurrency(kpiData.expenses),
             change: kpiData.expenses_change,
             icon: <TrendingDown size={24} />,
             iconBg: '#fce4ec', iconColor: '#c62828',
-            accounting: isRTL ? 'إجمالي المصروفات (مدين 5xxx-6xxx)' : 'Total expenses (Dr. 5xxx-6xxx)',
+            accounting: t('reports.total_expenses_dr_5xxx6xxx'),
             invertColor: true
         },
         {
-            label: isRTL ? 'ذمم مدينة' : 'Accounts Receivable',
+            label: t('reports.accounts_receivable'),
             value: formatCurrency(kpiData.accounts_receivable),
             change: kpiData.ar_change,
             icon: <TrendingUp size={24} />,
             iconBg: '#e3f2fd', iconColor: '#1565c0',
-            accounting: isRTL ? 'رصيد الذمم المدينة (مدين 1200)' : 'AR balance (Dr. 1200)'
+            accounting: t('reports.ar_balance_dr_1200')
         },
         {
-            label: isRTL ? 'ذمم دائنة' : 'Accounts Payable',
+            label: t('reports.accounts_payable'),
             value: formatCurrency(kpiData.accounts_payable),
             change: kpiData.ap_change,
             icon: <Wallet size={24} />,
             iconBg: '#fff3e0', iconColor: '#e65100',
-            accounting: isRTL ? 'رصيد الذمم الدائنة (دائن 2100)' : 'AP balance (Cr. 2100)'
+            accounting: t('reports.ap_balance_cr_2100')
         },
         {
-            label: isRTL ? 'الرصيد النقدي' : 'Cash Balance',
+            label: t('reports.cash_balance'),
             value: formatCurrency(kpiData.cash_balance),
             change: kpiData.cash_change,
             icon: <DollarSign size={24} />,
             iconBg: '#f3e5f5', iconColor: '#7b1fa2',
-            accounting: isRTL ? 'النقد والأرصدة البنكية (1000-1100)' : 'Cash & bank balances (1000-1100)'
+            accounting: t('reports.cash_bank_balances_10001100')
         },
         {
-            label: isRTL ? 'قيمة المخزون' : 'Inventory Value',
+            label: t('reports.inventory_value'),
             value: formatCurrency(kpiData.inventory_value),
             change: kpiData.inventory_change,
             icon: <Package size={24} />,
             iconBg: '#e0f2f1', iconColor: '#00695c',
-            accounting: isRTL ? 'مخزون آخر المدة (مدين 1400)' : 'Ending inventory (Dr. 1400)'
+            accounting: t('reports.ending_inventory_dr_1400')
         },
         {
-            label: isRTL ? 'عدد الموظفين' : 'Employee Count',
+            label: t('reports.employee_count'),
             value: formatNumber(kpiData.employee_count),
             change: kpiData.employee_change,
             icon: <Users size={24} />,
             iconBg: '#fce4ec', iconColor: '#ad1457',
-            accounting: isRTL ? 'عدد الموظفين النشطين' : 'Active headcount'
+            accounting: t('reports.active_headcount')
         }
     ] : [];
 
@@ -128,17 +128,17 @@ const KPIDashboard = () => {
                     <div>
                         <h1 className="workspace-title">
                             <BarChart3 size={24} className="me-2" />
-                            {isRTL ? 'لوحة مؤشرات الأداء الرئيسية' : 'Key Performance Indicators'}
+                            {t('reports.key_performance_indicators')}
                         </h1>
                         <p className="workspace-subtitle">
-                            {isRTL ? 'مؤشرات مالية وتشغيلية حية مع النسب المحاسبية' : 'Live financial & operational KPIs with accounting ratios'}
+                            {t('reports.live_financial_operational_kpis_with_accounting_ra')}
                             {lastRefresh && <span className="ms-2 text-muted" style={{ fontSize: '0.8rem' }}>
-                                ({isRTL ? 'آخر تحديث: ' : 'Last: '}{lastRefresh.toLocaleTimeString()})
+                                ({t('reports.last')}{lastRefresh.toLocaleTimeString()})
                             </span>}
                         </p>
                     </div>
                     <button className="btn btn-outline-primary" onClick={fetchKPIs} disabled={loading}>
-                        <RefreshCw size={16} className={loading ? 'spin' : ''} /> <span className="ms-1">{isRTL ? 'تحديث' : 'Refresh'}</span>
+                        <RefreshCw size={16} className={loading ? 'spin' : ''} /> <span className="ms-1">{t('reports.refresh')}</span>
                     </button>
                 </div>
             </div>
@@ -169,15 +169,15 @@ const KPIDashboard = () => {
                     {/* Financial Ratios */}
                     {ratios && (
                         <div className="section-card mb-4">
-                            <h4 className="mb-3">{isRTL ? 'النسب المالية الرئيسية' : 'Key Financial Ratios'}</h4>
+                            <h4 className="mb-3">{t('reports.key_financial_ratios')}</h4>
                             <div className="row g-3">
                                 <div className="col-md-3">
                                     <div className="p-3 rounded" style={{ background: ratios.netIncome >= 0 ? '#e8f5e9' : '#fce4ec', textAlign: 'center' }}>
                                         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: ratios.netIncome >= 0 ? '#2e7d32' : '#c62828' }}>
                                             {formatCurrency(ratios.netIncome)}
                                         </div>
-                                        <div style={{ fontWeight: 600 }}>{isRTL ? 'صافي الدخل' : 'Net Income'}</div>
-                                        <small className="text-muted">{isRTL ? 'الإيرادات - المصروفات' : 'Revenue - Expenses'}</small>
+                                        <div style={{ fontWeight: 600 }}>{t('reports.net_income')}</div>
+                                        <small className="text-muted">{t('reports.revenue_expenses')}</small>
                                     </div>
                                 </div>
                                 <div className="col-md-3">
@@ -185,8 +185,8 @@ const KPIDashboard = () => {
                                         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: ratios.profitMargin >= 0 ? '#2e7d32' : '#c62828' }}>
                                             {ratios.profitMargin.toFixed(1)}%
                                         </div>
-                                        <div style={{ fontWeight: 600 }}>{isRTL ? 'هامش الربح' : 'Profit Margin'}</div>
-                                        <small className="text-muted">{isRTL ? 'صافي الدخل / الإيرادات' : 'Net Income / Revenue'}</small>
+                                        <div style={{ fontWeight: 600 }}>{t('reports.profit_margin')}</div>
+                                        <small className="text-muted">{t('reports.net_income_revenue')}</small>
                                     </div>
                                 </div>
                                 <div className="col-md-3">
@@ -194,8 +194,8 @@ const KPIDashboard = () => {
                                         <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>
                                             {ratios.currentRatio.toFixed(2)}x
                                         </div>
-                                        <div style={{ fontWeight: 600 }}>{isRTL ? 'نسبة التداول' : 'Current Ratio'}</div>
-                                        <small className="text-muted">{isRTL ? 'الأصول المتداولة / الخصوم المتداولة' : 'Current Assets / Current Liabilities'}</small>
+                                        <div style={{ fontWeight: 600 }}>{t('reports.current_ratio')}</div>
+                                        <small className="text-muted">{t('reports.current_assets_current_liabilities')}</small>
                                     </div>
                                 </div>
                                 <div className="col-md-3">
@@ -203,8 +203,8 @@ const KPIDashboard = () => {
                                         <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>
                                             {ratios.arTurnover.toFixed(1)}x
                                         </div>
-                                        <div style={{ fontWeight: 600 }}>{isRTL ? 'دوران الذمم' : 'AR Turnover'}</div>
-                                        <small className="text-muted">{isRTL ? 'المبيعات / متوسط الذمم' : 'Sales / Avg. AR'}</small>
+                                        <div style={{ fontWeight: 600 }}>{t('reports.ar_turnover')}</div>
+                                        <small className="text-muted">{t('reports.sales_avg_ar')}</small>
                                     </div>
                                 </div>
                             </div>
@@ -213,22 +213,22 @@ const KPIDashboard = () => {
 
                     {/* Accounting Reference */}
                     <div className="section-card" style={{ background: '#f0f7ff', border: '1px dashed #90caf9' }}>
-                        <h5 style={{ color: '#1565c0' }}>{isRTL ? 'المرجعية المحاسبية' : 'Accounting Reference'}</h5>
+                        <h5 style={{ color: '#1565c0' }}>{t('reports.accounting_reference')}</h5>
                         <div className="row g-3">
                             <div className="col-md-6">
                                 <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                     <thead>
                                         <tr>
-                                            <th>{isRTL ? 'المؤشر' : 'KPI'}</th>
-                                            <th>{isRTL ? 'المعيار' : 'Standard'}</th>
-                                            <th>{isRTL ? 'الحسابات' : 'GL Accounts'}</th>
+                                            <th>{t('reports.kpi')}</th>
+                                            <th>{t('reports.standard')}</th>
+                                            <th>{t('reports.gl_accounts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td>{isRTL ? 'الإيرادات' : 'Revenue'}</td><td>IFRS 15</td><td>4000-4999</td></tr>
-                                        <tr><td>{isRTL ? 'المصروفات' : 'Expenses'}</td><td>IAS 1</td><td>5000-6999</td></tr>
-                                        <tr><td>{isRTL ? 'ذمم مدينة' : 'AR'}</td><td>IFRS 9</td><td>1200-1299</td></tr>
-                                        <tr><td>{isRTL ? 'ذمم دائنة' : 'AP'}</td><td>IAS 37</td><td>2100-2199</td></tr>
+                                        <tr><td>{t('reports.revenue')}</td><td>IFRS 15</td><td>4000-4999</td></tr>
+                                        <tr><td>{t('reports.expenses')}</td><td>IAS 1</td><td>5000-6999</td></tr>
+                                        <tr><td>{t('reports.accounts_receivable_abbr')}</td><td>IFRS 9</td><td>1200-1299</td></tr>
+                                        <tr><td>{t('reports.accounts_payable_abbr')}</td><td>IAS 37</td><td>2100-2199</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -236,16 +236,16 @@ const KPIDashboard = () => {
                                 <table className="data-table" style={{ fontSize: '0.85rem' }}>
                                     <thead>
                                         <tr>
-                                            <th>{isRTL ? 'المؤشر' : 'KPI'}</th>
-                                            <th>{isRTL ? 'المعيار' : 'Standard'}</th>
-                                            <th>{isRTL ? 'الحسابات' : 'GL Accounts'}</th>
+                                            <th>{t('reports.kpi')}</th>
+                                            <th>{t('reports.standard')}</th>
+                                            <th>{t('reports.gl_accounts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr><td>{isRTL ? 'النقد' : 'Cash'}</td><td>IAS 7</td><td>1000-1100</td></tr>
-                                        <tr><td>{isRTL ? 'المخزون' : 'Inventory'}</td><td>IAS 2</td><td>1400-1499</td></tr>
-                                        <tr><td>{isRTL ? 'الأجور' : 'Payroll'}</td><td>IAS 19</td><td>5100-5199</td></tr>
-                                        <tr><td>{isRTL ? 'الإيجارات' : 'Leases'}</td><td>IFRS 16</td><td>1600, 2300</td></tr>
+                                        <tr><td>{t('reports.cash')}</td><td>IAS 7</td><td>1000-1100</td></tr>
+                                        <tr><td>{t('reports.inventory')}</td><td>IAS 2</td><td>1400-1499</td></tr>
+                                        <tr><td>{t('reports.payroll')}</td><td>IAS 19</td><td>5100-5199</td></tr>
+                                        <tr><td>{t('reports.leases')}</td><td>IFRS 16</td><td>1600, 2300</td></tr>
                                     </tbody>
                                 </table>
                             </div>

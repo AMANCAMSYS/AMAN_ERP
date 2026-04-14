@@ -336,6 +336,73 @@ def cleanup_expired_blacklist():
         logger.warning(f"Blacklist cleanup failed: {e}")
 
 
+# ============ SEC-FIX-007: User-level token invalidation ============
+
+def invalidate_user_tokens(company_id: str, username: str, reason: str = "password_change"):
+    """
+    Invalidate ALL tokens for a specific user.
+    Uses Redis for fast checks + DB persistence.
+    """
+    invalidated_at = int(datetime.now(timezone.utc).timestamp())
+
+    # Redis: set invalidation timestamp (fast path)
+    r = _get_rate_redis()
+    if r is not None:
+        try:
+            # Key expires after max token lifetime (refresh token days)
+            ttl = getattr(settings, 'REFRESH_TOKEN_EXPIRE_DAYS', 7) * 86400
+            r.setex(f"tok_inv:{company_id}:{username}", ttl, str(invalidated_at))
+        except Exception as e:
+            logger.warning(f"Redis token invalidation failed: {e}")
+
+    # DB: persist for Redis-down scenario
+    try:
+        _ensure_blacklist_table()
+        sentinel_hash = hashlib.sha256(
+            f"user_inv:{company_id}:{username}:{invalidated_at}".encode()
+        ).hexdigest()
+        from database import engine as sys_engine
+        with sys_engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO token_blacklist (token_hash, expires_at, username, reason)
+                VALUES (:hash, :exp, :user, :reason)
+                ON CONFLICT (token_hash) DO NOTHING
+            """), {
+                "hash": sentinel_hash,
+                "exp": datetime.now(timezone.utc) + timedelta(days=getattr(settings, 'REFRESH_TOKEN_EXPIRE_DAYS', 7)),
+                "user": f"{company_id}:{username}",
+                "reason": reason
+            })
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"DB token invalidation failed: {e}")
+
+    # Deactivate all sessions in company DB
+    try:
+        company_db = get_db_connection(company_id)
+        company_db.execute(text("""
+            UPDATE user_sessions SET is_active = FALSE
+            WHERE user_id = (SELECT id FROM company_users WHERE username = :uname LIMIT 1)
+        """), {"uname": username})
+        company_db.commit()
+        company_db.close()
+    except Exception as e:
+        logger.warning(f"Session deactivation failed: {e}")
+
+
+def _is_user_tokens_invalidated(company_id: str, username: str, token_iat: int) -> bool:
+    """Check if user's tokens were invalidated after this token was issued."""
+    r = _get_rate_redis()
+    if r is not None:
+        try:
+            inv_ts = r.get(f"tok_inv:{company_id}:{username}")
+            if inv_ts and token_iat < int(inv_ts):
+                return True
+        except Exception:
+            pass
+    return False
+
+
 # Legacy compatibility alias
 token_blacklist = _token_blacklist_cache
 
@@ -408,7 +475,7 @@ async def login(
                 logger.critical("⚠️ ADMIN_PASSWORD_HASH not configured! Admin login DISABLED.")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Admin password not configured. Set ADMIN_PASSWORD_HASH in .env"
+                    detail="خطأ في تسجيل الدخول. يرجى التواصل مع مسؤول النظام"
                 )
             
             if not verify_pwd(form_data.password, admin_hash):
@@ -418,6 +485,39 @@ async def login(
                     detail="كلمة المرور غير صحيحة",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
+            
+            # SEC-FIX: Require TOTP for admin when ADMIN_TOTP_SECRET is configured (RT-003)
+            admin_totp_secret = getattr(settings, 'ADMIN_TOTP_SECRET', None) or os.environ.get('ADMIN_TOTP_SECRET')
+            if admin_totp_secret:
+                # Check if 2FA code was provided via company_code field (reused for admin TOTP)
+                totp_code = company_code  # Admin doesn't need company_code, reuse for TOTP
+                if not totp_code:
+                    clear_failed_attempts(request, form_data.username)
+                    # Return 2FA challenge
+                    temp_payload = {
+                        "sub": form_data.username,
+                        "token_use": "2fa_challenge",
+                        "type": "admin_2fa_temp",
+                    }
+                    temp_token = jwt.encode(
+                        {**temp_payload, "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+                         "iat": datetime.now(timezone.utc)},
+                        settings.SECRET_KEY, algorithm=settings.ALGORITHM
+                    )
+                    return {
+                        "requires_2fa": True,
+                        "temp_token": temp_token,
+                        "message": "يرجى إدخال رمز المصادقة الثنائية للمسؤول"
+                    }
+                else:
+                    import pyotp
+                    totp = pyotp.TOTP(admin_totp_secret)
+                    if not totp.verify(totp_code, valid_window=1):
+                        record_failed_attempt(request, form_data.username)
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="رمز المصادقة الثنائية غير صحيح",
+                        )
             
             clear_failed_attempts(request, form_data.username)
             auth_payload = {
@@ -491,6 +591,37 @@ async def login(
                         detail="اسم المستخدم أو كلمة المرور غير صحيحة",
                         headers={"WWW-Authenticate": "Bearer"}
                     )
+
+                # ── SEC-FIX: 2FA Challenge ──────────────────────────────────
+                # Check if user has 2FA enabled — if so, return temp token instead of full JWT
+                try:
+                    tfa_row = company_conn.execute(
+                        text("SELECT is_enabled FROM user_2fa_settings WHERE user_id = :uid"),
+                        {"uid": result[0]}
+                    ).fetchone()
+                    if tfa_row and tfa_row.is_enabled:
+                        # Issue a short-lived temp token for 2FA verification (5 min)
+                        temp_payload = {
+                            "sub": result[1],
+                            "user_id": result[0],
+                            "company_id": company_id,
+                            "token_use": "2fa_challenge",
+                            "type": "2fa_temp",
+                        }
+                        temp_token = jwt.encode(
+                            {**temp_payload, "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+                             "iat": datetime.now(timezone.utc)},
+                            settings.SECRET_KEY, algorithm=settings.ALGORITHM
+                        )
+                        clear_failed_attempts(request, form_data.username)
+                        company_engine.dispose()
+                        return {
+                            "requires_2fa": True,
+                            "temp_token": temp_token,
+                            "message": "يرجى إدخال رمز المصادقة الثنائية"
+                        }
+                except Exception as tfa_err:
+                    logger.warning(f"2FA check failed, proceeding without 2FA: {tfa_err}")
 
                 # ── تسجيل الدخول ناجح ──────────────────────────────────────
                 company_conn.execute(
@@ -636,6 +767,24 @@ async def login(
                 clear_failed_attempts(request, form_data.username)
                 logger.info(f"✅ Login: {result[1]} -> company:{company_id}")
 
+                # SEC-FIX-006: Record session in user_sessions table
+                try:
+                    session_token_hash = _hash_token(access_token)
+                    user_agent = request.headers.get("user-agent", "")[:500]
+                    client_ip = _get_client_ip(request)
+                    company_conn.execute(text("""
+                        INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, login_time, last_activity, is_active)
+                        VALUES (:uid, :thash, :ip, :ua, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE)
+                    """), {
+                        "uid": result[0],
+                        "thash": session_token_hash,
+                        "ip": client_ip,
+                        "ua": user_agent
+                    })
+                    company_conn.commit()
+                except Exception as sess_err:
+                    logger.warning(f"Failed to create user_session: {sess_err}")
+
                 return Token(
                     access_token=access_token,
                     refresh_token=refresh_token,
@@ -663,7 +812,7 @@ async def login(
         except Exception as e:
             logger.error(f"Login error for company {company_id}: {e}")
             import traceback
-            traceback.print_exc()
+            logger.exception("Unexpected error")
             raise HTTPException(status_code=500, detail="خطأ في الخادم أثناء تسجيل الدخول")
 
     finally:
@@ -696,6 +845,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         is_system_admin = payload.get("type") == "system_admin"
         if not is_system_admin and company_id is None:
             raise credentials_exception
+
+        # SEC-FIX-007: Check user-level token invalidation (password change/reset)
+        if not is_system_admin and company_id and username:
+            token_iat = payload.get("iat", 0)
+            if _is_user_tokens_invalidated(company_id, username, token_iat):
+                raise credentials_exception
             
     except JWTError as e:
         logger.warning(f"Token decode failed: {e}")
@@ -964,6 +1119,24 @@ async def logout(
     add_token_to_blacklist(token, username=username, reason="logout")
     if body and body.refresh_token:
         add_token_to_blacklist(body.refresh_token, username=username, reason="logout_refresh")
+
+    # SEC-FIX: Deactivate user session on logout
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"verify_exp": False})
+        company_id = payload.get("company_id")
+        user_id = payload.get("user_id")
+        if company_id and user_id:
+            token_hash = _hash_token(token)
+            with get_db_connection(company_id) as sess_conn:
+                sess_conn.execute(text("""
+                    UPDATE user_sessions SET is_active = FALSE
+                    WHERE user_id = :uid AND token_hash = :thash
+                """), {"uid": user_id, "thash": token_hash})
+                sess_conn.commit()
+    except Exception as e:
+        logger.warning(f"Session deactivation on logout failed: {e}")
+
     return {"message": "تم تسجيل الخروج بنجاح"}
 
 
@@ -1002,7 +1175,30 @@ async def refresh_token(
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
-        
+
+        # SEC-FIX: Re-verify user is still active in DB before issuing new tokens
+        company_id = payload.get("company_id")
+        user_id = payload.get("user_id")
+        if company_id and user_id:
+            try:
+                with get_db_connection(company_id) as check_conn:
+                    active = check_conn.execute(
+                        text("SELECT is_active FROM company_users WHERE id = :uid"),
+                        {"uid": user_id}
+                    ).scalar()
+                    if not active:
+                        raise credentials_exception
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning(f"Could not verify user active status during refresh: {e}")
+
+        # SEC-FIX: Check user-level token invalidation
+        if company_id and username:
+            token_iat = payload.get("iat", 0)
+            if _is_user_tokens_invalidated(company_id, username, token_iat):
+                raise credentials_exception
+
         # Create new token with same claims but fresh expiry
         new_payload = {
             "sub": payload.get("sub"),
@@ -1232,12 +1428,51 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         try:
             company_db = get_db_connection(company_id)
             new_hash = hash_password(body.new_password)
+
+            # SEC-FIX: Check password history to prevent reuse
+            try:
+                from routers.security import get_password_policy
+                policy = get_password_policy(company_db)
+                prevent_reuse = policy.get("prevent_reuse", 5)
+                if prevent_reuse > 0:
+                    user_row = company_db.execute(
+                        text("SELECT id FROM company_users WHERE username = :user"),
+                        {"user": username}
+                    ).fetchone()
+                    if user_row:
+                        old_passwords = company_db.execute(text("""
+                            SELECT password_hash FROM password_history
+                            WHERE user_id = :uid ORDER BY created_at DESC LIMIT :limit
+                        """), {"uid": user_row[0], "limit": prevent_reuse}).fetchall()
+                        for old_pw in old_passwords:
+                            if verify_password(body.new_password, old_pw[0]):
+                                raise HTTPException(400, f"لا يمكن استخدام كلمة مرور مستخدمة في آخر {prevent_reuse} مرات")
+            except HTTPException:
+                raise
+            except Exception as hist_err:
+                logger.warning(f"Password history check skipped: {hist_err}")
+
             company_db.execute(
                 text("UPDATE company_users SET password = :pwd, updated_at = CURRENT_TIMESTAMP WHERE username = :user"),
                 {"pwd": new_hash, "user": username}
             )
+            # Save to password history
+            try:
+                user_id = company_db.execute(
+                    text("SELECT id FROM company_users WHERE username = :user"),
+                    {"user": username}
+                ).scalar()
+                if user_id:
+                    company_db.execute(text("""
+                        INSERT INTO password_history (user_id, password_hash)
+                        VALUES (:uid, :pw)
+                    """), {"uid": user_id, "pw": new_hash})
+            except Exception:
+                logger.warning("Failed to save password history for reset")
             company_db.commit()
             company_db.close()
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to update password: {e}")
             raise HTTPException(500, "فشل في تحديث كلمة المرور")
@@ -1248,8 +1483,9 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         ), {"hash": token_hash})
         conn.commit()
 
-        # Blacklist all existing tokens for this user
-        # (force re-login after password change)
+        # SEC-FIX-007: Invalidate all existing tokens for this user
+        invalidate_user_tokens(company_id, username, reason="password_reset")
+
         log_system_activity(
             action="auth.password_reset",
             performed_by=username,
@@ -1258,6 +1494,185 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         )
 
         return {"message": "تم تغيير كلمة المرور بنجاح. يرجى تسجيل الدخول"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SEC-FIX: 2FA LOGIN VERIFICATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TwoFALoginRequest(BaseModel):
+    temp_token: str
+    code: str
+
+
+@router.post("/2fa/verify-login")
+@limiter.limit("10/minute")
+async def verify_2fa_login(request: Request, body: TwoFALoginRequest):
+    """
+    التحقق من رمز 2FA بعد تسجيل الدخول الأولي
+    يُستخدم بعد أن يعيد /auth/login الحقل requires_2fa: true
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="رمز التحقق غير صالح أو منتهي",
+    )
+
+    try:
+        payload = jwt.decode(body.temp_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("token_use") != "2fa_challenge":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    username = payload.get("sub")
+    user_id = payload.get("user_id")
+    company_id = payload.get("company_id")
+
+    if not all([username, user_id, company_id]):
+        raise credentials_exception
+
+    with get_db_connection(company_id) as company_conn:
+        # Verify TOTP code
+        tfa_row = company_conn.execute(
+            text("SELECT secret_key FROM user_2fa_settings WHERE user_id = :uid AND is_enabled = TRUE"),
+            {"uid": user_id}
+        ).fetchone()
+
+        if not tfa_row:
+            raise credentials_exception
+
+        import pyotp
+        totp = pyotp.TOTP(tfa_row.secret_key)
+        if not totp.verify(body.code, valid_window=1):
+            record_failed_attempt(request, username)
+            raise HTTPException(status_code=401, detail="رمز المصادقة الثنائية غير صحيح")
+
+        clear_failed_attempts(request, username)
+
+        # Now complete the full login: fetch user data and issue full JWT
+        result = company_conn.execute(
+            text("""
+                SELECT id, username, email, full_name, role, permissions, is_active
+                FROM company_users WHERE id = :uid AND is_active = true
+            """),
+            {"uid": user_id}
+        ).fetchone()
+
+        if not result:
+            raise credentials_exception
+
+        company_conn.execute(
+            text("UPDATE company_users SET last_login = :now WHERE id = :uid"),
+            {"now": datetime.now(timezone.utc), "uid": user_id}
+        )
+
+        allowed_branches_rows = company_conn.execute(
+            text("SELECT branch_id FROM user_branches WHERE user_id = :uid"),
+            {"uid": user_id}
+        ).fetchall()
+        allowed_branches = [r[0] for r in allowed_branches_rows] if allowed_branches_rows else []
+
+        # Permissions
+        role_permissions = []
+        if result[4]:  # role
+            try:
+                role_res = company_conn.execute(
+                    text("SELECT permissions FROM roles WHERE role_name = :r"),
+                    {"r": result[4]}
+                ).scalar()
+                if role_res:
+                    role_permissions = role_res
+            except Exception:
+                pass
+
+        user_permissions = result[5]
+        if isinstance(user_permissions, dict) and user_permissions.get('all') is True:
+            user_permissions = ["*"]
+        elif not isinstance(user_permissions, list):
+            user_permissions = []
+
+        final_permissions = list(set((role_permissions or []) + user_permissions))
+        if result[4] in ['admin', 'system_admin', 'superuser'] or result[1] == 'admin':
+            final_permissions = ["*"]
+        elif "*" in final_permissions:
+            final_permissions = ["*"]
+
+        # Company info
+        db = get_system_db()
+        try:
+            company_info = db.execute(
+                text("SELECT currency, enabled_modules, company_name FROM system_companies WHERE id = :id"),
+                {"id": company_id}
+            ).fetchone()
+            currency = company_info[0] if company_info else "SAR"
+            enabled_modules = company_info[1] if company_info and company_info[1] else []
+            if isinstance(enabled_modules, str):
+                import json
+                try:
+                    enabled_modules = json.loads(enabled_modules)
+                except Exception:
+                    enabled_modules = []
+        finally:
+            db.close()
+
+        auth_payload = {
+            "sub": result[1],
+            "user_id": result[0],
+            "company_id": company_id,
+            "role": result[4],
+            "permissions": final_permissions,
+            "enabled_modules": enabled_modules,
+            "allowed_branches": allowed_branches,
+            "type": "company_user"
+        }
+        access_token = create_access_token(auth_payload)
+        refresh_token = create_refresh_token(auth_payload)
+
+        try:
+            log_activity(
+                company_conn,
+                user_id=result[0],
+                username=result[1],
+                action="auth.login_2fa",
+                resource_type="user",
+                resource_id=str(result[0]),
+                details={"method": "2fa"},
+                request=request,
+            )
+            company_conn.commit()
+        except Exception as log_err:
+            logger.warning(f"2FA login audit log failed: {log_err}")
+
+        # Record session
+        try:
+            session_token_hash = _hash_token(access_token)
+            user_agent = request.headers.get("user-agent", "")[:500]
+            client_ip = _get_client_ip(request)
+            company_conn.execute(text("""
+                INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, login_time, last_activity, is_active)
+                VALUES (:uid, :thash, :ip, :ua, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE)
+            """), {"uid": result[0], "thash": session_token_hash, "ip": client_ip, "ua": user_agent})
+            company_conn.commit()
+        except Exception as sess_err:
+            logger.warning(f"Failed to create 2FA user_session: {sess_err}")
+
+        return Token(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user={
+                "id": result[0],
+                "username": result[1],
+                "email": result[2],
+                "full_name": result[3],
+                "role": result[4],
+                "permissions": final_permissions,
+                "enabled_modules": enabled_modules,
+                "allowed_branches": allowed_branches,
+            },
+            company_id=company_id
+        )
+
 
 def get_current_user_company(current_user: UserResponse = Depends(get_current_user)):
     """Dependency that ensures a user is linked to a company and returns that company_id"""

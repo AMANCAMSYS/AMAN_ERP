@@ -53,7 +53,7 @@ const PayrollList = () => {
             fetchPeriods();
             setFormData({ name: '', start_date: '', end_date: '', payment_date: '' });
         } catch (err) {
-            toastEmitter.emit("Error creating period: " + (err.response?.data?.detail || err.message), 'error');
+            toastEmitter.emit(t('hr.payroll.error_creating_period') + (err.response?.data?.detail || err.message), 'error');
         }
     };
 

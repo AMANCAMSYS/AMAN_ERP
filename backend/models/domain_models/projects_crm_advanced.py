@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, Date
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -73,3 +73,62 @@ class CrmSalesForecast(ModelBase):
     branch_id: Mapped[int | None] = mapped_column(Integer)
     created_by: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Campaign(ModelBase):
+    """Marketing campaign with segment targeting, scheduling, and engagement tracking."""
+    __tablename__ = "marketing_campaigns"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    campaign_type: Mapped[str | None] = mapped_column(String(20), default="email")
+    segment_id: Mapped[int | None] = mapped_column(ForeignKey("crm_customer_segments.id", ondelete="SET NULL"))
+    subject: Mapped[str | None] = mapped_column(String(500))
+    content: Mapped[str | None] = mapped_column(Text)
+    scheduled_date: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    executed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str | None] = mapped_column(String(20), default="draft")
+    total_sent: Mapped[int | None] = mapped_column(Integer, default=0)
+    total_delivered: Mapped[int | None] = mapped_column(Integer, default=0)
+    total_opened: Mapped[int | None] = mapped_column(Integer, default=0)
+    total_clicked: Mapped[int | None] = mapped_column(Integer, default=0)
+    total_responded: Mapped[int | None] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    actual_cost: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    budget: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    target_audience: Mapped[str | None] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    start_date: Mapped[str | None] = mapped_column(String(20))
+    end_date: Mapped[str | None] = mapped_column(String(20))
+    branch_id: Mapped[int | None] = mapped_column(Integer)
+    created_by: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CampaignRecipient(ModelBase):
+    """Per-recipient delivery and engagement tracking for campaigns."""
+    __tablename__ = "campaign_recipients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
+    contact_id: Mapped[int] = mapped_column(ForeignKey("parties.id", ondelete="CASCADE"), nullable=False)
+    channel: Mapped[str | None] = mapped_column(String(10), default="email")
+    delivery_status: Mapped[str | None] = mapped_column(String(20), default="pending")
+    opened_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    clicked_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    responded_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CampaignLeadAttribution(ModelBase):
+    """Attributes a CRM lead/opportunity to a specific campaign."""
+    __tablename__ = "campaign_lead_attributions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("marketing_campaigns.id", ondelete="CASCADE"), nullable=False)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("sales_opportunities.id", ondelete="CASCADE"), nullable=False)
+    attributed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())

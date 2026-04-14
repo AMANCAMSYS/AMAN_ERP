@@ -42,21 +42,21 @@ class EmailService:
 
             if self.use_tls:
                 context = ssl.create_default_context()
-                with smtplib.SMTP(self.host, self.port) as server:
+                with smtplib.SMTP(self.host, self.port, timeout=30) as server:
                     server.ehlo()
                     server.starttls(context=context)
                     server.ehlo()
                     server.login(self.username, self.password)
                     server.sendmail(self.from_email, to, msg.as_string())
             else:
-                with smtplib.SMTP_SSL(self.host, self.port) as server:
+                with smtplib.SMTP_SSL(self.host, self.port, timeout=30) as server:
                     server.login(self.username, self.password)
                     server.sendmail(self.from_email, to, msg.as_string())
 
             logger.info(f"✅ Email sent to {to}: {subject}")
             return True
         except Exception as e:
-            logger.error(f"❌ Email send failed to {to}: {str(e)}")
+            logger.exception(f"Email send failed to {to}")
             return False
 
     def send_bulk(self, recipients: List[str], subject: str, html_body: str) -> dict:

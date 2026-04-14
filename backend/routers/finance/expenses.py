@@ -222,7 +222,7 @@ async def get_expenses_summary(
 
 # ===================== C1: Expense Policies =====================
 
-@router.get("/policies")
+@router.get("/policies", dependencies=[Depends(require_permission("expenses.view"))])
 def list_expense_policies(current_user=Depends(get_current_user)):
     """سياسات المصروفات"""
     db = get_db_connection(current_user.company_id)
@@ -238,7 +238,7 @@ def list_expense_policies(current_user=Depends(get_current_user)):
         db.close()
 
 
-@router.post("/policies")
+@router.post("/policies", dependencies=[Depends(require_permission("expenses.manage"))])
 def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
     """إنشاء سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
@@ -262,12 +262,13 @@ def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
         return {"id": pid, "message": "تم إنشاء سياسة المصروفات بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.put("/policies/{policy_id}")
+@router.put("/policies/{policy_id}", dependencies=[Depends(require_permission("expenses.manage"))])
 def update_expense_policy(policy_id: int, policy: dict, current_user=Depends(get_current_user)):
     """تحديث سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
@@ -291,12 +292,13 @@ def update_expense_policy(policy_id: int, policy: dict, current_user=Depends(get
         return {"message": "تم تحديث السياسة بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
 
-@router.delete("/policies/{policy_id}")
+@router.delete("/policies/{policy_id}", dependencies=[Depends(require_permission("expenses.manage"))])
 def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)):
     """حذف سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
@@ -306,7 +308,8 @@ def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)
         return {"message": "تم حذف السياسة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -566,7 +569,8 @@ async def create_expense(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating expense: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -628,7 +632,8 @@ async def update_expense(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -766,7 +771,8 @@ async def approve_expense(
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving expense: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -805,7 +811,8 @@ async def delete_expense(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 

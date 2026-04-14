@@ -7,13 +7,15 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.audit import log_activity
+from utils.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +106,10 @@ def _get_company_id(current_user) -> str:
 
 @router.post("/sync", response_model=SyncBatchResponse,
              dependencies=[Depends(require_permission("mobile.sync"))])
+@limiter.limit("30/minute")
 async def batch_sync(
     body: SyncBatchRequest,
+    request: Request,
     current_user=Depends(get_current_user),
 ):
     """Sync a batch of offline changes from mobile device."""
@@ -187,10 +191,19 @@ async def batch_sync(
                     logger.warning("Sync item %d failed: %s", idx, exc)
                     errors += 1
                     results.append(SyncResultItem(
-                        index=idx, status="error", message=str(exc)[:200],
+                        index=idx, status="error", message="حدث خطأ أثناء المزامنة",
                     ))
     finally:
         conn.close()
+
+    log_activity(
+        user_id=user_id,
+        username=getattr(current_user, "username", ""),
+        action="mobile_batch_sync",
+        resource_type="sync",
+        details={"device_id": body.device_id, "synced": synced, "conflicts": conflicts, "errors": errors},
+        request=request,
+    )
 
     return SyncBatchResponse(synced=synced, conflicts=conflicts, errors=errors, results=results)
 
@@ -235,6 +248,7 @@ async def sync_status(
              dependencies=[Depends(require_permission("mobile.sync"))])
 async def resolve_conflict(
     body: ConflictResolveRequest,
+    request: Request,
     current_user=Depends(get_current_user),
 ):
     company_id = _get_company_id(current_user)
@@ -277,6 +291,16 @@ async def resolve_conflict(
             """), {"sid": body.sync_queue_id, "res": f'"{body.resolution}"'})
     finally:
         conn.close()
+
+    log_activity(
+        user_id=current_user.id,
+        username=getattr(current_user, "username", ""),
+        action="mobile_resolve_conflict",
+        resource_type="sync",
+        resource_id=str(body.sync_queue_id),
+        details={"resolution": body.resolution},
+        request=request,
+    )
 
     return {"status": "resolved", "resolution": body.resolution}
 
@@ -444,21 +468,9 @@ async def register_device(
     conn = get_db_connection(company_id)
     try:
         with conn.begin():
-            # Ensure push_devices table exists
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS push_devices (
-                    id SERIAL PRIMARY KEY,
-                    device_id VARCHAR(255) NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    platform VARCHAR(10) NOT NULL CHECK (platform IN ('ios', 'android')),
-                    fcm_token VARCHAR(500) NOT NULL,
-                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                    last_seen_at TIMESTAMPTZ DEFAULT NOW(),
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    UNIQUE(device_id, user_id)
-                )
-            """))
+            # NOTE: push_devices table must be created via Alembic migration,
+            # not via DDL here.  The migration should include:
+            #   CREATE TABLE push_devices ( ... UNIQUE(device_id, user_id) )
             # Upsert device registration into dedicated push_devices table
             conn.execute(text("""
                 INSERT INTO push_devices
@@ -496,11 +508,32 @@ def _json_dumps(obj) -> str:
 
 # Entity table mapping for conflict detection & sync application
 _ENTITY_TABLE_MAP = {
-    "quotation": {"table": "sales_quotations", "id_col": "id"},
-    "sales_order": {"table": "sales_orders", "id_col": "id"},
-    "approval": {"table": "approval_requests", "id_col": "id"},
-    "inventory_adjustment": {"table": "stock_adjustments", "id_col": "id"},
+    "quotation": {
+        "table": "sales_quotations", "id_col": "id",
+        "allowed_cols": {"quotation_number", "customer_id", "party_id", "quotation_date",
+                         "valid_until", "subtotal", "tax_amount", "discount", "total",
+                         "status", "notes", "branch_id", "currency"},
+    },
+    "sales_order": {
+        "table": "sales_orders", "id_col": "id",
+        "allowed_cols": {"so_number", "customer_id", "party_id", "order_date",
+                         "subtotal", "tax_amount", "discount", "total",
+                         "status", "notes", "branch_id", "currency"},
+    },
+    "approval": {
+        "table": "approval_requests", "id_col": "id",
+        "allowed_cols": {"status", "current_step", "notes", "description"},
+    },
+    "inventory_adjustment": {
+        "table": "stock_adjustments", "id_col": "id",
+        "allowed_cols": {"warehouse_id", "product_id", "quantity", "adjustment_type",
+                         "reason", "notes", "status", "branch_id"},
+    },
 }
+
+# Regex pattern for valid SQL column names (alphanumeric + underscore only)
+import re
+_VALID_COL_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def _check_conflict(conn, entity_type: str, entity_id: int, device_timestamp: datetime) -> tuple[bool, dict | None]:
@@ -544,13 +577,18 @@ def _apply_sync_item_raw(conn, entity_type: str, entity_id: int | None, payload:
 
     table = mapping["table"]
     id_col = mapping["id_col"]
+    allowed_cols = mapping.get("allowed_cols", set())
 
-    # Filter payload to only include safe/known columns  
-    # For now, store the payload in a generic way — the actual column mapping  
-    # depends on the entity type and should be validated per-table
+    # Filter payload to only include safe/known columns — prevents SQL injection
+    # via malicious column names in the payload keys
     if entity_id and entity_type != "create":
         # UPDATE — set updated_at and updated_by
-        safe_cols = {k: v for k, v in payload.items() if k not in ("id", "created_at", "created_by")}
+        safe_cols = {
+            k: v for k, v in payload.items()
+            if k not in ("id", "created_at", "created_by")
+            and k in allowed_cols
+            and _VALID_COL_RE.match(k)
+        }
         if safe_cols:
             set_clause = ", ".join(f"{k} = :{k}" for k in safe_cols)
             safe_cols[id_col] = entity_id
@@ -563,7 +601,12 @@ def _apply_sync_item_raw(conn, entity_type: str, entity_id: int | None, payload:
         return entity_id
     else:
         # CREATE — use payload fields
-        safe_cols = {k: v for k, v in payload.items() if k not in ("id", "created_at", "updated_at")}
+        safe_cols = {
+            k: v for k, v in payload.items()
+            if k not in ("id", "created_at", "updated_at")
+            and k in allowed_cols
+            and _VALID_COL_RE.match(k)
+        }
         safe_cols["created_by"] = str(user_id)
         safe_cols["updated_by"] = str(user_id)
         if safe_cols:

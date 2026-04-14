@@ -22,6 +22,7 @@ from utils.accounting import (
 )
 from utils.fiscal_lock import check_fiscal_period_open, create_fiscal_lock_table
 from utils.duplicate_detection import find_duplicate_parties, find_duplicate_products
+import logging
 
 router = APIRouter(tags=["System Completion"])
 logger = logging.getLogger(__name__)
@@ -173,7 +174,8 @@ async def import_bank_statement(
                 imported += 1
 
             except Exception as e:
-                errors.append(f"سطر {idx}: {str(e)}")
+                logger.warning("Bank import line %d failed", idx, exc_info=True)
+                errors.append(f"سطر {idx}: خطأ في البيانات")
 
         # Update batch
         db.execute(text("""
@@ -198,7 +200,8 @@ async def import_bank_statement(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -332,7 +335,8 @@ def auto_match_bank_lines(batch_id: int, current_user: dict = Depends(get_curren
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -868,7 +872,8 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -936,6 +941,10 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
 
         db.commit()
 
+        log_activity(db, user_id, _u(current_user, "username", ""),
+                     "zakat.post", "zakat_calculation", str(fiscal_year),
+                     {"amount": amount, "journal_entry": je_number})
+
         return {
             "journal_entry_id": je_id,
             "entry_number": je_number,
@@ -946,7 +955,8 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1356,7 +1366,8 @@ def fx_gain_loss_report(
         }
     except Exception as e:
         logger.error(f"FX gain/loss report error: {e}")
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -1437,8 +1448,9 @@ def lock_fiscal_period(period_id: int, current_user: dict = Depends(get_current_
         """), {"uid": user_id, "id": period_id})
         db.commit()
 
-        log_activity(db, user_id, "fiscal_period.lock",
-                     f"قفل الفترة {period.period_name}", {"period_id": period_id})
+        log_activity(db, user_id, _u(current_user, "username", ""),
+                     "fiscal_period.lock", "fiscal_period", str(period_id),
+                     {"period_name": period.period_name})
 
         return {"message": f"تم قفل الفترة {period.period_name}"}
     finally:
@@ -1593,6 +1605,11 @@ def create_backup(current_user: dict = Depends(get_current_user)):
                 "uid": user_id
             })
             db.commit()
+
+            log_activity(db, user_id, _u(current_user, "username", ""),
+                         "admin.backup.create", "backup",
+                         os.path.basename(backup_file),
+                         {"file_size_mb": round(file_size / (1024 * 1024), 2)})
         finally:
             db.close()
 
@@ -1737,7 +1754,8 @@ def create_print_template(body: PrintTemplateCreate, current_user: dict = Depend
         return {"id": tmpl_id, "message": "تم إنشاء قالب الطباعة"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.exception("Internal error")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 

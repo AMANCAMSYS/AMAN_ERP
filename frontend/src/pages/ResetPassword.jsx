@@ -17,14 +17,25 @@ function ResetPassword() {
     const [error, setError] = useState('')
     const [success, setSuccess] = useState(false)
 
+    const validatePassword = (pwd) => {
+        const errors = []
+        if (pwd.length < 10) errors.push(t('reset_password.min_length', 'يجب أن تكون 10 أحرف على الأقل'))
+        if (!/[A-Z]/.test(pwd)) errors.push(t('reset_password.need_uppercase', 'يجب أن تحتوي على حرف كبير'))
+        if (!/[a-z]/.test(pwd)) errors.push(t('reset_password.need_lowercase', 'يجب أن تحتوي على حرف صغير'))
+        if (!/[0-9]/.test(pwd)) errors.push(t('reset_password.need_number', 'يجب أن تحتوي على رقم'))
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) errors.push(t('reset_password.need_special', 'يجب أن تحتوي على رمز خاص'))
+        return errors
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         if (password !== confirmPassword) {
             setError(t('reset_password.mismatch'))
             return
         }
-        if (password.length < 8) {
-            setError(t('reset_password.too_short'))
+        const pwdErrors = validatePassword(password)
+        if (pwdErrors.length > 0) {
+            setError(pwdErrors.join('\n'))
             return
         }
         setLoading(true)
@@ -77,7 +88,7 @@ function ResetPassword() {
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     required
-                                    minLength={8}
+                                    minLength={10}
                                 />
                                 <button type="button" className="btn btn-light" onClick={() => setShowPassword(prev => !prev)}>
                                     {showPassword ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}

@@ -369,7 +369,7 @@ const Payslips = () => {
 
                                     <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', borderTop: '1px dashed #d1d5db', paddingTop: 10 }}>
                                         <span>{t('hr.payslip_auto_generated')}</span>
-                                        <span>{new Date().toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')}</span>
+                                        <span>{new Date().toLocaleDateString(t('hr.enus'))}</span>
                                     </div>
                                 </div>
                             </div>

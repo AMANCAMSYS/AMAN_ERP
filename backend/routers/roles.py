@@ -14,6 +14,7 @@ from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission
 from schemas.roles import RoleCreate, RoleUpdate
+from utils.audit import log_activity
 
 router = APIRouter(prefix="/roles", tags=["إدارة الأدوار"])
 logger = logging.getLogger(__name__)
@@ -531,11 +532,19 @@ def init_default_roles(
                 created += 1
 
         db.commit()
+        log_activity(
+            db, user_id=getattr(current_user, 'id', None),
+            username=getattr(current_user, 'username', ''),
+            action="roles_init_defaults", resource_type="role",
+            resource_id="system",
+            details={"created": created, "updated": updated}
+        )
         return {"message": f"تم تحديث الأدوار الافتراضية: {created} جديد، {updated} محدث", "created": created, "updated": updated}
     except Exception as e:
         db.rollback()
         logger.error(f"Error initializing default roles: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -642,12 +651,20 @@ def create_role(
         }).fetchone()
         
         db.commit()
+        log_activity(
+            db, user_id=getattr(current_user, 'id', None),
+            username=getattr(current_user, 'username', ''),
+            action="role_create", resource_type="role",
+            resource_id=str(result[0]),
+            details={"role_name": role.role_name, "permissions_count": len(role.permissions)}
+        )
         return {"id": result[0], "message": "تم إنشاء الدور بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -697,13 +714,21 @@ def update_role(
             query = f"UPDATE roles SET {', '.join(updates)} WHERE id = :id"
             db.execute(text(query), params)
             db.commit()
+            log_activity(
+                db, user_id=getattr(current_user, 'id', None),
+                username=getattr(current_user, 'username', ''),
+                action="role_update", resource_type="role",
+                resource_id=str(role_id),
+                details={"role_name": existing.role_name, "updated_fields": list(params.keys())}
+            )
         
         return {"message": "تم تحديث الدور بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -735,14 +760,23 @@ def delete_role(
         if usage > 0:
             raise HTTPException(status_code=400, detail=f"لا يمكن حذف الدور لأنه مستخدم من قبل {usage} مستخدم")
         
+        role_name = db.execute(text("SELECT role_name FROM roles WHERE id = :id"), {"id": role_id}).scalar()
         db.execute(text("DELETE FROM roles WHERE id = :id"), {"id": role_id})
         db.commit()
+        log_activity(
+            db, user_id=getattr(current_user, 'id', None),
+            username=getattr(current_user, 'username', ''),
+            action="role_delete", resource_type="role",
+            resource_id=str(role_id),
+            details={"role_name": role_name}
+        )
         
         return {"message": "تم حذف الدور بنجاح"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

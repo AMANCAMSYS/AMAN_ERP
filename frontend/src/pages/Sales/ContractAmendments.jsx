@@ -52,7 +52,7 @@ const ContractAmendments = () => {
         e.preventDefault();
         try {
             await contractsAPI.createAmendment(selectedContract, form);
-            showToast(isRTL ? 'تم إضافة التعديل' : 'Amendment added', 'success');
+            showToast(t('sales.amendment_added'), 'success');
             setShowForm(false);
             setForm({ amendment_type: 'scope_change', description: '', old_value: '', new_value: '', effective_date: '', approved_by: '' });
             fetchData();
@@ -60,18 +60,18 @@ const ContractAmendments = () => {
     };
 
     const amendmentTypes = {
-        scope_change: { label: isRTL ? 'تغيير النطاق' : 'Scope Change', color: '#1565c0' },
-        price_adjustment: { label: isRTL ? 'تعديل السعر' : 'Price Adjustment', color: '#2e7d32' },
-        term_extension: { label: isRTL ? 'تمديد المدة' : 'Term Extension', color: '#f57f17' },
-        term_reduction: { label: isRTL ? 'تقليص المدة' : 'Term Reduction', color: '#e65100' },
-        clause_modification: { label: isRTL ? 'تعديل بند' : 'Clause Modification', color: '#7b1fa2' },
-        party_change: { label: isRTL ? 'تغيير طرف' : 'Party Change', color: '#00838f' },
-        termination: { label: isRTL ? 'إنهاء' : 'Termination', color: '#c62828' }
+        scope_change: { label: t('sales.scope_change'), color: '#1565c0' },
+        price_adjustment: { label: t('sales.price_adjustment'), color: '#2e7d32' },
+        term_extension: { label: t('sales.term_extension'), color: '#f57f17' },
+        term_reduction: { label: t('sales.term_reduction'), color: '#e65100' },
+        clause_modification: { label: t('sales.clause_modification'), color: '#7b1fa2' },
+        party_change: { label: t('sales.party_change'), color: '#00838f' },
+        termination: { label: t('sales.termination'), color: '#c62828' }
     };
 
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '—';
-        return new Intl.NumberFormat(isRTL ? 'ar-SA' : 'en-SA', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }).format(val);
+        return new Intl.NumberFormat(t('sales.ensa'), { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }).format(val);
     };
 
     return (
@@ -81,17 +81,17 @@ const ContractAmendments = () => {
                 <div>
                     <h1 className="workspace-title">
                         <FileText size={24} className="me-2" />
-                        {isRTL ? 'تعديلات العقود ومؤشرات الأداء' : 'Contract Amendments & KPIs'}
+                        {t('sales.contract_amendments_kpis')}
                     </h1>
                     <p className="workspace-subtitle">
-                        {isRTL ? 'تتبع تعديلات العقود ومؤشرات أداء العقد' : 'Track contract amendments and performance indicators'}
+                        {t('sales.track_contract_amendments_and_performance_indicato')}
                     </p>
                 </div>
             </div>
 
             {/* Contract Selector */}
             <div className="d-flex gap-3 mb-4 align-items-center">
-                <label className="form-label mb-0" style={{ whiteSpace: 'nowrap' }}>{isRTL ? 'العقد:' : 'Contract:'}</label>
+                <label className="form-label mb-0" style={{ whiteSpace: 'nowrap' }}>{t('sales.contract')}</label>
                 <select className="form-input" style={{ maxWidth: 400 }} value={selectedContract}
                     onChange={e => setSelectedContract(e.target.value)}>
                     {contracts.map(c => <option key={c.id} value={c.id}>{c.title || c.contract_number || `#${c.id}`}</option>)}
@@ -101,10 +101,10 @@ const ContractAmendments = () => {
             {/* Tabs */}
             <div className="tabs mb-4">
                 <button className={`tab ${activeTab === 'amendments' ? 'active' : ''}`} onClick={() => setActiveTab('amendments')}>
-                    <FileText size={16} /> <span className="ms-1">{isRTL ? 'التعديلات' : 'Amendments'}</span>
+                    <FileText size={16} /> <span className="ms-1">{t('sales.amendments')}</span>
                 </button>
                 <button className={`tab ${activeTab === 'kpis' ? 'active' : ''}`} onClick={() => setActiveTab('kpis')}>
-                    <BarChart3 size={16} /> <span className="ms-1">{isRTL ? 'مؤشرات الأداء' : 'KPIs'}</span>
+                    <BarChart3 size={16} /> <span className="ms-1">{t('sales.kpis')}</span>
                 </button>
             </div>
 
@@ -114,19 +114,19 @@ const ContractAmendments = () => {
                 <>
                     <div className="mb-3">
                         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-                            <Plus size={16} className="me-1" /> {isRTL ? 'إضافة تعديل' : 'Add Amendment'}
+                            <Plus size={16} className="me-1" /> {t('sales.add_amendment')}
                         </button>
                     </div>
 
                     {/* Amendment Form */}
                     {showForm && (
                         <div className="section-card mb-4">
-                            <h4 className="mb-3">{isRTL ? 'تعديل جديد' : 'New Amendment'}</h4>
+                            <h4 className="mb-3">{t('sales.new_amendment')}</h4>
                             <form onSubmit={handleSubmit}>
                                 <div className="row g-3">
                                     <div className="col-md-4">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'نوع التعديل' : 'Type'} *</label>
+                                            <label className="form-label">{t('sales.type')} *</label>
                                             <select className="form-input" required value={form.amendment_type}
                                                 onChange={e => setForm(p => ({ ...p, amendment_type: e.target.value }))}>
                                                 {Object.entries(amendmentTypes).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -135,43 +135,43 @@ const ContractAmendments = () => {
                                     </div>
                                     <div className="col-md-4">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'تاريخ السريان' : 'Effective Date'}</label>
+                                            <label className="form-label">{t('sales.effective_date')}</label>
                                             <DateInput className="form-input" value={form.effective_date}
                                                 onChange={e => setForm(p => ({ ...p, effective_date: e.target.value }))} />
                                         </div>
                                     </div>
                                     <div className="col-md-4">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'معتمد من' : 'Approved By'}</label>
+                                            <label className="form-label">{t('sales.approved_by')}</label>
                                             <input className="form-input" value={form.approved_by}
                                                 onChange={e => setForm(p => ({ ...p, approved_by: e.target.value }))} />
                                         </div>
                                     </div>
                                     <div className="col-md-6">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'القيمة القديمة' : 'Old Value'}</label>
+                                            <label className="form-label">{t('sales.old_value')}</label>
                                             <input className="form-input" value={form.old_value}
                                                 onChange={e => setForm(p => ({ ...p, old_value: e.target.value }))} />
                                         </div>
                                     </div>
                                     <div className="col-md-6">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'القيمة الجديدة' : 'New Value'}</label>
+                                            <label className="form-label">{t('sales.new_value')}</label>
                                             <input className="form-input" value={form.new_value}
                                                 onChange={e => setForm(p => ({ ...p, new_value: e.target.value }))} />
                                         </div>
                                     </div>
                                     <div className="col-md-12">
                                         <div className="form-group">
-                                            <label className="form-label">{isRTL ? 'الوصف' : 'Description'} *</label>
+                                            <label className="form-label">{t('sales.description')} *</label>
                                             <textarea className="form-input" rows={3} required value={form.description}
                                                 onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
                                         </div>
                                     </div>
                                 </div>
                                 <div className="d-flex gap-2 mt-3">
-                                    <button type="submit" className="btn btn-primary"><Save size={16} className="me-1" /> {isRTL ? 'حفظ' : 'Save'}</button>
-                                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowForm(false)}><X size={16} className="me-1" /> {isRTL ? 'إلغاء' : 'Cancel'}</button>
+                                    <button type="submit" className="btn btn-primary"><Save size={16} className="me-1" /> {t('sales.save')}</button>
+                                    <button type="button" className="btn btn-outline-secondary" onClick={() => setShowForm(false)}><X size={16} className="me-1" /> {t('sales.cancel')}</button>
                                 </div>
                             </form>
                         </div>
@@ -184,17 +184,17 @@ const ContractAmendments = () => {
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>{isRTL ? 'النوع' : 'Type'}</th>
-                                        <th>{isRTL ? 'الوصف' : 'Description'}</th>
-                                        <th>{isRTL ? 'القيمة القديمة' : 'Old Value'}</th>
-                                        <th>{isRTL ? 'القيمة الجديدة' : 'New Value'}</th>
-                                        <th>{isRTL ? 'التاريخ' : 'Effective Date'}</th>
-                                        <th>{isRTL ? 'معتمد من' : 'Approved By'}</th>
+                                        <th>{t('sales.type_2')}</th>
+                                        <th>{t('sales.description')}</th>
+                                        <th>{t('sales.old_value')}</th>
+                                        <th>{t('sales.new_value')}</th>
+                                        <th>{t('sales.effective_date_2')}</th>
+                                        <th>{t('sales.approved_by')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {amendments.length === 0 ? (
-                                        <tr><td colSpan={7} className="text-center p-4">{isRTL ? 'لا توجد تعديلات' : 'No amendments yet'}</td></tr>
+                                        <tr><td colSpan={7} className="text-center p-4">{t('sales.no_amendments_yet')}</td></tr>
                                     ) : amendments.map((a, idx) => (
                                         <tr key={a.id}>
                                             <td>{idx + 1}</td>
@@ -217,11 +217,11 @@ const ContractAmendments = () => {
 
                     {/* Accounting Note */}
                     <div className="section-card mt-4" style={{ background: '#f0f7ff', border: '1px dashed #90caf9' }}>
-                        <h5 style={{ color: '#1565c0' }}>{isRTL ? 'الأثر المحاسبي' : 'Accounting Impact'}</h5>
+                        <h5 style={{ color: '#1565c0' }}>{t('sales.accounting_impact')}</h5>
                         <ul style={{ fontSize: '0.9rem', lineHeight: 1.8 }}>
-                            <li><strong>{isRTL ? 'تعديل السعر:' : 'Price Adjustment:'}</strong> {isRTL ? 'يعدّل الإيراد / التكلفة المتبقية بأثر مستقبلي (IAS 8)' : 'Adjusts remaining revenue/cost prospectively (IAS 8)'}</li>
-                            <li><strong>{isRTL ? 'تغيير النطاق:' : 'Scope Change:'}</strong> {isRTL ? 'يُعاد حساب نسبة الإنجاز وفق IFRS 15.18' : 'Recalculates % completion per IFRS 15.18'}</li>
-                            <li><strong>{isRTL ? 'إنهاء مبكر:' : 'Early Termination:'}</strong> {isRTL ? 'يُثبت مخصص / غرامة — مدين: مصروف غرامات / دائن: مخصصات' : 'Records penalty provision — Dr. Penalty Expense / Cr. Provision for Penalties'}</li>
+                            <li><strong>{t('sales.price_adjustment_2')}</strong> {t('sales.adjusts_remaining_revenuecost_prospectively_ias_8')}</li>
+                            <li><strong>{t('sales.scope_change_2')}</strong> {t('sales.recalculates_completion_per_ifrs_1518')}</li>
+                            <li><strong>{t('sales.early_termination')}</strong> {t('sales.records_penalty_provision_dr_penalty_expense_cr_pr')}</li>
                         </ul>
                     </div>
                 </>
@@ -234,28 +234,28 @@ const ContractAmendments = () => {
                                 <div className="metric-icon" style={{ background: '#e3f2fd' }}><TrendingUp size={22} color="#1565c0" /></div>
                                 <div className="metric-info">
                                     <span className="metric-value">{(kpis.utilization_pct || 0).toFixed(1)}%</span>
-                                    <span className="metric-label">{isRTL ? 'نسبة الاستخدام' : 'Utilization %'}</span>
+                                    <span className="metric-label">{t('sales.utilization')}</span>
                                 </div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-icon" style={{ background: '#fff3e0' }}><Calendar size={22} color="#ef6c00" /></div>
                                 <div className="metric-info">
                                     <span className="metric-value">{kpis.days_remaining || 0}</span>
-                                    <span className="metric-label">{isRTL ? 'أيام متبقية' : 'Days Remaining'}</span>
+                                    <span className="metric-label">{t('sales.days_remaining')}</span>
                                 </div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-icon" style={{ background: '#e8f5e9' }}><DollarSign size={22} color="#2e7d32" /></div>
                                 <div className="metric-info">
                                     <span className="metric-value">{kpis.invoice_count || 0}</span>
-                                    <span className="metric-label">{isRTL ? 'عدد الفواتير' : 'Invoice Count'}</span>
+                                    <span className="metric-label">{t('sales.invoice_count')}</span>
                                 </div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-icon" style={{ background: '#fce4ec' }}><DollarSign size={22} color="#c62828" /></div>
                                 <div className="metric-info">
                                     <span className="metric-value">{formatCurrency(kpis.outstanding_amount)}</span>
-                                    <span className="metric-label">{isRTL ? 'المبالغ المعلقة' : 'Outstanding Amount'}</span>
+                                    <span className="metric-label">{t('sales.outstanding_amount')}</span>
                                 </div>
                             </div>
                         </div>
@@ -264,25 +264,25 @@ const ContractAmendments = () => {
                     {/* Contract financial summary */}
                     {kpis && (
                         <div className="section-card">
-                            <h4 className="mb-3">{isRTL ? 'ملخص مالي' : 'Financial Summary'}</h4>
+                            <h4 className="mb-3">{t('sales.financial_summary')}</h4>
                             <div className="row g-3">
                                 <div className="col-md-6">
                                     <table className="data-table">
                                         <tbody>
-                                            <tr><td><strong>{isRTL ? 'قيمة العقد' : 'Contract Value'}</strong></td><td>{formatCurrency(kpis.contract_value)}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'المبلغ المفوتر' : 'Invoiced Amount'}</strong></td><td>{formatCurrency(kpis.invoiced_amount)}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'المبلغ المحصل' : 'Collected Amount'}</strong></td><td>{formatCurrency(kpis.collected_amount)}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'المتبقي' : 'Outstanding'}</strong></td><td style={{ color: '#c62828' }}>{formatCurrency(kpis.outstanding_amount)}</td></tr>
+                                            <tr><td><strong>{t('sales.contract_value')}</strong></td><td>{formatCurrency(kpis.contract_value)}</td></tr>
+                                            <tr><td><strong>{t('sales.invoiced_amount')}</strong></td><td>{formatCurrency(kpis.invoiced_amount)}</td></tr>
+                                            <tr><td><strong>{t('sales.collected_amount')}</strong></td><td>{formatCurrency(kpis.collected_amount)}</td></tr>
+                                            <tr><td><strong>{t('sales.outstanding')}</strong></td><td style={{ color: '#c62828' }}>{formatCurrency(kpis.outstanding_amount)}</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
                                 <div className="col-md-6">
                                     <table className="data-table">
                                         <tbody>
-                                            <tr><td><strong>{isRTL ? 'تاريخ البدء' : 'Start Date'}</strong></td><td>{kpis.start_date || '—'}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'تاريخ الانتهاء' : 'End Date'}</strong></td><td>{kpis.end_date || '—'}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'عدد التعديلات' : 'Amendments'}</strong></td><td>{kpis.amendment_count || 0}</td></tr>
-                                            <tr><td><strong>{isRTL ? 'هامش الربح' : 'Profit Margin'}</strong></td><td>{(kpis.profit_margin || 0).toFixed(1)}%</td></tr>
+                                            <tr><td><strong>{t('sales.start_date')}</strong></td><td>{kpis.start_date || '—'}</td></tr>
+                                            <tr><td><strong>{t('sales.end_date')}</strong></td><td>{kpis.end_date || '—'}</td></tr>
+                                            <tr><td><strong>{t('sales.amendments_2')}</strong></td><td>{kpis.amendment_count || 0}</td></tr>
+                                            <tr><td><strong>{t('sales.profit_margin')}</strong></td><td>{(kpis.profit_margin || 0).toFixed(1)}%</td></tr>
                                         </tbody>
                                     </table>
                                 </div>

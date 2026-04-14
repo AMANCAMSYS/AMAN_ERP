@@ -2,9 +2,10 @@
 Inventory Module - Shared Pydantic Schemas
 """
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 from datetime import datetime
+import re
 
 
 # --- Product Schemas ---
@@ -54,6 +55,22 @@ class SupplierCreate(BaseModel):
     branch_id: Optional[int] = None
     currency: Optional[str] = None
     group_id: Optional[int] = None
+
+    @field_validator('email')
+    @classmethod
+    def email_must_be_valid(cls, v):
+        if v is not None and v != '':
+            if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', v):
+                raise ValueError("صيغة البريد الإلكتروني غير صحيحة")
+        return v
+
+    @field_validator('tax_number')
+    @classmethod
+    def tax_number_must_be_valid(cls, v):
+        if v is not None and v != '':
+            if not re.match(r'^[\d\-]{5,20}$', v):
+                raise ValueError("الرقم الضريبي يجب أن يكون أرقام فقط (5-20 خانة)")
+        return v
 
 class SupplierResponse(SupplierCreate):
     id: int

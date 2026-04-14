@@ -605,7 +605,7 @@ const ApprovalsPage = () => {
                         </label>
                         <textarea
                             className="textarea textarea-bordered h-24 focus:border-primary"
-                            placeholder={isRTL ? "أضف ملاحظاتك هنا (اختياري)..." : "Add notes here (optional)..."}
+                            placeholder={t('approvals.add_notes_placeholder')}
                             value={actionNotes}
                             onChange={(e) => setActionNotes(e.target.value)}
                         />

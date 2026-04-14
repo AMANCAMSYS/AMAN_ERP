@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
@@ -7,6 +7,7 @@ from datetime import datetime
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.audit import log_activity
 from utils.ws_manager import ws_manager
 import logging
 import asyncio
@@ -149,15 +150,18 @@ async def create_and_send_notification(
 
         # Push via WebSocket in real-time
         if notif_row:
-            asyncio.ensure_future(push_notification(company_id, data.user_id, {
-                "id": notif_row.id,
-                "title": data.title,
-                "message": data.message,
-                "link": data.link,
-                "type": data.type,
-                "is_read": False,
-                "created_at": notif_row.created_at.isoformat() if notif_row.created_at else None
-            }))
+            try:
+                await push_notification(company_id, data.user_id, {
+                    "id": notif_row.id,
+                    "title": data.title,
+                    "message": data.message,
+                    "link": data.link,
+                    "type": data.type,
+                    "is_read": False,
+                    "created_at": notif_row.created_at.isoformat() if notif_row.created_at else None
+                })
+            except Exception:
+                logger.debug("WS push during notification create failed")
 
         # 2. Send email if requested
         if data.send_email:
@@ -170,7 +174,7 @@ async def create_and_send_notification(
                 """)
                 results["email"] = send_notification_email(db, data.user_id, data.title, html)
             except Exception as e:
-                logger.error(f"Email notification failed: {str(e)}")
+                logger.exception("Email notification failed")
                 results["email"] = False
 
         # 3. Send SMS if requested
@@ -180,7 +184,7 @@ async def create_and_send_notification(
                 sms_text = f"{data.title}: {data.message or ''}"[:160]
                 results["sms"] = send_notification_sms(db, data.user_id, sms_text)
             except Exception as e:
-                logger.error(f"SMS notification failed: {str(e)}")
+                logger.exception("SMS notification failed")
                 results["sms"] = False
 
         db.commit()
@@ -189,7 +193,8 @@ async def create_and_send_notification(
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error sending notification: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -229,6 +234,7 @@ async def get_notification_settings(current_user: dict = Depends(get_current_use
 @router.put("/settings", dependencies=[Depends(require_permission("settings.edit"))])
 async def update_notification_settings(
     data: dict,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """تحديث إعدادات البريد الإلكتروني و SMS"""
@@ -245,6 +251,18 @@ async def update_notification_settings(
             'notification_email_enabled', 'notification_sms_enabled'
         ]
 
+        # T021: Input validation for notification settings
+        if "smtp_port" in data:
+            try:
+                port_val = int(data["smtp_port"])
+                if port_val < 1 or port_val > 65535:
+                    raise HTTPException(400, "smtp_port must be between 1 and 65535")
+            except (ValueError, TypeError):
+                raise HTTPException(400, "smtp_port must be a valid integer")
+        if "smtp_host" in data and data["smtp_host"] != "********":
+            if not isinstance(data["smtp_host"], str) or not data["smtp_host"].strip():
+                raise HTTPException(400, "smtp_host must be a non-empty string")
+
         for key, value in data.items():
             if key not in allowed_keys:
                 continue
@@ -258,10 +276,20 @@ async def update_notification_settings(
             """), {"key": key, "val": str(value)})
 
         db.commit()
+        log_activity(
+            db=db,
+            user_id=getattr(current_user, "id", None),
+            username=getattr(current_user, "username", ""),
+            action="notification_settings_updated",
+            resource_type="notification_settings",
+            details={"updated_keys": [k for k in data if k in allowed_keys and data[k] != "********"]},
+            request=request,
+        )
         return {"message": "تم تحديث إعدادات الإشعارات بنجاح"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error updating notification settings: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -302,7 +330,7 @@ async def get_preferences(current_user: dict = Depends(get_current_user)):
 
 
 @router.put("/preferences")
-async def update_preference(body: PreferenceUpdate, current_user: dict = Depends(get_current_user)):
+async def update_preference(body: PreferenceUpdate, request: Request, current_user: dict = Depends(get_current_user)):
     """تحديث تفضيل إشعار واحد (upsert)"""
     company_id = getattr(current_user, "company_id", None)
     if not company_id:
@@ -331,10 +359,19 @@ async def update_preference(body: PreferenceUpdate, current_user: dict = Depends
                 "email": body.email_enabled, "inapp": body.in_app_enabled, "push": body.push_enabled,
             })
         db.commit()
+        log_activity(
+            db=db,
+            user_id=user_id,
+            action="notification_preference_updated",
+            resource_type="notification_preference",
+            details={"event_type": body.event_type, "email": body.email_enabled, "in_app": body.in_app_enabled, "push": body.push_enabled},
+            request=request,
+        )
         return {"detail": "Preference updated"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error updating preference: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -371,7 +408,8 @@ async def test_email_connection(current_user: dict = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error testing email connection: {e}")
+        raise HTTPException(500, "حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -394,7 +432,6 @@ async def notifications_ws(ws: WebSocket, token: Optional[str] = None):
         actual_token = ws.cookies.get("access_token")
 
     if not actual_token:
-        await ws.accept() # We must accept before we can close with a custom code in some versions of FastAPI/Starlette
         await ws.close(code=4001, reason="Missing token")
         return
 
@@ -403,15 +440,15 @@ async def notifications_ws(ws: WebSocket, token: Optional[str] = None):
         user_id = payload.get("user_id")
         company_id = payload.get("company_id")
         if not user_id or not company_id:
-            await ws.accept()
             await ws.close(code=4001, reason="Invalid token")
             return
     except JWTError:
-        await ws.accept()
         await ws.close(code=4001, reason="Invalid token")
         return
 
-    await ws_manager.connect(ws, company_id, user_id)
+    connected = await ws_manager.connect(ws, company_id, user_id)
+    if not connected:
+        return
     try:
         while True:
             # Keep alive — client can send pings, we just read and discard

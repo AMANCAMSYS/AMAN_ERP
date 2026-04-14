@@ -12,6 +12,7 @@ import logging
 
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.limiter import limiter
 from schemas.intercompany import (
     EntityGroupCreate, EntityGroupRead, IntercompanyTransactionCreate,
     IntercompanyTransactionRead, ConsolidationRequest, ConsolidationResult,
@@ -28,14 +29,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 @router.get("/entities", dependencies=[Depends(require_permission("accounting.view"))])
-def list_entities(current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_entities(request: Request, current_user=Depends(get_current_user)):
     """Return entity group tree."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     return intercompany_service.get_entity_tree(str(company_id))
 
 
 @router.post("/entities", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
-def create_entity(data: EntityGroupCreate, current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_entity(request: Request, data: EntityGroupCreate, current_user=Depends(get_current_user)):
     """Create a new entity group node."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
@@ -47,19 +50,22 @@ def create_entity(data: EntityGroupCreate, current_user=Depends(get_current_user
 # ---------------------------------------------------------------------------
 
 @router.post("/transactions", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
-def create_transaction(data: IntercompanyTransactionCreate, current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_transaction(request: Request, data: IntercompanyTransactionCreate, current_user=Depends(get_current_user)):
     """Create intercompany transaction with reciprocal JEs."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
     try:
         return intercompany_service.create_transaction(data.model_dump(), str(company_id), user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
 
 
 @router.get("/transactions", dependencies=[Depends(require_permission("accounting.view"))])
+@limiter.limit("200/minute")
 def list_transactions(
-    status_filter: Optional[str] = None,
+    request: Request,
     entity_id: Optional[int] = None,
     current_user=Depends(get_current_user),
 ):
@@ -69,7 +75,8 @@ def list_transactions(
 
 
 @router.get("/transactions/{txn_id}", dependencies=[Depends(require_permission("accounting.view"))])
-def get_transaction(txn_id: int, current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_transaction(request: Request, txn_id: int, current_user=Depends(get_current_user)):
     """Get a single intercompany transaction."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     result = intercompany_service.get_transaction_by_id(txn_id, str(company_id))
@@ -83,7 +90,8 @@ def get_transaction(txn_id: int, current_user=Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @router.post("/consolidate", dependencies=[Depends(require_permission("accounting.edit"))])
-def consolidate(data: ConsolidationRequest, current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def consolidate(request: Request, data: ConsolidationRequest, current_user=Depends(get_current_user)):
     """Run consolidation elimination for an entity group."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
@@ -95,7 +103,8 @@ def consolidate(data: ConsolidationRequest, current_user=Depends(get_current_use
             as_of_date=data.as_of_date,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +112,8 @@ def consolidate(data: ConsolidationRequest, current_user=Depends(get_current_use
 # ---------------------------------------------------------------------------
 
 @router.get("/balances", dependencies=[Depends(require_permission("accounting.view"))])
-def get_balances(current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def get_balances(request: Request, current_user=Depends(get_current_user)):
     """Report outstanding intercompany balances."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     return intercompany_service.get_intercompany_balances(str(company_id))
@@ -114,14 +124,16 @@ def get_balances(current_user=Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @router.get("/mappings", dependencies=[Depends(require_permission("accounting.view"))])
-def list_mappings(current_user=Depends(get_current_user)):
+@limiter.limit("200/minute")
+def list_mappings(request: Request, current_user=Depends(get_current_user)):
     """List intercompany account mappings."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     return intercompany_service.get_account_mappings(str(company_id))
 
 
 @router.post("/mappings", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
-def create_mapping(data: AccountMappingCreate, current_user=Depends(get_current_user)):
+@limiter.limit("100/minute")
+def create_mapping(request: Request, data: AccountMappingCreate, current_user=Depends(get_current_user)):
     """Create a new intercompany account mapping."""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id

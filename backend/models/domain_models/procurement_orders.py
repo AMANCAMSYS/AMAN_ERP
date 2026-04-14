@@ -1,7 +1,8 @@
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text as sa_text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin
 
 
 class PurchaseOrder(ModelBase):
@@ -47,7 +48,40 @@ class PurchaseOrderLine(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class BlanketPurchaseOrder(ModelBase, AuditMixin):
+    __tablename__ = "blanket_purchase_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("parties.id"), nullable=False)
+    agreement_number: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    total_quantity: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    unit_price: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    total_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    released_quantity: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    released_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    valid_from: Mapped[Date | None] = mapped_column(Date)
+    valid_to: Mapped[Date | None] = mapped_column(Date)
+    status: Mapped[str | None] = mapped_column(String(20), default="draft")
+    price_amendment_history: Mapped[dict | None] = mapped_column(JSONB, default=list)
+    branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
+    currency: Mapped[str | None] = mapped_column(String(3), default="SAR")
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class BlanketPOReleaseOrder(ModelBase, AuditMixin):
+    __tablename__ = "blanket_po_release_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    blanket_po_id: Mapped[int] = mapped_column(ForeignKey("blanket_purchase_orders.id", ondelete="CASCADE"), nullable=False)
+    purchase_order_id: Mapped[int | None] = mapped_column(ForeignKey("purchase_orders.id"))
+    release_quantity: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    release_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    release_date: Mapped[Date | None] = mapped_column(Date)
+
+
 __all__ = [
     "PurchaseOrder",
     "PurchaseOrderLine",
+    "BlanketPurchaseOrder",
+    "BlanketPOReleaseOrder",
 ]

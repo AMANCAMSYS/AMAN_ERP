@@ -219,7 +219,7 @@ const Routings = () => {
                                             className="form-input"
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="e.g. Table Assembly Standard"
+                                            placeholder={t('manufacturing.routing_name_placeholder')}
                                         />
                                     </div>
                                     <div className="col-md-6 form-group">

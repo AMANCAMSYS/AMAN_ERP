@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -14,6 +14,7 @@ from database import get_company_db
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.fiscal_lock import check_fiscal_period_open
+from utils.audit import log_activity
 
 from config import settings
 from schemas import UserResponse
@@ -36,6 +37,7 @@ router = APIRouter(prefix="/pos", tags=["Point of Sale"], dependencies=[Depends(
 @router.post("/sessions/open", response_model=SessionResponse, dependencies=[Depends(require_permission("pos.sessions"))])
 def open_session(
     session_in: SessionCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -82,6 +84,15 @@ def open_session(
         raise HTTPException(status_code=500, detail="Failed to create POS session")
     
     session_id = result._mapping["id"]
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="open_pos_session", resource_type="pos_session",
+        resource_id=str(session_id),
+        details={"branch_id": session_in.branch_id, "warehouse_id": session_in.warehouse_id, "opening_balance": float(session_in.opening_balance)},
+        request=request, branch_id=session_in.branch_id
+    )
+
     populated = _get_populated_session(db, session_id, user_id)
     if populated:
         return populated
@@ -166,10 +177,10 @@ def _get_populated_session(db: Session, session_id: int, current_user_id: int):
 def close_session(
     session_id: int,
     close_in: SessionClose,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Retrieve session
     from utils.accounting import get_base_currency
     base_currency = get_base_currency(db)
     sess = db.execute(text("SELECT * FROM pos_sessions WHERE id = :id"), {"id": session_id}).fetchone()
@@ -265,6 +276,15 @@ def close_session(
             )
     
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="close_pos_session", resource_type="pos_session",
+        resource_id=str(session_id),
+        details={"closing_balance": float(close_in.closing_balance), "difference": float(difference)},
+        request=request, branch_id=branch_id
+    )
+
     return _get_populated_session(db, session_id, current_user.id)
 
 
@@ -313,7 +333,7 @@ def get_pos_warehouses(
         result = db.execute(text(stmt), params).fetchall()
         return [{"id": r.id, "name": r.name, "code": r.code, "branch_id": r.branch_id, "branch_name": r.branch_name} for r in result]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching warehouses: {str(e)}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
 
 
 @router.get("/products", response_model=List[POSProductResponse], dependencies=[Depends(require_permission("pos.view"))])
@@ -375,6 +395,7 @@ def get_pos_products(
 @router.post("/orders", response_model=OrderResponse, dependencies=[Depends(require_permission("pos.create"))])
 def create_order(
     order_in: OrderCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -730,7 +751,15 @@ def create_order(
                 pass  # Non-blocking — POS must not fail for party update
 
     db.commit()
-    
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="create_pos_order", resource_type="pos_order",
+        resource_id=str(order_id),
+        details={"order_number": order_number, "total": float(total), "status": order_in.status, "branch_id": branch_id},
+        request=request, branch_id=branch_id
+    )
+
     return OrderResponse(
         id=order_id,
         order_number=order_number,
@@ -749,15 +778,27 @@ def get_held_orders(
 ):
     """Get all held orders for current session"""
     try:
-        result = db.execute(text("""
-            SELECT po.id, po.order_number, po.total_amount, po.status, po.created_at,
-                   COALESCE(c.name, po.walk_in_customer_name, 'عميل نقدي') as customer_name,
-                   (SELECT COUNT(*) FROM pos_order_lines WHERE order_id = po.id) as items_count
-            FROM pos_orders po
-            LEFT JOIN parties c ON po.customer_id = c.id
-            WHERE po.status = 'hold'
-            ORDER BY po.created_at DESC
-        """)).fetchall()
+        allowed_branches = current_user.allowed_branches or []
+        if current_user.role == "admin" or not allowed_branches:
+            result = db.execute(text("""
+                SELECT po.id, po.order_number, po.total_amount, po.status, po.created_at,
+                       COALESCE(c.name, po.walk_in_customer_name, 'عميل نقدي') as customer_name,
+                       (SELECT COUNT(*) FROM pos_order_lines WHERE order_id = po.id) as items_count
+                FROM pos_orders po
+                LEFT JOIN parties c ON po.customer_id = c.id
+                WHERE po.status = 'hold'
+                ORDER BY po.created_at DESC
+            """)).fetchall()
+        else:
+            result = db.execute(text("""
+                SELECT po.id, po.order_number, po.total_amount, po.status, po.created_at,
+                       COALESCE(c.name, po.walk_in_customer_name, 'عميل نقدي') as customer_name,
+                       (SELECT COUNT(*) FROM pos_order_lines WHERE order_id = po.id) as items_count
+                FROM pos_orders po
+                LEFT JOIN parties c ON po.customer_id = c.id
+                WHERE po.status = 'hold' AND po.branch_id = ANY(:branches)
+                ORDER BY po.created_at DESC
+            """), {"branches": allowed_branches}).fetchall()
         
         return [dict(r._mapping) for r in result]
     except Exception as e:
@@ -782,7 +823,10 @@ def resume_held_order(
     
     if not order:
         raise HTTPException(status_code=404, detail="Held order not found")
-    
+
+    if order.branch_id:
+        validate_branch_access(current_user, order.branch_id)
+
     # Get order items
     items = db.execute(text("""
         SELECT poi.*, p.product_name as name, p.product_code as code, p.barcode
@@ -800,23 +844,36 @@ def resume_held_order(
 @router.delete("/orders/{order_id}/cancel-held", dependencies=[Depends(require_permission("pos.manage"))])
 def cancel_held_order(
     order_id: int,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Cancel a held order"""
     order = db.execute(text("""
-        SELECT id FROM pos_orders 
+        SELECT id, branch_id, order_number FROM pos_orders 
         WHERE id = :id AND status = 'hold'
     """), {"id": order_id}).fetchone()
     
     if not order:
         raise HTTPException(status_code=404, detail="Held order not found")
-    
+
+    if order.branch_id:
+        validate_branch_access(current_user, order.branch_id)
+
     # Delete related records from all possible tables to avoid foreign key issues
     db.execute(text("DELETE FROM pos_order_lines WHERE order_id = :id"), {"id": order_id})
     db.execute(text("DELETE FROM pos_payments WHERE order_id = :id"), {"id": order_id})
     db.execute(text("DELETE FROM pos_orders WHERE id = :id"), {"id": order_id})
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="cancel_held_order", resource_type="pos_order",
+        resource_id=str(order_id),
+        details={"order_number": getattr(order, "order_number", None)},
+        request=request, branch_id=getattr(order, "branch_id", None)
+    )
+
     return {"message": "Order cancelled successfully"}
 
 
@@ -826,6 +883,7 @@ def cancel_held_order(
 def create_return(
     order_id: int,
     return_in: ReturnCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1036,7 +1094,15 @@ def create_return(
                        {"amt": total_refund_with_tax, "id": session_treasury.treasury_account_id})
     
     db.commit()
-    
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="create_pos_return", resource_type="pos_return",
+        resource_id=str(return_id),
+        details={"order_id": order_id, "order_number": order.order_number, "refund_amount": float(total_refund), "refund_method": return_in.refund_method},
+        request=request, branch_id=order.branch_id
+    )
+
     return {
         "return_id": return_id,
         "refund_amount": float(total_refund),
@@ -1061,7 +1127,10 @@ def get_order_details(
     
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
+    if hasattr(order, 'branch_id') and order.branch_id:
+        validate_branch_access(current_user, order.branch_id)
+
     items = db.execute(text("""
         SELECT poi.*, p.product_name as name
         FROM pos_order_lines poi
@@ -1099,9 +1168,14 @@ def list_promotions(
 @router.post("/promotions", dependencies=[Depends(require_permission("pos.manage"))])
 def create_promotion(
     data: dict,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    branch_id = data.get("branch_id")
+    if branch_id:
+        validate_branch_access(current_user, branch_id)
+
     result = db.execute(text("""
         INSERT INTO pos_promotions (name, promotion_type, value, buy_qty, get_qty, coupon_code,
             applicable_products, applicable_categories, min_order_amount, start_date, end_date,
@@ -1123,17 +1197,28 @@ def create_promotion(
         "start": data.get("start_date"),
         "end": data.get("end_date"),
         "active": data.get("is_active", True),
-        "branch": data.get("branch_id"),
+        "branch": branch_id,
         "uid": current_user.id,
     })
     db.commit()
-    return dict(result.fetchone()._mapping)
+    row = dict(result.fetchone()._mapping)
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="create_promotion", resource_type="pos_promotion",
+        resource_id=str(row.get("id")),
+        details={"name": data.get("name"), "type": data.get("promotion_type")},
+        request=request, branch_id=branch_id
+    )
+
+    return row
 
 
 @router.put("/promotions/{promo_id}", dependencies=[Depends(require_permission("pos.manage"))])
 def update_promotion(
     promo_id: int,
     data: dict,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1153,13 +1238,29 @@ def update_promotion(
     if not row:
         raise HTTPException(status_code=404, detail="Promotion not found")
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="update_promotion", resource_type="pos_promotion",
+        resource_id=str(promo_id),
+        details={"updated_fields": list(data.keys())},
+        request=request
+    )
+
     return dict(row._mapping)
 
 
 @router.delete("/promotions/{promo_id}", dependencies=[Depends(require_permission("pos.manage"))])
-def delete_promotion(promo_id: int, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_promotion(promo_id: int, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     db.execute(text("DELETE FROM pos_promotions WHERE id = :id"), {"id": promo_id})
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="delete_promotion", resource_type="pos_promotion",
+        resource_id=str(promo_id), request=request
+    )
+
     return {"message": "Deleted"}
 
 
@@ -1226,7 +1327,7 @@ def get_customer_loyalty(party_id: int, current_user: UserResponse = Depends(get
 
 
 @router.post("/loyalty/enroll", dependencies=[Depends(require_permission("pos.manage"))])
-def enroll_customer(data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def enroll_customer(data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     existing = db.execute(text(
         "SELECT id FROM pos_loyalty_points WHERE party_id = :pid AND program_id = :prog"
     ), {"pid": data["party_id"], "prog": data["program_id"]}).fetchone()
@@ -1238,11 +1339,21 @@ def enroll_customer(data: dict, current_user: UserResponse = Depends(get_current
         RETURNING *
     """), {"prog": data["program_id"], "pid": data["party_id"]})
     db.commit()
-    return dict(result.fetchone()._mapping)
+    row = dict(result.fetchone()._mapping)
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="enroll_loyalty", resource_type="pos_loyalty",
+        resource_id=str(row.get("id")),
+        details={"party_id": data["party_id"], "program_id": data["program_id"]},
+        request=request
+    )
+
+    return row
 
 
 @router.post("/loyalty/earn", dependencies=[Depends(require_permission("pos.create"))])
-def earn_points(data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def earn_points(data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     """Award loyalty points after a sale."""
     loyalty = db.execute(text("SELECT * FROM pos_loyalty_points WHERE party_id = :pid"), {"pid": data["party_id"]}).fetchone()
     if not loyalty:
@@ -1258,11 +1369,20 @@ def earn_points(data: dict, current_user: UserResponse = Depends(get_current_use
         VALUES (:lid, :oid, 'earn', :pts, :desc)
     """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": points, "desc": f"Earned from order"})
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="earn_loyalty_points", resource_type="pos_loyalty",
+        resource_id=str(loyalty.id),
+        details={"party_id": data["party_id"], "points": float(points), "order_id": data.get("order_id")},
+        request=request
+    )
+
     return {"points_earned": float(points), "new_balance": float((_dec(loyalty.balance) + points).quantize(_D2, ROUND_HALF_UP))}
 
 
 @router.post("/loyalty/redeem", dependencies=[Depends(require_permission("pos.create"))])
-def redeem_points(data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def redeem_points(data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     """Redeem loyalty points as discount."""
     loyalty = db.execute(text("SELECT * FROM pos_loyalty_points WHERE party_id = :pid"), {"pid": data["party_id"]}).fetchone()
     if not loyalty:
@@ -1283,6 +1403,15 @@ def redeem_points(data: dict, current_user: UserResponse = Depends(get_current_u
         VALUES (:lid, :oid, 'redeem', :pts, :desc)
     """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": -points, "desc": f"Redeemed for discount"})
     db.commit()
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="redeem_loyalty_points", resource_type="pos_loyalty",
+        resource_id=str(loyalty.id),
+        details={"party_id": data["party_id"], "points": float(points), "discount_value": float(discount_value)},
+        request=request
+    )
+
     return {"points_redeemed": float(points), "discount_value": float(discount_value), "new_balance": float((_dec(loyalty.balance) - points).quantize(_D2, ROUND_HALF_UP))}
 
 
@@ -1345,8 +1474,14 @@ def list_tables(
     q = "SELECT * FROM pos_tables WHERE is_active = true"
     params = {}
     if branch_id:
+        validate_branch_access(current_user, branch_id)
         q += " AND branch_id = :bid"
         params["bid"] = branch_id
+    else:
+        allowed_branches = current_user.allowed_branches or []
+        if current_user.role != "admin" and allowed_branches:
+            q += " AND branch_id = ANY(:branches)"
+            params["branches"] = allowed_branches
     if floor:
         q += " AND floor = :floor"
         params["floor"] = floor
@@ -1356,7 +1491,11 @@ def list_tables(
 
 
 @router.post("/tables", dependencies=[Depends(require_permission("pos.manage"))])
-def create_table(data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_table(data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+    branch_id = data.get("branch_id")
+    if branch_id:
+        validate_branch_access(current_user, branch_id)
+
     result = db.execute(text("""
         INSERT INTO pos_tables (table_number, table_name, floor, capacity, shape, pos_x, pos_y, branch_id)
         VALUES (:num, :name, :floor, :cap, :shape, :x, :y, :branch)
@@ -1369,10 +1508,20 @@ def create_table(data: dict, current_user: UserResponse = Depends(get_current_us
         "shape": data.get("shape", "square"),
         "x": data.get("pos_x", 0),
         "y": data.get("pos_y", 0),
-        "branch": data.get("branch_id"),
+        "branch": branch_id,
     })
     db.commit()
-    return dict(result.fetchone()._mapping)
+    row = dict(result.fetchone()._mapping)
+
+    log_activity(
+        db, user_id=current_user.id, username=current_user.username,
+        action="create_pos_table", resource_type="pos_table",
+        resource_id=str(row.get("id")),
+        details={"table_number": data["table_number"]},
+        request=request, branch_id=branch_id
+    )
+
+    return row
 
 
 @router.put("/tables/{table_id}", dependencies=[Depends(require_permission("pos.manage"))])
@@ -1444,7 +1593,7 @@ def kitchen_orders(
 
 
 @router.post("/kitchen/orders", dependencies=[Depends(require_permission("pos.create"))])
-def send_to_kitchen(data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def send_to_kitchen(data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     """Send order items to kitchen."""
     items = data.get("items", [])
     results = []
@@ -1467,11 +1616,20 @@ def send_to_kitchen(data: dict, current_user: UserResponse = Depends(get_current
         }).fetchone()
         results.append(dict(row._mapping))
     db.commit()
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action="kitchen_order_created",
+        resource_type="pos_kitchen_order",
+        resource_id=data.get("order_id"),
+        details={"items_count": len(items), "order_id": data.get("order_id")},
+        request=request,
+    )
     return results
 
 
 @router.put("/kitchen/orders/{ko_id}/status", dependencies=[Depends(require_permission("pos.manage"))])
-def update_kitchen_status(ko_id: int, data: dict, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_kitchen_status(ko_id: int, data: dict, request: Request, current_user: UserResponse = Depends(get_current_user), db: Session = Depends(get_db)):
     new_status = data.get("status")
     ts_field = {"accepted": "accepted_at", "ready": "ready_at", "served": "served_at"}.get(new_status)
     if ts_field:
@@ -1479,6 +1637,15 @@ def update_kitchen_status(ko_id: int, data: dict, current_user: UserResponse = D
     else:
         db.execute(text("UPDATE pos_kitchen_orders SET status = :s WHERE id = :id"), {"s": new_status, "id": ko_id})
     db.commit()
+    log_activity(
+        db=db,
+        user_id=current_user.id,
+        action="kitchen_status_changed",
+        resource_type="pos_kitchen_order",
+        resource_id=ko_id,
+        details={"new_status": new_status},
+        request=request,
+    )
     return {"message": f"Kitchen order {ko_id} → {new_status}"}
 
 
@@ -1509,7 +1676,7 @@ def get_pwa_manifest(current_user: UserResponse = Depends(get_current_user)):
 @router.get("/pwa/config")
 def get_pwa_config(current_user: UserResponse = Depends(get_current_user)):
     """PWA offline config - cached products and settings"""
-    db = get_db_connection(current_user.company_id)
+    db = get_company_db(current_user.company_id)
     try:
         products = db.execute(text("""
             SELECT id, name, name_ar, sku, sale_price, tax_rate, category_id, unit_id, barcode
@@ -1527,6 +1694,7 @@ def get_pwa_config(current_user: UserResponse = Depends(get_current_user)):
             "cache_version": __import__('time').time()
         }
     except Exception as e:
-        return {"products": [], "tax_rates": [], "payment_methods": [], "error": str(e)}
+        logger.error(f"Error loading PWA config: {e}")
+        return {"products": [], "tax_rates": [], "payment_methods": [], "error": "Failed to load configuration"}
     finally:
         db.close()

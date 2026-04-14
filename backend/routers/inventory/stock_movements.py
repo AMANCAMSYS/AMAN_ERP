@@ -2,13 +2,15 @@
 Inventory Module - Stock Receipt & Delivery
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from datetime import datetime
 import logging
+import uuid
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.audit import log_activity
 from utils.permissions import require_permission
 from .schemas import StockMovementCreate
 
@@ -19,18 +21,24 @@ logger = logging.getLogger(__name__)
 @stock_movements_router.post("/receipt", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
 def create_stock_receipt(
     movement: StockMovementCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إضافة مخزون (استلام بضاعة)"""
     db = get_db_connection(current_user.company_id)
     try:
         # Validate warehouse
-        wh = db.execute(text("SELECT warehouse_name FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
+        wh = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
         if not wh:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
 
-        import random
-        ref = movement.reference or f"REC-{datetime.now().year}-{random.randint(10000, 99999)}"
+        # INV-007: Branch access check
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if wh.branch_id and wh.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك استلام بضاعة في مستودع خارج فروعك")
+
+        ref = movement.reference or f"REC-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
         txn_date = movement.date or datetime.now().strftime("%Y-%m-%d")
 
         # UOM Validation: Discrete units must have integer quantities
@@ -86,10 +94,20 @@ def create_stock_receipt(
             })
 
         db.commit()
+
+        # INV-007: Audit log
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="stock.receipt", resource_type="stock_movement",
+            resource_id=ref, details={"warehouse_id": movement.warehouse_id, "items_count": len(movement.items)},
+            request=request, branch_id=wh.branch_id
+        )
+
         return {"message": "تم استلام البضاعة بنجاح", "reference": ref}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -97,18 +115,24 @@ def create_stock_receipt(
 @stock_movements_router.post("/delivery", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.manage"))])
 def create_stock_delivery(
     movement: StockMovementCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """صرف مخزون (تسليم بضاعة)"""
     db = get_db_connection(current_user.company_id)
     try:
         # Validate warehouse
-        wh = db.execute(text("SELECT warehouse_name FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
+        wh = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
         if not wh:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
 
-        import random
-        ref = movement.reference or f"DEL-{datetime.now().year}-{random.randint(10000, 99999)}"
+        # INV-007: Branch access check
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if wh.branch_id and wh.branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك صرف بضاعة من مستودع خارج فروعك")
+
+        ref = movement.reference or f"DEL-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
         txn_date = movement.date or datetime.now().strftime("%Y-%m-%d")
 
         # UOM Validation: Discrete units must have integer quantities
@@ -154,11 +178,21 @@ def create_stock_delivery(
             })
 
         db.commit()
+
+        # INV-007: Audit log
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="stock.delivery", resource_type="stock_movement",
+            resource_id=ref, details={"warehouse_id": movement.warehouse_id, "items_count": len(movement.items)},
+            request=request, branch_id=wh.branch_id
+        )
+
         return {"message": "تم تسليم البضاعة بنجاح", "reference": ref}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

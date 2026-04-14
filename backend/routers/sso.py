@@ -5,6 +5,7 @@ Endpoints for SSO configuration management and SSO authentication flows.
 
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -22,6 +23,7 @@ from schemas.sso import (
 from routers.auth import get_current_user
 from services import sso_service
 from utils.permissions import require_permission
+from utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -240,11 +242,16 @@ async def saml_acs(request: Request, response: Response):
     if not saml_response:
         raise HTTPException(status_code=400, detail="Missing SAMLResponse")
 
-    # RelayState carries "company_id:sso_config_id"
-    parts = relay_state.split(":")
-    if len(parts) < 2:
-        raise HTTPException(status_code=400, detail="Invalid RelayState")
-    company_id, sso_config_id_str = parts[0], parts[1]
+    # SEC-FIX: Look up server-side state by relay token instead of parsing URI
+    if not relay_state:
+        raise HTTPException(status_code=400, detail="Missing RelayState")
+    state_data = cache.get(f"saml_state:{relay_state}")
+    if not state_data:
+        raise HTTPException(status_code=400, detail="Invalid or expired RelayState token")
+    company_id = state_data["company_id"]
+    sso_config_id_str = str(state_data["sso_config_id"])
+    # Delete used state token to prevent replay
+    cache.delete(f"saml_state:{relay_state}")
 
     sso_config = sso_service.get_sso_config_by_id(int(sso_config_id_str), company_id)
     if not sso_config or sso_config["provider_type"] != "saml":
@@ -320,9 +327,14 @@ async def sso_login(body: SsoLoginRequest, response: Response):
     if sso_config["provider_type"] == "saml":
         # Return redirect URL for SAML
         redirect_url = sso_service.saml_initiate_login(sso_config, company_id)
-        # Append RelayState so ACS can find the company
+        # SEC-FIX: Store state server-side instead of exposing company_id:config_id in RelayState
+        state_token = str(uuid.uuid4())
+        cache.set(f"saml_state:{state_token}", {
+            "company_id": company_id,
+            "sso_config_id": sso_config["id"],
+        }, expire=300)  # 5-minute TTL
         separator = "&" if "?" in redirect_url else "?"
-        redirect_url += f"{separator}RelayState={company_id}:{sso_config['id']}"
+        redirect_url += f"{separator}RelayState={state_token}"
         return {"redirect_url": redirect_url}
 
     elif sso_config["provider_type"] == "ldap":

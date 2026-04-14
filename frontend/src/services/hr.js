@@ -74,6 +74,20 @@ export const hrAdvancedAPI = {
     createPerformanceReview: (data) => api.post('/hr-advanced/performance-reviews', data),
     updatePerformanceReview: (id, data) => api.put(`/hr-advanced/performance-reviews/${id}`, data),
 
+    // Performance Cycles (US12)
+    listCycles: (params) => api.get('/hr/performance/cycles', { params }),
+    createCycle: (data) => api.post('/hr/performance/cycles', data),
+    launchCycle: (id) => api.post(`/hr/performance/cycles/${id}/launch`),
+    listMyReviews: (params) => api.get('/hr/performance/reviews', { params }),
+    getReviewDetail: (id) => api.get(`/hr/performance/reviews/${id}`),
+    submitSelfAssessment: (id, data) => api.put(`/hr/performance/reviews/${id}/self-assessment`, data),
+    listTeamReviews: (params) => api.get('/hr/performance/team-reviews', { params }),
+    submitManagerAssessment: (id, data) => api.put(`/hr/performance/reviews/${id}/manager-assessment`, data),
+    finalizeReview: (id) => api.post(`/hr/performance/reviews/${id}/finalize`),
+    addGoal: (reviewId, data) => api.post(`/hr/performance/reviews/${reviewId}/goals`, data),
+    listGoals: (reviewId) => api.get(`/hr/performance/reviews/${reviewId}/goals`),
+    deleteGoal: (goalId) => api.delete(`/hr/performance/goals/${goalId}`),
+
     // Training
     listTraining: () => api.get('/hr-advanced/training'),
     createTraining: (data) => api.post('/hr-advanced/training', data),

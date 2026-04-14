@@ -2,7 +2,7 @@
 Inventory Module - Shipments Lifecycle
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
@@ -10,7 +10,8 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.audit import log_activity
+from utils.permissions import require_permission, validate_branch_access
 from .schemas import ShipmentCreate
 
 shipments_router = APIRouter()
@@ -20,24 +21,32 @@ logger = logging.getLogger(__name__)
 @shipments_router.post("/shipments", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("stock.transfer"))])
 def create_shipment(
     shipment: ShipmentCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء شحنة جديدة بين المستودعات"""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    username = current_user.get("username") if isinstance(current_user, dict) else getattr(current_user, "username", None)
     db = get_db_connection(company_id)
     try:
         if shipment.source_warehouse_id == shipment.destination_warehouse_id:
             raise HTTPException(status_code=400, detail="لا يمكن الشحن لنفس المستودع")
 
         # Validate warehouses
-        src = db.execute(text("SELECT warehouse_name FROM warehouses WHERE id = :id"),
+        src = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"),
                         {"id": shipment.source_warehouse_id}).fetchone()
-        dst = db.execute(text("SELECT warehouse_name FROM warehouses WHERE id = :id"),
+        dst = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"),
                         {"id": shipment.destination_warehouse_id}).fetchone()
 
         if not src or not dst:
             raise HTTPException(status_code=404, detail="المستودع غير موجود")
+
+        # INV-S01: Branch access check on both warehouses
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if (src.branch_id and src.branch_id not in allowed) or (dst.branch_id and dst.branch_id not in allowed):
+                raise HTTPException(status_code=403, detail="لا يمكنك إنشاء شحنة بين مستودعات خارج فروعك")
 
         import random
         shipment_ref = f"SHP-{datetime.now().year}-{random.randint(10000, 99999)}"
@@ -101,13 +110,26 @@ def create_shipment(
             })
 
         db.commit()
+
+        # INV-S01: Audit log
+        try:
+            log_activity(
+                db, user_id=user_id, username=username,
+                action="shipment.create", resource_type="stock_shipment",
+                resource_id=str(shipment_id), details={"shipment_ref": shipment_ref, "source": shipment.source_warehouse_id, "destination": shipment.destination_warehouse_id},
+                request=request, branch_id=src.branch_id
+            )
+        except Exception:
+            pass
+
         return {"message": "تم إنشاء الشحنة بنجاح", "reference": shipment_ref, "id": shipment_id}
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -137,6 +159,14 @@ def list_shipments(
         if branch_id:
             query += " AND (sw.branch_id = :branch_id OR dw.branch_id = :branch_id)"
             params["branch_id"] = branch_id
+        else:
+            # INV-S02: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND (sw.branch_id IN ({branch_placeholders}) OR dw.branch_id IN ({branch_placeholders}))"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         if status_filter:
             query += " AND s.status = :status"
@@ -180,6 +210,14 @@ def list_incoming_shipments(
         if branch_id:
             query += " AND dw.branch_id = :bid"
             params["bid"] = branch_id
+        else:
+            # INV-S02: Enforce allowed_branches
+            allowed = getattr(current_user, 'allowed_branches', []) or []
+            if allowed and "*" not in getattr(current_user, 'permissions', []):
+                branch_placeholders = ", ".join(f":_ab_{i}" for i in range(len(allowed)))
+                query += f" AND dw.branch_id IN ({branch_placeholders})"
+                for i, bid in enumerate(allowed):
+                    params[f"_ab_{i}"] = bid
 
         query += " ORDER BY s.created_at DESC"
         result = db.execute(text(query), params).fetchall()
@@ -210,6 +248,14 @@ def get_shipment_details(
         if not shipment:
             raise HTTPException(status_code=404, detail="الشحنة غير موجودة")
 
+        # INV-S03: Branch access check
+        src_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": shipment.source_warehouse_id}).scalar()
+        dst_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": shipment.destination_warehouse_id}).scalar()
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if (src_branch and src_branch not in allowed) and (dst_branch and dst_branch not in allowed):
+                raise HTTPException(status_code=403, detail="لا يمكنك عرض هذه الشحنة")
+
         items = db.execute(text("""
             SELECT i.*, p.product_name, p.product_code
             FROM stock_shipment_items i
@@ -228,11 +274,13 @@ def get_shipment_details(
 @shipments_router.post("/shipments/{id}/confirm", dependencies=[Depends(require_permission("stock.transfer"))])
 def confirm_shipment(
     id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """تأكيد استلام الشحنة"""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    username = current_user.get("username") if isinstance(current_user, dict) else getattr(current_user, "username", None)
     db = get_db_connection(company_id)
     try:
         # Get shipment
@@ -250,6 +298,13 @@ def confirm_shipment(
         if shipment.status != 'pending':
             raise HTTPException(status_code=400, detail="لا يمكن تأكيد هذه الشحنة")
 
+        # INV-S04: Branch access check on destination warehouse
+        dst_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": shipment.destination_warehouse_id}).scalar()
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if dst_branch and dst_branch not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك تأكيد شحنة لمستودع خارج فروعك")
+
         # Get items
         items = db.execute(text("""
             SELECT * FROM stock_shipment_items WHERE shipment_id = :id
@@ -259,7 +314,19 @@ def confirm_shipment(
 
         # Process each item
         for item in items:
-            # 1. Deduct from source
+            # INV-S05: Lock source inventory row with FOR UPDATE to prevent race conditions
+            src_inv = db.execute(text("""
+                SELECT quantity FROM inventory
+                WHERE product_id = :pid AND warehouse_id = :wh
+                FOR UPDATE
+            """), {"pid": item.product_id, "wh": shipment.source_warehouse_id}).fetchone()
+
+            src_qty = float(src_inv.quantity) if src_inv else 0
+            if src_qty < item.quantity:
+                prod_name = db.execute(text("SELECT product_name FROM products WHERE id = :pid"), {"pid": item.product_id}).scalar()
+                raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}. المتوفر: {src_qty}")
+
+            # 1. Deduct from source (row already locked)
             db.execute(text("""
                 UPDATE inventory SET quantity = quantity - :qty
                 WHERE product_id = :pid AND warehouse_id = :wh
@@ -368,13 +435,26 @@ def confirm_shipment(
         })
 
         db.commit()
+
+        # INV-S04: Audit log
+        try:
+            log_activity(
+                db, user_id=user_id, username=username,
+                action="shipment.confirm", resource_type="stock_shipment",
+                resource_id=str(id), details={"shipment_ref": shipment.shipment_ref, "items_count": len(items)},
+                request=request, branch_id=dst_branch
+            )
+        except Exception:
+            pass
+
         return {"message": "تم تأكيد استلام الشحنة بنجاح"}
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -382,14 +462,19 @@ def confirm_shipment(
 @shipments_router.post("/shipments/{id}/cancel", dependencies=[Depends(require_permission("stock.manage"))])
 def cancel_shipment(
     id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """إلغاء الشحنة"""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
+    user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+    username = current_user.get("username") if isinstance(current_user, dict) else getattr(current_user, "username", None)
     db = get_db_connection(company_id)
     try:
         shipment = db.execute(text("""
-            SELECT * FROM stock_shipments WHERE id = :id
+            SELECT s.*, sw.branch_id as src_branch_id FROM stock_shipments s
+            JOIN warehouses sw ON s.source_warehouse_id = sw.id
+            WHERE s.id = :id
         """), {"id": id}).fetchone()
 
         if not shipment:
@@ -398,17 +483,36 @@ def cancel_shipment(
         if shipment.status != 'pending':
             raise HTTPException(status_code=400, detail="لا يمكن إلغاء هذه الشحنة")
 
+        # INV-S06: Branch access check
+        allowed = getattr(current_user, 'allowed_branches', []) or []
+        if allowed and "*" not in getattr(current_user, 'permissions', []):
+            if shipment.src_branch_id and shipment.src_branch_id not in allowed:
+                raise HTTPException(status_code=403, detail="لا يمكنك إلغاء هذه الشحنة")
+
         db.execute(text("""
             UPDATE stock_shipments SET status = 'cancelled' WHERE id = :id
         """), {"id": id})
 
         db.commit()
+
+        # INV-S06: Audit log
+        try:
+            log_activity(
+                db, user_id=user_id, username=username,
+                action="shipment.cancel", resource_type="stock_shipment",
+                resource_id=str(id), details={"shipment_ref": shipment.shipment_ref},
+                request=request, branch_id=shipment.src_branch_id
+            )
+        except Exception:
+            pass
+
         return {"message": "تم إلغاء الشحنة"}
 
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

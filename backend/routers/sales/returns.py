@@ -26,6 +26,9 @@ def _dec(v) -> Decimal:
 @returns_router.get("/returns", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def list_sales_returns(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """عرض قائمة مرتجعات المبيعات"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -63,6 +66,11 @@ def get_sales_return(return_id: int, current_user: dict = Depends(get_current_us
         if not header:
             raise HTTPException(status_code=404, detail="المرتجع غير موجود")
 
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if header.branch_id:
+            validate_branch_access(current_user, header.branch_id)
+
         lines = db.execute(text("""
             SELECT l.*, p.product_name
             FROM sales_return_lines l
@@ -93,7 +101,7 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
             branch_id = db.execute(text("SELECT branch_id FROM invoices WHERE id = :id"), {"id": data.invoice_id}).scalar()
 
         # FIN-FIX: Fiscal period lock on returns (was missing — could post to closed periods)
-        from utils.accounting import check_fiscal_period_open
+        from utils.fiscal_lock import check_fiscal_period_open
         check_fiscal_period_open(db, data.return_date)
 
         # UOM Validation: Discrete units must have integer quantities
@@ -204,13 +212,14 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
         return {"id": ret_id, "return_number": ret_num}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @returns_router.post("/returns/{return_id}/approve", dependencies=[Depends(require_permission("sales.create"))])
-def approve_sales_return(return_id: int, current_user: dict = Depends(get_current_user)):
+def approve_sales_return(return_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """اعتماد مرتجع المبيعات (تحديث المخزون وقيد محاسبي)"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -487,6 +496,7 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
             resource_type="sales_return",
             resource_id=str(return_id),
             details={"return_number": header.return_number, "total": float(header.total), "info": "Return Approved"},
+            request=request,
             branch_id=header.branch_id
         )
 
@@ -494,6 +504,7 @@ def approve_sales_return(return_id: int, current_user: dict = Depends(get_curren
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving return: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

@@ -119,81 +119,81 @@ function DataTable({ columns, rows, color }) {
 //   RENDER FUNCTIONS PER REPORT TYPE
 // ═══════════════════════════════════════════
 
-function renderFoodCost(data, isRTL, color) {
+function renderFoodCost(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'الإيرادات' : 'Revenue'} value={fmtNum(s.revenue)} />
-      <MetricCard color={color} label={isRTL ? 'تكلفة البضاعة' : 'COGS'} value={fmtNum(s.cogs)} />
-      <MetricCard color="#EF4444" label={isRTL ? 'نسبة تكلفة الطعام' : 'Food Cost %'}
+      <MetricCard color={color} label={t('industry_reports.revenue')} value={fmtNum(s.revenue)} />
+      <MetricCard color={color} label={t('industry_reports.cogs')} value={fmtNum(s.cogs)} />
+      <MetricCard color="#EF4444" label={t('industry_reports.food_cost_pct')}
         value={fmtPct(s.food_cost_pct)} alert={s.food_cost_pct > 35 ? '⚠️' : '✅'}
-        sub={s.food_cost_pct > 35 ? (isRTL ? 'أعلى من المعيار (35%)' : 'Above benchmark (35%)') : (isRTL ? 'ضمن المعيار' : 'Within benchmark')} />
-      <MetricCard color="#10B981" label={isRTL ? 'هامش الربح الإجمالي' : 'Gross Margin'} value={fmtPct(s.gross_margin_pct)} />
-      <MetricCard color={color} label={isRTL ? 'الربح الإجمالي' : 'Gross Profit'} value={fmtNum(s.gross_profit)} />
-      <MetricCard color={color} label={isRTL ? 'صافي الربح' : 'Net Profit'} value={fmtNum(s.net_profit)} />
+        sub={s.food_cost_pct > 35 ? t('industry_reports.above_benchmark') : t('industry_reports.within_benchmark')} />
+      <MetricCard color="#10B981" label={t('industry_reports.gross_margin')} value={fmtPct(s.gross_margin_pct)} />
+      <MetricCard color={color} label={t('industry_reports.gross_profit')} value={fmtNum(s.gross_profit)} />
+      <MetricCard color={color} label={t('industry_reports.net_profit')} value={fmtNum(s.net_profit)} />
     </div>
     {data.top_items?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>📊 {isRTL ? 'أعلى 10 منتجات مبيعاً' : 'Top 10 Selling Items'}</h3>
+        <h3>📊 {t('industry_reports.top_10_items')}</h3>
         <DataTable color={color} rows={data.top_items} columns={[
-          { key: 'product_name', label: isRTL ? 'المنتج' : 'Product' },
-          { key: 'qty_sold', label: isRTL ? 'الكمية' : 'Qty', align: 'center', render: r => fmtNum(r.qty_sold) },
-          { key: 'total_revenue', label: isRTL ? 'الإيراد' : 'Revenue', align: 'right', render: r => fmtNum(r.total_revenue) },
-          { key: 'total_cost', label: isRTL ? 'التكلفة' : 'Cost', align: 'right', render: r => fmtNum(r.total_cost) },
-          { key: 'cost_pct', label: isRTL ? 'نسبة التكلفة' : 'Cost %', align: 'center', render: r => <span style={{ color: r.cost_pct > 35 ? '#EF4444' : '#10B981', fontWeight: 600 }}>{fmtPct(r.cost_pct)}</span> },
+          { key: 'product_name', label: t('industry_reports.product') },
+          { key: 'qty_sold', label: t('industry_reports.qty'), align: 'center', render: r => fmtNum(r.qty_sold) },
+          { key: 'total_revenue', label: t('industry_reports.revenue_col'), align: 'right', render: r => fmtNum(r.total_revenue) },
+          { key: 'total_cost', label: t('industry_reports.cost'), align: 'right', render: r => fmtNum(r.total_cost) },
+          { key: 'cost_pct', label: t('industry_reports.cost_pct'), align: 'center', render: r => <span style={{ color: r.cost_pct > 35 ? '#EF4444' : '#10B981', fontWeight: 600 }}>{fmtPct(r.cost_pct)}</span> },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderProductionCost(data, isRTL, color) {
+function renderProductionCost(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'أوامر الإنتاج' : 'Production Orders'} value={s.total_orders} />
-      <MetricCard color={color} label={isRTL ? 'المنتج' : 'Produced'} value={fmtNum(s.produced_qty)} sub={`${isRTL ? 'مخطط' : 'Planned'}: ${fmtNum(s.planned_qty)}`} />
-      <MetricCard color="#10B981" label={isRTL ? 'كفاءة الإنتاج' : 'Efficiency'} value={fmtPct(s.efficiency_pct)} />
-      <MetricCard color="#EF4444" label={isRTL ? 'نسبة الهالك' : 'Scrap Rate'} value={fmtPct(s.scrap_rate_pct)} alert={s.scrap_rate_pct > 5 ? '⚠️' : ''} />
-      <MetricCard color={color} label={isRTL ? 'التكلفة المخططة' : 'Planned Cost'} value={fmtNum(s.planned_cost)} />
-      <MetricCard color={color} label={isRTL ? 'التكلفة الفعلية' : 'Actual Cost'} value={fmtNum(s.total_actual_cost)} />
-      <MetricCard color={s.variance > 0 ? '#EF4444' : '#10B981'} label={isRTL ? 'الانحراف' : 'Variance'}
-        value={fmtNum(s.variance)} sub={`${fmtPct(s.variance_pct)} ${s.variance > 0 ? (isRTL ? 'تجاوز' : 'over') : (isRTL ? 'وفر' : 'under')}`} />
+      <MetricCard color={color} label={t('industry_reports.production_orders')} value={s.total_orders} />
+      <MetricCard color={color} label={t('industry_reports.produced')} value={fmtNum(s.produced_qty)} sub={`${t('industry_reports.planned')}: ${fmtNum(s.planned_qty)}`} />
+      <MetricCard color="#10B981" label={t('industry_reports.efficiency')} value={fmtPct(s.efficiency_pct)} />
+      <MetricCard color="#EF4444" label={t('industry_reports.scrap_rate')} value={fmtPct(s.scrap_rate_pct)} alert={s.scrap_rate_pct > 5 ? '⚠️' : ''} />
+      <MetricCard color={color} label={t('industry_reports.planned_cost')} value={fmtNum(s.planned_cost)} />
+      <MetricCard color={color} label={t('industry_reports.actual_cost')} value={fmtNum(s.total_actual_cost)} />
+      <MetricCard color={s.variance > 0 ? '#EF4444' : '#10B981'} label={t('industry_reports.variance')}
+        value={fmtNum(s.variance)} sub={`${fmtPct(s.variance_pct)} ${s.variance > 0 ? (t('industry_reports.over')) : (t('industry_reports.under'))}`} />
     </div>
     {data.orders?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>🏭 {isRTL ? 'أوامر الإنتاج' : 'Production Orders'}</h3>
+        <h3>🏭 {t('industry_reports.production_orders')}</h3>
         <DataTable color={color} rows={data.orders} columns={[
           { key: 'order_number', label: '#' },
-          { key: 'product_name', label: isRTL ? 'المنتج' : 'Product' },
-          { key: 'status', label: isRTL ? 'الحالة' : 'Status' },
-          { key: 'planned_qty', label: isRTL ? 'مخطط' : 'Planned', align: 'center', render: r => fmtNum(r.planned_qty) },
-          { key: 'produced_quantity', label: isRTL ? 'منتج' : 'Produced', align: 'center', render: r => fmtNum(r.produced_quantity) },
-          { key: 'scrapped_quantity', label: isRTL ? 'هالك' : 'Scrapped', align: 'center', render: r => fmtNum(r.scrapped_quantity) },
+          { key: 'product_name', label: t('industry_reports.product') },
+          { key: 'status', label: t('industry_reports.status') },
+          { key: 'planned_qty', label: t('industry_reports.planned'), align: 'center', render: r => fmtNum(r.planned_qty) },
+          { key: 'produced_quantity', label: t('industry_reports.produced_col'), align: 'center', render: r => fmtNum(r.produced_quantity) },
+          { key: 'scrapped_quantity', label: t('industry_reports.scrapped'), align: 'center', render: r => fmtNum(r.scrapped_quantity) },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderProgressBilling(data, isRTL, color) {
+function renderProgressBilling(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'المشاريع' : 'Projects'} value={s.total_projects} sub={`${s.active_projects || 0} ${isRTL ? 'نشط' : 'active'}`} />
-      <MetricCard color={color} label={isRTL ? 'إجمالي الميزانيات' : 'Total Budgets'} value={fmtNum(s.total_budget)} />
-      <MetricCard color="#10B981" label={isRTL ? 'إجمالي المفوتر' : 'Total Invoiced'} value={fmtNum(s.total_invoiced)} sub={fmtPct(s.overall_billing_pct)} />
-      <MetricCard color={color} label={isRTL ? 'إجمالي التكاليف' : 'Total Costs'} value={fmtNum(s.total_cost)} />
-      <MetricCard color={s.overall_profit >= 0 ? '#10B981' : '#EF4444'} label={isRTL ? 'الربح الإجمالي' : 'Overall Profit'} value={fmtNum(s.overall_profit)} />
+      <MetricCard color={color} label={t('industry_reports.projects')} value={s.total_projects} sub={`${s.active_projects || 0} ${t('industry_reports.active')}`} />
+      <MetricCard color={color} label={t('industry_reports.total_budgets')} value={fmtNum(s.total_budget)} />
+      <MetricCard color="#10B981" label={t('industry_reports.total_invoiced')} value={fmtNum(s.total_invoiced)} sub={fmtPct(s.overall_billing_pct)} />
+      <MetricCard color={color} label={t('industry_reports.total_costs')} value={fmtNum(s.total_cost)} />
+      <MetricCard color={s.overall_profit >= 0 ? '#10B981' : '#EF4444'} label={t('industry_reports.overall_profit')} value={fmtNum(s.overall_profit)} />
     </div>
     {data.projects?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>📋 {isRTL ? 'تفاصيل المشاريع' : 'Project Details'}</h3>
+        <h3>📋 {t('industry_reports.project_details')}</h3>
         <DataTable color={color} rows={data.projects} columns={[
           { key: 'project_code', label: '#' },
-          { key: 'project_name', label: isRTL ? 'المشروع' : 'Project' },
-          { key: 'status', label: isRTL ? 'الحالة' : 'Status' },
-          { key: 'progress_percentage', label: isRTL ? 'الإنجاز' : 'Progress', align: 'center',
+          { key: 'project_name', label: t('industry_reports.project') },
+          { key: 'status', label: t('industry_reports.status') },
+          { key: 'progress_percentage', label: t('industry_reports.progress'), align: 'center',
             render: r => (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ flex: 1, height: 6, background: '#e2e8f0', borderRadius: 3 }}>
@@ -203,119 +203,119 @@ function renderProgressBilling(data, isRTL, color) {
               </div>
             )
           },
-          { key: 'planned_budget', label: isRTL ? 'الميزانية' : 'Budget', align: 'right', render: r => fmtNum(r.planned_budget) },
-          { key: 'invoiced_amount', label: isRTL ? 'المفوتر' : 'Invoiced', align: 'right', render: r => fmtNum(r.invoiced_amount) },
-          { key: 'profit', label: isRTL ? 'الربح' : 'Profit', align: 'right', render: r => <span style={{ color: r.profit >= 0 ? '#10B981' : '#EF4444' }}>{fmtNum(r.profit)}</span> },
+          { key: 'planned_budget', label: t('industry_reports.budget'), align: 'right', render: r => fmtNum(r.planned_budget) },
+          { key: 'invoiced_amount', label: t('industry_reports.invoiced'), align: 'right', render: r => fmtNum(r.invoiced_amount) },
+          { key: 'profit', label: t('industry_reports.profit'), align: 'right', render: r => <span style={{ color: r.profit >= 0 ? '#10B981' : '#EF4444' }}>{fmtNum(r.profit)}</span> },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderDrugExpiry(data, isRTL, color) {
+function renderDrugExpiry(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color="#EF4444" label={isRTL ? 'منتهية الصلاحية' : 'Expired'} value={s.expired_count} alert={s.expired_count > 0 ? '🔴' : ''} />
-      <MetricCard color="#F59E0B" label={isRTL ? 'خلال 30 يوم' : 'Expires in 30d'} value={s.expiring_30_days} alert={s.expiring_30_days > 0 ? '🟡' : ''} />
-      <MetricCard color="#3B82F6" label={isRTL ? 'خلال 60 يوم' : 'Expires in 60d'} value={s.expiring_60_days} />
-      <MetricCard color="#10B981" label={isRTL ? 'خلال 90 يوم' : 'Expires in 90d'} value={s.expiring_90_days} />
-      <MetricCard color="#EF4444" label={isRTL ? 'القيمة المعرضة للخطر' : 'Value at Risk'} value={fmtNum(s.total_value_at_risk)} />
+      <MetricCard color="#EF4444" label={t('industry_reports.expired')} value={s.expired_count} alert={s.expired_count > 0 ? '🔴' : ''} />
+      <MetricCard color="#F59E0B" label={t('industry_reports.expires_30d')} value={s.expiring_30_days} alert={s.expiring_30_days > 0 ? '🟡' : ''} />
+      <MetricCard color="#3B82F6" label={t('industry_reports.expires_60d')} value={s.expiring_60_days} />
+      <MetricCard color="#10B981" label={t('industry_reports.expires_90d')} value={s.expiring_90_days} />
+      <MetricCard color="#EF4444" label={t('industry_reports.value_at_risk')} value={fmtNum(s.total_value_at_risk)} />
     </div>
     {data.items?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>💊 {isRTL ? 'المنتجات المعرضة للخطر' : 'At-Risk Products'}</h3>
+        <h3>💊 {t('industry_reports.at_risk_products')}</h3>
         <DataTable color={color} rows={data.items} columns={[
-          { key: 'product_name', label: isRTL ? 'المنتج' : 'Product' },
-          { key: 'batch_number', label: isRTL ? 'رقم الدفعة' : 'Batch #' },
-          { key: 'warehouse_name', label: isRTL ? 'المستودع' : 'Warehouse' },
-          { key: 'available_quantity', label: isRTL ? 'الكمية' : 'Qty', align: 'center', render: r => fmtNum(r.available_quantity) },
-          { key: 'expiry_date', label: isRTL ? 'الانتهاء' : 'Expiry', render: r => fmtDate(r.expiry_date) },
-          { key: 'days_left', label: isRTL ? 'المتبقي' : 'Days Left', align: 'center',
+          { key: 'product_name', label: t('industry_reports.product') },
+          { key: 'batch_number', label: t('industry_reports.batch_number') },
+          { key: 'warehouse_name', label: t('industry_reports.warehouse') },
+          { key: 'available_quantity', label: t('industry_reports.qty'), align: 'center', render: r => fmtNum(r.available_quantity) },
+          { key: 'expiry_date', label: t('industry_reports.expiry'), render: r => fmtDate(r.expiry_date) },
+          { key: 'days_left', label: t('industry_reports.days_left'), align: 'center',
             render: r => <span style={{ fontWeight: 700, color: r.days_left <= 0 ? '#EF4444' : r.days_left <= 30 ? '#F59E0B' : '#10B981' }}>{r.days_left}</span> },
-          { key: 'value_at_risk', label: isRTL ? 'القيمة' : 'Value', align: 'right', render: r => fmtNum(r.value_at_risk) },
+          { key: 'value_at_risk', label: t('industry_reports.value'), align: 'right', render: r => fmtNum(r.value_at_risk) },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderFleetTracking(data, isRTL, color) {
+function renderFleetTracking(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'إجمالي التوصيلات' : 'Total Deliveries'} value={s.total} />
-      <MetricCard color="#10B981" label={isRTL ? 'تم التسليم' : 'Delivered'} value={s.delivered} />
-      <MetricCard color="#F59E0B" label={isRTL ? 'في الطريق' : 'In Transit'} value={s.in_transit} />
-      <MetricCard color="#EF4444" label={isRTL ? 'ملغاة' : 'Cancelled'} value={s.cancelled} />
-      <MetricCard color={color} label={isRTL ? 'المركبات' : 'Vehicles'} value={s.vehicles_used} />
-      <MetricCard color={color} label={isRTL ? 'نسبة الإنجاز' : 'Completion Rate'} value={fmtPct(s.on_time_rate)} />
+      <MetricCard color={color} label={t('industry_reports.total_deliveries')} value={s.total} />
+      <MetricCard color="#10B981" label={t('industry_reports.delivered')} value={s.delivered} />
+      <MetricCard color="#F59E0B" label={t('industry_reports.in_transit')} value={s.in_transit} />
+      <MetricCard color="#EF4444" label={t('industry_reports.cancelled')} value={s.cancelled} />
+      <MetricCard color={color} label={t('industry_reports.vehicles')} value={s.vehicles_used} />
+      <MetricCard color={color} label={t('industry_reports.completion_rate')} value={fmtPct(s.on_time_rate)} />
     </div>
     {data.vehicles?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>🚛 {isRTL ? 'أداء المركبات' : 'Vehicle Performance'}</h3>
+        <h3>🚛 {t('industry_reports.vehicle_performance')}</h3>
         <DataTable color={color} rows={data.vehicles} columns={[
-          { key: 'vehicle_number', label: isRTL ? 'المركبة' : 'Vehicle' },
-          { key: 'driver_name', label: isRTL ? 'السائق' : 'Driver' },
-          { key: 'total_deliveries', label: isRTL ? 'الرحلات' : 'Trips', align: 'center' },
-          { key: 'completed', label: isRTL ? 'مكتمل' : 'Done', align: 'center' },
-          { key: 'completion_rate', label: isRTL ? 'نسبة الإنجاز' : 'Rate', align: 'center', render: r => fmtPct(r.completion_rate) },
-          { key: 'total_qty', label: isRTL ? 'الكمية' : 'Qty', align: 'right', render: r => fmtNum(r.total_qty) },
+          { key: 'vehicle_number', label: t('industry_reports.vehicle') },
+          { key: 'driver_name', label: t('industry_reports.driver') },
+          { key: 'total_deliveries', label: t('industry_reports.trips'), align: 'center' },
+          { key: 'completed', label: t('industry_reports.done'), align: 'center' },
+          { key: 'completion_rate', label: t('industry_reports.rate'), align: 'center', render: r => fmtPct(r.completion_rate) },
+          { key: 'total_qty', label: t('industry_reports.qty'), align: 'right', render: r => fmtNum(r.total_qty) },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderUtilization(data, isRTL, color) {
+function renderUtilization(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'الموظفون' : 'Employees'} value={s.total_employees} />
-      <MetricCard color={color} label={isRTL ? 'ساعات مفوترة' : 'Billable Hours'} value={fmtNum(s.total_billable_hours)} />
-      <MetricCard color={s.avg_utilization_pct >= 70 ? '#10B981' : '#F59E0B'} label={isRTL ? 'معدل الاستغلال' : 'Avg Utilization'}
+      <MetricCard color={color} label={t('industry_reports.employees')} value={s.total_employees} />
+      <MetricCard color={color} label={t('industry_reports.billable_hours')} value={fmtNum(s.total_billable_hours)} />
+      <MetricCard color={s.avg_utilization_pct >= 70 ? '#10B981' : '#F59E0B'} label={t('industry_reports.avg_utilization')}
         value={fmtPct(s.avg_utilization_pct)} alert={s.avg_utilization_pct >= 70 ? '✅' : '⚠️'} />
-      <MetricCard color={color} label={isRTL ? 'سعر الساعة الفعلي' : 'Eff. Hourly Rate'} value={fmtNum(s.effective_hourly_rate)} />
-      <MetricCard color={color} label={isRTL ? 'إيراد الخدمات' : 'Service Revenue'} value={fmtNum(s.service_revenue)} />
-      <MetricCard color={s.net_profit >= 0 ? '#10B981' : '#EF4444'} label={isRTL ? 'صافي الربح' : 'Net Profit'} value={fmtNum(s.net_profit)} />
+      <MetricCard color={color} label={t('industry_reports.eff_hourly_rate')} value={fmtNum(s.effective_hourly_rate)} />
+      <MetricCard color={color} label={t('industry_reports.service_revenue')} value={fmtNum(s.service_revenue)} />
+      <MetricCard color={s.net_profit >= 0 ? '#10B981' : '#EF4444'} label={t('industry_reports.net_profit')} value={fmtNum(s.net_profit)} />
     </div>
     {data.employees?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>👥 {isRTL ? 'أداء الموظفين' : 'Employee Performance'}</h3>
+        <h3>👥 {t('industry_reports.employee_performance')}</h3>
         <DataTable color={color} rows={data.employees} columns={[
-          { key: 'employee_name', label: isRTL ? 'الموظف' : 'Employee' },
-          { key: 'billable_hours', label: isRTL ? 'ساعات مفوترة' : 'Billable', align: 'center', render: r => fmtNum(r.billable_hours) },
-          { key: 'available_hours', label: isRTL ? 'متاحة' : 'Available', align: 'center' },
-          { key: 'utilization_pct', label: isRTL ? 'الاستغلال' : 'Util %', align: 'center',
+          { key: 'employee_name', label: t('industry_reports.employee') },
+          { key: 'billable_hours', label: t('industry_reports.billable_col'), align: 'center', render: r => fmtNum(r.billable_hours) },
+          { key: 'available_hours', label: t('industry_reports.available'), align: 'center' },
+          { key: 'utilization_pct', label: t('industry_reports.utilization_pct'), align: 'center',
             render: r => <span style={{ fontWeight: 600, color: r.utilization_pct >= 70 ? '#10B981' : '#F59E0B' }}>{fmtPct(r.utilization_pct)}</span> },
-          { key: 'tasks_count', label: isRTL ? 'المهام' : 'Tasks', align: 'center' },
-          { key: 'completed_tasks', label: isRTL ? 'مكتمل' : 'Done', align: 'center' },
+          { key: 'tasks_count', label: t('industry_reports.tasks'), align: 'center' },
+          { key: 'completed_tasks', label: t('industry_reports.done'), align: 'center' },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderWorkshopRevenue(data, isRTL, color) {
+function renderWorkshopRevenue(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'عدد الأعمال' : 'Total Jobs'} value={s.total_jobs} />
-      <MetricCard color={color} label={isRTL ? 'الإيرادات' : 'Revenue'} value={fmtNum(s.total_revenue)} />
-      <MetricCard color={color} label={isRTL ? 'متوسط قيمة العمل' : 'Avg Job Value'} value={fmtNum(s.avg_job_value)} />
-      <MetricCard color="#10B981" label={isRTL ? 'هامش الربح' : 'Gross Margin'} value={fmtPct(s.gross_margin_pct)} />
-      <MetricCard color={color} label={isRTL ? 'خدمات' : 'Services'} value={s.service_items} />
-      <MetricCard color={color} label={isRTL ? 'قطع غيار' : 'Parts'} value={s.parts_items} />
+      <MetricCard color={color} label={t('industry_reports.total_jobs')} value={s.total_jobs} />
+      <MetricCard color={color} label={t('industry_reports.revenue')} value={fmtNum(s.total_revenue)} />
+      <MetricCard color={color} label={t('industry_reports.avg_job_value')} value={fmtNum(s.avg_job_value)} />
+      <MetricCard color="#10B981" label={t('industry_reports.gross_margin_col')} value={fmtPct(s.gross_margin_pct)} />
+      <MetricCard color={color} label={t('industry_reports.services')} value={s.service_items} />
+      <MetricCard color={color} label={t('industry_reports.parts')} value={s.parts_items} />
     </div>
     {data.services?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>🔧 {isRTL ? 'تفاصيل الخدمات' : 'Service Breakdown'}</h3>
+        <h3>🔧 {t('industry_reports.service_breakdown')}</h3>
         <DataTable color={color} rows={data.services} columns={[
-          { key: 'service_name', label: isRTL ? 'الخدمة/القطعة' : 'Service/Part' },
-          { key: 'product_type', label: isRTL ? 'النوع' : 'Type', render: r => r.product_type === 'service' ? (isRTL ? 'خدمة' : 'Service') : (isRTL ? 'منتج' : 'Part') },
-          { key: 'job_count', label: isRTL ? 'العدد' : 'Jobs', align: 'center' },
-          { key: 'total_revenue', label: isRTL ? 'الإيراد' : 'Revenue', align: 'right', render: r => fmtNum(r.total_revenue) },
-          { key: 'margin', label: isRTL ? 'الربح' : 'Margin', align: 'right', render: r => fmtNum(r.margin) },
+          { key: 'service_name', label: t('industry_reports.service_part') },
+          { key: 'product_type', label: t('industry_reports.type'), render: r => r.product_type === 'service' ? t('industry_reports.service') : t('industry_reports.part') },
+          { key: 'job_count', label: t('industry_reports.jobs'), align: 'center' },
+          { key: 'total_revenue', label: t('industry_reports.revenue_col'), align: 'right', render: r => fmtNum(r.total_revenue) },
+          { key: 'margin', label: t('industry_reports.margin'), align: 'right', render: r => fmtNum(r.margin) },
           { key: 'margin_pct', label: '%', align: 'center', render: r => <span style={{ color: r.margin_pct >= 30 ? '#10B981' : '#EF4444' }}>{fmtPct(r.margin_pct)}</span> },
         ]} />
       </div>
@@ -323,88 +323,88 @@ function renderWorkshopRevenue(data, isRTL, color) {
   </>
 }
 
-function renderEcomReturns(data, isRTL, color) {
+function renderEcomReturns(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'إجمالي المبيعات' : 'Total Sales'} value={s.total_sales} sub={fmtNum(s.total_sales_value)} />
-      <MetricCard color="#EF4444" label={isRTL ? 'المرتجعات' : 'Returns'} value={s.total_returns} sub={fmtNum(s.total_return_value)} />
-      <MetricCard color={s.return_rate_pct > 10 ? '#EF4444' : '#10B981'} label={isRTL ? 'نسبة الإرجاع (عدد)' : 'Return Rate (count)'}
+      <MetricCard color={color} label={t('industry_reports.total_sales')} value={s.total_sales} sub={fmtNum(s.total_sales_value)} />
+      <MetricCard color="#EF4444" label={t('industry_reports.returns')} value={s.total_returns} sub={fmtNum(s.total_return_value)} />
+      <MetricCard color={s.return_rate_pct > 10 ? '#EF4444' : '#10B981'} label={t('industry_reports.return_rate_count')}
         value={fmtPct(s.return_rate_pct)} alert={s.return_rate_pct > 10 ? '⚠️' : '✅'} />
-      <MetricCard color={color} label={isRTL ? 'نسبة الإرجاع (قيمة)' : 'Return Rate (value)'} value={fmtPct(s.value_return_rate_pct)} />
-      <MetricCard color="#10B981" label={isRTL ? 'صافي المبيعات' : 'Net Sales'} value={fmtNum(s.net_sales)} />
+      <MetricCard color={color} label={t('industry_reports.return_rate_value')} value={fmtPct(s.value_return_rate_pct)} />
+      <MetricCard color="#10B981" label={t('industry_reports.net_sales')} value={fmtNum(s.net_sales)} />
     </div>
     {data.top_returned_products?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>📦 {isRTL ? 'أكثر المنتجات مرتجعاً' : 'Top Returned Products'}</h3>
+        <h3>📦 {t('industry_reports.top_returned_products')}</h3>
         <DataTable color={color} rows={data.top_returned_products} columns={[
-          { key: 'product_name', label: isRTL ? 'المنتج' : 'Product' },
-          { key: 'product_code', label: isRTL ? 'الكود' : 'Code' },
-          { key: 'return_count', label: isRTL ? 'عدد المرتجعات' : 'Returns', align: 'center' },
-          { key: 'returned_qty', label: isRTL ? 'الكمية' : 'Qty', align: 'center', render: r => fmtNum(r.returned_qty) },
-          { key: 'return_value', label: isRTL ? 'القيمة' : 'Value', align: 'right', render: r => fmtNum(r.return_value) },
+          { key: 'product_name', label: t('industry_reports.product') },
+          { key: 'product_code', label: t('industry_reports.code') },
+          { key: 'return_count', label: t('industry_reports.return_count'), align: 'center' },
+          { key: 'returned_qty', label: t('industry_reports.qty'), align: 'center', render: r => fmtNum(r.returned_qty) },
+          { key: 'return_value', label: t('industry_reports.value'), align: 'right', render: r => fmtNum(r.return_value) },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderAgentPerformance(data, isRTL, color) {
+function renderAgentPerformance(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'عدد المناديب' : 'Total Agents'} value={s.total_agents} />
-      <MetricCard color={color} label={isRTL ? 'إجمالي المبيعات' : 'Grand Total'} value={fmtNum(s.grand_total_sales)} />
-      <MetricCard color={color} label={isRTL ? 'متوسط لكل مندوب' : 'Avg per Agent'} value={fmtNum(s.avg_sales_per_agent)} />
+      <MetricCard color={color} label={t('industry_reports.total_agents')} value={s.total_agents} />
+      <MetricCard color={color} label={t('industry_reports.grand_total')} value={fmtNum(s.grand_total_sales)} />
+      <MetricCard color={color} label={t('industry_reports.avg_per_agent')} value={fmtNum(s.avg_sales_per_agent)} />
     </div>
     {data.agents?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>👤 {isRTL ? 'أداء المناديب' : 'Agent Breakdown'}</h3>
+        <h3>👤 {t('industry_reports.agent_breakdown')}</h3>
         <DataTable color={color} rows={data.agents} columns={[
-          { key: 'agent_full_name', label: isRTL ? 'المندوب' : 'Agent', render: r => r.agent_full_name || r.agent_name },
-          { key: 'invoice_count', label: isRTL ? 'الفواتير' : 'Invoices', align: 'center' },
-          { key: 'total_sales', label: isRTL ? 'المبيعات' : 'Sales', align: 'right', render: r => fmtNum(r.total_sales) },
-          { key: 'total_collected', label: isRTL ? 'المحصّل' : 'Collected', align: 'right', render: r => fmtNum(r.total_collected) },
-          { key: 'collection_rate_pct', label: isRTL ? 'التحصيل' : 'Collection', align: 'center',
+          { key: 'agent_full_name', label: t('industry_reports.agent'), render: r => r.agent_full_name || r.agent_name },
+          { key: 'invoice_count', label: t('industry_reports.invoices'), align: 'center' },
+          { key: 'total_sales', label: t('industry_reports.sales'), align: 'right', render: r => fmtNum(r.total_sales) },
+          { key: 'total_collected', label: t('industry_reports.collected'), align: 'right', render: r => fmtNum(r.total_collected) },
+          { key: 'collection_rate_pct', label: t('industry_reports.collection'), align: 'center',
             render: r => <span style={{ color: r.collection_rate_pct >= 80 ? '#10B981' : '#EF4444' }}>{fmtPct(r.collection_rate_pct)}</span> },
-          { key: 'customer_count', label: isRTL ? 'العملاء' : 'Customers', align: 'center' },
-          { key: 'share_pct', label: isRTL ? 'الحصة' : 'Share', align: 'center', render: r => fmtPct(r.share_pct) },
+          { key: 'customer_count', label: t('industry_reports.customers'), align: 'center' },
+          { key: 'share_pct', label: t('industry_reports.share'), align: 'center', render: r => fmtPct(r.share_pct) },
         ]} />
       </div>
     )}
     {data.top_customers?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>🏆 {isRTL ? 'أكبر العملاء' : 'Top Customers'}</h3>
+        <h3>🏆 {t('industry_reports.top_customers')}</h3>
         <DataTable color={color} rows={data.top_customers} columns={[
-          { key: 'customer_name', label: isRTL ? 'العميل' : 'Customer' },
-          { key: 'order_count', label: isRTL ? 'الطلبات' : 'Orders', align: 'center' },
-          { key: 'total_value', label: isRTL ? 'القيمة' : 'Value', align: 'right', render: r => fmtNum(r.total_value) },
+          { key: 'customer_name', label: t('industry_reports.customer') },
+          { key: 'order_count', label: t('industry_reports.orders'), align: 'center' },
+          { key: 'total_value', label: t('industry_reports.value'), align: 'right', render: r => fmtNum(r.total_value) },
         ]} />
       </div>
     )}
   </>
 }
 
-function renderCropYield(data, isRTL, color) {
+function renderCropYield(data, t, color) {
   const s = data.summary || {}
   return <>
     <div className="metrics-grid">
-      <MetricCard color={color} label={isRTL ? 'المحاصيل' : 'Crops'} value={s.total_crops} />
-      <MetricCard color={color} label={isRTL ? 'الإيرادات' : 'Revenue'} value={fmtNum(s.total_revenue)} />
-      <MetricCard color={color} label={isRTL ? 'التكلفة المباشرة' : 'Direct Cost'} value={fmtNum(s.total_direct_cost)} />
-      <MetricCard color="#10B981" label={isRTL ? 'هامش الربح' : 'Gross Margin'} value={fmtPct(s.gross_margin_pct)} />
-      <MetricCard color={color} label={isRTL ? 'مصاريف التشغيل' : 'Operating Exp.'} value={fmtNum(s.total_operating_expenses)} />
-      <MetricCard color={s.net_farm_income >= 0 ? '#10B981' : '#EF4444'} label={isRTL ? 'صافي دخل المزرعة' : 'Net Farm Income'} value={fmtNum(s.net_farm_income)} />
+      <MetricCard color={color} label={t('industry_reports.crops')} value={s.total_crops} />
+      <MetricCard color={color} label={t('industry_reports.revenue')} value={fmtNum(s.total_revenue)} />
+      <MetricCard color={color} label={t('industry_reports.direct_cost')} value={fmtNum(s.total_direct_cost)} />
+      <MetricCard color="#10B981" label={t('industry_reports.gross_margin_col')} value={fmtPct(s.gross_margin_pct)} />
+      <MetricCard color={color} label={t('industry_reports.operating_exp')} value={fmtNum(s.total_operating_expenses)} />
+      <MetricCard color={s.net_farm_income >= 0 ? '#10B981' : '#EF4444'} label={t('industry_reports.net_farm_income')} value={fmtNum(s.net_farm_income)} />
     </div>
     {data.crops?.length > 0 && (
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
-        <h3>🌾 {isRTL ? 'تفاصيل المحاصيل' : 'Crop Details'}</h3>
+        <h3>🌾 {t('industry_reports.crop_details')}</h3>
         <DataTable color={color} rows={data.crops} columns={[
-          { key: 'product_name', label: isRTL ? 'المحصول' : 'Crop' },
-          { key: 'total_qty_sold', label: isRTL ? 'الكمية' : 'Qty', align: 'center', render: r => fmtNum(r.total_qty_sold) },
-          { key: 'total_revenue', label: isRTL ? 'الإيراد' : 'Revenue', align: 'right', render: r => fmtNum(r.total_revenue) },
-          { key: 'total_cost', label: isRTL ? 'التكلفة' : 'Cost', align: 'right', render: r => fmtNum(r.total_cost) },
-          { key: 'profit', label: isRTL ? 'الربح' : 'Profit', align: 'right', render: r => <span style={{ color: r.profit >= 0 ? '#10B981' : '#EF4444' }}>{fmtNum(r.profit)}</span> },
+          { key: 'product_name', label: t('industry_reports.crop') },
+          { key: 'total_qty_sold', label: t('industry_reports.qty'), align: 'center', render: r => fmtNum(r.total_qty_sold) },
+          { key: 'total_revenue', label: t('industry_reports.revenue_col'), align: 'right', render: r => fmtNum(r.total_revenue) },
+          { key: 'total_cost', label: t('industry_reports.cost'), align: 'right', render: r => fmtNum(r.total_cost) },
+          { key: 'profit', label: t('industry_reports.profit'), align: 'right', render: r => <span style={{ color: r.profit >= 0 ? '#10B981' : '#EF4444' }}>{fmtNum(r.profit)}</span> },
           { key: 'margin_pct', label: '%', align: 'center', render: r => fmtPct(r.margin_pct) },
         ]} />
       </div>
@@ -431,7 +431,7 @@ const RENDERERS = {
 // ═══════════════════════════════════════════
 export default function IndustryReport() {
   const { reportType } = useParams()
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isRTL = i18n.language === 'ar'
 
   const [data, setData] = useState(null)
@@ -461,8 +461,8 @@ export default function IndustryReport() {
   if (!config) {
     return (
       <div className="workspace fade-in">
-        <div className="workspace-header"><BackButton /><h1>❌ {isRTL ? 'غير موجود' : 'Not Found'}</h1></div>
-        <p>{isRTL ? 'هذا التقرير غير موجود.' : 'This report type does not exist.'}</p>
+        <div className="workspace-header"><BackButton /><h1>❌ {t('industry_reports.not_found')}</h1></div>
+        <p>{t('industry_reports.report_not_found')}</p>
       </div>
     )
   }
@@ -496,22 +496,22 @@ export default function IndustryReport() {
             borderTopColor: config.color, borderRadius: '50%',
             animation: 'spin 0.8s linear infinite', margin: '0 auto 16px',
           }} />
-          <p style={{ color: '#64748b' }}>{isRTL ? 'جاري التحميل...' : 'Loading...'}</p>
+          <p style={{ color: '#64748b' }}>{t('industry_reports.loading')}</p>
         </div>
       ) : error ? (
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
           <p style={{ color: '#EF4444', fontSize: 16, marginBottom: 12 }}>❌ {error}</p>
           <button onClick={fetchReport} className="btn btn-primary" style={{ padding: '8px 20px' }}>
-            {isRTL ? 'إعادة المحاولة' : 'Retry'}
+            {t('industry_reports.retry')}
           </button>
         </div>
       ) : data && renderFn ? (
         <div style={{ display: 'grid', gap: 16 }}>
-          {renderFn(data, isRTL, config.color)}
+          {renderFn(data, t, config.color)}
         </div>
       ) : (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-          {isRTL ? 'لا توجد بيانات لهذه الفترة' : 'No data for this period'}
+          {t('industry_reports.no_data')}
         </div>
       )}
 

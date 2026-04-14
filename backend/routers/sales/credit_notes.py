@@ -128,6 +128,11 @@ def get_sales_credit_note(note_id: int, current_user: dict = Depends(get_current
         if not note:
             raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
 
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if note.branch_id:
+            validate_branch_access(current_user, note.branch_id)
+
         lines = db.execute(text("""
             SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
             FROM invoice_lines il
@@ -187,6 +192,10 @@ def create_sales_credit_note(
 
         # Calculate totals
         inv_date = data.get("invoice_date", str(date.today()))
+        # SLS-010: Prevent posting to closed fiscal periods
+        from utils.accounting import check_fiscal_period_open
+        check_fiscal_period_open(db, inv_date)
+
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
@@ -374,7 +383,8 @@ def create_sales_credit_note(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating sales credit note: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -469,6 +479,11 @@ def get_sales_debit_note(note_id: int, current_user: dict = Depends(get_current_
         if not note:
             raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
 
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if note.branch_id:
+            validate_branch_access(current_user, note.branch_id)
+
         lines = db.execute(text("""
             SELECT il.*, pr.name AS product_name, pr.sku AS product_sku
             FROM invoice_lines il
@@ -520,6 +535,10 @@ def create_sales_debit_note(
                 raise HTTPException(status_code=400, detail="الفاتورة لا تخص هذا العميل")
 
         inv_date = data.get("invoice_date", str(date.today()))
+        # SLS-010: Prevent posting to closed fiscal periods
+        from utils.accounting import check_fiscal_period_open
+        check_fiscal_period_open(db, inv_date)
+
         base_currency = get_base_currency(db)
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
@@ -690,6 +709,7 @@ def create_sales_debit_note(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating sales debit note: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

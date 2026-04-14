@@ -335,7 +335,8 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
         
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         conn.close()
 
@@ -469,7 +470,8 @@ def update_employee(
         return {"message": "Updated successfully"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         conn.close()
 
@@ -534,7 +536,7 @@ def get_payroll_period(period_id: int, company_id: str = Depends(get_current_use
         conn.close()
 
 @router.post("/payroll-periods", dependencies=[Depends(require_permission(["hr.manage", "hr.payroll.manage"]))])
-def create_payroll_period(period: PayrollPeriodCreate, company_id: str = Depends(get_current_user_company)):
+def create_payroll_period(period: PayrollPeriodCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         # Check overlap? For now skip complex validation
@@ -549,14 +551,20 @@ def create_payroll_period(period: PayrollPeriodCreate, company_id: str = Depends
             "pay": period.payment_date
         })
         conn.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="payroll_period.create",
+                     resource_type="payroll_period", resource_id=0, details={"name": period.name})
         return {"message": "Created successfully"}
     finally:
         conn.close()
 
 @router.get("/payroll-periods/{period_id}/entries", response_model=List[PayrollEntryResponse], dependencies=[Depends(require_permission(["hr.view", "hr.payroll.view"]))])
-def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, company_id: str = Depends(get_current_user_company)):
+def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT pe.id, 
                    e.first_name || ' ' || e.last_name as employee_name,
@@ -633,18 +641,26 @@ def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(g
         }).fetchone()
         
         conn.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="loan.create",
+                     resource_type="employee_loan", resource_id=result.id,
+                     details={"employee_id": loan.employee_id, "amount": loan.amount})
         return {**loan.model_dump(), "id": result.id, "monthly_installment": result.monthly_installment, 
                 "paid_amount": result.paid_amount, "status": result.status, "created_at": result.created_at}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.get("/loans", dependencies=[Depends(require_permission("hr.loans.view"))])
-def list_loans(branch_id: Optional[int] = None, company_id: str = Depends(get_current_user_company)):
+def list_loans(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT l.*, e.first_name || ' ' || e.last_name as employee_name 
             FROM employee_loans l
@@ -661,8 +677,9 @@ def list_loans(branch_id: Optional[int] = None, company_id: str = Depends(get_cu
         loans = conn.execute(text(query), params).fetchall()
         return [dict(row._mapping) for row in loans]
     except Exception as e:
-        print(f"ERROR list_loans: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("list_loans error: %s", e)
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -713,15 +730,21 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
             )
         
         trans.commit()
+        user_id_val = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username_val = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id_val, username=username_val, action="loan.approve",
+                     resource_type="employee_loan", resource_id=loan_id,
+                     details={"amount": float(loan.amount), "employee_id": loan.employee_id})
         return {"status": "active"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.post("/payroll-periods/{period_id}/generate", dependencies=[Depends(require_permission(["hr.manage", "hr.payroll.manage"]))])
-def generate_payroll(period_id: int, company_id: str = Depends(get_current_user_company)):
+def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -859,10 +882,16 @@ def generate_payroll(period_id: int, company_id: str = Depends(get_current_user_
             count += 1
             
         trans.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="payroll.generate",
+                     resource_type="payroll_period", resource_id=period_id,
+                     details={"employee_count": count})
         return {"message": f"Generated payroll for {count} employees"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1101,11 +1130,15 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
             pass  # Non-blocking
 
         trans.commit()
+        log_activity(conn, user_id=user_id, username=current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", ""),
+                     action="payroll.post", resource_type="payroll_period", resource_id=period_id,
+                     details={"journal_entry": je_num, "total_net": float(total_net)})
         return {"message": "Payroll posted successfully", "journal_entry": je_num}
 
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1120,21 +1153,26 @@ def list_departments(company_id: str = Depends(get_current_user_company)):
         conn.close()
 
 @router.post("/departments", dependencies=[Depends(require_permission("hr.manage"))])
-def create_department(dept: DepartmentCreate, company_id: str = Depends(get_current_user_company)):
+def create_department(dept: DepartmentCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
         conn.execute(text("INSERT INTO departments (department_name) VALUES (:name)"), {"name": dept.department_name})
         trans.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="department.create",
+                     resource_type="department", resource_id=0, details={"name": dept.department_name})
         return {"message": "Department created"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.delete("/departments/{dept_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def delete_department(dept_id: int, company_id: str = Depends(get_current_user_company)):
+def delete_department(dept_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -1145,12 +1183,17 @@ def delete_department(dept_id: int, company_id: str = Depends(get_current_user_c
 
         conn.execute(text("DELETE FROM departments WHERE id = :id"), {"id": dept_id})
         trans.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="department.delete",
+                     resource_type="department", resource_id=dept_id, details={})
         return {"message": "Department deleted"}
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1179,22 +1222,27 @@ def list_positions(company_id: str = Depends(get_current_user_company)):
         conn.close()
 
 @router.post("/positions", dependencies=[Depends(require_permission("hr.manage"))])
-def create_position(pos: PositionCreate, company_id: str = Depends(get_current_user_company)):
+def create_position(pos: PositionCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
         conn.execute(text("INSERT INTO employee_positions (position_name, department_id) VALUES (:name, :did)"), 
                      {"name": pos.position_name, "did": pos.department_id})
         trans.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="position.create",
+                     resource_type="position", resource_id=0, details={"name": pos.position_name})
         return {"message": "Position created"}
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
 @router.delete("/positions/{pos_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def delete_position(pos_id: int, company_id: str = Depends(get_current_user_company)):
+def delete_position(pos_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     trans = conn.begin()
     try:
@@ -1205,12 +1253,17 @@ def delete_position(pos_id: int, company_id: str = Depends(get_current_user_comp
 
         conn.execute(text("DELETE FROM employee_positions WHERE id = :id"), {"id": pos_id})
         trans.commit()
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="position.delete",
+                     resource_type="position", resource_id=pos_id, details={})
         return {"message": "Position deleted"}
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1299,7 +1352,8 @@ def check_in(current_user: UserResponse = Depends(get_current_user), company_id:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1359,7 +1413,8 @@ def check_out(
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1593,8 +1648,9 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
         return response
     except Exception as e:
         conn.rollback()
-        print(f"Error creating leave: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error creating leave: %s", e)
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 
@@ -1608,6 +1664,8 @@ def list_leave_requests(branch_id: Optional[int] = None, current_user: UserRespo
     
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         # Check if manager
         is_manager = has_permission(current_user, "hr.leaves.manage")
         
@@ -1676,6 +1734,13 @@ def update_leave_status(leave_id: int, status_in: str, current_user: UserRespons
                 conn.commit()
         except Exception:
             pass  # Non-blocking
+
+        # Audit log
+        user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
+        log_activity(conn, user_id=user_id, username=username, action="leave.status_update",
+                     resource_type="leave_request", resource_id=leave_id,
+                     details={"new_status": status_in})
 
         return {"message": "Status updated"}
     finally:
@@ -1758,7 +1823,8 @@ def calculate_end_of_service(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         conn.close()
 

@@ -60,7 +60,7 @@ const KPIHub = () => {
             <div className="workspace-header" style={{ marginBottom: '1.5rem' }}>
                 <h1 className="workspace-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <BarChart3 size={24} />
-                    {isRTL ? 'مركز لوحات الأداء' : 'KPI Dashboard Hub'}
+                    {t('kpi.kpi_dashboard_hub')}
                 </h1>
                 <p className="workspace-subtitle">
                     {isRTL
@@ -86,7 +86,7 @@ const KPIHub = () => {
                 <Compass size={32} strokeWidth={1.5} />
                 <div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>
-                        {isRTL ? '🎯 لوحتي الذكية' : '🎯 My Smart Dashboard'}
+                        {t('kpi.my_smart_dashboard')}
                     </div>
                     <div style={{ fontSize: '0.82rem', opacity: 0.85, marginTop: 2 }}>
                         {isRTL
@@ -144,7 +144,7 @@ const KPIHub = () => {
                                         background: color + '15', color: color,
                                         padding: '2px 8px', borderRadius: 20,
                                     }}>
-                                        {isRTL ? 'افتراضي' : 'Default'}
+                                        {t('kpi.default')}
                                     </span>
                                 )}
 

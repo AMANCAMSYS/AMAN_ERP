@@ -1,6 +1,7 @@
+import logging
 from datetime import datetime, date
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from routers.auth import get_current_user
@@ -11,6 +12,8 @@ from utils.fiscal_lock import check_fiscal_period_open
 from utils.exports import generate_excel, generate_pdf, create_export_response
 from utils.audit import log_activity
 from schemas import UserResponse
+
+logger = logging.getLogger(__name__)
 from schemas.manufacturing_advanced import (
     WorkCenterCreate, WorkCenterResponse,
     RouteCreate, RouteResponse,
@@ -52,7 +55,7 @@ def list_work_centers(
         conn.close()
 
 @router.post("/work-centers", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_work_center(wc: WorkCenterCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_work_center(wc: WorkCenterCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         new_wc = conn.execute(text("""
@@ -65,15 +68,22 @@ def create_work_center(wc: WorkCenterCreate, current_user: UserResponse = Depend
             "ccid": wc.cost_center_id, "accid": wc.default_expense_account_id
         }).fetchone()
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_work_center", resource_type="work_centers",
+                     resource_id=str(new_wc.id), details={"name": wc.name, "code": wc.code},
+                     request=request)
         return dict(new_wc._mapping)
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating work center: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء مركز العمل")
     finally:
         conn.close()
 
 @router.put("/work-centers/{wc_id}", response_model=WorkCenterResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
-def update_work_center(wc_id: int, wc: WorkCenterCreate, current_user: UserResponse = Depends(get_current_user)):
+def update_work_center(wc_id: int, wc: WorkCenterCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         updated = conn.execute(text("""
@@ -90,10 +100,17 @@ def update_work_center(wc_id: int, wc: WorkCenterCreate, current_user: UserRespo
         if not updated:
             raise HTTPException(status_code=404, detail="Work center not found")
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_work_center", resource_type="work_centers",
+                     resource_id=str(wc_id), details={"name": wc.name},
+                     request=request)
         return dict(updated._mapping)
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error updating work center {wc_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في تحديث مركز العمل")
     finally:
         conn.close()
 
@@ -131,28 +148,30 @@ def list_routes(current_user: UserResponse = Depends(get_current_user)):
         conn.close()
 
 @router.post("/routes", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_route(route: RouteCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_route(route: RouteCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
         # Create Header
         new_route = conn.execute(text("""
-            INSERT INTO manufacturing_routes (name, product_id, is_active, description)
-            VALUES (:name, :pid, :active, :desc)
+            INSERT INTO manufacturing_routes (name, product_id, bom_id, is_default, is_active, description)
+            VALUES (:name, :pid, :bid, :default, :active, :desc)
             RETURNING *
         """), {
-            "name": route.name, "pid": route.product_id, 
+            "name": route.name, "pid": route.product_id,
+            "bid": route.bom_id, "default": route.is_default,
             "active": route.is_active, "desc": route.description
         }).fetchone()
         
         # Create Operations
         for op in route.operations:
             conn.execute(text("""
-                INSERT INTO manufacturing_operations (route_id, sequence, work_center_id, description, setup_time, cycle_time)
-                VALUES (:rid, :seq, :wcid, :desc, :setup, :cycle)
+                INSERT INTO manufacturing_operations (route_id, sequence, name, work_center_id, description, setup_time, cycle_time, labor_rate_per_hour)
+                VALUES (:rid, :seq, :name, :wcid, :desc, :setup, :cycle, :labor)
             """), {
-                "rid": new_route.id, "seq": op.sequence, "wcid": op.work_center_id,
-                "desc": op.description, "setup": op.setup_time, "cycle": op.cycle_time
+                "rid": new_route.id, "seq": op.sequence, "name": op.name, "wcid": op.work_center_id,
+                "desc": op.description, "setup": op.setup_time, "cycle": op.cycle_time,
+                "labor": op.labor_rate_per_hour
             })
             
         trans.commit()
@@ -173,15 +192,22 @@ def create_route(route: RouteCreate, current_user: UserResponse = Depends(get_cu
             route_dict['product_name'] = prod.product_name if prod else None
         else:
             route_dict['product_name'] = None
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_route", resource_type="manufacturing_routes",
+                     resource_id=str(new_route.id), details={"name": route.name},
+                     request=request)
         return route_dict
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating route: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء المسار")
     finally:
         conn.close()
 
 @router.put("/routes/{route_id}", response_model=RouteResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
-def update_route(route_id: int, route: RouteCreate, current_user: UserResponse = Depends(get_current_user)):
+def update_route(route_id: int, route: RouteCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -190,17 +216,17 @@ def update_route(route_id: int, route: RouteCreate, current_user: UserResponse =
             raise HTTPException(status_code=404, detail="Route not found")
 
         conn.execute(text("""
-            UPDATE manufacturing_routes SET name=:name, product_id=:pid, is_active=:active, description=:desc, updated_at=NOW()
+            UPDATE manufacturing_routes SET name=:name, product_id=:pid, bom_id=:bid, is_default=:default, is_active=:active, description=:desc, updated_at=NOW()
             WHERE id=:id
-        """), {"name": route.name, "pid": route.product_id, "active": route.is_active, "desc": route.description, "id": route_id})
+        """), {"name": route.name, "pid": route.product_id, "bid": route.bom_id, "default": route.is_default, "active": route.is_active, "desc": route.description, "id": route_id})
 
         # Replace operations: delete old ones & insert new
         conn.execute(text("DELETE FROM manufacturing_operations WHERE route_id = :rid"), {"rid": route_id})
         for op in route.operations:
             conn.execute(text("""
-                INSERT INTO manufacturing_operations (route_id, sequence, work_center_id, description, setup_time, cycle_time)
-                VALUES (:rid, :seq, :wcid, :desc, :setup, :cycle)
-            """), {"rid": route_id, "seq": op.sequence, "wcid": op.work_center_id, "desc": op.description, "setup": op.setup_time, "cycle": op.cycle_time})
+                INSERT INTO manufacturing_operations (route_id, sequence, name, work_center_id, description, setup_time, cycle_time, labor_rate_per_hour)
+                VALUES (:rid, :seq, :name, :wcid, :desc, :setup, :cycle, :labor)
+            """), {"rid": route_id, "seq": op.sequence, "name": op.name, "wcid": op.work_center_id, "desc": op.description, "setup": op.setup_time, "cycle": op.cycle_time, "labor": op.labor_rate_per_hour})
 
         trans.commit()
 
@@ -213,12 +239,17 @@ def update_route(route_id: int, route: RouteCreate, current_user: UserResponse =
             LEFT JOIN work_centers wc ON mo.work_center_id = wc.id WHERE mo.route_id = :rid ORDER BY mo.sequence
         """), {"rid": route_id}).fetchall()
         route_dict['operations'] = [dict(op._mapping) for op in ops]
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_route", resource_type="manufacturing_routes",
+                     resource_id=str(route_id), details={"name": route.name},
+                     request=request)
         return route_dict
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error updating route {route_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في تحديث المسار")
     finally:
         conn.close()
 
@@ -267,7 +298,7 @@ def list_boms(current_user: UserResponse = Depends(get_current_user)):
         conn.close()
 
 @router.post("/boms", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_bom(bom: BOMCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_bom(bom: BOMCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -337,10 +368,17 @@ def create_bom(bom: BOMCreate, current_user: UserResponse = Depends(get_current_
         """), {"bid": new_bom.id}).fetchall()
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_bom", resource_type="bill_of_materials",
+                     resource_id=str(new_bom.id), details={"name": bom.name, "code": bom.code},
+                     request=request)
         return bom_dict
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating BOM: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء قائمة المواد")
     finally:
         conn.close()
 
@@ -376,7 +414,7 @@ def get_bom(bom_id: int, current_user: UserResponse = Depends(get_current_user))
         conn.close()
 
 @router.put("/boms/{bom_id}", response_model=BOMResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
-def update_bom(bom_id: int, bom: BOMCreate, current_user: UserResponse = Depends(get_current_user)):
+def update_bom(bom_id: int, bom: BOMCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -434,12 +472,17 @@ def update_bom(bom_id: int, bom: BOMCreate, current_user: UserResponse = Depends
             LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid
         """), {"bid": bom_id}).fetchall()
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_bom", resource_type="bill_of_materials",
+                     resource_id=str(bom_id), details={"name": bom.name},
+                     request=request)
         return bom_dict
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error updating BOM {bom_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في تحديث قائمة المواد")
     finally:
         conn.close()
 
@@ -759,13 +802,25 @@ def list_all_operations(
         conn.close()
 
 @router.post("/orders", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_production_order(order: ProductionOrderCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_production_order(order: ProductionOrderCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
         # Generate Order Number if not provided
         if not order.order_number:
             order.order_number = f"PO-{datetime.now().strftime('%y%m%d%H%M%S')}"
+
+        # Auto-detect default routing if route_id not provided
+        route_id = order.route_id
+        if not route_id and order.product_id:
+            default_route = conn.execute(text("""
+                SELECT id FROM manufacturing_routes
+                WHERE product_id = :pid AND is_active = true
+                ORDER BY is_default DESC, id ASC
+                LIMIT 1
+            """), {"pid": order.product_id}).fetchone()
+            if default_route:
+                route_id = default_route.id
 
         # 1. Create Order Header
         new_order = conn.execute(text("""
@@ -775,26 +830,40 @@ def create_production_order(order: ProductionOrderCreate, current_user: UserResp
             RETURNING *
         """), {
             "num": order.order_number, "pid": order.product_id, "bid": order.bom_id,
-            "rid": order.route_id, "qty": order.quantity, "status": order.status or 'draft',
+            "rid": route_id, "qty": order.quantity, "status": order.status or 'draft',
             "start": order.start_date, "due": order.due_date, 
             "whid": order.warehouse_id, "dwhid": order.destination_warehouse_id,
             "notes": order.notes, "uid": current_user.id
         }).fetchone()
         new_order_id = new_order.id
 
-        # 2. Create Order Operations (Copy from Route)
-        if order.route_id:
+        # 2. Create Order Operations (Copy from Route) & calculate labor cost
+        total_labor_cost = 0.0
+        if route_id:
             route_ops = conn.execute(text("""
                 SELECT * FROM manufacturing_operations WHERE route_id = :rid ORDER BY sequence
-            """), {"rid": order.route_id}).fetchall()
+            """), {"rid": route_id}).fetchall()
 
             for op in route_ops:
                 conn.execute(text("""
-                    INSERT INTO production_order_operations (production_order_id, operation_id, work_center_id, status)
-                    VALUES (:poid, :opid, :wcid, 'pending')
+                    INSERT INTO production_order_operations (production_order_id, operation_id, work_center_id, status, sequence)
+                    VALUES (:poid, :opid, :wcid, 'pending', :seq)
                 """), {
-                    "poid": new_order_id, "opid": op.id, "wcid": op.work_center_id
+                    "poid": new_order_id, "opid": op.id, "wcid": op.work_center_id, "seq": op.sequence
                 })
+                # Calculate labor cost: (setup_time + cycle_time * qty) / 60 * labor_rate
+                setup = float(op.setup_time or 0)
+                run = float(op.cycle_time or 0) * float(order.quantity)
+                rate = float(getattr(op, 'labor_rate_per_hour', 0) or 0)
+                total_labor_cost += ((setup + run) / 60.0) * rate
+
+            # Update standard labor cost on the order
+            if total_labor_cost > 0:
+                conn.execute(text("""
+                    UPDATE production_orders
+                    SET actual_labor_cost = :lc
+                    WHERE id = :oid
+                """), {"lc": round(total_labor_cost, 4), "oid": new_order_id})
 
         trans.commit()
         
@@ -824,16 +893,24 @@ def create_production_order(order: ProductionOrderCreate, current_user: UserResp
         """), {"poid": new_order_id}).fetchall()
         order_dict['operations'] = [dict(op._mapping) for op in ops]
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_production_order", resource_type="production_orders",
+                     resource_id=str(new_order_id),
+                     details={"order_number": order.order_number, "product_id": order.product_id, "quantity": float(order.quantity)},
+                     request=request)
         return order_dict
 
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating production order: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء أمر الإنتاج")
     finally:
         conn.close()
 
 @router.post("/orders/{order_id}/start", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def start_production_order(order_id: int, current_user: UserResponse = Depends(get_current_user)):
+def start_production_order(order_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -925,6 +1002,9 @@ def start_production_order(order_id: int, current_user: UserResponse = Depends(g
             rm_acc_id = settings.get('acc_map_raw_materials') or settings.get('acc_map_inventory')
             
             if wip_acc_id and rm_acc_id and total_material_cost > 0:
+                # Validate fiscal period is open before creating GL entry
+                check_fiscal_period_open(conn, date.today())
+
                 # Create Journal Header
                 journal = conn.execute(text("""
                     INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, currency, exchange_rate, created_by)
@@ -957,12 +1037,11 @@ def start_production_order(order_id: int, current_user: UserResponse = Depends(g
         trans.commit()
 
         # Audit log
-        try:
-            log_activity(conn, current_user.id, current_user.username, "start_production",
-                         "production_orders", str(order_id),
-                         {"material_cost": total_material_cost})
-        except Exception:
-            pass
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="start_production", resource_type="production_orders",
+                     resource_id=str(order_id),
+                     details={"material_cost": total_material_cost},
+                     request=request)
 
         # Re-fetch full object
         o = conn.execute(text("""
@@ -981,12 +1060,13 @@ def start_production_order(order_id: int, current_user: UserResponse = Depends(g
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         conn.close()
 
 @router.post("/orders/{order_id}/complete", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def complete_production_order(order_id: int, current_user: UserResponse = Depends(get_current_user)):
+def complete_production_order(order_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -1116,7 +1196,10 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
         overhead_absorption_acc_id = settings.get('acc_map_mfg_overhead') # e.g., Factory Overhead Absorption
 
         if wip_acc_id and fg_acc_id and total_production_cost > 0:
-             # Create Journal Header
+            # Validate fiscal period is open before creating GL entry
+            check_fiscal_period_open(conn, date.today())
+
+            # Create Journal Header
             journal = conn.execute(text("""
                 INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, currency, exchange_rate, created_by)
                 VALUES (:enum, CURRENT_DATE, :ref, :desc, 'posted', :currency, 1.0, :uid)
@@ -1195,12 +1278,11 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
         trans.commit()
 
         # Audit log
-        try:
-            log_activity(conn, current_user.id, current_user.username, "complete_production",
-                         "production_orders", str(order_id),
-                         {"quantity": float(order.quantity), "total_cost": total_production_cost})
-        except Exception:
-            pass
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="complete_production", resource_type="production_orders",
+                     resource_id=str(order_id),
+                     details={"quantity": float(order.quantity), "total_cost": total_production_cost},
+                     request=request)
 
         # Re-fetch full object
         o = conn.execute(text("""
@@ -1219,7 +1301,8 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         conn.close()
 
@@ -1227,7 +1310,7 @@ def complete_production_order(order_id: int, current_user: UserResponse = Depend
 # ---- Cancel / Delete / Update Production Orders ----
 
 @router.post("/orders/{order_id}/cancel", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def cancel_production_order(order_id: int, current_user: UserResponse = Depends(get_current_user)):
+def cancel_production_order(order_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Cancel a production order. Only draft/confirmed orders can be cancelled."""
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
@@ -1252,6 +1335,10 @@ def cancel_production_order(order_id: int, current_user: UserResponse = Depends(
         
         trans.commit()
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="cancel_production_order", resource_type="production_orders",
+                     resource_id=str(order_id), details={"order_number": order.order_number},
+                     request=request)
         updated = conn.execute(text("""
             SELECT po.*, p.product_name as product_name, b.name as bom_name
             FROM production_orders po
@@ -1266,13 +1353,14 @@ def cancel_production_order(order_id: int, current_user: UserResponse = Depends(
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error cancelling production order {order_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إلغاء أمر الإنتاج")
     finally:
         conn.close()
 
 
 @router.delete("/orders/{order_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
-def delete_production_order(order_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_production_order(order_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Delete a production order. Only draft orders can be deleted."""
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
@@ -1288,18 +1376,22 @@ def delete_production_order(order_id: int, current_user: UserResponse = Depends(
         conn.execute(text("DELETE FROM production_orders WHERE id = :id"), {"id": order_id})
         
         trans.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_production_order", resource_type="production_orders",
+                     resource_id=str(order_id), request=request)
         return {"message": "Production order deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error deleting production order {order_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في حذف أمر الإنتاج")
     finally:
         conn.close()
 
 
 @router.put("/orders/{order_id}", response_model=ProductionOrderResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
-def update_production_order(order_id: int, order: ProductionOrderCreate, current_user: UserResponse = Depends(get_current_user)):
+def update_production_order(order_id: int, order: ProductionOrderCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Update a production order. Only draft orders can be updated."""
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
@@ -1360,12 +1452,17 @@ def update_production_order(order_id: int, order: ProductionOrderCreate, current
         """), {"poid": order_id}).fetchall()
         order_dict['operations'] = [dict(op._mapping) for op in ops]
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_production_order", resource_type="production_orders",
+                     resource_id=str(order_id), details={"quantity": float(order.quantity)},
+                     request=request)
         return order_dict
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error updating production order {order_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في تحديث أمر الإنتاج")
     finally:
         conn.close()
 
@@ -1373,7 +1470,7 @@ def update_production_order(order_id: int, order: ProductionOrderCreate, current
 # ---- Delete Work Center / Route / BOM ----
 
 @router.delete("/work-centers/{wc_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
-def delete_work_center(wc_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_work_center(wc_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         # Check if in use by any operations
@@ -1387,18 +1484,22 @@ def delete_work_center(wc_id: int, current_user: UserResponse = Depends(get_curr
         conn.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Work center not found")
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_work_center", resource_type="work_centers",
+                     resource_id=str(wc_id), request=request)
         return {"message": "Work center deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error deleting work center {wc_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في حذف مركز العمل")
     finally:
         conn.close()
 
 
 @router.delete("/routes/{route_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
-def delete_route(route_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_route(route_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -1416,18 +1517,22 @@ def delete_route(route_id: int, current_user: UserResponse = Depends(get_current
             raise HTTPException(status_code=404, detail="Route not found")
         
         trans.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_route", resource_type="manufacturing_routes",
+                     resource_id=str(route_id), request=request)
         return {"message": "Route and its operations deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error deleting route {route_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في حذف المسار")
     finally:
         conn.close()
 
 
 @router.delete("/boms/{bom_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
-def delete_bom(bom_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_bom(bom_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -1446,12 +1551,16 @@ def delete_bom(bom_id: int, current_user: UserResponse = Depends(get_current_use
             raise HTTPException(status_code=404, detail="BOM not found")
         
         trans.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_bom", resource_type="bill_of_materials",
+                     resource_id=str(bom_id), request=request)
         return {"message": "BOM deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error deleting BOM {bom_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في حذف قائمة المواد")
     finally:
         conn.close()
 
@@ -1459,7 +1568,7 @@ def delete_bom(bom_id: int, current_user: UserResponse = Depends(get_current_use
 # --- JOB CARDS (MFG-007) ---
 
 @router.post("/operations/{op_id}/start", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def start_operation(op_id: int, current_user: UserResponse = Depends(get_current_user)):
+def start_operation(op_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         # Check if operation is already in progress
@@ -1482,6 +1591,9 @@ def start_operation(op_id: int, current_user: UserResponse = Depends(get_current
         
         conn.commit()
         
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="start_operation", resource_type="production_order_operations",
+                     resource_id=str(op_id), request=request)
         # Re-fetch
         updated = conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
         return updated
@@ -1489,7 +1601,7 @@ def start_operation(op_id: int, current_user: UserResponse = Depends(get_current
         conn.close()
 
 @router.post("/operations/{op_id}/pause", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def pause_operation(op_id: int, current_user: UserResponse = Depends(get_current_user)):
+def pause_operation(op_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         op = conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
@@ -1503,12 +1615,15 @@ def pause_operation(op_id: int, current_user: UserResponse = Depends(get_current
             WHERE id = :id
         """), {"id": op_id})
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="pause_operation", resource_type="production_order_operations",
+                     resource_id=str(op_id), request=request)
         return conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
     finally:
         conn.close()
 
 @router.post("/operations/{op_id}/complete", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def complete_operation(op_id: int, completed_qty: float, current_user: UserResponse = Depends(get_current_user)):
+def complete_operation(op_id: int, completed_qty: float, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         op = conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
@@ -1533,6 +1648,10 @@ def complete_operation(op_id: int, completed_qty: float, current_user: UserRespo
         """), {"id": op_id, "qty": completed_qty, "duration": duration})
         
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="complete_operation", resource_type="production_order_operations",
+                     resource_id=str(op_id), details={"completed_qty": completed_qty},
+                     request=request)
         return conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
     finally:
         conn.close()
@@ -1656,7 +1775,8 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error calculating MRP for order {order_id}: {e}")
+        raise HTTPException(status_code=500, detail="فشل في حساب تخطيط الاحتياجات")
     finally:
         conn.close()
 
@@ -1704,7 +1824,7 @@ def list_equipment(current_user: UserResponse = Depends(get_current_user)):
         conn.close()
 
 @router.post("/equipment", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_equipment(equip: EquipmentCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_equipment(equip: EquipmentCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -1720,15 +1840,22 @@ def create_equipment(equip: EquipmentCreate, current_user: UserResponse = Depend
         }).fetchone()
         
         trans.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_equipment", resource_type="manufacturing_equipment",
+                     resource_id=str(new_equip.id), details={"name": equip.name},
+                     request=request)
         return dict(new_equip._mapping)
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating equipment: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء المعدات")
     finally:
         conn.close()
 
 @router.put("/equipment/{equip_id}", response_model=EquipmentResponse, dependencies=[Depends(require_permission("manufacturing.manage"))])
-def update_equipment(equip_id: int, equip: EquipmentCreate, current_user: UserResponse = Depends(get_current_user)):
+def update_equipment(equip_id: int, equip: EquipmentCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         updated = conn.execute(text("""
@@ -1747,17 +1874,22 @@ def update_equipment(equip_id: int, equip: EquipmentCreate, current_user: UserRe
         result = dict(updated._mapping)
         wc = conn.execute(text("SELECT name FROM work_centers WHERE id = :wid"), {"wid": equip.work_center_id}).fetchone() if equip.work_center_id else None
         result['work_center_name'] = wc.name if wc else None
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_equipment", resource_type="manufacturing_equipment",
+                     resource_id=str(equip_id), details={"name": equip.name},
+                     request=request)
         return result
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error updating equipment {equip_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في تحديث المعدات")
     finally:
         conn.close()
 
 @router.delete("/equipment/{equip_id}", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.delete"]))])
-def delete_equipment(equip_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_equipment(equip_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
         # Check for maintenance logs
@@ -1768,12 +1900,16 @@ def delete_equipment(equip_id: int, current_user: UserResponse = Depends(get_cur
         if not deleted:
             raise HTTPException(status_code=404, detail="Equipment not found")
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="delete_equipment", resource_type="manufacturing_equipment",
+                     resource_id=str(equip_id), request=request)
         return {"detail": "Equipment deleted"}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error deleting equipment {equip_id}: {e}")
+        raise HTTPException(status_code=400, detail="فشل في حذف المعدات")
     finally:
         conn.close()
 
@@ -1800,7 +1936,7 @@ def list_maintenance_logs(equipment_id: Optional[int] = None, current_user: User
         conn.close()
 
 @router.post("/maintenance-logs", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
-def create_maintenance_log(log: MaintenanceLogCreate, current_user: UserResponse = Depends(get_current_user)):
+def create_maintenance_log(log: MaintenanceLogCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -1826,6 +1962,10 @@ def create_maintenance_log(log: MaintenanceLogCreate, current_user: UserResponse
                          {"date": log.next_due_date, "id": log.equipment_id})
 
         trans.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_maintenance_log", resource_type="maintenance_logs",
+                     resource_id=str(new_log.id), details={"equipment_id": log.equipment_id, "type": log.maintenance_type},
+                     request=request)
         # Fetch updated log with joins
         log_res = conn.execute(text("""
             SELECT ml.*, e.name as equipment_name, u.full_name as performed_by_name
@@ -1836,9 +1976,12 @@ def create_maintenance_log(log: MaintenanceLogCreate, current_user: UserResponse
         """), {"lid": new_log.id}).fetchone()
         
         return dict(log_res._mapping)
+    except HTTPException:
+        raise
     except Exception as e:
         trans.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error creating maintenance log: {e}")
+        raise HTTPException(status_code=400, detail="فشل في إنشاء سجل الصيانة")
     finally:
         conn.close()
 
@@ -2343,7 +2486,8 @@ def compute_bom_materials(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error computing BOM materials: {e}")
+        raise HTTPException(status_code=500, detail="فشل في حساب المواد")
     finally:
         conn.close()
 
@@ -2390,6 +2534,7 @@ def get_qc_checks(order_id: int, current_user: UserResponse = Depends(get_curren
 def create_qc_check(
     order_id: int,
     qc: QCCheckCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """إضافة فحص جودة لأمر إنتاج"""
@@ -2415,12 +2560,17 @@ def create_qc_check(
             "uid": current_user.id
         }).scalar()
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_qc_check", resource_type="mfg_qc_checks",
+                     resource_id=str(qc_id), details={"order_id": order_id, "check_name": qc.check_name},
+                     request=request)
         return {"success": True, "id": qc_id}
     except HTTPException:
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating QC check: {e}")
+        raise HTTPException(status_code=500, detail="فشل في إنشاء فحص الجودة")
     finally:
         conn.close()
 
@@ -2429,6 +2579,7 @@ def create_qc_check(
 def record_qc_result(
     qc_id: int,
     res: QCResultRecord,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -2468,6 +2619,10 @@ def record_qc_result(
 
         conn.commit()
 
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="record_qc_result", resource_type="mfg_qc_checks",
+                     resource_id=str(qc_id), details={"result": res.result},
+                     request=request)
         return {
             "success": True,
             "result": res.result,
@@ -2481,7 +2636,8 @@ def record_qc_result(
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error recording QC result: {e}")
+        raise HTTPException(status_code=500, detail="فشل في تسجيل نتيجة الفحص")
     finally:
         conn.close()
 
@@ -2664,7 +2820,8 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
         raise
     except Exception as e:
         conn.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error calculating actual cost for order {order_id}: {e}")
+        raise HTTPException(500, "فشل في حساب التكلفة الفعلية")
     finally:
         conn.close()
 
@@ -2725,7 +2882,7 @@ def cost_variance_report(
 
 # ===================== B4: OEE + Capacity Planning =====================
 
-@router.get("/oee")
+@router.get("/oee", dependencies=[Depends(require_permission("manufacturing.view"))])
 def calculate_oee(
     work_center_id: Optional[int] = None,
     date_from: Optional[str] = None,
@@ -2775,12 +2932,13 @@ def calculate_oee(
             results.append(d)
         return results
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error calculating OEE: {e}")
+        raise HTTPException(500, "فشل في حساب الفعالية الشاملة")
     finally:
         conn.close()
 
 
-@router.get("/capacity-plans")
+@router.get("/capacity-plans", dependencies=[Depends(require_permission("manufacturing.view"))])
 def list_capacity_plans(
     work_center_id: Optional[int] = None,
     date_from: Optional[str] = None,
@@ -2810,13 +2968,14 @@ def list_capacity_plans(
         rows = conn.execute(text(q), params).fetchall()
         return [dict(r._mapping) for r in rows]
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logger.error(f"Error listing capacity plans: {e}")
+        raise HTTPException(500, "فشل في جلب خطط الطاقة")
     finally:
         conn.close()
 
 
-@router.post("/capacity-plans")
-def create_capacity_plan(plan: dict, current_user=Depends(get_current_user)):
+@router.post("/capacity-plans", dependencies=[Depends(require_permission("manufacturing.manage"))])
+def create_capacity_plan(plan: dict, request: Request, current_user=Depends(get_current_user)):
     """إنشاء خطة طاقة إنتاجية"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -2835,16 +2994,20 @@ def create_capacity_plan(plan: dict, current_user=Depends(get_current_user)):
         })
         plan_id = result.fetchone()[0]
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="create_capacity_plan", resource_type="capacity_plans",
+                     resource_id=str(plan_id), request=request)
         return {"id": plan_id, "message": "تم إنشاء خطة الطاقة بنجاح"}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error creating capacity plan: {e}")
+        raise HTTPException(500, "فشل في إنشاء خطة الطاقة")
     finally:
         conn.close()
 
 
-@router.put("/capacity-plans/{plan_id}")
-def update_capacity_plan(plan_id: int, plan: dict, current_user=Depends(get_current_user)):
+@router.put("/capacity-plans/{plan_id}", dependencies=[Depends(require_permission("manufacturing.manage"))])
+def update_capacity_plan(plan_id: int, plan: dict, request: Request, current_user=Depends(get_current_user)):
     """تحديث خطة طاقة إنتاجية"""
     conn = get_db_connection(current_user.company_id)
     try:
@@ -2860,9 +3023,13 @@ def update_capacity_plan(plan_id: int, plan: dict, current_user=Depends(get_curr
             "ach": plan.get("actual_hours"), "eff": eff, "n": plan.get("notes"), "id": plan_id
         })
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="update_capacity_plan", resource_type="capacity_plans",
+                     resource_id=str(plan_id), request=request)
         return {"message": "تم تحديث خطة الطاقة بنجاح"}
     except Exception as e:
         conn.rollback()
-        raise HTTPException(500, str(e))
+        logger.error(f"Error updating capacity plan {plan_id}: {e}")
+        raise HTTPException(500, "فشل في تحديث خطة الطاقة")
     finally:
         conn.close()

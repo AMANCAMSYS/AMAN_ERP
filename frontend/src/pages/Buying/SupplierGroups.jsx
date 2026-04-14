@@ -219,7 +219,7 @@ function SupplierGroups() {
                                         className="form-input"
                                         value={formData.group_name_en}
                                         onChange={e => setFormData({ ...formData, group_name_en: e.target.value })}
-                                        placeholder="Ex: Local Suppliers"
+                                        placeholder={t('buying.supplier_groups.placeholder_example')}
                                     />
                                 </div>
                             </div>

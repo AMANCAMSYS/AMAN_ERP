@@ -137,6 +137,11 @@ function BuyingHome() {
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         )}
+                        <div className="link-item" onClick={() => navigate('/buying/blanket-po')}>
+                            <span className="link-icon">📋</span>
+                            {i18n.language === 'ar' ? 'أوامر الشراء الشاملة' : 'Blanket Purchase Orders'}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
                     </div>
                 </div>
 

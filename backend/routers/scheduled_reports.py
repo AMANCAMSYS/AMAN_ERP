@@ -3,7 +3,7 @@ Scheduled Reports & Report Sharing Router
 RPT-106: مشاركة التقارير بين المستخدمين
 RPT-106b: جدولة التقارير التلقائية (Scheduled Reports)
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date, timedelta
@@ -14,6 +14,7 @@ import json
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
+from utils.audit import log_activity
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def list_scheduled_reports(
 @router.post("/scheduled/", dependencies=[Depends(require_permission(["reports.create"]))])
 def create_scheduled_report(
     data: ScheduledReportCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new scheduled report."""
@@ -134,12 +136,20 @@ def create_scheduled_report(
         })
         db.commit()
         row = result.fetchone()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.scheduled.create", resource_type="scheduled_report",
+            resource_id=str(dict(row._mapping).get("id", "")),
+            details={"report_type": data.report_type, "frequency": data.frequency},
+            request=request
+        )
         return dict(row._mapping)
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         db.close()
 
@@ -148,6 +158,7 @@ def create_scheduled_report(
 def update_scheduled_report(
     report_id: int,
     data: ScheduledReportCreate,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a scheduled report."""
@@ -177,6 +188,13 @@ def update_scheduled_report(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Report not found or unauthorized")
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.scheduled.update", resource_type="scheduled_report",
+            resource_id=str(report_id),
+            details={"report_type": data.report_type, "frequency": data.frequency},
+            request=request
+        )
         return {"message": "Scheduled report updated"}
     finally:
         db.close()
@@ -185,6 +203,7 @@ def update_scheduled_report(
 @router.delete("/scheduled/{report_id}", dependencies=[Depends(require_permission(["reports.delete"]))])
 def delete_scheduled_report(
     report_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a scheduled report."""
@@ -196,6 +215,12 @@ def delete_scheduled_report(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Report not found or unauthorized")
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.scheduled.delete", resource_type="scheduled_report",
+            resource_id=str(report_id), details={},
+            request=request
+        )
         return {"message": "Scheduled report deleted"}
     finally:
         db.close()
@@ -205,6 +230,7 @@ def delete_scheduled_report(
 def toggle_scheduled_report(
     report_id: int,
     active: bool,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Activate/Deactivate a scheduled report."""
@@ -217,6 +243,12 @@ def toggle_scheduled_report(
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Report not found")
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.scheduled.toggle", resource_type="scheduled_report",
+            resource_id=str(report_id), details={"is_active": active},
+            request=request
+        )
         return {"message": f"Report {'activated' if active else 'deactivated'}"}
     finally:
         db.close()
@@ -226,6 +258,7 @@ def toggle_scheduled_report(
 def run_scheduled_report_now(
     report_id: int,
     background_tasks: BackgroundTasks,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Manually trigger a scheduled report immediately."""
@@ -236,6 +269,12 @@ def run_scheduled_report_now(
             raise HTTPException(status_code=404, detail="Report not found")
 
         background_tasks.add_task(_execute_scheduled_report, current_user.company_id, dict(report._mapping))
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.scheduled.run_now", resource_type="scheduled_report",
+            resource_id=str(report_id), details={},
+            request=request
+        )
         return {"message": "Report execution started in background"}
     finally:
         db.close()
@@ -248,6 +287,7 @@ def run_scheduled_report_now(
 @router.post("/share", dependencies=[Depends(require_permission(["reports.view"]))])
 def share_report(
     data: ShareReportRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user)
 ):
     """Share a report with another user."""
@@ -280,18 +320,26 @@ def share_report(
             "perm": data.permission, "msg": data.message,
         })
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.share.create", resource_type="shared_report",
+            resource_id=str(data.report_id),
+            details={"report_type": data.report_type, "shared_with": data.shared_with},
+            request=request
+        )
         return {"message": f"Report shared with {user.full_name}"}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=400, detail="طلب غير صالح")
     finally:
         db.close()
 
 
 @router.delete("/share/{share_id}", dependencies=[Depends(require_permission(["reports.view"]))])
-def unshare_report(share_id: int, current_user: dict = Depends(get_current_user)):
+def unshare_report(share_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """Remove report sharing."""
     db = get_db_connection(current_user.company_id)
     try:
@@ -300,6 +348,12 @@ def unshare_report(share_id: int, current_user: dict = Depends(get_current_user)
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Share not found or unauthorized")
         db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
+            action="reports.share.delete", resource_type="shared_report",
+            resource_id=str(share_id), details={},
+            request=request
+        )
         return {"message": "Share removed"}
     finally:
         db.close()

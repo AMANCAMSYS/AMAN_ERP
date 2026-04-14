@@ -4,6 +4,7 @@ Handles SAML SP flow, LDAP bind authentication, group→role mapping, and user p
 """
 
 import logging
+import os
 from typing import Optional, Dict, Any, List
 
 from sqlalchemy import text
@@ -162,8 +163,13 @@ def ldap_authenticate(
     conn = ldap_lib.initialize(uri)
     conn.set_option(ldap_lib.OPT_NETWORK_TIMEOUT, 10)
     conn.set_option(ldap_lib.OPT_REFERRALS, 0)
-    if use_tls and not uri.startswith("ldaps://"):
-        conn.start_tls_s()
+    if use_tls:
+        conn.set_option(ldap_lib.OPT_X_TLS_REQUIRE_CERT, ldap_lib.OPT_X_TLS_DEMAND)
+        ca_cert = os.environ.get("LDAP_CA_CERT_PATH")
+        if ca_cert and os.path.exists(ca_cert):
+            conn.set_option(ldap_lib.OPT_X_TLS_CACERTFILE, ca_cert)
+        if not uri.startswith("ldaps://"):
+            conn.start_tls_s()
 
     try:
         # Service-account bind to search for the user
@@ -246,8 +252,13 @@ def test_ldap_connection(
         conn = ldap_lib.initialize(uri)
         conn.set_option(ldap_lib.OPT_NETWORK_TIMEOUT, 10)
         conn.set_option(ldap_lib.OPT_REFERRALS, 0)
-        if ldap_use_tls and not uri.startswith("ldaps://"):
-            conn.start_tls_s()
+        if ldap_use_tls:
+            conn.set_option(ldap_lib.OPT_X_TLS_REQUIRE_CERT, ldap_lib.OPT_X_TLS_DEMAND)
+            ca_cert = os.environ.get("LDAP_CA_CERT_PATH")
+            if ca_cert and os.path.exists(ca_cert):
+                conn.set_option(ldap_lib.OPT_X_TLS_CACERTFILE, ca_cert)
+            if not uri.startswith("ldaps://"):
+                conn.start_tls_s()
         conn.simple_bind_s(ldap_bind_dn, ldap_bind_password)
         # Quick search to confirm base_dn is valid
         conn.search_s(ldap_base_dn, ldap_lib.SCOPE_BASE, "(objectClass=*)", ["dn"])
@@ -258,7 +269,8 @@ def test_ldap_connection(
     except ldap_lib.SERVER_DOWN:
         return {"success": False, "message": "LDAP server unreachable"}
     except Exception as exc:
-        return {"success": False, "message": str(exc)}
+        logger.exception("LDAP test connection failed")
+        return {"success": False, "message": "LDAP connection failed"}
 
 
 # ---------------------------------------------------------------------------

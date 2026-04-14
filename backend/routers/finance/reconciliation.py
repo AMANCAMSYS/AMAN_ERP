@@ -7,11 +7,15 @@ from pydantic import BaseModel
 import csv
 import io
 import re
+import logging
 from decimal import Decimal, ROUND_HALF_UP
+
+logger = logging.getLogger(__name__)
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
+from utils.audit import log_activity
 from schemas.reconciliation import ReconciliationCreate, StatementLineCreate, MatchRequest, UnmatchRequest
 
 router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"], dependencies=[Depends(require_module("accounting"))])
@@ -31,6 +35,7 @@ def list_reconciliations(
     current_user: dict = Depends(get_current_user)
 ):
     """عرض قائمة التسويات"""
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         query = """
@@ -55,6 +60,11 @@ def list_reconciliations(
         if branch_id:
              query += " AND r.branch_id = :bid"
              params["bid"] = branch_id
+        else:
+            allowed_branches = getattr(current_user, 'allowed_branches', [])
+            if allowed_branches and "*" not in getattr(current_user, 'permissions', []):
+                query += " AND r.branch_id = ANY(:allowed_branches)"
+                params["allowed_branches"] = allowed_branches
              
         query += " ORDER BY r.statement_date DESC"
         
@@ -66,6 +76,8 @@ def list_reconciliations(
 @router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("reconciliation.create"))])
 def create_reconciliation(data: ReconciliationCreate, current_user: dict = Depends(get_current_user)):
     """إنشاء مسودة تسوية جديدة"""
+    if data.branch_id:
+        validate_branch_access(current_user, data.branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         # Check if draft already exists for this account
@@ -93,6 +105,10 @@ def create_reconciliation(data: ReconciliationCreate, current_user: dict = Depen
         }).scalar()
         
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="reconciliation.create",
+                     resource_type="bank_reconciliation", resource_id=str(rec_id),
+                     details={"treasury_account_id": data.treasury_account_id, "statement_date": str(data.statement_date)})
         return {"id": rec_id, "message": "تم إنشاء التسوية بنجاح"}
     finally:
         db.close()
@@ -111,6 +127,10 @@ def get_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
         
         if not rec:
             raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+
+        # Branch access check
+        if rec.branch_id:
+            validate_branch_access(current_user, rec.branch_id)
             
         statement_lines = db.execute(text("""
             SELECT sl.*, 
@@ -399,7 +419,8 @@ async def preview_import(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"خطأ في تحليل الملف: {str(e)}")
+        logger.exception("Error parsing reconciliation file")
+        raise HTTPException(status_code=400, detail="خطأ في تحليل الملف")
     finally:
         db.close()
 
@@ -766,12 +787,16 @@ def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_us
     db = get_db_connection(current_user.company_id)
     try:
         rec = db.execute(text("""
-            SELECT start_balance, end_balance, status 
+            SELECT start_balance, end_balance, status, branch_id 
             FROM bank_reconciliations WHERE id = :id
         """), {"id": id}).fetchone()
         
         if not rec:
             raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+
+        # Branch access check
+        if rec.branch_id:
+            validate_branch_access(current_user, rec.branch_id)
         
         if rec.status == 'posted':
             raise HTTPException(status_code=400, detail="التسوية معتمدة بالفعل")
@@ -807,6 +832,10 @@ def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_us
             WHERE id = :id
         """), {"id": id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="reconciliation.finalize",
+                     resource_type="bank_reconciliation", resource_id=str(id),
+                     details={"end_balance": float(_dec(rec.end_balance))})
         return {"success": True, "message": "تم اعتماد التسوية"}
     finally:
         db.close()

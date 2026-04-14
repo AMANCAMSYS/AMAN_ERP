@@ -1,12 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Any
 from datetime import date, datetime
 from pydantic import BaseModel
+import logging
 from database import get_db, get_company_db
 from utils.permissions import require_permission
+from utils.audit import log_activity
+from utils.limiter import limiter
 from schemas import CurrencyCreate, CurrencyResponse, ExchangeRateCreate, ExchangeRateResponse
+
+logger = logging.getLogger(__name__)
 from schemas.currencies import RevaluationRequest
 
 router = APIRouter(
@@ -15,8 +20,9 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[CurrencyResponse])
+@limiter.limit("200/minute")
 def list_currencies(
-    current_user: Any = Depends(require_permission(["accounting.view", "currencies.view"]))
+    request: Request,
 ):
     """List all configured currencies"""
     from database import get_db_connection, get_currency_tables_sql
@@ -47,18 +53,16 @@ def list_currencies(
                     sys_db.close()
 
                 # Initialize with company default currency
-                db.execute(text(f"""
+                db.execute(text("""
                     INSERT INTO currencies (code, name, symbol, is_base, current_rate)
-                    VALUES ('{default_currency}', '{default_currency}', '{default_currency}', TRUE, 1.0)
+                    VALUES (:code, :name, :symbol, TRUE, 1.0)
                     ON CONFLICT (code) DO UPDATE SET is_base = TRUE
-                """))
+                """), {"code": default_currency, "name": default_currency, "symbol": default_currency})
                 
                 # Correction Logic: If 'SAR' exists but it's NOT the company currency, remove it or demote it.
-                # If we just inserted the correct one, and SAR was there from before (if table wasn't empty but we thought it was? unlikely in this block)
-                # But to be safe, let's clean up if there are multiple bases.
                 if default_currency != 'SAR':
                      # Remove SAR if it was wrongly added as base
-                     db.execute(text("DELETE FROM currencies WHERE code = 'SAR' AND is_base = TRUE"))
+                     db.execute(text("DELETE FROM currencies WHERE code = :code AND is_base = TRUE"), {"code": "SAR"})
                      
                 db.commit()
                 result = db.execute(text("SELECT * FROM currencies ORDER BY is_base DESC, code ASC"))
@@ -68,7 +72,9 @@ def list_currencies(
         db.close()
 
 @router.post("/", response_model=CurrencyResponse)
+@limiter.limit("100/minute")
 def create_currency(
+    request: Request,
     currency: CurrencyCreate,
     current_user: Any = Depends(require_permission(["accounting.manage", "currencies.manage"]))
 ):
@@ -97,12 +103,18 @@ def create_currency(
         """)
         result = db.execute(query, currency.model_dump()).mappings().fetchone()
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="create_currency", resource_type="currency",
+                     resource_id=str(result["id"]),
+                     details={"code": currency.code}, request=request)
         return result
     finally:
         db.close()
 
 @router.put("/{currency_id}", response_model=CurrencyResponse)
+@limiter.limit("100/minute")
 def update_currency(
+    request: Request,
     currency_id: int,
     currency: CurrencyCreate,
     current_user: Any = Depends(require_permission(["accounting.manage", "currencies.manage"]))
@@ -133,12 +145,18 @@ def update_currency(
             raise HTTPException(status_code=404, detail="Currency not found")
             
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="update_currency", resource_type="currency",
+                     resource_id=str(currency_id),
+                     details={"code": currency.code}, request=request)
         return result
     finally:
         db.close()
 
 @router.delete("/{currency_id}")
+@limiter.limit("100/minute")
 def delete_currency(
+    request: Request,
     currency_id: int,
     current_user: Any = Depends(require_permission(["accounting.manage", "currencies.manage"]))
 ):
@@ -174,12 +192,18 @@ def delete_currency(
 
         db.execute(text("DELETE FROM currencies WHERE id = :id"), {"id": currency_id})
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="delete_currency", resource_type="currency",
+                     resource_id=str(currency_id),
+                     details={"code": code}, request=request)
         return {"message": "Currency deleted"}
     finally:
         db.close()
 
 @router.post("/rates", response_model=ExchangeRateResponse)
+@limiter.limit("100/minute")
 def add_exchange_rate(
+    request: Request,
     rate_data: ExchangeRateCreate,
     current_user: Any = Depends(require_permission(["accounting.manage", "currencies.manage"]))
 ):
@@ -214,13 +238,18 @@ def add_exchange_rate(
                 {"rate": rate_data.rate, "id": rate_data.currency_id})
         
         db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="add_exchange_rate", resource_type="exchange_rate",
+                     resource_id=str(result["id"]),
+                     details={"currency_id": rate_data.currency_id, "rate": float(rate_data.rate)}, request=request)
         return result
     finally:
         db.close()
 
 @router.get("/{currency_id}/rates", response_model=List[ExchangeRateResponse])
+@limiter.limit("200/minute")
 def get_rate_history(
-    currency_id: int,
+    request: Request,
     limit: int = 30,
     current_user: Any = Depends(require_permission(["accounting.view", "currencies.view"]))
 ):
@@ -241,7 +270,9 @@ def get_rate_history(
 
 
 @router.post("/revaluate")
+@limiter.limit("100/minute")
 def create_revaluation(
+    request: Request,
     req: RevaluationRequest,
     current_user: Any = Depends(require_permission(["accounting.manage", "currencies.manage"]))
 ):
@@ -339,40 +370,31 @@ def create_revaluation(
         if not journal_entry_lines:
             return {"message": "No revaluation needed", "entries_created": 0}
 
-        # 5. Create Journal Entry (wrapped in try/except for rollback on partial failure)
+        # 5. FIN-001: Create Journal Entry via centralized GL service
         try:
-            entry_num = f"REV-{code}-{datetime.now().strftime('%Y%m%d%H%M')}"
-            
-            je_query = text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, created_by, branch_id)
-                VALUES (:entry_num, :date, :desc, 'posted', :uid, 1)
-                RETURNING id
-            """)
-            je_result = db.execute(je_query, {
-                "entry_num": entry_num,
-                "date": req.rate_date,
-                "desc": req.description or f"Currency Revaluation {code} to {req.new_rate}",
-                "uid": current_user.id
-            }).fetchone()
-            
-            je_id = je_result.id
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
 
-            # Insert Lines
-            line_query = text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, :debit, :credit, :desc)
-            """)
-            
-            from utils.accounting import update_account_balance
+            gl_lines = []
             for line in journal_entry_lines:
-                db.execute(line_query, {
-                    "jid": je_id,
-                    "aid": line["account_id"],
+                gl_lines.append({
+                    "account_id": line["account_id"],
                     "debit": line["debit"],
                     "credit": line["credit"],
-                    "desc": line["desc"]
+                    "description": line["desc"],
                 })
-                update_account_balance(db, account_id=line["account_id"], debit_base=line["debit"], credit_base=line["credit"])
+
+            je_id, entry_num = gl_create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(req.rate_date),
+                description=req.description or f"Currency Revaluation {code} to {req.new_rate}",
+                lines=gl_lines,
+                user_id=current_user.id,
+                branch_id=getattr(current_user, 'branch_id', None),
+                reference=f"REV-{code}",
+                source="currency_revaluation",
+                source_id=req.currency_id,
+            )
             
             # Update currency current_rate
             db.execute(text("UPDATE currencies SET current_rate = :rate WHERE id = :id"),
@@ -380,9 +402,15 @@ def create_revaluation(
                 
             db.commit()
             
+            log_activity(db, user_id=current_user.id, username=current_user.username,
+                         action="currency_revaluation", resource_type="currency",
+                         resource_id=str(req.currency_id),
+                         details={"new_rate": float(req.new_rate), "je_id": je_id, "lines": len(journal_entry_lines)}, request=request)
+            
             return {
                 "message": "Revaluation completed successfully",
                 "journal_entry_id": je_id,
+                "entry_number": entry_num,
                 "lines_count": len(journal_entry_lines),
                 "total_impact": sum(l['debit'] for l in journal_entry_lines) / 2
             }
@@ -391,6 +419,7 @@ def create_revaluation(
             raise
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"خطأ أثناء إعادة التقييم: {str(e)}")
+            logger.exception("Error during currency revaluation")
+            raise HTTPException(status_code=500, detail="خطأ أثناء إعادة التقييم")
     finally:
         db.close()

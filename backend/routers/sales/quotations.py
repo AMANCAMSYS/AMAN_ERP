@@ -1,5 +1,5 @@
 """Sales quotations endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -25,6 +25,9 @@ def _dec(v) -> Decimal:
 @quotations_router.get("/quotations", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
 def list_quotations(branch_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """List all sales quotations"""
+    from utils.permissions import validate_branch_access
+    branch_id = validate_branch_access(current_user, branch_id)
+
     db = get_db_connection(current_user.company_id)
     try:
         query_str = """
@@ -45,7 +48,8 @@ def list_quotations(branch_id: Optional[int] = None, current_user: dict = Depend
         return [dict(row._mapping) for row in result]
     except Exception as e:
         logger.error(f"Error listing quotations: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
@@ -67,6 +71,11 @@ def get_quotation(id: int, current_user: dict = Depends(get_current_user)):
         if not quotation:
             raise HTTPException(status_code=404, detail="Quotation not found")
 
+        # Enforce branch access for single resource
+        from utils.permissions import validate_branch_access
+        if quotation.branch_id:
+            validate_branch_access(current_user, quotation.branch_id)
+
         # Get Items
         items = db.execute(text("""
             SELECT l.*, p.product_name
@@ -83,13 +92,14 @@ def get_quotation(id: int, current_user: dict = Depends(get_current_user)):
         raise
     except Exception as e:
         logger.error(f"Error fetching quotation {id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()
 
 
 @quotations_router.post("/quotations", response_model=dict, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
-def create_quotation(quotation: QuotationCreate, current_user: dict = Depends(get_current_user)):
+def create_quotation(request: Request, quotation: QuotationCreate, current_user: dict = Depends(get_current_user)):
     """Create a new sales quotation"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -178,12 +188,13 @@ def create_quotation(quotation: QuotationCreate, current_user: dict = Depends(ge
             resource_type="sales_quotation",
             resource_id=str(sq_id),
             details={"sq_number": sq_num, "total": float(grand_total), "customer_id": quotation.customer_id, "customer_name": cust_name},
-            request=None
+            request=request
         )
         return {"id": sq_id, "sq_number": sq_num}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating Quotation: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Internal error")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
     finally:
         db.close()

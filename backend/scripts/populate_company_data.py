@@ -692,7 +692,7 @@ def run():
         print("15. Updating account balances from JE...")
         exe("""UPDATE accounts SET balance = COALESCE(sub.bal, 0)
             FROM (
-                SELECT jl.account_id, SUM(jl.debit - jl.credit) as bal
+                SELECT jl.account_id, CAST(SUM(jl.debit - jl.credit) AS NUMERIC(18,4)) as bal
                 FROM journal_lines jl
                 JOIN journal_entries je ON je.id = jl.journal_entry_id
                 WHERE je.status = 'posted'

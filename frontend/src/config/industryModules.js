@@ -25,10 +25,17 @@ export const ALWAYS_ENABLED_MODULES = [
   'roles',
   'settings',
   'data_import',
+  // US feature modules (cross-cutting)
+  'sso',
+  'analytics',
+  'performance',
+  'cashflow',
+  'campaigns',
+  'subscriptions',
 ]
 
 // ===== الوحدات المتغيرة حسب النشاط =====
-export const VARIABLE_MODULES = ['pos', 'stock', 'manufacturing', 'projects', 'services']
+export const VARIABLE_MODULES = ['pos', 'stock', 'manufacturing', 'projects', 'services', 'matching', 'intercompany', 'cpq', 'forecast', 'shop_floor']
 
 // ===== تحويل بين Key و Code =====
 // Key = رمز قصير (RT, FB, MF) — يُستخدم في الفرونت كمعرف، و localStorage
@@ -54,6 +61,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: true,
+      intercompany: false,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   WS: {
@@ -70,6 +82,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: true,
+      intercompany: true,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   FB: {
@@ -86,6 +103,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: false,
+      intercompany: false,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   MF: {
@@ -102,6 +124,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: true,
       projects: true,
       services: true,
+      matching: true,
+      intercompany: true,
+      cpq: true,
+      forecast: true,
+      shop_floor: true,
     },
   },
   CN: {
@@ -118,6 +145,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: true,
       services: true,
+      matching: true,
+      intercompany: true,
+      cpq: false,
+      forecast: false,
+      shop_floor: false,
     },
   },
   SV: {
@@ -134,6 +166,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: true,
       services: true,
+      matching: false,
+      intercompany: true,
+      cpq: true,
+      forecast: false,
+      shop_floor: false,
     },
   },
   PH: {
@@ -150,6 +187,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: true,
+      intercompany: false,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   WK: {
@@ -166,6 +208,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: true,
+      matching: false,
+      intercompany: false,
+      cpq: false,
+      forecast: false,
+      shop_floor: false,
     },
   },
   EC: {
@@ -182,6 +229,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: false,
+      intercompany: false,
+      cpq: true,
+      forecast: true,
+      shop_floor: false,
     },
   },
   LG: {
@@ -198,6 +250,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: true,
+      matching: true,
+      intercompany: true,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   AG: {
@@ -214,6 +271,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: false,
       projects: false,
       services: false,
+      matching: false,
+      intercompany: false,
+      cpq: false,
+      forecast: true,
+      shop_floor: false,
     },
   },
   GN: {
@@ -230,6 +292,11 @@ export const INDUSTRY_TYPES = {
       manufacturing: true,
       projects: true,
       services: true,
+      matching: true,
+      intercompany: true,
+      cpq: true,
+      forecast: true,
+      shop_floor: true,
     },
   },
 }

@@ -67,14 +67,12 @@ class NotificationService:
                     link=link,
                 )
             except Exception as exc:
-                logger.error(
-                    "Failed to dispatch %s notification to user %s (%s): %s",
-                    channel,
-                    recipient_id,
-                    event_type,
-                    exc,
-                    exc_info=True,
+                # T023: On failure, update delivery tracking columns
+                logger.warning(
+                    "Failed to dispatch %s notification to user %s (%s)",
+                    channel, recipient_id, event_type,
                 )
+                self._mark_delivery_failed(db, recipient_id, channel)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -257,6 +255,37 @@ class NotificationService:
         ).fetchone()
         return row.fcm_token if row and hasattr(row, "fcm_token") else None
 
+    def _mark_delivery_failed(self, db, recipient_id: int, channel: str) -> None:
+        """T023: Mark the latest notification as failed for retry tracking."""
+        try:
+            db.execute(
+                text(
+                    "UPDATE notifications SET delivery_status = 'failed', "
+                    "delivery_channel = :channel, retry_count = 0, last_retry_at = NOW() "
+                    "WHERE id = (SELECT id FROM notifications WHERE user_id = :uid "
+                    "ORDER BY created_at DESC LIMIT 1)"
+                ),
+                {"channel": channel, "uid": recipient_id},
+            )
+            db.commit()
+        except Exception:
+            pass  # Column may not exist yet
+
 
 # Module-level singleton
 notification_service = NotificationService()
+
+
+def _update_delivery_status(db, notif_id: int, status: str, channel: str) -> None:
+    """Update delivery tracking columns on a notification row (best-effort)."""
+    try:
+        db.execute(
+            text(
+                "UPDATE notifications SET delivery_status = :status, "
+                "delivery_channel = :channel WHERE id = :id"
+            ),
+            {"status": status, "channel": channel, "id": notif_id},
+        )
+        db.commit()
+    except Exception:
+        pass  # Column may not exist yet if migration hasn't run

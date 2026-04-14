@@ -76,6 +76,14 @@ export const purchasesAPI = {
     // Match Tolerances
     listTolerances: () => api.get('/buying/tolerances'),
     saveTolerance: (data) => api.post('/buying/tolerances', data),
+
+    // Blanket Purchase Orders (US10)
+    listBlanketPOs: (params) => api.get('/buying/blanket', { params }),
+    getBlanketPO: (id) => api.get(`/buying/blanket/${id}`),
+    createBlanketPO: (data) => api.post('/buying/blanket', data),
+    activateBlanketPO: (id) => api.put(`/buying/blanket/${id}/activate`),
+    createBlanketPORelease: (id, data) => api.post(`/buying/blanket/${id}/release`, data),
+    amendBlanketPOPrice: (id, data) => api.put(`/buying/blanket/${id}/amend-price`, data),
 }
 
 // Landed Costs
