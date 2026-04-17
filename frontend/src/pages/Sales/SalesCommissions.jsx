@@ -34,13 +34,13 @@ const SalesCommissions = () => {
             setCommissions(commRes.data || []);
             setRules(rulesRes.data || []);
             setSummary(summRes.data);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { showToast(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreateRule = async (e) => {
         e.preventDefault();
         try {
-            await salesAPI.createCommissionRule({ salesperson_id: parseInt(ruleForm.salesperson_id), rate: parseFloat(ruleForm.rate), min_amount: parseFloat(ruleForm.min_amount) || 0 });
+            await salesAPI.createCommissionRule({ salesperson_id: parseInt(ruleForm.salesperson_id), rate: Number(ruleForm.rate), min_amount: Number(ruleForm.min_amount) || 0 });
             showToast(t('sales.rule_created'), 'success');
             setShowRuleModal(false); fetchAll();
         } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }

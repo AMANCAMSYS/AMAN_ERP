@@ -6,6 +6,7 @@ INV-103: Expiry Date tracking
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date, timedelta
@@ -224,7 +225,7 @@ def get_batch(batch_id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": batch_id}).fetchone()
 
         if not batch:
-            raise HTTPException(status_code=404, detail="الدفعة غير موجودة")
+            raise HTTPException(**http_error(404, "batch_not_found"))
 
         result = dict(batch._mapping)
 
@@ -269,7 +270,7 @@ def create_batch(
         """), {"id": batch.product_id}).fetchone()
 
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         # Check duplicate batch number
         exists = db.execute(text("""
@@ -386,7 +387,7 @@ def create_batch(
         db.rollback()
         logger.error(f"Error creating batch: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -402,7 +403,7 @@ def update_batch(
     try:
         batch = db.execute(text("SELECT id FROM product_batches WHERE id = :id"), {"id": batch_id}).fetchone()
         if not batch:
-            raise HTTPException(status_code=404, detail="الدفعة غير موجودة")
+            raise HTTPException(**http_error(404, "batch_not_found"))
 
         updates = []
         params = {"id": batch_id}
@@ -431,7 +432,7 @@ def update_batch(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -557,7 +558,7 @@ def get_serial(serial_id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": serial_id}).fetchone()
 
         if not serial:
-            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+            raise HTTPException(**http_error(404, "serial_number_not_found"))
 
         result = dict(serial._mapping)
 
@@ -597,7 +598,7 @@ def lookup_serial(serial_number: str, current_user: dict = Depends(get_current_u
         """), {"sn": serial_number}).fetchone()
 
         if not serial:
-            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+            raise HTTPException(**http_error(404, "serial_number_not_found"))
 
         result = dict(serial._mapping)
 
@@ -629,7 +630,7 @@ def create_serial(
         # Validate product
         product = db.execute(text("SELECT id, product_name FROM products WHERE id = :id"), {"id": serial.product_id}).fetchone()
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         # Check duplicate
         exists = db.execute(text("""
@@ -697,7 +698,7 @@ def create_serial(
         db.rollback()
         logger.error(f"Error creating serial: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -715,7 +716,7 @@ def create_serials_bulk(
 
         product = db.execute(text("SELECT id FROM products WHERE id = :id"), {"id": data.product_id}).fetchone()
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         created = []
         failed = []
@@ -776,7 +777,7 @@ def create_serials_bulk(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -792,7 +793,7 @@ def update_serial(
     try:
         serial = db.execute(text("SELECT id, serial_number FROM product_serials WHERE id = :id"), {"id": serial_id}).fetchone()
         if not serial:
-            raise HTTPException(status_code=404, detail="الرقم التسلسلي غير موجود")
+            raise HTTPException(**http_error(404, "serial_number_not_found"))
 
         updates = []
         params = {"id": serial_id}
@@ -821,7 +822,7 @@ def update_serial(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -843,7 +844,7 @@ def update_product_tracking(
     try:
         product = db.execute(text("SELECT id FROM products WHERE id = :id"), {"id": product_id}).fetchone()
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         updates = []
         params = {"id": product_id}
@@ -874,7 +875,7 @@ def update_product_tracking(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -945,7 +946,7 @@ def get_quality_inspection(inspection_id: int, current_user: dict = Depends(get_
         """), {"id": inspection_id}).fetchone()
 
         if not qi:
-            raise HTTPException(status_code=404, detail="فحص الجودة غير موجود")
+            raise HTTPException(**http_error(404, "quality_check_not_found"))
 
         result = dict(qi._mapping)
 
@@ -1034,7 +1035,7 @@ def create_quality_inspection(
         db.rollback()
         logger.error(f"Error creating QI: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1050,7 +1051,7 @@ def complete_quality_inspection(
     try:
         qi = db.execute(text("SELECT * FROM quality_inspections WHERE id = :id"), {"id": inspection_id}).fetchone()
         if not qi:
-            raise HTTPException(status_code=404, detail="فحص الجودة غير موجود")
+            raise HTTPException(**http_error(404, "quality_check_not_found"))
 
         db.execute(text("""
             UPDATE quality_inspections SET
@@ -1096,7 +1097,7 @@ def complete_quality_inspection(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1173,7 +1174,7 @@ def get_cycle_count(count_id: int, current_user: dict = Depends(get_current_user
         """), {"id": count_id}).fetchone()
 
         if not cc:
-            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+            raise HTTPException(**http_error(404, "inventory_not_found"))
 
         result = dict(cc._mapping)
 
@@ -1252,8 +1253,8 @@ def create_cycle_count(
             """), {
                 "ccid": result.id,
                 "pid": prod.product_id,
-                "qty": float(prod.quantity),
-                "cost": float(prod.cost)
+                "qty": str(prod.quantity),
+                "cost": str(prod.cost)
             })
 
         db.commit()
@@ -1269,7 +1270,7 @@ def create_cycle_count(
         db.rollback()
         logger.error(f"Error creating cycle count: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1281,7 +1282,7 @@ def start_cycle_count(count_id: int, current_user: dict = Depends(get_current_us
     try:
         cc = db.execute(text("SELECT status FROM cycle_counts WHERE id = :id"), {"id": count_id}).fetchone()
         if not cc:
-            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+            raise HTTPException(**http_error(404, "inventory_not_found"))
         if cc.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن بدء جرد ليس في حالة مسودة")
 
@@ -1296,7 +1297,7 @@ def start_cycle_count(count_id: int, current_user: dict = Depends(get_current_us
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1312,7 +1313,7 @@ def complete_cycle_count(
     try:
         cc = db.execute(text("SELECT * FROM cycle_counts WHERE id = :id"), {"id": count_id}).fetchone()
         if not cc:
-            raise HTTPException(status_code=404, detail="الجرد غير موجود")
+            raise HTTPException(**http_error(404, "inventory_not_found"))
 
         variance_count = 0
         counted_count = 0
@@ -1326,8 +1327,8 @@ def complete_cycle_count(
             if not cci:
                 continue
 
-            variance = item.counted_quantity - float(cci.system_quantity)
-            variance_value = variance * float(cci.unit_cost)
+            variance = item.counted_quantity - (cci.system_quantity or 0)
+            variance_value = variance * (cci.unit_cost or 0)
 
             db.execute(text("""
                 UPDATE cycle_count_items SET
@@ -1354,6 +1355,20 @@ def complete_cycle_count(
 
                 # Auto adjust inventory if requested
                 if data.auto_adjust:
+                    # T024: Hard-block negative stock — check reserved qty
+                    inv_row = db.execute(text("""
+                        SELECT reserved, available FROM inventory
+                        WHERE product_id = :pid AND warehouse_id = :wid
+                    """), {"pid": cci.product_id, "wid": cc.warehouse_id}).fetchone()
+                    reserved = (inv_row.reserved if inv_row else 0) or 0
+                    new_available = item.counted_quantity - reserved
+                    if new_available < 0:
+                        prod_name = db.execute(text("SELECT item_name FROM products WHERE id = :pid"), {"pid": cci.product_id}).scalar() or cci.product_id
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"لا يمكن تعديل المخزون للمنتج {prod_name}: الكمية المحجوزة ({reserved}) أكبر من الكمية المحسوبة ({item.counted_quantity})"
+                        )
+
                     db.execute(text("""
                         UPDATE inventory SET quantity = :qty, updated_at = NOW()
                         WHERE product_id = :pid AND warehouse_id = :wid
@@ -1383,6 +1398,58 @@ def complete_cycle_count(
                         "uid": current_user.id
                     })
 
+        # T023: Post GL journal entries for cycle count variances
+        if data.auto_adjust and variance_count > 0:
+            from utils.accounting import get_mapped_account_id, get_base_currency
+            from utils.fiscal_lock import check_fiscal_period_open
+            from services.gl_service import create_journal_entry as gl_create_journal_entry
+
+            acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
+            acc_variance = get_mapped_account_id(db, "acc_map_inventory_adjustment")
+            base_currency = get_base_currency(db)
+
+            if acc_inventory and acc_variance:
+                check_fiscal_period_open(db, datetime.now().date())
+
+                branch_id = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": cc.warehouse_id}).scalar()
+
+                # Gather all variance items for GL posting
+                variance_items = db.execute(text("""
+                    SELECT cci.product_id, cci.variance, cci.variance_value, cci.unit_cost
+                    FROM cycle_count_items cci
+                    WHERE cci.cycle_count_id = :ccid AND cci.variance != 0
+                """), {"ccid": count_id}).fetchall()
+
+                for vi in variance_items:
+                    abs_value = abs(float(vi.variance_value or 0))
+                    if abs_value < 0.01:
+                        continue
+
+                    if vi.variance > 0:
+                        # Surplus: Dr. Inventory Asset / Cr. Inventory Variance
+                        lines = [
+                            {"account_id": acc_inventory, "debit": abs_value, "credit": 0, "description": f"Cycle Count Surplus - {cc.count_number}"},
+                            {"account_id": acc_variance, "debit": 0, "credit": abs_value, "description": f"Inventory Variance - {cc.count_number}"},
+                        ]
+                    else:
+                        # Shortage: Dr. Inventory Variance / Cr. Inventory Asset
+                        lines = [
+                            {"account_id": acc_variance, "debit": abs_value, "credit": 0, "description": f"Inventory Variance - {cc.count_number}"},
+                            {"account_id": acc_inventory, "debit": 0, "credit": abs_value, "description": f"Cycle Count Shortage - {cc.count_number}"},
+                        ]
+
+                    gl_create_journal_entry(
+                        db,
+                        company_id=current_user.company_id,
+                        date=datetime.now().strftime("%Y-%m-%d"),
+                        description=f"Cycle Count Variance - {cc.count_number}",
+                        lines=lines,
+                        user_id=current_user.id,
+                        branch_id=branch_id,
+                        reference=cc.count_number,
+                        currency=base_currency,
+                    )
+
         # Update cycle count
         db.execute(text("""
             UPDATE cycle_counts SET
@@ -1407,6 +1474,6 @@ def complete_cycle_count(
         db.rollback()
         logger.error(f"Error completing cycle count: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

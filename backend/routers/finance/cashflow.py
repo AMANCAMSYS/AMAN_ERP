@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from utils.i18n import http_error
 from sqlalchemy import text
 
 from database import get_db_connection
@@ -56,7 +57,7 @@ def generate_forecast(
         db.rollback()
         logger.exception("Forecast generation failed")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -158,6 +159,6 @@ def delete_forecast(forecast_id: int, current_user=Depends(get_current_user)):
         db.rollback()
         logger.exception("Forecast deletion failed")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

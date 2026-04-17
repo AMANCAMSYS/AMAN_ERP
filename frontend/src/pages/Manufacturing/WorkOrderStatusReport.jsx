@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { manufacturingAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
@@ -33,7 +34,7 @@ const WorkOrderStatusReport = () => {
                 setOrders(data?.orders || data?.items || data || []);
             }
         } catch (e) {
-            console.error(e);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

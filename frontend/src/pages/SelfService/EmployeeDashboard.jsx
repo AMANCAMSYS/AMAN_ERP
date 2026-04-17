@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { selfServiceAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
+import { formatNumber } from '../../utils/format';
 import { Calendar, FileText, User, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -31,7 +33,7 @@ const EmployeeDashboard = () => {
             setRecentLeaves((leavesRes.data?.data || []).slice(0, 5));
             setRecentPayslips((payslipsRes.data?.data || []).slice(0, 5));
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -144,7 +146,7 @@ const EmployeeDashboard = () => {
                             {recentPayslips.map(ps => (
                                 <tr key={ps.id} onClick={() => navigate(`/hr/self-service/payslips/${ps.id}`)} style={{ cursor: 'pointer' }}>
                                     <td>{ps.period_name || `${ps.month}/${ps.year}`}</td>
-                                    <td>{Number(ps.net_salary || 0).toLocaleString()}</td>
+                                    <td>{formatNumber(ps.net_salary || 0)}</td>
                                     <td>{ps.status}</td>
                                 </tr>
                             ))}

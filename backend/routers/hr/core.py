@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Union, Any, Dict
@@ -336,7 +337,7 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     finally:
         conn.close()
 
@@ -471,7 +472,7 @@ def update_employee(
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     finally:
         conn.close()
 
@@ -603,15 +604,15 @@ def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, current
                 "deductions": row.deductions or 0,
                 "net_salary": row.net_salary or 0,
                 "currency": row.currency,
-                "exchange_rate": float(row.exchange_rate) if row.exchange_rate else 1.0,
-                "net_salary_base": float(row.net_salary_base) if row.net_salary_base else None,
-                "gosi_employee_share": float(row.gosi_employee_share or 0),
-                "gosi_employer_share": float(row.gosi_employer_share or 0),
-                "overtime_amount": float(row.overtime_amount or 0),
-                "violation_deduction": float(row.violation_deduction or 0),
-                "loan_deduction": float(row.loan_deduction or 0),
-                "salary_components_earning": float(row.salary_components_earning or 0),
-                "salary_components_deduction": float(row.salary_components_deduction or 0)
+                "exchange_rate": str(row.exchange_rate) if row.exchange_rate else "1",
+                "net_salary_base": str(row.net_salary_base) if row.net_salary_base else None,
+                "gosi_employee_share": str(row.gosi_employee_share or 0),
+                "gosi_employer_share": str(row.gosi_employer_share or 0),
+                "overtime_amount": str(row.overtime_amount or 0),
+                "violation_deduction": str(row.violation_deduction or 0),
+                "loan_deduction": str(row.loan_deduction or 0),
+                "salary_components_earning": str(row.salary_components_earning or 0),
+                "salary_components_deduction": str(row.salary_components_deduction or 0)
             })
         return entries
     finally:
@@ -623,7 +624,7 @@ def get_payroll_entries(period_id: int, branch_id: Optional[int] = None, current
 def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
-        monthly_installment = float((_dec(loan.amount) / Decimal(str(loan.total_installments))).quantize(_D2, ROUND_HALF_UP))
+        monthly_installment = str((_dec(loan.amount) / Decimal(str(loan.total_installments))).quantize(_D2, ROUND_HALF_UP))
         
         # Check if employee exists
         emp = conn.execute(text("SELECT id FROM employees WHERE id=:id"), {"id": loan.employee_id}).fetchone()
@@ -651,7 +652,7 @@ def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(g
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -679,7 +680,7 @@ def list_loans(branch_id: Optional[int] = None, current_user: UserResponse = Dep
     except Exception as e:
         logger.error("list_loans error: %s", e)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -734,12 +735,12 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         username_val = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
         log_activity(conn, user_id=user_id_val, username=username_val, action="loan.approve",
                      resource_type="employee_loan", resource_id=loan_id,
-                     details={"amount": float(loan.amount), "employee_id": loan.employee_id})
+                     details={"amount": str(loan.amount), "employee_id": loan.employee_id})
         return {"status": "active"}
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -872,12 +873,12 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
                         :currency, :exchange_rate, :net_base)
             """), {
                 "pid": period_id, "eid": emp.id,
-                "basic": float(basic), "housing": float(housing), "transport": float(transport), "other": float(other),
-                "comp_earn": float(comp_earning), "comp_ded": float(comp_deduction),
-                "overtime": float(overtime_amount), "gosi_emp": float(gosi_emp_share), "gosi_empr": float(gosi_empr_share),
-                "viol_ded": float(violation_deduction), "loan_ded": float(loan_deduction),
-                "total_ded": float(total_deductions), "net": float(net),
-                "currency": emp_currency, "exchange_rate": float(exchange_rate), "net_base": float(net_base)
+                "basic": str(basic), "housing": str(housing), "transport": str(transport), "other": str(other),
+                "comp_earn": str(comp_earning), "comp_ded": str(comp_deduction),
+                "overtime": str(overtime_amount), "gosi_emp": str(gosi_emp_share), "gosi_empr": str(gosi_empr_share),
+                "viol_ded": str(violation_deduction), "loan_ded": str(loan_deduction),
+                "total_ded": str(total_deductions), "net": str(net),
+                "currency": emp_currency, "exchange_rate": str(exchange_rate), "net_base": str(net_base)
             })
             count += 1
             
@@ -891,7 +892,7 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -954,7 +955,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                     new_paid = _dec(loan.paid_amount) + _dec(entry.loan_deduction)
                     new_status = 'completed' if new_paid >= _dec(loan.amount) else 'active'
                     conn.execute(text("UPDATE employee_loans SET paid_amount = :paid, status = :status WHERE id=:id"),
-                                 {"paid": float(new_paid.quantize(_D2, ROUND_HALF_UP)), "status": new_status, "id": loan.id})
+                                 {"paid": str(new_paid.quantize(_D2, ROUND_HALF_UP)), "status": new_status, "id": loan.id})
 
         # 4. Mark processed overtime requests (so they're not counted again)
         try:
@@ -1066,7 +1067,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                 if pay_currency == base_currency:
                     desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({pay_currency})'
                 else:
-                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({float(local_amount):,.2f} {pay_currency} × {float(rate)})'
+                    desc_text = f'صافي الرواتب المحولة - Net Salary Payment ({str(local_amount)} {pay_currency} × {str(rate)})'
 
                 lines.append({
                     "account_id": acc_bank, "debit": 0, "credit": base_amount,
@@ -1105,7 +1106,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                         UPDATE treasury_accounts
                         SET current_balance = current_balance - :amt, updated_at = CURRENT_TIMESTAMP
                         WHERE id = :tid
-                    """), {"amt": float(total_net_all), "tid": treasury.id})
+                    """), {"amt": str(total_net_all), "tid": treasury.id})
             except Exception as tres_err:
                 logger.warning(f"Treasury balance update for payroll skipped: {tres_err}")
 
@@ -1123,7 +1124,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                 AND u.role IN ('admin', 'superuser')
             """), {
                 "title": "💰 تم ترحيل الرواتب",
-                "message": f"تم ترحيل مسير الرواتب {period.name} بنجاح — {emp_count} موظف — إجمالي {float(total_net):,.2f} {base_currency}",
+                "message": f"تم ترحيل مسير الرواتب {period.name} بنجاح — {emp_count} موظف — إجمالي {str(total_net)} {base_currency}",
                 "link": "/hr/payroll"
             })
         except Exception:
@@ -1132,13 +1133,13 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
         trans.commit()
         log_activity(conn, user_id=user_id, username=current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", ""),
                      action="payroll.post", resource_type="payroll_period", resource_id=period_id,
-                     details={"journal_entry": je_num, "total_net": float(total_net)})
+                     details={"journal_entry": je_num, "total_net": str(total_net)})
         return {"message": "Payroll posted successfully", "journal_entry": je_num}
 
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1167,7 +1168,7 @@ def create_department(dept: DepartmentCreate, current_user: UserResponse = Depen
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1193,7 +1194,7 @@ def delete_department(dept_id: int, current_user: UserResponse = Depends(get_cur
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1237,7 +1238,7 @@ def create_position(pos: PositionCreate, current_user: UserResponse = Depends(ge
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1263,7 +1264,7 @@ def delete_position(pos_id: int, current_user: UserResponse = Depends(get_curren
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1353,7 +1354,7 @@ def check_in(current_user: UserResponse = Depends(get_current_user), company_id:
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1414,7 +1415,7 @@ def check_out(
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1602,7 +1603,7 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
                 document_type="leave_request",
                 document_id=result.id,
                 document_number=f"LR-{result.id}",
-                amount=float(leave_days),
+                amount=str(leave_days),
                 submitted_by=user_id,
                 description=f"طلب إجازة {request.leave_type} - {leave_days} يوم",
                 link=f"/hr/leaves"
@@ -1650,7 +1651,7 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
         conn.rollback()
         logger.error("Error creating leave: %s", e)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1768,7 +1769,7 @@ def calculate_end_of_service(
         """), {"eid": data.employee_id}).fetchone()
         
         if not emp:
-            raise HTTPException(status_code=404, detail="الموظف غير موجود")
+            raise HTTPException(**http_error(404, "employee_not_found"))
         
         termination_date = data.termination_date or date.today()
         join_date = emp.hire_date
@@ -1790,7 +1791,7 @@ def calculate_end_of_service(
         
         # Calculate EOS using shared helper (Saudi Labor Law Art. 84/85)
         from utils.hr_helpers import calculate_eos_gratuity
-        eos = calculate_eos_gratuity(float(total_salary), float(total_years), data.termination_reason)
+        eos = calculate_eos_gratuity(total_salary, total_years, data.termination_reason)
         
         gratuity = eos["full_gratuity"]
         resignation_factor = eos["resignation_factor"]
@@ -1810,13 +1811,13 @@ def calculate_end_of_service(
             "join_date": str(join_date),
             "termination_date": str(termination_date),
             "termination_reason": data.termination_reason,
-            "service_years": float(total_years.quantize(_D2, ROUND_HALF_UP)),
+            "service_years": str(total_years.quantize(_D2, ROUND_HALF_UP)),
             "service_years_display": f"{delta.years} سنة و {delta.months} شهر و {delta.days} يوم",
-            "base_salary": float(base_salary),
-            "total_salary_used": float(total_salary),
-            "full_gratuity": round(gratuity, 2),
-            "resignation_factor": resignation_factor,
-            "final_gratuity": final_gratuity,
+            "base_salary": str(base_salary),
+            "total_salary_used": str(total_salary),
+            "full_gratuity": str(gratuity),
+            "resignation_factor": str(resignation_factor),
+            "final_gratuity": str(final_gratuity),
             "unpaid_leave_days": int(unpaid_days),
             "notes": "الحساب وفقاً لنظام العمل السعودي - المادة 84 و 85"
         }
@@ -1824,7 +1825,7 @@ def calculate_end_of_service(
         raise
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -2041,12 +2042,12 @@ def generate_single_payslip(data: PayslipGenerateRequest, company_id: str = Depe
              salary_components_earning,salary_components_deduction,overtime_amount,
              gosi_employee_share,gosi_employer_share,violation_deduction,loan_deduction,deductions,net_salary)
             VALUES (:pid,:eid,:basic,:housing,:transport,:other,:comp_earn,:comp_ded,0,:gosi_emp,:gosi_empr,:violation,:loan,:deductions,:net)
-        """), {"pid": period_id, "eid": data.employee_id, "basic": float(basic),
-               "housing": float(housing), "transport": float(transport), "other": float(other),
-               "comp_earn": float(comp_earning), "comp_ded": float(comp_deduction),
-               "gosi_emp": float(gosi_emp), "gosi_empr": float(gosi_empr),
-               "violation": float(violation_deduction), "loan": float(loan_deduction),
-               "deductions": float(total_deductions), "net": float(net)})
+        """), {"pid": period_id, "eid": data.employee_id, "basic": str(basic),
+               "housing": str(housing), "transport": str(transport), "other": str(other),
+               "comp_earn": str(comp_earning), "comp_ded": str(comp_deduction),
+               "gosi_emp": str(gosi_emp), "gosi_empr": str(gosi_empr),
+               "violation": str(violation_deduction), "loan": str(loan_deduction),
+               "deductions": str(total_deductions), "net": str(net)})
         conn.commit()
         return {"message": "Payslip generated successfully"}
     finally:
@@ -2254,9 +2255,9 @@ def get_leave_balance(emp_id: int, company_id: str = Depends(get_current_user_co
         remaining = max(Decimal('0'), entitled + carried_d - used_d)
         return {
             "employee_id": emp_id, "employee_name": emp.name, "year": year,
-            "balances": [{"leave_type": "annual", "entitled_days": float(entitled),
-                          "used_days": float(used_d), "carried_days": float(carried_d),
-                          "remaining_days": float(remaining)}]
+            "balances": [{"leave_type": "annual", "entitled_days": str(entitled),
+                          "used_days": str(used_d), "carried_days": str(carried_d),
+                          "remaining_days": str(remaining)}]
         }
     finally:
         conn.close()
@@ -2300,10 +2301,10 @@ def calculate_leave_carryover(data: LeaveCarryoverRequest, current_user: UserRes
             ON CONFLICT (employee_id,leave_type,year) DO UPDATE SET
             entitled_days=EXCLUDED.entitled_days, used_days=EXCLUDED.used_days,
             carried_days=EXCLUDED.carried_days, expired_days=EXCLUDED.expired_days, calculated_at=NOW()
-        """), {"eid": data.employee_id, "year": year, "entitled": float(entitled), "used": float(used_d),
-               "carried": float(carried), "expired": float(expired), "max_carry": float(max_carry)})
+        """), {"eid": data.employee_id, "year": year, "entitled": str(entitled), "used": str(used_d),
+               "carried": str(carried), "expired": str(expired), "max_carry": str(max_carry)})
         conn.commit()
         return {"employee_id": data.employee_id, "employee_name": emp.name, "year": year,
-                "entitled_days": float(entitled), "used_days": float(used_d), "carried_days": float(carried), "expired_days": float(expired)}
+                "entitled_days": str(entitled), "used_days": str(used_d), "carried_days": str(carried), "expired_days": str(expired)}
     finally:
         conn.close()

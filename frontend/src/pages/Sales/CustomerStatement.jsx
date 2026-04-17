@@ -4,12 +4,14 @@ import { getCurrency, hasPermission } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 const CustomerStatement = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [statement, setStatement] = useState(null);
@@ -39,7 +41,7 @@ const CustomerStatement = () => {
             });
             setStatement(res.data);
         } catch (err) {
-            console.error(err);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

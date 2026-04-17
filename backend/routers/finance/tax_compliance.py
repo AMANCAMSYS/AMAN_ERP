@@ -7,10 +7,11 @@
 • تقارير ضريبية رسمية: إقرار VAT سعودي، ضريبة دخل سورية، إلخ
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime, timezone
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
@@ -42,6 +43,16 @@ class CompanyTaxSettingsUpdate(BaseModel):
     fiscal_year_start: str = "01-01"
     default_filing_frequency: str = "quarterly"
     zatca_phase: str = "none"
+
+    @validator('vat_number')
+    def validate_vat_number(cls, v, values):
+        if v is not None and v.strip():
+            cc = values.get('country_code', '')
+            if cc == 'SA':
+                import re
+                if not re.fullmatch(r'3\d{14}', v.strip()):
+                    raise ValueError('Saudi VAT number must be 15 digits starting with 3')
+        return v
 
 class BranchTaxSettingUpdate(BaseModel):
     branch_id: int
@@ -213,7 +224,7 @@ def update_company_tax_settings(
         db.rollback()
         logger.error(f"Error updating company tax settings: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -232,7 +243,7 @@ def get_branch_tax_settings(branch_id: int, current_user: dict = Depends(get_cur
             "SELECT id, branch_name, branch_name_en, country, country_code FROM branches WHERE id = :id"
         ), {"id": branch_id}).fetchone()
         if not branch:
-            raise HTTPException(status_code=404, detail="الفرع غير موجود")
+            raise HTTPException(**http_error(404, "branch_not_found"))
 
         branch_cc = branch.country_code or "SA"
 
@@ -276,7 +287,7 @@ def update_branch_tax_setting(
         # Verify branch exists
         branch = db.execute(text("SELECT 1 FROM branches WHERE id = :id"), {"id": data.branch_id}).fetchone()
         if not branch:
-            raise HTTPException(status_code=404, detail="الفرع غير موجود")
+            raise HTTPException(**http_error(404, "branch_not_found"))
 
         # Verify tax regime exists
         regime = db.execute(text("SELECT 1 FROM tax_regimes WHERE id = :id"), {"id": data.tax_regime_id}).fetchone()
@@ -317,7 +328,7 @@ def update_branch_tax_setting(
         db.rollback()
         logger.error(f"Error updating branch tax settings: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -338,7 +349,7 @@ def get_applicable_taxes(branch_id: int, current_user: dict = Depends(get_curren
             "SELECT id, country_code FROM branches WHERE id = :id"
         ), {"id": branch_id}).fetchone()
         if not branch:
-            raise HTTPException(status_code=404, detail="الفرع غير موجود")
+            raise HTTPException(**http_error(404, "branch_not_found"))
 
         branch_cc = branch.country_code or "SA"
 

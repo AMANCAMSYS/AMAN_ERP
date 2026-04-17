@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Edit2, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -36,7 +37,7 @@ const EmployeeDocuments = () => {
             ]);
             setDocs(dRes.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -54,12 +55,12 @@ const EmployeeDocuments = () => {
             setEditItem(null);
             setForm({ employee_id: '', document_type: 'passport', document_number: '', issue_date: '', expiry_date: '', notes: '' });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm(t('hr.documents.are_you_sure'))) return;
-        try { await hrAdvancedAPI.deleteDocument(id); fetchData(); } catch (e) { console.error(e); }
+        try { await hrAdvancedAPI.deleteDocument(id); fetchData(); } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const getDaysUntilExpiry = (expiryDate) => {

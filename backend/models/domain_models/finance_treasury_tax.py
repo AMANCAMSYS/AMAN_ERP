@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text as sa_text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,8 @@ class TreasuryTransaction(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
     reference_number: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[str | None] = mapped_column(String(20), default="posted")
+    exchange_rate: Mapped[float | None] = mapped_column(Numeric(18, 6), server_default=sa_text("1.0"))
+    currency: Mapped[str | None] = mapped_column(String(3))
     created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

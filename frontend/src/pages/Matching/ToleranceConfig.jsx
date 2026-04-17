@@ -43,10 +43,10 @@ export default function ToleranceConfig() {
       setSaving(true)
       const payload = {
         ...editing,
-        quantity_percent: parseFloat(editing.quantity_percent) || 0,
-        quantity_absolute: parseFloat(editing.quantity_absolute) || 0,
-        price_percent: parseFloat(editing.price_percent) || 0,
-        price_absolute: parseFloat(editing.price_absolute) || 0,
+        quantity_percent: String(editing.quantity_percent || 0),
+        quantity_absolute: String(editing.quantity_absolute || 0),
+        price_percent: String(editing.price_percent || 0),
+        price_absolute: String(editing.price_absolute || 0),
         supplier_id: editing.supplier_id ? parseInt(editing.supplier_id) : null,
         product_category_id: editing.product_category_id ? parseInt(editing.product_category_id) : null,
       }

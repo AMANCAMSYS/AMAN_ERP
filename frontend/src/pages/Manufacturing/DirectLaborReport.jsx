@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
@@ -29,7 +30,7 @@ const DirectLaborReport = () => {
             const res = await manufacturingAPI.getDirectLaborReport(params);
             setReport(res.data);
         } catch (e) {
-            console.error(e);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -43,7 +44,7 @@ const DirectLaborReport = () => {
             if (!params.work_center_id) delete params.work_center_id;
             const res = await manufacturingAPI.getDirectLaborReport(params);
             if (res.data?.file_url) window.open(res.data.file_url, '_blank');
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     return (

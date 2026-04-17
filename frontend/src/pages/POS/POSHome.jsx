@@ -44,7 +44,7 @@ const POSHome = () => {
                 setLoading(false);
             }
         } catch (error) {
-            console.error("Error checking session:", error);
+            showToast(t('common.error_occurred'), 'error');
             setLoading(false);
         }
     };
@@ -56,7 +56,7 @@ const POSHome = () => {
             setWarehouses(response.data);
             if (response.data.length > 0) setSelectedWarehouse(response.data[0].id);
         } catch (error) {
-            console.error("Error fetching warehouses", error);
+            showToast(t('common.error_occurred'), 'error');
         }
     }
 
@@ -68,7 +68,7 @@ const POSHome = () => {
             setTreasuryAccounts(activeAccounts);
             if (activeAccounts.length > 0) setSelectedTreasury(activeAccounts[0].id);
         } catch (error) {
-            console.error("Error fetching treasury accounts", error);
+            showToast(t('common.error_occurred'), 'error');
         }
     }
 
@@ -81,7 +81,7 @@ const POSHome = () => {
 
         try {
             await api.post('/pos/sessions/open', {
-                opening_balance: parseFloat(openingBalance),
+                opening_balance: String(openingBalance),
                 warehouse_id: parseInt(selectedWarehouse),
                 treasury_account_id: parseInt(selectedTreasury),
                 notes: notes

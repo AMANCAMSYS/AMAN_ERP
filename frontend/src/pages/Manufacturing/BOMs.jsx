@@ -63,7 +63,7 @@ const BOMs = () => {
             setRoutes(routesRes.data);
             setLoading(false);
         } catch (error) {
-            console.error("Error fetching data:", error);
+            toastEmitter.emit(t('common.error'), 'error');
             setLoading(false);
         }
     };
@@ -105,7 +105,7 @@ const BOMs = () => {
 
     const handleAddComponent = () => {
         if (!newComp.component_product_id) {
-            toastEmitter.emit(t('Please select a Component Product'), 'warning');
+            toastEmitter.emit(t('manufacturing.validation.select_component_product'), 'warning');
             return;
         }
         const product = products.find(p => p.id === parseInt(newComp.component_product_id));
@@ -133,7 +133,7 @@ const BOMs = () => {
 
     const handleAddOutput = () => {
         if (!newOutput.product_id) {
-            toastEmitter.emit(t('Please select a Product'), 'warning');
+            toastEmitter.emit(t('manufacturing.validation.select_product'), 'warning');
             return;
         }
         const product = products.find(p => p.id === parseInt(newOutput.product_id));
@@ -184,12 +184,11 @@ const BOMs = () => {
             setShowModal(false);
             fetchData();
         } catch (error) {
-            console.error("Error saving BOM:", error);
-            toastEmitter.emit(t('Operation Failed'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
 
     return (
         <div className="workspace fade-in">

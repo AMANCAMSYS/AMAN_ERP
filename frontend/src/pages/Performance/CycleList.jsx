@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { hrAdvancedAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Play, CheckCircle, Clock } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -22,7 +23,7 @@ const CycleList = () => {
             if (statusFilter) params.status = statusFilter;
             const res = await hrAdvancedAPI.listCycles(params);
             setCycles(res.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 

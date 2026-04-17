@@ -4,6 +4,7 @@ import { purchasesAPI } from '../../utils/api'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
 import { formatNumber } from '../../utils/format'
 import { getIndustryFeature } from '../../hooks/useIndustryType'
@@ -11,6 +12,7 @@ import { getIndustryFeature } from '../../hooks/useIndustryType'
 function BuyingHome() {
     const { t, i18n } = useTranslation()
     const navigate = useNavigate()
+    const { showToast } = useToast()
     const [stats, setStats] = useState({ supplier_count: 0, total_payables: 0, monthly_purchases: 0 })
     const [loading, setLoading] = useState(true)
     const currency = getCurrency()
@@ -33,7 +35,7 @@ function BuyingHome() {
                 const response = await purchasesAPI.getSummary(params)
                 setStats(response.data)
             } catch (err) {
-                console.error("Failed to fetch purchase stats", err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -126,20 +128,20 @@ function BuyingHome() {
                         {showRFQ && (
                             <div className="link-item" onClick={() => navigate('/buying/rfq')}>
                                 <span className="link-icon">📨</span>
-                                {i18n.language === 'ar' ? 'طلبات عروض الأسعار' : 'RFQ'}
+                                {i18n.t('buying.rfq_title')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         )}
                         {showAgreements && (
                             <div className="link-item" onClick={() => navigate('/buying/agreements')}>
                                 <span className="link-icon">🤝</span>
-                                {i18n.language === 'ar' ? 'اتفاقيات الشراء' : 'Purchase Agreements'}
+                                {i18n.t('buying.agreements_title')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         )}
                         <div className="link-item" onClick={() => navigate('/buying/blanket-po')}>
                             <span className="link-icon">📋</span>
-                            {i18n.language === 'ar' ? 'أوامر الشراء الشاملة' : 'Blanket Purchase Orders'}
+                            {i18n.t('blanket_po.title')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>
@@ -164,13 +166,13 @@ function BuyingHome() {
                             {showSupplierRatings && (
                                 <div className="link-item" onClick={() => navigate('/buying/supplier-ratings')}>
                                     <span className="link-icon">⭐</span>
-                                    {i18n.language === 'ar' ? 'تقييم الموردين' : 'Supplier Ratings'}
+                                    {i18n.t('buying.ratings_title')}
                                     <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                                 </div>
                             )}
                             <div className="link-item" onClick={() => navigate('/buying/reports/aging')}>
                                 <span className="link-icon">⏳</span>
-                                {i18n.language === 'ar' ? 'تقادم المشتريات' : 'Purchases Aging'}
+                                {i18n.t('buying.purchases_aging')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         </div>
@@ -180,21 +182,21 @@ function BuyingHome() {
                 {/* Matching & Quality Section */}
                 {hasPermission('buying.view') && (
                     <div className="card section-card">
-                        <h3 className="section-title">{i18n.language === 'ar' ? 'المطابقة والجودة' : 'Matching & Quality'}</h3>
+                        <h3 className="section-title">{i18n.t('buying.matching_quality')}</h3>
                         <div className="links-list">
                             <div className="link-item" onClick={() => navigate('/buying/matching')}>
                                 <span className="link-icon">🔗</span>
-                                {i18n.language === 'ar' ? 'مطابقة ثلاثية' : '3-Way Matching'}
+                                {i18n.t('nav.matching')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                             <div className="link-item" onClick={() => navigate('/buying/matching/tolerances')}>
                                 <span className="link-icon">⚙️</span>
-                                {i18n.language === 'ar' ? 'إعدادات التفاوت' : 'Tolerance Settings'}
+                                {i18n.t('matching.tolerances')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                             <div className="link-item" onClick={() => navigate('/buying/landed-costs')}>
                                 <span className="link-icon">🚢</span>
-                                {i18n.language === 'ar' ? 'التكاليف الإضافية' : 'Landed Costs'}
+                                {i18n.t('landed_costs.title')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         </div>

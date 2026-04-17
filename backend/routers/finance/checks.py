@@ -3,6 +3,7 @@ Checks Management Router - TRS-001 & TRS-002
 إدارة الشيكات تحت التحصيل والدفع
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from utils.i18n import http_error
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -11,6 +12,7 @@ from utils.permissions import require_permission, validate_branch_access, requir
 from utils.accounting import get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry as gl_create_journal_entry
+from utils.treasury_gl import ensure_treasury_gl_accounts
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
 from typing import Optional
@@ -117,7 +119,7 @@ def list_checks_receivable(
         return {"items": items, "total": total, "page": page}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -152,7 +154,7 @@ def checks_receivable_stats(branch_id: Optional[int] = None, current_user=Depend
         }
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -170,7 +172,7 @@ def get_check_receivable(check_id: int, current_user=Depends(get_current_user)):
             WHERE cr.id = :id
         """), {"id": check_id}).fetchone()
         if not r:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
         
         # Validate branch access
         validate_branch_access(current_user, r.branch_id)
@@ -197,7 +199,7 @@ def get_check_receivable(check_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -219,7 +221,20 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
             if not data.get(f):
                 raise HTTPException(400, f"الحقل {f} مطلوب")
 
+        # T015: Duplicate check number warning per branch
+        dup = db.execute(text("""
+            SELECT id, status, amount FROM checks_receivable
+            WHERE check_number = :cn AND branch_id IS NOT DISTINCT FROM :bid
+        """), {"cn": data["check_number"], "bid": data.get("branch_id")}).fetchone()
+        if dup:
+            raise HTTPException(
+                409,
+                detail=f"شيك بنفس الرقم موجود مسبقاً (ID={dup.id}, الحالة={dup.status}, المبلغ={float(dup.amount):,.2f})"
+            )
+
         _ensure_checks_accounts(db)
+        # Also ensure all 4 treasury GL accounts exist (1205, 2105, 1210, 2110)
+        ensure_treasury_gl_accounts(db, user_id=current_user.id, username=current_user.username)
 
         amount = _dec(data["amount"]).quantize(_D2, ROUND_HALF_UP)
 
@@ -256,11 +271,11 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
             INSERT INTO checks_receivable (
                 check_number, drawer_name, bank_name, branch_name, amount, currency,
                 issue_date, due_date, party_id, treasury_account_id, receipt_id,
-                journal_entry_id, status, notes, branch_id, created_by
+                journal_entry_id, status, notes, branch_id, created_by, exchange_rate
             ) VALUES (
                 :check_number, :drawer_name, :bank_name, :branch_name, :amount, :currency,
                 :issue_date, :due_date, :party_id, :treasury_id, :receipt_id,
-                :je_id, 'pending', :notes, :branch_id, :user_id
+                :je_id, 'pending', :notes, :branch_id, :user_id, :exchange_rate
             ) RETURNING id
         """), {
             "check_number": data["check_number"],
@@ -278,6 +293,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
             "notes": data.get("notes", ""),
             "branch_id": data.get("branch_id"),
             "user_id": current_user.id,
+            "exchange_rate": float(_dec(data.get("exchange_rate", 1))),
         }).fetchone()
 
         db.commit()
@@ -289,7 +305,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -302,9 +318,9 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
     """
     db = get_db_connection(current_user.company_id)
     try:
-        check = db.execute(text("SELECT * FROM checks_receivable WHERE id = :id"), {"id": check_id}).fetchone()
+        check = db.execute(text("SELECT * FROM checks_receivable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
         if not check:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, check.branch_id)
@@ -316,11 +332,11 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
         treasury_id = data.get("treasury_account_id") or check.treasury_account_id
 
         if not treasury_id:
-            raise HTTPException(400, "يجب تحديد حساب الخزينة/البنك")
+            raise HTTPException(**http_error(400, "treasury_or_bank_required"))
 
         treasury = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": treasury_id}).fetchone()
         if not treasury:
-            raise HTTPException(404, "حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
 
         checks_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '1205' LIMIT 1")).fetchone()
         if not checks_account:
@@ -367,7 +383,7 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -381,9 +397,9 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
     """
     db = get_db_connection(current_user.company_id)
     try:
-        check = db.execute(text("SELECT * FROM checks_receivable WHERE id = :id"), {"id": check_id}).fetchone()
+        check = db.execute(text("SELECT * FROM checks_receivable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
         if not check:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, check.branch_id)
@@ -466,7 +482,80 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post("/receivable/{check_id}/represent", dependencies=[Depends(require_permission("treasury.create"))])
+def represent_check_receivable(check_id: int, data: dict = None, current_user=Depends(get_current_user)):
+    """
+    Re-present a bounced check receivable.
+    Sets status back to 'pending', posts GL entry (Dr. 1205 / Cr. AR),
+    increments re_presentation_count, stores re_presentation_journal_id.
+    """
+    if data is None:
+        data = {}
+    db = get_db_connection(current_user.company_id)
+    try:
+        check = db.execute(text("SELECT * FROM checks_receivable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
+        if not check:
+            raise HTTPException(**http_error(404, "check_not_found"))
+
+        validate_branch_access(current_user, check.branch_id)
+
+        if check.status != 'bounced':
+            raise HTTPException(400, "لا يمكن إعادة تقديم شيك غير مرتجع")
+
+        represent_date = data.get("represent_date", str(date.today()))
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
+
+        checks_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '1205' LIMIT 1")).fetchone()
+        ar_account = db.execute(text(
+            "SELECT id FROM accounts WHERE account_code IN ('1201', '1200') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+        )).fetchone()
+        if not checks_account or not ar_account:
+            raise HTTPException(500, "حسابات الشيكات (1205) أو العملاء (1200/1201) غير موجودة")
+
+        check_fiscal_period_open(db, represent_date)
+
+        je_lines = [
+            {"account_id": checks_account.id, "debit": float(amount), "credit": 0, "description": f"إعادة تقديم شيك {check.check_number}"},
+            {"account_id": ar_account.id, "debit": 0, "credit": float(amount), "description": f"إعادة تقديم شيك {check.check_number}"},
+        ]
+
+        je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=represent_date,
+            description=f"إعادة تقديم شيك رقم {check.check_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=check.branch_id,
+            source="check_re_presentation",
+            source_id=check_id
+        )
+
+        new_count = (check.re_presentation_count or 0) + 1
+        db.execute(text("""
+            UPDATE checks_receivable
+            SET status = 'pending', re_presentation_date = :rdate,
+                re_presentation_count = :cnt, re_presentation_journal_id = :je_id,
+                bounce_date = NULL, bounce_reason = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": check_id, "rdate": represent_date, "cnt": new_count, "je_id": je_id})
+
+        db.commit()
+        log_activity(db, current_user.id, current_user.username, "represent", "checks_receivable", str(check_id),
+                     {"re_presentation_count": new_count})
+        return {"message": "تم إعادة تقديم الشيك بنجاح", "journal_entry_id": je_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Internal error")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -539,7 +628,7 @@ def list_checks_payable(
         return {"items": items, "total": total, "page": page}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -574,7 +663,7 @@ def checks_payable_stats(branch_id: Optional[int] = None, current_user=Depends(g
         }
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -592,7 +681,7 @@ def get_check_payable(check_id: int, current_user=Depends(get_current_user)):
             WHERE cp.id = :id
         """), {"id": check_id}).fetchone()
         if not r:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, r.branch_id)
@@ -619,7 +708,7 @@ def get_check_payable(check_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -640,6 +729,15 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
         for f in required:
             if not data.get(f):
                 raise HTTPException(400, f"الحقل {f} مطلوب")
+
+        # --- T021: Duplicate check number warning ---
+        dup = db.execute(text("""
+            SELECT id, status, amount FROM checks_payable
+            WHERE check_number = :cn AND branch_id IS NOT DISTINCT FROM :bid
+            LIMIT 1
+        """), {"cn": data["check_number"], "bid": data.get("branch_id")}).fetchone()
+        if dup:
+            raise HTTPException(409, f"يوجد شيك صادر بنفس الرقم (معرف={dup.id}, حالة={dup.status})")
 
         _ensure_checks_accounts(db)
 
@@ -678,11 +776,11 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
             INSERT INTO checks_payable (
                 check_number, beneficiary_name, bank_name, branch_name, amount, currency,
                 issue_date, due_date, party_id, treasury_account_id, payment_voucher_id,
-                journal_entry_id, status, notes, branch_id, created_by
+                journal_entry_id, status, notes, branch_id, created_by, exchange_rate
             ) VALUES (
                 :check_number, :beneficiary_name, :bank_name, :branch_name, :amount, :currency,
                 :issue_date, :due_date, :party_id, :treasury_id, :payment_voucher_id,
-                :je_id, 'issued', :notes, :branch_id, :user_id
+                :je_id, 'issued', :notes, :branch_id, :user_id, :exchange_rate
             ) RETURNING id
         """), {
             "check_number": data["check_number"],
@@ -700,6 +798,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
             "notes": data.get("notes", ""),
             "branch_id": data.get("branch_id"),
             "user_id": current_user.id,
+            "exchange_rate": float(_dec(data.get("exchange_rate", 1))),
         }).fetchone()
 
         db.commit()
@@ -711,7 +810,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -724,9 +823,9 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
     """
     db = get_db_connection(current_user.company_id)
     try:
-        check = db.execute(text("SELECT * FROM checks_payable WHERE id = :id"), {"id": check_id}).fetchone()
+        check = db.execute(text("SELECT * FROM checks_payable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
         if not check:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, check.branch_id)
@@ -738,11 +837,11 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
         treasury_id = data.get("treasury_account_id") or check.treasury_account_id
 
         if not treasury_id:
-            raise HTTPException(400, "يجب تحديد حساب الخزينة/البنك")
+            raise HTTPException(**http_error(400, "treasury_or_bank_required"))
 
         treasury = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": treasury_id}).fetchone()
         if not treasury:
-            raise HTTPException(404, "حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
 
         checks_pay_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2105' LIMIT 1")).fetchone()
         if not checks_pay_account:
@@ -796,7 +895,7 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -809,9 +908,9 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
     """
     db = get_db_connection(current_user.company_id)
     try:
-        check = db.execute(text("SELECT * FROM checks_payable WHERE id = :id"), {"id": check_id}).fetchone()
+        check = db.execute(text("SELECT * FROM checks_payable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
         if not check:
-            raise HTTPException(404, "الشيك غير موجود")
+            raise HTTPException(**http_error(404, "check_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, check.branch_id)
@@ -916,7 +1015,83 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post("/payable/{check_id}/represent", dependencies=[Depends(require_permission("treasury.create"))])
+def represent_check_payable(check_id: int, data: dict = {}, current_user=Depends(get_current_user)):
+    """
+    Re-present a bounced payable check.
+    GL: Dr. Accounts Payable / Cr. Checks Payable (2105)
+    Resets status to 'issued', increments re_presentation_count.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        check = db.execute(text("SELECT * FROM checks_payable WHERE id = :id FOR UPDATE"), {"id": check_id}).fetchone()
+        if not check:
+            raise HTTPException(**http_error(404, "check_not_found"))
+
+        validate_branch_access(current_user, check.branch_id)
+
+        if check.status != 'bounced':
+            raise HTTPException(400, "لا يمكن إعادة تقديم شيك غير مرتجع")
+
+        represent_date = data.get("represent_date", str(date.today()))
+        amount = _dec(check.amount).quantize(_D2, ROUND_HALF_UP)
+
+        checks_pay_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2105' LIMIT 1")).fetchone()
+        ap_account = db.execute(text(
+            "SELECT id FROM accounts WHERE account_code IN ('2101', '2100') AND is_active = TRUE ORDER BY account_code LIMIT 1"
+        )).fetchone()
+
+        if not checks_pay_account or not ap_account:
+            raise HTTPException(500, "حسابات الشيكات أو الموردين غير موجودة")
+
+        check_fiscal_period_open(db, represent_date)
+
+        je_lines = [
+            {"account_id": ap_account.id, "debit": float(amount), "credit": 0,
+             "description": f"إعادة تقديم شيك صادر {check.check_number}"},
+            {"account_id": checks_pay_account.id, "debit": 0, "credit": float(amount),
+             "description": f"إعادة تقديم شيك صادر {check.check_number}"},
+        ]
+
+        re_je_id, _ = gl_create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=represent_date,
+            description=f"إعادة تقديم شيك صادر رقم {check.check_number}",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=check.branch_id,
+            source="check_payable_represent",
+            source_id=check_id,
+        )
+
+        new_count = (check.re_presentation_count or 0) + 1
+        db.execute(text("""
+            UPDATE checks_payable
+            SET status = 'issued',
+                bounce_date = NULL, bounce_reason = NULL, bounce_journal_id = NULL,
+                re_presentation_date = :rdate,
+                re_presentation_count = :rcount,
+                re_presentation_journal_id = :je_id,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        """), {"id": check_id, "rdate": represent_date, "rcount": new_count, "je_id": re_je_id})
+
+        db.commit()
+        log_activity(db, current_user.id, current_user.username, "represent", "checks_payable", str(check_id),
+                     {"re_presentation_count": new_count, "represent_date": represent_date})
+        return {"message": "تم إعادة تقديم الشيك بنجاح", "re_presentation_count": new_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception("Internal error")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -968,7 +1143,7 @@ def get_due_checks_alerts(days_ahead: int = Query(7, ge=1, le=90), branch_id: Op
         return {"alerts": alerts, "total": len(alerts)}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1077,7 +1252,7 @@ def checks_aging_report(
         }
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1099,7 +1274,7 @@ def get_check_status_log(check_type: str, check_id: int, current_user=Depends(ge
         return [dict(r._mapping) for r in rows]
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1119,6 +1294,6 @@ def check_status_summary(current_user=Depends(get_current_user)):
         return [dict(r._mapping) for r in rows]
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()

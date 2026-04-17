@@ -3,8 +3,10 @@ Inventory Module - Stock Receipt & Delivery
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from datetime import datetime
+from decimal import Decimal
 import logging
 import uuid
 
@@ -30,7 +32,7 @@ def create_stock_receipt(
         # Validate warehouse
         wh = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
         if not wh:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-007: Branch access check
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -48,7 +50,7 @@ def create_stock_receipt(
 
         for item in movement.items:
             # Update WAC before quantity change
-            unit_cost = float(getattr(item, 'unit_cost', 0) or 0)
+            unit_cost = Decimal(str(getattr(item, 'unit_cost', 0) or 0))
             if unit_cost > 0:
                 from services.costing_service import CostingService
                 CostingService.update_cost(
@@ -107,7 +109,7 @@ def create_stock_receipt(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -124,7 +126,7 @@ def create_stock_delivery(
         # Validate warehouse
         wh = db.execute(text("SELECT warehouse_name, branch_id FROM warehouses WHERE id = :id"), {"id": movement.warehouse_id}).fetchone()
         if not wh:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-007: Branch access check
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -148,7 +150,7 @@ def create_stock_delivery(
                 FOR UPDATE
             """), {"pid": item.product_id, "wh": movement.warehouse_id}).fetchone()
 
-            current_qty = float(inv_row.quantity) if inv_row else 0
+            current_qty = inv_row.quantity if inv_row else 0
             if current_qty < item.quantity:
                 prod_name = db.execute(text("SELECT product_name FROM products WHERE id = :pid"), {"pid": item.product_id}).scalar()
                 raise HTTPException(status_code=400, detail=f"الكمية غير متوفرة للمنتج: {prod_name}. المتوفر: {current_qty}, المطلوب: {item.quantity}")
@@ -193,6 +195,6 @@ def create_stock_delivery(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

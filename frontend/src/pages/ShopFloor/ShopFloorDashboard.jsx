@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { shopFloorAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Activity, Eye, AlertTriangle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -19,7 +20,7 @@ const ShopFloorDashboard = () => {
     const loadDashboard = useCallback(() => {
         shopFloorAPI.getDashboard()
             .then(res => setWorkOrders(res.data || []))
-            .catch(e => console.error(e))
+            .catch(() => toastEmitter.emit(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     }, []);
 

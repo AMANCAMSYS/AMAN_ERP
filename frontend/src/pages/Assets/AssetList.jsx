@@ -102,16 +102,16 @@ const AssetList = () => {
                     </div>
                     <div className="header-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline-primary shadow-sm" onClick={() => navigate('/assets/reports')}>
-                            📊 {i18n.language === 'ar' ? 'التقارير' : 'Reports'}
+                            📊 {i18n.t('common.reports')}
                         </button>
                         <button className="btn btn-secondary shadow-sm" onClick={() => navigate('/assets/management')}>
-                            {i18n.language === 'ar' ? 'النقل والتقييم' : 'Transfers & Reval'}
+                            {i18n.t('asset.transfers_reval')}
                         </button>
                         <button className="btn btn-outline-secondary shadow-sm" onClick={() => navigate('/assets/leases')}>
-                            📄 {i18n.language === 'ar' ? 'عقود الإيجار' : 'Leases'}
+                            📄 {i18n.t('reports.leases')}
                         </button>
                         <button className="btn btn-outline-secondary shadow-sm" onClick={() => navigate('/assets/impairment')}>
-                            🔍 {i18n.language === 'ar' ? 'اختبار الاضمحلال' : 'Impairment'}
+                            🔍 {i18n.t('accounting.impairment')}
                         </button>
                         <button className="btn btn-primary shadow-sm" onClick={() => navigate('/assets/new')}>
                             <Plus size={18} className={t('common.is_rtl') === 'true' ? 'ms-2' : 'me-2'} />

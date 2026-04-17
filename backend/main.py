@@ -216,6 +216,28 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     logger.info("⏰ Report Scheduler Started")
     
+    # Sync schema for all existing company databases via Alembic migrations
+    try:
+        import subprocess, sys as _sys
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        alembic_ini = os.path.join(backend_dir, "alembic.ini")
+        alembic_cmd = [
+            _sys.executable, "-m", "alembic",
+            "-c", alembic_ini,
+            "-x", "company=all",
+            "upgrade", "head",
+        ]
+        result = subprocess.run(
+            alembic_cmd, cwd=backend_dir,
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0:
+            logger.info("🔄 Alembic migrations applied for all company databases")
+        else:
+            logger.warning(f"⚠️ Alembic migration warnings: {result.stderr or result.stdout}")
+    except Exception as e:
+        logger.warning(f"⚠️ Schema sync skipped: {e}")
+    
     yield
     
     logger.info("⏹️ Stopping AMAN ERP System...")

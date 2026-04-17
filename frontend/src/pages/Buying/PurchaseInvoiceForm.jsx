@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { formatNumber, getStep } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -13,6 +14,7 @@ function PurchaseInvoiceForm() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const location = useLocation()
+    const { showToast } = useToast()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const currency = getCurrency()
@@ -80,9 +82,9 @@ function PurchaseInvoiceForm() {
                         is_prepayment: false
                     }))
                     setItems(order.items.map(item => {
-                        const quantity = parseFloat(item.received_quantity) > 0 ? parseFloat(item.received_quantity) : (parseFloat(item.quantity) || 0)
-                        const unitPrice = parseFloat(item.unit_price) || 0
-                        const discount = parseFloat(item.discount) || 0
+                        const quantity = Number(item.received_quantity) > 0 ? Number(item.received_quantity) : (Number(item.quantity) || 0)
+                        const unitPrice = Number(item.unit_price) || 0
+                        const discount = Number(item.discount) || 0
                         const discountPercent = (quantity * unitPrice) > 0 ? (discount / (quantity * unitPrice)) * 100 : 0
 
                         return {
@@ -90,14 +92,14 @@ function PurchaseInvoiceForm() {
                             description: item.description || '',
                             quantity: quantity,
                             unit_price: unitPrice,
-                            tax_rate: parseFloat(item.tax_rate) || 0,
+                            tax_rate: Number(item.tax_rate) || 0,
                             discount: discount,
                             discount_percent: discountPercent
                         }
                     }))
                 }
             } catch (err) {
-                console.error("Error fetching resources", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchResources()
@@ -136,7 +138,7 @@ function PurchaseInvoiceForm() {
             const group = supplierGroups.find(g => g.id === supplier.group_id);
             if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
                 globalEffectType = group.effect_type;
-                globalEffectPercent = parseFloat(group.discount_percentage);
+                globalEffectPercent = Number(group.discount_percentage);
             }
         }
 
@@ -215,13 +217,13 @@ function PurchaseInvoiceForm() {
                 }
 
                 // Calculate discount logic
-                const qty = parseFloat(field === 'quantity' ? value : updatedItem.quantity) || 0
-                const price = parseFloat(field === 'unit_price' ? value : updatedItem.unit_price) || 0
-                let discount = parseFloat(updatedItem.discount) || 0
-                let discountPercent = parseFloat(updatedItem.discount_percent) || 0
+                const qty = Number(field === 'quantity' ? value : updatedItem.quantity) || 0
+                const price = Number(field === 'unit_price' ? value : updatedItem.unit_price) || 0
+                let discount = Number(updatedItem.discount) || 0
+                let discountPercent = Number(updatedItem.discount_percent) || 0
 
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(value) || 0
+                    discountPercent = Number(value) || 0
                     discount = (qty * price) * (discountPercent / 100)
                     updatedItem.discount = discount
                 } else if (field === 'quantity' || field === 'unit_price') {
@@ -233,7 +235,7 @@ function PurchaseInvoiceForm() {
                 updatedItem.discount = discount
 
                 updatedItem[field] = ['quantity', 'unit_price', 'tax_rate', 'discount', 'discount_percent'].includes(field)
-                    ? (value === '' ? '' : parseFloat(value) || 0)
+                    ? (value === '' ? '' : Number(value) || 0)
                     : value
                 return updatedItem
             }
@@ -285,10 +287,10 @@ function PurchaseInvoiceForm() {
                 invoice_date: formData.invoice_date,
                 due_date: formData.due_date,
                 payment_method: formData.payment_method,
-                paid_amount: parseFloat(formData.paid_amount) || 0,
+                paid_amount: String(formData.paid_amount || 0),
                 notes: formData.notes,
                 currency: formData.currency,
-                exchange_rate: parseFloat(formData.exchange_rate) || 1.0,
+                exchange_rate: String(formData.exchange_rate || 1.0),
                 treasury_id: formData.treasury_id ? parseInt(formData.treasury_id) : null,
                 is_prepayment: formData.is_prepayment,
                 original_invoice_id: location.state?.fromOrder?.id || null,
@@ -298,10 +300,10 @@ function PurchaseInvoiceForm() {
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id) || null,
                     description: item.description || '',
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0,
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    tax_rate: String(item.tax_rate || 0),
+                    discount: String(item.discount || 0),
                     markup: 0 // Handled at line level unit_price for purchases
                 }))
             }
@@ -309,7 +311,7 @@ function PurchaseInvoiceForm() {
             await purchasesAPI.createInvoice(payload)
             navigate('/buying/invoices')
         } catch (err) {
-            console.error(err)
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
             const errMsg = err.response?.data?.detail
             setError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) || t('buying.purchase_invoices.form.error_saving'))
         } finally {

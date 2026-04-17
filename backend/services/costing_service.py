@@ -352,7 +352,7 @@ class CostingService:
                    cl.purchase_date, cl.original_quantity, cl.remaining_quantity,
                    cl.unit_cost, cl.source_document_type, cl.source_document_id,
                    cl.is_exhausted, cl.created_at, cl.updated_at,
-                   p.name as product_name, w.name as warehouse_name
+                   p.product_name as product_name, w.warehouse_name as warehouse_name
             FROM cost_layers cl
             LEFT JOIN products p ON p.id = cl.product_id
             LEFT JOIN warehouses w ON w.id = cl.warehouse_id
@@ -436,7 +436,7 @@ class CostingService:
             params["cutoff"] = str(as_of_date)
 
         rows = db.execute(text(f"""
-            SELECT cl.product_id, p.name as product_name, cl.costing_method,
+            SELECT cl.product_id, p.product_name as product_name, cl.costing_method,
                    SUM(cl.remaining_quantity) as total_quantity,
                    SUM(cl.remaining_quantity * cl.unit_cost) as total_value,
                    CASE WHEN SUM(cl.remaining_quantity) > 0
@@ -445,9 +445,9 @@ class CostingService:
             FROM cost_layers cl
             JOIN products p ON p.id = cl.product_id
             WHERE cl.is_exhausted = FALSE {date_filter}
-            GROUP BY cl.product_id, p.name, cl.costing_method
+            GROUP BY cl.product_id, p.product_name, cl.costing_method
             HAVING SUM(cl.remaining_quantity) > 0
-            ORDER BY p.name
+            ORDER BY p.product_name
         """), params).fetchall()
 
         items = []

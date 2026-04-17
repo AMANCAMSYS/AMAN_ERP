@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -17,6 +17,7 @@ const SalesReturnForm = () => {
     const navigate = useNavigate();
     const currency = getCurrency();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -53,8 +54,7 @@ const SalesReturnForm = () => {
             setProducts(prodRes.data);
             setWarehouses(whRes.data);
         } catch (error) {
-            console.error('Error fetching data:', error);
-            toastEmitter.emit(t('sales.orders.form.errors.fetch_failed'), 'error');
+            showToast(t('sales.orders.form.errors.fetch_failed'), 'error');
         }
     };
 
@@ -70,7 +70,7 @@ const SalesReturnForm = () => {
                 const res = await salesAPI.listInvoices({ customer_id: customerId });
                 setInvoices(res.data);
             } catch (error) {
-                console.error('Error fetching invoices:', error);
+                showToast(t('common.error'), 'error');
             }
         }
     };
@@ -116,7 +116,7 @@ const SalesReturnForm = () => {
                 notesRef = `${t('sales.returns.form.auto_note')} #${invoiceDetails.invoice_number}`;
                 setSelectedInvoiceInfo(invoiceDetails);
             } catch (error) {
-                console.error('Error fetching invoice details:', error);
+                showToast(t('common.error'), 'error');
                 setSelectedInvoiceInfo(null);
             }
         } else {
@@ -152,7 +152,7 @@ const SalesReturnForm = () => {
                 // Validate quantity
                 if (field === 'quantity') {
                     if (newValue > item.max_quantity) {
-                        toastEmitter.emit(`${t('sales.returns.form.errors.max_quantity')} (${item.max_quantity})`, 'error');
+                        showToast(`${t('sales.returns.form.errors.max_quantity')} (${item.max_quantity})`, 'error');
                         newValue = item.max_quantity;
                     }
                 }
@@ -171,13 +171,13 @@ const SalesReturnForm = () => {
                 }
 
                 // Calculate discount logic
-                const qty = parseFloat(field === 'quantity' ? newValue : updated.quantity) || 0;
-                const price = parseFloat(field === 'unit_price' ? newValue : updated.unit_price) || 0;
-                let discount = parseFloat(updated.discount) || 0;
-                let discountPercent = parseFloat(updated.discount_percent) || 0;
+                const qty = Number(field === 'quantity' ? newValue : updated.quantity) || 0;
+                const price = Number(field === 'unit_price' ? newValue : updated.unit_price) || 0;
+                let discount = Number(updated.discount) || 0;
+                let discountPercent = Number(updated.discount_percent) || 0;
 
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(newValue) || 0;
+                    discountPercent = Number(newValue) || 0;
                     discount = (qty * price) * (discountPercent / 100);
                     updated.discount = discount;
                 } else if (field === 'quantity' || field === 'unit_price') {
@@ -201,10 +201,10 @@ const SalesReturnForm = () => {
         let tax = 0;
 
         formData.items.forEach(item => {
-            const qty = parseFloat(item.quantity) || 0;
-            const price = parseFloat(item.unit_price) || 0;
-            const discount = parseFloat(item.discount) || 0;
-            const taxRate = parseFloat(item.tax_rate) || 0;
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unit_price) || 0;
+            const discount = Number(item.discount) || 0;
+            const taxRate = Number(item.tax_rate) || 0;
 
             const linePrice = qty * price;
             const taxable = linePrice - discount;
@@ -228,11 +228,11 @@ const SalesReturnForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (formData.items.length === 0) {
-            toastEmitter.emit(t('sales.returns.form.errors.no_items'), 'error');
+            showToast(t('sales.returns.form.errors.no_items'), 'error');
             return;
         }
         if (!formData.warehouse_id) {
-            toastEmitter.emit(t('sales.invoices.form.error_warehouse') || t('common.required'), 'error');
+            showToast(t('sales.invoices.form.error_warehouse') || t('common.required'), 'error');
             return;
         }
 
@@ -248,23 +248,22 @@ const SalesReturnForm = () => {
                 items: formData.items.map(item => ({
                     ...item,
                     product_id: item.product_id ? parseInt(item.product_id) : null,
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0,
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    tax_rate: String(item.tax_rate || 0),
+                    discount: String(item.discount || 0),
                 })),
                 bank_account_id: formData.bank_account_id ? parseInt(formData.bank_account_id) : null,
                 check_number: formData.check_number || null,
                 check_date: formData.check_date || null,
-                refund_amount: formData.refund_method !== 'credit' ? parseFloat(formData.refund_amount) || 0 : 0,
+                refund_amount: formData.refund_method !== 'credit' ? String(formData.refund_amount || 0) : 0,
                 branch_id: currentBranch?.id
             };
 
             const res = await salesAPI.createReturn(payload);
             navigate(`/sales/returns/${res.data.id}`);
         } catch (error) {
-            console.error('Error creating return:', error);
-            // Global interceptor in apiClient.js handles toast display
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -435,7 +434,7 @@ const SalesReturnForm = () => {
                                                     step={isDiscreteUnit(item.unit) ? "1" : "any"}
                                                     value={item.quantity}
                                                     onChange={(e) => {
-                                                        let val = parseFloat(e.target.value) || 0;
+                                                        let val = Number(e.target.value) || 0;
                                                         if (isDiscreteUnit(item.unit)) val = Math.round(val);
                                                         updateItem(index, 'quantity', val);
                                                     }}
@@ -448,7 +447,7 @@ const SalesReturnForm = () => {
                                                     min="0"
                                                     step="any"
                                                     value={item.unit_price}
-                                                    onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                    onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value) || 0)}
                                                     className="form-input text-center"
                                                 />
                                             </td>
@@ -459,7 +458,7 @@ const SalesReturnForm = () => {
                                                     max="100"
                                                     step="0.01"
                                                     value={item.discount_percent}
-                                                    onChange={(e) => updateItem(index, 'discount_percent', parseFloat(e.target.value) || 0)}
+                                                    onChange={(e) => updateItem(index, 'discount_percent', Number(e.target.value) || 0)}
                                                     className="form-input text-center"
                                                 />
                                             </td>
@@ -469,7 +468,7 @@ const SalesReturnForm = () => {
                                                     min="0"
                                                     step="any"
                                                     value={item.tax_rate}
-                                                    onChange={(e) => updateItem(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                    onChange={(e) => updateItem(index, 'tax_rate', Number(e.target.value) || 0)}
                                                     className="form-input text-center"
                                                 />
                                             </td>
@@ -555,7 +554,7 @@ const SalesReturnForm = () => {
                                         type="number"
                                         step="0.01"
                                         value={formData.refund_amount}
-                                        onChange={(e) => setFormData({ ...formData, refund_amount: parseFloat(e.target.value) || 0 })}
+                                        onChange={(e) => setFormData({ ...formData, refund_amount: Number(e.target.value) || 0 })}
                                         className="form-input"
                                     />
                                 </FormField>

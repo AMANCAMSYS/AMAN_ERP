@@ -29,13 +29,13 @@ const BlanketPOForm = () => {
                 const res = await purchasesAPI.listSuppliers({ limit: 500 });
                 setSuppliers(res.data || []);
             } catch (err) {
-                console.error(err);
+                showToast(t('common.error'), 'error');
             }
         };
         fetchSuppliers();
     }, []);
 
-    const totalAmount = (parseFloat(form.total_quantity) || 0) * (parseFloat(form.unit_price) || 0);
+    const totalAmount = (Number(form.total_quantity) || 0) * (Number(form.unit_price) || 0);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -48,8 +48,8 @@ const BlanketPOForm = () => {
         try {
             const payload = {
                 supplier_id: parseInt(form.supplier_id),
-                total_quantity: parseFloat(form.total_quantity),
-                unit_price: parseFloat(form.unit_price),
+                total_quantity: String(form.total_quantity),
+                unit_price: String(form.unit_price),
                 valid_from: form.valid_from,
                 valid_to: form.valid_to,
                 currency: form.currency || 'SAR',

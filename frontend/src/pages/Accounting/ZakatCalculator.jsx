@@ -28,11 +28,13 @@ function ZakatCalculator() {
     const [method, setMethod] = useState('net_assets')
     const [useGregorian, setUseGregorian] = useState(false)
     const [result, setResult] = useState(null)
+    const [postResult, setPostResult] = useState(null)
     const [loading, setLoading] = useState(false)
     const [posting, setPosting] = useState(false)
 
     const handleCalculate = async () => {
         setLoading(true)
+        setPostResult(null)
         try {
             const res = await zakatAPI.calculate({
                 fiscal_year: fiscalYear, method, use_gregorian_rate: useGregorian,
@@ -47,7 +49,8 @@ function ZakatCalculator() {
     const handlePost = async () => {
         setPosting(true)
         try {
-            await zakatAPI.post(fiscalYear)
+            const res = await zakatAPI.post(fiscalYear)
+            setPostResult(res.data)
             showToast(t('zakat.posted_success'), 'success')
         } catch (err) {
             showToast(err.response?.data?.detail || t('common.error'), 'error')
@@ -209,9 +212,15 @@ function ZakatCalculator() {
                         </div>
 
                         <div className="mt-4 flex justify-center">
-                            <button className="btn btn-success" onClick={handlePost} disabled={posting}>
-                                {posting ? t('common.posting') : `✅ ${t('zakat.post_journal_entry')}`}
-                            </button>
+                            {postResult ? (
+                                <div className="alert alert-success" style={{ textAlign: 'center' }}>
+                                    ✅ {t('zakat.posted_success')} — {t('zakat.gl_reference', 'مرجع القيد')}: <strong style={{ fontFamily: 'monospace' }}>{postResult.entry_number}</strong>
+                                </div>
+                            ) : (
+                                <button className="btn btn-success" onClick={handlePost} disabled={posting}>
+                                    {posting ? t('common.posting') : `✅ ${t('zakat.post_journal_entry')}`}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hrAdvancedAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Eye, CheckSquare } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -25,7 +26,7 @@ const TeamReviews = () => {
         if (statusFilter) params.status = statusFilter;
         hrAdvancedAPI.listTeamReviews(params)
             .then(res => setReviews(res.data || []))
-            .catch(e => console.error(e))
+            .catch(e => toastEmitter.emit(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     };
 

@@ -4,19 +4,20 @@ Advanced HR Router - Phase 4
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse, get_current_user_company
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.exports import generate_excel, generate_pdf, create_export_response
 from utils.audit import log_activity
-
-from schemas.hr_advanced import (
 import logging
 logger = logging.getLogger(__name__)
+
+from schemas.hr_advanced import (
     SalaryStructureCreate, SalaryStructureUpdate, SalaryStructureResponse,
     SalaryComponentCreate, SalaryComponentUpdate, SalaryComponentResponse,
     EmployeeSalaryComponentCreate, EmployeeSalaryComponentResponse,
@@ -83,7 +84,7 @@ def update_salary_structure(structure_id: int, data: SalaryStructureUpdate, requ
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE salary_structures SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
@@ -170,7 +171,7 @@ def update_salary_component(component_id: int, data: SalaryComponentUpdate, requ
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         conn.execute(text(f"UPDATE salary_components SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
             conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
@@ -215,7 +216,7 @@ def assign_salary_component(data: EmployeeSalaryComponentCreate, request: Reques
         log_activity(
             conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
             action="hr.employee_salary_component.assign", resource_type="employee_salary_component",
-            resource_id=str(data.employee_id), details={"component_id": data.component_id, "amount": float(data.amount) if data.amount else 0}, request=request
+            resource_id=str(data.employee_id), details={"component_id": data.component_id, "amount": str(data.amount) if data.amount else "0"}, request=request
         )
         conn.commit()
         return {"message": "تم تعيين مكون الراتب بنجاح"}
@@ -228,9 +229,11 @@ def assign_salary_component(data: EmployeeSalaryComponentCreate, request: Reques
 # =============================================
 
 @router.get("/overtime", response_model=List[OvertimeRequestResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_overtime_requests(employee_id: Optional[int] = None, status: Optional[str] = None, company_id: str = Depends(get_current_user_company)):
+def list_overtime_requests(employee_id: Optional[int] = None, status: Optional[str] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT o.*, e.first_name || ' ' || e.last_name as employee_name
             FROM overtime_requests o
@@ -244,6 +247,9 @@ def list_overtime_requests(employee_id: Optional[int] = None, status: Optional[s
         if status:
             query += " AND o.status = :status"
             params["status"] = status
+        if branch_id:
+            query += " AND e.branch_id = :bid"
+            params["bid"] = branch_id
         query += " ORDER BY o.created_at DESC"
         rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -258,11 +264,11 @@ def create_overtime_request(data: OvertimeRequestCreate, request: Request, curre
         # Calculate amount: (salary / 30 / 8) * hours * multiplier
         emp = conn.execute(text("SELECT salary FROM employees WHERE id = :eid"), {"eid": data.employee_id}).fetchone()
         if not emp:
-            raise HTTPException(status_code=404, detail="الموظف غير موجود")
+            raise HTTPException(**http_error(404, "employee_not_found"))
 
         hourly_rate = (_dec(emp.salary) / Decimal('30') / Decimal('8'))
         multiplier = _dec(data.multiplier) if data.multiplier else (Decimal('1.5') if data.overtime_type == "normal" else Decimal('2'))
-        amount = float((hourly_rate * _dec(data.hours) * multiplier).quantize(_D2, ROUND_HALF_UP))
+        amount = str((hourly_rate * _dec(data.hours) * multiplier).quantize(_D2, ROUND_HALF_UP))
 
         result = conn.execute(text("""
             INSERT INTO overtime_requests (employee_id, request_date, overtime_date, hours, overtime_type, multiplier, calculated_amount, reason, branch_id)
@@ -270,7 +276,7 @@ def create_overtime_request(data: OvertimeRequestCreate, request: Request, curre
             RETURNING id
         """), {
             "eid": data.employee_id, "odate": data.overtime_date, "hours": data.hours,
-            "otype": data.overtime_type, "mult": float(multiplier), "amt": amount,
+            "otype": data.overtime_type, "mult": str(multiplier), "amt": amount,
             "reason": data.reason, "bid": data.branch_id
         })
         ot_id = result.scalar()
@@ -348,9 +354,11 @@ def save_gosi_settings(data: GOSISettingsCreate, request: Request, current_user:
 
 
 @router.get("/gosi-calculation", response_model=List[GOSICalculationResponse], dependencies=[Depends(require_permission("hr.view"))])
-def calculate_gosi(company_id: str = Depends(get_current_user_company)):
+def calculate_gosi(branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         # Get active settings
         settings = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
         emp_pct = _dec(settings.employee_share_percentage) if settings else Decimal('9.75')
@@ -358,10 +366,15 @@ def calculate_gosi(company_id: str = Depends(get_current_user_company)):
         occ_pct = _dec(settings.occupational_hazard_percentage) if settings else Decimal('2.0')
         max_sal = _dec(settings.max_contributable_salary) if settings else Decimal('45000')
 
-        employees = conn.execute(text("""
+        gosi_query = """
             SELECT id, first_name || ' ' || last_name as name, salary, housing_allowance
             FROM employees WHERE status = 'active'
-        """)).fetchall()
+        """
+        gosi_params = {}
+        if branch_id:
+            gosi_query += " AND branch_id = :bid"
+            gosi_params["bid"] = branch_id
+        employees = conn.execute(text(gosi_query), gosi_params).fetchall()
 
         results = []
         for emp in employees:
@@ -373,11 +386,11 @@ def calculate_gosi(company_id: str = Depends(get_current_user_company)):
             occ_hazard = (contributable * occ_pct / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
             results.append({
                 "employee_id": emp.id, "employee_name": emp.name,
-                "basic_salary": float(basic), "housing_allowance": float(housing),
-                "contributable_salary": float(contributable),
-                "employee_share": float(emp_share), "employer_share": float(empr_share),
-                "occupational_hazard": float(occ_hazard),
-                "total_contribution": float((emp_share + empr_share + occ_hazard).quantize(_D2, ROUND_HALF_UP))
+                "basic_salary": str(basic), "housing_allowance": str(housing),
+                "contributable_salary": str(contributable),
+                "employee_share": str(emp_share), "employer_share": str(empr_share),
+                "occupational_hazard": str(occ_hazard),
+                "total_contribution": str((emp_share + empr_share + occ_hazard).quantize(_D2, ROUND_HALF_UP))
             })
         return results
     finally:
@@ -389,6 +402,7 @@ def export_gosi(
     format: str = "excel",
     month: Optional[int] = None,
     year: Optional[int] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company)
 ):
@@ -398,6 +412,8 @@ def export_gosi(
     """
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         # Get active settings
         settings = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
         emp_pct = _dec(settings.employee_share_percentage) if settings else Decimal('9.75')
@@ -406,14 +422,20 @@ def export_gosi(
         max_sal = _dec(settings.max_contributable_salary) if settings else Decimal('45000')
 
         # Get employees with additional GOSI-relevant fields
-        employees = conn.execute(text("""
-            SELECT e.id, e.employee_number, e.first_name || ' ' || e.last_name as name,
-                   e.salary, e.housing_allowance, e.national_id, e.nationality,
-                   e.date_of_birth, e.hire_date, e.department
+        gosi_exp_query = """
+            SELECT e.id, e.employee_code as employee_number, e.first_name || ' ' || e.last_name as name,
+                   e.salary, e.housing_allowance, e.social_security as national_id, e.nationality,
+                   e.birth_date as date_of_birth, e.hire_date, d.department_name as department
             FROM employees e
+            LEFT JOIN departments d ON d.id = e.department_id
             WHERE e.status = 'active'
-            ORDER BY e.department, e.first_name
-        """)).fetchall()
+        """
+        gosi_exp_params = {}
+        if branch_id:
+            gosi_exp_query += " AND e.branch_id = :bid"
+            gosi_exp_params["bid"] = branch_id
+        gosi_exp_query += " ORDER BY d.department_name, e.first_name"
+        employees = conn.execute(text(gosi_exp_query), gosi_exp_params).fetchall()
 
         target_month = month or date.today().month
         target_year = year or date.today().year
@@ -444,13 +466,13 @@ def export_gosi(
                 "رقم الهوية / National ID": getattr(emp, 'national_id', '') or '',
                 "الجنسية / Nationality": getattr(emp, 'nationality', '') or '',
                 "القسم / Department": getattr(emp, 'department', '') or '',
-                "الراتب الأساسي / Basic Salary": float(basic),
-                "بدل السكن / Housing": float(housing),
-                "الراتب الخاضع / Contributable": float(contributable),
-                f"حصة الموظف {emp_pct}% / Employee Share": float(emp_share),
-                f"حصة صاحب العمل {empr_pct}% / Employer Share": float(empr_share),
-                f"أخطار مهنية {occ_pct}% / Occ. Hazard": float(occ_hazard),
-                "الإجمالي / Total": float(total),
+                "الراتب الأساسي / Basic Salary": str(basic),
+                "بدل السكن / Housing": str(housing),
+                "الراتب الخاضع / Contributable": str(contributable),
+                f"حصة الموظف {emp_pct}% / Employee Share": str(emp_share),
+                f"حصة صاحب العمل {empr_pct}% / Employer Share": str(empr_share),
+                f"أخطار مهنية {occ_pct}% / Occ. Hazard": str(occ_hazard),
+                "الإجمالي / Total": str(total),
             })
 
         # Summary row
@@ -463,10 +485,10 @@ def export_gosi(
             "الراتب الأساسي / Basic Salary": "",
             "بدل السكن / Housing": "",
             "الراتب الخاضع / Contributable": "",
-            f"حصة الموظف {emp_pct}% / Employee Share": float(total_emp_share.quantize(_D2, ROUND_HALF_UP)),
-            f"حصة صاحب العمل {empr_pct}% / Employer Share": float(total_empr_share.quantize(_D2, ROUND_HALF_UP)),
-            f"أخطار مهنية {occ_pct}% / Occ. Hazard": float(total_occ_hazard.quantize(_D2, ROUND_HALF_UP)),
-            "الإجمالي / Total": float(total_all.quantize(_D2, ROUND_HALF_UP)),
+            f"حصة الموظف {emp_pct}% / Employee Share": str(total_emp_share.quantize(_D2, ROUND_HALF_UP)),
+            f"حصة صاحب العمل {empr_pct}% / Employer Share": str(total_empr_share.quantize(_D2, ROUND_HALF_UP)),
+            f"أخطار مهنية {occ_pct}% / Occ. Hazard": str(total_occ_hazard.quantize(_D2, ROUND_HALF_UP)),
+            "الإجمالي / Total": str(total_all.quantize(_D2, ROUND_HALF_UP)),
         })
 
         columns = list(export_data[0].keys())
@@ -499,9 +521,11 @@ def export_gosi(
 # =============================================
 
 @router.get("/documents", response_model=List[EmployeeDocumentResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_documents(employee_id: Optional[int] = None, expiring_soon: Optional[bool] = None, company_id: str = Depends(get_current_user_company)):
+def list_documents(employee_id: Optional[int] = None, expiring_soon: Optional[bool] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT d.*, e.first_name || ' ' || e.last_name as employee_name
             FROM employee_documents d
@@ -514,6 +538,9 @@ def list_documents(employee_id: Optional[int] = None, expiring_soon: Optional[bo
             params["eid"] = employee_id
         if expiring_soon:
             query += " AND d.expiry_date IS NOT NULL AND d.expiry_date <= CURRENT_DATE + d.alert_days * INTERVAL '1 day'"
+        if branch_id:
+            query += " AND e.branch_id = :bid"
+            params["bid"] = branch_id
         query += " ORDER BY d.expiry_date ASC NULLS LAST"
         rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -564,7 +591,7 @@ def update_document(doc_id: int, data: EmployeeDocumentUpdate, request: Request,
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_documents SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
@@ -599,9 +626,11 @@ def delete_document(doc_id: int, request: Request, current_user: UserResponse = 
 # =============================================
 
 @router.get("/performance-reviews", response_model=List[PerformanceReviewResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_performance_reviews(employee_id: Optional[int] = None, company_id: str = Depends(get_current_user_company)):
+def list_performance_reviews(employee_id: Optional[int] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT pr.*, 
                 e.first_name || ' ' || e.last_name as employee_name,
@@ -615,6 +644,9 @@ def list_performance_reviews(employee_id: Optional[int] = None, company_id: str 
         if employee_id:
             query += " AND pr.employee_id = :eid"
             params["eid"] = employee_id
+        if branch_id:
+            query += " AND e.branch_id = :bid"
+            params["bid"] = branch_id
         query += " ORDER BY pr.review_date DESC"
         rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -657,7 +689,7 @@ def update_performance_review(review_id: int, data: PerformanceReviewUpdate, req
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE performance_reviews SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
@@ -726,7 +758,7 @@ def update_training_program(training_id: int, data: TrainingProgramUpdate, reque
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         conn.execute(text(f"UPDATE training_programs SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
             conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
@@ -758,7 +790,7 @@ def add_training_participant(training_id: int, data: TrainingParticipantCreate, 
         if "unique" in str(e).lower() or "duplicate" in str(e).lower():
             raise HTTPException(status_code=400, detail="المشارك مسجل مسبقاً")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -790,7 +822,7 @@ def update_training_participant(participant_id: int, data: TrainingParticipantUp
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         conn.execute(text(f"UPDATE training_participants SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
             conn, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
@@ -808,9 +840,11 @@ def update_training_participant(participant_id: int, data: TrainingParticipantUp
 # =============================================
 
 @router.get("/violations", response_model=List[ViolationResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_violations(employee_id: Optional[int] = None, company_id: str = Depends(get_current_user_company)):
+def list_violations(employee_id: Optional[int] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT v.*, e.first_name || ' ' || e.last_name as employee_name
             FROM employee_violations v
@@ -821,6 +855,9 @@ def list_violations(employee_id: Optional[int] = None, company_id: str = Depends
         if employee_id:
             query += " AND v.employee_id = :eid"
             params["eid"] = employee_id
+        if branch_id:
+            query += " AND e.branch_id = :bid"
+            params["bid"] = branch_id
         query += " ORDER BY v.violation_date DESC"
         rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -865,7 +902,7 @@ def update_violation(violation_id: int, data: ViolationUpdate, request: Request,
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_violations SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(
@@ -884,9 +921,11 @@ def update_violation(violation_id: int, data: ViolationUpdate, request: Request,
 # =============================================
 
 @router.get("/custody", response_model=List[CustodyResponse], dependencies=[Depends(require_permission("hr.view"))])
-def list_custody(employee_id: Optional[int] = None, status_filter: Optional[str] = None, company_id: str = Depends(get_current_user_company)):
+def list_custody(employee_id: Optional[int] = None, status_filter: Optional[str] = None, branch_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         query = """
             SELECT c.*, e.first_name || ' ' || e.last_name as employee_name
             FROM employee_custody c
@@ -900,6 +939,9 @@ def list_custody(employee_id: Optional[int] = None, status_filter: Optional[str]
         if status_filter:
             query += " AND c.status = :status"
             params["status"] = status_filter
+        if branch_id:
+            query += " AND e.branch_id = :bid"
+            params["bid"] = branch_id
         query += " ORDER BY c.assigned_date DESC"
         rows = conn.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -942,7 +984,7 @@ def update_custody(custody_id: int, data: CustodyUpdate, request: Request, curre
                 fields.append(f"{field} = :{field}")
                 params[field] = val
         if not fields:
-            raise HTTPException(status_code=400, detail="لا يوجد تعديلات")
+            raise HTTPException(**http_error(400, "no_changes"))
         fields.append("updated_at = CURRENT_TIMESTAMP")
         conn.execute(text(f"UPDATE employee_custody SET {', '.join(fields)} WHERE id = :id"), params)
         log_activity(

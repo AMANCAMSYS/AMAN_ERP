@@ -13,7 +13,7 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse, get_current_user_company
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.audit import log_activity
 from schemas.performance import (
     ReviewCycleCreate, ReviewCycleRead,
@@ -76,32 +76,47 @@ def create_cycle(
 @router.get("/cycles", dependencies=[Depends(require_permission("hr.performance_view"))])
 def list_cycles(
     status: Optional[str] = None,
+    branch_id: Optional[int] = None,
+    current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
     conn = get_db_connection(company_id)
     try:
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
         conditions = ["1=1"]
         params = {}
         if status:
             conditions.append("rc.status = :status")
             params["status"] = status
 
-        rows = conn.execute(text(f"""
-            SELECT rc.*,
-                COALESCE(cnt.total, 0) as total_reviews,
-                COALESCE(cnt.completed, 0) as completed_reviews
-            FROM review_cycles rc
-            LEFT JOIN (
-                SELECT cycle_id,
-                    COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status = 'completed') as completed
-                FROM performance_reviews
-                WHERE cycle_id IS NOT NULL
-                GROUP BY cycle_id
-            ) cnt ON cnt.cycle_id = rc.id
-            WHERE {' AND '.join(conditions)}
-            ORDER BY rc.created_at DESC
-        """), params).fetchall()
+        branch_filter = ""
+        if branch_id:
+            branch_filter = "AND pr_inner.employee_id IN (SELECT id FROM employees WHERE branch_id = :bid)"
+            params["bid"] = branch_id
+
+        try:
+            rows = conn.execute(text(f"""
+                SELECT rc.*,
+                    COALESCE(cnt.total, 0) as total_reviews,
+                    COALESCE(cnt.completed, 0) as completed_reviews
+                FROM review_cycles rc
+                LEFT JOIN (
+                    SELECT cycle_id,
+                        COUNT(*) as total,
+                        COUNT(*) FILTER (WHERE status = 'completed') as completed
+                    FROM performance_reviews pr_inner
+                    WHERE cycle_id IS NOT NULL {branch_filter}
+                    GROUP BY cycle_id
+                ) cnt ON cnt.cycle_id = rc.id
+                WHERE {' AND '.join(conditions)}
+                ORDER BY rc.created_at DESC
+            """), params).fetchall()
+        except Exception as e:
+            conn.rollback()
+            if "does not exist" in str(e):
+                return []
+            raise
         return [dict(r._mapping) for r in rows]
     finally:
         conn.close()
@@ -111,6 +126,7 @@ def list_cycles(
 def launch_cycle(
     cycle_id: int,
     request: Request,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -135,8 +151,11 @@ def launch_cycle(
         if existing > 0:
             raise HTTPException(status_code=400, detail="Reviews already exist for this cycle")
 
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
+
         # Fetch active employees with their managers
-        employees = conn.execute(text("""
+        emp_query = """
             SELECT e.id as employee_id,
                    COALESCE(e.manager_id, (
                        SELECT d.manager_id FROM departments d
@@ -145,7 +164,12 @@ def launch_cycle(
                    )) as manager_id
             FROM employees e
             WHERE e.status = 'active'
-        """)).fetchall()
+        """
+        emp_params = {}
+        if branch_id:
+            emp_query += " AND e.branch_id = :bid"
+            emp_params["bid"] = branch_id
+        employees = conn.execute(text(emp_query), emp_params).fetchall()
 
         if not employees:
             raise HTTPException(status_code=400, detail="No active employees found")
@@ -196,6 +220,7 @@ def launch_cycle(
 @router.get("/reviews", dependencies=[Depends(require_permission("hr.performance_self"))])
 def list_my_reviews(
     cycle_id: Optional[int] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -210,11 +235,17 @@ def list_my_reviews(
         if not emp:
             return []
 
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
+
         conditions = ["pr.employee_id = :eid"]
         params = {"eid": emp[0]}
         if cycle_id:
             conditions.append("pr.cycle_id = :cid")
             params["cid"] = cycle_id
+        if branch_id:
+            conditions.append("e.branch_id = :bid")
+            params["bid"] = branch_id
 
         rows = conn.execute(text(f"""
             SELECT pr.*,
@@ -310,6 +341,7 @@ def submit_self_assessment(
 @router.get("/team-reviews", dependencies=[Depends(require_permission("hr.performance_review"))])
 def list_team_reviews(
     cycle_id: Optional[int] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -332,9 +364,15 @@ def list_team_reviews(
             conditions = ["pr.reviewer_id = :mgr_id"]
             params = {"mgr_id": mgr[0]}
 
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
+
         if cycle_id:
             conditions.append("pr.cycle_id = :cid")
             params["cid"] = cycle_id
+        if branch_id:
+            conditions.append("e.branch_id = :bid")
+            params["bid"] = branch_id
 
         rows = conn.execute(text(f"""
             SELECT pr.*,
@@ -613,6 +651,7 @@ def delete_goal(
 @router.get("/reviews/{review_id}", dependencies=[Depends(require_permission("hr.performance_view"))])
 def get_review_detail(
     review_id: int,
+    current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
     conn = get_db_connection(company_id)
@@ -633,6 +672,13 @@ def get_review_detail(
             raise HTTPException(status_code=404, detail="Review not found")
 
         d = dict(row._mapping)
+        # Validate branch access if employee has a branch
+        emp_branch = conn.execute(text(
+            "SELECT branch_id FROM employees WHERE id = :eid"
+        ), {"eid": d.get("employee_id")}).fetchone()
+        if emp_branch and emp_branch[0]:
+            validate_branch_access(current_user, emp_branch[0])
+
         goals = conn.execute(text(
             "SELECT * FROM performance_goals WHERE review_id = :rid ORDER BY id"
         ), {"rid": review_id}).fetchall()

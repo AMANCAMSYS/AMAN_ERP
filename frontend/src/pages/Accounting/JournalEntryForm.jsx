@@ -30,6 +30,7 @@ const JournalEntryForm = () => {
             { account_id: '', debit: 0, credit: 0, description: '', cost_center_id: '' }
         ]
     });
+    const [idempotencyKey, setIdempotencyKey] = useState(crypto.randomUUID());
 
     useEffect(() => {
         fetchAccounts();
@@ -114,8 +115,11 @@ const JournalEntryForm = () => {
                 status: entryStatus,
                 branch_id: currentBranch?.id
             };
-            const res = await accountingAPI.createJournalEntry(payload);
+            const res = await accountingAPI.createJournalEntry(payload, {
+                headers: { 'Idempotency-Key': idempotencyKey }
+            });
             toast.success(res.data?.message || t('common.success'));
+            setIdempotencyKey(crypto.randomUUID());
             navigate('/accounting/journal-entries');
         } catch (error) {
             console.error(error);

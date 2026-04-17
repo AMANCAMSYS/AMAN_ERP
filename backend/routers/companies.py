@@ -3,6 +3,7 @@ AMAN ERP - Companies Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Body
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
@@ -358,7 +359,7 @@ def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_cu
     except Exception as e:
         sys_db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         sys_db.close()
     
@@ -416,7 +417,8 @@ def get_company(
     try:
         result = db.execute(
             text("""
-                SELECT id, company_name, company_name_en, email, phone, address, 
+                SELECT id, company_name, company_name_en, email, phone, address,
+                       commercial_registry, tax_number,
                        status, plan_type, currency, created_at, activated_at, logo_url
                 FROM system_companies WHERE id = :id
             """),
@@ -433,18 +435,20 @@ def get_company(
             "email": result[3],
             "phone": result[4],
             "address": result[5],
-            "status": result[6],
-            "plan_type": result[7],
-            "currency": result[8],
-            "created_at": result[9],
-            "activated_at": result[10],
-            "logo_url": result[11]
+            "commercial_registry": result[6],
+            "tax_number": result[7],
+            "status": result[8],
+            "plan_type": result[9],
+            "currency": result[10],
+            "created_at": result[11],
+            "activated_at": result[12],
+            "logo_url": result[13]
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Error in get_company {company_id}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.put("/update/{company_id}", dependencies=[Depends(require_permission("settings.manage"))])
@@ -515,7 +519,7 @@ def update_company(
     except Exception as e:
         db.rollback()
         logger.exception(f"Error updating company {company_id}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -591,5 +595,5 @@ async def upload_company_logo(
             
     except Exception as e:
         logger.exception("Error uploading logo")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
 

@@ -43,6 +43,7 @@ function ChecksReceivable() {
     // Action modals
     const [showCollect, setShowCollect] = useState(false)
     const [showBounce, setShowBounce] = useState(false)
+    const [showRepresent, setShowRepresent] = useState(false)
     const [actionForm, setActionForm] = useState({})
 
     const fetchList = useCallback(async () => {
@@ -151,6 +152,24 @@ function ChecksReceivable() {
     const openBounce = () => {
         setActionForm({ bounce_date: new Date().toISOString().split('T')[0], bounce_reason: '' })
         setShowBounce(true)
+    }
+
+    const openRepresent = () => {
+        setActionForm({ represent_date: new Date().toISOString().split('T')[0] })
+        setShowRepresent(true)
+    }
+
+    const handleRepresent = async () => {
+        try {
+            setSaving(true)
+            await checksAPI.representReceivable(detailItem.id, {
+                represent_date: actionForm.represent_date || new Date().toISOString().split('T')[0],
+            })
+            setShowRepresent(false); setShowDetail(false)
+            fetchList(); fetchStats()
+        } catch (err) {
+            showToast(err.response?.data?.detail || t('checks.receivable.error', 'error'))
+        } finally { setSaving(false) }
     }
 
     const statusBadge = (s) => {
@@ -355,6 +374,11 @@ function ChecksReceivable() {
                                     <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={openBounce}>❌ {t('checks.receivable.bounce')}</button>
                                 </div>
                             )}
+                            {detailItem.status === 'bounced' && (
+                                <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+                                    <button className="btn btn-warning" onClick={openRepresent}>🔄 {t('checks.receivable.represent', 'إعادة تقديم')}</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -417,6 +441,31 @@ function ChecksReceivable() {
                                 <button className="btn btn-secondary" onClick={() => setShowBounce(false)}>{t('notesReceivable.cancel')}</button>
                                 <button className="btn" style={{ background: '#dc3545', color: '#fff' }} onClick={handleBounce} disabled={saving}>
                                     {saving ? t('checks.receivable.processing') : t('checks.receivable.confirmBounce')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Represent Modal */}
+            {showRepresent && (
+                <div className="modal-overlay" onClick={() => setShowRepresent(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+                        <div className="modal-header">
+                            <h2>{t('checks.receivable.represent', 'إعادة تقديم')}</h2>
+                            <button className="modal-close" onClick={() => setShowRepresent(false)}>✕</button>
+                        </div>
+                        <div style={{ padding: 20 }}>
+                            <div style={{ marginBottom: 16 }}>
+                                <label className="form-label">{t('checks.receivable.representDate', 'تاريخ إعادة التقديم')}</label>
+                                <DateInput className="form-input" value={actionForm.represent_date}
+                                    onChange={e => setActionForm(f => ({ ...f, represent_date: e.target.value }))} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                                <button className="btn btn-secondary" onClick={() => setShowRepresent(false)}>{t('notesReceivable.cancel')}</button>
+                                <button className="btn btn-warning" onClick={handleRepresent} disabled={saving}>
+                                    {saving ? t('checks.receivable.processing') : t('checks.receivable.confirmRepresent', 'تأكيد إعادة التقديم')}
                                 </button>
                             </div>
                         </div>

@@ -4,12 +4,14 @@ import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 
 function BuyingReturns() {
     const { t, i18n } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [returns, setReturns] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -20,7 +22,7 @@ function BuyingReturns() {
                 const response = await purchasesAPI.listReturns({ branch_id: currentBranch?.id })
                 setReturns(response.data)
             } catch (err) {
-                console.error(err)
+                showToast(t('common.error'), 'error')
                 setError(t('common.error_loading'))
             } finally {
                 setLoading(false)

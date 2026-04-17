@@ -3,11 +3,12 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { inventoryAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 
 const PriceListItems = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -32,7 +33,7 @@ const PriceListItems = () => {
             // Based on utils/api.js, it returns `api.get(...)` which returns the full axios response.
             setItems(response.data || []);
         } catch (error) {
-            console.error('Error fetching items:', error);
+            showToast(t('errors.fetch_failed'), 'error');
         } finally {
             setLoading(false);
         }
@@ -40,7 +41,7 @@ const PriceListItems = () => {
 
     const handlePriceChange = (productId, newPrice) => {
         setItems(items.map(item =>
-            item.product_id === productId ? { ...item, price: parseFloat(newPrice) || 0 } : item
+            item.product_id === productId ? { ...item, price: String(newPrice) } : item
         ));
     };
 
@@ -53,11 +54,10 @@ const PriceListItems = () => {
             }));
 
             await inventoryAPI.updatePriceListItems(id, updates);
-            toastEmitter.emit(t('stock.price_lists.edit_prices.validation.success'), 'success');
+            showToast(t('stock.price_lists.edit_prices.validation.success'), 'success');
             navigate('/stock/price-lists');
         } catch (error) {
-            console.error('Error saving prices:', error);
-            toastEmitter.emit(t('stock.price_lists.edit_prices.validation.error'), 'error');
+            showToast(t('stock.price_lists.edit_prices.validation.error'), 'error');
         } finally {
             setSaving(false);
         }

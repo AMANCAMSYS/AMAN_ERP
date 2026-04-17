@@ -279,7 +279,7 @@ function Topbar({ sidebarOpen = false, onToggleSidebar }) {
                                         }}
                                     >
                                         <span>{branch.branch_name}</span>
-                                        {branch.is_default && <span style={{ fontSize: '10px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>Default</span>}
+                                        {branch.is_default && <span style={{ fontSize: '10px', background: 'var(--bg-hover)', padding: '2px 4px', borderRadius: '4px' }}>{t('common.default')}</span>}
                                     </div>
                                 ))}
                             </div>

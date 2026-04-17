@@ -1,0 +1,2558 @@
+{
+  "total_records": 2315,
+  "unique_messages": 1010,
+  "top_files": [
+    [
+      "backend/routers/manufacturing/core.py",
+      129
+    ],
+    [
+      "backend/routers/purchases.py",
+      128
+    ],
+    [
+      "backend/routers/projects.py",
+      116
+    ],
+    [
+      "backend/routers/finance/accounting.py",
+      100
+    ],
+    [
+      "backend/routers/hr/core.py",
+      99
+    ],
+    [
+      "backend/routers/crm.py",
+      78
+    ],
+    [
+      "backend/routers/finance/assets.py",
+      64
+    ],
+    [
+      "backend/routers/finance/reconciliation.py",
+      59
+    ],
+    [
+      "backend/routers/finance/checks.py",
+      58
+    ],
+    [
+      "backend/routers/finance/taxes.py",
+      58
+    ],
+    [
+      "backend/routers/hr/performance.py",
+      54
+    ],
+    [
+      "backend/routers/pos.py",
+      50
+    ],
+    [
+      "backend/routers/finance/treasury.py",
+      48
+    ],
+    [
+      "backend/routers/finance/budgets.py",
+      48
+    ],
+    [
+      "backend/routers/auth.py",
+      44
+    ],
+    [
+      "backend/routers/inventory/batches.py",
+      43
+    ],
+    [
+      "backend/routers/finance/notes.py",
+      42
+    ],
+    [
+      "backend/routers/dashboard.py",
+      41
+    ],
+    [
+      "backend/routers/sso.py",
+      38
+    ],
+    [
+      "backend/routers/hr/advanced.py",
+      35
+    ],
+    [
+      "backend/routers/reports.py",
+      34
+    ],
+    [
+      "backend/routers/finance/expenses.py",
+      32
+    ],
+    [
+      "backend/routers/contracts.py",
+      30
+    ],
+    [
+      "backend/routers/inventory/advanced.py",
+      30
+    ],
+    [
+      "backend/routers/sales/sales_improvements.py",
+      28
+    ]
+  ],
+  "top_messages": [
+    {
+      "text": "internal_error",
+      "count": 374,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/security.py:112",
+        "backend/routers/security.py:166",
+        "backend/routers/security.py:204"
+      ]
+    },
+    {
+      "text": "Company ID missing",
+      "count": 20,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/roles.py:493",
+        "backend/routers/roles.py:493",
+        "backend/routers/roles.py:598"
+      ]
+    },
+    {
+      "text": "Order not found",
+      "count": 18,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/pos.py:1136",
+        "backend/routers/pos.py:1136",
+        "backend/routers/manufacturing/core.py:751"
+      ]
+    },
+    {
+      "text": "Budget not found",
+      "count": 16,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/budgets.py:98",
+        "backend/routers/finance/budgets.py:98",
+        "backend/routers/finance/budgets.py:131"
+      ]
+    },
+    {
+      "text": "invalid_data",
+      "count": 15,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/scheduled_reports.py:153",
+        "backend/routers/scheduled_reports.py:337",
+        "backend/routers/inventory/forecast.py:40"
+      ]
+    },
+    {
+      "text": "Asset not found",
+      "count": 15,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/assets.py:58",
+        "backend/routers/finance/assets.py:58",
+        "backend/routers/finance/assets.py:133"
+      ]
+    },
+    {
+      "text": "project_not_found",
+      "count": 14,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:211",
+        "backend/routers/projects.py:336",
+        "backend/routers/projects.py:394"
+      ]
+    },
+    {
+      "text": "Employee not found",
+      "count": 14,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/core.py:358",
+        "backend/routers/hr/core.py:358",
+        "backend/routers/hr/core.py:632"
+      ]
+    },
+    {
+      "text": "no_data_to_update",
+      "count": 13,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:363",
+        "backend/routers/projects.py:534",
+        "backend/routers/projects.py:1740"
+      ]
+    },
+    {
+      "text": "No fields to update",
+      "count": 13,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/pos.py:1241",
+        "backend/routers/pos.py:1241",
+        "backend/routers/inventory/advanced.py:182"
+      ]
+    },
+    {
+      "text": "reconciliation_not_found",
+      "count": 11,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/reconciliation.py:130",
+        "backend/routers/finance/reconciliation.py:186",
+        "backend/routers/finance/reconciliation.py:300"
+      ]
+    },
+    {
+      "text": "Review not found",
+      "count": 10,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/performance.py:297",
+        "backend/routers/hr/performance.py:297",
+        "backend/routers/hr/performance.py:422"
+      ]
+    },
+    {
+      "text": "exchange_rate_must_be_positive",
+      "count": 9,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1882",
+        "backend/routers/purchases.py:2049",
+        "backend/routers/purchases.py:2567"
+      ]
+    },
+    {
+      "text": "تم التحديث",
+      "count": 9,
+      "types": [
+        "message"
+      ],
+      "samples": [
+        "backend/routers/crm.py:243",
+        "backend/routers/crm.py:431",
+        "backend/routers/crm.py:1141"
+      ]
+    },
+    {
+      "text": "invalid_setting_value",
+      "count": 8,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/settings.py:185",
+        "backend/routers/settings.py:187",
+        "backend/routers/settings.py:189"
+      ]
+    },
+    {
+      "text": "Blanket PO not found",
+      "count": 8,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3415",
+        "backend/routers/purchases.py:3415",
+        "backend/routers/purchases.py:3444"
+      ]
+    },
+    {
+      "text": "Internal server error",
+      "count": 8,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/branches.py:83",
+        "backend/routers/branches.py:83",
+        "backend/routers/branches.py:183"
+      ]
+    },
+    {
+      "text": "warehouse_not_found",
+      "count": 8,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/stock_movements.py:35",
+        "backend/routers/inventory/stock_movements.py:129",
+        "backend/routers/inventory/shipments.py:44"
+      ]
+    },
+    {
+      "text": "product_not_found",
+      "count": 8,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/products.py:345",
+        "backend/routers/inventory/products.py:359",
+        "backend/routers/inventory/products.py:469"
+      ]
+    },
+    {
+      "text": "Forecast not found",
+      "count": 8,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/forecast.py:104",
+        "backend/routers/inventory/forecast.py:104",
+        "backend/routers/inventory/forecast.py:144"
+      ]
+    },
+    {
+      "text": "BOM not found",
+      "count": 8,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:439",
+        "backend/routers/manufacturing/core.py:439",
+        "backend/routers/manufacturing/core.py:465"
+      ]
+    },
+    {
+      "text": "check_not_found",
+      "count": 8,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/checks.py:175",
+        "backend/routers/finance/checks.py:323",
+        "backend/routers/finance/checks.py:402"
+      ]
+    },
+    {
+      "text": "Unauthorized access to this branch",
+      "count": 8,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/core.py:90",
+        "backend/routers/hr/core.py:90",
+        "backend/routers/hr/core.py:1874"
+      ]
+    },
+    {
+      "text": "no_changes",
+      "count": 8,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/advanced.py:87",
+        "backend/routers/hr/advanced.py:174",
+        "backend/routers/hr/advanced.py:594"
+      ]
+    },
+    {
+      "text": "قاعدة بيانات الشركة غير جاهزة لإعدادات SSO. راجع تهيئة قاعدة البيانات أو تواصل مع الدعم.",
+      "count": 7,
+      "types": [
+        "detail"
+      ],
+      "samples": [
+        "backend/routers/sso.py:75",
+        "backend/routers/sso.py:96",
+        "backend/routers/sso.py:110"
+      ]
+    },
+    {
+      "text": "Match not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/matching.py:142",
+        "backend/routers/matching.py:142",
+        "backend/routers/matching.py:208"
+      ]
+    },
+    {
+      "text": "Invalid date format. Use YYYY-MM-DD",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:2124",
+        "backend/routers/reports.py:2124",
+        "backend/routers/reports.py:2179"
+      ]
+    },
+    {
+      "text": "Exchange rate must be greater than zero",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1152",
+        "backend/routers/purchases.py:1152",
+        "backend/routers/sales/invoices.py:185"
+      ]
+    },
+    {
+      "text": "Dashboard not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/dashboard.py:1274",
+        "backend/routers/dashboard.py:1274",
+        "backend/routers/dashboard.py:1373"
+      ]
+    },
+    {
+      "text": "delivery_order_not_found",
+      "count": 6,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/delivery_orders.py:148",
+        "backend/routers/delivery_orders.py:285",
+        "backend/routers/delivery_orders.py:364"
+      ]
+    },
+    {
+      "text": "Report not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/scheduled_reports.py:245",
+        "backend/routers/scheduled_reports.py:245",
+        "backend/routers/scheduled_reports.py:270"
+      ]
+    },
+    {
+      "text": "Campaign not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/crm.py:676",
+        "backend/routers/crm.py:676",
+        "backend/routers/crm.py:884"
+      ]
+    },
+    {
+      "text": "Routing not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/routing.py:208",
+        "backend/routers/manufacturing/routing.py:208",
+        "backend/routers/manufacturing/routing.py:233"
+      ]
+    },
+    {
+      "text": "Operation not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:1662",
+        "backend/routers/manufacturing/core.py:1662",
+        "backend/routers/manufacturing/core.py:1728"
+      ]
+    },
+    {
+      "text": "treasury_account_not_found",
+      "count": 6,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/treasury.py:308",
+        "backend/routers/finance/treasury.py:405",
+        "backend/routers/finance/checks.py:339"
+      ]
+    },
+    {
+      "text": "Currency not found",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/currencies.py:148",
+        "backend/routers/finance/currencies.py:148",
+        "backend/routers/finance/currencies.py:224"
+      ]
+    },
+    {
+      "text": "sheet_not_found",
+      "count": 6,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/notes.py:165",
+        "backend/routers/finance/notes.py:266",
+        "backend/routers/finance/notes.py:348"
+      ]
+    },
+    {
+      "text": "القيد غير موجود",
+      "count": 6,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/accounting.py:765",
+        "backend/routers/finance/accounting.py:765",
+        "backend/routers/finance/accounting.py:821"
+      ]
+    },
+    {
+      "text": "Contract not found",
+      "count": 5,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:200",
+        "backend/routers/contracts.py:200",
+        "backend/routers/contracts.py:291"
+      ]
+    },
+    {
+      "text": "template_not_found",
+      "count": 5,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/system_completion.py:1772",
+        "backend/routers/finance/accounting.py:1617",
+        "backend/routers/finance/accounting.py:1711"
+      ]
+    },
+    {
+      "text": "supplier_not_found",
+      "count": 5,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1747",
+        "backend/routers/purchases.py:2044",
+        "backend/routers/inventory/suppliers.py:109"
+      ]
+    },
+    {
+      "text": "تم الحذف",
+      "count": 5,
+      "types": [
+        "message"
+      ],
+      "samples": [
+        "backend/routers/crm.py:1153",
+        "backend/routers/crm.py:1340",
+        "backend/routers/crm.py:1518"
+      ]
+    },
+    {
+      "text": "maintenance_request_not_found",
+      "count": 5,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/services.py:120",
+        "backend/routers/services.py:189",
+        "backend/routers/services.py:234"
+      ]
+    },
+    {
+      "text": "Table not migrated yet",
+      "count": 5,
+      "types": [
+        "detail",
+        "http",
+        "message"
+      ],
+      "samples": [
+        "backend/routers/inventory/advanced.py:130",
+        "backend/routers/inventory/advanced.py:234",
+        "backend/routers/inventory/advanced.py:315"
+      ]
+    },
+    {
+      "text": "نوع الكيان غير مدعوم: {entity_type}",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/data_import.py:89",
+        "backend/routers/data_import.py:124",
+        "backend/routers/data_import.py:193"
+      ]
+    },
+    {
+      "text": "file_empty",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/data_import.py:142",
+        "backend/routers/data_import.py:211",
+        "backend/routers/finance/reconciliation.py:319"
+      ]
+    },
+    {
+      "text": "company_id not available",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/mobile.py:99",
+        "backend/routers/mobile.py:99",
+        "backend/routers/sso.py:40"
+      ]
+    },
+    {
+      "text": "الشركة غير موجودة",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:429",
+        "backend/routers/companies.py:429",
+        "backend/routers/auth.py:887"
+      ]
+    },
+    {
+      "text": "purchase_order_not_found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:287",
+        "backend/routers/purchases.py:295",
+        "backend/routers/purchases.py:655"
+      ]
+    },
+    {
+      "text": "invoice_not_found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1049",
+        "backend/routers/external.py:301",
+        "backend/routers/sales/invoices.py:728"
+      ]
+    },
+    {
+      "text": "المستودع المختار لا يتبع للفرع الحالي",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1172",
+        "backend/routers/purchases.py:1172",
+        "backend/routers/purchases.py:1785"
+      ]
+    },
+    {
+      "text": "Payment not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2348",
+        "backend/routers/purchases.py:2348",
+        "backend/routers/sales/vouchers.py:532"
+      ]
+    },
+    {
+      "text": "min_one_item_required",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2551",
+        "backend/routers/purchases.py:2819",
+        "backend/routers/sales/credit_notes.py:178"
+      ]
+    },
+    {
+      "text": "يجب تحديد المورد",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2553",
+        "backend/routers/purchases.py:2553",
+        "backend/routers/purchases.py:2821"
+      ]
+    },
+    {
+      "text": "إعدادات الحسابات غير مكتملة (AP / Inventory)",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2629",
+        "backend/routers/purchases.py:2629",
+        "backend/routers/purchases.py:2890"
+      ]
+    },
+    {
+      "text": "SSO configuration not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:113",
+        "backend/routers/sso.py:113",
+        "backend/routers/sso.py:138"
+      ]
+    },
+    {
+      "text": "Session not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/pos.py:189",
+        "backend/routers/pos.py:189",
+        "backend/routers/pos.py:1435"
+      ]
+    },
+    {
+      "text": "Held order not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/pos.py:829",
+        "backend/routers/pos.py:829",
+        "backend/routers/pos.py:862"
+      ]
+    },
+    {
+      "text": "Branch not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/branches.py:203",
+        "backend/routers/branches.py:203",
+        "backend/routers/branches.py:301"
+      ]
+    },
+    {
+      "text": "Report not found or unauthorized",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/scheduled_reports.py:190",
+        "backend/routers/scheduled_reports.py:190",
+        "backend/routers/scheduled_reports.py:217"
+      ]
+    },
+    {
+      "text": "document_not_found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/services.py:388",
+        "backend/routers/services.py:491",
+        "backend/routers/services.py:525"
+      ]
+    },
+    {
+      "text": "Invalid branch ID",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/utils/permissions.py:264",
+        "backend/utils/permissions.py:264",
+        "backend/utils/permissions.py:286"
+      ]
+    },
+    {
+      "text": "لا يمكن ترحيل قيود في فترة محاسبية مغلقة",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/services/gl_service.py:110",
+        "backend/services/gl_service.py:110",
+        "backend/routers/finance/accounting.py:833"
+      ]
+    },
+    {
+      "text": "Work center not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:103",
+        "backend/routers/manufacturing/core.py:103",
+        "backend/routers/manufacturing/core.py:1570"
+      ]
+    },
+    {
+      "text": "Route not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:238",
+        "backend/routers/manufacturing/core.py:238",
+        "backend/routers/manufacturing/core.py:1602"
+      ]
+    },
+    {
+      "text": "Operation already in progress",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:1671",
+        "backend/routers/manufacturing/core.py:1671",
+        "backend/routers/manufacturing/shopfloor.py:228"
+      ]
+    },
+    {
+      "text": "Equipment not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/core.py:2003",
+        "backend/routers/manufacturing/core.py:2003",
+        "backend/routers/manufacturing/core.py:2033"
+      ]
+    },
+    {
+      "text": "Work order not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/shopfloor.py:169",
+        "backend/routers/manufacturing/shopfloor.py:169",
+        "backend/routers/manufacturing/shopfloor.py:446"
+      ]
+    },
+    {
+      "text": "Log entry not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/manufacturing/shopfloor.py:288",
+        "backend/routers/manufacturing/shopfloor.py:288",
+        "backend/routers/manufacturing/shopfloor.py:385"
+      ]
+    },
+    {
+      "text": "يجب تحديد الشركة أولاً",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/treasury.py:42",
+        "backend/routers/finance/treasury.py:42",
+        "backend/routers/finance/treasury.py:81"
+      ]
+    },
+    {
+      "text": "Invalid transaction type",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/treasury.py:456",
+        "backend/routers/finance/treasury.py:456",
+        "backend/routers/finance/treasury.py:589"
+      ]
+    },
+    {
+      "text": "لا يمكن الاستيراد في تسوية معتمدة",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/reconciliation.py:302",
+        "backend/routers/finance/reconciliation.py:302",
+        "backend/routers/finance/reconciliation.py:438"
+      ]
+    },
+    {
+      "text": "لا يمكن المطابقة في تسوية معتمدة",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/reconciliation.py:489",
+        "backend/routers/finance/reconciliation.py:489",
+        "backend/routers/finance/reconciliation.py:664"
+      ]
+    },
+    {
+      "text": "treasury_or_bank_required",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/checks.py:335",
+        "backend/routers/finance/checks.py:840",
+        "backend/routers/finance/notes.py:276"
+      ]
+    },
+    {
+      "text": "tax_return_not_found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/taxes.py:336",
+        "backend/routers/finance/taxes.py:517",
+        "backend/routers/finance/taxes.py:564"
+      ]
+    },
+    {
+      "text": "Calendar item not found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/taxes.py:1454",
+        "backend/routers/finance/taxes.py:1531",
+        "backend/routers/finance/taxes.py:1559"
+      ]
+    },
+    {
+      "text": "Cost center code already exists",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/cost_centers.py:45",
+        "backend/routers/finance/cost_centers.py:45",
+        "backend/routers/finance/cost_centers.py:90"
+      ]
+    },
+    {
+      "text": "Cost center not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/cost_centers.py:83",
+        "backend/routers/finance/cost_centers.py:83",
+        "backend/routers/finance/cost_centers.py:149"
+      ]
+    },
+    {
+      "text": "expense_not_found",
+      "count": 4,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/expenses.py:383",
+        "backend/routers/finance/expenses.py:596",
+        "backend/routers/finance/expenses.py:663"
+      ]
+    },
+    {
+      "text": "Budget name already exists",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/budgets.py:29",
+        "backend/routers/finance/budgets.py:29",
+        "backend/routers/finance/budgets.py:311"
+      ]
+    },
+    {
+      "text": "يجب إضافة سطرين على الأقل",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/accounting.py:1640",
+        "backend/routers/finance/accounting.py:1640",
+        "backend/routers/finance/accounting.py:1749"
+      ]
+    },
+    {
+      "text": "Quote not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/cpq.py:220",
+        "backend/routers/sales/cpq.py:220",
+        "backend/routers/sales/cpq.py:287"
+      ]
+    },
+    {
+      "text": "Quotation not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/sales_improvements.py:37",
+        "backend/routers/sales/sales_improvements.py:37",
+        "backend/routers/sales/quotations.py:73"
+      ]
+    },
+    {
+      "text": "Customer not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/sales_improvements.py:462",
+        "backend/routers/sales/sales_improvements.py:462",
+        "backend/routers/sales/sales_improvements.py:510"
+      ]
+    },
+    {
+      "text": "لا يمكنك الوصول لبيانات عميل خارج فروعك",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/customers.py:109",
+        "backend/routers/sales/customers.py:109",
+        "backend/routers/sales/customers.py:210"
+      ]
+    },
+    {
+      "text": "إعدادات الحسابات غير مكتملة (AR / Sales Revenue)",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/credit_notes.py:280",
+        "backend/routers/sales/credit_notes.py:280",
+        "backend/routers/sales/credit_notes.py:618"
+      ]
+    },
+    {
+      "text": "مبلغ التخصيص يجب أن يكون أكبر من صفر",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/vouchers.py:76",
+        "backend/routers/sales/vouchers.py:76",
+        "backend/routers/sales/vouchers.py:308"
+      ]
+    },
+    {
+      "text": "Payslip not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/self_service.py:222",
+        "backend/routers/hr/self_service.py:222",
+        "backend/routers/hr/core.py:1931"
+      ]
+    },
+    {
+      "text": "تاريخ البداية لا يمكن أن يكون بعد تاريخ النهاية",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/self_service.py:300",
+        "backend/routers/hr/self_service.py:300",
+        "backend/routers/hr/core.py:1538"
+      ]
+    },
+    {
+      "text": "يوجد طلب إجازة متداخل مع هذه الفترة",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/self_service.py:311",
+        "backend/routers/hr/self_service.py:311",
+        "backend/routers/hr/core.py:1553"
+      ]
+    },
+    {
+      "text": "Leave request not found",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/self_service.py:507",
+        "backend/routers/hr/self_service.py:507",
+        "backend/routers/hr/self_service.py:578"
+      ]
+    },
+    {
+      "text": "Unauthorized access to this employee",
+      "count": 4,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr/core.py:2240",
+        "backend/routers/hr/core.py:2240",
+        "backend/routers/hr/core.py:2287"
+      ]
+    },
+    {
+      "text": "غير متاح لمسؤولي النظام",
+      "count": 3,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/security.py:281",
+        "backend/routers/auth.py:1034",
+        "backend/routers/auth.py:1034"
+      ]
+    },
+    {
+      "text": "role_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/roles.py:609",
+        "backend/routers/roles.py:691",
+        "backend/routers/roles.py:754"
+      ]
+    },
+    {
+      "text": "Entry not found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:2908",
+        "backend/routers/projects.py:3026",
+        "backend/routers/projects.py:3071"
+      ]
+    },
+    {
+      "text": "amount_must_be_positive",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2034",
+        "backend/routers/finance/treasury.py:460",
+        "backend/routers/finance/treasury.py:593"
+      ]
+    },
+    {
+      "text": "الفاتورة {alloc.invoice_id} غير موجودة",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2096",
+        "backend/routers/sales/vouchers.py:86",
+        "backend/routers/sales/vouchers.py:317"
+      ]
+    },
+    {
+      "text": "التكلفة المُضافة غير موجودة",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/landed_costs.py:114",
+        "backend/routers/landed_costs.py:226",
+        "backend/routers/landed_costs.py:375"
+      ]
+    },
+    {
+      "text": "employee_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/hr_wps_compliance.py:507",
+        "backend/routers/hr/core.py:1772",
+        "backend/routers/hr/advanced.py:267"
+      ]
+    },
+    {
+      "text": "...",
+      "count": 3,
+      "types": [
+        "message"
+      ],
+      "samples": [
+        "backend/routers/notifications.py:475",
+        "backend/services/sso_service.py:246",
+        "backend/schemas/responses.py:14"
+      ]
+    },
+    {
+      "text": "shipment_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/shipments.py:250",
+        "backend/routers/inventory/shipments.py:297",
+        "backend/routers/inventory/shipments.py:482"
+      ]
+    },
+    {
+      "text": "serial_number_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/batches.py:561",
+        "backend/routers/inventory/batches.py:601",
+        "backend/routers/inventory/batches.py:796"
+      ]
+    },
+    {
+      "text": "quality_check_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/batches.py:949",
+        "backend/routers/inventory/batches.py:1054",
+        "backend/routers/manufacturing/core.py:2773"
+      ]
+    },
+    {
+      "text": "inventory_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/inventory/batches.py:1177",
+        "backend/routers/inventory/batches.py:1285",
+        "backend/routers/inventory/batches.py:1316"
+      ]
+    },
+    {
+      "text": "branch_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/tax_compliance.py:246",
+        "backend/routers/finance/tax_compliance.py:290",
+        "backend/routers/finance/tax_compliance.py:352"
+      ]
+    },
+    {
+      "text": "حساب العملاء (1200/1201) غير موجود",
+      "count": 3,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/checks.py:420",
+        "backend/routers/finance/notes.py:192",
+        "backend/routers/finance/notes.py:192"
+      ]
+    },
+    {
+      "text": "tax_type_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/taxes.py:74",
+        "backend/routers/finance/taxes.py:136",
+        "backend/routers/finance/taxes.py:173"
+      ]
+    },
+    {
+      "text": "السنة المالية {year} غير موجودة",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/finance/accounting.py:1152",
+        "backend/routers/finance/accounting.py:1235",
+        "backend/routers/finance/accounting.py:1404"
+      ]
+    },
+    {
+      "text": "customer_not_found",
+      "count": 3,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sales/customers.py:105",
+        "backend/routers/sales/customers.py:204",
+        "backend/routers/sales/customers.py:225"
+      ]
+    },
+    {
+      "text": "لا يمكن استخدام كلمة مرور مستخدمة في آخر {prevent_reuse} مرات",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/security.py:307",
+        "backend/routers/auth.py:1450"
+      ]
+    },
+    {
+      "text": "not_available",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/security.py:428",
+        "backend/routers/security.py:451"
+      ]
+    },
+    {
+      "text": "Only held matches can be approved",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/matching.py:210",
+        "backend/routers/matching.py:210"
+      ]
+    },
+    {
+      "text": "Only held matches can be rejected",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/matching.py:241",
+        "backend/routers/matching.py:241"
+      ]
+    },
+    {
+      "text": "Tolerance not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/matching.py:297",
+        "backend/routers/matching.py:297"
+      ]
+    },
+    {
+      "text": "تاريخ نهاية العقد يجب أن يكون بعد تاريخ البداية",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:36",
+        "backend/routers/contracts.py:36"
+      ]
+    },
+    {
+      "text": "رقم العقد مكرر، يرجى استخدام رقم مختلف",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:45",
+        "backend/routers/contracts.py:45"
+      ]
+    },
+    {
+      "text": "contract_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:227",
+        "backend/routers/contracts.py:455"
+      ]
+    },
+    {
+      "text": "يمكن تجديد العقود النشطة فقط",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:294",
+        "backend/routers/contracts.py:294"
+      ]
+    },
+    {
+      "text": "العقد غير موجود أو غير نشط",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:365",
+        "backend/routers/contracts.py:365"
+      ]
+    },
+    {
+      "text": "لا توجد بنود في العقد",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:373",
+        "backend/routers/contracts.py:373"
+      ]
+    },
+    {
+      "text": "العقد ملغي بالفعل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/contracts.py:458",
+        "backend/routers/contracts.py:458"
+      ]
+    },
+    {
+      "text": "اسم الدور موجود بالفعل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/roles.py:640",
+        "backend/routers/roles.py:640"
+      ]
+    },
+    {
+      "text": "لا يمكن حذف الأدوار الافتراضية للنظام",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/roles.py:757",
+        "backend/routers/roles.py:757"
+      ]
+    },
+    {
+      "text": "file_read_error",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/data_import.py:139",
+        "backend/routers/data_import.py:208"
+      ]
+    },
+    {
+      "text": "نسبة الإنجاز يجب أن تكون بين 0 و 100",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:358",
+        "backend/routers/projects.py:358"
+      ]
+    },
+    {
+      "text": "المهمة غير موجودة",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:516",
+        "backend/routers/projects.py:516"
+      ]
+    },
+    {
+      "text": "لم يتم العثور على حساب المصاريف",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:637",
+        "backend/routers/projects.py:637"
+      ]
+    },
+    {
+      "text": "لم يتم العثور على حساب النقدية",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:648",
+        "backend/routers/projects.py:648"
+      ]
+    },
+    {
+      "text": "لم يتم العثور على حساب الإيرادات",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:784",
+        "backend/routers/projects.py:784"
+      ]
+    },
+    {
+      "text": "لم يتم العثور على الحساب المدين",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:793",
+        "backend/routers/projects.py:793"
+      ]
+    },
+    {
+      "text": "record_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1152",
+        "backend/routers/projects.py:1212"
+      ]
+    },
+    {
+      "text": "غير مصرح لك بتعديل هذا السجل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1158",
+        "backend/routers/projects.py:1158"
+      ]
+    },
+    {
+      "text": "غير مصرح لك بحذف هذا السجل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1215",
+        "backend/routers/projects.py:1215"
+      ]
+    },
+    {
+      "text": "حسابات تكلفة العمالة غير معرفة في إعدادات الشركة",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1249",
+        "backend/routers/projects.py:1249"
+      ]
+    },
+    {
+      "text": "change_order_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1726",
+        "backend/routers/projects.py:1766"
+      ]
+    },
+    {
+      "text": "لا يمكن تعديل أمر تغيير تمت الموافقة عليه",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1728",
+        "backend/routers/projects.py:1728"
+      ]
+    },
+    {
+      "text": "المشروع مغلق بالفعل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:1834",
+        "backend/routers/projects.py:1834"
+      ]
+    },
+    {
+      "text": "Allocation not found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/projects.py:3331",
+        "backend/routers/projects.py:3392"
+      ]
+    },
+    {
+      "text": "Missing SMTP configuration",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/settings.py:448",
+        "backend/routers/settings.py:448"
+      ]
+    },
+    {
+      "text": "فشل الاتصال بالخادم",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/settings.py:459",
+        "backend/routers/settings.py:459"
+      ]
+    },
+    {
+      "text": "Missing OTP or Organization Name",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/settings.py:474",
+        "backend/routers/settings.py:474"
+      ]
+    },
+    {
+      "text": "Invalid OTP",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/settings.py:479",
+        "backend/routers/settings.py:479"
+      ]
+    },
+    {
+      "text": "البريد مستخدم",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:57",
+        "backend/routers/companies.py:57"
+      ]
+    },
+    {
+      "text": "فشل توليد معرف فريد",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:72",
+        "backend/routers/companies.py:72"
+      ]
+    },
+    {
+      "text": "فشل إنشاء قاعدة البيانات",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:83",
+        "backend/routers/companies.py:83"
+      ]
+    },
+    {
+      "text": "فشل إنشاء الجداول",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:97",
+        "backend/routers/companies.py:97"
+      ]
+    },
+    {
+      "text": "فشل إنشاء الشركة",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:225",
+        "backend/routers/companies.py:225"
+      ]
+    },
+    {
+      "text": "Access Denied",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:413",
+        "backend/routers/companies.py:413"
+      ]
+    },
+    {
+      "text": "Forbidden: Admin access required",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:473",
+        "backend/routers/companies.py:473"
+      ]
+    },
+    {
+      "text": "Company not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:484",
+        "backend/routers/companies.py:484"
+      ]
+    },
+    {
+      "text": "Forbidden",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/companies.py:535",
+        "backend/routers/companies.py:535"
+      ]
+    },
+    {
+      "text": "Company ID missing and not a system view",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/audit.py:105",
+        "backend/routers/audit.py:105"
+      ]
+    },
+    {
+      "text": "ليس لديك صلاحية لعرض سجلات هذا الفرع",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/audit.py:130",
+        "backend/routers/audit.py:130"
+      ]
+    },
+    {
+      "text": "يجب تحديد الحساب",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:1817",
+        "backend/routers/reports.py:1817"
+      ]
+    },
+    {
+      "text": "يجب تحديد فترتين على الأقل للمقارنة",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:1947",
+        "backend/routers/reports.py:1947"
+      ]
+    },
+    {
+      "text": "يجب تحديد تاريخين على الأقل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:2032",
+        "backend/routers/reports.py:2032"
+      ]
+    },
+    {
+      "text": "يجب تحديد فترتين على الأقل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:2225",
+        "backend/routers/reports.py:2225"
+      ]
+    },
+    {
+      "text": "يجب فترتين على الأقل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:2476",
+        "backend/routers/reports.py:2476"
+      ]
+    },
+    {
+      "text": "التقرير غير موجود",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/reports.py:3091",
+        "backend/routers/reports.py:3091"
+      ]
+    },
+    {
+      "text": "Error loading industry dashboard",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/role_dashboards.py:342",
+        "backend/routers/role_dashboards.py:342"
+      ]
+    },
+    {
+      "text": "Error loading combined dashboard",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/role_dashboards.py:408",
+        "backend/routers/role_dashboards.py:408"
+      ]
+    },
+    {
+      "text": "Error loading dashboard data",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/role_dashboards.py:521",
+        "backend/routers/role_dashboards.py:521"
+      ]
+    },
+    {
+      "text": "group_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:157",
+        "backend/routers/purchases.py:200"
+      ]
+    },
+    {
+      "text": "لا يمكن حذف المجموعة لأنها مرتبطة بموردين",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:195",
+        "backend/routers/purchases.py:195"
+      ]
+    },
+    {
+      "text": "يجب اعتماد أمر الشراء أولاً قبل الاستلام",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:739",
+        "backend/routers/purchases.py:739"
+      ]
+    },
+    {
+      "text": "تم استلام البضاعة بنجاح",
+      "count": 2,
+      "types": [
+        "message"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:908",
+        "backend/routers/inventory/stock_movements.py:108"
+      ]
+    },
+    {
+      "text": "No exchange rate found for {inv_currency}",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1148",
+        "backend/routers/sales/invoices.py:178"
+      ]
+    },
+    {
+      "text": "مردود المشتريات غير موجود",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1702",
+        "backend/routers/purchases.py:1702"
+      ]
+    },
+    {
+      "text": "يجب تعريف مستودع واحد على الأقل",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:1779",
+        "backend/routers/purchases.py:1779"
+      ]
+    },
+    {
+      "text": "حدث خطأ أثناء إنشاء مردود المشتريات",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2021",
+        "backend/routers/purchases.py:2021"
+      ]
+    },
+    {
+      "text": "قيمة التخصيص يجب أن تكون أكبر من صفر",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2086",
+        "backend/routers/purchases.py:2086"
+      ]
+    },
+    {
+      "text": "حدث خطأ أثناء إنشاء سند الصرف",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2300",
+        "backend/routers/purchases.py:2300"
+      ]
+    },
+    {
+      "text": "credit_note_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2518",
+        "backend/routers/sales/credit_notes.py:130"
+      ]
+    },
+    {
+      "text": "الفاتورة المرتبطة غير موجودة أو لا تخص هذا المورد",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2560",
+        "backend/routers/purchases.py:2560"
+      ]
+    },
+    {
+      "text": "debit_note_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2786",
+        "backend/routers/sales/credit_notes.py:481"
+      ]
+    },
+    {
+      "text": "RFQ not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:2980",
+        "backend/routers/purchases.py:2980"
+      ]
+    },
+    {
+      "text": "Response not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3089",
+        "backend/routers/purchases.py:3089"
+      ]
+    },
+    {
+      "text": "Agreement not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3199",
+        "backend/routers/purchases.py:3199"
+      ]
+    },
+    {
+      "text": "Active agreement not found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3265",
+        "backend/routers/purchases.py:3265"
+      ]
+    },
+    {
+      "text": "Call-off exceeds agreement total",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3270",
+        "backend/routers/purchases.py:3270"
+      ]
+    },
+    {
+      "text": "Failed to create blanket PO",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3345",
+        "backend/routers/purchases.py:3345"
+      ]
+    },
+    {
+      "text": "Only draft blanket POs can be activated",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3446",
+        "backend/routers/purchases.py:3446"
+      ]
+    },
+    {
+      "text": "Blanket PO must be active to release orders",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3482",
+        "backend/routers/purchases.py:3482"
+      ]
+    },
+    {
+      "text": "Failed to create release order",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3553",
+        "backend/routers/purchases.py:3553"
+      ]
+    },
+    {
+      "text": "Cannot amend price on a completed/cancelled/expired blanket PO",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3573",
+        "backend/routers/purchases.py:3573"
+      ]
+    },
+    {
+      "text": "Failed to amend price",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/purchases.py:3623",
+        "backend/routers/purchases.py:3623"
+      ]
+    },
+    {
+      "text": "تم ترحيل هذه التكلفة بالفعل",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/landed_costs.py:228",
+        "backend/routers/landed_costs.py:377"
+      ]
+    },
+    {
+      "text": "Company not found or inactive",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:55",
+        "backend/routers/sso.py:55"
+      ]
+    },
+    {
+      "text": "company_id or company_code is required",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:57",
+        "backend/routers/sso.py:57"
+      ]
+    },
+    {
+      "text": "No active SAML configuration found",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:221",
+        "backend/routers/sso.py:221"
+      ]
+    },
+    {
+      "text": "Missing SAMLResponse",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:243",
+        "backend/routers/sso.py:243"
+      ]
+    },
+    {
+      "text": "Missing RelayState",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:247",
+        "backend/routers/sso.py:247"
+      ]
+    },
+    {
+      "text": "Invalid or expired RelayState token",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:250",
+        "backend/routers/sso.py:250"
+      ]
+    },
+    {
+      "text": "Invalid SSO configuration",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:258",
+        "backend/routers/sso.py:258"
+      ]
+    },
+    {
+      "text": "Cannot determine company for this SSO configuration",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:321",
+        "backend/routers/sso.py:321"
+      ]
+    },
+    {
+      "text": "SSO configuration not found or inactive",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:325",
+        "backend/routers/sso.py:325"
+      ]
+    },
+    {
+      "text": "Username and password required for LDAP login",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:342",
+        "backend/routers/sso.py:342"
+      ]
+    },
+    {
+      "text": "LDAP server unreachable. Use local login if you are a fallback admin.",
+      "count": 2,
+      "types": [
+        "detail",
+        "http"
+      ],
+      "samples": [
+        "backend/routers/sso.py:349",
+        "backend/routers/sso.py:349"
+      ]
+    },
+    {
+      "text": "سلسلة الاعتماد غير موجودة",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/approvals.py:81",
+        "backend/routers/approvals.py:147"
+      ]
+    },
+    {
+      "text": "approval_request_not_found",
+      "count": 2,
+      "types": [
+        "http"
+      ],
+      "samples": [
+        "backend/routers/approvals.py:440",
+        "backend/routers/approvals.py:481"
+      ]
+    }
+  ]
+}

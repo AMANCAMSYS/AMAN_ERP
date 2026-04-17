@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { manufacturingCostingAPI, manufacturingAPI } from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
@@ -23,7 +24,7 @@ function ManufacturingCosting() {
         ]).then(([rptRes, ordRes]) => {
             setReport(rptRes.data)
             setOrders(ordRes.data || [])
-        }).catch(console.error).finally(() => setLoading(false))
+        }).catch(() => toastEmitter.emit(t('common.error'), 'error')).finally(() => setLoading(false))
     }, [])
 
     const handleCalculate = async () => {

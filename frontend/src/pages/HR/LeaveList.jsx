@@ -5,8 +5,8 @@ import {
     CheckCircle, XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
 import { hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { hasPermission } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
 import SimpleModal from '../../components/common/SimpleModal';
@@ -52,7 +52,7 @@ const LeaveList = () => {
             const response = await hrAPI.listLeaveRequests(params);
             setLeaves(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
-            console.error('Error fetching leaves:', error);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -62,13 +62,12 @@ const LeaveList = () => {
         setActionLoading(true);
         try {
             await hrAPI.createLeaveRequest(formData);
-            toast.success(t('common.success'));
+            toastEmitter.emit(t('common.success'), 'success');
             setIsModalOpen(false);
             setFormData({ leave_type: 'annual', start_date: '', end_date: '', reason: '' });
             fetchData();
         } catch (error) {
-            console.error(error);
-            toast.error(error.message || t('common.error_occurred'));
+            toastEmitter.emit(error.message || t('common.error_occurred'), 'error');
         } finally {
             setActionLoading(false);
         }
@@ -79,11 +78,10 @@ const LeaveList = () => {
 
         try {
             await hrAPI.updateLeaveStatus(id, status);
-            toast.success(t('common.success'));
+            toastEmitter.emit(t('common.success'), 'success');
             fetchData();
         } catch (error) {
-            console.error(error);
-            toast.error(t('common.error_occurred'));
+            toastEmitter.emit(t('common.error_occurred'), 'error');
         }
     };
 

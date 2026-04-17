@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.i18n import http_error, i18n_message
 from utils.permissions import require_permission, require_module, validate_branch_access
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,8 @@ router = APIRouter(
 # Schemas
 # ---------------------------------------------------------------------------
 
+from decimal import Decimal
+
 class MatchActionRequest(BaseModel):
     exception_notes: Optional[str] = None
 
@@ -36,10 +39,10 @@ class MatchActionRequest(BaseModel):
 class ToleranceSave(BaseModel):
     id: Optional[int] = None
     name: str
-    quantity_percent: float = 0
-    quantity_absolute: float = 0
-    price_percent: float = 0
-    price_absolute: float = 0
+    quantity_percent: Decimal = Decimal("0")
+    quantity_absolute: Decimal = Decimal("0")
+    price_percent: Decimal = Decimal("0")
+    price_absolute: Decimal = Decimal("0")
     supplier_id: Optional[int] = None
     product_category_id: Optional[int] = None
 
@@ -137,7 +140,7 @@ def get_match(match_id: int, current_user=Depends(get_current_user)):
             WHERE m.id = :mid AND m.is_deleted = false
         """), {"mid": match_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Match not found")
+            raise HTTPException(**http_error(404, "match_not_found"))
 
         # Fetch lines
         lines = db.execute(text("""
@@ -167,15 +170,15 @@ def get_match(match_id: int, current_user=Depends(get_current_user)):
                     "id": ln.id,
                     "po_line_id": ln.po_line_id,
                     "invoice_line_id": ln.invoice_line_id,
-                    "po_quantity": float(ln.po_quantity or 0),
-                    "received_quantity": float(ln.received_quantity or 0),
-                    "invoiced_quantity": float(ln.invoiced_quantity or 0),
-                    "po_unit_price": float(ln.po_unit_price or 0),
-                    "invoiced_unit_price": float(ln.invoiced_unit_price or 0),
-                    "quantity_variance_pct": float(ln.quantity_variance_pct or 0),
-                    "quantity_variance_abs": float(ln.quantity_variance_abs or 0),
-                    "price_variance_pct": float(ln.price_variance_pct or 0),
-                    "price_variance_abs": float(ln.price_variance_abs or 0),
+                    "po_quantity": str(ln.po_quantity or 0),
+                    "received_quantity": str(ln.received_quantity or 0),
+                    "invoiced_quantity": str(ln.invoiced_quantity or 0),
+                    "po_unit_price": str(ln.po_unit_price or 0),
+                    "invoiced_unit_price": str(ln.invoiced_unit_price or 0),
+                    "quantity_variance_pct": str(ln.quantity_variance_pct or 0),
+                    "quantity_variance_abs": str(ln.quantity_variance_abs or 0),
+                    "price_variance_pct": str(ln.price_variance_pct or 0),
+                    "price_variance_abs": str(ln.price_variance_abs or 0),
                     "line_status": ln.line_status,
                 }
                 for ln in lines
@@ -203,9 +206,9 @@ def approve_match(
             "SELECT id, match_status FROM three_way_matches WHERE id = :mid AND is_deleted = false"
         ), {"mid": match_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Match not found")
+            raise HTTPException(**http_error(404, "match_not_found"))
         if row.match_status not in ("held",):
-            raise HTTPException(status_code=400, detail="Only held matches can be approved")
+            raise HTTPException(**http_error(400, "match_approve_only_held"))
         db.execute(text("""
             UPDATE three_way_matches
             SET match_status = 'approved_with_exception',
@@ -215,7 +218,7 @@ def approve_match(
             WHERE id = :mid
         """), {"mid": match_id, "uid": user_id, "notes": body.exception_notes})
         db.commit()
-        return {"detail": "Match approved with exception"}
+        return {"detail": i18n_message("match_approved_with_exception")}
     finally:
         db.close()
 
@@ -234,9 +237,9 @@ def reject_match(
             "SELECT id, match_status FROM three_way_matches WHERE id = :mid AND is_deleted = false"
         ), {"mid": match_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Match not found")
+            raise HTTPException(**http_error(404, "match_not_found"))
         if row.match_status not in ("held",):
-            raise HTTPException(status_code=400, detail="Only held matches can be rejected")
+            raise HTTPException(**http_error(400, "match_reject_only_held"))
         db.execute(text("""
             UPDATE three_way_matches
             SET match_status = 'rejected',
@@ -246,7 +249,7 @@ def reject_match(
             WHERE id = :mid
         """), {"mid": match_id, "uid": user_id, "notes": body.exception_notes})
         db.commit()
-        return {"detail": "Match rejected"}
+        return {"detail": i18n_message("match_rejected")}
     finally:
         db.close()
 
@@ -267,10 +270,10 @@ def list_tolerances(current_user=Depends(get_current_user)):
             {
                 "id": r.id,
                 "name": r.name,
-                "quantity_percent": float(r.quantity_percent or 0),
-                "quantity_absolute": float(r.quantity_absolute or 0),
-                "price_percent": float(r.price_percent or 0),
-                "price_absolute": float(r.price_absolute or 0),
+                "quantity_percent": str(r.quantity_percent or 0),
+                "quantity_absolute": str(r.quantity_absolute or 0),
+                "price_percent": str(r.price_percent or 0),
+                "price_absolute": str(r.price_absolute or 0),
                 "supplier_id": r.supplier_id,
                 "product_category_id": r.product_category_id,
             }
@@ -292,7 +295,7 @@ def save_tolerance(body: ToleranceSave, current_user=Depends(get_current_user)):
                 "SELECT id FROM match_tolerances WHERE id = :tid AND is_deleted = false"
             ), {"tid": body.id}).fetchone()
             if not existing:
-                raise HTTPException(status_code=404, detail="Tolerance not found")
+                raise HTTPException(**http_error(404, "tolerance_not_found"))
             db.execute(text("""
                 UPDATE match_tolerances
                 SET name = :name, quantity_percent = :qp, quantity_absolute = :qa,
@@ -308,7 +311,7 @@ def save_tolerance(body: ToleranceSave, current_user=Depends(get_current_user)):
                 "uid": str(user_id) if user_id else None,
             })
             db.commit()
-            return {"id": body.id, "detail": "Tolerance updated"}
+            return {"id": body.id, "detail": i18n_message("tolerance_updated")}
         else:
             # Create new
             result = db.execute(text("""
@@ -326,6 +329,6 @@ def save_tolerance(body: ToleranceSave, current_user=Depends(get_current_user)):
             })
             new_id = result.scalar()
             db.commit()
-            return {"id": new_id, "detail": "Tolerance created"}
+            return {"id": new_id, "detail": i18n_message("tolerance_created")}
     finally:
         db.close()

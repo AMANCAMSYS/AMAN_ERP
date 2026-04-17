@@ -4,6 +4,7 @@ AMAN ERP — WPS Export, Saudization Tracking, End of Service Settlement
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
@@ -13,8 +14,9 @@ import io, csv, logging
 
 from database import get_db_connection
 from routers.auth import get_current_user, get_current_user_company
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, validate_branch_access, check_permission
 from utils.audit import log_activity
+from utils.masking import mask_pii
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     update_account_balance, get_base_currency
@@ -58,9 +60,10 @@ REGION_SA = "SA"  # Saudi Arabia region code
 class WPSExportRequest(BaseModel):
     period_id: int
     bank_code: Optional[str] = None  # IBAN prefix
+    branch_id: Optional[int] = None
 
 
-@router.post("/wps/export", dependencies=[Depends(require_permission("hr.manage"))])
+@router.post("/wps/export", dependencies=[Depends(require_permission(["hr.manage", "hr.pii"]))])
 def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_user)):
     """
     تصدير ملف WPS (نظام حماية الأجور) بتنسيق SIF
@@ -78,7 +81,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
             SELECT * FROM payroll_periods WHERE id = :pid
         """), {"pid": body.period_id}).fetchone()
         if not period:
-            raise HTTPException(404, "فترة الرواتب غير موجودة")
+            raise HTTPException(**http_error(404, "payroll_period_not_found"))
         if period.status != 'posted':
             raise HTTPException(400, "يجب ترحيل الرواتب أولاً قبل التصدير")
 
@@ -89,8 +92,11 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
             FROM company_info c LIMIT 1
         """)).fetchone()
 
+        if body.branch_id:
+            body.branch_id = validate_branch_access(current_user, body.branch_id)
+
         # Get payroll entries with employee bank details
-        entries = db.execute(text("""
+        wps_query = """
             SELECT pe.*,
                    e.first_name, e.last_name, e.employee_code,
                    e.national_id, e.bank_name, e.bank_account_number,
@@ -99,8 +105,13 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
             WHERE pe.period_id = :pid AND pe.net_salary > 0
-            ORDER BY e.employee_code
-        """), {"pid": body.period_id}).fetchall()
+        """
+        wps_params = {"pid": body.period_id}
+        if body.branch_id:
+            wps_query += " AND e.branch_id = :bid"
+            wps_params["bid"] = body.branch_id
+        wps_query += " ORDER BY e.employee_code"
+        entries = db.execute(text(wps_query), wps_params).fetchall()
 
         if not entries:
             raise HTTPException(400, "لا توجد رواتب للتصدير")
@@ -186,7 +197,7 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
         username = current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", "")
         log_activity(db, user_id=user_id, username=username, action="wps.export",
                      resource_type="payroll_period", resource_id=body.period_id,
-                     details={"period_name": period.name, "records": record_count, "total": float(total_amount)})
+                     details={"period_name": period.name, "records": record_count, "total": str(total_amount)})
 
         return Response(
             content=csv_content,
@@ -198,22 +209,25 @@ def export_wps_file(body: WPSExportRequest, current_user=Depends(get_current_use
     except Exception as e:
         logger.error(f"WPS export error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
 
 @router.get("/wps/preview/{period_id}", dependencies=[Depends(require_permission("hr.manage"))])
-def preview_wps(period_id: int, current_user=Depends(get_current_user)):
+def preview_wps(period_id: int, branch_id: Optional[int] = None, current_user=Depends(get_current_user)):
     """معاينة بيانات WPS قبل التصدير"""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     db = get_db_connection(company_id)
     try:
         period = db.execute(text("SELECT * FROM payroll_periods WHERE id = :pid"), {"pid": period_id}).fetchone()
         if not period:
-            raise HTTPException(404, "فترة الرواتب غير موجودة")
+            raise HTTPException(**http_error(404, "payroll_period_not_found"))
 
-        entries = db.execute(text("""
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
+
+        preview_query = """
             SELECT pe.employee_id, pe.basic_salary, pe.housing_allowance,
                    pe.transport_allowance, pe.other_allowances,
                    pe.deductions, pe.net_salary,
@@ -227,17 +241,30 @@ def preview_wps(period_id: int, current_user=Depends(get_current_user)):
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
             WHERE pe.period_id = :pid AND pe.net_salary > 0
-            ORDER BY e.employee_code
-        """), {"pid": period_id}).fetchall()
+        """
+        preview_params = {"pid": period_id}
+        if branch_id:
+            preview_query += " AND e.branch_id = :bid"
+            preview_params["bid"] = branch_id
+        preview_query += " ORDER BY e.employee_code"
+        entries = db.execute(text(preview_query), preview_params).fetchall()
 
-        result = [dict(e._mapping) for e in entries]
+        result = []
+        user_perms = current_user.get("permissions", []) if isinstance(current_user, dict) else getattr(current_user, "permissions", []) or []
+        has_pii = check_permission(user_perms, "hr.pii")
+        for e in entries:
+            row = dict(e._mapping)
+            if not has_pii:
+                row["national_id"] = mask_pii(row.get("national_id"))
+                row["iban_number"] = mask_pii(row.get("iban_number"))
+            result.append(row)
         warnings = [e for e in result if e.get('iban_status') == 'missing_iban' or e.get('id_status') == 'missing_id']
 
         return {
             "period": dict(period._mapping),
             "entries": result,
             "total_employees": len(result),
-            "total_amount": float(sum(_dec(e.get('net_salary', 0)) for e in result)),
+            "total_amount": str(sum(_dec(e.get('net_salary', 0)) for e in result)),
             "warnings": warnings,
             "warnings_count": len(warnings)
         }
@@ -378,18 +405,21 @@ def saudization_dashboard(branch_id: Optional[int] = None, current_user=Depends(
         raise
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
 
 @router.get("/saudization/report", dependencies=[Depends(require_permission("hr.view"))])
-def saudization_report(current_user=Depends(get_current_user)):
+def saudization_report(branch_id: Optional[int] = None, current_user=Depends(get_current_user)):
     """تقرير السعودة التفصيلي — لكل فرع"""
     company_id = current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id
     db = get_db_connection(company_id)
     try:
-        branches = db.execute(text("""
+        if branch_id:
+            branch_id = validate_branch_access(current_user, branch_id)
+
+        report_query = """
             SELECT b.id, b.branch_name,
                    COUNT(e.id) as total,
                    COUNT(e.id) FILTER (WHERE
@@ -402,9 +432,14 @@ def saudization_report(current_user=Depends(get_current_user)):
                    ) as non_saudi
             FROM branches b
             LEFT JOIN employees e ON e.branch_id = b.id AND e.status = 'active'
-            GROUP BY b.id, b.branch_name
-            ORDER BY b.branch_name
-        """)).fetchall()
+        """
+        report_params = {}
+        if branch_id:
+            report_query += " WHERE b.id = :bid"
+            report_params["bid"] = branch_id
+        report_query += " GROUP BY b.id, b.branch_name ORDER BY b.branch_name"
+
+        branches = db.execute(text(report_query), report_params).fetchall()
 
         results = []
         for br in branches:
@@ -445,7 +480,7 @@ class EOSSettlementRequest(BaseModel):
     termination_reason: str = "termination"  # termination, resignation, retirement, contract_end
     include_vacation_balance: bool = True
     include_pending_salary: bool = True
-    additional_deductions: float = 0
+    additional_deductions: Decimal = Decimal("0")
     notes: Optional[str] = None
 
 
@@ -469,7 +504,7 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         """), {"eid": body.employee_id}).fetchone()
 
         if not emp:
-            raise HTTPException(404, "الموظف غير موجود")
+            raise HTTPException(**http_error(404, "employee_not_found"))
 
         from dateutil.relativedelta import relativedelta
 
@@ -479,14 +514,14 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
             raise HTTPException(400, "تاريخ التعيين غير محدد")
 
         delta = relativedelta(term_date, join_date)
-        total_years = delta.years + (delta.months / 12) + (delta.days / 365.25)
+        total_years = _dec(delta.years) + (_dec(delta.months) / Decimal('12')) + (_dec(delta.days) / Decimal('365.25'))
 
         base_salary = _dec(emp.basic_salary)
         total_salary = base_salary + _dec(emp.housing_allowance) + _dec(emp.transport_allowance)
 
         # ── Calculate EOS Gratuity using shared helper (Saudi Labor Law Art. 84/85) ──
         from utils.hr_helpers import calculate_eos_gratuity
-        eos = calculate_eos_gratuity(float(total_salary), total_years, body.termination_reason)
+        eos = calculate_eos_gratuity(total_salary, total_years, body.termination_reason)
         eos_amount = _dec(eos["final_gratuity"])
 
         # ── Vacation balance ──
@@ -586,7 +621,7 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         # Audit log
         log_activity(db, user_id=user_id, username=current_user.get("username", "") if isinstance(current_user, dict) else getattr(current_user, "username", ""),
                      action="eos.settle", resource_type="employee", resource_id=body.employee_id,
-                     details={"total_settlement": float(total_settlement), "service_years": round(total_years, 2),
+                     details={"total_settlement": str(total_settlement), "service_years": round(total_years, 2),
                               "termination_reason": body.termination_reason, "journal_entry_id": je_id})
 
         return {
@@ -594,11 +629,11 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
             "employee_name": emp.employee_name,
             "service_years": round(total_years, 2),
             "termination_reason": body.termination_reason,
-            "eos_gratuity": float(eos_amount),
-            "vacation_balance_amount": float(vacation_amount),
-            "pending_salary": float(pending_salary),
+            "eos_gratuity": str(eos_amount),
+            "vacation_balance_amount": str(vacation_amount),
+            "pending_salary": str(pending_salary),
             "additional_deductions": body.additional_deductions,
-            "total_settlement": float(total_settlement),
+            "total_settlement": str(total_settlement),
             "journal_entry_id": je_id,
             "journal_entry_number": je_number,
             "message": "تم تسوية نهاية الخدمة بنجاح"
@@ -608,6 +643,6 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -17,6 +17,7 @@ function ReceiptForm() {
     const navigate = useNavigate();
     const location = useLocation();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const currency = getCurrency();
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState([]);
@@ -72,14 +73,13 @@ function ReceiptForm() {
                 }));
             }
         } catch (error) {
-            console.error('Error fetching initial data:', error);
-            toastEmitter.emit(t('sales.receipts.form.errors.fetch_failed'), 'error');
+            showToast(t('sales.receipts.form.errors.fetch_failed'), 'error');
         }
     };
 
     // ... (autoAllocate helper remains the same) ...
     const autoAllocate = (amount, invoices) => {
-        let remainingBase = parseFloat(amount) || 0;
+        let remainingBase = Number(amount) || 0;
         const newAllocations = [];
         const targetType = formData.voucher_type === 'receipt' ? 'sales' : 'sales_return';
         const filteredInvoices = invoices.filter(inv => inv.invoice_type === targetType);
@@ -137,7 +137,7 @@ function ReceiptForm() {
                     setFormData(prev => ({ ...prev, allocations }));
                 }
             } catch (error) {
-                console.error('Error fetching invoices:', error);
+                showToast(t('common.error'), 'error');
             }
         } else {
             setOutstandingInvoices([]);
@@ -147,7 +147,7 @@ function ReceiptForm() {
     // ... (handleAllocationChange, handleAmountChange, handleAutoAllocate, handleReceiveAll, handleQuickFill remain similar but adapted for type) ...
 
     const handleAllocationChange = (invoiceId, amount) => {
-        const val = parseFloat(amount) || 0;
+        const val = Number(amount) || 0;
         const existing = formData.allocations.find(a => a.invoice_id === invoiceId);
         if (existing) {
             setFormData({
@@ -165,7 +165,7 @@ function ReceiptForm() {
     };
 
     const handleAmountChange = (e) => {
-        const newAmount = parseFloat(e.target.value) || 0;
+        const newAmount = Number(e.target.value) || 0;
         setFormData({ ...formData, amount: newAmount });
         if (outstandingInvoices.length > 0) {
             const allocations = autoAllocate(newAmount, outstandingInvoices);
@@ -221,19 +221,19 @@ function ReceiptForm() {
         e.preventDefault();
 
         if (!formData.customer_id) {
-            toastEmitter.emit(t('sales.receipts.form.errors.customer_required'), 'error');
+            showToast(t('sales.receipts.form.errors.customer_required'), 'error');
             return;
         }
         if (formData.amount <= 0) {
-            toastEmitter.emit(t('sales.receipts.form.errors.amount_required'), 'error');
+            showToast(t('sales.receipts.form.errors.amount_required'), 'error');
             return;
         }
         if (totalAllocated > formData.amount) {
-            toastEmitter.emit(t('sales.receipts.form.errors.allocation_error'), 'error');
+            showToast(t('sales.receipts.form.errors.allocation_error'), 'error');
             return;
         }
         if (!formData.payment_method) {
-            toastEmitter.emit(t('sales.receipts.form.errors.payment_method_required'), 'error');
+            showToast(t('sales.receipts.form.errors.payment_method_required'), 'error');
             return;
         }
 
@@ -252,7 +252,7 @@ function ReceiptForm() {
                 notes: formData.notes || null,
                 allocations: formData.allocations.filter(a => a.allocated_amount > 0).map(a => ({
                     invoice_id: parseInt(a.invoice_id),
-                    allocated_amount: parseFloat(a.allocated_amount)
+                    allocated_amount: String(a.allocated_amount)
                 }))
             };
 
@@ -262,11 +262,10 @@ function ReceiptForm() {
                 await salesAPI.createPayment(sanitizedData);
             }
 
-            toastEmitter.emit(t('sales.receipts.form.errors.create_success'), 'success');
+            showToast(t('sales.receipts.form.errors.create_success'), 'success');
             navigate('/sales/receipts');
         } catch (error) {
-            console.error('Error creating voucher:', error);
-            toastEmitter.emit(t('sales.receipts.form.errors.create_failed') + ': ' + (error.response?.data?.detail || error.message), 'error');
+            showToast(t('sales.receipts.form.errors.create_failed') + ': ' + (error.response?.data?.detail || error.message), 'error');
         } finally {
             setLoading(false);
         }

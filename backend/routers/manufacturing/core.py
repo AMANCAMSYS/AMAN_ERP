@@ -1,7 +1,9 @@
 import logging
+from decimal import Decimal
 from datetime import datetime, date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from utils.i18n import http_error
 from pydantic import BaseModel
 from sqlalchemy import text
 from routers.auth import get_current_user
@@ -43,10 +45,10 @@ def list_work_centers(
     validated_branch = validate_branch_access(current_user, branch_id)
     conn = get_db_connection(current_user.company_id)
     try:
-        query = "SELECT * FROM work_centers"
+        query = "SELECT * FROM work_centers WHERE is_deleted = false"
         params = {}
         if validated_branch:
-            query += " WHERE branch_id = :branch_id"
+            query += " AND branch_id = :branch_id"
             params["branch_id"] = validated_branch
         query += " ORDER BY name"
         rows = conn.execute(text(query), params).fetchall()
@@ -119,15 +121,35 @@ def update_work_center(wc_id: int, wc: WorkCenterCreate, request: Request, curre
 # ==========================================
 
 @router.get("/routes", response_model=List[RouteResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_routes(current_user: UserResponse = Depends(get_current_user)):
+def list_routes(
+    branch_id: Optional[int] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: UserResponse = Depends(get_current_user),
+):
     conn = get_db_connection(current_user.company_id)
     try:
-        routes_db = conn.execute(text("""
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
+        query = """
             SELECT r.*, p.product_name as product_name
             FROM manufacturing_routes r
             LEFT JOIN products p ON r.product_id = p.id
-            ORDER BY r.name
-        """)).fetchall()
+            WHERE r.is_deleted = false
+        """
+        params = {}
+        if validated_branch:
+            query += """
+                AND r.product_id IN (
+                    SELECT DISTINCT product_id FROM inventory WHERE branch_id = :branch_id
+                )
+            """
+            params["branch_id"] = validated_branch
+        query += " ORDER BY r.name LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
+        routes_db = conn.execute(text(query), params).fetchall()
         
         result = []
         for r in routes_db:
@@ -137,7 +159,7 @@ def list_routes(current_user: UserResponse = Depends(get_current_user)):
                 SELECT mo.*, wc.name as work_center_name 
                 FROM manufacturing_operations mo
                 LEFT JOIN work_centers wc ON mo.work_center_id = wc.id
-                WHERE mo.route_id = :rid
+                WHERE mo.route_id = :rid AND mo.is_deleted = false
                 ORDER BY mo.sequence
             """), {"rid": r.id}).fetchall()
             route_dict['operations'] = [dict(op._mapping) for op in ops]
@@ -182,7 +204,7 @@ def create_route(route: RouteCreate, request: Request, current_user: UserRespons
             SELECT mo.*, wc.name as work_center_name 
             FROM manufacturing_operations mo
             LEFT JOIN work_centers wc ON mo.work_center_id = wc.id
-            WHERE mo.route_id = :rid
+            WHERE mo.route_id = :rid AND mo.is_deleted = false
             ORDER BY mo.sequence
         """), {"rid": new_route.id}).fetchall()
         route_dict['operations'] = [dict(op._mapping) for op in ops]
@@ -211,7 +233,7 @@ def update_route(route_id: int, route: RouteCreate, request: Request, current_us
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
-        existing = conn.execute(text("SELECT * FROM manufacturing_routes WHERE id = :id"), {"id": route_id}).fetchone()
+        existing = conn.execute(text("SELECT * FROM manufacturing_routes WHERE id = :id AND is_deleted = false"), {"id": route_id}).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Route not found")
 
@@ -231,12 +253,12 @@ def update_route(route_id: int, route: RouteCreate, request: Request, current_us
         trans.commit()
 
         route_row = conn.execute(text("""
-            SELECT r.*, p.product_name FROM manufacturing_routes r LEFT JOIN products p ON r.product_id = p.id WHERE r.id = :id
+            SELECT r.*, p.product_name FROM manufacturing_routes r LEFT JOIN products p ON r.product_id = p.id WHERE r.id = :id AND r.is_deleted = false
         """), {"id": route_id}).fetchone()
         route_dict = dict(route_row._mapping)
         ops = conn.execute(text("""
             SELECT mo.*, wc.name as work_center_name FROM manufacturing_operations mo
-            LEFT JOIN work_centers wc ON mo.work_center_id = wc.id WHERE mo.route_id = :rid ORDER BY mo.sequence
+            LEFT JOIN work_centers wc ON mo.work_center_id = wc.id WHERE mo.route_id = :rid AND mo.is_deleted = false ORDER BY mo.sequence
         """), {"rid": route_id}).fetchall()
         route_dict['operations'] = [dict(op._mapping) for op in ops]
         log_activity(conn, user_id=current_user.id, username=current_user.username,
@@ -258,16 +280,36 @@ def update_route(route_id: int, route: RouteCreate, request: Request, current_us
 # ==========================================
 
 @router.get("/boms", response_model=List[BOMResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_boms(current_user: UserResponse = Depends(get_current_user)):
+def list_boms(
+    branch_id: Optional[int] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: UserResponse = Depends(get_current_user),
+):
     conn = get_db_connection(current_user.company_id)
     try:
-        boms_db = conn.execute(text("""
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
+        query = """
             SELECT b.*, p.product_name as product_name, r.name as route_name
             FROM bill_of_materials b
             LEFT JOIN products p ON b.product_id = p.id
             LEFT JOIN manufacturing_routes r ON b.route_id = r.id
-            ORDER BY b.id DESC
-        """)).fetchall()
+            WHERE b.is_deleted = false
+        """
+        params = {}
+        if validated_branch:
+            query += """
+                AND b.product_id IN (
+                    SELECT DISTINCT product_id FROM inventory WHERE branch_id = :branch_id
+                )
+            """
+            params["branch_id"] = validated_branch
+        query += " ORDER BY b.id DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
+        boms_db = conn.execute(text(query), params).fetchall()
         
         result = []
         for b in boms_db:
@@ -278,7 +320,7 @@ def list_boms(current_user: UserResponse = Depends(get_current_user)):
                 FROM bom_components bc
                 LEFT JOIN products p ON bc.component_product_id = p.id
                 LEFT JOIN product_units u ON p.unit_id = u.id
-                WHERE bc.bom_id = :bid
+                WHERE bc.bom_id = :bid AND bc.is_deleted = false
             """), {"bid": b.id}).fetchall()
             bom_dict['components'] = [dict(c._mapping) for c in comps]
             
@@ -287,7 +329,7 @@ def list_boms(current_user: UserResponse = Depends(get_current_user)):
                 SELECT bo.*, p.product_name 
                 FROM bom_outputs bo
                 LEFT JOIN products p ON bo.product_id = p.id
-                WHERE bo.bom_id = :bid
+                WHERE bo.bom_id = :bid AND bo.is_deleted = false
             """), {"bid": b.id}).fetchall()
             bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
             
@@ -343,7 +385,7 @@ def create_bom(bom: BOMCreate, request: Request, current_user: UserResponse = De
             FROM bill_of_materials b
             LEFT JOIN products p ON b.product_id = p.id
             LEFT JOIN manufacturing_routes r ON b.route_id = r.id
-            WHERE b.id = :bid
+            WHERE b.id = :bid AND b.is_deleted = false
         """), {"bid": new_bom.id}).fetchone()
         if prod_route:
             bom_dict['product_name'] = prod_route.product_name
@@ -355,7 +397,7 @@ def create_bom(bom: BOMCreate, request: Request, current_user: UserResponse = De
             FROM bom_components bc
             LEFT JOIN products p ON bc.component_product_id = p.id
             LEFT JOIN product_units u ON p.unit_id = u.id
-            WHERE bc.bom_id = :bid
+            WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": new_bom.id}).fetchall()
         bom_dict['components'] = [dict(c._mapping) for c in comps]
         
@@ -364,7 +406,7 @@ def create_bom(bom: BOMCreate, request: Request, current_user: UserResponse = De
             SELECT bo.*, p.product_name 
             FROM bom_outputs bo
             LEFT JOIN products p ON bo.product_id = p.id
-            WHERE bo.bom_id = :bid
+            WHERE bo.bom_id = :bid AND bo.is_deleted = false
         """), {"bid": new_bom.id}).fetchall()
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
         
@@ -391,7 +433,7 @@ def get_bom(bom_id: int, current_user: UserResponse = Depends(get_current_user))
             FROM bill_of_materials b
             LEFT JOIN products p ON b.product_id = p.id
             LEFT JOIN manufacturing_routes r ON b.route_id = r.id
-            WHERE b.id = :bid
+            WHERE b.id = :bid AND b.is_deleted = false
         """), {"bid": bom_id}).fetchone()
         if not b:
             raise HTTPException(status_code=404, detail="BOM not found")
@@ -401,12 +443,12 @@ def get_bom(bom_id: int, current_user: UserResponse = Depends(get_current_user))
             FROM bom_components bc
             LEFT JOIN products p ON bc.component_product_id = p.id
             LEFT JOIN product_units u ON p.unit_id = u.id
-            WHERE bc.bom_id = :bid
+            WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": bom_id}).fetchall()
         bom_dict['components'] = [dict(c._mapping) for c in comps]
         outputs = conn.execute(text("""
             SELECT bo.*, p.product_name FROM bom_outputs bo
-            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid
+            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid AND bo.is_deleted = false
         """), {"bid": bom_id}).fetchall()
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
         return bom_dict
@@ -418,7 +460,7 @@ def update_bom(bom_id: int, bom: BOMCreate, request: Request, current_user: User
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
-        existing = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :id"), {"id": bom_id}).fetchone()
+        existing = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :id AND is_deleted = false"), {"id": bom_id}).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="BOM not found")
 
@@ -458,18 +500,18 @@ def update_bom(bom_id: int, bom: BOMCreate, request: Request, current_user: User
         b = conn.execute(text("""
             SELECT b.*, p.product_name as product_name, r.name as route_name
             FROM bill_of_materials b LEFT JOIN products p ON b.product_id = p.id
-            LEFT JOIN manufacturing_routes r ON b.route_id = r.id WHERE b.id = :bid
+            LEFT JOIN manufacturing_routes r ON b.route_id = r.id WHERE b.id = :bid AND b.is_deleted = false
         """), {"bid": bom_id}).fetchone()
         bom_dict = dict(b._mapping)
         comps = conn.execute(text("""
             SELECT bc.*, p.product_name as component_name, u.unit_name as component_uom
             FROM bom_components bc LEFT JOIN products p ON bc.component_product_id = p.id
-            LEFT JOIN product_units u ON p.unit_id = u.id WHERE bc.bom_id = :bid
+            LEFT JOIN product_units u ON p.unit_id = u.id WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": bom_id}).fetchall()
         bom_dict['components'] = [dict(c._mapping) for c in comps]
         outputs = conn.execute(text("""
             SELECT bo.*, p.product_name FROM bom_outputs bo
-            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid
+            LEFT JOIN products p ON bo.product_id = p.id WHERE bo.bom_id = :bid AND bo.is_deleted = false
         """), {"bid": bom_id}).fetchall()
         bom_dict['outputs'] = [dict(o._mapping) for o in outputs]
         log_activity(conn, user_id=current_user.id, username=current_user.username,
@@ -498,7 +540,7 @@ def calculate_production_cost(conn, bom_id: int, order_quantity: float, order_id
     Returns dict with material_cost, labor_cost, overhead_cost, total_cost, and unit_cost.
     """
     # A. Material Cost (from BOM components × quantity × cost_price)
-    total_material_cost = 0.0
+    total_material_cost = Decimal("0")
     component_details = []
     
     if bom_id:
@@ -506,33 +548,33 @@ def calculate_production_cost(conn, bom_id: int, order_quantity: float, order_id
             SELECT bc.*, p.cost_price, p.product_name
             FROM bom_components bc
             JOIN products p ON bc.component_product_id = p.id
-            WHERE bc.bom_id = :bid
+            WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": bom_id}).fetchall()
         
         for comp in components:
-            waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+            waste_factor = 1 + Decimal(str(comp.waste_percentage or 0)) / Decimal("100")
             # Handle percentage-based BOM components
             if comp.is_percentage:
-                base_qty = comp.quantity / 100.0 * order_quantity
+                base_qty = Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order_quantity))
                 required_qty = base_qty * waste_factor
             else:
-                required_qty = comp.quantity * order_quantity * waste_factor
-            unit_cost = comp.cost_price or 0
+                required_qty = Decimal(str(comp.quantity)) * Decimal(str(order_quantity)) * waste_factor
+            unit_cost = Decimal(str(comp.cost_price or 0))
             line_cost = required_qty * unit_cost
             total_material_cost += line_cost
             component_details.append({
                 "product_name": comp.product_name,
                 "product_id": comp.component_product_id,
-                "base_qty": (comp.quantity / 100.0 * order_quantity) if comp.is_percentage else comp.quantity * order_quantity,
-                "waste_qty": required_qty - ((comp.quantity / 100.0 * order_quantity) if comp.is_percentage else comp.quantity * order_quantity),
+                "base_qty": (Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order_quantity))) if comp.is_percentage else Decimal(str(comp.quantity)) * Decimal(str(order_quantity)),
+                "waste_qty": required_qty - ((Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order_quantity))) if comp.is_percentage else Decimal(str(comp.quantity)) * Decimal(str(order_quantity))),
                 "total_qty": required_qty,
                 "unit_cost": unit_cost,
                 "total_cost": line_cost,
             })
     
     # B. Labor Cost (from production_order_operations × work_center cost_per_hour)
-    total_labor_cost = 0.0
-    total_overhead_cost = 0.0
+    total_labor_cost = Decimal("0")
+    total_overhead_cost = Decimal("0")
     
     if order_id:
         ops_data = conn.execute(text("""
@@ -543,8 +585,8 @@ def calculate_production_cost(conn, bom_id: int, order_quantity: float, order_id
         """), {"oid": order_id}).fetchall()
         
         for op in ops_data:
-            duration_hours = (op.actual_run_time or 0) / 60.0
-            rate = op.cost_per_hour or 0
+            duration_hours = Decimal(str(op.actual_run_time or 0)) / Decimal("60")
+            rate = Decimal(str(op.cost_per_hour or 0))
             total_labor_cost += duration_hours * rate
         
         # C. Overhead = configurable percentage of labor cost (default 30%)
@@ -552,11 +594,11 @@ def calculate_production_cost(conn, bom_id: int, order_quantity: float, order_id
         overhead_rate_row = conn.execute(text(
             "SELECT setting_value FROM company_settings WHERE setting_key = 'mfg_overhead_rate'"
         )).fetchone()
-        overhead_rate = float(overhead_rate_row.setting_value) if overhead_rate_row else 0.30
+        overhead_rate = Decimal(str(overhead_rate_row.setting_value)) if overhead_rate_row else Decimal("0.30")
         total_overhead_cost = total_labor_cost * overhead_rate
     
     total_cost = total_material_cost + total_labor_cost + total_overhead_cost
-    unit_cost = total_cost / order_quantity if order_quantity else 0
+    unit_cost = total_cost / Decimal(str(order_quantity)) if order_quantity else Decimal("0")
     
     return {
         "material_cost": round(total_material_cost, 2),
@@ -581,15 +623,15 @@ def check_inventory_sufficiency(conn, bom_id: int, order_quantity: float, wareho
         SELECT bc.*, p.product_name
         FROM bom_components bc
         JOIN products p ON bc.component_product_id = p.id
-        WHERE bc.bom_id = :bid
+        WHERE bc.bom_id = :bid AND bc.is_deleted = false
     """), {"bid": bom_id}).fetchall()
     
     shortages = []
     for comp in components:
-        waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+        waste_factor = 1 + Decimal(str(comp.waste_percentage or 0)) / Decimal("100")
         # Variable BOM: quantity is a percentage of the order quantity
-        base_qty = (comp.quantity / 100.0 * order_quantity) if comp.is_percentage else comp.quantity
-        required_qty = base_qty * order_quantity * waste_factor if not comp.is_percentage else base_qty * waste_factor
+        base_qty = (Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order_quantity))) if comp.is_percentage else Decimal(str(comp.quantity))
+        required_qty = base_qty * Decimal(str(order_quantity)) * waste_factor if not comp.is_percentage else base_qty * waste_factor
         
         # Check available quantity
         if warehouse_id:
@@ -603,7 +645,7 @@ def check_inventory_sufficiency(conn, bom_id: int, order_quantity: float, wareho
                 WHERE product_id = :pid
             """), {"pid": comp.component_product_id}).fetchone()
         
-        available = float(inv.qty) if inv else 0
+        available = Decimal(str(inv.qty)) if inv else Decimal("0")
         
         if available < required_qty:
             shortages.append({
@@ -626,7 +668,7 @@ def estimate_production_cost(
     """Estimate production cost before creating an order."""
     conn = get_db_connection(current_user.company_id)
     try:
-        bom = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :bid"), {"bid": bom_id}).fetchone()
+        bom = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :bid AND is_deleted = false"), {"bid": bom_id}).fetchone()
         if not bom:
             raise HTTPException(status_code=404, detail="BOM not found")
         cost = calculate_production_cost(conn, bom_id, quantity)
@@ -653,6 +695,8 @@ def check_materials_availability(
 @router.get("/orders", response_model=List[ProductionOrderResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
 def list_production_orders(
     branch_id: Optional[int] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
     current_user: UserResponse = Depends(get_current_user)
 ):
     from utils.permissions import validate_branch_access
@@ -666,11 +710,11 @@ def list_production_orders(
             LEFT JOIN products p ON po.product_id = p.id
             LEFT JOIN bill_of_materials b ON po.bom_id = b.id
         """
-        params = {}
+        params = {"limit": limit, "offset": offset}
         if validated_branch:
             query += " WHERE po.branch_id = :branch_id"
             params["branch_id"] = validated_branch
-        query += " ORDER BY po.id DESC"
+        query += " ORDER BY po.id DESC LIMIT :limit OFFSET :offset"
         orders_db = conn.execute(text(query), params).fetchall()
 
         result = []
@@ -705,6 +749,9 @@ def get_production_order(order_id: int, current_user: UserResponse = Depends(get
         
         if not o:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if o.branch_id:
+            validate_branch_access(current_user, o.branch_id)
             
         order_dict = dict(o._mapping)
         
@@ -743,7 +790,7 @@ def get_production_order(order_id: int, current_user: UserResponse = Depends(get
                 SELECT SUM(bc.quantity * p.cost_price)
                 FROM bom_components bc
                 JOIN products p ON bc.component_product_id = p.id
-                WHERE bc.bom_id = :bid
+                WHERE bc.bom_id = :bid AND bc.is_deleted = false
              """), {"bid": o.bom_id}).scalar()
              current_material_cost = (bom_cost or 0) * o.quantity
 
@@ -760,10 +807,14 @@ def list_all_operations(
     end_date: Optional[date] = None,
     work_center_id: Optional[int] = None,
     status: Optional[str] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         query = """
             SELECT poo.*, mo.description as operation_description, wc.name as work_center_name,
                    po.order_number, p.product_name
@@ -775,6 +826,10 @@ def list_all_operations(
             WHERE 1=1
         """
         params = {}
+        
+        if validated_branch:
+            query += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         
         if work_center_id:
             query += " AND poo.work_center_id = :wcid"
@@ -803,6 +858,15 @@ def list_all_operations(
 
 @router.post("/orders", dependencies=[Depends(require_permission(["manufacturing.manage", "manufacturing.create"]))])
 def create_production_order(order: ProductionOrderCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
+    from utils.permissions import validate_branch_access
+    if order.warehouse_id:
+        conn_pre = get_db_connection(current_user.company_id)
+        try:
+            wh = conn_pre.execute(text("SELECT branch_id FROM warehouses WHERE id = :wid"), {"wid": order.warehouse_id}).fetchone()
+            if wh and wh.branch_id:
+                validate_branch_access(current_user, wh.branch_id)
+        finally:
+            conn_pre.close()
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
@@ -815,7 +879,7 @@ def create_production_order(order: ProductionOrderCreate, request: Request, curr
         if not route_id and order.product_id:
             default_route = conn.execute(text("""
                 SELECT id FROM manufacturing_routes
-                WHERE product_id = :pid AND is_active = true
+                WHERE product_id = :pid AND is_active = true AND is_deleted = false
                 ORDER BY is_default DESC, id ASC
                 LIMIT 1
             """), {"pid": order.product_id}).fetchone()
@@ -838,10 +902,10 @@ def create_production_order(order: ProductionOrderCreate, request: Request, curr
         new_order_id = new_order.id
 
         # 2. Create Order Operations (Copy from Route) & calculate labor cost
-        total_labor_cost = 0.0
+        total_labor_cost = Decimal("0")
         if route_id:
             route_ops = conn.execute(text("""
-                SELECT * FROM manufacturing_operations WHERE route_id = :rid ORDER BY sequence
+                SELECT * FROM manufacturing_operations WHERE route_id = :rid AND is_deleted = false ORDER BY sequence
             """), {"rid": route_id}).fetchall()
 
             for op in route_ops:
@@ -852,10 +916,10 @@ def create_production_order(order: ProductionOrderCreate, request: Request, curr
                     "poid": new_order_id, "opid": op.id, "wcid": op.work_center_id, "seq": op.sequence
                 })
                 # Calculate labor cost: (setup_time + cycle_time * qty) / 60 * labor_rate
-                setup = float(op.setup_time or 0)
-                run = float(op.cycle_time or 0) * float(order.quantity)
-                rate = float(getattr(op, 'labor_rate_per_hour', 0) or 0)
-                total_labor_cost += ((setup + run) / 60.0) * rate
+                setup = Decimal(str(op.setup_time or 0))
+                run = Decimal(str(op.cycle_time or 0)) * Decimal(str(order.quantity))
+                rate = Decimal(str(getattr(op, 'labor_rate_per_hour', 0) or 0))
+                total_labor_cost += ((setup + run) / Decimal("60")) * rate
 
             # Update standard labor cost on the order
             if total_labor_cost > 0:
@@ -924,9 +988,13 @@ def start_production_order(order_id: int, request: Request, current_user: UserRe
         
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
         
         if order.status not in ['draft', 'confirmed']:
-            raise HTTPException(status_code=400, detail=f"Cannot start order with status {order.status}")
+            logger.warning(f"Cannot start order {order_id} with status {order.status}")
+            raise HTTPException(status_code=400, detail="لا يمكن بدء الأمر في حالته الحالية")
 
         # Check inventory sufficiency before starting
         if order.bom_id:
@@ -938,9 +1006,10 @@ def start_production_order(order_id: int, request: Request, current_user: UserRe
                     f"{s['product_name']}: need {s['required']}, have {s['available']} (short {s['shortage']})"
                     for s in shortages
                 )
+                logger.warning(f"Insufficient raw materials for order {order_id}: {shortage_details}")
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Insufficient raw materials: {shortage_details}"
+                    detail="المواد الخام غير كافية لبدء أمر الإنتاج"
                 )
 
         # Update status to in_progress
@@ -958,19 +1027,19 @@ def start_production_order(order_id: int, request: Request, current_user: UserRe
                 SELECT bc.*, p.cost_price, p.product_name, p.id as product_id
                 FROM bom_components bc
                 JOIN products p ON bc.component_product_id = p.id
-                WHERE bc.bom_id = :bid
+                WHERE bc.bom_id = :bid AND bc.is_deleted = false
             """), {"bid": order.bom_id}).fetchall()
             
-            total_material_cost = 0
+            total_material_cost = Decimal("0")
             
             for comp in components:
-                waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+                waste_factor = 1 + Decimal(str(comp.waste_percentage or 0)) / Decimal("100")
                 # Variable BOM: quantity is % of order quantity
                 if comp.is_percentage:
-                    required_qty = (comp.quantity / 100.0 * order.quantity) * waste_factor
+                    required_qty = (Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order.quantity))) * waste_factor
                 else:
-                    required_qty = comp.quantity * order.quantity * waste_factor
-                cost = required_qty * (comp.cost_price or 0)
+                    required_qty = Decimal(str(comp.quantity)) * Decimal(str(order.quantity)) * waste_factor
+                cost = required_qty * Decimal(str(comp.cost_price or 0))
                 total_material_cost += cost
                 
                 # Deduct from Source Warehouse
@@ -1061,7 +1130,7 @@ def start_production_order(order_id: int, request: Request, current_user: UserRe
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     finally:
         conn.close()
 
@@ -1087,9 +1156,13 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
         
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
         
         if order.status != 'in_progress':
-            raise HTTPException(status_code=400, detail=f"Cannot complete order with status {order.status}")
+            logger.warning(f"Cannot complete order {order_id} with status {order.status}")
+            raise HTTPException(status_code=400, detail="لا يمكن إكمال الأمر في حالته الحالية")
 
         # Update status to completed
         updated = conn.execute(text("""
@@ -1121,7 +1194,7 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
 
             # 1.b Handle By-products (BOM Outputs)
             if order.bom_id:
-                by_products = conn.execute(text("SELECT * FROM bom_outputs WHERE bom_id = :bid"), {"bid": order.bom_id}).fetchall()
+                by_products = conn.execute(text("SELECT * FROM bom_outputs WHERE bom_id = :bid AND is_deleted = false"), {"bid": order.bom_id}).fetchall()
                 for bp in by_products:
                     bp_qty = bp.quantity * order.quantity
                     # Add to stock
@@ -1146,24 +1219,24 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
         # Calculate Costs
         
         # A. Material Cost
-        total_material_cost = 0
+        total_material_cost = Decimal("0")
         if order.bom_id:
             components = conn.execute(text("""
                 SELECT bc.*, p.cost_price 
                 FROM bom_components bc
                 JOIN products p ON bc.component_product_id = p.id
-                WHERE bc.bom_id = :bid
+                WHERE bc.bom_id = :bid AND bc.is_deleted = false
             """), {"bid": order.bom_id}).fetchall()
             
             for comp in components:
-                waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+                waste_factor = 1 + Decimal(str(comp.waste_percentage or 0)) / Decimal("100")
                 # Handle percentage-based BOM components
                 if comp.is_percentage:
-                    base_qty = comp.quantity / 100.0 * order.quantity
+                    base_qty = Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order.quantity))
                     required_qty = base_qty * waste_factor
                 else:
-                    required_qty = comp.quantity * order.quantity * waste_factor
-                total_material_cost += (required_qty * (comp.cost_price or 0))
+                    required_qty = Decimal(str(comp.quantity)) * Decimal(str(order.quantity)) * waste_factor
+                total_material_cost += (required_qty * Decimal(str(comp.cost_price or 0)))
 
         # B. Labor & Overhead Cost
         # Calculate actual run time from operations
@@ -1175,7 +1248,7 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
             WHERE poo.production_order_id = :oid
         """), {"oid": order_id}).fetchone()
         
-        total_labor_overhead_cost = ops_costs.total_cost or 0
+        total_labor_overhead_cost = Decimal(str(ops_costs.total_cost or 0))
         
         total_production_cost = total_material_cost + total_labor_overhead_cost
         
@@ -1260,14 +1333,14 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
                 SELECT COALESCE(SUM(quantity), 0) as qty FROM inventory 
                 WHERE product_id = :pid
             """), {"pid": order.product_id}).fetchone()
-            existing_qty = float(existing.qty) - order.quantity  # subtract newly added qty
+            existing_qty = Decimal(str(existing.qty)) - Decimal(str(order.quantity))  # subtract newly added qty
             old_cost_row = conn.execute(text(
                 "SELECT cost_price FROM products WHERE id = :pid"
             ), {"pid": order.product_id}).fetchone()
-            old_cost = float(old_cost_row.cost_price or 0) if old_cost_row else 0
+            old_cost = Decimal(str(old_cost_row.cost_price or 0)) if old_cost_row else Decimal("0")
             
-            if existing_qty + order.quantity > 0:
-                wac = (existing_qty * old_cost + order.quantity * new_unit_cost) / (existing_qty + order.quantity)
+            if existing_qty + Decimal(str(order.quantity)) > 0:
+                wac = (existing_qty * old_cost + Decimal(str(order.quantity)) * new_unit_cost) / (existing_qty + Decimal(str(order.quantity)))
             else:
                 wac = new_unit_cost
             
@@ -1302,7 +1375,7 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     finally:
         conn.close()
 
@@ -1325,9 +1398,13 @@ def cancel_production_order(order_id: int, request: Request, current_user: UserR
         
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
         
         if order.status not in ['draft', 'confirmed']:
-            raise HTTPException(status_code=400, detail=f"Cannot cancel order with status '{order.status}'. Only draft/confirmed orders can be cancelled.")
+            logger.warning(f"Cannot cancel order {order_id} with status {order.status}")
+            raise HTTPException(status_code=400, detail="لا يمكن إلغاء الأمر في حالته الحالية")
         
         conn.execute(text("""
             UPDATE production_orders SET status = 'cancelled', updated_at = NOW() WHERE id = :id
@@ -1368,6 +1445,9 @@ def delete_production_order(order_id: int, request: Request, current_user: UserR
         order = conn.execute(text("SELECT * FROM production_orders WHERE id = :id"), {"id": order_id}).fetchone()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
         if order.status != 'draft':
             raise HTTPException(status_code=400, detail="Only draft orders can be deleted")
         
@@ -1399,6 +1479,9 @@ def update_production_order(order_id: int, order: ProductionOrderCreate, request
         existing = conn.execute(text("SELECT * FROM production_orders WHERE id = :id"), {"id": order_id}).fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Order not found")
+        from utils.permissions import validate_branch_access
+        if existing.branch_id:
+            validate_branch_access(current_user, existing.branch_id)
         if existing.status != 'draft':
             raise HTTPException(status_code=400, detail="Only draft orders can be updated")
         
@@ -1423,7 +1506,7 @@ def update_production_order(order_id: int, order: ProductionOrderCreate, request
         if order.route_id and order.route_id != existing.route_id:
             conn.execute(text("DELETE FROM production_order_operations WHERE production_order_id = :id"), {"id": order_id})
             route_ops = conn.execute(text("""
-                SELECT * FROM manufacturing_operations WHERE route_id = :rid ORDER BY sequence
+                SELECT * FROM manufacturing_operations WHERE route_id = :rid AND is_deleted = false ORDER BY sequence
             """), {"rid": order.route_id}).fetchall()
             for op in route_ops:
                 conn.execute(text("""
@@ -1475,12 +1558,13 @@ def delete_work_center(wc_id: int, request: Request, current_user: UserResponse 
     try:
         # Check if in use by any operations
         in_use = conn.execute(text("""
-            SELECT COUNT(*) FROM manufacturing_operations WHERE work_center_id = :id
+            SELECT COUNT(*) FROM manufacturing_operations WHERE work_center_id = :id AND is_deleted = false
         """), {"id": wc_id}).scalar()
         if in_use > 0:
-            raise HTTPException(status_code=400, detail=f"Work center is used in {in_use} operation(s). Remove them first.")
+            logger.warning(f"Cannot delete work center {wc_id}: used in {in_use} operation(s)")
+            raise HTTPException(status_code=400, detail="لا يمكن حذف مركز العمل لارتباطه بعمليات قائمة")
         
-        result = conn.execute(text("DELETE FROM work_centers WHERE id = :id"), {"id": wc_id})
+        result = conn.execute(text("UPDATE work_centers SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = :id AND is_deleted = false"), {"id": wc_id})
         conn.commit()
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Work center not found")
@@ -1508,10 +1592,11 @@ def delete_route(route_id: int, request: Request, current_user: UserResponse = D
             SELECT COUNT(*) FROM production_orders WHERE route_id = :id AND status NOT IN ('cancelled', 'completed')
         """), {"id": route_id}).scalar()
         if in_use > 0:
-            raise HTTPException(status_code=400, detail=f"Route is used in {in_use} active production order(s).")
+            logger.warning(f"Cannot delete route {route_id}: used in {in_use} active order(s)")
+            raise HTTPException(status_code=400, detail="لا يمكن حذف المسار لارتباطه بأوامر إنتاج نشطة")
         
-        conn.execute(text("DELETE FROM manufacturing_operations WHERE route_id = :id"), {"id": route_id})
-        result = conn.execute(text("DELETE FROM manufacturing_routes WHERE id = :id"), {"id": route_id})
+        conn.execute(text("UPDATE manufacturing_operations SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE route_id = :id"), {"id": route_id})
+        result = conn.execute(text("UPDATE manufacturing_routes SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = :id AND is_deleted = false"), {"id": route_id})
         
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Route not found")
@@ -1541,11 +1626,12 @@ def delete_bom(bom_id: int, request: Request, current_user: UserResponse = Depen
             SELECT COUNT(*) FROM production_orders WHERE bom_id = :id AND status NOT IN ('cancelled', 'completed')
         """), {"id": bom_id}).scalar()
         if in_use > 0:
-            raise HTTPException(status_code=400, detail=f"BOM is used in {in_use} active production order(s).")
+            logger.warning(f"Cannot delete BOM {bom_id}: used in {in_use} active order(s)")
+            raise HTTPException(status_code=400, detail="لا يمكن حذف قائمة المواد لارتباطها بأوامر إنتاج نشطة")
         
-        conn.execute(text("DELETE FROM bom_outputs WHERE bom_id = :id"), {"id": bom_id})
-        conn.execute(text("DELETE FROM bom_components WHERE bom_id = :id"), {"id": bom_id})
-        result = conn.execute(text("DELETE FROM bill_of_materials WHERE id = :id"), {"id": bom_id})
+        conn.execute(text("UPDATE bom_outputs SET is_deleted = true, deleted_at = NOW() WHERE bom_id = :id"), {"id": bom_id})
+        conn.execute(text("UPDATE bom_components SET is_deleted = true, deleted_at = NOW() WHERE bom_id = :id"), {"id": bom_id})
+        result = conn.execute(text("UPDATE bill_of_materials SET is_deleted = true, deleted_at = NOW(), updated_at = NOW() WHERE id = :id AND is_deleted = false"), {"id": bom_id})
         
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="BOM not found")
@@ -1571,10 +1657,15 @@ def delete_bom(bom_id: int, request: Request, current_user: UserResponse = Depen
 def start_operation(op_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     conn = get_db_connection(current_user.company_id)
     try:
-        # Check if operation is already in progress
         op = conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
         if not op:
             raise HTTPException(status_code=404, detail="Operation not found")
+        
+        # Branch validation via production order
+        from utils.permissions import validate_branch_access
+        po = conn.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": op.production_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
         
         if op.status == 'in_progress':
             raise HTTPException(status_code=400, detail="Operation already in progress")
@@ -1608,6 +1699,12 @@ def pause_operation(op_id: int, request: Request, current_user: UserResponse = D
         if not op or op.status != 'in_progress':
             raise HTTPException(status_code=400, detail="Only in-progress operations can be paused")
 
+        # Branch validation via production order
+        from utils.permissions import validate_branch_access
+        po = conn.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": op.production_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
+
         # Update status
         conn.execute(text("""
             UPDATE production_order_operations 
@@ -1629,6 +1726,12 @@ def complete_operation(op_id: int, completed_qty: float, request: Request, curre
         op = conn.execute(text("SELECT * FROM production_order_operations WHERE id = :id"), {"id": op_id}).fetchone()
         if not op:
             raise HTTPException(status_code=404, detail="Operation not found")
+
+        # Branch validation via production order
+        from utils.permissions import validate_branch_access
+        po = conn.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": op.production_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
 
         # Calculate duration if we have start_time
         duration = 0
@@ -1686,6 +1789,12 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
         order = conn.execute(text("SELECT * FROM production_orders WHERE id = :id"), {"id": order_id}).fetchone()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+        
+        # Branch validation
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
+        
         if not order.bom_id:
             raise HTTPException(status_code=400, detail="Order has no BOM assigned")
 
@@ -1695,21 +1804,21 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
                    COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) as on_hand
             FROM bom_components bc
             JOIN products p ON bc.component_product_id = p.id
-            WHERE bc.bom_id = :bid
+            WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": order.bom_id}).fetchall()
 
         # Check pending purchase orders for on_order_quantity
         mrp_items = []
         for comp in components:
             # Handle waste percentage & variable BOM (is_percentage)
-            waste_factor = 1 + (comp.waste_percentage or 0) / 100.0
+            waste_factor = 1 + Decimal(str(comp.waste_percentage or 0)) / Decimal("100")
             if comp.is_percentage:
-                required = (comp.quantity / 100.0 * float(order.quantity)) * waste_factor
+                required = (Decimal(str(comp.quantity)) / Decimal("100") * Decimal(str(order.quantity))) * waste_factor
             else:
-                required = float(comp.quantity) * float(order.quantity) * waste_factor
+                required = Decimal(str(comp.quantity)) * Decimal(str(order.quantity)) * waste_factor
             required = round(required, 4)
 
-            on_hand = float(comp.on_hand or 0)
+            on_hand = Decimal(str(comp.on_hand or 0))
 
             # Check pending POs for this product
             on_order = conn.execute(text("""
@@ -1718,7 +1827,7 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
                 JOIN purchase_invoices p ON pi.invoice_id = p.id
                 WHERE pi.product_id = :pid AND p.status IN ('draft', 'approved', 'sent', 'partially_received')
             """), {"pid": comp.component_product_id}).scalar() or 0
-            on_order = float(on_order)
+            on_order = Decimal(str(on_order))
 
             available = on_hand + on_order
             shortage = max(0.0, round(required - available, 4))
@@ -1781,15 +1890,31 @@ def calculate_mrp_for_order(order_id: int, current_user: UserResponse = Depends(
         conn.close()
 
 @router.get("/mrp/plans", dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_mrp_plans(current_user: UserResponse = Depends(get_current_user)):
+def list_mrp_plans(
+    branch_id: Optional[int] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: UserResponse = Depends(get_current_user),
+):
     conn = get_db_connection(current_user.company_id)
     try:
-        plans = conn.execute(text("""
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
+        query = """
             SELECT mp.*, po.order_number 
             FROM mrp_plans mp
             LEFT JOIN production_orders po ON mp.production_order_id = po.id
-            ORDER BY mp.calculated_at DESC
-        """)).fetchall()
+            WHERE 1=1
+        """
+        params = {}
+        if validated_branch:
+            query += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
+        query += " ORDER BY mp.calculated_at DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
+        plans = conn.execute(text(query), params).fetchall()
         result = []
         for p in plans:
             pd = dict(p._mapping)
@@ -1810,15 +1935,21 @@ def list_mrp_plans(current_user: UserResponse = Depends(get_current_user)):
 # ==========================================
 
 @router.get("/equipment", response_model=List[EquipmentResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_equipment(current_user: UserResponse = Depends(get_current_user)):
+def list_equipment(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: UserResponse = Depends(get_current_user),
+):
     conn = get_db_connection(current_user.company_id)
     try:
         equip = conn.execute(text("""
             SELECT e.*, wc.name as work_center_name
             FROM manufacturing_equipment e
             LEFT JOIN work_centers wc ON e.work_center_id = wc.id
+            WHERE e.is_deleted = false
             ORDER BY e.id DESC
-        """)).fetchall()
+            LIMIT :limit OFFSET :offset
+        """), {"limit": limit, "offset": offset}).fetchall()
         return [dict(e._mapping) for e in equip]
     finally:
         conn.close()
@@ -1895,8 +2026,9 @@ def delete_equipment(equip_id: int, request: Request, current_user: UserResponse
         # Check for maintenance logs
         logs = conn.execute(text("SELECT COUNT(*) FROM maintenance_logs WHERE equipment_id = :id"), {"id": equip_id}).scalar()
         if logs > 0:
-            raise HTTPException(status_code=400, detail=f"Cannot delete equipment with {logs} maintenance log(s). Delete logs first.")
-        deleted = conn.execute(text("DELETE FROM manufacturing_equipment WHERE id = :id RETURNING id"), {"id": equip_id}).fetchone()
+            logger.warning(f"Cannot delete equipment {equip_id}: has {logs} maintenance log(s)")
+            raise HTTPException(status_code=400, detail="لا يمكن حذف المعدة لوجود سجلات صيانة مرتبطة")
+        deleted = conn.execute(text("UPDATE manufacturing_equipment SET is_deleted = true, deleted_at = NOW() WHERE id = :id AND is_deleted = false RETURNING id"), {"id": equip_id}).fetchone()
         if not deleted:
             raise HTTPException(status_code=404, detail="Equipment not found")
         conn.commit()
@@ -1914,7 +2046,12 @@ def delete_equipment(equip_id: int, request: Request, current_user: UserResponse
         conn.close()
 
 @router.get("/maintenance-logs", response_model=List[MaintenanceLogResponse], dependencies=[Depends(require_permission("manufacturing.view"))])
-def list_maintenance_logs(equipment_id: Optional[int] = None, current_user: UserResponse = Depends(get_current_user)):
+def list_maintenance_logs(
+    equipment_id: Optional[int] = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: UserResponse = Depends(get_current_user),
+):
     conn = get_db_connection(current_user.company_id)
     try:
         query = """
@@ -1922,13 +2059,16 @@ def list_maintenance_logs(equipment_id: Optional[int] = None, current_user: User
             FROM maintenance_logs ml
             LEFT JOIN manufacturing_equipment e ON ml.equipment_id = e.id
             LEFT JOIN company_users u ON ml.performed_by = u.id
+            WHERE 1=1
         """
         params = {}
         if equipment_id:
-            query += " WHERE ml.equipment_id = :eid"
+            query += " AND ml.equipment_id = :eid"
             params["eid"] = equipment_id
             
-        query += " ORDER BY ml.maintenance_date DESC"
+        query += " ORDER BY ml.maintenance_date DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
         
         logs = conn.execute(text(query), params).fetchall()
         return [dict(l._mapping) for l in logs]
@@ -1994,6 +2134,7 @@ def create_maintenance_log(log: MaintenanceLogCreate, request: Request, current_
 def report_production_cost(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -2001,6 +2142,9 @@ def report_production_cost(
     """
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         query = """
             SELECT po.id, po.order_number, po.product_id, p.product_name, po.quantity,
                    po.status, po.start_date, po.updated_at as completion_date,
@@ -2011,6 +2155,9 @@ def report_production_cost(
             WHERE po.status = 'completed'
         """
         params = {}
+        if validated_branch:
+            query += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         if start_date:
             query += " AND po.start_date >= :start"
             params["start"] = start_date
@@ -2032,7 +2179,7 @@ def report_production_cost(
             # Re-calculate with actual BOM
             if o.product_id:
                 bom_row = conn.execute(text(
-                    "SELECT id FROM bill_of_materials WHERE product_id = :pid AND is_active = true LIMIT 1"
+                    "SELECT id FROM bill_of_materials WHERE product_id = :pid AND is_active = true AND is_deleted = false LIMIT 1"
                 ), {"pid": o.product_id}).fetchone()
                 if bom_row:
                     cost = calculate_production_cost(conn, bom_row.id, o.quantity, o.id)
@@ -2083,7 +2230,7 @@ def report_work_center_efficiency(
     """
     conn = get_db_connection(current_user.company_id)
     try:
-        wcs = conn.execute(text("SELECT * FROM work_centers ORDER BY name")).fetchall()
+        wcs = conn.execute(text("SELECT * FROM work_centers WHERE is_deleted = false ORDER BY name")).fetchall()
         
         date_filter = ""
         params = {}
@@ -2115,14 +2262,14 @@ def report_work_center_efficiency(
                 "work_center_id": wc.id,
                 "work_center_name": wc.name,
                 "code": wc.code,
-                "cost_per_hour": float(wc.cost_per_hour or 0),
+                "cost_per_hour": Decimal(str(wc.cost_per_hour or 0)),
                 "total_operations": stats.total_operations,
                 "completed_operations": stats.completed_operations,
                 "total_run_time_hours": round(used_hours, 2),
-                "total_output": float(stats.total_output or 0),
-                "avg_cycle_time_min": round(float(stats.avg_run_time_min or 0), 2),
+                "total_output": Decimal(str(stats.total_output or 0)),
+                "avg_cycle_time_min": round(Decimal(str(stats.avg_run_time_min or 0)), 2),
                 "utilization_percent": round(utilization, 2),
-                "total_cost": round(used_hours * float(wc.cost_per_hour or 0), 2),
+                "total_cost": round(used_hours * Decimal(str(wc.cost_per_hour or 0)), 2),
             })
         
         return {
@@ -2138,6 +2285,7 @@ def report_work_center_efficiency(
 def report_material_consumption(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -2145,8 +2293,14 @@ def report_material_consumption(
     """
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         date_filter = ""
         params = {}
+        if validated_branch:
+            date_filter += " AND it.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         if start_date:
             date_filter += " AND it.created_at >= :start"
             params["start"] = start_date
@@ -2176,10 +2330,10 @@ def report_material_consumption(
                 "product_id": r.product_id,
                 "product_name": r.product_name,
                 "product_code": r.product_code,
-                "total_consumed": round(float(r.total_consumed or 0), 4),
+                "total_consumed": round(Decimal(str(r.total_consumed or 0)), 4),
                 "order_count": r.order_count,
-                "avg_unit_cost": round(float(r.avg_unit_cost or 0), 4),
-                "total_cost": round(float(r.total_cost or 0), 2),
+                "avg_unit_cost": round(Decimal(str(r.avg_unit_cost or 0)), 4),
+                "total_cost": round(Decimal(str(r.total_cost or 0)), 2),
             }
             materials.append(mat)
             grand_total += mat["total_cost"]
@@ -2198,6 +2352,7 @@ def report_material_consumption(
 def report_production_summary(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """
@@ -2205,8 +2360,14 @@ def report_production_summary(
     """
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         date_filter = ""
         params = {}
+        if validated_branch:
+            date_filter += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         if start_date:
             date_filter += " AND po.created_at >= :start"
             params["start"] = start_date
@@ -2222,7 +2383,7 @@ def report_production_summary(
             GROUP BY status
         """), params).fetchall()
         
-        by_status = {row.status: {"count": row.count, "total_qty": float(row.total_qty)} for row in status_counts}
+        by_status = {row.status: {"count": row.count, "total_qty": Decimal(str(row.total_qty))} for row in status_counts}
         
         # Top produced products
         top_products = conn.execute(text(f"""
@@ -2238,7 +2399,7 @@ def report_production_summary(
         # Equipment maintenance due
         maint_due = conn.execute(text("""
             SELECT COUNT(*) FROM manufacturing_equipment 
-            WHERE next_maintenance_date <= CURRENT_DATE + INTERVAL '7 days' AND status != 'decommissioned'
+            WHERE next_maintenance_date <= CURRENT_DATE + INTERVAL '7 days' AND status != 'decommissioned' AND is_deleted = false
         """)).scalar()
         
         return {
@@ -2247,7 +2408,7 @@ def report_production_summary(
             "orders_by_status": by_status,
             "total_orders": sum(s["count"] for s in by_status.values()),
             "top_produced_products": [
-                {"product_name": r.product_name, "total_produced": float(r.total_produced or 0), "order_count": r.order_count}
+                {"product_name": r.product_name, "total_produced": Decimal(str(r.total_produced or 0)), "order_count": r.order_count}
                 for r in top_products
             ],
             "equipment_maintenance_due": maint_due or 0,
@@ -2265,6 +2426,7 @@ def report_direct_labor(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     work_center_id: Optional[int] = None,
+    branch_id: Optional[int] = None,
     format: Optional[str] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
@@ -2274,8 +2436,14 @@ def report_direct_labor(
     """
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         date_filter = ""
         params = {}
+        if validated_branch:
+            date_filter += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         if start_date:
             date_filter += " AND poo.start_time >= :start"
             params["start"] = start_date
@@ -2325,9 +2493,9 @@ def report_direct_labor(
         total_labor_cost = 0
 
         for r in rows:
-            actual_hours = round(float(r.actual_run_time_min or 0) / 60.0, 2)
-            planned_hours = round(float(r.planned_run_time_min or 0) / 60.0, 2)
-            cost_per_hour = float(r.cost_per_hour or 0)
+            actual_hours = round(Decimal(str(r.actual_run_time_min or 0)) / Decimal("60"), 2)
+            planned_hours = round(Decimal(str(r.planned_run_time_min or 0)) / Decimal("60"), 2)
+            cost_per_hour = Decimal(str(r.cost_per_hour or 0))
             labor_cost = round(actual_hours * cost_per_hour, 2)
             efficiency = round((planned_hours / actual_hours * 100), 1) if actual_hours > 0 else 0
 
@@ -2346,8 +2514,8 @@ def report_direct_labor(
                 "efficiency_pct": efficiency,
                 "cost_per_hour": cost_per_hour,
                 "labor_cost": labor_cost,
-                "completed_qty": float(r.completed_quantity or 0),
-                "cost_per_unit": round(labor_cost / float(r.completed_quantity), 2) if r.completed_quantity else 0,
+                "completed_qty": Decimal(str(r.completed_quantity or 0)),
+                "cost_per_unit": round(labor_cost / Decimal(str(r.completed_quantity)), 2) if r.completed_quantity else 0,
             })
 
         # Summary by work center
@@ -2426,7 +2594,7 @@ def compute_bom_materials(
     """
     conn = get_db_connection(current_user.company_id)
     try:
-        bom = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :id"), {"id": bom_id}).fetchone()
+        bom = conn.execute(text("SELECT * FROM bill_of_materials WHERE id = :id AND is_deleted = false"), {"id": bom_id}).fetchone()
         if not bom:
             raise HTTPException(status_code=404, detail="BOM غير موجود")
 
@@ -2435,11 +2603,11 @@ def compute_bom_materials(
             FROM bom_components bc
             JOIN products p ON bc.component_product_id = p.id
             LEFT JOIN product_units u ON p.unit_id = u.id
-            WHERE bc.bom_id = :bid
+            WHERE bc.bom_id = :bid AND bc.is_deleted = false
         """), {"bid": bom_id}).fetchall()
 
         result_components = []
-        total_material_cost = 0.0
+        total_material_cost = Decimal("0")
 
         for c in components:
             waste_factor = 1 + (c.waste_percentage or 0) / 100.0
@@ -2450,7 +2618,7 @@ def compute_bom_materials(
                 # Fixed BOM: qty per unit × order qty
                 computed_qty = round(c.quantity * quantity * waste_factor, 4)
 
-            unit_cost = float(c.cost_price or 0)
+            unit_cost = Decimal(str(c.cost_price or 0))
             line_cost = computed_qty * unit_cost
             total_material_cost += line_cost
 
@@ -2458,16 +2626,16 @@ def compute_bom_materials(
             inv = conn.execute(text(
                 "SELECT COALESCE(SUM(quantity), 0) as qty FROM inventory WHERE product_id = :pid"
             ), {"pid": c.component_product_id}).scalar()
-            available = float(inv)
+            available = Decimal(str(inv))
 
             result_components.append({
                 "component_product_id": c.component_product_id,
                 "product_name": c.product_name,
                 "unit": c.unit_name,
                 "is_percentage": bool(c.is_percentage),
-                "bom_quantity": float(c.quantity),
+                "bom_quantity": Decimal(str(c.quantity)),
                 "computed_quantity": computed_qty,
-                "waste_percentage": float(c.waste_percentage or 0),
+                "waste_percentage": Decimal(str(c.waste_percentage or 0)),
                 "unit_cost": unit_cost,
                 "line_cost": round(line_cost, 2),
                 "available_inventory": round(available, 4),
@@ -2516,13 +2684,19 @@ def get_qc_checks(order_id: int, current_user: UserResponse = Depends(get_curren
     """جلب فحوصات الجودة لأمر الإنتاج"""
     conn = get_db_connection(current_user.company_id)
     try:
+        # Branch validation
+        from utils.permissions import validate_branch_access
+        po = conn.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
+
         rows = conn.execute(text("""
             SELECT q.*, u.full_name as checked_by_name,
                    op.name as operation_name
             FROM mfg_qc_checks q
             LEFT JOIN company_users u ON q.checked_by = u.id
             LEFT JOIN manufacturing_operations op ON q.operation_id = op.id
-            WHERE q.production_order_id = :oid
+            WHERE q.production_order_id = :oid AND q.is_deleted = false
             ORDER BY q.created_at
         """), {"oid": order_id}).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -2540,9 +2714,12 @@ def create_qc_check(
     """إضافة فحص جودة لأمر إنتاج"""
     conn = get_db_connection(current_user.company_id)
     try:
-        order = conn.execute(text("SELECT id, status FROM production_orders WHERE id=:id"), {"id": order_id}).fetchone()
+        order = conn.execute(text("SELECT id, status, branch_id FROM production_orders WHERE id=:id"), {"id": order_id}).fetchone()
         if not order:
-            raise HTTPException(status_code=404, detail="أمر الإنتاج غير موجود")
+            raise HTTPException(**http_error(404, "production_order_not_found"))
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
         if order.status not in ("in_progress", "confirmed"):
             raise HTTPException(status_code=400, detail="فحص الجودة يُضاف فقط للأوامر قيد التنفيذ أو المؤكدة")
 
@@ -2591,9 +2768,15 @@ def record_qc_result(
         if res.result not in ("pass", "fail", "warning"):
             raise HTTPException(status_code=400, detail="النتيجة يجب أن تكون: pass / fail / warning")
 
-        qc = conn.execute(text("SELECT * FROM mfg_qc_checks WHERE id=:id"), {"id": qc_id}).fetchone()
+        qc = conn.execute(text("SELECT * FROM mfg_qc_checks WHERE id=:id AND is_deleted = false"), {"id": qc_id}).fetchone()
         if not qc:
-            raise HTTPException(status_code=404, detail="فحص الجودة غير موجود")
+            raise HTTPException(**http_error(404, "quality_check_not_found"))
+
+        # Branch validation via production order
+        from utils.permissions import validate_branch_access
+        po = conn.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": qc.production_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
 
         conn.execute(text("""
             UPDATE mfg_qc_checks
@@ -2654,7 +2837,7 @@ def get_qc_failures(current_user: UserResponse = Depends(get_current_user)):
             JOIN production_orders po ON q.production_order_id = po.id
             JOIN products p ON po.product_id = p.id
             LEFT JOIN company_users u ON q.checked_by = u.id
-            WHERE q.result IN ('fail', 'pending')
+            WHERE q.result IN ('fail', 'pending') AND q.is_deleted = false
             ORDER BY q.created_at DESC
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -2690,9 +2873,12 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
         """), {"id": order_id}).fetchone()
 
         if not order:
-            raise HTTPException(404, "أمر الإنتاج غير موجود")
+            raise HTTPException(**http_error(404, "production_order_not_found"))
+        from utils.permissions import validate_branch_access
+        if order.branch_id:
+            validate_branch_access(current_user, order.branch_id)
 
-        qty = float(order.quantity or 1)
+        qty = Decimal(str(order.quantity or 1))
 
         # ── 1. Actual Material Cost ──
         material_consumed = conn.execute(text("""
@@ -2704,7 +2890,7 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
               AND it.quantity < 0
         """), {"oid": order_id}).scalar() or 0
 
-        actual_material = float(body.actual_material_cost) if body and body.actual_material_cost is not None else float(material_consumed)
+        actual_material = Decimal(str(body.actual_material_cost)) if body and body.actual_material_cost is not None else Decimal(str(material_consumed))
 
         # ── 2. Actual Labor Cost ──
         labor_cost = conn.execute(text("""
@@ -2716,25 +2902,25 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
             WHERE poo.production_order_id = :oid
         """), {"oid": order_id}).scalar() or 0
 
-        actual_labor = float(body.actual_labor_cost) if body and body.actual_labor_cost is not None else float(labor_cost)
+        actual_labor = Decimal(str(body.actual_labor_cost)) if body and body.actual_labor_cost is not None else Decimal(str(labor_cost))
 
         # ── 3. Overhead ──
         settings = conn.execute(text("SELECT * FROM company_settings LIMIT 1")).fetchone()
-        overhead_rate = float(getattr(settings, 'mfg_overhead_rate', 0) or 0) / 100.0
-        default_overhead = round(actual_labor * overhead_rate, 2) if overhead_rate > 0 else 0
-        actual_overhead = float(body.actual_overhead_cost) if body and body.actual_overhead_cost is not None else default_overhead
+        overhead_rate = Decimal(str(getattr(settings, 'mfg_overhead_rate', 0) or 0)) / Decimal("100")
+        default_overhead = round(actual_labor * overhead_rate, 2) if overhead_rate > 0 else Decimal("0")
+        actual_overhead = Decimal(str(body.actual_overhead_cost)) if body and body.actual_overhead_cost is not None else default_overhead
 
         actual_total = round(actual_material + actual_labor + actual_overhead, 2)
 
         # ── 4. Standard Cost (from BOM) ──
-        standard_cost = 0
+        standard_cost = Decimal("0")
         if order.bom_id:
             # BOM material cost from bom_components
             bom_material = conn.execute(text("""
                 SELECT COALESCE(SUM(bc.quantity * COALESCE(p.cost_price, 0)), 0)
                 FROM bom_components bc
                 JOIN products p ON p.id = bc.component_product_id
-                WHERE bc.bom_id = :boid
+                WHERE bc.bom_id = :boid AND bc.is_deleted = false
             """), {"boid": order.bom_id}).scalar() or 0
 
             # BOM operation cost from manufacturing_operations via route
@@ -2744,18 +2930,18 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
                 ), 0)
                 FROM manufacturing_operations mo
                 LEFT JOIN work_centers wc ON wc.id = mo.work_center_id
-                WHERE mo.route_id = (SELECT route_id FROM bill_of_materials WHERE id = :boid)
+                WHERE mo.route_id = (SELECT route_id FROM bill_of_materials WHERE id = :boid) AND mo.is_deleted = false
             """), {"boid": order.bom_id}).scalar() or 0
 
-            standard_cost = (float(bom_material) + float(bom_ops)) * qty
+            standard_cost = (Decimal(str(bom_material)) + Decimal(str(bom_ops))) * qty
         else:
-            standard_cost = float(order.standard_unit_cost or 0) * qty
+            standard_cost = Decimal(str(order.standard_unit_cost or 0)) * qty
 
         standard_cost = round(standard_cost, 2)
 
         # ── 5. Variance ──
         variance = round(actual_total - standard_cost, 2)
-        variance_pct = round((variance / standard_cost * 100), 2) if standard_cost > 0 else 0
+        variance_pct = round((variance / standard_cost * 100), 2) if standard_cost > 0 else Decimal("0")
 
         if variance > 0:
             variance_type = "unfavorable"
@@ -2768,8 +2954,8 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
             variance_type_ar = "لا انحراف"
 
         # ── 6. Per-unit cost ──
-        actual_qty = float(order.produced_quantity or order.quantity or 1)
-        actual_unit_cost = round(actual_total / actual_qty, 4) if actual_qty > 0 else 0
+        actual_qty = Decimal(str(order.produced_quantity or order.quantity or 1))
+        actual_unit_cost = round(actual_total / actual_qty, 4) if actual_qty > 0 else Decimal("0")
 
         # ── Update production order with costs ──
         conn.execute(text("""
@@ -2830,11 +3016,15 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
 def cost_variance_report(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
+    branch_id: Optional[int] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """تقرير الانحرافات — مقارنة التكلفة المعيارية بالفعلية لكل أوامر الإنتاج"""
     conn = get_db_connection(current_user.company_id)
     try:
+        from utils.permissions import validate_branch_access
+        validated_branch = validate_branch_access(current_user, branch_id)
+
         query = """
             SELECT po.id, po.order_number, po.product_id,
                    p.product_name, p.sku,
@@ -2848,6 +3038,9 @@ def cost_variance_report(
             WHERE po.costing_status = 'calculated'
         """
         params = {}
+        if validated_branch:
+            query += " AND po.branch_id = :branch_id"
+            params["branch_id"] = validated_branch
         if from_date:
             query += " AND po.created_at >= :fd"
             params["fd"] = from_date
@@ -2860,8 +3053,8 @@ def cost_variance_report(
         rows = conn.execute(text(query), params).fetchall()
         results = [dict(r._mapping) for r in rows]
 
-        total_actual = sum(float(r.get('actual_total_cost', 0) or 0) for r in results)
-        total_standard = sum(float(r.get('standard_cost', 0) or 0) for r in results)
+        total_actual = sum(Decimal(str(r.get('actual_total_cost', 0) or 0)) for r in results)
+        total_standard = sum(Decimal(str(r.get('standard_cost', 0) or 0)) for r in results)
         total_variance = round(total_actual - total_standard, 2)
 
         return {
@@ -2872,8 +3065,8 @@ def cost_variance_report(
                 "total_standard_cost": total_standard,
                 "total_variance": total_variance,
                 "overall_variance_pct": round((total_variance / total_standard * 100), 2) if total_standard else 0,
-                "favorable_count": sum(1 for r in results if float(r.get('variance_amount', 0) or 0) < 0),
-                "unfavorable_count": sum(1 for r in results if float(r.get('variance_amount', 0) or 0) > 0)
+                "favorable_count": sum(1 for r in results if Decimal(str(r.get('variance_amount', 0) or 0)) < 0),
+                "unfavorable_count": sum(1 for r in results if Decimal(str(r.get('variance_amount', 0) or 0)) > 0)
             }
         }
     finally:
@@ -2900,7 +3093,7 @@ def calculate_oee(
                    SUM(cp.actual_hours) as total_actual
             FROM capacity_plans cp
             LEFT JOIN work_centers wc ON wc.id = cp.work_center_id
-            WHERE 1=1
+            WHERE 1=1 AND cp.is_deleted = false AND (wc.is_deleted = false OR wc.id IS NULL)
         """
         params = {}
         if work_center_id:
@@ -2918,9 +3111,9 @@ def calculate_oee(
         results = []
         for r in rows:
             d = dict(r._mapping)
-            avail = float(d.get("total_available") or 1)
-            planned = float(d.get("total_planned") or 0)
-            actual = float(d.get("total_actual") or 0)
+            avail = Decimal(str(d.get("total_available") or 1))
+            planned = Decimal(str(d.get("total_planned") or 0))
+            actual = Decimal(str(d.get("total_actual") or 0))
             availability = min(actual / avail * 100, 100) if avail > 0 else 0
             performance = min(planned / actual * 100, 100) if actual > 0 else 0
             quality = 98.5  # placeholder - would come from QC data
@@ -2952,7 +3145,7 @@ def list_capacity_plans(
             SELECT cp.*, wc.name as work_center_name
             FROM capacity_plans cp
             LEFT JOIN work_centers wc ON wc.id = cp.work_center_id
-            WHERE 1=1
+            WHERE 1=1 AND cp.is_deleted = false
         """
         params = {}
         if work_center_id:
@@ -2981,7 +3174,7 @@ def create_capacity_plan(plan: dict, request: Request, current_user=Depends(get_
     try:
         eff = 0
         if plan.get("available_hours") and plan.get("actual_hours"):
-            eff = round(float(plan["actual_hours"]) / float(plan["available_hours"]) * 100, 2)
+            eff = round(Decimal(str(plan["actual_hours"])) / Decimal(str(plan["available_hours"])) * 100, 2)
         result = conn.execute(text("""
             INSERT INTO capacity_plans (work_center_id, plan_date, available_hours,
                 planned_hours, actual_hours, efficiency_pct, notes)
@@ -3013,7 +3206,7 @@ def update_capacity_plan(plan_id: int, plan: dict, request: Request, current_use
     try:
         eff = 0
         if plan.get("available_hours") and plan.get("actual_hours"):
-            eff = round(float(plan["actual_hours"]) / float(plan["available_hours"]) * 100, 2)
+            eff = round(Decimal(str(plan["actual_hours"])) / Decimal(str(plan["available_hours"])) * 100, 2)
         conn.execute(text("""
             UPDATE capacity_plans SET available_hours = :ah, planned_hours = :ph,
                 actual_hours = :ach, efficiency_pct = :eff, notes = :n

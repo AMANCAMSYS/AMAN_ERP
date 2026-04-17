@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Check, X, Clock } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -25,7 +26,7 @@ const OvertimeRequests = () => {
             ]);
             setItems(res.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -33,18 +34,18 @@ const OvertimeRequests = () => {
 
     const handleSave = async () => {
         try {
-            await hrAdvancedAPI.createOvertime({ ...form, hours: parseFloat(form.hours), rate_multiplier: parseFloat(form.rate_multiplier), employee_id: parseInt(form.employee_id) });
+            await hrAdvancedAPI.createOvertime({ ...form, hours: String(form.hours), rate_multiplier: String(form.rate_multiplier), employee_id: parseInt(form.employee_id) });
             setShowModal(false);
             setForm({ employee_id: '', date: '', hours: '', rate_multiplier: 1.5, reason: '' });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleApprove = async (id, status) => {
         try {
             await hrAdvancedAPI.approveOvertime(id, { status });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const getStatusBadge = (status) => {

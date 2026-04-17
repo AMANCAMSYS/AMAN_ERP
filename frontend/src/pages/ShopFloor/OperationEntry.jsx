@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { shopFloorAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Play, CheckCircle, Pause, ArrowLeft } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -28,7 +29,7 @@ const OperationEntry = () => {
     const loadProgress = () => {
         shopFloorAPI.getWorkOrderProgress(id)
             .then(res => setProgress(res.data))
-            .catch(e => console.error(e))
+            .catch(() => toastEmitter.emit(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     };
 

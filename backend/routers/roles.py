@@ -4,6 +4,7 @@ API endpoints for managing roles and permissions.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional, List, Any
 from datetime import datetime
@@ -544,7 +545,7 @@ def init_default_roles(
         db.rollback()
         logger.error(f"Error initializing default roles: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -605,7 +606,7 @@ def get_role(
         """), {"id": role_id}).fetchone()
         
         if not row:
-            raise HTTPException(status_code=404, detail="الدور غير موجود")
+            raise HTTPException(**http_error(404, "role_not_found"))
         
         return {
             "id": row.id,
@@ -664,7 +665,7 @@ def create_role(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -687,7 +688,7 @@ def update_role(
         existing = db.execute(text("SELECT is_system_role, role_name FROM roles WHERE id = :id"), {"id": role_id}).fetchone()
         
         if not existing:
-            raise HTTPException(status_code=404, detail="الدور غير موجود")
+            raise HTTPException(**http_error(404, "role_not_found"))
         
         # Build update query dynamically
         updates = []
@@ -728,7 +729,7 @@ def update_role(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -750,7 +751,7 @@ def delete_role(
         existing = db.execute(text("SELECT is_system_role FROM roles WHERE id = :id"), {"id": role_id}).fetchone()
         
         if not existing:
-            raise HTTPException(status_code=404, detail="الدور غير موجود")
+            raise HTTPException(**http_error(404, "role_not_found"))
         
         if existing.is_system_role:
             raise HTTPException(status_code=400, detail="لا يمكن حذف الأدوار الافتراضية للنظام")
@@ -777,6 +778,6 @@ def delete_role(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

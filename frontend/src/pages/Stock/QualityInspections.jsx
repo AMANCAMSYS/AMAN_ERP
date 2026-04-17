@@ -105,8 +105,8 @@ function QualityInspections() {
                 notes: form.notes || null,
                 criteria: form.criteria.filter(c => c.criteria_name).map(c => ({
                     ...c,
-                    min_value: c.min_value ? parseFloat(c.min_value) : null,
-                    max_value: c.max_value ? parseFloat(c.max_value) : null
+                    min_value: c.min_value ? String(c.min_value) : null,
+                    max_value: c.max_value ? String(c.max_value) : null
                 }))
             })
             setShowCreateModal(false)

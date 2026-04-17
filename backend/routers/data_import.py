@@ -3,6 +3,7 @@ Data Import / Export Router - DI-001, DI-002
 استيراد/تصدير البيانات (Excel / CSV)
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from utils.i18n import http_error
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -135,10 +136,10 @@ async def preview_import(
         rows = _parse_file(content, filename)
     except Exception as e:
         logger.exception("Error parsing import file")
-        raise HTTPException(400, "خطأ في قراءة الملف")
+        raise HTTPException(**http_error(400, "file_read_error"))
 
     if not rows:
-        raise HTTPException(400, "الملف فارغ")
+        raise HTTPException(**http_error(400, "file_empty"))
 
     # Validate columns
     headers = list(rows[0].keys()) if rows else []
@@ -204,10 +205,10 @@ async def execute_import(
         rows = _parse_file(content, filename)
     except Exception as e:
         logger.exception("Error parsing import file")
-        raise HTTPException(400, "خطأ في قراءة الملف")
+        raise HTTPException(**http_error(400, "file_read_error"))
 
     if not rows:
-        raise HTTPException(400, "الملف فارغ")
+        raise HTTPException(**http_error(400, "file_empty"))
 
     db = get_db_connection(current_user.company_id)
     try:
@@ -302,7 +303,7 @@ async def execute_import(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -358,7 +359,7 @@ def export_data(
             )
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

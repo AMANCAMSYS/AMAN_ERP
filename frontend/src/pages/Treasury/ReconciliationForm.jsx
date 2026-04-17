@@ -192,7 +192,10 @@ const ReconciliationForm = () => {
     };
 
     const handleFinalize = async () => {
-        if (!window.confirm(t('common.confirm_action'))) return;
+        const toleranceMsg = summary?.tolerance != null
+            ? `\n${t('treasury.reconciliation.tolerance', 'هامش التسامح')}: ${summary.tolerance}`
+            : '';
+        if (!window.confirm(t('common.confirm_action') + toleranceMsg)) return;
         try {
             await reconciliationAPI.finalize(id);
             toastEmitter.emit(t('treasury.reconciliation.finalized_success'), 'success');
@@ -467,7 +470,7 @@ const ReconciliationForm = () => {
                             {!importPreview ? (
                                 <div style={{ textAlign: 'center', padding: '24px' }}>
                                     <FileSpreadsheet size={40} style={{ color: 'var(--success)', marginBottom: '12px', opacity: 0.6 }} />
-                                    <p className="small text-muted mb-3">ارفع ملف كشف حساب بنكي (CSV أو Excel)</p>
+                                    <p className="small text-muted mb-3">{t('treasury.upload_bank_statement')}</p>
                                     <label className="btn btn-sm btn-success" style={{ cursor: 'pointer', borderRadius: '8px' }}>
                                         <Upload size={14} style={{ marginInlineEnd: '6px' }} />
                                         {importLoading ? 'جاري التحليل...' : 'اختيار ملف'}
@@ -506,11 +509,11 @@ const ReconciliationForm = () => {
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
-                                                    <th>التاريخ</th>
-                                                    <th>الوصف</th>
-                                                    <th>المرجع</th>
-                                                    <th className="text-end">سحب</th>
-                                                    <th className="text-end">إيداع</th>
+                                                    <th>{t('common.date')}</th>
+                                                    <th>{t('common.description')}</th>
+                                                    <th>{t('common.reference')}</th>
+                                                    <th className="text-end">{t('treasury.withdrawal')}</th>
+                                                    <th className="text-end">{t('treasury.deposit')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>

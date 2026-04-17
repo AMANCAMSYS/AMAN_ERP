@@ -1,5 +1,6 @@
 """Sales quotations endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -49,7 +50,7 @@ def list_quotations(branch_id: Optional[int] = None, current_user: dict = Depend
     except Exception as e:
         logger.error(f"Error listing quotations: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -93,7 +94,7 @@ def get_quotation(id: int, current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Error fetching quotation {id}: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -187,7 +188,7 @@ def create_quotation(request: Request, quotation: QuotationCreate, current_user:
             action="sales.quotation.create",
             resource_type="sales_quotation",
             resource_id=str(sq_id),
-            details={"sq_number": sq_num, "total": float(grand_total), "customer_id": quotation.customer_id, "customer_name": cust_name},
+            details={"sq_number": sq_num, "total": str(grand_total or 0), "customer_id": quotation.customer_id, "customer_name": cust_name},
             request=request
         )
         return {"id": sq_id, "sq_number": sq_num}
@@ -195,6 +196,6 @@ def create_quotation(request: Request, quotation: QuotationCreate, current_user:
         db.rollback()
         logger.error(f"Error creating Quotation: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

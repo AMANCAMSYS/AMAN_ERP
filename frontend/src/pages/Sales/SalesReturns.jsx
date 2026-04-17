@@ -5,10 +5,13 @@ import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { formatShortDate } from '../../utils/dateUtils';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 const SalesReturns = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
     const currency = getCurrency();
@@ -24,7 +27,7 @@ const SalesReturns = () => {
             const response = await salesAPI.listReturns({ branch_id: currentBranch?.id });
             setReturns(response.data);
         } catch (error) {
-            console.error('Error fetching returns:', error);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -76,7 +79,7 @@ const SalesReturns = () => {
                                     <td>{ret.customer_name}</td>
                                     <td>{formatShortDate(ret.return_date)}</td>
                                     <td className="font-bold">
-                                        {Number(ret.total).toLocaleString(undefined, { maximumFractionDigits: 2 })} <small>{currency}</small>
+                                        {formatNumber(ret.total)} <small>{currency}</small>
                                     </td>
                                     <td>
                                         <span className={`status-badge ${ret.status}`}>

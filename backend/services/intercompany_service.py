@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from database import db_connection
 from services.gl_service import create_journal_entry as gl_create_je
+from utils.accounting import get_mapped_account_id
 
 logger = logging.getLogger(__name__)
 
@@ -109,31 +110,35 @@ def create_transaction(
             LIMIT 1
         """), {"sid": data["source_entity_id"], "tid": data["target_entity_id"]}).fetchone()
 
-        # Fallback: find generic IC receivable / IC payable accounts
+        # Resolve IC accounts — explicit mapping required, no LIKE fallback
         if mapping:
             ic_receivable_id, ic_payable_id = mapping[0], mapping[1]
         else:
-            ic_receivable_id = conn.execute(
-                text("SELECT id FROM accounts WHERE account_code LIKE '13%' LIMIT 1")
-            ).scalar()
-            ic_payable_id = conn.execute(
-                text("SELECT id FROM accounts WHERE account_code LIKE '21%' LIMIT 1")
-            ).scalar()
+            ic_receivable_id = get_mapped_account_id(conn, "ic_receivable_account_id")
+            ic_payable_id = get_mapped_account_id(conn, "ic_payable_account_id")
+        if not ic_receivable_id or not ic_payable_id:
+            raise ValueError(
+                "Intercompany receivable/payable accounts not configured. "
+                "Set ic_receivable_account_id and ic_payable_account_id in company_settings "
+                "or add an intercompany_account_mappings entry."
+            )
 
-        # Revenue and COGS/expense accounts for source entity
-        revenue_acct = conn.execute(
-            text("SELECT id FROM accounts WHERE account_type = 'revenue' LIMIT 1")
-        ).scalar()
-        expense_acct = conn.execute(
-            text("SELECT id FROM accounts WHERE account_type = 'expense' LIMIT 1")
-        ).scalar()
+        # Revenue and expense accounts from company settings — fail-fast if missing
+        revenue_acct = get_mapped_account_id(conn, "ic_revenue_account_id")
+        expense_acct = get_mapped_account_id(conn, "ic_expense_account_id")
+        if not revenue_acct:
+            raise ValueError("ic_revenue_account_id not configured in company_settings")
+        if not expense_acct:
+            raise ValueError("ic_expense_account_id not configured in company_settings")
+
+        assert _dec(source_amount) > 0, "Intercompany amount must be positive"
 
         today = date.today().isoformat()
         ref = data.get("reference_document") or f"IC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
         # --- Source entity JE: Dr IC Receivable, Cr Revenue ---
         source_je_id = None
-        if ic_receivable_id and revenue_acct:
+        if True:  # accounts validated above — always create
             source_je_id, _ = gl_create_je(
                 db=conn,
                 company_id=company_id,
@@ -153,7 +158,7 @@ def create_transaction(
 
         # --- Target entity JE: Dr Expense/COGS, Cr IC Payable ---
         target_je_id = None
-        if expense_acct and ic_payable_id:
+        if True:  # accounts validated above — always create
             target_je_id, _ = gl_create_je(
                 db=conn,
                 company_id=company_id,
@@ -329,16 +334,15 @@ def run_consolidation(
         je_ids = []
         total_eliminated = Decimal("0")
 
-        # Find IC accounts for elimination
-        ic_receivable_id = conn.execute(
-            text("SELECT id FROM accounts WHERE account_code LIKE '13%' LIMIT 1")
-        ).scalar()
-        ic_payable_id = conn.execute(
-            text("SELECT id FROM accounts WHERE account_code LIKE '21%' LIMIT 1")
-        ).scalar()
+        # Find IC accounts for elimination — explicit settings required
+        ic_receivable_id = get_mapped_account_id(conn, "ic_receivable_account_id")
+        ic_payable_id = get_mapped_account_id(conn, "ic_payable_account_id")
 
         if not ic_receivable_id or not ic_payable_id:
-            raise ValueError("Intercompany accounts (receivable/payable) not configured")
+            raise ValueError(
+                "Intercompany receivable/payable accounts not configured. "
+                "Set ic_receivable_account_id and ic_payable_account_id in company_settings."
+            )
 
         today = (as_of_date or date.today().isoformat())
 

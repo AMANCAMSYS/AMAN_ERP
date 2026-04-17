@@ -28,7 +28,6 @@ function ContractList() {
                 setContracts(response.data)
             } catch (err) {
                 setError(t('common.error_loading'))
-                console.error(err)
             } finally {
                 setLoading(false)
             }

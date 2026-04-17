@@ -3,6 +3,7 @@ Inventory Module - Reports (Summary, Warehouse Stock, Movements, Valuation)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 import logging
@@ -160,7 +161,7 @@ def get_warehouse_stock(
     except Exception as e:
         logger.error(f"Error fetching warehouse stock: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -300,9 +301,9 @@ def get_valuation_report(
                 "name": r.name,
                 "unit": r.unit,
                 "category": r.category_name,
-                "quantity": float(r.total_quantity or 0),
-                "cost": float(r.moving_avg_cost or 0),
-                "valuation": float(r.total_valuation or 0)
+                "quantity": str(r.total_quantity or 0),
+                "cost": str(r.moving_avg_cost or 0),
+                "valuation": str(r.total_valuation or 0)
             }
             for r in result
         ]

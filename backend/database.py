@@ -346,6 +346,7 @@ def get_all_table_sql() -> str:
         branch_id INTEGER REFERENCES branches(id),
         source VARCHAR(100),
         source_id INTEGER,
+        idempotency_key VARCHAR(255),
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         posted_at TIMESTAMPTZ,
@@ -437,7 +438,8 @@ def get_all_table_sql() -> str:
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS invoice_lines (
@@ -451,7 +453,10 @@ def get_all_table_sql() -> str:
         discount DECIMAL(18, 4) DEFAULT 0,
         markup DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
     
     CREATE TABLE IF NOT EXISTS company_settings (
@@ -717,7 +722,10 @@ def get_additional_tables_sql() -> str:
         image_url TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         sort_order INTEGER DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id),
+        updated_at TIMESTAMPTZ,
+        updated_by INTEGER REFERENCES company_users(id)
     );
     
     CREATE TABLE IF NOT EXISTS product_units (
@@ -838,7 +846,9 @@ def get_additional_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== STOCK SHIPMENTS (2) =====
@@ -895,7 +905,8 @@ def get_additional_tables_sql() -> str:
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS purchase_order_lines (
@@ -909,7 +920,10 @@ def get_additional_tables_sql() -> str:
         discount DECIMAL(18, 4) DEFAULT 0,
         total DECIMAL(18, 4) DEFAULT 0,
         received_quantity DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
 
@@ -921,6 +935,14 @@ def get_additional_tables_sql() -> str:
         link VARCHAR(255),
         is_read BOOLEAN DEFAULT FALSE,
         type VARCHAR(20) DEFAULT 'info',
+        channel VARCHAR(20),
+        event_type VARCHAR(100),
+        feature_source VARCHAR(100),
+        body TEXT,
+        reference_type VARCHAR(100),
+        reference_id INTEGER,
+        status VARCHAR(20) DEFAULT 'pending',
+        sent_at TIMESTAMPTZ,
         delivery_status VARCHAR DEFAULT 'pending',
         retry_count INTEGER DEFAULT 0,
         last_retry_at TIMESTAMPTZ,
@@ -986,7 +1008,9 @@ def get_additional_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS sales_quotation_lines (
@@ -998,7 +1022,11 @@ def get_additional_tables_sql() -> str:
         unit_price DECIMAL(18, 4) NOT NULL,
         tax_rate DECIMAL(5, 2) DEFAULT 0,
         discount DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) NOT NULL
+        total DECIMAL(18, 4) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS sales_orders (
@@ -1020,7 +1048,9 @@ def get_additional_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT 'SAR',
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS sales_order_lines (
@@ -1032,7 +1062,11 @@ def get_additional_tables_sql() -> str:
         unit_price DECIMAL(18, 4) NOT NULL,
         tax_rate DECIMAL(5, 2) DEFAULT 0,
         discount DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) NOT NULL
+        total DECIMAL(18, 4) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
 
@@ -1059,7 +1093,9 @@ def get_additional_tables_sql() -> str:
         check_date DATE,
         exchange_rate DECIMAL(10, 6) DEFAULT 1.0,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS sales_return_lines (
@@ -1071,7 +1107,11 @@ def get_additional_tables_sql() -> str:
         unit_price DECIMAL(18, 4) NOT NULL,
         tax_rate DECIMAL(5, 2) DEFAULT 0,
         total DECIMAL(18, 4) NOT NULL,
-        reason TEXT
+        reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS payment_vouchers (
@@ -1094,7 +1134,9 @@ def get_additional_tables_sql() -> str:
         exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
         status VARCHAR(20) DEFAULT 'posted',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS payment_allocations (
@@ -1135,6 +1177,9 @@ def get_additional_tables_sql() -> str:
         paid_date DATE,
         branch_id INTEGER REFERENCES branches(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100),
         UNIQUE(invoice_id, salesperson_id)
     );
 
@@ -1149,7 +1194,8 @@ def get_additional_tables_sql() -> str:
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS rfq_lines (
@@ -1159,7 +1205,11 @@ def get_additional_tables_sql() -> str:
         product_name VARCHAR(255),
         quantity NUMERIC(12, 3) NOT NULL,
         unit VARCHAR(50),
-        specifications TEXT
+        specifications TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS rfq_responses (
@@ -1172,7 +1222,11 @@ def get_additional_tables_sql() -> str:
         delivery_days INTEGER,
         notes TEXT,
         is_selected BOOLEAN DEFAULT FALSE,
-        submitted_at TIMESTAMPTZ DEFAULT NOW()
+        submitted_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== SUPPLIER RATINGS =====
@@ -1187,7 +1241,10 @@ def get_additional_tables_sql() -> str:
         overall_score NUMERIC(3, 1) DEFAULT 0,
         comments TEXT,
         rated_by INTEGER REFERENCES company_users(id),
-        rated_at TIMESTAMPTZ DEFAULT NOW()
+        rated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== PURCHASE AGREEMENTS =====
@@ -1204,7 +1261,9 @@ def get_additional_tables_sql() -> str:
         status VARCHAR(30) DEFAULT 'draft',
         branch_id INTEGER REFERENCES branches(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS purchase_agreement_lines (
@@ -1214,7 +1273,11 @@ def get_additional_tables_sql() -> str:
         product_name VARCHAR(255),
         quantity NUMERIC(12, 3),
         unit_price NUMERIC(15, 2),
-        delivered_qty NUMERIC(12, 3) DEFAULT 0
+        delivered_qty NUMERIC(12, 3) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_rfq_status ON request_for_quotations(status);
@@ -1693,7 +1756,9 @@ def get_financial_tables_sql() -> str:
         notes TEXT,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
     
     CREATE TABLE IF NOT EXISTS payments (
@@ -1728,7 +1793,10 @@ def get_financial_tables_sql() -> str:
         outstanding_amount DECIMAL(18, 4) DEFAULT 0,
         days_overdue INTEGER DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
     
     CREATE TABLE IF NOT EXISTS pending_payables (
@@ -2899,6 +2967,9 @@ def get_manufacturing_tables_sql() -> str:
         cost_center_id INTEGER REFERENCES cost_centers(id), -- For linking to Cost Accounting
         default_expense_account_id INTEGER REFERENCES accounts(id), -- For Overhead Absorption
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'maintenance')),
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -2908,8 +2979,13 @@ def get_manufacturing_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         product_id INTEGER REFERENCES products(id), -- Default route for product
+        bom_id INTEGER, -- FK to bill_of_materials (circular dep, enforced at app level)
+        is_default BOOLEAN DEFAULT FALSE,
         is_active BOOLEAN DEFAULT TRUE,
         description TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -2918,11 +2994,17 @@ def get_manufacturing_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         route_id INTEGER REFERENCES manufacturing_routes(id) ON DELETE CASCADE,
         sequence INTEGER NOT NULL,
+        name VARCHAR(255),
         work_center_id INTEGER REFERENCES work_centers(id),
         description VARCHAR(255),
         setup_time DECIMAL(8, 2) DEFAULT 0, -- minutes
         cycle_time DECIMAL(8, 2) DEFAULT 0, -- minutes per unit
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        labor_rate_per_hour DECIMAL(10, 2) DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
     -- ===== BILL OF MATERIALS (MFG-003) =====
@@ -2935,6 +3017,9 @@ def get_manufacturing_tables_sql() -> str:
         route_id INTEGER REFERENCES manufacturing_routes(id),
         is_active BOOLEAN DEFAULT TRUE,
         notes TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -2948,6 +3033,9 @@ def get_manufacturing_tables_sql() -> str:
         cost_share_percentage DECIMAL(5, 2) DEFAULT 0,
         is_percentage BOOLEAN DEFAULT FALSE, -- Variable BOM: quantity = % of order qty
         notes TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -2959,6 +3047,9 @@ def get_manufacturing_tables_sql() -> str:
         quantity DECIMAL(15, 4) NOT NULL,
         cost_allocation_percentage DECIMAL(5, 2) DEFAULT 0,
         notes TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -2975,8 +3066,18 @@ def get_manufacturing_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'confirmed', 'in_progress', 'completed', 'cancelled')),
         start_date DATE,
         due_date DATE,
-        warehouse_id INTEGER REFERENCES warehouses(id), -- Logic: Raw materials source / FG destination? Usually separate.
+        warehouse_id INTEGER REFERENCES warehouses(id),
         destination_warehouse_id INTEGER REFERENCES warehouses(id),
+        branch_id INTEGER REFERENCES branches(id),
+        -- Costing columns
+        actual_material_cost DECIMAL(18, 4) DEFAULT 0,
+        actual_labor_cost DECIMAL(18, 4) DEFAULT 0,
+        actual_overhead_cost DECIMAL(18, 4) DEFAULT 0,
+        actual_total_cost DECIMAL(18, 4) DEFAULT 0,
+        standard_cost DECIMAL(18, 4) DEFAULT 0,
+        variance_amount DECIMAL(18, 4) DEFAULT 0,
+        variance_percentage DECIMAL(8, 4) DEFAULT 0,
+        costing_status VARCHAR(20) DEFAULT 'pending',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -3042,6 +3143,9 @@ def get_manufacturing_tables_sql() -> str:
         checked_by INTEGER REFERENCES company_users(id),
         notes TEXT,
         checked_at TIMESTAMPTZ,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -3057,6 +3161,9 @@ def get_manufacturing_tables_sql() -> str:
         last_maintenance_date DATE,
         next_maintenance_date DATE,
         notes TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -3159,120 +3266,12 @@ def get_manufacturing_tables_sql() -> str:
     """
 
 
-def sync_essential_columns(conn):
-    """Ensure essential columns exist even in older companies"""
-    columns_to_add = [
-        # Phase 7 / Legacy
-        ("journal_entries", "source", "VARCHAR(100)"),
-        ("journal_entries", "source_id", "INTEGER"),
-        ("products", "sku", "VARCHAR(100) UNIQUE"),
-        # Budgets improvements (Phase 8.13)
-        ("budgets", "name", "VARCHAR(255)"),
-        ("budgets", "description", "TEXT"),
-        ("budgets", "cost_center_id", "INTEGER"),
-        ("budgets", "budget_type", "VARCHAR(30) DEFAULT 'annual'"),
-        # POS treasury link
-        ("pos_sessions", "treasury_account_id", "INTEGER REFERENCES treasury_accounts(id)"),
-    ]
-
-    for table, column, col_type in columns_to_add:
-        try:
-            query = text(f"""
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name = '{table}' AND column_name = '{column}'
-            """)
-            if not conn.execute(query).fetchone():
-                logger.info(f"Adding missing column {column} to {table}")
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
-        except Exception as e:
-            logger.warning(f"Could not add column {column} to {table}: {e}")
-
-    # Backfill budgets.name from budget_name for existing rows
-    try:
-        conn.execute(text(
-            "UPDATE budgets SET name = budget_name WHERE name IS NULL AND budget_name IS NOT NULL"
-        ))
-    except Exception:
-        pass
-
-    # Ensure Phase 8.13 tables exist in older company DBs
-    missing_tables_sql = [
-        # budget_items
-        """CREATE TABLE IF NOT EXISTS budget_items (
-            id SERIAL PRIMARY KEY,
-            budget_id INTEGER REFERENCES budgets(id) ON DELETE CASCADE,
-            account_id INTEGER REFERENCES accounts(id),
-            planned_amount DECIMAL(18, 4) DEFAULT 0,
-            actual_amount DECIMAL(18, 4) DEFAULT 0,
-            notes TEXT,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )""",
-        # commission_rules
-        """CREATE TABLE IF NOT EXISTS commission_rules (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
-            product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
-            category_id INTEGER REFERENCES product_categories(id) ON DELETE SET NULL,
-            rate_type VARCHAR(20) DEFAULT 'percentage',
-            rate DECIMAL(10, 4) DEFAULT 0,
-            min_amount DECIMAL(18, 4) DEFAULT 0,
-            max_amount DECIMAL(18, 4),
-            is_active BOOLEAN DEFAULT TRUE,
-            branch_id INTEGER REFERENCES branches(id),
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )""",
-        # sales_commissions
-        """CREATE TABLE IF NOT EXISTS sales_commissions (
-            id SERIAL PRIMARY KEY,
-            salesperson_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
-            salesperson_name VARCHAR(255),
-            invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
-            invoice_number VARCHAR(50),
-            invoice_date DATE,
-            invoice_total DECIMAL(18, 4) DEFAULT 0,
-            commission_rate DECIMAL(10, 4) DEFAULT 0,
-            commission_amount DECIMAL(18, 4) DEFAULT 0,
-            status VARCHAR(20) DEFAULT 'pending',
-            paid_date DATE,
-            branch_id INTEGER REFERENCES branches(id),
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(invoice_id, salesperson_id)
-        )""",
-        # stock_transfer_log
-        """CREATE TABLE IF NOT EXISTS stock_transfer_log (
-            id SERIAL PRIMARY KEY,
-            shipment_id INTEGER REFERENCES stock_shipments(id) ON DELETE SET NULL,
-            product_id INTEGER REFERENCES products(id),
-            from_warehouse_id INTEGER REFERENCES warehouses(id),
-            to_warehouse_id INTEGER REFERENCES warehouses(id),
-            quantity DECIMAL(18, 4) DEFAULT 0,
-            transfer_cost DECIMAL(18, 4) DEFAULT 0,
-            from_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
-            to_avg_cost_before DECIMAL(18, 4) DEFAULT 0,
-            to_avg_cost_after DECIMAL(18, 4) DEFAULT 0,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )""",
-        # customer_price_list_items
-        """CREATE TABLE IF NOT EXISTS customer_price_list_items (
-            id SERIAL PRIMARY KEY,
-            price_list_id INTEGER NOT NULL REFERENCES customer_price_lists(id) ON DELETE CASCADE,
-            product_id INTEGER REFERENCES products(id),
-            price DECIMAL(18, 4) NOT NULL DEFAULT 0,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )""",
-    ]
-
-    for sql in missing_tables_sql:
-        try:
-            conn.execute(text(sql))
-        except Exception as e:
-            logger.warning(f"Could not ensure table: {e}")
-
-
+    # NOTE: sync_essential_columns has been removed.
+    # Existing tenant schema changes are handled by Alembic migrations.
+    # New tenant DBs get the full schema from CREATE TABLE blocks above.
 
 def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool, str]:
-    """Create all 91 tables for a company database"""
+    """Create tenant schema from canonical SQL blocks, then stamp Alembic head."""
     db_name = f"aman_{company_id}"
     connection_url = settings.get_company_database_url(company_id)
 
@@ -3339,8 +3338,8 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
 
         return statements
 
-    def run_company_alembic_upgrade() -> Tuple[bool, str]:
-        """Run Alembic migrations to head for a single company database."""
+    def run_company_alembic_stamp_head() -> Tuple[bool, str]:
+        """Stamp Alembic head for a freshly created company database."""
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         alembic_ini = os.path.join(backend_dir, "alembic.ini")
         alembic_args = [
@@ -3348,7 +3347,7 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
             alembic_ini,
             "-x",
             f"company={company_id}",
-            "upgrade",
+            "stamp",
             "head",
         ]
         candidate_commands = [
@@ -3374,7 +3373,7 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 continue
 
             if result.returncode == 0:
-                logger.info(f"✅ Alembic upgrade head applied for {db_name}")
+                logger.info(f"✅ Alembic head stamped for {db_name}")
                 return True, "ok"
 
             stderr = (result.stderr or "").strip()
@@ -3383,7 +3382,7 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
             errors.append(f"{' '.join(alembic_cmd)} -> {details}")
 
         combined_error = " | ".join(errors)
-        logger.error(f"❌ Alembic upgrade failed for {db_name}: {combined_error}")
+        logger.error(f"❌ Alembic stamp failed for {db_name}: {combined_error}")
         return False, combined_error
 
     def get_statement_kind(statement: str) -> str:
@@ -3414,15 +3413,21 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
             return "CREATE INDEX"
         if stmt_upper.startswith("ALTER TABLE"):
             return "ALTER TABLE"
+        if re.match(r"^CREATE\s+MATERIALIZED\s+VIEW\b", stmt_upper):
+            return "CREATE MATERIALIZED VIEW"
         return "OTHER"
 
     def should_defer_statement(statement: str, error: Exception) -> bool:
-        """Defer statements that fail only due to unresolved table dependencies."""
+        """Defer statements that fail only due to unresolved table/column dependencies."""
         statement_kind = get_statement_kind(statement)
-        if statement_kind not in ("CREATE TABLE", "CREATE INDEX", "ALTER TABLE"):
+        if statement_kind not in ("CREATE TABLE", "CREATE INDEX", "ALTER TABLE", "CREATE MATERIALIZED VIEW"):
             return False
         error_text = str(error)
-        return "UndefinedTable" in error_text
+        if "UndefinedTable" in error_text:
+            return True
+        if "UndefinedColumn" in error_text and statement_kind in ("CREATE INDEX", "CREATE MATERIALIZED VIEW"):
+            return True
+        return False
 
     def ensure_fk_if_missing(
         conn,
@@ -3481,9 +3486,6 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
         company_engine = create_engine(connection_url, isolation_level="AUTOCOMMIT")
         
         with company_engine.connect() as conn:
-            # Sync essential columns (Phase 7/8 updates for existing DBs)
-            sync_essential_columns(conn)
-            
             # Execute all table creation SQL
             sql_blocks = [
                 get_all_table_sql(),                # 0: Core tables (Users, Branches, Parties, Accounts, Treasury Accounts, Invoices)
@@ -3559,7 +3561,10 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
 
                 if not progress_made:
                     unresolved_non_index = [
-                        item for item in remaining if get_statement_kind(item[2]) != "CREATE INDEX"
+                        item
+                        for item in remaining
+                        if get_statement_kind(item[2])
+                        not in ("CREATE INDEX", "CREATE MATERIALIZED VIEW")
                     ]
                     if unresolved_non_index:
                         first_block, first_i, first_stmt, first_error = unresolved_non_index[0]
@@ -3571,7 +3576,7 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
 
                     for block_num, stmt_num, unresolved_stmt, _stmt_error in remaining:
                         logger.warning(
-                            "Skipping unresolved index due to missing table "
+                            "Skipping unresolved index/materialized view due to missing dependency "
                             f"(block={block_num}, statement={stmt_num}): {unresolved_stmt[:120]}"
                         )
                     break
@@ -3652,12 +3657,6 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 $$ language 'plpgsql';
             """))
 
-            # ── Migrations for existing databases ──
-            # Add is_header column to accounts if it doesn't exist
-            conn.execute(text("""
-                ALTER TABLE accounts ADD COLUMN IF NOT EXISTS is_header BOOLEAN DEFAULT FALSE;
-            """))
-            
             # Apply updated_at trigger to tables that have the column
             trigger_tables = [
                 'company_users', 'accounts', 'customers', 'suppliers', 'products',
@@ -3679,16 +3678,13 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                     """))
                 except Exception:
                     pass  # Ignore if table doesn't have updated_at
-            
-            # Note: with isolation_level="AUTOCOMMIT", we don't need conn.commit()
-            # but it doesn't hurt.
 
-        migration_ok, migration_msg = run_company_alembic_upgrade()
+        migration_ok, migration_msg = run_company_alembic_stamp_head()
         if not migration_ok:
             return False, f"فشل ترحيل Alembic: {migration_msg}"
         
-        logger.info(f"✅ Created all tables and applied Alembic for {db_name}")
-        return True, "تم إنشاء جميع الجداول وتطبيق ترحيلات Alembic بنجاح"
+        logger.info(f"✅ Created all tables and stamped Alembic head for {db_name}")
+        return True, "تم إنشاء جميع الجداول وتثبيت Alembic head بنجاح"
 
         
     except Exception as e:
@@ -4215,7 +4211,10 @@ def get_pos_tables_sql() -> str:
         closed_at TIMESTAMPTZ,
         notes TEXT,
         branch_id INTEGER REFERENCES branches(id),
-        treasury_account_id INTEGER REFERENCES treasury_accounts(id)
+        treasury_account_id INTEGER REFERENCES treasury_accounts(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_orders (
@@ -4240,7 +4239,8 @@ def get_pos_tables_sql() -> str:
         
         note TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_order_lines (
@@ -4259,7 +4259,11 @@ def get_pos_tables_sql() -> str:
         total DECIMAL(18, 4) NOT NULL,    
         
         warehouse_id INTEGER REFERENCES warehouses(id),
-        notes TEXT
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_payments (
@@ -4269,7 +4273,10 @@ def get_pos_tables_sql() -> str:
         payment_method VARCHAR(50) NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         reference_number VARCHAR(100),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     -- POS Order Payments (per-order payment method breakdown)
@@ -4279,7 +4286,10 @@ def get_pos_tables_sql() -> str:
         method VARCHAR(50) NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
         reference VARCHAR(100),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     -- POS Returns
@@ -4291,7 +4301,10 @@ def get_pos_tables_sql() -> str:
         refund_amount DECIMAL(18, 4) NOT NULL DEFAULT 0,
         refund_method VARCHAR(50) DEFAULT 'cash',
         notes TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_return_items (
@@ -4300,7 +4313,10 @@ def get_pos_tables_sql() -> str:
         original_item_id INTEGER REFERENCES pos_order_lines(id) ON DELETE SET NULL,
         quantity DECIMAL(18, 4) NOT NULL DEFAULT 1,
         reason TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     -- POS Promotions
@@ -4321,7 +4337,8 @@ def get_pos_tables_sql() -> str:
         branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by VARCHAR(100)
     );
 
     -- POS Loyalty Programs
@@ -4334,7 +4351,10 @@ def get_pos_tables_sql() -> str:
         tier_rules JSONB DEFAULT '[]'::jsonb,
         is_active BOOLEAN DEFAULT TRUE,
         branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_loyalty_points (
@@ -4346,7 +4366,10 @@ def get_pos_tables_sql() -> str:
         balance NUMERIC(12, 2) DEFAULT 0,
         tier VARCHAR(50) DEFAULT 'standard',
         last_activity_at TIMESTAMPTZ DEFAULT NOW(),
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_loyalty_transactions (
@@ -4356,7 +4379,10 @@ def get_pos_tables_sql() -> str:
         txn_type VARCHAR(20) NOT NULL,
         points NUMERIC(12, 2) NOT NULL,
         description TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     -- POS Tables (Restaurant/Dine-in)
@@ -4372,7 +4398,10 @@ def get_pos_tables_sql() -> str:
         pos_y NUMERIC(8, 2) DEFAULT 0,
         branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE TABLE IF NOT EXISTS pos_table_orders (
@@ -4383,7 +4412,11 @@ def get_pos_tables_sql() -> str:
         cleared_at TIMESTAMPTZ,
         guests INTEGER DEFAULT 1,
         waiter_id INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
-        status VARCHAR(20) DEFAULT 'seated'
+        status VARCHAR(20) DEFAULT 'seated',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     -- POS Kitchen Display
@@ -4402,7 +4435,11 @@ def get_pos_tables_sql() -> str:
         accepted_at TIMESTAMPTZ,
         ready_at TIMESTAMPTZ,
         served_at TIMESTAMPTZ,
-        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL
+        branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
     );
 
     CREATE INDEX IF NOT EXISTS idx_pos_returns_session ON pos_returns(session_id);
@@ -5181,7 +5218,8 @@ def get_system_completion_tables_sql() -> str:
         created_by INTEGER REFERENCES company_users(id),
         journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS landed_cost_items (
@@ -5192,7 +5230,10 @@ def get_system_completion_tables_sql() -> str:
         amount NUMERIC(15,4) NOT NULL DEFAULT 0,
         vendor_id INTEGER REFERENCES parties(id),
         invoice_ref VARCHAR(100),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS landed_cost_allocations (
@@ -5205,7 +5246,10 @@ def get_system_completion_tables_sql() -> str:
         new_cost NUMERIC(15,4) NOT NULL DEFAULT 0,
         allocation_basis NUMERIC(15,6) DEFAULT 0,
         allocation_share NUMERIC(15,6) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== PRINT TEMPLATES =====
@@ -5376,6 +5420,9 @@ def get_system_completion_tables_sql() -> str:
         actual_hours NUMERIC(8,2) DEFAULT 0,
         efficiency_pct NUMERIC(5,2) DEFAULT 0,
         notes TEXT,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        deleted_at TIMESTAMPTZ,
+        deleted_by VARCHAR(100),
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(work_center_id, plan_date)
@@ -5838,9 +5885,20 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE INDEX IF NOT EXISTS ix_perf_goals_review ON performance_goals(review_id);
 
-    -- Add FK from performance_reviews to review_cycles (deferred, will succeed after review_cycles exists)
-    ALTER TABLE performance_reviews ADD CONSTRAINT IF NOT EXISTS fk_perf_reviews_cycle
-        FOREIGN KEY (cycle_id) REFERENCES review_cycles(id);
+    -- Add FK from performance_reviews to review_cycles when missing.
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM information_schema.table_constraints
+            WHERE table_name = 'performance_reviews'
+              AND constraint_name = 'fk_perf_reviews_cycle'
+        ) THEN
+            ALTER TABLE performance_reviews
+            ADD CONSTRAINT fk_perf_reviews_cycle
+            FOREIGN KEY (cycle_id) REFERENCES review_cycles(id);
+        END IF;
+    END$$;
 
     -- ========== US17: CPQ (Configure-Price-Quote) ==========
     CREATE TABLE IF NOT EXISTS product_configurations (

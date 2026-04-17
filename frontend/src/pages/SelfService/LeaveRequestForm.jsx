@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { selfServiceAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 
 const LeaveRequestForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         leave_type: 'annual',
@@ -32,16 +31,16 @@ const LeaveRequestForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.start_date || !form.end_date) {
-            showToast(t('self_service.dates_required'), 'error');
+            toastEmitter.emit(t('self_service.dates_required'), 'error');
             return;
         }
         setLoading(true);
         try {
             await selfServiceAPI.submitLeaveRequest(form);
-            showToast(t('self_service.leave_submitted'), 'success');
+            toastEmitter.emit(t('self_service.leave_submitted'), 'success');
             navigate('/hr/self-service');
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error');
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

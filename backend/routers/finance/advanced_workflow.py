@@ -4,6 +4,7 @@ AMAN ERP - Advanced Workflow Engine
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ import json
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
+from utils.audit import log_activity
 from utils.limiter import limiter
 
 router = APIRouter(prefix="/workflow", tags=["سير العمل المتقدم"])
@@ -127,6 +129,13 @@ def check_sla_escalations(request: Request, current_user=Depends(get_current_use
                     WHERE id = :id
                 """), {"esc": r["escalation_to"], "id": r["id"]})
                 escalated += 1
+                log_activity(db, user_id=current_user.id, username=current_user.username,
+                             action="workflow.escalate", resource_type="approval_request",
+                             resource_id=str(r["id"]),
+                             details={"escalated_to": r["escalation_to"],
+                                      "hours_waiting": round(r["hours_waiting"], 2),
+                                      "sla_hours": r["sla_hours"]},
+                             request=request)
 
         db.commit()
         return {
@@ -137,7 +146,7 @@ def check_sla_escalations(request: Request, current_user=Depends(get_current_use
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -161,6 +170,12 @@ def auto_approve_below_threshold(request: Request, current_user=Depends(get_curr
         """)).fetchall()
 
         db.commit()
+        for approved in auto_approved:
+            log_activity(db, user_id=current_user.id, username=current_user.username,
+                         action="workflow.auto_approve", resource_type="approval_request",
+                         resource_id=str(approved[0]),
+                         details={"reason": "below_threshold"},
+                         request=request)
         return {
             "auto_approved": len(auto_approved),
             "message": f"تمت الموافقة التلقائية على {len(auto_approved)} طلب"
@@ -168,7 +183,7 @@ def auto_approve_below_threshold(request: Request, current_user=Depends(get_curr
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

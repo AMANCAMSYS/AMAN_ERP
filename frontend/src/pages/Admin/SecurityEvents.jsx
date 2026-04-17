@@ -17,18 +17,28 @@ const SecurityEvents = () => {
     const [blockedIPs, setBlockedIPs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState({ event_type: '', severity: '' });
+    const [page, setPage] = useState(1);
+    const [totalEvents, setTotalEvents] = useState(0);
+    const PAGE_SIZE = 25;
 
-    useEffect(() => { fetchData(); }, [activeTab, filter]);
+    useEffect(() => { fetchData(); }, [activeTab, filter, page]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
             if (activeTab === 'events') {
                 const [evRes, sumRes] = await Promise.all([
-                    securityAPI.listSecurityEvents(filter),
+                    securityAPI.listSecurityEvents({ ...filter, page, limit: PAGE_SIZE }),
                     securityAPI.getSecurityEventsSummary()
                 ]);
-                setEvents(evRes.data || []);
+                const evData = evRes.data;
+                if (Array.isArray(evData)) {
+                    setEvents(evData);
+                    setTotalEvents(evData.length >= PAGE_SIZE ? (page * PAGE_SIZE) + 1 : ((page - 1) * PAGE_SIZE) + evData.length);
+                } else {
+                    setEvents(evData?.items || evData?.data || []);
+                    setTotalEvents(evData?.total || evData?.count || 0);
+                }
                 setSummary(sumRes.data || {});
             } else if (activeTab === 'attempts') {
                 const res = await securityAPI.listLoginAttempts({});
@@ -115,14 +125,14 @@ const SecurityEvents = () => {
             {activeTab === 'events' && (
                 <div className="d-flex gap-2 mb-3">
                     <select className="form-input" style={{ maxWidth: 200 }}
-                        value={filter.severity} onChange={e => setFilter(p => ({ ...p, severity: e.target.value }))}>
+                        value={filter.severity} onChange={e => { setPage(1); setFilter(p => ({ ...p, severity: e.target.value })); }}>
                         <option value="">{t('security_events.all_severities')}</option>
                         {['critical', 'high', 'medium', 'low', 'info'].map(s => (
                             <option key={s} value={s}>{s}</option>
                         ))}
                     </select>
                     <select className="form-input" style={{ maxWidth: 200 }}
-                        value={filter.event_type} onChange={e => setFilter(p => ({ ...p, event_type: e.target.value }))}>
+                        value={filter.event_type} onChange={e => { setPage(1); setFilter(p => ({ ...p, event_type: e.target.value })); }}>
                         <option value="">{t('security_events.all_types')}</option>
                         {(summary.by_type || []).map(t => (
                             <option key={t.event_type} value={t.event_type}>{t.event_type} ({t.cnt})</option>
@@ -166,6 +176,26 @@ const SecurityEvents = () => {
                                 ))}
                             </tbody>
                         </table>
+                        {/* Pagination */}
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '16px 0' }}>
+                            <button
+                                className="btn btn-sm btn-outline"
+                                disabled={page <= 1}
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                            >
+                                {t('common.previous', 'السابق')}
+                            </button>
+                            <span style={{ fontSize: '14px', color: '#666' }}>
+                                {t('common.page', 'صفحة')} {page}
+                            </span>
+                            <button
+                                className="btn btn-sm btn-outline"
+                                disabled={events.length < PAGE_SIZE}
+                                onClick={() => setPage(p => p + 1)}
+                            >
+                                {t('common.next', 'التالي')}
+                            </button>
+                        </div>
                     </div>
                 ) : activeTab === 'attempts' ? (
                     <div className="data-table-container">

@@ -6,9 +6,11 @@ Phase 8.12 Sales Improvements:
   SALES-004: Smart credit limit
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 
 from database import get_db_connection
@@ -52,10 +54,10 @@ def convert_quotation_to_order(sq_id: int, current_user=Depends(get_current_user
         """), {
             "num": so_num, "cid": sq.customer_id,
             "bid": getattr(sq, 'branch_id', None),
-            "total": float(getattr(sq, 'total', 0)),
-            "disc": float(getattr(sq, 'discount', 0)),
-            "tax": float(getattr(sq, 'tax', 0)),
-            "grand": float(getattr(sq, 'grand_total', 0)),
+            "total": str(getattr(sq, 'total', 0) or 0),
+            "disc": str(getattr(sq, 'discount', 0) or 0),
+            "tax": str(getattr(sq, 'tax', 0) or 0),
+            "grand": str(getattr(sq, 'grand_total', 0) or 0),
             "notes": getattr(sq, 'notes', None),
             "curr": getattr(sq, 'currency', None),
             "sqid": sq_id, "uid": current_user.id,
@@ -69,10 +71,10 @@ def convert_quotation_to_order(sq_id: int, current_user=Depends(get_current_user
                 VALUES (:oid, :pid, :qty, :price, :disc, :tax, :sub)
             """), {
                 "oid": so.id, "pid": line.product_id,
-                "qty": float(line.quantity), "price": float(line.unit_price),
-                "disc": float(getattr(line, 'discount', 0)),
-                "tax": float(getattr(line, 'tax_rate', 0)),
-                "sub": float(getattr(line, 'subtotal', 0)),
+                "qty": str(line.quantity or 0), "price": str(line.unit_price or 0),
+                "disc": str(getattr(line, 'discount', 0) or 0),
+                "tax": str(getattr(line, 'tax_rate', 0) or 0),
+                "sub": str(getattr(line, 'subtotal', 0) or 0),
             })
 
         # Mark quotation as converted
@@ -89,7 +91,7 @@ def convert_quotation_to_order(sq_id: int, current_user=Depends(get_current_user
         db.rollback()
         logger.error(f"Quotation conversion error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -129,7 +131,7 @@ def create_commission_rule(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -206,11 +208,11 @@ def calculate_commission(data: dict, current_user=Depends(get_current_user)):
                     WHERE is_active = true AND (salesperson_id = :sp OR salesperson_id IS NULL)
                     ORDER BY salesperson_id DESC NULLS LAST LIMIT 1
                 """), {"sp": sp_id}).fetchone()
-                rate = float(rule.rate) if rule else 0.0
+                rate = Decimal(str(rule.rate)) if rule else Decimal("0")
                 if rate == 0:
                     continue
-                total = float(getattr(inv, 'grand_total', getattr(inv, 'total', 0)) or 0)
-                commission = round(total * rate / 100, 2)
+                total = Decimal(str(getattr(inv, 'grand_total', getattr(inv, 'total', 0)) or 0))
+                commission = (total * rate / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 db.execute(text("""
                     INSERT INTO sales_commissions (salesperson_id, salesperson_name, invoice_id, invoice_number,
                         invoice_date, invoice_total, commission_rate, commission_amount, status, branch_id)
@@ -243,9 +245,9 @@ def calculate_commission(data: dict, current_user=Depends(get_current_user)):
             ORDER BY salesperson_id DESC NULLS LAST LIMIT 1
         """), {"sp": salesperson_id}).fetchone()
 
-        rate = float(rule.rate) if rule else float(data.get("rate", 0))
-        total = float(getattr(inv, 'grand_total', getattr(inv, 'total', 0)) or 0)
-        commission = round(total * rate / 100, 2) if (rule and rule.rate_type == 'percentage') or not rule else rate
+        rate = Decimal(str(rule.rate)) if rule else Decimal(str(data.get("rate", 0)))
+        total = Decimal(str(getattr(inv, 'grand_total', getattr(inv, 'total', 0)) or 0))
+        commission = (total * rate / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if (rule and rule.rate_type == 'percentage') or not rule else rate
 
         result = db.execute(text("""
             INSERT INTO sales_commissions (salesperson_id, salesperson_name, invoice_id, invoice_number,
@@ -268,7 +270,7 @@ def calculate_commission(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -321,7 +323,7 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
         if not commissions:
             raise HTTPException(status_code=400, detail="لا توجد عمولات معلقة بالأرقام المحددة")
         
-        total_amount = sum(float(c.commission_amount) for c in commissions)
+        total_amount = sum(Decimal(str(c.commission_amount)) for c in commissions)
         
         # Create GL Entry
         commission_acc = get_mapped_account_id(db, "acc_map_sales_commission")
@@ -380,7 +382,7 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -422,15 +424,15 @@ def create_partial_invoice(order_id: int, data: dict, current_user=Depends(get_c
                             {"id": line_data["order_line_id"]}).fetchone()
             if not ol:
                 continue
-            qty = min(float(line_data["quantity"]), float(ol.quantity))
-            subtotal = qty * float(ol.unit_price)
+            qty = min(Decimal(str(line_data["quantity"])), Decimal(str(ol.quantity)))
+            subtotal = qty * Decimal(str(ol.unit_price))
             total += subtotal
             # Insert invoice line (format depends on existing schema)
             db.execute(text("""
                 INSERT INTO invoice_lines (invoice_id, product_id, quantity, unit_price, subtotal)
                 VALUES (:iid, :pid, :qty, :price, :sub)
             """), {"iid": inv.id, "pid": ol.product_id, "qty": qty,
-                   "price": float(ol.unit_price), "sub": subtotal})
+                   "price": str(ol.unit_price or 0), "sub": subtotal})
 
         db.execute(text("UPDATE invoices SET total = :total, grand_total = :total WHERE id = :id"),
                    {"total": total, "id": inv.id})
@@ -441,7 +443,7 @@ def create_partial_invoice(order_id: int, data: dict, current_user=Depends(get_c
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -458,15 +460,15 @@ def get_credit_status(party_id: int, current_user=Depends(get_current_user)):
                            {"id": party_id}).fetchone()
         if not party:
             raise HTTPException(status_code=404, detail="Customer not found")
-        limit_ = float(party.credit_limit or 0)
-        used = float(party.credit_used or 0)
+        limit_ = Decimal(str(party.credit_limit or 0))
+        used = Decimal(str(party.credit_used or 0))
         return {
             "party_id": party_id,
             "name": party.name,
-            "credit_limit": limit_,
-            "credit_used": used,
-            "available": limit_ - used,
-            "utilization_pct": round(used / limit_ * 100, 1) if limit_ > 0 else 0,
+            "credit_limit": str(limit_),
+            "credit_used": str(used),
+            "available": str(limit_ - used),
+            "utilization_pct": str((used / limit_ * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)) if limit_ > 0 else "0",
         }
     finally:
         db.close()
@@ -487,7 +489,7 @@ def update_credit_limit(party_id: int, data: dict, request: Request, current_use
             action="sales.credit_limit.update",
             resource_type="party",
             resource_id=str(party_id),
-            details={"old_limit": float(old_limit or 0), "new_limit": data["credit_limit"]},
+            details={"old_limit": str(old_limit or 0), "new_limit": data["credit_limit"]},
             request=request
         )
         return {"message": "Credit limit updated", "credit_limit": data["credit_limit"]}
@@ -501,21 +503,21 @@ def check_credit(data: dict, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         party_id = data["party_id"]
-        amount = float(data["amount"])
+        amount = Decimal(str(data["amount"]))
         party = db.execute(text("SELECT credit_limit, credit_used FROM parties WHERE id = :id"),
                            {"id": party_id}).fetchone()
         if not party:
             raise HTTPException(status_code=404, detail="Customer not found")
-        limit_ = float(party.credit_limit or 0)
-        used = float(party.credit_used or 0)
+        limit_ = Decimal(str(party.credit_limit or 0))
+        used = Decimal(str(party.credit_used or 0))
         available = limit_ - used
         approved = limit_ == 0 or amount <= available  # 0 = no limit
         return {
             "approved": approved,
-            "credit_limit": limit_,
-            "credit_used": used,
-            "available": available,
-            "requested": amount,
+            "credit_limit": str(limit_),
+            "credit_used": str(used),
+            "available": str(available),
+            "requested": str(amount),
             "message": "Approved" if approved else f"Credit limit exceeded by {amount - available:.2f}"
         }
     finally:

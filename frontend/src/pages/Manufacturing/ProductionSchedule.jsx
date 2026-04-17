@@ -36,7 +36,7 @@ const ProductionSchedule = () => {
             const res = await manufacturingAPI.listWorkCenters();
             setWorkCenters(res.data);
         } catch (error) {
-            console.error(error);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -52,8 +52,7 @@ const ProductionSchedule = () => {
             const res = await manufacturingAPI.listOperations(params);
             setOperations(res.data);
         } catch (error) {
-            console.error("Error fetching operations:", error);
-            toastEmitter.emit(t('error_fetching_data'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

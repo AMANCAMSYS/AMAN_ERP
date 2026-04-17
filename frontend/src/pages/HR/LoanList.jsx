@@ -1,11 +1,11 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { useTranslation } from 'react-i18next';
 import { Plus, Check, X, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useBranch } from '../../context/BranchContext';
-import { toast } from 'react-hot-toast';
 import { hasPermission } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
@@ -40,7 +40,7 @@ const LoanList = () => {
 
     useEffect(() => {
         if (!canViewLoans) {
-            toast.error(t('common.unauthorized'));
+            toastEmitter.emit(t('common.unauthorized'), 'error');
             navigate('/hr');
             return;
         }
@@ -65,9 +65,9 @@ const LoanList = () => {
             setLoans(Array.isArray(loansRes.data) ? loansRes.data : loansRes || []);
             setEmployees(Array.isArray(employeesRes.data) ? employeesRes.data : employeesRes || []);
         } catch (error) {
-            console.error('Error fetching data:', error);
+            toastEmitter.emit(t('common.error'), 'error');
             const detail = error.response?.data?.detail;
-            if (detail) toast.error(detail);
+            if (detail) toastEmitter.emit(detail, 'error');
         } finally {
             setLoading(false);
         }
@@ -78,12 +78,12 @@ const LoanList = () => {
         setActionLoading(true);
         try {
             await hrAPI.createLoan(formData);
-            toast.success(t('hr.loans.save_success'));
+            toastEmitter.emit(t('hr.loans.save_success'), 'success');
             setIsModalOpen(false);
             fetchData();
             setFormData({ ...formData, amount: '', reason: '' });
         } catch (error) {
-            toast.error(error.response?.data?.detail || error.message);
+            toastEmitter.emit(error.response?.data?.detail || error.message, 'error');
         } finally {
             setActionLoading(false);
         }
@@ -93,10 +93,10 @@ const LoanList = () => {
         if (!window.confirm(t('common.confirm_delete') || 'Are you sure?')) return;
         try {
             await hrAPI.approveLoan(id);
-            toast.success(t('hr.loans.approve_success'));
+            toastEmitter.emit(t('hr.loans.approve_success'), 'success');
             fetchData();
         } catch (error) {
-            toast.error(error.response?.data?.detail || error.message);
+            toastEmitter.emit(error.response?.data?.detail || error.message, 'error');
         }
     };
 

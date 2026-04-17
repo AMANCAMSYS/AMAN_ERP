@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 
 function CustomerGroups() {
     const { t } = useTranslation()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [groups, setGroups] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -33,7 +34,6 @@ function CustomerGroups() {
             setError(null)
         } catch (err) {
             setError(t('sales.groups.form.errors.fetch_failed'))
-            console.error(err)
         } finally {
             setLoading(false)
         }
@@ -78,7 +78,7 @@ function CustomerGroups() {
         try {
             const payload = {
                 ...formData,
-                discount_percentage: parseFloat(formData.discount_percentage) || 0,
+                discount_percentage: Number(formData.discount_percentage) || 0,
                 payment_days: parseInt(formData.payment_days) || 30,
                 branch_id: currentBranch?.id
             }
@@ -91,7 +91,6 @@ function CustomerGroups() {
             setShowModal(false)
             fetchGroups()
         } catch (err) {
-            console.error(err)
             const detail = err.response?.data?.detail
             if (typeof detail === 'string') setError(detail)
             else if (Array.isArray(detail)) setError(detail.map(e => e.msg).join(', '))
@@ -105,8 +104,7 @@ function CustomerGroups() {
             await salesAPI.deleteCustomerGroup(id)
             fetchGroups()
         } catch (err) {
-            console.error(err)
-            toastEmitter.emit(t('sales.groups.actions.delete_error'), 'error')
+            showToast(t('sales.groups.actions.delete_error'), 'error')
         }
     }
 
@@ -269,8 +267,8 @@ function CustomerGroups() {
                                         value={formData.effect_type}
                                         onChange={e => setFormData({ ...formData, effect_type: e.target.value })}
                                     >
-                                        <option value="discount">خصم</option>
-                                        <option value="markup">زيادة</option>
+                                        <option value="discount">{t('common.discount')}</option>
+                                        <option value="markup">{t('common.increase')}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -280,7 +278,7 @@ function CustomerGroups() {
                                         value={formData.application_scope}
                                         onChange={e => setFormData({ ...formData, application_scope: e.target.value })}
                                     >
-                                        <option value="total">إجمالي</option>
+                                        <option value="total">{t('pos.receipt.total')}</option>
                                         <option value="line">لكل صنف</option>
                                     </select>
                                 </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { selfServiceAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { User, Save } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -10,7 +10,6 @@ import '../../components/ModuleStyles.css';
 const ProfileEdit = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { showToast } = useToast();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -28,7 +27,7 @@ const ProfileEdit = () => {
             setProfile(p);
             setForm({ phone: p.phone || '', email: p.email || '' });
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -43,10 +42,10 @@ const ProfileEdit = () => {
         setSaving(true);
         try {
             await selfServiceAPI.updateProfile(form);
-            showToast(t('self_service.profile_updated'), 'success');
+            toastEmitter.emit(t('self_service.profile_updated'), 'success');
             navigate('/hr/self-service');
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error');
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setSaving(false);
         }

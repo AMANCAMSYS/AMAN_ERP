@@ -7,6 +7,7 @@ export const checksAPI = {
     createReceivable: (data) => api.post('/checks/receivable', data),
     collectReceivable: (id, data) => api.post(`/checks/receivable/${id}/collect`, data),
     bounceReceivable: (id, data) => api.post(`/checks/receivable/${id}/bounce`, data),
+    representReceivable: (id, data) => api.post(`/checks/receivable/${id}/represent`, data),
     receivableStats: (params) => api.get('/checks/receivable/summary/stats', { params }),
     // Checks Payable
     listPayable: (params) => api.get('/checks/payable', { params }),
@@ -14,6 +15,7 @@ export const checksAPI = {
     createPayable: (data) => api.post('/checks/payable', data),
     clearPayable: (id, data) => api.post(`/checks/payable/${id}/clear`, data),
     bouncePayable: (id, data) => api.post(`/checks/payable/${id}/bounce`, data),
+    representPayable: (id, data) => api.post(`/checks/payable/${id}/represent`, data),
     payableStats: (params) => api.get('/checks/payable/summary/stats', { params }),
     // Alerts
     getDueAlerts: (params) => api.get('/checks/due-alerts', { params }),

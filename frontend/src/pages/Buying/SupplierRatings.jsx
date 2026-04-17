@@ -19,7 +19,7 @@ const SupplierRatings = () => {
 
     const fetchRatings = async () => {
         try { setLoading(true); const res = await purchasesAPI.listSupplierRatings(); setRatings(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        catch (err) { showToast(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreate = async (e) => {

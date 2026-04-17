@@ -1,5 +1,6 @@
 """CPQ (Configure-Price-Quote) endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 import logging
@@ -196,7 +197,7 @@ def create_quote(
         db.rollback()
         logger.error(f"create_quote error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -260,12 +261,12 @@ def generate_pdf(
         return {"pdf_path": pdf_path}
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=404, detail="طلب غير صالح")
+        raise HTTPException(**http_error(404, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.error(f"generate_pdf error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -359,6 +360,6 @@ def convert_to_quotation(
         db.rollback()
         logger.error(f"convert_to_quotation error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

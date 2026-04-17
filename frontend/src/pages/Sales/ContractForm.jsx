@@ -6,11 +6,13 @@ import { formatNumber, getStep } from '../../utils/format'
 import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
 function ContractForm() {
     const { t } = useTranslation()
+    const { showToast } = useToast()
     const navigate = useNavigate()
     const { id } = useParams()
     const currency = getCurrency()
@@ -61,7 +63,7 @@ function ContractForm() {
                     setLoading(false)
                 }
             } catch (err) {
-                console.error("Failed to load data", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchData()
@@ -116,9 +118,9 @@ function ContractForm() {
                 items: items.map(item => ({
                     ...item,
                     product_id: parseInt(item.product_id),
-                    quantity: parseFloat(item.quantity),
-                    unit_price: parseFloat(item.unit_price),
-                    tax_rate: parseFloat(item.tax_rate)
+                    quantity: Number(item.quantity),
+                    unit_price: Number(item.unit_price),
+                    tax_rate: Number(item.tax_rate)
                 }))
             }
             if (id) {
@@ -232,13 +234,13 @@ function ContractForm() {
                                             </select>
                                         </td>
                                         <td>
-                                            <input type="number" className="form-input" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)} />
+                                            <input type="number" className="form-input" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value) || 0)} />
                                         </td>
                                         <td>
-                                            <input type="number" className="form-input" value={item.unit_price} onChange={e => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)} />
+                                            <input type="number" className="form-input" value={item.unit_price} onChange={e => handleItemChange(index, 'unit_price', Number(e.target.value) || 0)} />
                                         </td>
                                         <td>
-                                            <input type="number" className="form-input" value={item.tax_rate} onChange={e => handleItemChange(index, 'tax_rate', parseFloat(e.target.value) || 0)} />
+                                            <input type="number" className="form-input" value={item.tax_rate} onChange={e => handleItemChange(index, 'tax_rate', Number(e.target.value) || 0)} />
                                         </td>
                                         <td style={{ fontWeight: 'bold' }}>{formatNumber(lineTotal)}</td>
                                         <td>

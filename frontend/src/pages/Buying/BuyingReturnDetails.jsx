@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
-
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -11,6 +11,7 @@ function BuyingReturnDetails() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
+    const { showToast } = useToast()
     const [returnn, setReturnn] = useState(null)
     const [loading, setLoading] = useState(true)
     const currency = getCurrency()
@@ -21,7 +22,7 @@ function BuyingReturnDetails() {
                 const res = await purchasesAPI.getReturn(id)
                 setReturnn(res.data)
             } catch (err) {
-                console.error("Failed to load return details", err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

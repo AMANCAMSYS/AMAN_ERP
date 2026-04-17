@@ -43,12 +43,12 @@ const RFQList = () => {
 
     const fetchSuppliers = async () => {
         try { const res = await inventoryAPI.listSuppliers({ limit: 1000 }); setSuppliers(res.data || []); }
-        catch (err) { console.error(err); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const fetchRFQs = async () => {
         try { setLoading(true); const res = await purchasesAPI.listRFQs(); setRfqs(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        catch (err) { showToast(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreate = async (e) => {

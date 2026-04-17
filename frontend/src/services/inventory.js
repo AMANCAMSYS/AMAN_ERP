@@ -54,12 +54,6 @@ export const inventoryAPI = {
     confirmShipment: (id) => api.post(`/inventory/shipments/${id}/confirm`),
     cancelShipment: (id) => api.post(`/inventory/shipments/${id}/cancel`),
 
-    // Notifications
-    getNotifications: () => api.get('/inventory/notifications'),
-    getUnreadCount: () => api.get('/inventory/notifications/unread-count'),
-    markNotificationRead: (id) => api.post(`/inventory/notifications/${id}/read`),
-    markAllNotificationsRead: () => api.post('/inventory/notifications/read-all'),
-
     // Stock Adjustments
     listAdjustments: (params) => api.get('/inventory/adjustments', { params }),
     createAdjustment: (data) => api.post('/inventory/adjustments', data),

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getUser, updateUser } from '../utils/auth'
 import { getEnabledModulesForIndustry, INDUSTRY_TYPES, resolveIndustryKey, resolveIndustryCode, hasIndustryFeature } from '../config/industryModules'
 
@@ -12,6 +13,7 @@ const STORAGE_KEY = 'industry_type'
  * ويُرسل إلى الباك اند بصيغة Code (retail, restaurant, manufacturing)
  */
 export function useIndustryType() {
+  const { t } = useTranslation()
   const [industryType, setIndustryTypeState] = useState(() => {
     // أولوية 1: localStorage cache
     const cached = localStorage.getItem(STORAGE_KEY)
@@ -56,7 +58,7 @@ export function useIndustryType() {
     // Normalize to key for internal use
     const key = resolveIndustryKey(newType)
     if (!INDUSTRY_TYPES[key]) {
-      setError('نوع نشاط غير صالح')
+      setError(t('errors.invalid_industry_type'))
       return false
     }
 
@@ -93,12 +95,12 @@ export function useIndustryType() {
       return true
     } catch (err) {
       console.error('Failed to save industry type:', err)
-      setError(err.response?.data?.detail || 'فشل حفظ نوع النشاط')
+      setError(err.response?.data?.detail || t('errors.failed_save_industry_type'))
       return false
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   /**
    * تحميل نوع النشاط من الـ Backend (يُستخدم عند الحاجة)

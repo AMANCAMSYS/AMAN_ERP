@@ -6,12 +6,13 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileText, User, XCircle } from 'lucide-react'
 import { formatNumber } from '../../utils/format'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import InvoicePrintModal from './InvoicePrintModal'
 import BackButton from '../../components/common/BackButton';
 
 function InvoiceDetails() {
     const { t, i18n } = useTranslation()
+    const { showToast } = useToast()
     const { id } = useParams()
     const navigate = useNavigate()
     const [invoice, setInvoice] = useState(null)
@@ -33,7 +34,6 @@ function InvoiceDetails() {
                 }
             } catch (err) {
                 setError(t('sales.invoices.details.error_load'))
-                console.error(err)
             } finally {
                 setLoading(false)
             }
@@ -81,11 +81,11 @@ function InvoiceDetails() {
                                 if (!window.confirm(t('sales.invoices.details.confirm_cancel'))) return;
                                 try {
                                     await salesAPI.cancelInvoice(id);
-                                    toastEmitter.emit(t('sales.invoices.details.cancelled_success'), 'success');
+                                    showToast(t('sales.invoices.details.cancelled_success'), 'success');
                                     const response = await salesAPI.getInvoice(id);
                                     setInvoice(response.data);
                                 } catch (err) {
-                                    toastEmitter.emit(err.response?.data?.detail || t('common.error_occurred'), 'error');
+                                    showToast(err.response?.data?.detail || t('common.error_occurred'), 'error');
                                 }
                             }}
                         >

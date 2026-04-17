@@ -160,3 +160,73 @@ def update_account_balance(db, account_id: int, debit_base, credit_base, debit_c
             UPDATE accounts SET balance_currency = balance_currency + :change WHERE id = :id
         """), {"change": change_curr, "id": account_id})
 
+
+def compute_line_amounts(
+    quantity, unit_price, tax_rate=0, discount=0
+) -> Dict[str, Decimal]:
+    """
+    Compute amounts for a single invoice/contract line using Decimal arithmetic.
+    Returns dict with: subtotal, discount_amount, taxable, tax_amount, line_total.
+    """
+    qty = _to_decimal(quantity)
+    price = _to_decimal(unit_price)
+    tax_r = _to_decimal(tax_rate)
+    disc = _to_decimal(discount)
+
+    subtotal = (qty * price).quantize(_D2, ROUND_HALF_UP)
+    discount_amount = (subtotal * disc / Decimal("100")).quantize(_D2, ROUND_HALF_UP)
+    taxable = subtotal - discount_amount
+    tax_amount = (taxable * tax_r / Decimal("100")).quantize(_D2, ROUND_HALF_UP)
+    line_total = (taxable + tax_amount).quantize(_D2, ROUND_HALF_UP)
+
+    return {
+        "subtotal": subtotal,
+        "discount_amount": discount_amount,
+        "taxable": taxable,
+        "tax_amount": tax_amount,
+        "line_total": line_total,
+    }
+
+
+def compute_invoice_totals(
+    lines: List[Dict], header_discount_pct=0, markup_amount=0
+) -> Dict[str, Decimal]:
+    """
+    Aggregate line-level amounts into invoice totals using Decimal arithmetic.
+    Each line dict must have: quantity, unit_price, tax_rate; optional: discount.
+    header_discount_pct reduces tax proportionally (ZATCA-compliant).
+    """
+    subtotal = Decimal("0")
+    total_discount = Decimal("0")
+    total_tax = Decimal("0")
+
+    for ln in lines:
+        la = compute_line_amounts(
+            ln.get("quantity", 0),
+            ln.get("unit_price", 0),
+            ln.get("tax_rate", 0),
+            ln.get("discount", 0),
+        )
+        subtotal += la["subtotal"]
+        total_discount += la["discount_amount"]
+        total_tax += la["tax_amount"]
+
+    # Header-level discount (proportionally reduces tax — ZATCA rule)
+    hdr_disc = _to_decimal(header_discount_pct)
+    if hdr_disc > 0:
+        hdr_disc_amt = (subtotal * hdr_disc / Decimal("100")).quantize(_D2, ROUND_HALF_UP)
+        total_discount += hdr_disc_amt
+        tax_reduction = (total_tax * hdr_disc / Decimal("100")).quantize(_D2, ROUND_HALF_UP)
+        total_tax -= tax_reduction
+
+    net = subtotal - total_discount
+    markup = _to_decimal(markup_amount).quantize(_D2, ROUND_HALF_UP)
+    grand_total = (net + total_tax + markup).quantize(_D2, ROUND_HALF_UP)
+
+    return {
+        "subtotal": subtotal.quantize(_D2, ROUND_HALF_UP),
+        "total_discount": total_discount.quantize(_D2, ROUND_HALF_UP),
+        "total_tax": total_tax.quantize(_D2, ROUND_HALF_UP),
+        "grand_total": grand_total,
+    }
+

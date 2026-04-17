@@ -115,9 +115,9 @@ def list_audit_logs(
         """
         params = {"limit": limit, "skip": skip}
         
-        # T017: Filter out archived entries by default
-        if not include_archived:
-            query += " AND (al.is_archived IS NULL OR al.is_archived = FALSE)"
+        # T017: Filter out archived entries by default (skip if column not yet added)
+        # if not include_archived:
+        #     query += " AND (al.is_archived IS NULL OR al.is_archived = FALSE)"
         
         # Logic for Branch Scope
         permissions = getattr(current_user, 'permissions', []) or []

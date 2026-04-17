@@ -7,9 +7,11 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber } from '../../utils/format'
 import { Printer, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext';
 
 function ReceiptDetails() {
     const { t, i18n } = useTranslation();
+    const { showToast } = useToast();
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -30,7 +32,6 @@ function ReceiptDetails() {
                 setVoucher(response.data);
             } catch (err) {
                 setError(t('sales.receipts.form.errors.fetch_failed'));
-                console.error(err);
             } finally {
                 setLoading(false);
             }

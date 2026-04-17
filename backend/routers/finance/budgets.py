@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
@@ -61,7 +62,7 @@ def create_budget(budget: BudgetCreate, request: Request, current_user: UserResp
         conn.rollback()
         logger.error(f"Error creating budget: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -110,7 +111,7 @@ def delete_budget(budget_id: int, request: Request, current_user: UserResponse =
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -160,7 +161,7 @@ def set_budget_items(
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -286,7 +287,7 @@ def get_budget_report(
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -337,7 +338,7 @@ def update_budget(budget_id: int, budget: BudgetCreate, request: Request, curren
         conn.rollback()
         logger.error(f"Error updating budget: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -371,7 +372,7 @@ def activate_budget(budget_id: int, request: Request, current_user: UserResponse
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -400,7 +401,7 @@ def close_budget(budget_id: int, request: Request, current_user: UserResponse = 
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -444,6 +445,7 @@ def get_budget_items(request: Request, budget_id: int, current_user: UserRespons
 @limiter.limit("200/minute")
 def get_budget_overrun_alerts(
     request: Request,
+    threshold: float = 80.0,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """Get budget items that are at or over the threshold percentage of planned amount"""
@@ -521,7 +523,7 @@ def get_budget_overrun_alerts(
     except Exception as e:
         logger.error(f"Error fetching budget overrun alerts: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -610,7 +612,7 @@ def get_budget_stats(request: Request, current_user: UserResponse = Depends(get_
     except Exception as e:
         logger.error(f"Error fetching budget stats: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -638,7 +640,7 @@ def list_all_cc_budgets(request: Request, current_user: UserResponse = Depends(g
     except Exception as e:
         logger.error(f"Error listing cost center budgets: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -665,6 +667,11 @@ def create_budget_by_cost_center(request: Request, data: dict, current_user: Use
             "fy": data.get("fiscal_year"),
         }).fetchone()
         conn.commit()
+        log_activity(conn, user_id=current_user.id, username=current_user.username,
+                     action="budgets.create_by_cost_center", resource_type="budget",
+                     resource_id=str(result.id),
+                     details={"name": data["name"], "cost_center_id": data["cost_center_id"]},
+                     request=request)
         return {"id": result.id, "name": data["name"], "status": "draft",
                 "cost_center_id": data["cost_center_id"]}
     except HTTPException:
@@ -672,7 +679,7 @@ def create_budget_by_cost_center(request: Request, data: dict, current_user: Use
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -700,6 +707,7 @@ def list_budgets_by_cc(request: Request, cc_id: int, current_user: UserResponse 
 @limiter.limit("200/minute")
 def list_multi_year_budgets(
     request: Request,
+    fiscal_year: Optional[int] = None,
     budget_type: Optional[str] = None,
     current_user: UserResponse = Depends(get_current_user)
 ):
@@ -748,7 +756,7 @@ def compare_budgets(
         raise
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 

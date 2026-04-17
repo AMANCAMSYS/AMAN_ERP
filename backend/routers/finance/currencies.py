@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Any
@@ -6,6 +7,7 @@ from datetime import date, datetime
 from pydantic import BaseModel
 import logging
 from database import get_db, get_company_db
+from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.limiter import limiter
@@ -23,6 +25,7 @@ router = APIRouter(
 @limiter.limit("200/minute")
 def list_currencies(
     request: Request,
+    current_user = Depends(get_current_user),
 ):
     """List all configured currencies"""
     from database import get_db_connection, get_currency_tables_sql
@@ -213,7 +216,7 @@ def add_exchange_rate(
     try:
         # Validate exchange rate
         if rate_data.rate is None or rate_data.rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
 
         # Check currency exists
         curr = db.execute(text("SELECT code FROM currencies WHERE id = :id"), {"id": rate_data.currency_id}).fetchone()

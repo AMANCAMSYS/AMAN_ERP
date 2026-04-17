@@ -130,18 +130,23 @@ def run_migrations_online():
             eng.dispose()
         return
 
-    # 1. Run on system DB
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+    company_arg = _get_company_arg()
+
+    # 1. Run on system DB only when no tenant target was requested.
+    # For `-x company=...`, many migrations are tenant-only and can fail on system DB.
+    if not company_arg:
+        connectable = engine_from_config(
+            config.get_section(config.config_ini_section, {}),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+        with connectable.connect() as connection:
+            context.configure(connection=connection, target_metadata=target_metadata)
+            with context.begin_transaction():
+                context.run_migrations()
 
     # 2. Run on company DBs (if requested)
+    tenant_failures = []
     for url in _get_company_urls():
         from sqlalchemy import create_engine
         eng = create_engine(url, poolclass=pool.NullPool)
@@ -151,9 +156,13 @@ def run_migrations_online():
                 with context.begin_transaction():
                     context.run_migrations()
         except Exception as e:
-            print(f"⚠️ Migration failed for {url}: {e}")
+            tenant_failures.append((url, str(e)))
         finally:
             eng.dispose()
+
+    if tenant_failures:
+        details = " | ".join([f"{url}: {err}" for url, err in tenant_failures])
+        raise RuntimeError(f"Tenant migrations failed: {details}")
 
 
 if context.is_offline_mode():

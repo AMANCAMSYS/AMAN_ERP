@@ -8,6 +8,7 @@ INV-110: Product Ledger
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
@@ -128,7 +129,7 @@ async def list_variants(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -163,7 +164,7 @@ async def create_variant(data: ProductVariantCreate, request: Request, current_u
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -192,7 +193,7 @@ async def update_variant(variant_id: int, data: ProductVariantUpdate, request: R
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -232,7 +233,7 @@ async def list_bins(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -256,7 +257,7 @@ async def create_bin(data: BinLocationCreate, request: Request, current_user: di
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -285,7 +286,7 @@ async def update_bin(bin_id: int, data: BinLocationUpdate, request: Request, cur
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -313,7 +314,7 @@ async def list_kits(
         if "does not exist" in str(e):
             return {"data": [], "total": 0, "message": "Table not migrated yet"}
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -347,7 +348,7 @@ async def get_kit(kit_id: int, current_user: dict = Depends(get_current_user)):
         if "does not exist" in str(e):
             raise HTTPException(status_code=404, detail="Table not migrated yet")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -378,7 +379,7 @@ async def create_kit(data: ProductKitCreate, request: Request, current_user: dic
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -407,7 +408,7 @@ async def update_kit(kit_id: int, data: ProductKitUpdate, request: Request, curr
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -491,6 +492,6 @@ async def get_product_ledger(
         return {"data": rows, "total": total}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

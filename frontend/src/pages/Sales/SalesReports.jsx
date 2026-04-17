@@ -7,10 +7,12 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { useToast } from '../../context/ToastContext';
 import { ModuleKPISection } from '../../components/kpi';
 
 const SalesReports = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [summary, setSummary] = useState(null);
     const [trend, setTrend] = useState([]);
@@ -44,7 +46,7 @@ const SalesReports = () => {
             setTopCustomers(custRes.data);
             setTopProducts(prodRes.data);
         } catch (error) {
-            console.error("Failed to load reports", error);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

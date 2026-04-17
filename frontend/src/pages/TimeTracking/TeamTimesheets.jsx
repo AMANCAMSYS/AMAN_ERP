@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { timesheetAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { CheckCircle, XCircle, Filter } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -21,7 +22,7 @@ const TeamTimesheets = () => {
         setLoading(true);
         timesheetAPI.listTeam(filters)
             .then(res => setEntries(res.data || []))
-            .catch(e => console.error(e))
+            .catch(e => toastEmitter.emit(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     };
 
@@ -33,7 +34,7 @@ const TeamTimesheets = () => {
             setActionMsg(t('timetracking.approved_success'));
             load();
         } catch (e) {
-            console.error(e);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -46,7 +47,7 @@ const TeamTimesheets = () => {
             setActionMsg(t('timetracking.rejected_success'));
             load();
         } catch (e) {
-            console.error(e);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 

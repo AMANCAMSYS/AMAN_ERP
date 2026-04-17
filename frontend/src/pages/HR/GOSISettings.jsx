@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Save, Calculator, Shield } from 'lucide-react';
+import { formatNumber } from '../../utils/format';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
@@ -36,7 +38,7 @@ const GOSISettings = () => {
                     is_active: data[0].is_active !== false
                 });
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -44,7 +46,7 @@ const GOSISettings = () => {
         try {
             const res = await hrAdvancedAPI.calculateGOSI();
             setCalculations(res.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     useEffect(() => { fetchData(); }, []);
@@ -53,7 +55,7 @@ const GOSISettings = () => {
         try {
             await hrAdvancedAPI.saveGOSISettings(form);
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     return (
@@ -83,19 +85,19 @@ const GOSISettings = () => {
                     <h3 style={{ marginBottom: '1.5rem', color: '#1a1a2e' }}>{t('hr.gosi.contribution_rates')}</h3>
                     <div className="form-group">
                         <label>{t('hr.gosi.employee_share')}</label>
-                        <input type="number" step="0.25" className="form-input" value={form.employee_share_percentage} onChange={e => setForm({ ...form, employee_share_percentage: parseFloat(e.target.value) })} />
+                        <input type="number" step="0.25" className="form-input" value={form.employee_share_percentage} onChange={e => setForm({ ...form, employee_share_percentage: e.target.value })} />
                     </div>
                     <div className="form-group">
                         <label>{t('hr.gosi.employer_share')}</label>
-                        <input type="number" step="0.25" className="form-input" value={form.employer_share_percentage} onChange={e => setForm({ ...form, employer_share_percentage: parseFloat(e.target.value) })} />
+                        <input type="number" step="0.25" className="form-input" value={form.employer_share_percentage} onChange={e => setForm({ ...form, employer_share_percentage: e.target.value })} />
                     </div>
                     <div className="form-group">
                         <label>{t('hr.gosi.occupational_hazard')}</label>
-                        <input type="number" step="0.25" className="form-input" value={form.occupational_hazard_percentage} onChange={e => setForm({ ...form, occupational_hazard_percentage: parseFloat(e.target.value) })} />
+                        <input type="number" step="0.25" className="form-input" value={form.occupational_hazard_percentage} onChange={e => setForm({ ...form, occupational_hazard_percentage: e.target.value })} />
                     </div>
                     <div className="form-group">
                         <label>{t('hr.gosi.max_insurable_salary')}</label>
-                        <input type="number" className="form-input" value={form.max_insurable_salary} onChange={e => setForm({ ...form, max_insurable_salary: parseFloat(e.target.value) })} />
+                        <input type="number" className="form-input" value={form.max_insurable_salary} onChange={e => setForm({ ...form, max_insurable_salary: e.target.value })} />
                     </div>
                     <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
@@ -137,10 +139,10 @@ const GOSISettings = () => {
                             ) : calculations.map((c, i) => (
                                 <tr key={i}>
                                     <td style={{ fontWeight: 600 }}>{c.employee_name || `#${c.employee_id}`}</td>
-                                    <td>{c.basic_salary?.toLocaleString()}</td>
-                                    <td>{c.employee_share?.toLocaleString()}</td>
-                                    <td>{c.employer_share?.toLocaleString()}</td>
-                                    <td style={{ fontWeight: 700 }}>{c.total?.toLocaleString()}</td>
+                                    <td>{formatNumber(c.basic_salary)}</td>
+                                    <td>{formatNumber(c.employee_share)}</td>
+                                    <td>{formatNumber(c.employer_share)}</td>
+                                    <td style={{ fontWeight: 700 }}>{formatNumber(c.total)}</td>
                                 </tr>
                             ))}
                         </tbody>

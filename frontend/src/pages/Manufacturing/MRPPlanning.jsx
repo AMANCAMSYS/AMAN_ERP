@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Boxes, Package, ArrowRight, AlertTriangle, CheckCircle, Search } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
@@ -27,7 +28,7 @@ export default function MRPPlanning() {
             const activeOrders = res.data.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
             setOrders(activeOrders);
         } catch (err) {
-            console.error('Failed to fetch orders for MRP', err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

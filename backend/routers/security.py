@@ -3,6 +3,7 @@ Security Router - SEC-001, SEC-002, SEC-003, SEC-201, SEC-202
 المصادقة الثنائية (2FA) + سياسات كلمات المرور + إدارة الجلسات
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from utils.i18n import http_error, i18n_message
 from sqlalchemy import text
 from database import get_db_connection, hash_password, verify_password
 from routers.auth import get_current_user
@@ -77,7 +78,7 @@ def setup_2fa(current_user=Depends(get_current_user)):
         """), {"uid": current_user.id}).fetchone()
 
         if existing and existing.is_enabled:
-            raise HTTPException(400, "المصادقة الثنائية مفعّلة بالفعل")
+            raise HTTPException(**http_error(400, "2fa_already_enabled"))
 
         # Generate TOTP secret
         secret = pyotp.random_base32()
@@ -99,16 +100,16 @@ def setup_2fa(current_user=Depends(get_current_user)):
             "secret": secret,
             "provisioning_uri": provisioning_uri,
             "qr_data": provisioning_uri,  # Frontend can use a QR library
-            "message": "امسح رمز QR باستخدام تطبيق المصادقة، ثم أدخل الرمز للتأكيد"
+            "message": i18n_message("twofa_scan_qr_prompt")
         }
     except HTTPException:
         raise
     except ImportError:
-        raise HTTPException(500, "مكتبة pyotp غير مثبتة. قم بتشغيل: pip install pyotp")
+        raise HTTPException(**http_error(500, "pyotp_not_installed"))
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -127,11 +128,11 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
         """), {"uid": current_user.id}).fetchone()
 
         if not settings_row or not settings_row.secret_key:
-            raise HTTPException(400, "يجب إعداد 2FA أولاً")
+            raise HTTPException(**http_error(400, "2fa_setup_required"))
 
         totp = pyotp.TOTP(settings_row.secret_key)
         if not totp.verify(data.code, valid_window=1):
-            raise HTTPException(400, "الرمز غير صحيح أو منتهي الصلاحية")
+            raise HTTPException(**http_error(400, "2fa_code_invalid_or_expired"))
 
         # Enable 2FA
         db.execute(text("""
@@ -153,16 +154,16 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
                      "security", str(current_user.id), {})
 
         return {
-            "message": "تم تفعيل المصادقة الثنائية بنجاح",
+            "message": i18n_message("2fa_enabled_success"),
             "backup_codes": backup_codes,
-            "warning": "احتفظ بأكواد الاسترداد في مكان آمن. لن تظهر مرة أخرى!"
+            "warning": i18n_message("backup_codes_warning")
         }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -179,11 +180,11 @@ def disable_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user)
         """), {"uid": current_user.id}).fetchone()
 
         if not settings_row or not settings_row.is_enabled:
-            raise HTTPException(400, "المصادقة الثنائية غير مفعّلة")
+            raise HTTPException(**http_error(400, "2fa_setup_required"))
 
         totp = pyotp.TOTP(settings_row.secret_key)
         if not totp.verify(data.code, valid_window=1):
-            raise HTTPException(400, "الرمز غير صحيح")
+            raise HTTPException(**http_error(400, "2fa_code_invalid"))
 
         db.execute(text("""
             UPDATE user_2fa_settings SET is_enabled = FALSE, secret_key = NULL, backup_codes = NULL
@@ -194,13 +195,13 @@ def disable_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user)
         log_activity(db, current_user.id, current_user.username, "disable_2fa",
                      "security", str(current_user.id), {})
 
-        return {"message": "تم تعطيل المصادقة الثنائية"}
+        return {"message": i18n_message("2fa_disabled_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -277,7 +278,7 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
     """تغيير كلمة المرور مع التحقق من السياسة"""
     company_id = getattr(current_user, "company_id", None)
     if not company_id:
-        raise HTTPException(400, "غير متاح لمسؤولي النظام")
+        raise HTTPException(**http_error(400, "not_available"))
 
     db = get_db_connection(company_id)
     try:
@@ -285,13 +286,16 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
         user = db.execute(text("SELECT password FROM company_users WHERE id = :id"),
                           {"id": current_user.id}).fetchone()
         if not user or not verify_password(data.current_password, user.password):
-            raise HTTPException(400, "كلمة المرور الحالية غير صحيحة")
+            raise HTTPException(**http_error(400, "current_password_incorrect"))
 
         # Validate new password against policy
         policy = get_password_policy(db)
         validation = validate_password(data.new_password, policy)
         if not validation["valid"]:
-            raise HTTPException(400, "كلمة المرور لا تستوفي الشروط:\n" + "\n".join(validation["errors"]))
+            raise HTTPException(
+                status_code=400,
+                detail=f"{i18n_message('password_policy_not_met')}:\n" + "\n".join(validation["errors"]),
+            )
 
         # Check reuse prevention
         prevent_reuse = policy.get("prevent_reuse", 5)
@@ -303,7 +307,9 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
 
             for old_pw in old_passwords:
                 if verify_password(data.new_password, old_pw.password_hash):
-                    raise HTTPException(400, f"لا يمكن استخدام كلمة مرور مستخدمة في آخر {prevent_reuse} مرات")
+                    raise HTTPException(
+                        **http_error(400, "password_reuse_not_allowed", prevent_reuse=prevent_reuse)
+                    )
 
         # Update password
         new_hash = hash_password(data.new_password)
@@ -337,13 +343,13 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
         log_activity(db, current_user.id, current_user.username, "change_password",
                      "security", str(current_user.id), {})
 
-        return {"message": "تم تغيير كلمة المرور بنجاح"}
+        return {"message": i18n_message("password_changed_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -377,11 +383,11 @@ def update_password_policy(data: PasswordPolicySchema, current_user=Depends(get_
         """), {"val": policy_json})
         db.commit()
 
-        return {"message": "تم تحديث سياسة كلمات المرور"}
+        return {"message": i18n_message("password_policy_updated")}
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -424,7 +430,7 @@ def terminate_session(session_id: int, current_user=Depends(get_current_user)):
     """إنهاء جلسة محددة"""
     company_id = getattr(current_user, "company_id", None)
     if not company_id:
-        raise HTTPException(400, "غير متاح")
+        raise HTTPException(**http_error(400, "not_available"))
 
     db = get_db_connection(company_id)
     try:
@@ -433,11 +439,11 @@ def terminate_session(session_id: int, current_user=Depends(get_current_user)):
             WHERE id = :sid AND user_id = :uid
         """), {"sid": session_id, "uid": current_user.id})
         db.commit()
-        return {"message": "تم إنهاء الجلسة"}
+        return {"message": i18n_message("session_terminated")}
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -447,7 +453,7 @@ def terminate_all_sessions(current_user=Depends(get_current_user)):
     """إنهاء جميع الجلسات الأخرى"""
     company_id = getattr(current_user, "company_id", None)
     if not company_id:
-        raise HTTPException(400, "غير متاح")
+        raise HTTPException(**http_error(400, "not_available"))
 
     db = get_db_connection(company_id)
     try:
@@ -456,11 +462,11 @@ def terminate_all_sessions(current_user=Depends(get_current_user)):
             WHERE user_id = :uid
         """), {"uid": current_user.id})
         db.commit()
-        return {"message": "تم إنهاء جميع الجلسات"}
+        return {"message": i18n_message("all_sessions_terminated")}
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -484,7 +490,7 @@ def check_password_expiry(current_user=Depends(get_current_user)):
 
         if max_age_days <= 0:
             return {"expired": False, "days_remaining": 999, "warning": False,
-                    "message": "سياسة انتهاء كلمات المرور معطّلة"}
+                    "message": i18n_message("password_expiry_policy_disabled")}
 
         # Get last password change date
         last_change = db.execute(text("""
@@ -520,9 +526,9 @@ def check_password_expiry(current_user=Depends(get_current_user)):
         }
 
         if is_expired:
-            result["message"] = "كلمة المرور منتهية الصلاحية. يرجى تغييرها فوراً"
+            result["message"] = i18n_message("password_expired_change_now")
         elif is_warning:
-            result["message"] = f"تنبيه: ستنتهي صلاحية كلمة المرور خلال {days_remaining} يوم"
+            result["message"] = i18n_message("password_expiry_warning_in_days", days=days_remaining)
 
         return result
     except Exception as e:

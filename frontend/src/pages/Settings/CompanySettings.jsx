@@ -59,6 +59,7 @@ const CompanySettings = () => {
 
     // Extended Settings
     const [settingsData, setSettingsData] = useState({});
+    const [initialSettingsData, setInitialSettingsData] = useState({});
 
     // Define allTabs as a constant array (must be defined before useMemo)
     const enabledModules = user?.enabled_modules || [];
@@ -87,7 +88,7 @@ const CompanySettings = () => {
         { id: 'branches', label: t('settings.tabs.branches'), icon: Share2, gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', desc: t('settings.tabs_desc.branches'), permission: 'branches.view' },
         { id: 'workflow', label: t('settings.tabs.workflow'), icon: GitBranch, gradient: 'linear-gradient(135deg, #d946ef 0%, #c026d3 100%)', desc: t('settings.tabs_desc.workflow'), permission: 'settings.manage' },
         { id: 'audit', label: t('settings.tabs.audit'), icon: Database, gradient: 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)', desc: t('settings.tabs_desc.audit'), permission: 'audit.view', module: 'audit' },
-        { id: 'sso', label: i18n.language === 'ar' ? 'تسجيل دخول موحد (SSO)' : 'SSO Configuration', icon: Key, gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', desc: i18n.language === 'ar' ? 'إدارة موفري تسجيل الدخول الموحد' : 'Manage Single Sign-On providers', permission: 'settings.manage', navigateTo: '/settings/sso' },
+        { id: 'sso', label: i18n.t('sso.config_title'), icon: Key, gradient: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', desc: i18n.language === 'ar' ? 'إدارة موفري تسجيل الدخول الموحد' : 'Manage Single Sign-On providers', permission: 'settings.manage', navigateTo: '/settings/sso' },
     ], [t]);
 
     const tabs = React.useMemo(() =>
@@ -133,6 +134,7 @@ const CompanySettings = () => {
                         currency: data.currency || '', plan_type: data.plan_type || ''
                     });
                     setSettingsData(settingsRes.data || {});
+                    setInitialSettingsData(settingsRes.data || {});
                 }
             } catch (err) {
                 console.error("Failed to fetch settings", err);
@@ -175,8 +177,18 @@ const CompanySettings = () => {
         setError('');
         setSuccess('');
         try {
+            const changedSettings = Object.fromEntries(
+                Object.entries(settingsData).filter(([key, value]) => {
+                    const initialValue = initialSettingsData[key];
+                    return String(value ?? '') !== String(initialValue ?? '');
+                })
+            );
+
             await api.put(`/companies/update/${user.company_id}`, formData);
-            await settingsAPI.updateBulk(settingsData);
+            if (Object.keys(changedSettings).length > 0) {
+                await settingsAPI.updateBulk(changedSettings);
+                setInitialSettingsData(settingsData);
+            }
 
             // Update local user state for immediate reflection
             updateUser({

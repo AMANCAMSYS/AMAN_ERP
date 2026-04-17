@@ -214,8 +214,8 @@ const ExpensePolicies = () => {
                                     <th>{t('expenses.monthly')}</th>
                                     <th>{t('expenses.annual')}</th>
                                     <th>{t('expenses.autoapprove')}</th>
-                                    <th>{t('expenses.status')}</th>
-                                    <th>{t('expenses.actions')}</th>
+                                    <th>{t('expenses.status.label')}</th>
+                                    <th>{t('expenses.actions.label')}</th>
                                 </tr>
                             </thead>
                             <tbody>

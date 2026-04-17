@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -57,7 +58,7 @@ async def get_customers(
         return {"items": parties}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -104,6 +105,6 @@ async def get_suppliers(
         return {"items": parties}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

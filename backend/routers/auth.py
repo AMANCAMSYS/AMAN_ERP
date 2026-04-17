@@ -3,6 +3,7 @@ AMAN ERP - Authentication Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form, Body
+from utils.i18n import http_error
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
@@ -1044,7 +1045,7 @@ async def update_current_user_profile(
         updates["email"] = str(data.email).strip().lower()
 
     if not updates:
-        raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+        raise HTTPException(**http_error(400, "no_data_to_update"))
 
     db = get_db_connection(company_id)
     try:
@@ -1545,7 +1546,7 @@ async def verify_2fa_login(request: Request, body: TwoFALoginRequest):
         totp = pyotp.TOTP(tfa_row.secret_key)
         if not totp.verify(body.code, valid_window=1):
             record_failed_attempt(request, username)
-            raise HTTPException(status_code=401, detail="رمز المصادقة الثنائية غير صحيح")
+            raise HTTPException(**http_error(401, "2fa_invalid_code"))
 
         clear_failed_attempts(request, username)
 

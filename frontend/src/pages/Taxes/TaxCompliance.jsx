@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { taxComplianceAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
@@ -16,6 +17,7 @@ const COUNTRY_FLAGS = {
 
 function TaxCompliance() {
     const { t, i18n } = useTranslation()
+    const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 
@@ -44,10 +46,11 @@ function TaxCompliance() {
             setCountries(overviewRes.data.countries || countriesRes.data)
         } catch (err) {
             console.error('Error fetching compliance overview:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل بيانات الامتثال'), 'error')
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [showToast, t])
 
     const fetchRegimes = useCallback(async (cc) => {
         try {
@@ -55,8 +58,9 @@ function TaxCompliance() {
             setRegimes(res.data)
         } catch (err) {
             console.error('Error fetching regimes:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل الأنظمة الضريبية'), 'error')
         }
-    }, [])
+    }, [showToast, t])
 
     const fetchCompanySettings = useCallback(async () => {
         try {
@@ -64,8 +68,9 @@ function TaxCompliance() {
             setCompanySettings(res.data)
         } catch (err) {
             console.error('Error fetching company settings:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل إعدادات الشركة'), 'error')
         }
-    }, [])
+    }, [showToast, t])
 
     const fetchBranchSettings = useCallback(async (branchId) => {
         try {
@@ -73,8 +78,9 @@ function TaxCompliance() {
             setBranchSettings(res.data)
         } catch (err) {
             console.error('Error fetching branch settings:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل إعدادات الفرع'), 'error')
         }
-    }, [])
+    }, [showToast, t])
 
     useEffect(() => { fetchOverview() }, [fetchOverview])
 
@@ -119,6 +125,7 @@ function TaxCompliance() {
             setReportData(res.data)
         } catch (err) {
             console.error('Error generating report:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في توليد التقرير'), 'error')
         } finally {
             setReportLoading(false)
         }
@@ -307,7 +314,9 @@ function TaxCompliance() {
                                 <select value={reportType} onChange={e => { setReportType(e.target.value); setReportData(null) }}
                                     className="form-input" style={{ minWidth: '220px' }}>
                                     <option value="">{t('tax_compliance.select_report')}</option>
-                                    <option value="sa-vat">🇸🇦 {t('tax_compliance.report_sa_vat')}</option>
+                                    {(companySettings && (Array.isArray(companySettings) ? companySettings : [companySettings]).some(cs => cs.country_code === 'SA')) && (
+                                        <option value="sa-vat">🇸🇦 {t('tax_compliance.report_sa_vat')}</option>
+                                    )}
                                     <option value="sy-income">🇸🇾 {t('tax_compliance.report_sy_income')}</option>
                                     <option value="ae-vat">🇦🇪 {t('tax_compliance.report_ae_vat')}</option>
                                     <option value="eg-vat">🇪🇬 {t('tax_compliance.report_eg_vat')}</option>

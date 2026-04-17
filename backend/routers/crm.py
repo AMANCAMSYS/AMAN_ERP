@@ -5,6 +5,7 @@ CRM-004: Support Tickets with comments and SLA
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 
@@ -177,7 +178,7 @@ def get_opportunity(opp_id: int, current_user=Depends(get_current_user)):
             WHERE o.id = :id
         """), {"id": opp_id}).fetchone()
         if not opp:
-            raise HTTPException(404, "الفرصة غير موجودة")
+            raise HTTPException(**http_error(404, "opportunity_not_found"))
         
         activities = db.execute(text("""
             SELECT * FROM opportunity_activities WHERE opportunity_id = :id ORDER BY created_at DESC
@@ -227,7 +228,7 @@ def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Request, c
     try:
         updates = {k: v for k, v in data.model_dump().items() if v is not None}
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         
         # Auto-set probability based on stage
         if "stage" in updates and updates["stage"] in OPPORTUNITY_STAGES:
@@ -403,7 +404,7 @@ def create_ticket(data: TicketCreate, request: Request, current_user=Depends(get
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating ticket: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -414,7 +415,7 @@ def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, current_
     try:
         updates = {k: v for k, v in data.model_dump().items() if v is not None}
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         
         # Auto-set timestamps
         if updates.get("status") == "resolved":
@@ -464,7 +465,7 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
     try:
         opp = db.execute(text("SELECT * FROM sales_opportunities WHERE id = :id"), {"id": opp_id}).fetchone()
         if not opp:
-            raise HTTPException(status_code=404, detail="الفرصة غير موجودة")
+            raise HTTPException(**http_error(404, "opportunity_not_found"))
         opp = opp._mapping
 
         if not opp.get("customer_id"):
@@ -513,7 +514,7 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
     except Exception as e:
         db.rollback()
         logger.error(f"Error converting opportunity to quotation: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -556,10 +557,9 @@ def list_campaigns(
             params["type"] = campaign_type
 
         rows = db.execute(text(f"""
-            SELECT c.*, u.full_name as created_by_name, s.name as segment_name
+            SELECT c.*, u.full_name as created_by_name
             FROM marketing_campaigns c
             LEFT JOIN company_users u ON c.created_by = u.id
-            LEFT JOIN crm_customer_segments s ON c.segment_id = s.id
             WHERE {' AND '.join(conditions)}
             ORDER BY c.created_at DESC
         """), params).fetchall()
@@ -626,7 +626,7 @@ def create_campaign(data: CampaignCreate, request: Request, current_user=Depends
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating campaign: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -637,7 +637,7 @@ def update_campaign(campaign_id: int, data: CampaignUpdate, request: Request, cu
     try:
         updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = campaign_id
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE marketing_campaigns SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -1037,7 +1037,7 @@ def create_article(data: ArticleCreate, request: Request, current_user=Depends(g
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating article: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1048,7 +1048,7 @@ def update_article(article_id: int, data: ArticleUpdate, request: Request, curre
     try:
         updates = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = article_id
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -1121,7 +1121,7 @@ def create_scoring_rule(data: LeadScoringRuleCreate, request: Request, current_u
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating scoring rule: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1132,7 +1132,7 @@ def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, request: Requ
     try:
         updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = rule_id
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_lead_scoring_rules SET {set_clause} WHERE id = :id"), updates)
@@ -1220,7 +1220,7 @@ def calculate_lead_scores(request: Request, current_user=Depends(get_current_use
     except Exception as e:
         db.rollback()
         logger.error(f"Error calculating lead scores: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1304,7 +1304,7 @@ def create_segment(data: SegmentCreate, request: Request, current_user=Depends(g
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating segment: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1318,7 +1318,7 @@ def update_segment(seg_id: int, data: SegmentUpdate, request: Request, current_u
         if "criteria" in updates:
             updates["criteria"] = json.dumps(updates["criteria"])
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات")
+            raise HTTPException(**http_error(400, "no_data"))
         updates["id"] = seg_id
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_customer_segments SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -1357,7 +1357,7 @@ def add_customer_to_segment(seg_id: int, customer_id: int, request: Request, cur
     except Exception as e:
         db.rollback()
         logger.error(f"Error adding customer to segment: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1477,7 +1477,7 @@ def create_contact(data: ContactCreate, request: Request, current_user=Depends(g
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating contact: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1488,7 +1488,7 @@ def update_contact(contact_id: int, data: ContactUpdate, request: Request, curre
     try:
         updates = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات")
+            raise HTTPException(**http_error(400, "no_data"))
 
         # If setting as primary, unset others for same customer  
         if updates.get("is_primary"):

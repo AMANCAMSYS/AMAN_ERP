@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, SoftDeleteMixin
 
 
-class BillOfMaterial(ModelBase):
+class BillOfMaterial(SoftDeleteMixin, ModelBase):
     __tablename__ = "bill_of_materials"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -19,7 +19,7 @@ class BillOfMaterial(ModelBase):
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class BomOutput(ModelBase):
+class BomOutput(SoftDeleteMixin, ModelBase):
     __tablename__ = "bom_outputs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -31,7 +31,7 @@ class BomOutput(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class BomComponent(ModelBase):
+class BomComponent(SoftDeleteMixin, ModelBase):
     __tablename__ = "bom_components"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -45,7 +45,7 @@ class BomComponent(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class CapacityPlan(ModelBase):
+class CapacityPlan(SoftDeleteMixin, ModelBase):
     __tablename__ = "capacity_plans"
     __table_args__ = (UniqueConstraint("work_center_id", "plan_date", name="capacity_plans_work_center_id_plan_date_key"),)
 

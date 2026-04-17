@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Edit2, Star } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -32,7 +33,7 @@ const PerformanceReviews = () => {
             ]);
             setReviews(rRes.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -49,7 +50,7 @@ const PerformanceReviews = () => {
             setShowModal(false); setEditItem(null);
             setForm({ employee_id: '', review_period: 'annual', review_date: '', performance_score: 3, reviewer_notes: '', goals: '', strengths: '', improvements: '' });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const renderStars = (score) => {

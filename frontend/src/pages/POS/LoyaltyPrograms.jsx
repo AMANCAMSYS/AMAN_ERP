@@ -21,13 +21,13 @@ const LoyaltyPrograms = () => {
 
     const fetchPrograms = async () => {
         try { setLoading(true); const res = await posAPI.listLoyaltyPrograms(); setPrograms(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        catch (err) { showToast(t('common.error_occurred'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreate = async (e) => {
         e.preventDefault();
         try {
-            await posAPI.createLoyaltyProgram({ ...form, points_per_unit: parseFloat(form.points_per_unit), min_points_redeem: parseInt(form.min_points_redeem), point_value: parseFloat(form.point_value) });
+            await posAPI.createLoyaltyProgram({ ...form, points_per_unit: String(form.points_per_unit), min_points_redeem: parseInt(form.min_points_redeem), point_value: String(form.point_value) });
             showToast(t('pos.program_created'), 'success');
             setShowModal(false); fetchPrograms();
         } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }

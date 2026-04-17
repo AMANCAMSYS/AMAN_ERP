@@ -54,10 +54,11 @@ export default function WithholdingTax() {
             setRates(res.data ?? res)
         } catch (e) {
             console.error(e)
+            showToast(t('wht.error_loading_rates', 'حدث خطأ في تحميل نسب ضريبة الاستقطاع'), 'error')
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [showToast, t])
 
     const fetchTransactions = useCallback(async () => {
         try {
@@ -66,10 +67,11 @@ export default function WithholdingTax() {
             setTransactions(res.data ?? res)
         } catch (e) {
             console.error(e)
+            showToast(t('wht.error_loading_transactions', 'حدث خطأ في تحميل المعاملات'), 'error')
         } finally {
             setTxLoading(false)
         }
-    }, [])
+    }, [showToast, t])
 
     useEffect(() => {
         fetchRates()
@@ -88,7 +90,7 @@ export default function WithholdingTax() {
             setRateSubmitting(true)
             await externalAPI.createWhtRate({
                 ...rateForm,
-                rate: parseFloat(rateForm.rate),
+                rate: String(rateForm.rate),
             })
             setShowRateModal(false)
             setRateForm({ name: '', name_ar: '', rate: '', category: 'services' })
@@ -107,7 +109,7 @@ export default function WithholdingTax() {
             setCalcLoading(true)
             const res = await externalAPI.calculateWht({
                 wht_rate_id: parseInt(calcRateId),
-                gross_amount: parseFloat(calcGross),
+                gross_amount: String(calcGross),
             })
             setCalcResult(res.data ?? res)
         } catch (e) {
@@ -124,7 +126,7 @@ export default function WithholdingTax() {
             setTxSubmitting(true)
             await externalAPI.createWhtTransaction({
                 wht_rate_id: parseInt(calcRateId),
-                gross_amount: parseFloat(calcGross),
+                gross_amount: String(calcGross),
                 ...calcResult,
             })
             setCalcResult(null)

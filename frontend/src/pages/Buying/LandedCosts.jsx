@@ -19,7 +19,7 @@ function LandedCosts() {
     const [newItem, setNewItem] = useState({ cost_type: 'freight', description: '', amount: '' })
 
     useEffect(() => {
-        landedCostsAPI.list().then(r => setCosts(r.data)).catch(console.error).finally(() => setLoading(false))
+        landedCostsAPI.list().then(r => setCosts(r.data)).catch(() => showToast(t('common.error'), 'error')).finally(() => setLoading(false))
     }, [])
 
     const addItem = () => {

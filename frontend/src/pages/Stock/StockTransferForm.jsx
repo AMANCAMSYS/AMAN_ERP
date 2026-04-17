@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 
 import { useBranch } from '../../context/BranchContext';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
@@ -12,6 +12,7 @@ const StockTransferForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [warehouses, setWarehouses] = useState([]);
     const [sourceStock, setSourceStock] = useState([]);
@@ -86,7 +87,7 @@ const StockTransferForm = () => {
         e.preventDefault();
 
         if (formData.source_warehouse_id === formData.destination_warehouse_id) {
-            toastEmitter.emit(t('stock.transfer.validation.source_dest_same'), 'error');
+            showToast(t('stock.transfer.validation.source_dest_same'), 'error');
             return;
         }
 
@@ -97,17 +98,16 @@ const StockTransferForm = () => {
                 destination_warehouse_id: parseInt(formData.destination_warehouse_id),
                 items: formData.items.map(item => ({
                     product_id: parseInt(item.product_id),
-                    quantity: parseFloat(item.quantity)
+                    quantity: String(item.quantity)
                 })),
                 notes: formData.notes
             };
 
             await inventoryAPI.transferStock(payload);
-            toastEmitter.emit(t('stock.transfer.validation.success'), 'success');
+            showToast(t('stock.transfer.validation.success'), 'success');
             navigate('/stock'); // Or wherever appropriate
         } catch (error) {
-            console.error(error);
-            toastEmitter.emit(t('stock.transfer.validation.error') + (error.response?.data?.detail || error.message), 'error');
+            showToast(t('stock.transfer.validation.error') + (error.response?.data?.detail || error.message), 'error');
         } finally {
             setLoading(false);
         }

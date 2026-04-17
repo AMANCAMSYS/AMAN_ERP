@@ -1,5 +1,6 @@
 """Sales invoices endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -424,7 +425,7 @@ def create_sales_invoice(
                         db,
                         product_id=item["product_id"],
                         warehouse_id=wh_id,
-                        quantity=float(qty),
+                        quantity=_dec(qty),
                         sale_document_type="sales_invoice",
                         sale_document_id=invoice_id,
                         costing_method=method,
@@ -456,8 +457,8 @@ def create_sales_invoice(
             """), {
                 "pid": item["product_id"], "wh": wh_id,
                 "ref_id": invoice_id, "ref_doc": inv_num,
-                "qty": -float(_dec(item["quantity"])),
-                "cost": float(unit_cost),
+                "qty": -_dec(item["quantity"]),
+                "cost": unit_cost,
                 "total_cost": item_cogs,
                 "user": current_user.id
             })
@@ -701,7 +702,7 @@ def create_sales_invoice(
         db.rollback()
         logger.error(f"Error creating invoice: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @invoices_router.get("/invoices/{invoice_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
@@ -724,7 +725,7 @@ def get_invoice(
         row = db.execute(text(query), {"id": invoice_id}).fetchone()
 
         if not row:
-            raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+            raise HTTPException(**http_error(404, "invoice_not_found"))
 
         # 1.5 Enforce Branch Access for Single Resource
         # If user is restricted, they must have access to the invoice's branch
@@ -774,7 +775,7 @@ def cancel_invoice(
         """), {"id": invoice_id}).fetchone()
 
         if not inv:
-            raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+            raise HTTPException(**http_error(404, "invoice_not_found"))
         if inv.status == 'cancelled':
             raise HTTPException(status_code=400, detail="الفاتورة ملغاة بالفعل")
         if _dec(inv.paid_amount or 0) > _D2:
@@ -852,7 +853,7 @@ def cancel_invoice(
             action="sales.invoice.cancel",
             resource_type="invoice",
             resource_id=str(invoice_id),
-            details={"invoice_number": inv.invoice_number, "total": float(inv.total)},
+            details={"invoice_number": inv.invoice_number, "total": str(inv.total or 0)},
             request=request,
             branch_id=inv.branch_id
         )
@@ -864,7 +865,7 @@ def cancel_invoice(
         db.rollback()
         logger.error(f"Error cancelling invoice: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @invoices_router.get("/invoices/{invoice_id}/payment-history", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -890,6 +891,6 @@ def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(ge
     except Exception as e:
         logger.error(f"Error getting payment history: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

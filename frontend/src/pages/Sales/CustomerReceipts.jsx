@@ -4,13 +4,15 @@ import { salesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 
 function CustomerReceipts() {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
     const currency = getCurrency();
@@ -37,8 +39,7 @@ function CustomerReceipts() {
 
             setVouchers(unified);
         } catch (error) {
-            console.error('Error fetching vouchers:', error);
-            toastEmitter.emit(t('sales.receipts.form.errors.fetch_failed'), 'error');
+            showToast(t('sales.receipts.form.errors.fetch_failed'), 'error');
         } finally {
             setLoading(false);
         }
@@ -108,7 +109,7 @@ function CustomerReceipts() {
                                     </td>
                                     <td>{formatShortDate(voucher.voucher_date)}</td>
                                     <td>{voucher.customer_name}</td>
-                                    <td className="font-bold">{Number(voucher.amount).toLocaleString()} {currency}</td>
+                                    <td className="font-bold">{formatNumber(voucher.amount)} {currency}</td>
                                     <td>
                                         {voucher.payment_method === 'cash' ? t('sales.receipts.payment_methods.cash') :
                                             voucher.payment_method === 'bank' ? t('sales.receipts.payment_methods.bank') :

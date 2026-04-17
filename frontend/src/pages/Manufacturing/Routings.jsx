@@ -53,7 +53,7 @@ const Routings = () => {
             setWorkCenters(wcRes.data);
             setLoading(false);
         } catch (error) {
-            console.error("Error fetching data:", error);
+            toastEmitter.emit(t('common.error'), 'error');
             setLoading(false);
         }
     };
@@ -86,7 +86,7 @@ const Routings = () => {
 
     const handleAddOperation = () => {
         if (!newOp.work_center_id) {
-            toastEmitter.emit(t('Please select a Work Center'), 'warning');
+            toastEmitter.emit(t('manufacturing.validation.select_work_center'), 'warning');
             return;
         }
         const wc = workCenters.find(w => w.id === parseInt(newOp.work_center_id));
@@ -134,7 +134,7 @@ const Routings = () => {
             setShowModal(false);
             fetchData();
         } catch (error) {
-            console.error("Error saving route:", error);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 

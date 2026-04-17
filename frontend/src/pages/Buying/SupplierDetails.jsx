@@ -5,7 +5,7 @@ import { ArrowRight, FileText, Banknote, Calendar, CreditCard, Building, Edit2, 
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
-
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -14,6 +14,7 @@ export default function SupplierDetails() {
     const { id } = useParams()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState({ supplier: {}, invoices: [], payments: [], receipts: [] })
     const [activeTab, setActiveTab] = useState('invoices')
@@ -26,7 +27,7 @@ export default function SupplierDetails() {
                 const response = await purchasesAPI.getSupplierTransactions(id, currentBranch?.id)
                 setData(response.data)
             } catch (error) {
-                console.error("Error fetching supplier details:", error)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

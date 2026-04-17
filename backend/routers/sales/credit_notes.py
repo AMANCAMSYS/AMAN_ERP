@@ -9,6 +9,7 @@ Debit Note (إشعار مدين): Increases customer balance (e.g., undercharge 
   GL: Debit AR, Credit Sales Revenue + VAT Output
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional, List
 from datetime import date
@@ -126,7 +127,7 @@ def get_sales_credit_note(note_id: int, current_user: dict = Depends(get_current
             WHERE i.id = :id AND i.invoice_type = 'sales_credit_note'
         """), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
+            raise HTTPException(**http_error(404, "credit_note_not_found"))
 
         # Enforce branch access for single resource
         from utils.permissions import validate_branch_access
@@ -174,9 +175,9 @@ def create_sales_credit_note(
         related_invoice_id = data.get("related_invoice_id")
         lines = data.get("lines", [])
         if not lines:
-            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+            raise HTTPException(**http_error(400, "min_one_item_required"))
         if not party_id:
-            raise HTTPException(status_code=400, detail="يجب تحديد العميل")
+            raise HTTPException(**http_error(400, "customer_required"))
 
         # Validate related invoice exists and belongs to this customer
         if related_invoice_id:
@@ -184,9 +185,9 @@ def create_sales_credit_note(
                 "SELECT id, party_id, total, invoice_type FROM invoices WHERE id = :id"
             ), {"id": related_invoice_id}).fetchone()
             if not orig:
-                raise HTTPException(status_code=400, detail="الفاتورة المرتبطة غير موجودة")
+                raise HTTPException(**http_error(400, "linked_invoice_not_found"))
             if orig.party_id != party_id:
-                raise HTTPException(status_code=400, detail="الفاتورة لا تخص هذا العميل")
+                raise HTTPException(**http_error(400, "invoice_not_for_customer"))
             if orig.invoice_type not in ('sales',):
                 raise HTTPException(status_code=400, detail="يجب ربط الإشعار بفاتورة مبيعات")
 
@@ -200,7 +201,7 @@ def create_sales_credit_note(
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         branch_id = validate_branch_access(current_user, data.get("branch_id"))
 
         subtotal = Decimal("0")
@@ -369,7 +370,7 @@ def create_sales_credit_note(
             db, user_id=current_user.id, username=current_user.username,
             action="sales.credit_note.create",
             resource_type="sales_credit_note", resource_id=inv_num,
-            details={"party_id": party_id, "total": float(total), "related_invoice": related_invoice_id},
+            details={"party_id": party_id, "total": str(total or 0), "related_invoice": related_invoice_id},
             request=request, branch_id=branch_id,
         )
 
@@ -384,7 +385,7 @@ def create_sales_credit_note(
         db.rollback()
         logger.error(f"Error creating sales credit note: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -477,7 +478,7 @@ def get_sales_debit_note(note_id: int, current_user: dict = Depends(get_current_
             WHERE i.id = :id AND i.invoice_type = 'sales_debit_note'
         """), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
+            raise HTTPException(**http_error(404, "debit_note_not_found"))
 
         # Enforce branch access for single resource
         from utils.permissions import validate_branch_access
@@ -520,9 +521,9 @@ def create_sales_debit_note(
         related_invoice_id = data.get("related_invoice_id")
         lines = data.get("lines", [])
         if not lines:
-            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+            raise HTTPException(**http_error(400, "min_one_item_required"))
         if not party_id:
-            raise HTTPException(status_code=400, detail="يجب تحديد العميل")
+            raise HTTPException(**http_error(400, "customer_required"))
 
         # Validate related invoice if provided
         if related_invoice_id:
@@ -530,9 +531,9 @@ def create_sales_debit_note(
                 "SELECT id, party_id, invoice_type FROM invoices WHERE id = :id"
             ), {"id": related_invoice_id}).fetchone()
             if not orig:
-                raise HTTPException(status_code=400, detail="الفاتورة المرتبطة غير موجودة")
+                raise HTTPException(**http_error(400, "linked_invoice_not_found"))
             if orig.party_id != party_id:
-                raise HTTPException(status_code=400, detail="الفاتورة لا تخص هذا العميل")
+                raise HTTPException(**http_error(400, "invoice_not_for_customer"))
 
         inv_date = data.get("invoice_date", str(date.today()))
         # SLS-010: Prevent posting to closed fiscal periods
@@ -543,7 +544,7 @@ def create_sales_debit_note(
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         branch_id = validate_branch_access(current_user, data.get("branch_id"))
 
         subtotal = Decimal("0")
@@ -695,7 +696,7 @@ def create_sales_debit_note(
             db, user_id=current_user.id, username=current_user.username,
             action="sales.debit_note.create",
             resource_type="sales_debit_note", resource_id=inv_num,
-            details={"party_id": party_id, "total": float(total)},
+            details={"party_id": party_id, "total": str(total or 0)},
             request=request, branch_id=branch_id,
         )
 
@@ -710,6 +711,6 @@ def create_sales_debit_note(
         db.rollback()
         logger.error(f"Error creating sales debit note: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

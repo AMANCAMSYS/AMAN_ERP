@@ -1,10 +1,10 @@
 from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, SoftDeleteMixin
 
 
-class WorkCenter(ModelBase):
+class WorkCenter(SoftDeleteMixin, ModelBase):
     __tablename__ = "work_centers"
     __table_args__ = (UniqueConstraint("code", name="work_centers_code_key"),)
 

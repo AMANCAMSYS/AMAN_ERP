@@ -6,11 +6,13 @@ import { formatShortDate, formatDateTime} from '../../utils/dateUtils';
 import { formatNumber } from '../../utils/format';
 import { Filter, Search, Warehouse, Activity, Calendar } from 'lucide-react';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 
 const StockMovements = () => {
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -32,7 +34,7 @@ const StockMovements = () => {
                 setWarehouses(wRes.data);
                 setMovements(mRes.data);
             } catch (err) {
-                console.error("Failed to load movements data", err);
+                showToast(t('stock.reports.movements.error_load'), 'error');
             } finally {
                 setLoading(false);
             }
@@ -50,7 +52,7 @@ const StockMovements = () => {
             const res = await inventoryAPI.getStockMovements({ ...newFilters, branch_id: currentBranch?.id });
             setMovements(res.data);
         } catch (err) {
-            console.error("Failed to filter movements", err);
+            showToast(t('stock.reports.movements.error_filter'), 'error');
         } finally {
             setLoading(false);
         }

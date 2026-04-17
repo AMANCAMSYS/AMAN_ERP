@@ -5,7 +5,7 @@ import { purchasesAPI, inventoryAPI, currenciesAPI, treasuryAPI } from '../../ut
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -17,6 +17,7 @@ function PaymentForm() {
     const location = useLocation();
     const baseCurrency = getCurrency();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [recordCurrency, setRecordCurrency] = useState(baseCurrency);
     const [exchangeRate, setExchangeRate] = useState(1.0);
     const [transactionRate, setTransactionRate] = useState(1.0); // Rate between Record and Treasury
@@ -75,12 +76,12 @@ function PaymentForm() {
                 }));
             }
         } catch (error) {
-            console.error('Error fetching initial data:', error);
+            showToast(t('common.error'), 'error');
         }
     };
 
     const autoAllocate = (amount, invoices) => {
-        let remaining = parseFloat(amount) || 0;
+        let remaining = Number(amount) || 0;
         const newAllocations = [];
 
         // Filter invoices by type
@@ -139,7 +140,7 @@ function PaymentForm() {
                     setFormData(prev => ({ ...prev, allocations }));
                 }
             } catch (error) {
-                console.error('Error fetching invoices:', error);
+                showToast(t('common.error'), 'error');
             }
         } else {
             setOutstandingInvoices([]);
@@ -189,13 +190,13 @@ function PaymentForm() {
                 }
             }
         } catch (error) {
-            console.error('Error setting exchange rate:', error);
+            showToast(t('common.error'), 'error');
             setExchangeRate(1.0);
         }
     };
 
     const handleAllocationChange = (invoiceId, amount) => {
-        const val = parseFloat(amount) || 0;
+        const val = Number(amount) || 0;
 
         const existing = formData.allocations.find(a => a.invoice_id === invoiceId);
         if (existing) {
@@ -214,7 +215,7 @@ function PaymentForm() {
     };
 
     const handleAmountChange = (e) => {
-        const newAmount = parseFloat(e.target.value) || 0;
+        const newAmount = Number(e.target.value) || 0;
         setFormData({ ...formData, amount: newAmount });
 
         // Auto-allocate when amount changes and we have invoices
@@ -239,7 +240,7 @@ function PaymentForm() {
             );
 
             if (filteredInvoices.length === 0) {
-                toastEmitter.emit(t('buying.payments.form.validation.no_invoices_matching_currency') || `لا توجد فواتير مطابقة لعملة السند (${recordCurrency})`, 'error');
+                showToast(t('buying.payments.form.validation.no_invoices_matching_currency') || `لا توجد فواتير مطابقة لعملة السند (${recordCurrency})`, 'error');
                 return;
             }
 
@@ -274,22 +275,22 @@ function PaymentForm() {
         e.preventDefault();
 
         if (!formData.supplier_id) {
-            toastEmitter.emit(t('buying.payments.form.validation.select_supplier'), 'error');
+            showToast(t('buying.payments.form.validation.select_supplier'), 'error');
             return;
         }
 
         if (formData.amount <= 0) {
-            toastEmitter.emit(t('buying.payments.form.validation.invalid_amount'), 'error');
+            showToast(t('buying.payments.form.validation.invalid_amount'), 'error');
             return;
         }
 
         if (totalAllocated > formData.amount) {
-            toastEmitter.emit(t('buying.payments.form.validation.allocation_exceeded'), 'error');
+            showToast(t('buying.payments.form.validation.allocation_exceeded'), 'error');
             return;
         }
 
         if (!formData.payment_method) {
-            toastEmitter.emit(t('buying.payments.form.validation.payment_method_required'), 'error');
+            showToast(t('buying.payments.form.validation.payment_method_required'), 'error');
             return;
         }
 
@@ -310,20 +311,19 @@ function PaymentForm() {
                 notes: formData.notes || null,
                 allocations: formData.allocations.filter(a => a.allocated_amount > 0).map(a => ({
                     invoice_id: parseInt(a.invoice_id),
-                    allocated_amount: parseFloat(a.allocated_amount)
+                    allocated_amount: String(a.allocated_amount)
                 })),
                 currency: recordCurrency,
-                exchange_rate: parseFloat(exchangeRate) || 1.0,
+                exchange_rate: String(exchangeRate || 1.0),
                 treasury_account_id: formData.bank_account_id ? parseInt(formData.bank_account_id) : null,
-                transaction_rate: parseFloat(transactionRate) || 1.0
+                transaction_rate: String(transactionRate || 1.0)
             };
 
             await purchasesAPI.createPayment(sanitizedData);
-            toastEmitter.emit(t('buying.payments.form.validation.success'), 'success');
+            showToast(t('buying.payments.form.validation.success'), 'success');
             navigate('/buying/payments');
         } catch (error) {
-            console.error('Error creating payment:', error);
-            toastEmitter.emit(t('buying.payments.form.error_saving') + (error.response?.data?.detail || error.message), 'error');
+            showToast(t('buying.payments.form.error_saving') + (error.response?.data?.detail || error.message), 'error');
         } finally {
             setLoading(false);
         }
@@ -520,7 +520,7 @@ function PaymentForm() {
                                             step="0.01"
                                             min="0.01"
                                             value={formData.amount}
-                                            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                                            onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) || 0 })}
                                             className="form-input border-purple-200"
                                         />
                                         <span className="absolute left-3 top-2 text-gray-400">{recordCurrency}</span>

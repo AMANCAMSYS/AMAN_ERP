@@ -1,5 +1,6 @@
 """Customer receipts and payments (vouchers) endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -39,7 +40,7 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
         currency = data.currency or base_currency
         exchange_rate = _dec(data.exchange_rate or 1)
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 1. Insert Voucher Header
@@ -88,7 +89,7 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
 
             remaining = (_dec(inv_info.total) - _dec(inv_info.paid_amount)).quantize(_D2, ROUND_HALF_UP)
             if alloc_amt > remaining + _D2:
-                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({float(alloc_amt):.2f}) يتجاوز المتبقي على الفاتورة ({float(remaining):.2f})")
+                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({alloc_amt:.2f}) يتجاوز المتبقي على الفاتورة ({remaining:.2f})")
 
             total_allocated = (total_allocated + alloc_amt).quantize(_D2, ROUND_HALF_UP)
 
@@ -111,7 +112,7 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
             """), {"amt": alloc_amt, "iid": alloc.invoice_id})
 
         if total_allocated > (_dec(data.amount) + _D2):
-            raise HTTPException(status_code=400, detail="إجمالي التخصيصات أكبر من مبلغ السند")
+            raise HTTPException(**http_error(400, "allocations_exceed_voucher_amount"))
 
         # 3. Update Customer Balance (reduce receivables in Base Currency)
         db.execute(text("""
@@ -251,7 +252,7 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
         db.rollback()
         logger.error(f"Error creating receipt: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @vouchers_router.post("/payments", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
@@ -271,7 +272,7 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         currency = data.currency or base_currency
         exchange_rate = _dec(data.exchange_rate or 1)
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
         # 1. Insert Voucher Header
@@ -319,7 +320,7 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
 
             remaining = (_dec(inv_info.total) - _dec(inv_info.paid_amount)).quantize(_D2, ROUND_HALF_UP)
             if alloc_amt > remaining + _D2:
-                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({float(alloc_amt):.2f}) يتجاوز المتبقي على الفاتورة ({float(remaining):.2f})")
+                raise HTTPException(status_code=400, detail=f"مبلغ التخصيص ({alloc_amt:.2f}) يتجاوز المتبقي على الفاتورة ({remaining:.2f})")
 
             total_allocated = (total_allocated + alloc_amt).quantize(_D2, ROUND_HALF_UP)
 
@@ -346,7 +347,7 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
             """), {"iid": alloc.invoice_id})
 
         if total_allocated > (_dec(data.amount) + _D2):
-            raise HTTPException(status_code=400, detail="إجمالي التخصيصات أكبر من مبلغ السند")
+            raise HTTPException(**http_error(400, "allocations_exceed_voucher_amount"))
 
         # 2. Update Customer Balance (increase because we're paying them)
         db.execute(text("""
@@ -451,7 +452,7 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
         db.rollback()
         logger.error(f"Error creating receipt: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @vouchers_router.get("/receipts", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -481,7 +482,7 @@ def list_customer_receipts(branch_id: Optional[int] = None, current_user: dict =
     except Exception as e:
         logger.error(f"Error listing receipts: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @vouchers_router.get("/payments", response_model=List[dict], dependencies=[Depends(require_permission("sales.view"))])
@@ -511,7 +512,7 @@ def list_customer_payments(branch_id: Optional[int] = None, current_user: dict =
     except Exception as e:
         logger.error(f"Error listing payments: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @vouchers_router.get("/payments/{voucher_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
@@ -539,7 +540,7 @@ def get_payment_details(voucher_id: int, current_user: dict = Depends(get_curren
     except Exception as e:
         logger.error(f"Error getting payment details: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @vouchers_router.get("/receipts/{voucher_id}", response_model=dict, dependencies=[Depends(require_permission("sales.view"))])
@@ -580,6 +581,6 @@ def get_receipt_details(voucher_id: int, current_user: dict = Depends(get_curren
     except Exception as e:
         logger.error(f"Error getting receipt: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

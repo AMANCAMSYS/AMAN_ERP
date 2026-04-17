@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { wpsAPI, hrAPI } from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
+import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
-import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 
 function EOSSettlement() {
     const { t } = useTranslation()
-    const { showToast } = useToast()
     const currency = getCurrency()
     const [employees, setEmployees] = useState([])
     const [selectedEmp, setSelectedEmp] = useState('')
@@ -16,7 +16,7 @@ function EOSSettlement() {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        hrAPI.listEmployees({ status: 'active' }).then(r => setEmployees(r.data)).catch(console.error)
+        hrAPI.listEmployees({ status: 'active' }).then(r => setEmployees(r.data)).catch(() => toastEmitter.emit(t('common.error'), 'error'))
     }, [])
 
     const handleSettle = async () => {
@@ -25,9 +25,9 @@ function EOSSettlement() {
         try {
             const res = await wpsAPI.settleEndOfService({ employee_id: selectedEmp, reason })
             setResult(res.data)
-            showToast(t('eos.settled_success'), 'success')
+            toastEmitter.emit(t('eos.settled_success'), 'success')
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error')
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error')
         } finally { setLoading(false) }
     }
 
@@ -78,19 +78,19 @@ function EOSSettlement() {
                     <div className="grid grid-2" style={{ gap: 16 }}>
                         <div className="detail-grid">
                             <div><strong>{t('eos.years_of_service')}:</strong> {result.years_of_service}</div>
-                            <div><strong>{t('eos.last_salary')}:</strong> {Number(result.last_salary).toLocaleString()} {currency}</div>
+                            <div><strong>{t('eos.last_salary')}:</strong> {formatNumber(result.last_salary)} {currency}</div>
                             <div><strong>{t('eos.reason')}:</strong> {t(`eos.${result.reason}`, result.reason)}</div>
                         </div>
                         <div className="detail-grid">
-                            <div><strong>{t('eos.gratuity')}:</strong> {Number(result.gratuity_amount).toLocaleString()} {currency}</div>
-                            <div><strong>{t('eos.vacation_balance')}:</strong> {Number(result.vacation_balance || 0).toLocaleString()} {currency}</div>
-                            <div><strong>{t('eos.pending_salary')}:</strong> {Number(result.pending_salary || 0).toLocaleString()} {currency}</div>
+                            <div><strong>{t('eos.gratuity')}:</strong> {formatNumber(result.gratuity_amount)} {currency}</div>
+                            <div><strong>{t('eos.vacation_balance')}:</strong> {formatNumber(result.vacation_balance || 0)} {currency}</div>
+                            <div><strong>{t('eos.pending_salary')}:</strong> {formatNumber(result.pending_salary || 0)} {currency}</div>
                         </div>
                     </div>
                     <div className="mt-4 p-3 bg-light rounded text-center">
                         <div className="text-muted">{t('eos.total_settlement')}</div>
                         <div className="text-2xl font-bold text-primary">
-                            {Number(result.total_settlement).toLocaleString()} {currency}
+                            {formatNumber(result.total_settlement)} {currency}
                         </div>
                     </div>
                 </div>

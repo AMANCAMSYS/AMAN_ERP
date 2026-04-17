@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { inventoryAPI, companiesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -12,6 +13,7 @@ function SupplierList() {
     const { t, i18n } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [suppliers, setSuppliers] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -38,7 +40,7 @@ function SupplierList() {
                 }
             } catch (err) {
                 setError(t('common.error_loading'))
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

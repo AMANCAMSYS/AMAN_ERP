@@ -13,7 +13,7 @@ def _dec(v):
     return Decimal(str(v or 0))
 
 
-def calculate_eos_gratuity(total_salary: float, total_years: float, termination_reason: str = "termination") -> dict:
+def calculate_eos_gratuity(total_salary: Decimal, total_years: Decimal, termination_reason: str = "termination") -> dict:
     """
     Calculate End of Service gratuity per Saudi Labor Law Art. 84/85.
     
@@ -35,16 +35,16 @@ def calculate_eos_gratuity(total_salary: float, total_years: float, termination_
         termination_reason: One of: termination, resignation, retirement, contract_end
     
     Returns:
-        dict with full_gratuity, resignation_factor, final_gratuity
+        dict with full_gratuity, resignation_factor, final_gratuity (all Decimal)
     """
     salary = _dec(total_salary)
     years = _dec(total_years)
 
     if years <= 0:
         return {
-            "full_gratuity": 0.0,
-            "resignation_factor": 0.0,
-            "final_gratuity": 0.0
+            "full_gratuity": Decimal("0"),
+            "resignation_factor": Decimal("0"),
+            "final_gratuity": Decimal("0")
         }
 
     # Calculate base gratuity
@@ -71,7 +71,7 @@ def calculate_eos_gratuity(total_salary: float, total_years: float, termination_
     final_gratuity = (gratuity * resignation_factor).quantize(_D2, ROUND_HALF_UP)
 
     return {
-        "full_gratuity": float(full_gratuity),
-        "resignation_factor": float(resignation_factor.quantize(_D2, ROUND_HALF_UP)),
-        "final_gratuity": float(final_gratuity)
+        "full_gratuity": full_gratuity,
+        "resignation_factor": resignation_factor.quantize(_D2, ROUND_HALF_UP),
+        "final_gratuity": final_gratuity
     }

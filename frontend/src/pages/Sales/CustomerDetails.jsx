@@ -4,13 +4,16 @@ import { salesAPI } from '../../utils/api'
 import { FileText, Banknote, Calendar, CreditCard, Building } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 
 export default function CustomerDetails() {
     const { t } = useTranslation()
+    const { showToast } = useToast()
     const { id } = useParams()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
@@ -26,7 +29,7 @@ export default function CustomerDetails() {
                 const response = await salesAPI.getCustomerTransactions(id, currentBranch?.id)
                 setData(response.data)
             } catch (error) {
-                console.error("Error fetching customer details:", error)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -66,7 +69,7 @@ export default function CustomerDetails() {
                             direction: 'ltr',
                             display: 'block'
                         }}>
-                            {Number(data.customer?.total_sales || 0).toLocaleString()} {currency}
+                            {formatNumber(data.customer?.total_sales || 0)} {currency}
                         </span>
                     </div>
 
@@ -85,7 +88,7 @@ export default function CustomerDetails() {
                             direction: 'ltr',
                             display: 'block'
                         }}>
-                            {Number(data.customer?.balance).toLocaleString()} {currency}
+                            {formatNumber(data.customer?.balance)} {currency}
                         </span>
                     </div>
                 </div>
@@ -156,8 +159,8 @@ export default function CustomerDetails() {
                                             {formatShortDate(inv.date)}
                                         </div>
                                     </td>
-                                    <td style={{ fontWeight: '600' }}>{Number(inv.total).toLocaleString()} {currency}</td>
-                                    <td style={{ color: 'var(--success)' }}>{Number(inv.paid).toLocaleString()} {currency}</td>
+                                    <td style={{ fontWeight: '600' }}>{formatNumber(inv.total)} {currency}</td>
+                                    <td style={{ color: 'var(--success)' }}>{formatNumber(inv.paid)} {currency}</td>
                                     <td>
                                         <span className={`badge ${inv.status === 'paid' ? 'badge-success' :
                                             inv.status === 'partial' ? 'badge-warning' :
@@ -202,7 +205,7 @@ export default function CustomerDetails() {
                                             {formatShortDate(rec.date)}
                                         </div>
                                     </td>
-                                    <td style={{ fontWeight: '600' }}>{Number(rec.amount).toLocaleString()} {currency}</td>
+                                    <td style={{ fontWeight: '600' }}>{formatNumber(rec.amount)} {currency}</td>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <CreditCard size={14} style={{ color: 'var(--text-secondary)' }} />

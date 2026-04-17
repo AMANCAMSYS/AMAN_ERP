@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
 import { wpsAPI, hrAPI } from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
+import { formatNumber } from '../../utils/format'
 import { useTranslation } from 'react-i18next'
-import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 
 function WPSExport() {
     const { t } = useTranslation()
-    const { showToast } = useToast()
     const [periods, setPeriods] = useState([])
     const [selectedPeriod, setSelectedPeriod] = useState('')
     const [preview, setPreview] = useState(null)
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        hrAPI.listPayrollPeriods().then(r => setPeriods(r.data)).catch(console.error)
+        hrAPI.listPayrollPeriods().then(r => setPeriods(r.data)).catch(() => toastEmitter.emit(t('common.error'), 'error'))
     }, [])
 
     const handlePreview = async () => {
@@ -23,7 +23,7 @@ function WPSExport() {
             const res = await wpsAPI.previewWPS(selectedPeriod)
             setPreview(res.data)
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error')
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error')
         } finally { setLoading(false) }
     }
 
@@ -39,9 +39,9 @@ function WPSExport() {
             a.download = `WPS_SIF_${selectedPeriod}.csv`
             a.click()
             window.URL.revokeObjectURL(url)
-            showToast(t('wps.exported'), 'success')
+            toastEmitter.emit(t('wps.exported'), 'success')
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error')
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error')
         } finally { setLoading(false) }
     }
 
@@ -108,10 +108,10 @@ function WPSExport() {
                                     <td>{e.employee_name}</td>
                                     <td>{e.employee_id_number || '-'}</td>
                                     <td className="text-xs">{e.iban || <span className="text-danger">{t('wps.missing_iban')}</span>}</td>
-                                    <td>{Number(e.basic_salary).toLocaleString()}</td>
-                                    <td>{Number(e.allowances).toLocaleString()}</td>
-                                    <td>{Number(e.deductions).toLocaleString()}</td>
-                                    <td className="font-bold">{Number(e.net_salary).toLocaleString()}</td>
+                                    <td>{formatNumber(e.basic_salary)}</td>
+                                    <td>{formatNumber(e.allowances)}</td>
+                                    <td>{formatNumber(e.deductions)}</td>
+                                    <td className="font-bold">{formatNumber(e.net_salary)}</td>
                                 </tr>
                             ))}
                         </tbody>

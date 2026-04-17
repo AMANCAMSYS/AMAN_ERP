@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Edit2, RotateCcw, Package } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -39,7 +40,7 @@ const CustodyManagement = () => {
             ]);
             setItems(cRes.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -56,7 +57,7 @@ const CustodyManagement = () => {
             setShowModal(false); setEditItem(null);
             setForm({ employee_id: '', item_name: '', item_type: 'laptop', serial_number: '', assigned_date: '', notes: '' });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleReturn = async () => {
@@ -64,7 +65,7 @@ const CustodyManagement = () => {
             await hrAdvancedAPI.returnCustody(returnItem.id, returnForm);
             setShowReturnModal(false); setReturnItem(null);
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     return (

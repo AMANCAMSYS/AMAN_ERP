@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils'
 import { Printer, ArrowLeft, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
@@ -11,6 +12,7 @@ function PaymentDetails() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
+    const { showToast } = useToast()
     const [payment, setPayment] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -23,7 +25,7 @@ function PaymentDetails() {
                 setPayment(response.data)
             } catch (err) {
                 setError(t('buying.payments.details.failed_load'))
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

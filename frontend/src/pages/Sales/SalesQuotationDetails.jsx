@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 
 function SalesQuotationDetails() {
@@ -22,7 +23,6 @@ function SalesQuotationDetails() {
                 const response = await salesAPI.getQuotation(id)
                 setQuotation(response.data)
             } catch (err) {
-                console.error(err)
                 setError(t('sales.quotations.form.errors.fetch_failed'))
             } finally {
                 setLoading(false)
@@ -98,11 +98,11 @@ function SalesQuotationDetails() {
                                 <tr key={index}>
                                     <td className="font-medium">{item.product_name}</td>
                                     <td className="text-secondary">{item.description}</td>
-                                    <td style={{ textAlign: 'center' }}>{Number(item.quantity).toLocaleString()}</td>
-                                    <td style={{ textAlign: 'left' }}>{Number(item.unit_price).toLocaleString()} <small>{quotation.currency || currency}</small></td>
-                                    <td style={{ textAlign: 'left' }}>{Number(item.discount).toLocaleString()} <small>{quotation.currency || currency}</small></td>
+                                    <td style={{ textAlign: 'center' }}>{formatNumber(item.quantity)}</td>
+                                    <td style={{ textAlign: 'left' }}>{formatNumber(item.unit_price)} <small>{quotation.currency || currency}</small></td>
+                                    <td style={{ textAlign: 'left' }}>{formatNumber(item.discount)} <small>{quotation.currency || currency}</small></td>
                                     <td style={{ textAlign: 'left' }}>{item.tax_rate}%</td>
-                                    <td style={{ textAlign: 'left' }} className="font-bold">{Number(item.total).toLocaleString()} <small>{quotation.currency || currency}</small></td>
+                                    <td style={{ textAlign: 'left' }} className="font-bold">{formatNumber(item.total)} <small>{quotation.currency || currency}</small></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -124,20 +124,20 @@ function SalesQuotationDetails() {
                     <div style={{ width: '300px', padding: '20px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span>{t('sales.quotations.details.subtotal')}:</span>
-                            <span>{Number(quotation.subtotal).toLocaleString()} <small>{quotation.currency || currency}</small></span>
+                            <span>{formatNumber(quotation.subtotal)} <small>{quotation.currency || currency}</small></span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span>{t('sales.quotations.details.discount')}:</span>
-                            <span className="text-error">-{Number(quotation.discount).toLocaleString()} <small>{quotation.currency || currency}</small></span>
+                            <span className="text-error">-{formatNumber(quotation.discount)} <small>{quotation.currency || currency}</small></span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                             <span>{t('sales.quotations.details.tax')}:</span>
-                            <span>{Number(quotation.tax_amount).toLocaleString()} <small>{quotation.currency || currency}</small></span>
+                            <span>{formatNumber(quotation.tax_amount)} <small>{quotation.currency || currency}</small></span>
                         </div>
                         <div style={{ borderTop: '1px solid var(--border-color)', margin: '12px 0' }}></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.2rem', color: 'var(--primary)' }}>
                             <span>{t('sales.quotations.details.grand_total')}:</span>
-                            <span>{Number(quotation.total).toLocaleString()} <small>{quotation.currency || currency}</small></span>
+                            <span>{formatNumber(quotation.total)} <small>{quotation.currency || currency}</small></span>
                         </div>
                     </div>
                 </div>

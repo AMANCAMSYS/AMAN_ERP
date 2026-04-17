@@ -46,7 +46,7 @@ const WorkCenters = () => {
             setAccounts(accRes.data.filter(a => a.type === 'expense' || a.type === 'cogs' || true));
             setLoading(false);
         } catch (error) {
-            console.error("Error fetching data:", error);
+            toastEmitter.emit(t('common.error'), 'error');
             setLoading(false);
         }
     };
@@ -101,7 +101,7 @@ const WorkCenters = () => {
             setShowModal(false);
             fetchData();
         } catch (error) {
-            console.error("Error saving work center:", error);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -243,7 +243,7 @@ const WorkCenters = () => {
 
                                 <div className="row">
                                     <div className="col-md-6 form-group">
-                                        <label className="form-label">{t('reports.cost_id') || t('Cost Center')}</label>
+                                        <label className="form-label">{t('manufacturing.wc_cost_center')}</label>
                                         <select
                                             className="form-input"
                                             value={formData.cost_center_id}

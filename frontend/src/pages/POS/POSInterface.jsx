@@ -19,6 +19,7 @@ import {
     Clock, LayoutGrid, ArrowRightLeft, Smartphone, Package, RotateCcw
 } from 'lucide-react';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatNumber } from '../../utils/format';
 
 const POSInterface = () => {
     const { t, i18n } = useTranslation();
@@ -122,7 +123,7 @@ const POSInterface = () => {
                 setSession(sessionRes.data);
             }
         } catch (e) {
-            console.error("Refresh Session Error:", e);
+            showToast(t('common.error_occurred'), 'error');
         }
     };
 
@@ -144,7 +145,6 @@ const POSInterface = () => {
             setFilteredProducts(fetchedProducts);
             setLoading(false);
         } catch (error) {
-            console.error("Init POS Error:", error);
             showToast(t('common.error_occurred'), "error");
             navigate('/dashboard');
         }
@@ -154,7 +154,7 @@ const POSInterface = () => {
         try {
             const res = await api.get('/sales/customers');
             setCustomers(res.data);
-        } catch (e) { console.error(e); }
+        } catch (e) { showToast(t('common.error_occurred'), 'error'); }
     }
 
     // --- Cart Logic ---
@@ -264,7 +264,6 @@ const POSInterface = () => {
             refreshSession();
             return true;
         } catch (error) {
-            console.error("Order error", error);
             showToast(t('common.error_save'), "error");
             throw error;
         } finally {
@@ -297,8 +296,8 @@ const POSInterface = () => {
 
         try {
             await api.post(`/pos/sessions/${session.id}/close`, {
-                cash_register_balance: parseFloat(closingData.cashCount),
-                closing_balance: parseFloat(closingData.cashCount),
+                cash_register_balance: String(closingData.cashCount),
+                closing_balance: String(closingData.cashCount),
                 notes: closingData.notes
             });
 
@@ -508,7 +507,7 @@ const POSInterface = () => {
                                         <div className="product-card-content">
                                             <h3 className="product-card-name" title={product.name}>{product.name}</h3>
                                             <div className="product-card-price">
-                                                <span className="price">{product.price.toLocaleString()}</span>
+                                                <span className="price">{formatNumber(product.price)}</span>
                                                 <span className="currency">{currency}</span>
                                             </div>
                                         </div>
@@ -555,7 +554,7 @@ const POSInterface = () => {
                             <div key={item.id} className="cart-item">
                                 <div className="cart-item-info">
                                     <h4 className="cart-item-name">{item.name}</h4>
-                                    <p className="cart-item-price">{item.price.toLocaleString()} {currency}</p>
+                                    <p className="cart-item-price">{formatNumber(item.price)} {currency}</p>
                                 </div>
 
                                 <div className="cart-item-qty">
@@ -565,7 +564,7 @@ const POSInterface = () => {
                                 </div>
 
                                 <div className="cart-item-total">
-                                    <p className="total-amount">{(item.price * item.quantity).toLocaleString()}</p>
+                                    <p className="total-amount">{formatNumber(item.price * item.quantity)}</p>
                                     <p className="total-currency">{currency}</p>
                                 </div>
 
@@ -584,14 +583,14 @@ const POSInterface = () => {
                         <div className="cart-totals">
                             <div className="cart-totals-row">
                                 <span className="label">{t('pos.subtotal')}</span>
-                                <span className="value">{cartTotals.subtotal.toLocaleString()} {currency}</span>
+                                <span className="value">{formatNumber(cartTotals.subtotal)} {currency}</span>
                             </div>
                             <div className="cart-totals-row discount">
                                 <span className="label">{t('pos.discount')}</span>
                                 <div className="discount-actions">
                                     {globalDiscount > 0 ? (
                                         <>
-                                            <span className="value">-{globalDiscount.toLocaleString()} {currency}</span>
+                                            <span className="value">-{formatNumber(globalDiscount)} {currency}</span>
                                             <button onClick={() => setGlobalDiscount(0)} className="discount-btn remove">{t('common.cancel')}</button>
                                         </>
                                     ) : (
@@ -618,14 +617,14 @@ const POSInterface = () => {
                             </div>
                             <div className="cart-totals-row">
                                 <span className="label">{t('pos.tax')}</span>
-                                <span className="value">{cartTotals.tax.toLocaleString()} {currency}</span>
+                                <span className="value">{formatNumber(cartTotals.tax)} {currency}</span>
                             </div>
                         </div>
 
                         <div className="cart-grand-total">
                             <span className="label">{t('pos.total')}</span>
                             <div className="value">
-                                <p className="amount">{cartTotals.total.toLocaleString()}</p>
+                                <p className="amount">{formatNumber(cartTotals.total)}</p>
                                 <p className="currency">{currency}</p>
                             </div>
                         </div>
@@ -709,7 +708,7 @@ const POSInterface = () => {
                                 <p className="label">{t('pos.remaining_amount')}</p>
                                 <p className="amount">
                                     <span className="currency">{currency}</span>
-                                    {(cartTotals.total - Number(paymentAmounts.cash) - Number(paymentAmounts.card) - Number(paymentAmounts.mada)).toLocaleString()}
+                                    {formatNumber(cartTotals.total - Number(paymentAmounts.cash) - Number(paymentAmounts.card) - Number(paymentAmounts.mada))}
                                 </p>
                             </div>
 
@@ -836,28 +835,28 @@ const POSInterface = () => {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>{t('pos.opening_balance')}:</span>
-                                        <strong>{session?.opening_balance?.toLocaleString()} {currency}</strong>
+                                        <strong>{formatNumber(session?.opening_balance)} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--base-200)', paddingTop: '4px' }}>
                                         <span>{t('pos.total_actual_sales')}:</span>
-                                        <strong style={{ fontWeight: '500' }}>{session?.total_sales?.toLocaleString() || 0} {currency}</strong>
+                                        <strong style={{ fontWeight: '500' }}>{formatNumber(session?.total_sales || 0)} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>{t('pos.total_cash_sales')}:</span>
-                                        <strong style={{ color: '#059669' }}>+{session?.total_cash?.toLocaleString() || 0} {currency}</strong>
+                                        <strong style={{ color: '#059669' }}>+{formatNumber(session?.total_cash || 0)} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <span>{t('pos.total_bank_sales')}:</span>
-                                        <strong style={{ color: '#2563eb' }}>{session?.total_bank?.toLocaleString() || 0} {currency}</strong>
+                                        <strong style={{ color: '#2563eb' }}>{formatNumber(session?.total_bank || 0)} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', color: session?.total_returns_cash > 0 ? 'var(--pos-danger)' : 'inherit' }}>
                                         <span>{t('pos.total_returns_cash')}:</span>
-                                        <strong>-{session?.total_returns_cash?.toLocaleString() || 0} {currency}</strong>
+                                        <strong>-{formatNumber(session?.total_returns_cash || 0)} {currency}</strong>
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '8px', borderTop: '2px solid var(--base-300)' }}>
                                         <span style={{ fontWeight: '700', fontSize: '14px' }}>{t('pos.expected_cash')}:</span>
                                         <strong style={{ color: 'var(--primary)', fontSize: '17px' }}>
-                                            {((session?.opening_balance || 0) + (session?.total_cash || 0) - (session?.total_returns_cash || 0)).toLocaleString()} {currency}
+                                            {formatNumber((session?.opening_balance || 0) + (session?.total_cash || 0) - (session?.total_returns_cash || 0))} {currency}
                                         </strong>
                                     </div>
                                     <div style={{ fontSize: '11px', color: 'var(--base-content-secondary)', marginTop: '4px', textAlign: 'center' }}>

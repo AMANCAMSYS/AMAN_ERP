@@ -4,6 +4,7 @@ import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -13,6 +14,7 @@ function PurchaseInvoiceList() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [invoices, setInvoices] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -27,7 +29,7 @@ function PurchaseInvoiceList() {
                 setInvoices(response.data)
             } catch (err) {
                 setError(t('common.error_loading'))
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

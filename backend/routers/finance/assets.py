@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from datetime import date
@@ -77,7 +78,7 @@ def create_asset_transfer(data: dict, current_user: dict = Depends(get_current_u
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -100,7 +101,7 @@ def approve_transfer(transfer_id: int, current_user: dict = Depends(get_current_
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -153,7 +154,7 @@ def create_revaluation(data: dict, current_user: dict = Depends(get_current_user
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -485,7 +486,7 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -599,7 +600,7 @@ def create_lease_contract(lease: dict, current_user: dict = Depends(get_current_
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -664,7 +665,7 @@ def update_asset(asset_id: int, data: dict = Body(...), current_user: dict = Dep
     try:
         existing = conn.execute(text("SELECT * FROM assets WHERE id = :id"), {"id": asset_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="الأصل غير موجود")
+            raise HTTPException(**http_error(404, "asset_not_found"))
         if existing.status == 'disposed':
             raise HTTPException(status_code=400, detail="لا يمكن تعديل أصل مستبعد")
         
@@ -688,7 +689,7 @@ def update_asset(asset_id: int, data: dict = Body(...), current_user: dict = Dep
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -765,7 +766,7 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 @router.post("/{asset_id}/dispose", dependencies=[Depends(require_permission("assets.manage"))])
@@ -867,7 +868,7 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         trans.rollback()
         logger.exception("Operation failed")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -890,7 +891,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
 
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id FOR UPDATE"), {"id": asset_id}).fetchone()
         if not asset:
-            raise HTTPException(status_code=404, detail="الأصل غير موجود")
+            raise HTTPException(**http_error(404, "asset_not_found"))
         if asset.status == 'disposed':
             raise HTTPException(status_code=400, detail="لا يمكن نقل أصل مستبعد")
 
@@ -959,7 +960,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1050,7 +1051,7 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1174,7 +1175,7 @@ def add_insurance(asset_id: int, data: dict, current_user: dict = Depends(get_cu
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1212,7 +1213,7 @@ def add_maintenance(asset_id: int, data: dict, current_user: dict = Depends(get_
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -1347,6 +1348,6 @@ def run_impairment_test(asset_id: int, test_data: dict, current_user: dict = Dep
     except Exception as e:
         conn.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()

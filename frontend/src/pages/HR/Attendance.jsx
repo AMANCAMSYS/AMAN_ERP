@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { attendanceAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Clock, Calendar, AlertCircle, Play, Square, LogOut, CheckCircle } from 'lucide-react';
-import { toast } from 'react-hot-toast';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -36,7 +36,7 @@ const Attendance = () => {
             }
             setHistory(Array.isArray(historyData) ? historyData : []);
         } catch (error) {
-            console.error(error);
+            toastEmitter.emit(t('common.error'), 'error');
             // toast.error(t('common.error_loading_data'));
         } finally {
             setLoading(false);
@@ -48,16 +48,15 @@ const Attendance = () => {
             setActionLoading(true);
             if (status === 'checked_in') {
                 await attendanceAPI.checkOut();
-                toast.success(t('hr.attendance.check_out_success', 'Checked out successfully'));
+                toastEmitter.emit(t('hr.attendance.check_out_success', 'Checked out successfully'), 'success');
             } else {
                 await attendanceAPI.checkIn();
-                toast.success(t('hr.attendance.check_in_success', 'Checked in successfully'));
+                toastEmitter.emit(t('hr.attendance.check_in_success', 'Checked in successfully'), 'success');
             }
             // Refresh data
             fetchData();
         } catch (error) {
-            console.error(error);
-            toast.error(error.response?.data?.detail || t('common.error'));
+            toastEmitter.emit(error.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setActionLoading(false);
         }

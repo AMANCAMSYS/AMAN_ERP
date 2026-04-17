@@ -4,6 +4,7 @@ import { getCurrency, hasPermission } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -19,6 +20,7 @@ const SupplierStatement = () => {
         end: new Date().toISOString().split('T')[0]
     });
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
 
     useEffect(() => {
         inventoryAPI.listSuppliers().then(res => setSuppliers(res.data));
@@ -38,7 +40,7 @@ const SupplierStatement = () => {
             });
             setStatement(res.data);
         } catch (err) {
-            console.error(err);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

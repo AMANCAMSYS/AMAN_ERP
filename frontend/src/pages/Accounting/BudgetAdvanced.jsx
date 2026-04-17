@@ -56,7 +56,7 @@ const BudgetAdvanced = () => {
         try {
             const res = await budgetImprovementsAPI.compareBudgets(compForm.budget_id_1, compForm.budget_id_2);
             setComparison(res.data);
-        } catch (err) { showToast('Error comparing', 'error'); }
+        } catch (err) { showToast(t('errors.comparison_failed'), 'error'); }
     };
 
     const tabs = [

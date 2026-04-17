@@ -28,7 +28,8 @@ function ExpenseForm() {
         target_account_id: '',
         notes: '',
         reference_number: '',
-        branch_id: ''
+        branch_id: '',
+        exchange_rate: 1
     })
 
     useEffect(() => {
@@ -134,6 +135,16 @@ function ExpenseForm() {
                                     onChange={e => setForm({ ...form, amount: e.target.value })}
                                 />
                             </div>
+                        </FormField>
+                        <FormField label={t('common.exchange_rate', 'سعر الصرف')} style={{ flex: 1 }}>
+                            <input
+                                type="number"
+                                className="form-input"
+                                step="0.000001"
+                                min="0"
+                                value={form.exchange_rate}
+                                onChange={e => setForm({ ...form, exchange_rate: parseFloat(e.target.value) || 1 })}
+                            />
                         </FormField>
                     </div>
 

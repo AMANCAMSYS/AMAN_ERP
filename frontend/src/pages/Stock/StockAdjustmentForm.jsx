@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Save, AlertCircle, Trash2 } from 'lucide-react';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
@@ -11,6 +12,7 @@ const StockAdjustmentForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [warehouses, setWarehouses] = useState([]);
     const [products, setProducts] = useState([]);
@@ -36,7 +38,7 @@ const StockAdjustmentForm = () => {
                     setFormData(prev => ({ ...prev, warehouse_id: whRes.data[0].id }));
                 }
             } catch (err) {
-                console.error("Error loading data", err);
+                showToast(t('stock.adjustments.form.validation.error_load'), 'error');
             }
         };
         loadData();
@@ -60,7 +62,7 @@ const StockAdjustmentForm = () => {
             await inventoryAPI.createAdjustment({
                 warehouse_id: parseInt(formData.warehouse_id),
                 product_id: parseInt(formData.product_id),
-                new_quantity: parseFloat(formData.new_quantity),
+                new_quantity: String(formData.new_quantity),
                 reason: formData.reason,
                 notes: formData.notes,
                 branch_id: currentBranch?.id

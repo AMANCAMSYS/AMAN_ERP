@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { posAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
+import { useToast } from '../../context/ToastContext';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 
@@ -86,6 +87,7 @@ async function clearSyncedOrders() {
 
 function POSOfflineManager() {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingOrders, setPendingOrders] = useState([]);
     const [syncing, setSyncing] = useState(false);
@@ -97,7 +99,7 @@ function POSOfflineManager() {
         try {
             const orders = await getPendingOrders();
             setPendingOrders(orders);
-        } catch (e) { console.error(e); }
+        } catch (e) { showToast(t('common.error_occurred'), 'error'); }
     }, []);
 
     useEffect(() => {
@@ -133,7 +135,7 @@ function POSOfflineManager() {
             }
             await clearSyncedOrders();
             await refreshPending();
-        } catch (e) { console.error(e); }
+        } catch (e) { showToast(t('common.error_occurred'), 'error'); }
         finally {
             setSyncing(false);
             setSyncLog(prev => [...log, ...prev].slice(0, 50));

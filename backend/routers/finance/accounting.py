@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
+from utils.i18n import http_error
 from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -33,6 +34,7 @@ def _dec(v) -> Decimal:
 @limiter.limit("200/minute")
 def get_accounting_summary(
     request: Request,
+    branch_id: Optional[int] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب ملخص إحصائيات المحاسبة"""
@@ -186,7 +188,7 @@ async def get_chart_of_accounts(
     current_user: dict = Depends(get_current_user)
 ):
     """Fetch all accounts for the current company, optionally filtered by branch balance"""
-    branch_id = validate_branch_access(current_user, branch_id)
+    branch_id = validate_branch_access(current_user, None)
     db = get_db_connection(current_user.company_id)
     
     # Balances are computed live from journal_lines — no caching
@@ -386,7 +388,7 @@ async def create_account(
         db.rollback()
         logger.error(f"Error creating account: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         # Invalidate cache
         try:
@@ -460,7 +462,7 @@ async def delete_account(
         db.rollback()
         logger.error(f"Error deleting account: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -478,7 +480,7 @@ async def update_account(
         # Check if account exists
         existing = db.execute(text("SELECT 1 FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
         if not existing:
-             raise HTTPException(status_code=404, detail="الحساب غير موجود")
+             raise HTTPException(**http_error(404, "account_not_found"))
         
         # Check for duplicate account_code
         new_code = account_data.get("account_code")
@@ -529,7 +531,7 @@ async def update_account(
         db.rollback()
         logger.error(f"Error updating account: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -636,7 +638,7 @@ async def create_journal_entry(
         db.rollback()
         logger.error(f"Error creating journal: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -673,9 +675,9 @@ def list_journal_entries(
                 conditions.append("je.branch_id = ANY(:allowed_branches)")
                 params["allowed_branches"] = allowed_branches
 
-        if status_filter and status_filter in ('draft', 'posted', 'voided'):
-            conditions.append("je.status = :status")
-            params["status"] = status_filter
+        if search and search.strip() in ('draft', 'posted', 'voided'):
+            conditions.append("je.status = :status_val")
+            params["status_val"] = search.strip()
 
         if date_from:
             conditions.append("je.entry_date >= :date_from")
@@ -907,7 +909,7 @@ async def post_journal_entry(
         db.rollback()
         logger.error(f"Error posting journal entry: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/journal-entries/{entry_id}/void", dependencies=[Depends(require_permission("accounting.manage"))])
@@ -1002,7 +1004,7 @@ async def void_journal_entry(
         db.rollback()
         logger.error(f"Error voiding journal entry: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ============================================================
@@ -1132,7 +1134,7 @@ def create_fiscal_year(
         db.rollback()
         logger.error(f"Error creating fiscal year: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.get("/fiscal-years/{year}/preview-closing", dependencies=[Depends(require_permission("accounting.manage"))])
@@ -1383,7 +1385,7 @@ def close_fiscal_year(
         db.rollback()
         logger.error(f"Error closing fiscal year {year}: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/fiscal-years/{year}/reopen", dependencies=[Depends(require_permission("accounting.manage"))])
@@ -1480,7 +1482,7 @@ def reopen_fiscal_year(
         db.rollback()
         logger.error(f"Error reopening fiscal year {year}: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.get("/fiscal-years/{year}/periods", dependencies=[Depends(require_permission("accounting.view"))])
@@ -1568,7 +1570,7 @@ def toggle_fiscal_period(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ==================== ACC-003: Recurring Journal Templates ====================
@@ -1577,6 +1579,7 @@ def toggle_fiscal_period(
 @limiter.limit("200/minute")
 def list_recurring_templates(
     request: Request,
+    is_active: Optional[bool] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """قائمة قوالب القيود المتكررة"""
@@ -1611,7 +1614,7 @@ def get_recurring_template(request: Request, template_id: int, current_user: dic
             WHERE t.id = :id
         """), {"id": template_id}).fetchone()
         if not tmpl:
-            raise HTTPException(status_code=404, detail="القالب غير موجود")
+            raise HTTPException(**http_error(404, "template_not_found"))
 
         lines = db.execute(text("""
             SELECT l.*, a.name as account_name, a.account_code as account_code
@@ -1694,7 +1697,7 @@ def create_recurring_template(request: Request, data: dict = Body(...), current_
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.put("/recurring-templates/{template_id}", dependencies=[Depends(require_permission("accounting.edit"))])
@@ -1705,7 +1708,7 @@ def update_recurring_template(request: Request, template_id: int, data: dict = B
     try:
         existing = db.execute(text("SELECT id FROM recurring_journal_templates WHERE id = :id"), {"id": template_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="القالب غير موجود")
+            raise HTTPException(**http_error(404, "template_not_found"))
 
         lines = data.pop("lines", None)
 
@@ -1775,7 +1778,7 @@ def update_recurring_template(request: Request, template_id: int, data: dict = B
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.delete("/recurring-templates/{template_id}", dependencies=[Depends(require_permission("accounting.manage"))])
@@ -1788,7 +1791,7 @@ def delete_recurring_template(request: Request, template_id: int, current_user: 
             "SELECT id, name FROM recurring_journal_templates WHERE id = :id"
         ), {"id": template_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="القالب غير موجود")
+            raise HTTPException(**http_error(404, "template_not_found"))
 
         db.execute(text("DELETE FROM recurring_journal_templates WHERE id = :id"), {"id": template_id})
         db.commit()
@@ -1802,7 +1805,7 @@ def delete_recurring_template(request: Request, template_id: int, current_user: 
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/recurring-templates/{template_id}/generate", dependencies=[Depends(require_permission("accounting.edit"))])
@@ -1815,7 +1818,7 @@ def generate_from_template(request: Request, template_id: int, current_user: dic
             "SELECT * FROM recurring_journal_templates WHERE id = :id"
         ), {"id": template_id}).fetchone()
         if not tmpl:
-            raise HTTPException(status_code=404, detail="القالب غير موجود")
+            raise HTTPException(**http_error(404, "template_not_found"))
 
         lines = db.execute(text(
             "SELECT * FROM recurring_journal_lines WHERE template_id = :tid ORDER BY id"
@@ -1832,7 +1835,7 @@ def generate_from_template(request: Request, template_id: int, current_user: dic
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/recurring-templates/generate-due", dependencies=[Depends(require_permission("accounting.manage"))])
@@ -1877,7 +1880,7 @@ def generate_all_due_templates(request: Request, current_user: dict = Depends(ge
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 def _create_entry_from_template(db, tmpl, lines, current_user):
@@ -1952,6 +1955,7 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
 @limiter.limit("200/minute")
 def get_opening_balances(
     request: Request,
+    current_user: dict = Depends(get_current_user),
 ):
     """جلب الأرصدة الافتتاحية - آخر قيد أرصدة افتتاحية مع أرصدة جميع الحسابات"""
     db = get_db_connection(current_user.company_id)
@@ -2105,7 +2109,7 @@ def save_opening_balances(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ==================== ACC-006: Automatic Closing Entries ====================
@@ -2381,7 +2385,7 @@ def generate_closing_entries(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ═══════════════════════════════════════════════════════════
@@ -2448,7 +2452,7 @@ def create_bad_debt_provision(request: Request, req: ProvisionRequest, current_u
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ═══════════════════════════════════════════════════════════
@@ -2510,7 +2514,7 @@ def create_leave_provision(request: Request, req: ProvisionRequest, current_user
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ═══════════════════════════════════════════════════════════
@@ -2652,6 +2656,6 @@ def fx_revaluation(request: Request, req: FXRevaluationRequest, current_user: di
     except Exception as e:
         trans.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

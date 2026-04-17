@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -89,7 +90,7 @@ def open_session(
         db, user_id=current_user.id, username=current_user.username,
         action="open_pos_session", resource_type="pos_session",
         resource_id=str(session_id),
-        details={"branch_id": session_in.branch_id, "warehouse_id": session_in.warehouse_id, "opening_balance": float(session_in.opening_balance)},
+        details={"branch_id": session_in.branch_id, "warehouse_id": session_in.warehouse_id, "opening_balance": str(session_in.opening_balance)},
         request=request, branch_id=session_in.branch_id
     )
 
@@ -164,11 +165,11 @@ def _get_populated_session(db: Session, session_id: int, current_user_id: int):
         SELECT COUNT(*) FROM pos_orders WHERE session_id = :sid
     """), {"sid": session_id}).scalar() or 0
     
-    session_data['total_sales'] = float(_dec(sales).quantize(_D2, ROUND_HALF_UP))
-    session_data['total_cash'] = float(_dec(cash).quantize(_D2, ROUND_HALF_UP))
-    session_data['total_bank'] = float(_dec(bank).quantize(_D2, ROUND_HALF_UP))
-    session_data['total_returns'] = float(_dec(returns).quantize(_D2, ROUND_HALF_UP))
-    session_data['total_returns_cash'] = float(_dec(returns_cash).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_sales'] = str(_dec(sales).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_cash'] = str(_dec(cash).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_bank'] = str(_dec(bank).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_returns'] = str(_dec(returns).quantize(_D2, ROUND_HALF_UP))
+    session_data['total_returns_cash'] = str(_dec(returns_cash).quantize(_D2, ROUND_HALF_UP))
     session_data['order_count'] = int(order_count)
     
     return session_data
@@ -230,13 +231,16 @@ def close_session(
             total_returns = {total_returns_sql}
         WHERE id = :id
     """), {
-        "close_bal": float(_dec(close_in.closing_balance).quantize(_D2, ROUND_HALF_UP)),
-        "reg_bal": float(_dec(close_in.cash_register_balance).quantize(_D2, ROUND_HALF_UP)),
-        "diff": float(difference),
+        "close_bal": _dec(close_in.closing_balance).quantize(_D2, ROUND_HALF_UP),
+        "reg_bal": _dec(close_in.cash_register_balance).quantize(_D2, ROUND_HALF_UP),
+        "diff": difference,
         "notes": close_in.notes or "",
         "id": session_id
     })
     
+    # FISCAL-LOCK: Reject if accounting period is closed
+    check_fiscal_period_open(db, datetime.now().date())
+
     # Create Cash Over/Short GL Entry if there's a difference
     if abs(difference) > _D2:
         from utils.accounting import get_mapped_account_id, update_account_balance
@@ -252,7 +256,7 @@ def close_session(
                 WHERE s.id = :id
             """), {"id": session_id}).scalar()
             
-            diff_abs = float(abs(difference).quantize(_D2, ROUND_HALF_UP))
+            diff_abs = abs(difference).quantize(_D2, ROUND_HALF_UP)
             lines_data = []
             if difference > 0:
                 lines_data.append({"account_id": acc_cash, "debit": diff_abs, "credit": 0, "description": 'فائض صندوق'})
@@ -281,7 +285,7 @@ def close_session(
         db, user_id=current_user.id, username=current_user.username,
         action="close_pos_session", resource_type="pos_session",
         resource_id=str(session_id),
-        details={"closing_balance": float(close_in.closing_balance), "difference": float(difference)},
+        details={"closing_balance": str(close_in.closing_balance), "difference": str(difference)},
         request=request, branch_id=branch_id
     )
 
@@ -333,7 +337,7 @@ def get_pos_warehouses(
         result = db.execute(text(stmt), params).fetchall()
         return [{"id": r.id, "name": r.name, "code": r.code, "branch_id": r.branch_id, "branch_name": r.branch_name} for r in result]
     except Exception as e:
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
 
 
 @router.get("/products", response_model=List[POSProductResponse], dependencies=[Depends(require_permission("pos.view"))])
@@ -440,9 +444,9 @@ def create_order(
         if total_payments < total:
             if len(order_in.payments) == 1 and abs(total_payments - total) < _D2:
                 # Auto-adjust only for rounding differences
-                order_in.payments[0].amount = float(total)
+                order_in.payments[0].amount = total
             elif total_payments < total:
-                raise HTTPException(status_code=400, detail=f"المبلغ المدفوع ({float(total_payments):.2f}) أقل من إجمالي الطلب ({float(total):.2f})")
+                raise HTTPException(status_code=400, detail=f"المبلغ المدفوع ({total_payments:.2f}) أقل من إجمالي الطلب ({total:.2f})")
 
     # Fetch session info for branch_id if not provided
     pos_session = db.execute(text("SELECT branch_id, warehouse_id, treasury_account_id FROM pos_sessions WHERE id = :id"), {"id": order_in.session_id}).fetchone()
@@ -529,7 +533,7 @@ def create_order(
             avail_qty = _dec(current_stock.qty) if current_stock else Decimal('0')
             if avail_qty < _dec(item.quantity):
                 prod_name = prod_info[0] if prod_info else str(item.product_id)
-                raise HTTPException(status_code=400, detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {float(avail_qty):.0f}, المطلوب: {item.quantity}")
+                raise HTTPException(status_code=400, detail=f"المخزون غير كافٍ للمنتج {prod_name}. المتوفر: {avail_qty:.0f}, المطلوب: {item.quantity}")
 
             # Fetch cost price for COGS (FIFO/LIFO or WAC)
             try:
@@ -540,7 +544,7 @@ def create_order(
                         db,
                         product_id=item.product_id,
                         warehouse_id=warehouse_id,
-                        quantity=float(item.quantity),
+                        quantity=item.quantity,
                         sale_document_type="pos_order",
                         sale_document_id=order_id,
                         costing_method=method,
@@ -756,14 +760,14 @@ def create_order(
         db, user_id=current_user.id, username=current_user.username,
         action="create_pos_order", resource_type="pos_order",
         resource_id=str(order_id),
-        details={"order_number": order_number, "total": float(total), "status": order_in.status, "branch_id": branch_id},
+        details={"order_number": order_number, "total": str(total), "status": order_in.status, "branch_id": branch_id},
         request=request, branch_id=branch_id
     )
 
     return OrderResponse(
         id=order_id,
         order_number=order_number,
-        total_amount=float(total),
+        total_amount=total,
         status=order_in.status,
         created_at=datetime.now()
     )
@@ -926,7 +930,7 @@ def create_return(
             WHERE s.id = :sid
         """), {"sid": order.session_id}).fetchone()
         if session_info and _dec(session_info.cash_balance) < total_refund:
-            raise HTTPException(status_code=400, detail=f"رصيد الصندوق غير كافٍ للمرتجع. الرصيد الحالي: {float(_dec(session_info.cash_balance)):.2f}, المطلوب: {float(total_refund):.2f}")
+            raise HTTPException(status_code=400, detail=f"رصيد الصندوق غير كافٍ للمرتجع. الرصيد الحالي: {_dec(session_info.cash_balance):.2f}, المطلوب: {total_refund:.2f}")
 
     total_refund = Decimal('0')  # Reset for actual calculation
     total_refund_tax = Decimal('0')  # Track VAT on returns
@@ -1021,6 +1025,9 @@ def create_return(
         WHERE id = :id
     """), {"amount": total_refund, "id": order.session_id})
     
+    # FISCAL-LOCK: Reject if accounting period is closed
+    check_fiscal_period_open(db, datetime.now().date())
+
     # --- Create GL Journal Entries for Return ---
     # GL-FIX: Use configured account mappings with fallback to account_code lookup
     from utils.accounting import get_mapped_account_id
@@ -1099,13 +1106,13 @@ def create_return(
         db, user_id=current_user.id, username=current_user.username,
         action="create_pos_return", resource_type="pos_return",
         resource_id=str(return_id),
-        details={"order_id": order_id, "order_number": order.order_number, "refund_amount": float(total_refund), "refund_method": return_in.refund_method},
+        details={"order_id": order_id, "order_number": order.order_number, "refund_amount": str(total_refund), "refund_method": return_in.refund_method},
         request=request, branch_id=order.branch_id
     )
 
     return {
         "return_id": return_id,
-        "refund_amount": float(total_refund),
+        "refund_amount": str(total_refund),
         "message": "Return processed successfully"
     }
 
@@ -1374,11 +1381,11 @@ def earn_points(data: dict, request: Request, current_user: UserResponse = Depen
         db, user_id=current_user.id, username=current_user.username,
         action="earn_loyalty_points", resource_type="pos_loyalty",
         resource_id=str(loyalty.id),
-        details={"party_id": data["party_id"], "points": float(points), "order_id": data.get("order_id")},
+        details={"party_id": data["party_id"], "points": str(points), "order_id": data.get("order_id")},
         request=request
     )
 
-    return {"points_earned": float(points), "new_balance": float((_dec(loyalty.balance) + points).quantize(_D2, ROUND_HALF_UP))}
+    return {"points_earned": str(points), "new_balance": str((_dec(loyalty.balance) + points).quantize(_D2, ROUND_HALF_UP))}
 
 
 @router.post("/loyalty/redeem", dependencies=[Depends(require_permission("pos.create"))])
@@ -1408,11 +1415,11 @@ def redeem_points(data: dict, request: Request, current_user: UserResponse = Dep
         db, user_id=current_user.id, username=current_user.username,
         action="redeem_loyalty_points", resource_type="pos_loyalty",
         resource_id=str(loyalty.id),
-        details={"party_id": data["party_id"], "points": float(points), "discount_value": float(discount_value)},
+        details={"party_id": data["party_id"], "points": str(points), "discount_value": str(discount_value)},
         request=request
     )
 
-    return {"points_redeemed": float(points), "discount_value": float(discount_value), "new_balance": float((_dec(loyalty.balance) - points).quantize(_D2, ROUND_HALF_UP))}
+    return {"points_redeemed": str(points), "discount_value": str(discount_value), "new_balance": str((_dec(loyalty.balance) - points).quantize(_D2, ROUND_HALF_UP))}
 
 
 # ---------- POS-006: Session Reports (Enhanced) ----------

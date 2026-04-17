@@ -7,9 +7,11 @@ import { useTranslation } from 'react-i18next'
 import '../../components/ModuleStyles.css'
 import { formatNumber } from '../../utils/format'
 import { getIndustryFeature } from '../../hooks/useIndustryType'
+import { useToast } from '../../context/ToastContext'
 
 function SalesHome() {
     const { t, i18n } = useTranslation()
+    const { showToast } = useToast()
     const navigate = useNavigate()
     const [stats, setStats] = useState({ customer_count: 0, total_receivables: 0, monthly_sales: 0, unpaid_count: 0 })
     const [loading, setLoading] = useState(true)
@@ -31,7 +33,7 @@ function SalesHome() {
                 const response = await salesAPI.getSummary(params)
                 setStats(response.data)
             } catch (err) {
-                console.error("Failed to fetch sales stats", err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -145,7 +147,7 @@ function SalesHome() {
                         </div>
                         <div className="link-item" onClick={() => navigate('/sales/commissions')}>
                             <span className="link-icon">💵</span>
-                            {i18n.language === 'ar' ? 'العمولات' : 'Commissions'}
+                            {i18n.t('reports.report_types.commissions')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>

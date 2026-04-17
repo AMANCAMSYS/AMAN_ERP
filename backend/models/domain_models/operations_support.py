@@ -42,27 +42,10 @@ class MaintenanceLog(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class MarketingCampaign(ModelBase):
-    __tablename__ = "marketing_campaigns"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    campaign_type: Mapped[str | None] = mapped_column(String(50), default="email")
-    status: Mapped[str | None] = mapped_column(String(50), default="draft")
-    start_date: Mapped[Date | None] = mapped_column(Date)
-    end_date: Mapped[Date | None] = mapped_column(Date)
-    budget: Mapped[float | None] = mapped_column(Numeric(15, 2), default=0)
-    spent: Mapped[float | None] = mapped_column(Numeric(15, 2), default=0)
-    target_audience: Mapped[str | None] = mapped_column(Text)
-    description: Mapped[str | None] = mapped_column(Text)
-    sent_count: Mapped[int | None] = mapped_column(Integer, default=0)
-    open_count: Mapped[int | None] = mapped_column(Integer, default=0)
-    click_count: Mapped[int | None] = mapped_column(Integer, default=0)
-    conversion_count: Mapped[int | None] = mapped_column(Integer, default=0)
-    branch_id: Mapped[int | None] = mapped_column(Integer)
-    created_by: Mapped[int | None] = mapped_column(Integer)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+# MarketingCampaign was moved to projects_crm_advanced.py as Campaign
+# to avoid duplicate __tablename__ = "marketing_campaigns".
+# Import re-exported here for backward compatibility.
+from .projects_crm_advanced import Campaign as MarketingCampaign
 
 
 __all__ = [

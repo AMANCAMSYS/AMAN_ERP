@@ -4,6 +4,7 @@ AMAN ERP — Delivery Orders Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
@@ -19,6 +20,7 @@ from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
     update_account_balance, get_base_currency
 )
+from utils.fiscal_lock import check_fiscal_period_open
 
 router = APIRouter(prefix="/sales/delivery-orders", tags=["أوامر التسليم"])
 logger = logging.getLogger(__name__)
@@ -143,7 +145,7 @@ def get_delivery_order(do_id: int, current_user: dict = Depends(get_current_user
         """), {"id": do_id}).fetchone()
 
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
 
         lines = db.execute(text("""
             SELECT dol.*, pr.product_name, pr.product_name_en, pr.sku
@@ -181,7 +183,7 @@ def create_delivery_order(body: DeliveryOrderCreate, current_user: dict = Depend
         if so_id and not lines:
             so = db.execute(text("SELECT * FROM sales_orders WHERE id = :id"), {"id": so_id}).fetchone()
             if not so:
-                raise HTTPException(404, "أمر البيع غير موجود")
+                raise HTTPException(**http_error(404, "sales_order_not_found"))
             party_id = party_id or so.party_id
             warehouse_id = warehouse_id or so.warehouse_id
 
@@ -207,8 +209,8 @@ def create_delivery_order(body: DeliveryOrderCreate, current_user: dict = Depend
                         product_id=sl.product_id,
                         so_line_id=sl.id,
                         description=getattr(sl, 'description', ''),
-                        ordered_qty=float(remaining),
-                        delivered_qty=float(remaining),
+                        ordered_qty=remaining,
+                        delivered_qty=remaining,
                         unit=getattr(sl, 'unit', None)
                     ))
 
@@ -280,7 +282,7 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
     try:
         order = db.execute(text("SELECT * FROM delivery_orders WHERE id = :id"), {"id": do_id}).fetchone()
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
         if order.status != 'draft':
             raise HTTPException(400, f"لا يمكن تأكيد أمر بحالة {order.status}")
 
@@ -344,7 +346,7 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -359,7 +361,7 @@ def mark_delivered(do_id: int, current_user: dict = Depends(get_current_user)):
     try:
         order = db.execute(text("SELECT * FROM delivery_orders WHERE id = :id"), {"id": do_id}).fetchone()
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
         if order.status not in ('confirmed', 'shipped'):
             raise HTTPException(400, f"لا يمكن وضع حالة تسليم لأمر بحالة {order.status}")
 
@@ -385,7 +387,7 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
     try:
         order = db.execute(text("SELECT * FROM delivery_orders WHERE id = :id"), {"id": do_id}).fetchone()
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
         if order.status not in ('confirmed', 'delivered'):
             raise HTTPException(400, "يجب تأكيد أمر التسليم أولاً")
         if order.invoice_id:
@@ -458,6 +460,9 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
         # Link DO to invoice
         db.execute(text("UPDATE delivery_orders SET invoice_id = :iid WHERE id = :doid"),
                    {"iid": inv_id, "doid": do_id})
+
+        # ── Fiscal period check before GL posting ──
+        check_fiscal_period_open(db, datetime.now().date())
 
         # ── Create Journal Entry ──
         # Since inventory was already deducted in confirm, we only need AR/Revenue/Tax/COGS
@@ -547,7 +552,7 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
         db.rollback()
         logger.error(f"Error creating invoice from DO: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -563,7 +568,7 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
     try:
         order = db.execute(text("SELECT * FROM delivery_orders WHERE id = :id"), {"id": do_id}).fetchone()
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
         if order.status == 'cancelled':
             raise HTTPException(400, "أمر التسليم ملغى بالفعل")
         if order.invoice_id:
@@ -604,7 +609,7 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -619,14 +624,14 @@ def update_delivery_order(do_id: int, body: DeliveryOrderUpdate, current_user: d
     try:
         order = db.execute(text("SELECT status FROM delivery_orders WHERE id = :id"), {"id": do_id}).fetchone()
         if not order:
-            raise HTTPException(404, "أمر التسليم غير موجود")
+            raise HTTPException(**http_error(404, "delivery_order_not_found"))
         if order.status == 'cancelled':
             raise HTTPException(400, "لا يمكن تعديل أمر ملغى")
 
         updates = {}
         data = body.dict(exclude_none=True)
         if not data:
-            raise HTTPException(400, "لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         set_parts = []
         for key, val in data.items():

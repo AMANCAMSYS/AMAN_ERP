@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
+import { formatNumber } from '../../utils/format'
 
 function DeliveryOrderDetails() {
     const { id } = useParams()
@@ -102,9 +103,9 @@ function DeliveryOrderDetails() {
                 <div className="card p-4">
                     <h3 className="card-title">{t('common.summary')}</h3>
                     <div className="detail-grid">
-                        <div><strong>{t('common.subtotal')}:</strong> {Number(order.subtotal).toLocaleString()} {currency}</div>
-                        <div><strong>{t('common.tax')}:</strong> {Number(order.tax_amount).toLocaleString()} {currency}</div>
-                        <div className="text-xl font-bold"><strong>{t('common.total')}:</strong> {Number(order.total_amount).toLocaleString()} {currency}</div>
+                        <div><strong>{t('common.subtotal')}:</strong> {formatNumber(order.subtotal)} {currency}</div>
+                        <div><strong>{t('common.tax')}:</strong> {formatNumber(order.tax_amount)} {currency}</div>
+                        <div className="text-xl font-bold"><strong>{t('common.total')}:</strong> {formatNumber(order.total_amount)} {currency}</div>
                     </div>
                 </div>
             </div>
@@ -125,8 +126,8 @@ function DeliveryOrderDetails() {
                             <tr key={i}>
                                 <td>{line.product_name || `#${line.product_id}`}</td>
                                 <td>{line.quantity}</td>
-                                <td>{Number(line.unit_price).toLocaleString()} {currency}</td>
-                                <td className="font-bold">{Number(line.total).toLocaleString()} {currency}</td>
+                                <td>{formatNumber(line.unit_price)} {currency}</td>
+                                <td className="font-bold">{formatNumber(line.total)} {currency}</td>
                             </tr>
                         ))}
                     </tbody>

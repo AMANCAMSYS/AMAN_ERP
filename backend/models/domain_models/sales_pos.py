@@ -2,10 +2,10 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import AuditMixin, ModelBase
 
 
-class PendingReceivable(ModelBase):
+class PendingReceivable(AuditMixin, ModelBase):
     __tablename__ = "pending_receivables"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -18,10 +18,9 @@ class PendingReceivable(ModelBase):
     outstanding_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     days_overdue: Mapped[int | None] = mapped_column(Integer, default=0)
     status: Mapped[str | None] = mapped_column(String(20), default="pending")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosKitchenOrder(ModelBase):
+class PosKitchenOrder(AuditMixin, ModelBase):
     __tablename__ = "pos_kitchen_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -41,7 +40,7 @@ class PosKitchenOrder(ModelBase):
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
 
 
-class PosLoyaltyPoint(ModelBase):
+class PosLoyaltyPoint(AuditMixin, ModelBase):
     __tablename__ = "pos_loyalty_points"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -52,10 +51,9 @@ class PosLoyaltyPoint(ModelBase):
     balance: Mapped[float | None] = mapped_column(Numeric(12, 2), default=0)
     tier: Mapped[str | None] = mapped_column(String(50), default="standard")
     last_activity_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosLoyaltyProgram(ModelBase):
+class PosLoyaltyProgram(AuditMixin, ModelBase):
     __tablename__ = "pos_loyalty_programs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -66,10 +64,9 @@ class PosLoyaltyProgram(ModelBase):
     tier_rules: Mapped[list | None] = mapped_column(JSONB, default=list)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosLoyaltyTransaction(ModelBase):
+class PosLoyaltyTransaction(AuditMixin, ModelBase):
     __tablename__ = "pos_loyalty_transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -78,10 +75,9 @@ class PosLoyaltyTransaction(ModelBase):
     txn_type: Mapped[str] = mapped_column(String(20), nullable=False)
     points: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosOrderLine(ModelBase):
+class PosOrderLine(AuditMixin, ModelBase):
     __tablename__ = "pos_order_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -101,7 +97,7 @@ class PosOrderLine(ModelBase):
     notes: Mapped[str | None] = mapped_column(Text)
 
 
-class PosOrderPayment(ModelBase):
+class PosOrderPayment(AuditMixin, ModelBase):
     __tablename__ = "pos_order_payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -109,10 +105,9 @@ class PosOrderPayment(ModelBase):
     method: Mapped[str] = mapped_column(String(50), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     reference: Mapped[str | None] = mapped_column(String(100))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosOrder(ModelBase):
+class PosOrder(AuditMixin, ModelBase):
     __tablename__ = "pos_orders"
     __table_args__ = (UniqueConstraint("order_number", name="pos_orders_order_number_key"),)
 
@@ -133,18 +128,15 @@ class PosOrder(ModelBase):
     paid_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     change_amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     note: Mapped[str | None] = mapped_column(Text)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     coupon_code: Mapped[str | None] = mapped_column(String(100))
     loyalty_points_earned: Mapped[float | None] = mapped_column(Numeric(12, 2))
     loyalty_points_redeemed: Mapped[float | None] = mapped_column(Numeric(12, 2))
     party_id: Mapped[int | None] = mapped_column(Integer)
     promotion_id: Mapped[int | None] = mapped_column(Integer)
     table_id: Mapped[int | None] = mapped_column(Integer)
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime)
 
 
-class PosPayment(ModelBase):
+class PosPayment(AuditMixin, ModelBase):
     __tablename__ = "pos_payments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -153,10 +145,9 @@ class PosPayment(ModelBase):
     payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     reference_number: Mapped[str | None] = mapped_column(String(100))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosPromotion(ModelBase):
+class PosPromotion(AuditMixin, ModelBase):
     __tablename__ = "pos_promotions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -173,12 +164,9 @@ class PosPromotion(ModelBase):
     end_date: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosReturnItem(ModelBase):
+class PosReturnItem(AuditMixin, ModelBase):
     __tablename__ = "pos_return_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -186,10 +174,9 @@ class PosReturnItem(ModelBase):
     original_item_id: Mapped[int | None] = mapped_column(ForeignKey("pos_order_lines.id", ondelete="SET NULL"))
     quantity: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False, default=1)
     reason: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosReturn(ModelBase):
+class PosReturn(AuditMixin, ModelBase):
     __tablename__ = "pos_returns"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -199,10 +186,9 @@ class PosReturn(ModelBase):
     refund_amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False, default=0)
     refund_method: Mapped[str | None] = mapped_column(String(50), default="cash")
     notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PosSession(ModelBase):
+class PosSession(AuditMixin, ModelBase):
     __tablename__ = "pos_sessions"
     __table_args__ = (UniqueConstraint("session_code", name="pos_sessions_session_code_key"),)
 
@@ -223,10 +209,9 @@ class PosSession(ModelBase):
     notes: Mapped[str | None] = mapped_column(Text)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
     treasury_account_id: Mapped[int | None] = mapped_column(ForeignKey("treasury_accounts.id"))
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime)
 
 
-class PosTableOrder(ModelBase):
+class PosTableOrder(AuditMixin, ModelBase):
     __tablename__ = "pos_table_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -239,7 +224,7 @@ class PosTableOrder(ModelBase):
     status: Mapped[str | None] = mapped_column(String(20), default="seated")
 
 
-class PosTable(ModelBase):
+class PosTable(AuditMixin, ModelBase):
     __tablename__ = "pos_tables"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -253,10 +238,9 @@ class PosTable(ModelBase):
     pos_y: Mapped[float | None] = mapped_column(Numeric(8, 2), default=0)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id", ondelete="SET NULL"))
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class Receipt(ModelBase):
+class Receipt(AuditMixin, ModelBase):
     __tablename__ = "receipts"
     __table_args__ = (UniqueConstraint("receipt_number", name="receipts_receipt_number_key"),)
 
@@ -276,8 +260,6 @@ class Receipt(ModelBase):
     check_date: Mapped[Date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(20), default="pending")
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 __all__ = [

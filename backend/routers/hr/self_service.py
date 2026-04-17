@@ -8,7 +8,8 @@ Endpoints under /hr/self-service:
   - Manager: GET team requests, POST approve/reject
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional, List
 from datetime import date
@@ -17,6 +18,7 @@ import logging
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse, get_current_user_company
 from utils.permissions import require_permission, require_module
+from utils.audit import log_activity
 from schemas.self_service import (
     LeaveRequestCreate, LeaveRequestRead,
     ProfileUpdateRequest,
@@ -35,15 +37,15 @@ router = APIRouter(
 
 # --------------- helpers ------------------------------------------------
 
-def _resolve_employee(conn, user) -> dict:
-    """Return employee row dict for the authenticated user. Raises 400 if not linked."""
+def _resolve_employee(conn, user, raise_on_missing: bool = True) -> dict | None:
+    """Return employee row dict for the authenticated user. Raises 400 if not linked (unless raise_on_missing=False)."""
     uid = user.get("id") if isinstance(user, dict) else user.id
     row = conn.execute(text("""
         SELECT e.id, e.first_name, e.last_name, e.email, e.phone,
                e.department_id, e.position_id, e.branch_id,
                e.salary, e.housing_allowance, e.transport_allowance,
                e.other_allowances, e.nationality, e.hire_date,
-               COALESCE(e.annual_leave_days, 21) AS annual_leave_days,
+               21 AS annual_leave_days,
                d.department_name, p.position_name,
                e.user_id
         FROM employees e
@@ -52,7 +54,9 @@ def _resolve_employee(conn, user) -> dict:
         WHERE e.user_id = :uid
     """), {"uid": uid}).mappings().fetchone()
     if not row:
-        raise HTTPException(status_code=400, detail="User is not linked to an employee record")
+        if raise_on_missing:
+            raise HTTPException(status_code=400, detail="User is not linked to an employee record")
+        return None
     return dict(row)
 
 
@@ -77,7 +81,9 @@ def get_own_profile(
 ):
     conn = get_db_connection(company_id)
     try:
-        emp = _resolve_employee(conn, current_user)
+        emp = _resolve_employee(conn, current_user, raise_on_missing=False)
+        if not emp:
+            return {"success": True, "data": None, "message": "No employee record linked to this user"}
         return {
             "success": True,
             "data": {
@@ -100,6 +106,7 @@ def get_own_profile(
 @router.put("/profile", dependencies=[Depends(require_permission("hr.self_service"))])
 def update_own_profile(
     body: ProfileUpdateRequest,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -135,6 +142,11 @@ def update_own_profile(
         })
         conn.commit()
 
+        log_activity(
+            conn, user_id=uid, username=getattr(current_user, "username", "unknown"),
+            action="hr.self_service.profile_update", resource_type="employee",
+            resource_id=str(emp["id"]), details=body.model_dump(exclude_none=True), request=request
+        )
         return {"success": True, "message": "Profile updated"}
     except HTTPException:
         raise
@@ -142,7 +154,7 @@ def update_own_profile(
         conn.rollback()
         logger.error("profile update error: %s", e, exc_info=True)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -156,7 +168,9 @@ def list_own_payslips(
 ):
     conn = get_db_connection(company_id)
     try:
-        emp = _resolve_employee(conn, current_user)
+        emp = _resolve_employee(conn, current_user, raise_on_missing=False)
+        if not emp:
+            return {"success": True, "data": []}
         rows = conn.execute(text("""
             SELECT pe.id, pe.employee_id,
                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
@@ -165,7 +179,13 @@ def list_own_payslips(
                    EXTRACT(YEAR FROM pp.start_date)::int AS year,
                    pe.basic_salary, pe.housing_allowance,
                    pe.transport_allowance, pe.other_allowances,
-                   pe.total_earnings, pe.total_deductions, pe.net_salary,
+                   (pe.basic_salary + pe.housing_allowance + pe.transport_allowance
+                    + pe.other_allowances + pe.salary_components_earning
+                    + pe.overtime_amount) AS total_earnings,
+                   (pe.deductions + pe.salary_components_deduction
+                    + pe.gosi_employee_share + pe.violation_deduction
+                    + pe.loan_deduction) AS total_deductions,
+                   pe.net_salary,
                    pe.status
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
@@ -196,7 +216,13 @@ def get_payslip_detail(
                    EXTRACT(YEAR FROM pp.start_date)::int AS year,
                    pe.basic_salary, pe.housing_allowance,
                    pe.transport_allowance, pe.other_allowances,
-                   pe.total_earnings, pe.total_deductions, pe.net_salary,
+                   (pe.basic_salary + pe.housing_allowance + pe.transport_allowance
+                    + pe.other_allowances + pe.salary_components_earning
+                    + pe.overtime_amount) AS total_earnings,
+                   (pe.deductions + pe.salary_components_deduction
+                    + pe.gosi_employee_share + pe.violation_deduction
+                    + pe.loan_deduction) AS total_deductions,
+                   pe.net_salary,
                    pe.status
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
@@ -221,7 +247,9 @@ def get_leave_balance(
 ):
     conn = get_db_connection(company_id)
     try:
-        emp = _resolve_employee(conn, current_user)
+        emp = _resolve_employee(conn, current_user, raise_on_missing=False)
+        if not emp:
+            return {"success": True, "data": {"annual_entitlement": 0, "used_days": 0, "pending_days": 0, "remaining_days": 0, "carry_over": 0}}
         eid = emp["id"]
         entitlement = int(emp["annual_leave_days"])
         year_start = date(date.today().year, 1, 1)
@@ -243,7 +271,7 @@ def get_leave_balance(
         """), {"eid": eid, "ys": year_start}).scalar() or 0
 
         carry = conn.execute(text("""
-            SELECT COALESCE(carried_forward, 0)
+            SELECT COALESCE(carried_days, 0)
             FROM leave_carryover
             WHERE employee_id = :eid
             ORDER BY year DESC LIMIT 1
@@ -270,6 +298,7 @@ def get_leave_balance(
 @router.post("/leave-request", dependencies=[Depends(require_permission("hr.self_service"))])
 def submit_leave_request(
     body: LeaveRequestCreate,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -336,6 +365,12 @@ def submit_leave_request(
         })
         conn.commit()
 
+        log_activity(
+            conn, user_id=uid, username=getattr(current_user, "username", "unknown"),
+            action="hr.self_service.leave_request", resource_type="leave_request",
+            resource_id=str(result.id), details={"leave_type": body.leave_type, "days": leave_days}, request=request
+        )
+
         # Approval workflow (non-blocking)
         try:
             from utils.approval_utils import try_submit_for_approval
@@ -387,7 +422,7 @@ def submit_leave_request(
         conn.rollback()
         logger.error("leave request error: %s", e, exc_info=True)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -400,7 +435,9 @@ def list_own_leave_requests(
 ):
     conn = get_db_connection(company_id)
     try:
-        emp = _resolve_employee(conn, current_user)
+        emp = _resolve_employee(conn, current_user, raise_on_missing=False)
+        if not emp:
+            return {"success": True, "data": []}
         q = """
             SELECT lr.id, lr.employee_id,
                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
@@ -461,6 +498,7 @@ def list_team_requests(
 @router.post("/leave-request/{request_id}/approve", dependencies=[Depends(require_permission("hr.self_service_approve"))])
 def approve_leave_request(
     request_id: int,
+    request: Request,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
 ):
@@ -496,6 +534,13 @@ def approve_leave_request(
         """), {"mid": manager["id"], "rid_s": str(request_id)})
         conn.commit()
 
+        uid = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        log_activity(
+            conn, user_id=uid, username=getattr(current_user, "username", "unknown"),
+            action="hr.self_service.leave_approve", resource_type="leave_request",
+            resource_id=str(request_id), details={"employee_id": lr["employee_id"]}, request=request
+        )
+
         # Notify employee
         if lr["emp_user_id"]:
             _notify_leave(
@@ -516,7 +561,7 @@ def approve_leave_request(
         conn.rollback()
         logger.error("approve error: %s", e, exc_info=True)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()
 
@@ -524,6 +569,7 @@ def approve_leave_request(
 @router.post("/leave-request/{request_id}/reject", dependencies=[Depends(require_permission("hr.self_service_approve"))])
 def reject_leave_request(
     request_id: int,
+    request: Request,
     reason: Optional[str] = None,
     current_user: UserResponse = Depends(get_current_user),
     company_id: str = Depends(get_current_user_company),
@@ -556,6 +602,13 @@ def reject_leave_request(
         """), {"mid": manager["id"], "rid_s": str(request_id), "reason": reason})
         conn.commit()
 
+        uid = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+        log_activity(
+            conn, user_id=uid, username=getattr(current_user, "username", "unknown"),
+            action="hr.self_service.leave_reject", resource_type="leave_request",
+            resource_id=str(request_id), details={"employee_id": lr["employee_id"], "reason": reason}, request=request
+        )
+
         # Notify employee
         if lr["emp_user_id"]:
             _notify_leave(
@@ -577,6 +630,6 @@ def reject_leave_request(
         conn.rollback()
         logger.error("reject error: %s", e, exc_info=True)
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         conn.close()

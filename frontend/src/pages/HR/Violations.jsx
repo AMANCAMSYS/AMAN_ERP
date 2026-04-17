@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { formatNumber } from '../../utils/format';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Edit2, AlertOctagon } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -43,7 +45,7 @@ const Violations = () => {
             ]);
             setViolations(vRes.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -51,7 +53,7 @@ const Violations = () => {
 
     const handleSave = async () => {
         try {
-            const payload = { ...form, employee_id: parseInt(form.employee_id), deduction_amount: parseFloat(form.deduction_amount) || 0 };
+            const payload = { ...form, employee_id: parseInt(form.employee_id), deduction_amount: String(form.deduction_amount || 0) };
             if (editItem) {
                 await hrAdvancedAPI.updateViolation(editItem.id, payload);
             } else {
@@ -60,7 +62,7 @@ const Violations = () => {
             setShowModal(false); setEditItem(null);
             setForm({ employee_id: '', violation_type: '', violation_date: '', description: '', action_taken: 'warning', deduction_amount: 0 });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const getActionBadge = (action) => {
@@ -109,7 +111,7 @@ const Violations = () => {
                                 <td>{v.violation_date}</td>
                                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.description || '-'}</td>
                                 <td>{getActionBadge(v.action_taken)}</td>
-                                <td>{v.deduction_amount > 0 ? v.deduction_amount?.toLocaleString() : '-'}</td>
+                                <td>{v.deduction_amount > 0 ? formatNumber(v.deduction_amount) : '-'}</td>
                                 <td>
                                     <button className="btn btn-sm btn-secondary" onClick={() => { setEditItem(v); setForm({ employee_id: v.employee_id, violation_type: v.violation_type || '', violation_date: v.violation_date || '', description: v.description || '', action_taken: v.action_taken || 'warning', deduction_amount: v.deduction_amount || 0 }); setShowModal(true); }}><Edit2 size={14} /></button>
                                 </td>

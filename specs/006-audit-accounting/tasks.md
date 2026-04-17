@@ -190,7 +190,7 @@
 ### Audit for User Story 5
 
 - [x] T038 [US5] Audit budget CRUD — verify create, list, delete operations in `backend/routers/finance/budgets.py` with correct permissions (`accounting.budgets.manage`, `accounting.budgets.view`), and verify `log_activity()` is called on budget creation, deletion, and budget override approval (FR-017)
-  > PASS: 18 endpoints verified. All CRUD operations have log_activity(). Permissions correct. Budget override approval endpoint NOT present (override logic expected at JE posting time). All 5 mutation endpoints logged.
+  > PASS: 18 endpoints verified. All CRUD operations have log_activity(). Permissions correct. FIXED (re-audit): Added log_activity() to create_budget_by_cost_center endpoint (was missing). All 6 mutation endpoints now logged.
 - [x] T039 [US5] Audit budget item upsert — verify `POST /api/accounting/budgets/{id}/items` enforces per-account uniqueness (upserts, not duplicates) in `backend/routers/finance/budgets.py`
   > PASS: Explicit SELECT → UPDATE/INSERT pattern enforces per-account uniqueness. log_activity called.
 - [x] T040 [US5] Audit active budget deletion protection — verify delete endpoint blocks active budgets
@@ -230,9 +230,9 @@
 ### Audit for User Story 7
 
 - [x] T045 [US7] Audit reciprocal JE creation — verify `backend/services/intercompany_service.py` creates source JE (Dr IC Receivable, Cr Revenue) and target JE (Dr Expense, Cr IC Payable) atomically within a single transaction
-  > PARTIAL PASS: Both JEs created via gl_create_je() with single conn.commit(). However, source and target JE creation can succeed/fail independently if account resolution returns None. Account resolution fragility noted.
+  > PARTIAL PASS: Both JEs created via gl_create_je() with single conn.commit(). FIXED (re-audit): Removed conditional `if account_id:` guards — JE creation is now unconditional after account validation. Revenue/expense accounts resolved from company_settings via get_mapped_account_id() with fail-fast ValueError.
 - [x] T046 [US7] Audit account mapping — verify intercompany endpoints in `backend/routers/finance/intercompany_v2.py` use entity-pair mappings, defaulting to 13xx/21xx account ranges when unmapped
-  > PASS: Checks intercompany_account_mappings first, falls back to LIKE '13%'/LIKE '21%'. Non-deterministic LIMIT 1 noted but acceptable.
+  > PASS: Checks intercompany_account_mappings first. FIXED (re-audit): Removed LIKE '13%'/'21%' fallback — now requires explicit ic_receivable_account_id / ic_payable_account_id in company_settings or intercompany_account_mappings entry. Raises ValueError if missing.
 - [x] T047 [US7] Audit consolidation elimination — verify `POST /api/accounting/intercompany/consolidate` generates entries that net intercompany receivables and payables to zero
   > PASS: Elimination JE created with Dr IC Payable, Cr IC Receivable. Status updated to 'eliminated'. Single commit. Recursive CTE for entity group hierarchy.
 - [x] T048 [US7] Audit multi-currency intercompany — verify cross-currency transactions apply correct exchange rates to both source and target JEs
@@ -295,9 +295,9 @@
 - [x] T057 [US11] Audit approval workflow — verify `backend/routers/finance/advanced_workflow.py` retrieves workflows with SLA conditions and approval chains
   > PASS: GET /workflow/advanced/{id} retrieves workflows with sla_hours, allow_parallel, escalation_to. Permissions enforced.
 - [x] T058 [US11] Audit SLA escalation — verify `POST /api/workflow/check-escalation` detects overdue requests and promotes to escalation users
-  > PASS: Calculates hours_waiting via EXTRACT(EPOCH), compares to sla_hours, updates current_approver_id and status='escalated'.
+  > PASS: Calculates hours_waiting via EXTRACT(EPOCH), compares to sla_hours, updates current_approver_id and status='escalated'. FIXED (re-audit): Added log_activity() import and call with escalated_to, hours_waiting, sla_hours details.
 - [x] T059 [P] [US11] Audit auto-approve threshold — verify `POST /api/workflow/auto-approve` automatically approves requests below the configured threshold amount
-  > PASS: UPDATE approval_requests SET status='approved' WHERE amount <= auto_approve_below. Arabic action notes recorded.
+  > PASS: UPDATE approval_requests SET status='approved' WHERE amount <= auto_approve_below. Arabic action notes recorded. FIXED (re-audit): Added log_activity() call per approved request.
 - [x] T060 [P] [US11] Audit approval analytics — verify `GET /api/workflow/analytics` returns correct pending, approved, rejected counts and average processing hours
   > PASS: Uses COUNT(*) FILTER for status counts, AVG(EXTRACT(EPOCH)) for avg_approval_hours. Also groups by document_type.
 

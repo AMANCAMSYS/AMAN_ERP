@@ -4,6 +4,7 @@ AMAN ERP - Projects Module
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile
+from utils.i18n import http_error, i18n_message
 import shutil
 import os
 from pydantic import BaseModel
@@ -15,7 +16,8 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    get_base_currency, update_account_balance
+    get_base_currency, update_account_balance,
+    compute_line_amounts, compute_invoice_totals
 )
 from utils.audit import log_activity
 from utils.fiscal_lock import check_fiscal_period_open
@@ -103,7 +105,7 @@ async def get_projects(
         return [dict(r._mapping) for r in result]
     except Exception as e:
         logger.error(f"Error fetching projects: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -138,6 +140,58 @@ async def get_projects_summary(current_user: dict = Depends(get_current_user)):
         db.close()
 
 
+# NOTE: /timetracking must be defined BEFORE /{project_id} to avoid route shadowing
+@router.get("/timetracking", dependencies=[Depends(require_permission("projects.time_view"))])
+async def list_own_time_entries(
+    project_id: Optional[int] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    entry_status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """جلب سجلات الوقت الخاصة بالمستخدم (قابلة للفلترة)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        filters = ["te.employee_id = (SELECT id FROM employees WHERE user_id = :uid LIMIT 1)"]
+        params: dict = {"uid": current_user.id}
+        if project_id:
+            filters.append("te.project_id = :project_id")
+            params["project_id"] = project_id
+        if date_from:
+            filters.append("te.date >= :date_from")
+            params["date_from"] = date_from
+        if date_to:
+            filters.append("te.date <= :date_to")
+            params["date_to"] = date_to
+        if entry_status:
+            filters.append("te.status = :entry_status")
+            params["entry_status"] = entry_status
+        where = " AND ".join(filters)
+        try:
+            rows = db.execute(text(f"""
+                SELECT te.*,
+                       e.full_name  AS employee_name,
+                       p.project_name,
+                       pt.task_name,
+                       ae.full_name AS approver_name
+                FROM   timesheet_entries te
+                LEFT JOIN employees e  ON e.id  = te.employee_id
+                LEFT JOIN projects  p  ON p.id  = te.project_id
+                LEFT JOIN project_tasks pt ON pt.id = te.task_id
+                LEFT JOIN employees ae ON ae.id = te.approved_by
+                WHERE  {where}
+                ORDER BY te.date DESC
+            """), params).fetchall()
+        except Exception as e:
+            db.rollback()
+            if "does not exist" in str(e):
+                return []
+            raise
+        return [dict(r._mapping) for r in rows]
+    finally:
+        db.close()
+
+
 @router.get("/{project_id}", dependencies=[Depends(require_permission("projects.view"))])
 async def get_project(project_id: int, current_user: dict = Depends(get_current_user)):
     """جلب تفاصيل مشروع مع المهام والمصاريف والإيرادات"""
@@ -154,7 +208,7 @@ async def get_project(project_id: int, current_user: dict = Depends(get_current_
         """), {"id": project_id}).fetchone()
 
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         project_data: Dict[str, Any] = dict(project._mapping)
 
@@ -210,7 +264,7 @@ async def get_project(project_id: int, current_user: dict = Depends(get_current_
         raise
     except Exception as e:
         logger.error(f"Error fetching project {project_id}: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -258,11 +312,11 @@ async def create_project(
             request=request, branch_id=project.branch_id
         )
 
-        return {"success": True, "id": project_id, "project_code": code, "message": "تم إنشاء المشروع بنجاح"}
+        return {"success": True, "id": project_id, "project_code": code, "message": i18n_message("project_created_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -279,7 +333,7 @@ async def update_project(
     try:
         existing = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         updates = []
         params = {"id": project_id}
@@ -299,14 +353,14 @@ async def update_project(
                 if field == "status":
                     valid = ['planning', 'in_progress', 'on_hold', 'completed', 'cancelled']
                     if value not in valid:
-                        raise HTTPException(status_code=400, detail=f"حالة غير صالحة. المتاح: {', '.join(valid)}")
+                        raise HTTPException(status_code=400, detail=i18n_message("invalid_status_available", valid=', '.join(valid)))
                 if field == "progress_percentage" and (value < 0 or value > 100):
-                    raise HTTPException(status_code=400, detail="نسبة الإنجاز يجب أن تكون بين 0 و 100")
+                    raise HTTPException(status_code=400, detail=i18n_message("project_progress_between_0_100"))
                 updates.append(f"{field} = :{param}")
                 params[param] = value
 
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         updates.append("updated_at = NOW()")
         query = f"UPDATE projects SET {', '.join(updates)} WHERE id = :id"
@@ -319,13 +373,13 @@ async def update_project(
             resource_id=str(project_id), details={}, request=request
         )
 
-        return {"success": True, "message": "تم تحديث المشروع بنجاح"}
+        return {"success": True, "message": i18n_message("project_updated_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating project: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -337,7 +391,7 @@ async def delete_project(project_id: int, request: Request, current_user: dict =
     try:
         existing = db.execute(text("SELECT id FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         has_posted = db.execute(text("""
             SELECT COUNT(*) FROM (
@@ -350,7 +404,7 @@ async def delete_project(project_id: int, request: Request, current_user: dict =
         if has_posted > 0:
             raise HTTPException(
                 status_code=400,
-                detail="لا يمكن حذف المشروع لوجود مصاريف أو إيرادات مرحّلة. يمكنك إلغاؤه بدلاً من حذفه."
+                detail=i18n_message("project_delete_blocked_has_posted_financials")
             )
 
         db.execute(text("DELETE FROM project_revenues WHERE project_id = :id"), {"id": project_id})
@@ -366,13 +420,13 @@ async def delete_project(project_id: int, request: Request, current_user: dict =
             resource_id=str(project_id), details={}, request=request
         )
 
-        return {"success": True, "message": "تم حذف المشروع"}
+        return {"success": True, "message": i18n_message("project_deleted_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting project: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -407,7 +461,7 @@ async def create_task(project_id: int, task: TaskCreate, request: Request, curre
     try:
         project = db.execute(text("SELECT id FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         result = db.execute(text("""
             INSERT INTO project_tasks (
@@ -438,13 +492,13 @@ async def create_task(project_id: int, task: TaskCreate, request: Request, curre
             request=request
         )
 
-        return {"success": True, "id": task_id, "message": "تم إضافة المهمة"}
+        return {"success": True, "id": task_id, "message": i18n_message("task_created_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating task: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -459,7 +513,7 @@ async def update_task(project_id: int, task_id: int, data: TaskUpdate, request: 
             {"tid": task_id, "pid": project_id}
         ).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+            raise HTTPException(status_code=404, detail=i18n_message("task_not_found"))
 
         updates = []
         params = {"tid": task_id}
@@ -477,7 +531,7 @@ async def update_task(project_id: int, task_id: int, data: TaskUpdate, request: 
                 params[param] = value
 
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         query = f"UPDATE project_tasks SET {', '.join(updates)} WHERE id = :tid"
         db.execute(text(query), params)
@@ -500,13 +554,13 @@ async def update_task(project_id: int, task_id: int, data: TaskUpdate, request: 
             request=request
         )
 
-        return {"success": True, "message": "تم تحديث المهمة"}
+        return {"success": True, "message": i18n_message("task_updated_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating task: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -530,7 +584,7 @@ async def delete_task(project_id: int, task_id: int, request: Request, current_u
             request=request
         )
 
-        return {"success": True, "message": "تم حذف المهمة"}
+        return {"success": True, "message": i18n_message("task_deleted_success")}
     finally:
         db.close()
 
@@ -555,7 +609,7 @@ async def create_project_expense(
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         base_currency = get_base_currency(db)
         amount = _dec(expense.amount).quantize(_D2, ROUND_HALF_UP)
@@ -580,7 +634,7 @@ async def create_project_expense(
                 )).scalar()
 
         if not expense_acc:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على حساب المصاريف")
+            raise HTTPException(status_code=400, detail=i18n_message("expense_account_not_found"))
 
         # Cash/treasury account
         cash_acc = None
@@ -591,7 +645,7 @@ async def create_project_expense(
         if not cash_acc:
             cash_acc = get_mapped_account_id(db, "acc_map_cash_main")
         if not cash_acc:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على حساب النقدية")
+            raise HTTPException(status_code=400, detail=i18n_message("cash_account_not_found"))
 
         # 1. Record project expense
         exp_id = db.execute(text("""
@@ -664,13 +718,13 @@ async def create_project_expense(
         )
 
         return {"success": True, "id": exp_id, "journal_entry_id": je_id,
-                "message": "تم تسجيل المصروف وإنشاء القيد المحاسبي"}
+                "message": i18n_message("project_expense_recorded_with_je")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project expense: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -712,7 +766,7 @@ async def create_project_revenue(
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         base_currency = get_base_currency(db)
         amount = _dec(revenue.amount).quantize(_D2, ROUND_HALF_UP)
@@ -727,7 +781,7 @@ async def create_project_revenue(
                 "SELECT id FROM accounts WHERE account_type = 'revenue' LIMIT 1"
             )).scalar()
         if not revenue_acc:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على حساب الإيرادات")
+            raise HTTPException(status_code=400, detail=i18n_message("revenue_account_not_found"))
 
         # Debit account
         debit_acc = None
@@ -736,7 +790,7 @@ async def create_project_revenue(
         if not debit_acc:
             debit_acc = get_mapped_account_id(db, "acc_map_cash_main")
         if not debit_acc:
-            raise HTTPException(status_code=400, detail="لم يتم العثور على الحساب المدين")
+            raise HTTPException(status_code=400, detail=i18n_message("debit_account_not_found"))
 
         # 1. Record revenue
         rev_id = db.execute(text("""
@@ -799,13 +853,13 @@ async def create_project_revenue(
         )
 
         return {"success": True, "id": rev_id, "journal_entry_id": je_id,
-                "message": "تم تسجيل الإيراد وإنشاء القيد المحاسبي"}
+                "message": i18n_message("project_revenue_recorded_with_je")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project revenue: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -838,7 +892,7 @@ async def get_project_financials(project_id: int, current_user: dict = Depends(g
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         p = project._mapping
 
@@ -919,7 +973,7 @@ async def get_project_financials(project_id: int, current_user: dict = Depends(g
         raise
     except Exception as e:
         logger.error(f"Error fetching financials: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1004,7 +1058,7 @@ async def get_resource_allocation(
 
     except Exception as e:
         logger.error(f"Error fetching resource allocation: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1046,7 +1100,7 @@ async def create_timesheet(
         # Check if project exists
         project = db.execute(text("SELECT id FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         ts_id = db.execute(text("""
             INSERT INTO project_timesheets (
@@ -1074,11 +1128,11 @@ async def create_timesheet(
             """), {"hours": entry.hours, "tid": entry.task_id})
 
         db.commit()
-        return {"success": True, "id": ts_id, "message": "تم تسجيل الوقت بنجاح"}
+        return {"success": True, "id": ts_id, "message": i18n_message("timesheet_created_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating timesheet: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1095,13 +1149,13 @@ async def update_timesheet(
         # Get existing
         existing = db.execute(text("SELECT * FROM project_timesheets WHERE id = :id"), {"id": timesheet_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="السجل غير موجود")
+            raise HTTPException(**http_error(404, "record_not_found"))
         
         # Check permission (only owner or admin)
         # Note: existing.employee_id refers to company_users.id (based on my schema design)
         # so comparison with current_user.id is correct.
         if existing.employee_id != current_user.id and current_user.role != 'admin':
-             raise HTTPException(status_code=403, detail="غير مصرح لك بتعديل هذا السجل")
+             raise HTTPException(status_code=403, detail=i18n_message("not_allowed_edit_record"))
 
         # Calculate difference in hours if updating hours/task
         old_hours = _dec(existing.hours)
@@ -1139,11 +1193,11 @@ async def update_timesheet(
                                {"hrs": new_hours, "tid": new_task})
 
         db.commit()
-        return {"success": True, "message": "تم تحديث السجل"}
+        return {"success": True, "message": i18n_message("record_updated_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating timesheet: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1155,10 +1209,10 @@ async def delete_timesheet(timesheet_id: int, current_user: dict = Depends(get_c
     try:
         existing = db.execute(text("SELECT * FROM project_timesheets WHERE id = :id"), {"id": timesheet_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="السجل غير موجود")
+            raise HTTPException(**http_error(404, "record_not_found"))
 
         if existing.employee_id != current_user.id and current_user.role != 'admin':
-             raise HTTPException(status_code=403, detail="غير مصرح لك بحذف هذا السجل")
+             raise HTTPException(status_code=403, detail=i18n_message("not_allowed_delete_record"))
 
         # Revert task hours
         if existing.task_id:
@@ -1167,11 +1221,11 @@ async def delete_timesheet(timesheet_id: int, current_user: dict = Depends(get_c
 
         db.execute(text("DELETE FROM project_timesheets WHERE id = :id"), {"id": timesheet_id})
         db.commit()
-        return {"success": True, "message": "تم حذف السجل"}
+        return {"success": True, "message": i18n_message("record_deleted_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting timesheet: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1192,12 +1246,12 @@ async def approve_timesheets(
         base_curr = get_base_currency(db)
 
         if not acc_labor_exp or not acc_payable:
-            raise HTTPException(status_code=400, detail="حسابات تكلفة العمالة غير معرفة في إعدادات الشركة")
+            raise HTTPException(status_code=400, detail=i18n_message("labor_cost_accounts_not_configured"))
 
         # 2. Fetch Project Info
         project = db.execute(text("SELECT project_name FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         results = []
         for ts_id in approval.timesheet_ids:
@@ -1278,11 +1332,11 @@ async def approve_timesheets(
 
         trans.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username, action="approve_timesheets", resource_type="project_timesheet", resource_id=str(results), details={"approved_count": len(results), "project_id": project_id})
-        return {"success": True, "approved_count": len(results), "message": f"تم اعتماد {len(results)} سجل(ات) بنجاح"}
+        return {"success": True, "approved_count": len(results), "message": i18n_message("timesheets_approved_count_success", count=len(results))}
     except Exception as e:
         trans.rollback()
         logger.error(f"Error approving timesheets: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1341,11 +1395,11 @@ async def create_project_document(
         }).scalar()
         
         db.commit()
-        return {"success": True, "id": doc_id, "file_url": file_url, "message": "تم رفع المستند بنجاح"}
+        return {"success": True, "id": doc_id, "file_url": file_url, "message": i18n_message("project_document_uploaded_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error uploading document: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1383,11 +1437,11 @@ async def delete_project_document(project_id: int, doc_id: int, current_user: di
                 
         db.execute(text("DELETE FROM project_documents WHERE id = :id"), {"id": doc_id})
         db.commit()
-        return {"success": True, "message": "تم حذف المستند"}
+        return {"success": True, "message": i18n_message("project_document_deleted_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting document: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1408,28 +1462,26 @@ async def create_project_invoice(
         # Verify Project
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
             
         # 1. Generate Invoice Number
         inv_num = generate_sequential_number(db, f"INV-{datetime.now().year}", "invoices", "invoice_number")
         
-        # 2. Calculate Totals
-        subtotal = 0
-        total_tax = 0
-        total_discount = 0
+        # 2. Calculate Totals (centralized — no inline float math)
+        line_dicts = [
+            {"quantity": item.quantity, "unit_price": item.unit_price,
+             "tax_rate": item.tax_rate, "discount": item.discount}
+            for item in invoice_data.items
+        ]
+        totals = compute_invoice_totals(line_dicts)
+        subtotal = float(totals["subtotal"])
+        total_tax = float(totals["total_tax"])
+        total_discount = float(totals["total_discount"])
+        grand_total = float(totals["grand_total"])
         
         line_items_data = []
-        
         for item in invoice_data.items:
-            line_sub = item.quantity * item.unit_price
-            taxable = line_sub - item.discount
-            tax = taxable * (item.tax_rate / 100)
-            total = taxable + tax
-            
-            subtotal += line_sub
-            total_tax += tax
-            total_discount += item.discount
-            
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate, item.discount)
             line_items_data.append({
                 "pid": item.product_id,
                 "desc": item.description,
@@ -1437,10 +1489,8 @@ async def create_project_invoice(
                 "price": item.unit_price,
                 "tax": item.tax_rate,
                 "disc": item.discount,
-                "total": total
+                "total": float(la['line_total'])
             })
-            
-        grand_total = subtotal - total_discount + total_tax
         
         # 3. Create Invoice Header
         inv_currency = invoice_data.currency or get_base_currency(db)
@@ -1576,13 +1626,13 @@ async def create_project_invoice(
         return {
             "success": True, "invoice_id": inv_id, "invoice_number": inv_num,
             "journal_entry_id": je_id,
-            "message": "تم إنشاء الفاتورة والقيد المحاسبي بنجاح" if je_id else "تم إنشاء الفاتورة بنجاح (بدون قيد — تحقق من إعداد الحسابات)"
+            "message": i18n_message("project_invoice_and_je_created_success") if je_id else i18n_message("project_invoice_created_without_je")
         }
         
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project invoice: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1624,7 +1674,7 @@ async def create_change_order(
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         co_num = generate_sequential_number(db, f"CO-{datetime.now().year}", "project_change_orders", "change_order_number")
 
@@ -1657,7 +1707,7 @@ async def create_change_order(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating change order: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1673,9 +1723,9 @@ async def update_change_order(
     try:
         existing = db.execute(text("SELECT * FROM project_change_orders WHERE id = :id"), {"id": co_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="أمر التغيير غير موجود")
+            raise HTTPException(**http_error(404, "change_order_not_found"))
         if existing.status == 'approved':
-            raise HTTPException(status_code=400, detail="لا يمكن تعديل أمر تغيير تمت الموافقة عليه")
+            raise HTTPException(status_code=400, detail=i18n_message("change_order_cannot_edit_after_approval"))
 
         updates = []
         params = {"id": co_id}
@@ -1687,17 +1737,17 @@ async def update_change_order(
         updates.append("updated_at = NOW()")
 
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         db.execute(text(f"UPDATE project_change_orders SET {', '.join(updates)} WHERE id = :id"), params)
         db.commit()
-        return {"success": True, "message": "تم تحديث أمر التغيير"}
+        return {"success": True, "message": i18n_message("change_order_updated_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating change order: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1713,9 +1763,9 @@ async def approve_change_order(
     try:
         co = db.execute(text("SELECT * FROM project_change_orders WHERE id = :id"), {"id": co_id}).fetchone()
         if not co:
-            raise HTTPException(status_code=404, detail="أمر التغيير غير موجود")
+            raise HTTPException(**http_error(404, "change_order_not_found"))
         if co.status != 'pending':
-            raise HTTPException(status_code=400, detail=f"Cannot approve change order with status '{co.status}'")
+            raise HTTPException(status_code=400, detail=i18n_message("change_order_approve_invalid_status", status=co.status))
 
         db.execute(text("""
             UPDATE project_change_orders
@@ -1747,13 +1797,13 @@ async def approve_change_order(
             request=request
         )
 
-        return {"success": True, "message": "تمت الموافقة على أمر التغيير وتحديث ميزانية المشروع"}
+        return {"success": True, "message": i18n_message("change_order_approved_and_budget_updated")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving change order: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1777,11 +1827,11 @@ async def close_project(
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         p = project._mapping
         if p["status"] == "completed":
-            raise HTTPException(status_code=400, detail="المشروع مغلق بالفعل")
+            raise HTTPException(status_code=400, detail=i18n_message("project_already_closed"))
 
         total_expenses = _dec(db.execute(text(
             "SELECT COALESCE(SUM(amount), 0) FROM project_expenses WHERE project_id = :pid AND status != 'rejected'"
@@ -1874,7 +1924,7 @@ async def close_project(
 
         return {
             "success": True,
-            "message": "تم إغلاق المشروع بنجاح",
+            "message": i18n_message("project_closed_success"),
             "summary": {
                 "total_expenses": float(total_expenses.quantize(_D2)),
                 "total_revenues": float(total_revenues.quantize(_D2)),
@@ -1887,7 +1937,7 @@ async def close_project(
     except Exception as e:
         db.rollback()
         logger.error(f"Error closing project: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1912,7 +1962,7 @@ async def setup_retainer(
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
         
         next_date = data.next_billing_date or date.today()
         db.execute(text("""
@@ -1928,13 +1978,13 @@ async def setup_retainer(
             "next_date": next_date, "id": project_id
         })
         db.commit()
-        return {"success": True, "message": "تم إعداد الفوترة الدورية بنجاح"}
+        return {"success": True, "message": i18n_message("recurring_billing_configured_success")}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error setting up retainer: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1969,7 +2019,7 @@ async def generate_retainer_invoices(
         """), {"target": target_date}).fetchall()
         
         if not projects:
-            return {"success": True, "generated": 0, "message": "لا توجد عقود مستحقة للفوترة"}
+            return {"success": True, "generated": 0, "message": i18n_message("no_contracts_due_for_billing")}
         
         base_currency = get_base_currency(db)
         ar_acc = get_mapped_account_id(db, "acc_map_ar")
@@ -2084,14 +2134,14 @@ async def generate_retainer_invoices(
             "success": True,
             "generated": len(generated),
             "invoices": generated,
-            "message": f"تم إنشاء {len(generated)} فاتورة Retainer بنجاح"
+            "message": i18n_message("retainer_invoices_created_count_success", count=len(generated))
         }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error generating retainer invoices: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2111,7 +2161,7 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
     try:
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
-            raise HTTPException(status_code=404, detail="المشروع غير موجود")
+            raise HTTPException(**http_error(404, "project_not_found"))
 
         p = project._mapping
         bac = _dec(p.get("planned_budget") or 0)
@@ -2175,7 +2225,7 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
         raise
     except Exception as e:
         logger.error(f"Error calculating EVM: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2441,7 +2491,7 @@ async def get_overdue_tasks(current_user: dict = Depends(get_current_user)):
             "alert_type": "overdue_tasks",
             "count": len(tasks_list),
             "tasks": tasks_list,
-            "message": f"{len(tasks_list)} مهمة متأخرة تستلزم اهتماماً" if tasks_list else "لا توجد مهام متأخرة ✓",
+            "message": i18n_message("overdue_tasks_attention_count", count=len(tasks_list)) if tasks_list else i18n_message("overdue_tasks_none"),
         }
     finally:
         db.close()
@@ -2479,7 +2529,7 @@ async def get_over_budget_projects(current_user: dict = Depends(get_current_user
             "alert_type": "over_budget",
             "count": len(projects_list),
             "projects": projects_list,
-            "message": f"{len(projects_list)} مشروع تجاوز الميزانية" if projects_list else "جميع المشاريع ضمن الميزانية ✓",
+            "message": i18n_message("over_budget_projects_count", count=len(projects_list)) if projects_list else i18n_message("over_budget_projects_none"),
         }
     finally:
         db.close()
@@ -2550,19 +2600,19 @@ async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
         alerts = []
         if overdue_tasks_count:
             alerts.append({"type": "overdue_tasks", "severity": "high",
-                           "message": f"{overdue_tasks_count} مهمة متأخرة", "count": overdue_tasks_count})
+                           "message": i18n_message("overdue_tasks_count", count=overdue_tasks_count), "count": overdue_tasks_count})
         if over_budget_count:
             alerts.append({"type": "over_budget", "severity": "high",
-                           "message": f"{over_budget_count} مشروع تجاوز الميزانية", "count": over_budget_count})
+                           "message": i18n_message("over_budget_count", count=over_budget_count), "count": over_budget_count})
         if overdue_projects:
             alerts.append({"type": "overdue_projects", "severity": "critical",
-                           "message": f"{len(overdue_projects)} مشروع تجاوز الموعد النهائي", "count": len(overdue_projects)})
+                           "message": i18n_message("overdue_projects_count", count=len(overdue_projects)), "count": len(overdue_projects)})
         if due_soon:
             alerts.append({"type": "due_soon", "severity": "medium",
-                           "message": f"{len(due_soon)} مشروع ينتهي خلال 14 يوماً", "count": len(due_soon)})
+                           "message": i18n_message("projects_due_soon_14_days_count", count=len(due_soon)), "count": len(due_soon)})
         if pending_cos:
             alerts.append({"type": "pending_change_orders", "severity": "low",
-                           "message": f"{pending_cos} أوامر تغيير في انتظار الموافقة", "count": pending_cos})
+                           "message": i18n_message("pending_change_orders_count", count=pending_cos), "count": pending_cos})
 
         return {
             "total_alerts": len(alerts),
@@ -2626,11 +2676,11 @@ def create_project_risk(project_id: int, risk: dict, request: Request, current_u
             details={"project_id": project_id, "title": risk["title"]},
             request=request
         )
-        return {"id": risk_id, "message": "تم إضافة الخطر بنجاح"}
+        return {"id": risk_id, "message": i18n_message("risk_created_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating project risk: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2662,11 +2712,11 @@ def update_project_risk(risk_id: int, risk: dict, request: Request, current_user
             details={"risk_id": risk_id, "title": risk["title"]},
             request=request
         )
-        return {"message": "تم تحديث الخطر بنجاح"}
+        return {"message": i18n_message("risk_updated_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating project risk: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2685,11 +2735,11 @@ def delete_project_risk(risk_id: int, request: Request, current_user=Depends(get
             details={"risk_id": risk_id},
             request=request
         )
-        return {"message": "تم حذف الخطر"}
+        return {"message": i18n_message("risk_deleted_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting project risk: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2737,11 +2787,11 @@ def create_task_dependency(project_id: int, dep: dict, request: Request, current
             details={"project_id": project_id, "task_id": dep["task_id"], "depends_on": dep["depends_on_task_id"]},
             request=request
         )
-        return {"id": dep_id, "message": "تم إنشاء التبعية بنجاح"}
+        return {"id": dep_id, "message": i18n_message("dependency_created_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating task dependency: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2760,11 +2810,11 @@ def delete_task_dependency(dep_id: int, request: Request, current_user=Depends(g
             details={"dep_id": dep_id},
             request=request
         )
-        return {"message": "تم حذف التبعية"}
+        return {"message": i18n_message("dependency_deleted_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting task dependency: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2838,52 +2888,7 @@ async def log_time_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error logging time entry: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
-    finally:
-        db.close()
-
-
-@router.get("/timetracking", dependencies=[Depends(require_permission("projects.time_view"))])
-async def list_own_time_entries(
-    project_id: Optional[int] = None,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-    entry_status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """جلب سجلات الوقت الخاصة بالمستخدم (قابلة للفلترة)"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        filters = ["te.employee_id = (SELECT id FROM employees WHERE user_id = :uid LIMIT 1)"]
-        params: dict = {"uid": current_user.id}
-        if project_id:
-            filters.append("te.project_id = :project_id")
-            params["project_id"] = project_id
-        if date_from:
-            filters.append("te.date >= :date_from")
-            params["date_from"] = date_from
-        if date_to:
-            filters.append("te.date <= :date_to")
-            params["date_to"] = date_to
-        if entry_status:
-            filters.append("te.status = :entry_status")
-            params["entry_status"] = entry_status
-        where = " AND ".join(filters)
-        rows = db.execute(text(f"""
-            SELECT te.*,
-                   e.full_name  AS employee_name,
-                   p.project_name,
-                   pt.task_name,
-                   ae.full_name AS approver_name
-            FROM   timesheet_entries te
-            LEFT JOIN employees e  ON e.id  = te.employee_id
-            LEFT JOIN projects  p  ON p.id  = te.project_id
-            LEFT JOIN project_tasks pt ON pt.id = te.task_id
-            LEFT JOIN employees ae ON ae.id = te.approved_by
-            WHERE  {where}
-            ORDER BY te.date DESC
-        """), params).fetchall()
-        return [dict(r._mapping) for r in rows]
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -2900,10 +2905,9 @@ async def update_time_entry(
     try:
         existing = _fetch_timesheet_entry(db, entry_id)
         if not existing:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "entry_not_found"))
         if existing["status"] != "draft":
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                "Only draft entries can be edited")
+            raise HTTPException(**http_error(status.HTTP_400_BAD_REQUEST, "only_draft_entries_editable"))
         updates, params = [], {"id": entry_id}
         if entry.task_id is not None:
             updates.append("task_id = :task_id"); params["task_id"] = entry.task_id
@@ -2929,7 +2933,7 @@ async def update_time_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating time entry: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -2959,7 +2963,7 @@ async def submit_weekly_timesheet(
     except Exception as e:
         db.rollback()
         logger.error(f"Error submitting weekly timesheet: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3018,10 +3022,9 @@ async def approve_time_entry(
     try:
         existing = _fetch_timesheet_entry(db, entry_id)
         if not existing:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "entry_not_found"))
         if existing["status"] != "submitted":
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                "Only submitted entries can be approved")
+            raise HTTPException(**http_error(status.HTTP_400_BAD_REQUEST, "only_submitted_entries_approvable"))
         approver_emp = db.execute(text(
             "SELECT id FROM employees WHERE user_id = :uid LIMIT 1"
         ), {"uid": current_user.id}).fetchone()
@@ -3045,7 +3048,7 @@ async def approve_time_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error approving time entry: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3063,10 +3066,9 @@ async def reject_time_entry(
     try:
         existing = _fetch_timesheet_entry(db, entry_id)
         if not existing:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "entry_not_found"))
         if existing["status"] != "submitted":
-            raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                "Only submitted entries can be rejected")
+            raise HTTPException(**http_error(status.HTTP_400_BAD_REQUEST, "only_submitted_entries_rejectable"))
         db.execute(text("""
             UPDATE timesheet_entries
                SET status = 'rejected',
@@ -3088,7 +3090,7 @@ async def reject_time_entry(
     except Exception as e:
         db.rollback()
         logger.error(f"Error rejecting time entry: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3107,7 +3109,7 @@ async def get_project_profitability(
             FROM   projects WHERE id = :pid
         """), {"pid": project_id}).fetchone()
         if not project:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "project_not_found"))
 
         ts = db.execute(text("""
             SELECT
@@ -3151,7 +3153,7 @@ async def get_project_profitability(
         raise
     except Exception as e:
         logger.error(f"Error calculating profitability: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3209,13 +3211,19 @@ async def get_team_availability(
         if not date_to:
             date_to = date_from + timedelta(days=90)
 
-        employees = db.execute(text("""
-            SELECT DISTINCT ra.employee_id, e.full_name AS employee_name
-            FROM   resource_allocations ra
-            JOIN   employees e ON e.id = ra.employee_id
-            WHERE  ra.start_date <= :ed AND ra.end_date >= :sd
-            ORDER  BY e.full_name
-        """), {"sd": date_from, "ed": date_to}).fetchall()
+        try:
+            employees = db.execute(text("""
+                SELECT DISTINCT ra.employee_id, e.full_name AS employee_name
+                FROM   resource_allocations ra
+                JOIN   employees e ON e.id = ra.employee_id
+                WHERE  ra.start_date <= :ed AND ra.end_date >= :sd
+                ORDER  BY e.full_name
+            """), {"sd": date_from, "ed": date_to}).fetchall()
+        except Exception as e:
+            db.rollback()
+            if "does not exist" in str(e):
+                return {"employees": []}
+            raise
 
         result = []
         for emp in employees:
@@ -3291,15 +3299,12 @@ async def allocate_resource(
         data["total_allocation"] = new_total
         data["over_allocation_warning"] = over_allocated
         if over_allocated:
-            data["warning_message"] = (
-                f"Employee is allocated at {new_total:.0f}% "
-                f"(exceeds 100%) for the overlapping period."
-            )
+            data["warning_message"] = i18n_message("employee_overallocated_warning", total=f"{new_total:.0f}")
         return data
     except Exception as e:
         db.rollback()
         logger.error(f"Error allocating resource: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3317,7 +3322,7 @@ async def update_allocation(
     try:
         existing = _fetch_allocation(db, alloc_id)
         if not existing:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Allocation not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "allocation_not_found"))
 
         updates, params = [], {"id": alloc_id}
         if alloc.role is not None:
@@ -3361,7 +3366,7 @@ async def update_allocation(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating allocation: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 
@@ -3378,7 +3383,7 @@ async def delete_allocation(
     try:
         existing = _fetch_allocation(db, alloc_id)
         if not existing:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Allocation not found")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "allocation_not_found"))
         db.execute(text("DELETE FROM resource_allocations WHERE id = :id"),
                    {"id": alloc_id})
         db.commit()
@@ -3389,13 +3394,13 @@ async def delete_allocation(
             details={"alloc_id": alloc_id},
             request=request
         )
-        return {"message": "Allocation removed", "id": alloc_id}
+        return {"message": i18n_message("allocation_removed"), "id": alloc_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting allocation: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error"))
     finally:
         db.close()
 

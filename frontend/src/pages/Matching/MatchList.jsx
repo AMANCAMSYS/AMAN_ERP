@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -17,6 +18,7 @@ const STATUS_COLORS = {
 export default function MatchList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { showToast } = useToast()
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -36,7 +38,7 @@ export default function MatchList() {
       setMatches(Array.isArray(res.data) ? res.data : [])
     } catch (err) {
       setError(t('common.error_loading'))
-      console.error(err)
+      showToast(t('common.error'), 'error')
     } finally {
       setLoading(false)
     }

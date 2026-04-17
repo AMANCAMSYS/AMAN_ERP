@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, SoftDeleteMixin
 
 
-class ManufacturingEquipment(ModelBase):
+class ManufacturingEquipment(SoftDeleteMixin, ModelBase):
     __tablename__ = "manufacturing_equipment"
     __table_args__ = (UniqueConstraint("code", name="manufacturing_equipment_code_key"),)
 
@@ -21,7 +21,7 @@ class ManufacturingEquipment(ModelBase):
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class ManufacturingOperation(ModelBase):
+class ManufacturingOperation(SoftDeleteMixin, ModelBase):
     __tablename__ = "manufacturing_operations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -37,7 +37,7 @@ class ManufacturingOperation(ModelBase):
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class ManufacturingRoute(ModelBase):
+class ManufacturingRoute(SoftDeleteMixin, ModelBase):
     __tablename__ = "manufacturing_routes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -51,7 +51,7 @@ class ManufacturingRoute(ModelBase):
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class MfgQcCheck(ModelBase):
+class MfgQcCheck(SoftDeleteMixin, ModelBase):
     __tablename__ = "mfg_qc_checks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

@@ -193,8 +193,8 @@ def perform_match(db, invoice_id: int, po_id: int, supplier_id: int | None = Non
         line_results.append({
             "po_line_id": pol.id,
             "line_status": line_status,
-            "qty_variance": float(qty_var_pct),
-            "price_variance": float(price_var_pct),
+            "qty_variance": str(qty_var_pct),
+            "price_variance": str(price_var_pct),
         })
 
     # 6. Update overall match status

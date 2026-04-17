@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import DataTable from '../../components/common/DataTable';
@@ -13,6 +14,7 @@ const ShipmentList = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -28,7 +30,7 @@ const ShipmentList = () => {
             const res = await inventoryAPI.listShipments({ status_filter: statusFilter || undefined, branch_id: currentBranch?.id });
             setShipments(res.data);
         } catch (err) {
-            console.error("Failed to load shipments", err);
+            showToast(t('stock.shipments.validation.error_load'), 'error');
         } finally {
             setLoading(false);
         }

@@ -5,10 +5,13 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 function SalesQuotations() {
     const { t } = useTranslation()
+    const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -21,7 +24,7 @@ function SalesQuotations() {
                 const response = await salesAPI.listQuotations({ branch_id: currentBranch?.id })
                 setQuotations(response.data)
             } catch (err) {
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -75,7 +78,7 @@ function SalesQuotations() {
                                     <td>{formatShortDate(quote.quotation_date)}</td>
                                     <td>{quote.expiry_date ? formatShortDate(quote.expiry_date) : '-'}</td>
                                     <td className="font-bold">
-                                        {Number(quote.total).toLocaleString()} <small>{currency}</small>
+                                        {formatNumber(quote.total)} <small>{currency}</small>
                                     </td>
                                     <td>
                                         <span className={`status-badge ${quote.status}`}>

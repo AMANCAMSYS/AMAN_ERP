@@ -345,7 +345,7 @@ const ApprovalsPage = () => {
                                                             const steps = typeof wf.steps === 'string' ? JSON.parse(wf.steps) : wf.steps;
                                                             return <span className="badge badge-secondary badge-outline badge-sm">{steps?.length || 0} {t('approvals.table.steps')}</span>;
                                                         } catch (e) {
-                                                            return <span className="badge badge-ghost badge-sm">Invalid Data</span>;
+                                                            return <span className="badge badge-ghost badge-sm">{t('approvals.table.invalid_data')}</span>;
                                                         }
                                                     })()}
                                                 </td>

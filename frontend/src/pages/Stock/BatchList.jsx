@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { formatNumber } from '../../utils/format'
 import DateInput from '../../components/common/DateInput'
 import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
@@ -83,8 +84,8 @@ function BatchList() {
                 ...form,
                 product_id: parseInt(form.product_id),
                 warehouse_id: parseInt(form.warehouse_id),
-                quantity: parseFloat(form.quantity || 0),
-                unit_cost: parseFloat(form.unit_cost || 0)
+                quantity: String(form.quantity || 0),
+                unit_cost: String(form.unit_cost || 0)
             })
             setShowCreateModal(false)
             setForm({ product_id: '', warehouse_id: '', batch_number: '', manufacturing_date: '', expiry_date: '', quantity: '', unit_cost: '', notes: '' })
@@ -143,7 +144,7 @@ function BatchList() {
             key: 'quantity',
             label: t('common.quantity'),
             width: '10%',
-            render: (val) => parseFloat(val || 0).toLocaleString(),
+            render: (val) => formatNumber(val || 0),
         },
         {
             key: 'manufacturing_date',

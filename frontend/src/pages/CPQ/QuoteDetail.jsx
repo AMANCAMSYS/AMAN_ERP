@@ -6,12 +6,15 @@ import { FileDown, ArrowRightCircle, CheckCircle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext';
+import { formatNumber } from '../../utils/format';
 
 const QuoteDetail = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const { quoteId } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [quote, setQuote] = useState(null);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
@@ -21,7 +24,7 @@ const QuoteDetail = () => {
         setLoading(true);
         cpqAPI.getQuote(quoteId)
             .then(res => setQuote(res.data))
-            .catch(e => console.error(e))
+            .catch(() => showToast(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     };
 
@@ -98,7 +101,7 @@ const QuoteDetail = () => {
                 <div className="stat-card">
                     <div className="stat-label">{t('cpq.final_amount')}</div>
                     <div className="stat-value" style={{ fontSize: 20, color: '#2563eb' }}>
-                        {Number(quote.final_amount || 0).toFixed(2)}
+                        {formatNumber(quote.final_amount || 0)}
                     </div>
                 </div>
             </div>
@@ -134,12 +137,12 @@ const QuoteDetail = () => {
                         {(quote.lines || []).map(l => (
                             <tr key={l.id}>
                                 <td>{l.product_name}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(l.quantity).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(l.base_unit_price).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(l.option_adjustments).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right', color: '#dc2626' }}>-{Number(l.discount_applied).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right' }}>{Number(l.final_unit_price).toFixed(2)}</td>
-                                <td style={{ textAlign: 'right', fontWeight: 600 }}>{Number(l.line_total).toFixed(2)}</td>
+                                <td style={{ textAlign: 'right' }}>{formatNumber(l.quantity)}</td>
+                                <td style={{ textAlign: 'right' }}>{formatNumber(l.base_unit_price)}</td>
+                                <td style={{ textAlign: 'right' }}>{formatNumber(l.option_adjustments)}</td>
+                                <td style={{ textAlign: 'right', color: '#dc2626' }}>-{formatNumber(l.discount_applied)}</td>
+                                <td style={{ textAlign: 'right' }}>{formatNumber(l.final_unit_price)}</td>
+                                <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatNumber(l.line_total)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -147,17 +150,17 @@ const QuoteDetail = () => {
                         <tr style={{ fontWeight: 600 }}>
                             <td colSpan={5}></td>
                             <td style={{ textAlign: 'right' }}>{t('cpq.subtotal')}</td>
-                            <td style={{ textAlign: 'right' }}>{Number(quote.total_amount || 0).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatNumber(quote.total_amount || 0)}</td>
                         </tr>
                         <tr style={{ color: '#dc2626' }}>
                             <td colSpan={5}></td>
                             <td style={{ textAlign: 'right' }}>{t('cpq.discount')}</td>
-                            <td style={{ textAlign: 'right' }}>-{Number(quote.discount_total || 0).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>-{formatNumber(quote.discount_total || 0)}</td>
                         </tr>
                         <tr style={{ fontWeight: 700, fontSize: 16, color: '#2563eb' }}>
                             <td colSpan={5}></td>
                             <td style={{ textAlign: 'right' }}>{t('cpq.total')}</td>
-                            <td style={{ textAlign: 'right' }}>{Number(quote.final_amount || 0).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>{formatNumber(quote.final_amount || 0)}</td>
                         </tr>
                     </tfoot>
                 </table>

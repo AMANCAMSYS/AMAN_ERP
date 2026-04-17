@@ -441,9 +441,9 @@ export default function IndustryReport() {
   const config = REPORT_CONFIG[reportType]
 
   useEffect(() => {
-    if (!config) { setError('Unknown report type'); setLoading(false); return }
+    if (!config) { setError(t('errors.unknown_report_type')); setLoading(false); return }
     fetchReport()
-  }, [reportType])
+  }, [reportType, config, t])
 
   const fetchReport = async () => {
     try {
@@ -452,7 +452,7 @@ export default function IndustryReport() {
       const res = await api.get(config.endpoint)
       setData(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to load report')
+      setError(err.response?.data?.detail || err.message || t('errors.failed_load_report'))
     } finally {
       setLoading(false)
     }

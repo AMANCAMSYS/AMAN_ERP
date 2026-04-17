@@ -3,6 +3,7 @@ Inventory Module - Price Lists CRUD
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List
 import logging
@@ -74,7 +75,7 @@ def create_price_list(data: PriceListCreate, current_user: dict = Depends(get_cu
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -90,7 +91,7 @@ def update_price_list(
     try:
         existing = db.execute(text("SELECT id FROM customer_price_lists WHERE id = :id"), {"id": id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="قائمة الأسعار غير موجودة")
+            raise HTTPException(**http_error(404, "price_list_not_found"))
 
         if data.is_default:
             db.execute(text("UPDATE customer_price_lists SET is_default = FALSE WHERE id != :id"), {"id": id})
@@ -118,7 +119,7 @@ def update_price_list(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -134,7 +135,7 @@ def delete_price_list(
     try:
         price_list = db.execute(text("SELECT id, price_list_name FROM customer_price_lists WHERE id = :id"), {"id": id}).fetchone()
         if not price_list:
-            raise HTTPException(status_code=404, detail="قائمة الأسعار غير موجودة")
+            raise HTTPException(**http_error(404, "price_list_not_found"))
 
         # Check if it's used by any customers
         usage = db.execute(text("SELECT COUNT(*) FROM parties WHERE price_list_id = :id"), {"id": id}).scalar()
@@ -167,7 +168,7 @@ def delete_price_list(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -222,6 +223,6 @@ def update_price_list_items(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

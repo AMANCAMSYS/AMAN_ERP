@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 import { Briefcase, Users, Plus, ArrowRight, X, CheckCircle, ExternalLink } from 'lucide-react';
 import '../../components/ModuleStyles.css';
@@ -10,7 +10,6 @@ import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 const Recruitment = () => {
     const { t, i18n } = useTranslation();
-    const { showToast } = useToast();
     const { currentBranch } = useBranch();
     const isRTL = i18n.language === 'ar';
     const [activeTab, setActiveTab] = useState('openings');
@@ -42,7 +41,7 @@ const Recruitment = () => {
             ]);
             setOpenings(openRes.data || []);
             setApplications(appRes.data || []);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const fetchApplications = async () => {
@@ -52,46 +51,46 @@ const Recruitment = () => {
             if (currentBranch?.id) params.branch_id = currentBranch.id;
             const res = await hrImprovementsAPI.listAllApplications(params);
             setApplications(res.data || []);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreateOpening = async (e) => {
         e.preventDefault();
         try {
             await hrImprovementsAPI.createJobOpening({ ...openingForm, positions: parseInt(openingForm.positions) });
-            showToast(t('hr.job_opening_created'), 'success');
+            toastEmitter.emit(t('hr.job_opening_created'), 'success');
             setShowModal(false);
             setOpeningForm({ title: '', department: '', positions: 1, requirements: '', deadline: '', description: '', employment_type: 'full_time' });
             fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
+        } catch (err) { toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleCreateApplication = async (e) => {
         e.preventDefault();
         try {
             await hrImprovementsAPI.createApplication({ ...appForm, job_opening_id: parseInt(appForm.job_opening_id) });
-            showToast(t('hr.application_submitted'), 'success');
+            toastEmitter.emit(t('hr.application_submitted'), 'success');
             setShowModal(false);
             setAppForm({ job_opening_id: '', applicant_name: '', email: '', phone: '', resume_url: '', cover_letter: '' });
             fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
+        } catch (err) { toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleUpdateStage = async (appId, stage) => {
         try {
             await hrImprovementsAPI.updateApplicationStage(appId, { stage });
-            showToast(t('hr.stage_updated'), 'success');
+            toastEmitter.emit(t('hr.stage_updated'), 'success');
             fetchData();
             if (selectedApp && selectedApp.id === appId) setSelectedApp({ ...selectedApp, stage });
-        } catch (err) { showToast(t('common.error'), 'error'); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleCloseOpening = async (openingId) => {
         try {
             await hrImprovementsAPI.updateJobOpening(openingId, { status: 'closed' });
-            showToast(t('hr.opening_closed'), 'success');
+            toastEmitter.emit(t('hr.opening_closed'), 'success');
             fetchData();
-        } catch (err) { showToast(t('common.error'), 'error'); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const statusBadge = (status) => {

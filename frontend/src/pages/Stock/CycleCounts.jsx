@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { formatShortDate } from '../../utils/dateUtils';
+import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
 
@@ -128,7 +129,7 @@ function CycleCounts() {
             await inventoryAPI.completeCycleCount(selectedCount.id, {
                 items: itemUpdates.map(item => ({
                     ...item,
-                    counted_quantity: parseFloat(item.counted_quantity || 0)
+                    counted_quantity: String(item.counted_quantity || 0)
                 }))
             })
             setShowDetailModal(false)
@@ -404,11 +405,11 @@ function CycleCounts() {
                                 <tbody>
                                     {(countDetail.items || []).map(item => {
                                         const update = itemUpdates.find(u => u.item_id === item.id)
-                                        const variance = (parseFloat(update?.counted_quantity || 0) - parseFloat(item.system_quantity || 0))
+                                        const variance = (Number(update?.counted_quantity || 0) - Number(item.system_quantity || 0))
                                         return (
                                             <tr key={item.id}>
                                                 <td>{item.product_name}</td>
-                                                <td>{parseFloat(item.system_quantity || 0).toLocaleString()}</td>
+                                                <td>{formatNumber(item.system_quantity || 0)}</td>
                                                 <td>
                                                     {selectedCount?.status === 'in_progress' ? (
                                                         <input type="number" className="form-input" min="0" step="0.01"
@@ -416,7 +417,7 @@ function CycleCounts() {
                                                             value={update?.counted_quantity ?? ''}
                                                             onChange={(e) => updateItemCount(item.id, 'counted_quantity', e.target.value)} />
                                                     ) : (
-                                                        parseFloat(item.counted_quantity || 0).toLocaleString()
+                                                        formatNumber(item.counted_quantity || 0)
                                                     )}
                                                 </td>
                                                 <td>

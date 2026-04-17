@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getUser } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 import CurrencySelector from '../../components/common/CurrencySelector';
 import FormField from '../../components/common/FormField';
 
@@ -51,14 +52,13 @@ function CustomerForm() {
                         phone: c.phone || '',
                         tax_number: c.tax_number || '',
                         address: c.address || '',
-                        credit_limit: c.credit_limit ? parseFloat(c.credit_limit).toFixed(decimalPlaces) : (0).toFixed(decimalPlaces),
+                        credit_limit: c.credit_limit ? formatNumber(c.credit_limit) : formatNumber(0),
                         group_id: c.group_id || '',
                         currency: c.currency || '',
                         status: c.status || 'active'
                     })
                 }
             } catch (err) {
-                console.error("Error fetching data:", err)
                 setError(t('common.error_loading'))
             } finally {
                 setInitialLoading(false)
@@ -93,7 +93,6 @@ function CustomerForm() {
                 navigate('/sales/customers')
             }
         } catch (err) {
-            console.error(err)
             const errMsg = err.response?.data?.detail
             setError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) || t('sales.customers.form.error_add'))
         } finally {

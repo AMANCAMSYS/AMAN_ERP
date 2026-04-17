@@ -24,7 +24,7 @@ function DeliveryOrderForm() {
     useEffect(() => {
         salesAPI.listOrders({ status: 'confirmed', branch_id: currentBranch?.id })
             .then(res => setSalesOrders(res.data))
-            .catch(console.error)
+            .catch(() => showToast(t('common.error'), 'error'))
     }, [currentBranch])
 
     const handleSOChange = async (soId) => {
@@ -40,7 +40,7 @@ function DeliveryOrderForm() {
                     product_name: l.product_name
                 })).filter(l => l.quantity > 0)
             }))
-        } catch (err) { console.error(err) }
+        } catch (err) { showToast(t('common.error'), 'error') }
     }
 
     const handleSubmit = async (e) => {

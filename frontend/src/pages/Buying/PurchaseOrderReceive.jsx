@@ -6,7 +6,7 @@ import { useBranch } from '../../context/BranchContext';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 
 function PurchaseOrderReceive() {
@@ -14,6 +14,7 @@ function PurchaseOrderReceive() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [order, setOrder] = useState(null);
     const [warehouses, setWarehouses] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -47,8 +48,7 @@ function PurchaseOrderReceive() {
             });
             setReceiveQtys(initialQtys);
         } catch (err) {
-            console.error("Failed to fetch data", err);
-            toastEmitter.emit(t('common.error_occurred'), 'error');
+            showToast(t('common.error_occurred'), 'error');
         } finally {
             setLoading(false);
         }
@@ -61,7 +61,7 @@ function PurchaseOrderReceive() {
             return;
         }
 
-        const val = parseFloat(value);
+        const val = Number(value);
         if (!isNaN(val)) {
             setReceiveQtys(prev => ({
                 ...prev,
@@ -74,19 +74,19 @@ function PurchaseOrderReceive() {
         e.preventDefault();
 
         if (!selectedWarehouse) {
-            toastEmitter.emit(t('buying.receive.select_warehouse'), 'error');
+            showToast(t('buying.receive.select_warehouse'), 'error');
             return;
         }
 
         const itemsToReceive = [];
         for (const [lineId, qty] of Object.entries(receiveQtys)) {
-            const numericQty = parseFloat(qty);
+            const numericQty = Number(qty);
             if (!isNaN(numericQty) && numericQty > 0) {
                 const item = order.items?.find(i => i.id === parseInt(lineId));
                 const remaining = item ? (item.quantity - (item.received_quantity || 0)) : 0;
 
                 if (numericQty > remaining + 0.0001) { // small epsilon for floats
-                    toastEmitter.emit(`${t('common.error')}: ${t('buying.receive.qty_to_receive')} (${numericQty}) > ${t('buying.orders.item.qty_remaining')} (${remaining}) - ${item?.product_name}`, 'error');
+                    showToast(`${t('common.error')}: ${t('buying.receive.qty_to_receive')} (${numericQty}) > ${t('buying.orders.item.qty_remaining')} (${remaining}) - ${item?.product_name}`, 'error');
                     return;
                 }
 
@@ -98,7 +98,7 @@ function PurchaseOrderReceive() {
         }
 
         if (itemsToReceive.length === 0) {
-            toastEmitter.emit(t('buying.receive.no_items'), 'error');
+            showToast(t('buying.receive.no_items'), 'error');
             return;
         }
 
@@ -110,7 +110,7 @@ function PurchaseOrderReceive() {
             });
             navigate(`/buying/orders/${id}`);
         } catch (err) {
-            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
+            showToast(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setSubmitting(false);
         }

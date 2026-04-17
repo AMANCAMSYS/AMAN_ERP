@@ -3,6 +3,7 @@ Inventory Module - Products CRUD + Cost Breakdown
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -34,7 +35,7 @@ def get_product_cost_breakdown(
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
 
-        global_cost = float(product.cost_price or 0)
+        global_cost = product.cost_price or 0
 
         # Get Warehouse Details
         breakdown = []
@@ -51,21 +52,21 @@ def get_product_cost_breakdown(
         """), {"pid": product_id}).fetchall()
 
         for row in rows:
-            avg_cost = float(row.average_cost or 0)
-            qty = float(row.quantity or 0)
+            avg_cost = row.average_cost or 0
+            qty = row.quantity or 0
 
             breakdown.append({
                 "warehouse_id": row.warehouse_id,
                 "warehouse_name": row.warehouse_name,
-                "quantity": qty,
-                "average_cost": avg_cost,
-                "total_value": qty * avg_cost,
+                "quantity": str(qty),
+                "average_cost": str(avg_cost),
+                "total_value": str(qty * avg_cost),
                 "last_update": row.last_costing_update.isoformat() if row.last_costing_update else None
             })
 
         return {
             "policy_type": policy or 'global_wac',
-            "global_cost": global_cost,
+            "global_cost": str(global_cost),
             "breakdown": breakdown
         }
     finally:
@@ -135,14 +136,14 @@ def list_products(
                 "item_name_en": row.item_name_en,
                 "item_type": row.item_type,
                 "unit": row.unit or 'قطعة',
-                "selling_price": float(row.selling_price or 0),
-                "buying_price": float(row.buying_price or 0),
-                "last_buying_price": float(row.last_buying_price or 0),
-                "tax_rate": float(row.tax_rate or 0),
+                "selling_price": str(row.selling_price or 0),
+                "buying_price": str(row.buying_price or 0),
+                "last_buying_price": str(row.last_buying_price or 0),
+                "tax_rate": str(row.tax_rate or 0),
                 "description": row.description,
                 "is_active": row.is_active,
-                "current_stock": float(row.current_stock or 0),
-                "reserved_quantity": float(row.reserved_quantity or 0),
+                "current_stock": str(row.current_stock or 0),
+                "reserved_quantity": str(row.reserved_quantity or 0),
                 "category_id": row.category_id,
                 "category_name": row.category_name,
                 "has_batch_tracking": row.has_batch_tracking or False,
@@ -204,7 +205,7 @@ def get_product_stock(
 
         total_qty = db.execute(text(query), params).scalar()
 
-        return float(total_qty or 0)
+        return str(total_qty or 0)
     finally:
         db.close()
 
@@ -305,7 +306,7 @@ def create_product(
         db.rollback()
         logger.error(f"Error creating product: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -341,7 +342,7 @@ def get_product(id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": id}).fetchone()
 
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         return product
     finally:
@@ -355,7 +356,7 @@ def update_product(id: int, product: ProductCreate, request: Request, current_us
         # Check existence
         existing = db.execute(text("SELECT id FROM products WHERE id = :id"), {"id": id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         # Check code uniqueness if changed
         dup = db.execute(text("SELECT id FROM products WHERE product_code = :code AND id != :id"),
@@ -448,7 +449,7 @@ def update_product(id: int, product: ProductCreate, request: Request, current_us
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -465,7 +466,7 @@ def delete_product(
         # Check existence
         product = db.execute(text("SELECT id, product_name FROM products WHERE id = :id"), {"id": id}).fetchone()
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         # Check if product has stock
         stock = db.execute(text("""
@@ -513,6 +514,6 @@ def delete_product(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

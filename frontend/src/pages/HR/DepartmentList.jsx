@@ -28,7 +28,7 @@ const DepartmentList = () => {
             const res = await hrAPI.listDepartments();
             setDepartments(res.data);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

@@ -4,13 +4,16 @@ import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils';
+import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 
 
 function SupplierPayments() {
     const { t } = useTranslation()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const currency = getCurrency()
     const [payments, setPayments] = useState([])
     const [loading, setLoading] = useState(true)
@@ -26,7 +29,7 @@ function SupplierPayments() {
             const response = await purchasesAPI.listPayments({ branch_id: currentBranch?.id })
             setPayments(response.data)
         } catch (err) {
-            console.error('Error fetching payments:', err)
+            showToast(t('common.error'), 'error')
             setError(t('common.error_loading'))
         } finally {
             setLoading(false)
@@ -102,7 +105,7 @@ function SupplierPayments() {
                                     <td>{payment.supplier_name}</td>
                                     <td>{formatShortDate(payment.voucher_date)}</td>
                                     <td className="font-bold">
-                                        {parseFloat(payment.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} {payment.currency || currency}
+                                        {formatNumber(payment.amount)} {payment.currency || currency}
                                     </td>
                                     <td>
                                         <span className="badge badge-info">

@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import AuditMixin, ModelBase
 
 
-class RequestForQuotation(ModelBase):
+class RequestForQuotation(AuditMixin, ModelBase):
     __tablename__ = "request_for_quotations"
     __table_args__ = (UniqueConstraint("rfq_number", name="request_for_quotations_rfq_number_key"),)
 
@@ -15,12 +15,9 @@ class RequestForQuotation(ModelBase):
     status: Mapped[str | None] = mapped_column(String(30), default="draft")
     deadline: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class RfqLine(ModelBase):
+class RfqLine(AuditMixin, ModelBase):
     __tablename__ = "rfq_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -32,7 +29,7 @@ class RfqLine(ModelBase):
     specifications: Mapped[str | None] = mapped_column(Text)
 
 
-class RfqResponse(ModelBase):
+class RfqResponse(AuditMixin, ModelBase):
     __tablename__ = "rfq_responses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -47,7 +44,7 @@ class RfqResponse(ModelBase):
     submitted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SalesCommission(ModelBase):
+class SalesCommission(AuditMixin, ModelBase):
     __tablename__ = "sales_commissions"
     __table_args__ = (UniqueConstraint("invoice_id", "salesperson_id", name="sales_commissions_invoice_id_salesperson_id_key"),)
 
@@ -63,10 +60,9 @@ class SalesCommission(ModelBase):
     status: Mapped[str | None] = mapped_column(String(30), default="pending")
     paid_date: Mapped[Date | None] = mapped_column(Date)
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SalesOpportunity(ModelBase):
+class SalesOpportunity(AuditMixin, ModelBase):
     __tablename__ = "sales_opportunities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -86,12 +82,9 @@ class SalesOpportunity(ModelBase):
     notes: Mapped[str | None] = mapped_column(Text)
     lost_reason: Mapped[str | None] = mapped_column(Text)
     won_quotation_id: Mapped[int | None] = mapped_column(Integer)
-    created_by: Mapped[int | None] = mapped_column(Integer)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SalesOrderLine(ModelBase):
+class SalesOrderLine(AuditMixin, ModelBase):
     __tablename__ = "sales_order_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -105,7 +98,7 @@ class SalesOrderLine(ModelBase):
     total: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
 
 
-class SalesOrder(ModelBase):
+class SalesOrder(AuditMixin, ModelBase):
     __tablename__ = "sales_orders"
     __table_args__ = (UniqueConstraint("so_number", name="sales_orders_so_number_key"),)
 
@@ -126,12 +119,10 @@ class SalesOrder(ModelBase):
     notes: Mapped[str | None] = mapped_column(Text)
     currency: Mapped[str | None] = mapped_column(String(3), default="SAR")
     exchange_rate: Mapped[float | None] = mapped_column(Numeric(18, 6), default=1.0)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     source_quotation_id: Mapped[int | None] = mapped_column(Integer)
 
 
-class SalesQuotationLine(ModelBase):
+class SalesQuotationLine(AuditMixin, ModelBase):
     __tablename__ = "sales_quotation_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -145,7 +136,7 @@ class SalesQuotationLine(ModelBase):
     total: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
 
 
-class SalesQuotation(ModelBase):
+class SalesQuotation(AuditMixin, ModelBase):
     __tablename__ = "sales_quotations"
     __table_args__ = (UniqueConstraint("sq_number", name="sales_quotations_sq_number_key"),)
 
@@ -165,13 +156,11 @@ class SalesQuotation(ModelBase):
     terms_conditions: Mapped[str | None] = mapped_column(Text)
     currency: Mapped[str | None] = mapped_column(String(3), default="SAR")
     exchange_rate: Mapped[float | None] = mapped_column(Numeric(18, 6), default=1.0)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     conversion_date: Mapped[DateTime | None] = mapped_column(DateTime)
     converted_to_order_id: Mapped[int | None] = mapped_column(Integer)
 
 
-class SalesReturnLine(ModelBase):
+class SalesReturnLine(AuditMixin, ModelBase):
     __tablename__ = "sales_return_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -185,7 +174,7 @@ class SalesReturnLine(ModelBase):
     reason: Mapped[str | None] = mapped_column(Text)
 
 
-class SalesReturn(ModelBase):
+class SalesReturn(AuditMixin, ModelBase):
     __tablename__ = "sales_returns"
     __table_args__ = (UniqueConstraint("return_number", name="sales_returns_return_number_key"),)
 
@@ -209,12 +198,10 @@ class SalesReturn(ModelBase):
     check_number: Mapped[str | None] = mapped_column(String(50))
     check_date: Mapped[Date | None] = mapped_column(Date)
     exchange_rate: Mapped[float | None] = mapped_column(Numeric(10, 6), default=1.0)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     currency: Mapped[str | None] = mapped_column(String(10))
 
 
-class SalesTarget(ModelBase):
+class SalesTarget(AuditMixin, ModelBase):
     __tablename__ = "sales_targets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -224,9 +211,6 @@ class SalesTarget(ModelBase):
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
     salesperson_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id", ondelete="SET NULL"))
     notes: Mapped[str | None] = mapped_column(Text)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 __all__ = [

@@ -3,6 +3,7 @@ Approval Workflows Router - WF-001, WF-002, WF-003
 سلسلة اعتمادات متعددة المستويات
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -65,7 +66,7 @@ def list_workflows(
         return [dict(r._mapping) for r in rows]
     except Exception as e:
         logger.error(f"Error listing workflows: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -83,7 +84,7 @@ def get_workflow(workflow_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         logger.error(f"Error getting workflow: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -131,7 +132,7 @@ def create_workflow(data: WorkflowCreateSchema, current_user=Depends(get_current
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating workflow: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -177,7 +178,7 @@ def update_workflow(workflow_id: int, data: WorkflowCreateSchema, current_user=D
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating workflow: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -204,7 +205,7 @@ def delete_workflow(workflow_id: int, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting workflow: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -306,7 +307,7 @@ def create_approval_request(data: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating approval request: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -361,7 +362,7 @@ def list_pending_approvals(
         return {"items": items, "total": total, "page": page}
     except Exception as e:
         logger.error(f"Error listing pending approvals: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -416,7 +417,7 @@ def list_all_requests(
         return {"items": items, "total": total, "page": page}
     except Exception as e:
         logger.error(f"Error listing approval requests: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -436,7 +437,7 @@ def get_approval_request(request_id: int, current_user=Depends(get_current_user)
         """), {"id": request_id}).fetchone()
 
         if not request:
-            raise HTTPException(404, "طلب الاعتماد غير موجود")
+            raise HTTPException(**http_error(404, "approval_request_not_found"))
 
         # Get action history
         actions = db.execute(text("""
@@ -461,7 +462,7 @@ def get_approval_request(request_id: int, current_user=Depends(get_current_user)
         raise
     except Exception as e:
         logger.error(f"Error getting approval request: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -477,7 +478,7 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
 
         request = db.execute(text("SELECT * FROM approval_requests WHERE id = :id"), {"id": request_id}).fetchone()
         if not request:
-            raise HTTPException(404, "طلب الاعتماد غير موجود")
+            raise HTTPException(**http_error(404, "approval_request_not_found"))
         if request.status != 'pending':
             raise HTTPException(400, f"لا يمكن اتخاذ إجراء، الحالة الحالية: {request.status}")
 
@@ -619,7 +620,7 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
     except Exception as e:
         db.rollback()
         logger.error(f"Error taking approval action: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -650,7 +651,7 @@ def approval_stats(current_user=Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error getting approval stats: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

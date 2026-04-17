@@ -6,12 +6,15 @@ import { Check, X, ShoppingCart, AlertTriangle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext';
+import { formatNumber } from '../../utils/format';
 
 const Configurator = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const { configId } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [config, setConfig] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedOptions, setSelectedOptions] = useState({});
@@ -35,7 +38,7 @@ const Configurator = () => {
                 });
                 setSelectedOptions(defaults);
             })
-            .catch(e => console.error(e))
+            .catch(() => showToast(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     }, [configId]);
 
@@ -58,7 +61,7 @@ const Configurator = () => {
                 handleCalculatePrice();
             }
         } catch (e) {
-            console.error(e);
+            showToast(t('common.error'), 'error');
         }
     };
 
@@ -75,7 +78,7 @@ const Configurator = () => {
             });
             setPriceResult(res.data);
         } catch (e) {
-            console.error(e);
+            showToast(t('common.error'), 'error');
         }
     };
 
@@ -110,7 +113,7 @@ const Configurator = () => {
             <div className="module-header">
                 <h1>{t('cpq.configurator')}: {config.product_name}</h1>
             </div>
-            <p style={{ color: '#6b7280', marginBottom: 24 }}>{config.name} — {t('cpq.base_price')}: {Number(config.selling_price || 0).toFixed(2)}</p>
+            <p style={{ color: '#6b7280', marginBottom: 24 }}>{config.name} — {t('cpq.base_price')}: {formatNumber(config.selling_price || 0)}</p>
 
             {/* Step-by-step option groups */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
@@ -137,7 +140,7 @@ const Configurator = () => {
                                     <span style={{ flex: 1 }}>{o.name}</span>
                                     {Number(o.price_adjustment) !== 0 && (
                                         <span style={{ color: Number(o.price_adjustment) > 0 ? '#16a34a' : '#ef4444', fontWeight: 600, fontSize: 13 }}>
-                                            {Number(o.price_adjustment) > 0 ? '+' : ''}{Number(o.price_adjustment).toFixed(2)}
+                                            {Number(o.price_adjustment) > 0 ? '+' : ''}{formatNumber(o.price_adjustment)}
                                         </span>
                                     )}
                                 </label>
@@ -198,16 +201,16 @@ const Configurator = () => {
                     <h3 style={{ marginBottom: 12 }}>{t('cpq.price_preview')}</h3>
                     {priceResult.lines?.map((l, i) => (
                         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 8 }}>
-                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.base_price')}</span><div style={{ fontWeight: 600 }}>{Number(l.base_unit_price).toFixed(2)}</div></div>
-                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.option_adjustments')}</span><div style={{ fontWeight: 600 }}>{Number(l.option_adjustments).toFixed(2)}</div></div>
-                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.discount')}</span><div style={{ fontWeight: 600, color: '#dc2626' }}>-{Number(l.discount_applied).toFixed(2)}</div></div>
-                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.unit_price')}</span><div style={{ fontWeight: 600 }}>{Number(l.final_unit_price).toFixed(2)}</div></div>
+                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.base_price')}</span><div style={{ fontWeight: 600 }}>{formatNumber(l.base_unit_price)}</div></div>
+                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.option_adjustments')}</span><div style={{ fontWeight: 600 }}>{formatNumber(l.option_adjustments)}</div></div>
+                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.discount')}</span><div style={{ fontWeight: 600, color: '#dc2626' }}>-{formatNumber(l.discount_applied)}</div></div>
+                            <div><span style={{ color: '#6b7280', fontSize: 12 }}>{t('cpq.unit_price')}</span><div style={{ fontWeight: 600 }}>{formatNumber(l.final_unit_price)}</div></div>
                         </div>
                     ))}
                     <hr style={{ margin: '12px 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16 }}>
                         <span>{t('cpq.quantity')}: {quantity}</span>
-                        <span style={{ fontWeight: 700, color: '#2563eb' }}>{t('cpq.total')}: {Number(priceResult.final_amount).toFixed(2)}</span>
+                        <span style={{ fontWeight: 700, color: '#2563eb' }}>{t('cpq.total')}: {formatNumber(priceResult.final_amount)}</span>
                     </div>
                 </div>
             )}

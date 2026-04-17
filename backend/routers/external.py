@@ -7,6 +7,7 @@ TAX-001: Withholding Tax (WHT)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -184,7 +185,7 @@ def create_webhook(data: WebhookCreate, current_user=Depends(get_current_user)):
     try:
         validate_webhook_url(data.url)
     except ValueError:
-        raise HTTPException(400, "عنوان URL غير مسموح به")
+        raise HTTPException(**http_error(400, "url_not_allowed"))
 
     db = get_db_connection(current_user.company_id)
     try:
@@ -220,7 +221,7 @@ def update_webhook(webhook_id: int, data: WebhookUpdate, current_user=Depends(ge
         try:
             validate_webhook_url(data.url)
         except ValueError:
-            raise HTTPException(400, "عنوان URL غير مسموح به")
+            raise HTTPException(**http_error(400, "url_not_allowed"))
     db = get_db_connection(current_user.company_id)
     try:
         updates = {}
@@ -232,7 +233,7 @@ def update_webhook(webhook_id: int, data: WebhookUpdate, current_user=Depends(ge
         if data.timeout_seconds is not None: updates["timeout_seconds"] = data.timeout_seconds
         
         if not updates:
-            raise HTTPException(400, "لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         
         set_clause = ", ".join(f"{k} = :{k}" for k in updates)
         updates["id"] = webhook_id
@@ -297,7 +298,7 @@ def generate_qr_code(
         """), {"id": invoice_id}).fetchone()
         
         if not inv:
-            raise HTTPException(404, "الفاتورة غير موجودة")
+            raise HTTPException(**http_error(404, "invoice_not_found"))
         
         # Get company info
         seller_name = db.execute(text(
@@ -441,7 +442,7 @@ def calculate_wht(data: WHTTransactionCreate, current_user=Depends(get_current_u
         rate_row = db.execute(text("SELECT rate FROM wht_rates WHERE id = :id AND is_active = TRUE"),
                               {"id": data.wht_rate_id}).fetchone()
         if not rate_row:
-            raise HTTPException(404, "معدل الاستقطاع غير موجود")
+            raise HTTPException(**http_error(404, "wht_rate_not_found"))
         
         wht_rate = _dec(rate_row.rate)
         gross_amount = _dec(data.gross_amount)
@@ -467,7 +468,7 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
         rate_row = db.execute(text("SELECT rate, name FROM wht_rates WHERE id = :id"),
                               {"id": data.wht_rate_id}).fetchone()
         if not rate_row:
-            raise HTTPException(404, "معدل الاستقطاع غير موجود")
+            raise HTTPException(**http_error(404, "wht_rate_not_found"))
         
         wht_rate = _dec(rate_row.rate)
         gross_amount = _dec(data.gross_amount)
@@ -511,7 +512,7 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
     except Exception as e:
         db.rollback()
         logger.exception("Error creating WHT transaction")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

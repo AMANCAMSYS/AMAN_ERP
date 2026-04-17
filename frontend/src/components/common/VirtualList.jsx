@@ -2,6 +2,7 @@
 import React from 'react';
 import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
+import { useTranslation } from 'react-i18next';
 
 /**
  * A generic virtualized list component for handling large datasets efficiently.
@@ -12,8 +13,9 @@ import AutoSizer from 'react-virtualized-auto-sizer';
  * @param {string} className - Optional CSS class for the container.
  */
 const VirtualList = ({ items, rowHeight = 50, rowRenderer, className }) => {
+    const { t } = useTranslation();
     if (!items || items.length === 0) {
-        return <div className="no-data">No data available</div>;
+        return <div className="no-data">{t('common.no_data')}</div>;
     }
 
     return (

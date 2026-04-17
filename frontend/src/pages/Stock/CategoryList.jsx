@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { inventoryAPI } from '../../utils/api'
 import { Edit2, Trash2, Plus, X, Layers } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -11,6 +11,7 @@ import SearchFilter from '../../components/common/SearchFilter'
 function CategoryList() {
     const { t } = useTranslation()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [categories, setCategories] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -48,7 +49,7 @@ function CategoryList() {
             setFormData({ name: '', code: '' })
             fetchCategories()
         } catch (err) {
-            toastEmitter.emit(t('stock.categories.validation.error_save'), 'error')
+            showToast(t('stock.categories.validation.error_save'), 'error')
         }
     }
 
@@ -58,7 +59,7 @@ function CategoryList() {
                 await inventoryAPI.deleteCategory(id)
                 fetchCategories()
             } catch (err) {
-                toastEmitter.emit(t('stock.categories.validation.delete_error'), 'error')
+                showToast(t('stock.categories.validation.delete_error'), 'error')
             }
         }
     }
@@ -76,7 +77,7 @@ function CategoryList() {
                 const res = await inventoryAPI.getNextCategoryCode()
                 setFormData(prev => ({ ...prev, code: res.data.next_code }))
             } catch (err) {
-                console.error("Failed to fetch next code", err)
+                showToast(t('stock.categories.validation.error_fetch_code'), 'error')
                 setFormData(prev => ({ ...prev, code: '' }))
             }
         }

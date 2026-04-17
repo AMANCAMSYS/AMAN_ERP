@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { inventoryAPI } from '../../utils/api'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import '../../components/ModuleStyles.css'
 import { formatNumber } from '../../utils/format'
@@ -14,6 +15,7 @@ function StockHome() {
     const [loading, setLoading] = useState(true)
     const currency = getCurrency()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -29,7 +31,7 @@ function StockHome() {
                 const response = await inventoryAPI.getSummary(params)
                 setStats(response.data)
             } catch (err) {
-                console.error("Failed to fetch stock stats", err)
+                showToast(t('errors.fetch_failed'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -167,17 +169,17 @@ function StockHome() {
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/cost-layers')}>
                             <span className="link-icon">📊</span>
-                            {i18n.language === 'ar' ? 'طبقات التكلفة (FIFO/LIFO)' : 'Cost Layers (FIFO/LIFO)'}
+                            {i18n.t('nav.cost_layers')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/costing-method')}>
                             <span className="link-icon">⚙️</span>
-                            {i18n.language === 'ar' ? 'طريقة التكلفة' : 'Costing Method'}
+                            {i18n.t('costing.method')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/stock/costing-valuation')}>
                             <span className="link-icon">📈</span>
-                            {i18n.language === 'ar' ? 'تقرير تقييم المخزون' : 'Inventory Valuation Report'}
+                            {i18n.t('reports.inventory_valuation.title')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>

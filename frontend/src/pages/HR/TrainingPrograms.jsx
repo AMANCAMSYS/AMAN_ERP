@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Plus, Edit2, Users, BookOpen } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -31,7 +32,7 @@ const TrainingPrograms = () => {
             ]);
             setPrograms(pRes.data || []);
             setEmployees(empRes.data?.items || empRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -48,7 +49,7 @@ const TrainingPrograms = () => {
             setShowModal(false); setEditItem(null);
             setForm({ name: '', name_en: '', description: '', trainer: '', start_date: '', end_date: '', location: '', max_participants: 20 });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const openParticipants = async (program) => {
@@ -67,7 +68,7 @@ const TrainingPrograms = () => {
             const res = await hrAdvancedAPI.listParticipants(selectedProgram.id);
             setParticipants(res.data || []);
             setPartForm({ employee_id: '' });
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const getStatusBadge = (status) => {

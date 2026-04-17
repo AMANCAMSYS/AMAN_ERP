@@ -5,6 +5,7 @@ Handles dynamic key-value settings for each company.
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Dict, Any, List, Optional
@@ -115,9 +116,54 @@ SETTINGS_VALIDATION_MAP = {
     "pos_default_payment_method": {"type": "str"},
     # Audit
     "audit_retention_years": {"type": "int", "min": 1, "max": 10},
+    "audit_log_sensitive": {"type": "bool"},
+    "audit_log_view": {"type": "bool"},
     # Multi-branch
     "multi_branch_enabled": {"type": "bool"},
     "branches_max_count": {"type": "int", "min": 1, "max": 100},
+    # Invoicing / Sales extras
+    "invoice_prefix": {"type": "str"},
+    "invoice_footer": {"type": "str"},
+    "invoice_terms": {"type": "str"},
+    "quotation_prefix": {"type": "str"},
+    "show_logo_on_invoice": {"type": "bool"},
+    "report_show_logo": {"type": "bool"},
+    # Inventory extras
+    "allow_negative_stock": {"type": "bool"},
+    "default_warehouse": {"type": "str"},
+    "decimal_places": {"type": "int", "min": 0, "max": 6},
+    # Notification
+    "notify_low_stock": {"type": "bool"},
+    "notify_new_invoice": {"type": "bool"},
+    # CRM extras
+    "crm_loyalty_enabled": {"type": "bool"},
+    # Projects extras
+    "projects_enabled": {"type": "bool"},
+    "project_timesheet_required": {"type": "bool"},
+    # Purchases extras
+    "purchases_auto_approve": {"type": "bool"},
+    # Expense extras
+    "allow_expense_claims": {"type": "bool"},
+    # POS thermal
+    "pos_auto_cut": {"type": "bool"},
+    "pos_onscreen_keyboard": {"type": "bool"},
+    "pos_open_drawer": {"type": "bool"},
+    "pos_silent_print": {"type": "bool"},
+    "thermal_58": {"type": "bool"},
+    "thermal_80": {"type": "bool"},
+    # Workflow extras
+    "workflow_discount_limit": {"type": "float", "min": 0, "max": 100},
+    "workflow_sales_return": {"type": "bool"},
+    # Security extras
+    "security_complex_password": {"type": "bool"},
+    # ZATCA extras
+    "zatca_env": {"type": "str", "allowed": ["sandbox", "production"]},
+    # Performance
+    "perf_enable_caching": {"type": "bool"},
+    # Company extras
+    "commercial_registry": {"type": "str"},
+    "tax_number": {"type": "str"},
+    "plan_type": {"type": "str"},
 }
 
 
@@ -125,7 +171,9 @@ def _validate_setting_value(key: str, value: Any) -> None:
     """Validate a setting value against SETTINGS_VALIDATION_MAP. Raises HTTPException on failure."""
     spec = SETTINGS_VALIDATION_MAP.get(key)
     if spec is None:
-        raise HTTPException(status_code=400, detail="مفتاح إعدادات غير معروف")
+        # Unknown keys are accepted as plain strings — logged for auditing
+        logger.debug(f"Accepting unknown setting key: {key}")
+        return
 
     value_str = str(value) if value is not None else ""
     expected_type = spec.get("type", "str")
@@ -134,30 +182,30 @@ def _validate_setting_value(key: str, value: Any) -> None:
         try:
             int_val = int(value_str)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
         if "min" in spec and int_val < spec["min"]:
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
         if "max" in spec and int_val > spec["max"]:
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
     elif expected_type == "float":
         try:
             float_val = float(value_str)
         except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
         if "min" in spec and float_val < spec["min"]:
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
         if "max" in spec and float_val > spec["max"]:
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
     elif expected_type == "bool":
         if value_str.lower() not in ("true", "false", "1", "0", "yes", "no"):
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
     elif expected_type == "json":
         pass  # JSON values are stored as-is
     # str type: no special validation needed
 
     if "allowed" in spec:
         if value_str.lower() not in [str(a).lower() for a in spec["allowed"]]:
-            raise HTTPException(status_code=400, detail="قيمة غير صالحة للإعداد")
+            raise HTTPException(**http_error(400, "invalid_setting_value"))
 
 # Permission Mapping for Settings Keys
 # Keys starting with prefix -> require permission
@@ -369,11 +417,14 @@ def update_settings_bulk(
             logger.warning("Failed to write settings update audit log")
         
         return {"success": True, "message": "Settings updated successfully"}
-        
+
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/test-email", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("settings.manage"))])

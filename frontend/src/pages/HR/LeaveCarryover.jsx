@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 import { Calendar, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import '../../components/ModuleStyles.css';
@@ -9,7 +9,6 @@ import BackButton from '../../components/common/BackButton';
 
 const LeaveCarryover = () => {
     const { t, i18n } = useTranslation();
-    const { showToast } = useToast();
     const { currentBranch } = useBranch();
     const isRTL = i18n.language === 'ar';
     const [balances, setBalances] = useState([]);
@@ -31,7 +30,7 @@ const LeaveCarryover = () => {
             if (currentBranch?.id) params.branch_id = currentBranch.id;
             const res = await hrAPI.listEmployees(params);
             setEmployees(res.data?.items || res.data || []);
-        } catch (err) { console.error(err); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const fetchBalance = async (empId) => {
@@ -43,7 +42,7 @@ const LeaveCarryover = () => {
             const emp = employees.find(e => String(e.id) === String(empId));
             setSelectedEmployee(emp || null);
         } catch (err) {
-            showToast(t('hr.error_fetching_balances'), 'error');
+            toastEmitter.emit(t('hr.error_fetching_balances'), 'error');
             setBalances([]);
         } finally { setLoading(false); }
     };
@@ -56,11 +55,11 @@ const LeaveCarryover = () => {
                 employee_id: parseInt(carryForm.employee_id),
                 year: parseInt(carryForm.year)
             });
-            showToast(t('hr.leave_carried_success'), 'success');
+            toastEmitter.emit(t('hr.leave_carried_success'), 'success');
             setShowCarryover(false);
             if (employeeId) fetchBalance(employeeId);
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error');
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
         } finally { setCarryoverLoading(false); }
     };
 

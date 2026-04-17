@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI, currenciesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 
 const PriceLists = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const navigate = useNavigate();
     const systemCurrency = getCurrency();
     const [priceLists, setPriceLists] = useState([]);
@@ -35,7 +36,7 @@ const PriceLists = () => {
             const response = await inventoryAPI.listPriceLists();
             setPriceLists(response.data);
         } catch (error) {
-            console.error('Error fetching price lists:', error);
+            showToast(t('errors.fetch_failed'), 'error');
             setPriceLists([]);
         } finally {
             setLoading(false);
@@ -53,7 +54,7 @@ const PriceLists = () => {
                 setFormData(prev => ({ ...prev, currency: systemCurrency }));
             }
         } catch (error) {
-            console.error('Error fetching currencies:', error);
+            showToast(t('errors.fetch_failed'), 'error');
         }
     };
 
@@ -71,8 +72,7 @@ const PriceLists = () => {
             });
             fetchPriceLists();
         } catch (error) {
-            console.error('Error creating price list:', error);
-            toastEmitter.emit(t('stock.price_lists.error_creating'), 'error');
+            showToast(t('stock.price_lists.error_creating'), 'error');
         }
     };
 
@@ -94,10 +94,9 @@ const PriceLists = () => {
             setShowEditModal(false);
             setSelectedList(null);
             fetchPriceLists();
-            toastEmitter.emit(t('stock.price_lists.updated_successfully'), 'success');
+            showToast(t('stock.price_lists.updated_successfully'), 'success');
         } catch (error) {
-            console.error('Error updating price list:', error);
-            toastEmitter.emit(t('stock.price_lists.error_updating'), 'error');
+            showToast(t('stock.price_lists.error_updating'), 'error');
         }
     };
 
@@ -112,10 +111,10 @@ const PriceLists = () => {
             setShowDeleteModal(false);
             setSelectedList(null);
             fetchPriceLists();
-            toastEmitter.emit(t('stock.price_lists.deleted_successfully'), 'success');
+            showToast(t('stock.price_lists.deleted_successfully'), 'success');
         } catch (error) {
             const errorMsg = error.response?.data?.detail || t('stock.price_lists.error_deleting');
-            toastEmitter.emit(errorMsg, 'error');
+            showToast(errorMsg, 'error');
         }
     };
 

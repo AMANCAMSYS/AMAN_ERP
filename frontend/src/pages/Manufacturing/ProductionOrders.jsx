@@ -59,8 +59,7 @@ const ProductionOrders = () => {
             setWarehouses(whRes.data?.warehouses || whRes.data || []);
             setLoading(false);
         } catch (error) {
-            console.error("Error fetching data:", error);
-            // toastEmitter.emit(t('Error fetching data'), 'error'); // Optional
+            toastEmitter.emit(t('common.error'), 'error');
             setLoading(false);
         }
     };
@@ -125,8 +124,7 @@ const ProductionOrders = () => {
             });
 
         } catch (error) {
-            console.error("Error creating order:", error);
-            toastEmitter.emit(t('Failed to create order'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 

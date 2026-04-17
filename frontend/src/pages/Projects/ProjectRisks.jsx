@@ -76,7 +76,7 @@ const ProjectRisks = () => {
             await projectsAPI.createTaskDependency(selectedProject, depForm);
             showToast(t('project_risks.dependency_created', 'تم إنشاء التبعية'), 'success');
             setShowDepForm(false); fetchData();
-        } catch (err) { showToast(err.response?.data?.detail || 'Error', 'error'); }
+        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const handleDeleteRisk = async (id) => {
@@ -93,7 +93,7 @@ const ProjectRisks = () => {
             await projectsAPI.deleteTaskDependency(id);
             showToast(t('project_risks.dependency_deleted', 'تم حذف التبعية'), 'success');
             fetchData();
-        } catch (err) { showToast('Error', 'error'); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const resetRiskForm = () => {

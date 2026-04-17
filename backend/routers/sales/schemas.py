@@ -1,4 +1,5 @@
 """Sales module Pydantic schemas."""
+from decimal import Decimal
 from pydantic import BaseModel, EmailStr, validator, field_validator
 from typing import List, Optional
 from datetime import date
@@ -10,7 +11,7 @@ class CustomerGroupCreate(BaseModel):
     group_name: str
     group_name_en: Optional[str] = None
     description: Optional[str] = None
-    discount_percentage: float = 0.0
+    discount_percentage: Decimal = Decimal("0")
     effect_type: str = "discount"
     application_scope: str = "total"
     payment_days: int = 30
@@ -36,7 +37,7 @@ class CustomerCreate(BaseModel):
     country: Optional[str] = None
     tax_number: Optional[str] = None
     contact_person: Optional[str] = None
-    credit_limit: float = 0
+    credit_limit: Decimal = Decimal("0")
     payment_terms: Optional[int] = 30
     notes: Optional[str] = None
     group_id: Optional[int] = None
@@ -73,18 +74,18 @@ class CustomerResponse(BaseModel):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
-    current_balance: float = 0
+    current_balance: Decimal = Decimal("0")
 
 
 # --- Invoice ---
 class InvoiceLineItem(BaseModel):
     product_id: int
     description: Optional[str] = None
-    quantity: float
-    unit_price: float
-    tax_rate: float = 15.0
-    discount: float = 0
-    markup: float = 0
+    quantity: Decimal
+    unit_price: Decimal
+    tax_rate: Decimal = Decimal("15.0")
+    discount: Decimal = Decimal("0")
+    markup: Decimal = Decimal("0")
 
     @validator("quantity")
     def quantity_must_be_positive(cls, v):
@@ -124,20 +125,20 @@ class InvoiceCreate(BaseModel):
     items: List[InvoiceLineItem]
     notes: Optional[str] = None
     payment_method: Optional[str] = None
-    paid_amount: Optional[float] = 0
+    paid_amount: Optional[Decimal] = Decimal("0")
     down_payment_method: Optional[str] = None   # method used when payment_method='credit' + partial down payment
     branch_id: Optional[int] = None
     warehouse_id: Optional[int] = None
     treasury_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")
     cost_center_id: Optional[int] = None
     sales_order_id: Optional[int] = None
 
     # Group effects
     effect_type: str = "discount"
-    effect_percentage: float = 0.0
-    markup_amount: float = 0.0
+    effect_percentage: Decimal = Decimal("0")
+    markup_amount: Decimal = Decimal("0")
 
     @validator("paid_amount", "effect_percentage", "markup_amount")
     def invoice_amounts_must_be_non_negative(cls, v):
@@ -163,7 +164,7 @@ class InvoiceResponse(BaseModel):
     invoice_number: str
     customer_name: Optional[str] = None
     invoice_date: date
-    total: float
+    total: Decimal
     status: str
 
 
@@ -171,10 +172,10 @@ class InvoiceResponse(BaseModel):
 class SOLineItem(BaseModel):
     product_id: int
     description: Optional[str] = None
-    quantity: float
-    unit_price: float
-    tax_rate: float = 15.0
-    discount: float = 0
+    quantity: Decimal
+    unit_price: Decimal
+    tax_rate: Decimal = Decimal("15.0")
+    discount: Decimal = Decimal("0")
 
 
 class SOCreate(BaseModel):
@@ -187,17 +188,17 @@ class SOCreate(BaseModel):
     warehouse_id: Optional[int] = None
     quotation_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")
 
 
 # --- Quotation ---
 class QuotationLineItem(BaseModel):
     product_id: int
     description: Optional[str] = None
-    quantity: float
-    unit_price: float
-    tax_rate: float = 15.0
-    discount: float = 0
+    quantity: Decimal
+    unit_price: Decimal
+    tax_rate: Decimal = Decimal("15.0")
+    discount: Decimal = Decimal("0")
 
 
 class QuotationCreate(BaseModel):
@@ -209,16 +210,16 @@ class QuotationCreate(BaseModel):
     terms_conditions: Optional[str] = None
     branch_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")
 
 
 # --- Sales Return ---
 class SalesReturnLineItem(BaseModel):
     product_id: int
     description: Optional[str] = None
-    quantity: float
-    unit_price: float
-    tax_rate: Optional[float] = 0.0
+    quantity: Decimal
+    unit_price: Decimal
+    tax_rate: Optional[Decimal] = Decimal("0")
     reason: Optional[str] = None
 
     @validator("quantity")
@@ -253,14 +254,14 @@ class SalesReturnCreate(BaseModel):
     items: List[SalesReturnLineItem]
     notes: Optional[str] = None
     refund_method: Optional[str] = None
-    refund_amount: Optional[float] = 0
+    refund_amount: Optional[Decimal] = Decimal("0")
     bank_account_id: Optional[int] = None
     check_number: Optional[str] = None
     check_date: Optional[date] = None
     branch_id: Optional[int] = None
     warehouse_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")
 
     @validator("refund_amount")
     def refund_amount_must_be_non_negative(cls, v):
@@ -284,13 +285,13 @@ class SalesReturnCreate(BaseModel):
 # --- Payment Vouchers ---
 class PaymentAllocation(BaseModel):
     invoice_id: int
-    allocated_amount: float
+    allocated_amount: Decimal
 
 
 class CustomerReceiptCreate(BaseModel):
     customer_id: int
     voucher_date: date
-    amount: float
+    amount: Decimal
     payment_method: str
     bank_account_id: Optional[int] = None
     check_number: Optional[str] = None
@@ -301,13 +302,13 @@ class CustomerReceiptCreate(BaseModel):
     branch_id: Optional[int] = None
     treasury_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")
 
 
 class CustomerPaymentCreate(BaseModel):
     customer_id: int
     voucher_date: date
-    amount: float
+    amount: Decimal
     payment_method: str
     bank_account_id: Optional[int] = None
     check_number: Optional[str] = None
@@ -317,4 +318,4 @@ class CustomerPaymentCreate(BaseModel):
     allocations: List[PaymentAllocation] = []
     branch_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1.0")

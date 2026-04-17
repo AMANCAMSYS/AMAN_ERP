@@ -3,6 +3,7 @@ Inventory Module - Stock Transfers (Single-item with GL + Multi-item)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
@@ -61,7 +62,7 @@ def create_stock_transfer(
         product = db.execute(text("SELECT product_name FROM products WHERE id = :id"),
                             {"id": transfer.product_id}).fetchone()
         if not product:
-            raise HTTPException(status_code=404, detail="المنتج غير موجود")
+            raise HTTPException(**http_error(404, "product_not_found"))
 
         # 4. Check available stock in source — lock row to prevent phantom stock
         source_inv = db.execute(text("""
@@ -229,7 +230,7 @@ def create_stock_transfer(
         db.rollback()
         logger.error(f"Stock transfer error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -251,7 +252,7 @@ def transfer_stock(
         dst = db.execute(text("SELECT warehouse_name FROM warehouses WHERE id = :id"), {"id": transfer.destination_warehouse_id}).fetchone()
 
         if not src or not dst:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-006: Check branch access on both warehouses
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -370,6 +371,6 @@ def transfer_stock(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

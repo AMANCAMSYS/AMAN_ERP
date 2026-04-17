@@ -5,7 +5,7 @@ import { getCurrency, hasPermission } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -14,6 +14,7 @@ function PurchaseOrderDetails() {
     const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [approving, setApproving] = useState(false);
@@ -29,7 +30,7 @@ function PurchaseOrderDetails() {
             const response = await purchasesAPI.getOrder(id);
             setOrder(response.data);
         } catch (err) {
-            console.error("Failed to fetch order", err);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -42,7 +43,7 @@ function PurchaseOrderDetails() {
             await purchasesAPI.approveOrder(id);
             fetchOrder();
         } catch (err) {
-            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
+            showToast(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setApproving(false);
         }

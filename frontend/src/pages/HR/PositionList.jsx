@@ -35,7 +35,7 @@ const PositionList = () => {
             setPositions(posRes.data);
             setDepartments(deptRes.data);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

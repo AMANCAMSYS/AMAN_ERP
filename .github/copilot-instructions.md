@@ -1,6 +1,6 @@
 # aman Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-14
+Auto-generated from all feature plans. Last updated: 2026-04-16
 
 ## Active Technologies
 - Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0, APScheduler, Starlette middleware, openpyxl, i18next (004-audit-framework)
@@ -13,6 +13,14 @@ Auto-generated from all feature plans. Last updated: 2026-04-14
 - PostgreSQL 15 (multi-tenant `aman_{company_id}` + system `aman_system`), Redis (rate limiting, cache — partially adopted) (005-audit-core-admin)
 - Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, APScheduler, openpyxl, ReportLab, i18next, React Router (006-audit-accounting)
 - PostgreSQL 15 (multi-tenant `aman_{company_id}` + system `aman_system`), Redis (caching) (006-audit-accounting)
+- Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, openpyxl, i18next, React Router (007-audit-treasury)
+- PostgreSQL 15 (multi-tenant `aman_{company_id}` + system `aman_system`), Redis (rate limiting/cache) (007-audit-treasury)
+- Python 3.12 (backend) · React 18 / Vite (frontend) + FastAPI · SQLAlchemy 2.0 (SQL-first via `text()`) · Pydantic · i18next · React Router · openpyxl · python-jose (008-audit-taxes)
+- PostgreSQL 15 — per-tenant `aman_{company_id}` + system `aman_system`; Redis (rate limiting/cache) (008-audit-taxes)
+- Python 3.12 (backend) · React 18 / Vite (frontend) + FastAPI · SQLAlchemy 2.0 (`text()` SQL-first) · Pydantic · `decimal.Decimal` · `gl_service.py` · `fiscal_lock.py` · `validate_branch_access` · `formatNumber()` · `useToast` hook (009-audit-inventory)
+- PostgreSQL 15 — per-tenant `aman_{company_id}`; no schema changes required (009-audit-inventory)
+- Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (`text()` SQL-first), Pydantic, i18next, React Router (009-audit-inventory)
+- Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, i18next, React Router (011-audit-purchases)
 
 - Python 3.12.3 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0, Pydantic, Redis, i18next, React Router (003-constitution-remediation)
 
@@ -32,9 +40,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.12.3 (backend), React 18 / Vite (frontend): Follow standard conventions
 
 ## Recent Changes
-- 006-audit-accounting: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, APScheduler, openpyxl, ReportLab, i18next, React Router
-- 005-audit-core-admin: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), APScheduler, Pydantic, openpyxl, ReportLab, i18next, React Router
-- 004-audit-auth-security: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0, python-jose (JWT), passlib (bcrypt), pyotp (TOTP), slowapi (rate limiting), Redis, Starlette middleware
+- 016-audit-manufacturing: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, i18next, React Router
+- 015-audit-hr: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, i18next, React Router
+- 013-audit-pos: Added Python 3.12 (backend), React 18 / Vite (frontend) + FastAPI, SQLAlchemy 2.0 (SQL-first via `text()`), Pydantic, i18next, React Router
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -1,6 +1,7 @@
 """أوراق القبض والدفع - Notes Receivable & Payable"""
 from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import date, datetime, timedelta
@@ -12,6 +13,7 @@ from utils.permissions import require_permission, validate_branch_access, requir
 from utils.accounting import get_base_currency, validate_je_lines
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
+from utils.treasury_gl import ensure_treasury_gl_accounts
 import logging
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ class NoteReceivableCreate(BaseModel):
     bank_name: Optional[str] = None
     amount: float
     currency: Optional[str] = None
+    exchange_rate: Optional[float] = 1.0
     issue_date: Optional[str] = None
     due_date: str
     maturity_date: Optional[str] = None
@@ -47,6 +50,7 @@ class NotePayableCreate(BaseModel):
     bank_name: Optional[str] = None
     amount: float
     currency: Optional[str] = None
+    exchange_rate: Optional[float] = 1.0
     issue_date: Optional[str] = None
     due_date: str
     maturity_date: Optional[str] = None
@@ -158,7 +162,7 @@ def get_note_receivable(note_id: int, current_user: dict = Depends(get_current_u
             WHERE n.id = :id
         """), {"id": note_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
         
         # Validate branch access
         validate_branch_access(current_user, row.branch_id)
@@ -176,7 +180,7 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
     
     db = get_db_connection(current_user.company_id)
     try:
-        _ensure_notes_accounts(db)
+        ensure_treasury_gl_accounts(db, user_id=current_user.id, username=current_user.username)
         
         nr_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '1210'")).fetchone()
         ar_account = db.execute(text(
@@ -213,18 +217,19 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
             INSERT INTO notes_receivable (
                 note_number, drawer_name, bank_name, amount, currency,
                 issue_date, due_date, maturity_date, party_id, treasury_account_id,
-                journal_entry_id, status, notes, branch_id, created_by
+                journal_entry_id, status, notes, branch_id, created_by, exchange_rate
             ) VALUES (
                 :num, :drawer, :bank, :amt, :cur,
                 :issue, :due, :mat, :pid, :tid,
-                :je, 'pending', :notes, :bid, :uid
+                :je, 'pending', :notes, :bid, :uid, :exchange_rate
             ) RETURNING id
         """), {
             "num": data.note_number, "drawer": data.drawer_name, "bank": data.bank_name,
             "amt": amt, "cur": data.currency,
             "issue": data.issue_date, "due": data.due_date, "mat": data.maturity_date or data.due_date,
             "pid": data.party_id, "tid": data.treasury_account_id,
-            "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id
+            "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id,
+            "exchange_rate": float(_dec(data.exchange_rate or 1)),
         }).scalar()
 
         db.commit()
@@ -239,7 +244,7 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -256,9 +261,9 @@ def collect_note_receivable(note_id: int, data: dict = None,
         treasury_account_id = int(treasury_account_id)
     db = get_db_connection(current_user.company_id)
     try:
-        note = db.execute(text("SELECT * FROM notes_receivable WHERE id = :id"), {"id": note_id}).fetchone()
+        note = db.execute(text("SELECT * FROM notes_receivable WHERE id = :id FOR UPDATE"), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, note.branch_id)
@@ -268,11 +273,11 @@ def collect_note_receivable(note_id: int, data: dict = None,
 
         tid = treasury_account_id or note.treasury_account_id
         if not tid:
-            raise HTTPException(status_code=400, detail="يجب تحديد حساب الخزينة/البنك")
+            raise HTTPException(**http_error(400, "treasury_or_bank_required"))
 
         treasury = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": tid}).fetchone()
         if not treasury:
-            raise HTTPException(status_code=404, detail="حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
 
         nr_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '1210'")).fetchone()
         coll_date = collection_date or date.today().isoformat()
@@ -323,7 +328,7 @@ def collect_note_receivable(note_id: int, data: dict = None,
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -338,9 +343,9 @@ def protest_note_receivable(note_id: int, data: dict = None,
     reason = data.get("reason")
     db = get_db_connection(current_user.company_id)
     try:
-        note = db.execute(text("SELECT * FROM notes_receivable WHERE id = :id"), {"id": note_id}).fetchone()
+        note = db.execute(text("SELECT * FROM notes_receivable WHERE id = :id FOR UPDATE"), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, note.branch_id)
@@ -397,7 +402,7 @@ def protest_note_receivable(note_id: int, data: dict = None,
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -479,7 +484,7 @@ def get_note_payable(note_id: int, current_user: dict = Depends(get_current_user
             WHERE n.id = :id
         """), {"id": note_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, row.branch_id)
@@ -497,7 +502,7 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
     
     db = get_db_connection(current_user.company_id)
     try:
-        _ensure_notes_accounts(db)
+        ensure_treasury_gl_accounts(db, user_id=current_user.id, username=current_user.username)
 
         np_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2110'")).fetchone()
         ap_account = db.execute(text(
@@ -533,18 +538,19 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
             INSERT INTO notes_payable (
                 note_number, beneficiary_name, bank_name, amount, currency,
                 issue_date, due_date, maturity_date, party_id, treasury_account_id,
-                journal_entry_id, status, notes, branch_id, created_by
+                journal_entry_id, status, notes, branch_id, created_by, exchange_rate
             ) VALUES (
                 :num, :bene, :bank, :amt, :cur,
                 :issue, :due, :mat, :pid, :tid,
-                :je, 'issued', :notes, :bid, :uid
+                :je, 'issued', :notes, :bid, :uid, :exchange_rate
             ) RETURNING id
         """), {
             "num": data.note_number, "bene": data.beneficiary_name, "bank": data.bank_name,
             "amt": amt, "cur": data.currency,
             "issue": data.issue_date, "due": data.due_date, "mat": data.maturity_date or data.due_date,
             "pid": data.party_id, "tid": data.treasury_account_id,
-            "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id
+            "je": je_id, "notes": data.notes, "bid": data.branch_id, "uid": current_user.id,
+            "exchange_rate": float(_dec(data.exchange_rate or 1)),
         }).scalar()
 
         db.commit()
@@ -559,7 +565,7 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -576,9 +582,9 @@ def pay_note_payable(note_id: int, data: dict = None,
         treasury_account_id = int(treasury_account_id)
     db = get_db_connection(current_user.company_id)
     try:
-        note = db.execute(text("SELECT * FROM notes_payable WHERE id = :id"), {"id": note_id}).fetchone()
+        note = db.execute(text("SELECT * FROM notes_payable WHERE id = :id FOR UPDATE"), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, note.branch_id)
@@ -588,11 +594,11 @@ def pay_note_payable(note_id: int, data: dict = None,
 
         tid = treasury_account_id or note.treasury_account_id
         if not tid:
-            raise HTTPException(status_code=400, detail="يجب تحديد حساب الخزينة/البنك")
+            raise HTTPException(**http_error(400, "treasury_or_bank_required"))
 
         treasury = db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": tid}).fetchone()
         if not treasury:
-            raise HTTPException(status_code=404, detail="حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
 
         np_account = db.execute(text("SELECT id FROM accounts WHERE account_code = '2110'")).fetchone()
         pay_date = payment_date or date.today().isoformat()
@@ -643,7 +649,7 @@ def pay_note_payable(note_id: int, data: dict = None,
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -658,9 +664,9 @@ def protest_note_payable(note_id: int, data: dict = None,
     reason = data.get("reason")
     db = get_db_connection(current_user.company_id)
     try:
-        note = db.execute(text("SELECT * FROM notes_payable WHERE id = :id"), {"id": note_id}).fetchone()
+        note = db.execute(text("SELECT * FROM notes_payable WHERE id = :id FOR UPDATE"), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الورقة غير موجودة")
+            raise HTTPException(**http_error(404, "sheet_not_found"))
             
         # Validate branch access
         validate_branch_access(current_user, note.branch_id)
@@ -717,7 +723,7 @@ def protest_note_payable(note_id: int, data: dict = None,
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

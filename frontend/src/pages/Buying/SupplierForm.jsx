@@ -63,7 +63,7 @@ function SupplierForm() {
                 if (curRes.data) setCurrencies(curRes.data.filter(c => c.is_active));
                 if (groupRes.data) setSupplierGroups(groupRes.data.filter(g => g.status === 'active'));
             } catch (err) {
-                console.error("Failed to fetch currencies or groups", err);
+                showToast(t('common.error'), 'error');
             }
         }
         fetchSupplierData()

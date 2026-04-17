@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
@@ -231,7 +232,7 @@ def get_dashboard_stats(
         }
     except Exception as e:
         logger.exception("Dashboard calculation error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -539,7 +540,7 @@ def save_dashboard_layout(data: LayoutCreate, current_user=Depends(get_current_u
     except Exception as e:
         db.rollback()
         logger.exception("Failed to save dashboard layout")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -561,7 +562,7 @@ def update_dashboard_layout(layout_id: int, data: LayoutUpdate, current_user=Dep
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -580,7 +581,7 @@ def delete_dashboard_layout(layout_id: int, current_user=Depends(get_current_use
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -679,7 +680,7 @@ def widget_sales_summary(
         }
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -731,7 +732,7 @@ def widget_top_products(
         ]}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -784,7 +785,7 @@ def widget_low_stock(
         ]}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -877,7 +878,7 @@ def widget_pending_tasks(
         return {"tasks": tasks[:limit]}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -951,7 +952,7 @@ def widget_cash_flow(
         return {"data": result}
     except Exception as e:
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1202,19 +1203,24 @@ def list_analytics_dashboards(current_user: dict = Depends(get_current_user)):
     company_id = get_user_company_id(current_user)
     db = get_db_connection(company_id)
     try:
-        user_role = current_user.get("role", "")
-        rows = db.execute(text("""
-            SELECT id, name, description, is_system, access_roles, branch_scope,
-                   refresh_interval_minutes, created_at, created_by
-            FROM analytics_dashboards
-            ORDER BY is_system DESC, name
-        """)).fetchall()
+        user_role = getattr(current_user, "role", "")
+        try:
+            rows = db.execute(text("""
+                SELECT id, name, description, is_system, access_roles, branch_scope,
+                       refresh_interval_minutes, created_at, created_by
+                FROM analytics_dashboards
+                ORDER BY is_system DESC, name
+            """)).fetchall()
+        except Exception as e:
+            db.rollback()
+            if "does not exist" in str(e):
+                return {"dashboards": []}
+            raise
 
         dashboards = []
         for row in rows:
             d = dict(row._mapping)
             roles = d.get("access_roles") or []
-            # System admins see everything; others see dashboards matching their role
             if user_role == "system_admin" or not roles or user_role in roles:
                 dashboards.append(d)
 

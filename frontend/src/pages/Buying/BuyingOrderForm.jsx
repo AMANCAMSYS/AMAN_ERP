@@ -4,6 +4,7 @@ import { getCurrency } from '../../utils/auth'
 import { inventoryAPI, purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -12,6 +13,7 @@ function BuyingOrderForm() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const currency = getCurrency()
     const [suppliers, setSuppliers] = useState([])
     const [supplierGroups, setSupplierGroups] = useState([])
@@ -42,7 +44,7 @@ function BuyingOrderForm() {
                 setSupplierGroups(groupsRes.data)
                 setProducts(prodRes.data)
             } catch (err) {
-                console.error("Error fetching data", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchData()
@@ -86,13 +88,13 @@ function BuyingOrderForm() {
                 }
 
                 // Calculate discount logic
-                const qty = parseFloat(field === 'quantity' ? value : updatedItem.quantity) || 0
-                const price = parseFloat(field === 'unit_price' ? value : updatedItem.unit_price) || 0
-                let discount = parseFloat(updatedItem.discount) || 0
-                let discountPercent = parseFloat(updatedItem.discount_percent) || 0
+                const qty = Number(field === 'quantity' ? value : updatedItem.quantity) || 0
+                const price = Number(field === 'unit_price' ? value : updatedItem.unit_price) || 0
+                let discount = Number(updatedItem.discount) || 0
+                let discountPercent = Number(updatedItem.discount_percent) || 0
 
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(value) || 0
+                    discountPercent = Number(value) || 0
                     discount = (qty * price) * (discountPercent / 100)
                     updatedItem.discount = discount
                 } else if (field === 'quantity' || field === 'unit_price') {
@@ -108,7 +110,7 @@ function BuyingOrderForm() {
                 // Recalculate total immediately for UI if needed, but calculateTotals does it on render/submit
                 // But we update state, so it's fine.
                 // However, item.total is used in render, so we should update it:
-                const taxRate = parseFloat(field === 'tax_rate' ? value : updatedItem.tax_rate) || 0
+                const taxRate = Number(field === 'tax_rate' ? value : updatedItem.tax_rate) || 0
                 const subtotal = qty * price
                 const taxable = subtotal - discount
                 const tax = taxable * (taxRate / 100)
@@ -136,14 +138,14 @@ function BuyingOrderForm() {
             const group = supplierGroups.find(g => g.id === supplier.group_id);
             if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
                 globalEffectType = group.effect_type;
-                globalEffectPercent = parseFloat(group.discount_percentage);
+                globalEffectPercent = Number(group.discount_percentage);
             }
         }
 
         items.forEach(item => {
-            const qty = parseFloat(item.quantity) || 0;
-            const price = parseFloat(item.unit_price) || 0;
-            const lineDiscount = parseFloat(item.discount) || 0;
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unit_price) || 0;
+            const lineDiscount = Number(item.discount) || 0;
             const lineSubtotal = qty * price;
 
             subtotal += lineSubtotal;
@@ -165,10 +167,10 @@ function BuyingOrderForm() {
         let baseForTax = totalAfterLineDiscounts - globalDiscountAmount + globalMarkupAmount;
 
         items.forEach(item => {
-            const qty = parseFloat(item.quantity) || 0;
-            const price = parseFloat(item.unit_price) || 0;
-            const lineDiscount = parseFloat(item.discount) || 0;
-            const taxRate = parseFloat(item.tax_rate) || 0;
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unit_price) || 0;
+            const lineDiscount = Number(item.discount) || 0;
+            const taxRate = Number(item.tax_rate) || 0;
 
             const weight = (qty * price - lineDiscount) / totalAfterLineDiscounts || 0;
             const itemBase = (qty * price - lineDiscount)
@@ -222,10 +224,10 @@ function BuyingOrderForm() {
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id),
                     description: item.description || '',
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    discount: parseFloat(item.discount) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0,
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    discount: String(item.discount || 0),
+                    tax_rate: String(item.tax_rate || 0),
                     markup: 0 // Handled at line level unit_price
                 }))
             }
@@ -294,10 +296,10 @@ function BuyingOrderForm() {
                                         }
 
                                         // Recalculate line total
-                                        const qty = parseFloat(updated.quantity) || 0;
-                                        const price = parseFloat(updated.unit_price) || 0;
-                                        const discount = parseFloat(updated.discount) || 0;
-                                        const taxRate = parseFloat(updated.tax_rate) || 0;
+                                        const qty = Number(updated.quantity) || 0;
+                                        const price = Number(updated.unit_price) || 0;
+                                        const discount = Number(updated.discount) || 0;
+                                        const taxRate = Number(updated.tax_rate) || 0;
                                         const taxable = (qty * price) - discount;
                                         updated.total = taxable + (taxable * (taxRate / 100));
                                     }

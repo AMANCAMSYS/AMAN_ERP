@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { hrAdvancedAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Eye, ClipboardList } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -17,7 +18,7 @@ const MyReviews = () => {
     useEffect(() => {
         hrAdvancedAPI.listMyReviews()
             .then(res => setReviews(res.data || []))
-            .catch(e => console.error(e))
+            .catch(e => toastEmitter.emit(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     }, []);
 

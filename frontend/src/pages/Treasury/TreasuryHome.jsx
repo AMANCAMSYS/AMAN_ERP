@@ -159,17 +159,17 @@ function TreasuryHome() {
                             </div>
                             <div className="link-item" onClick={() => navigate('/treasury/reports/checks-aging')}>
                                 <span className="link-icon">⏳</span>
-                                {i18n.language === 'ar' ? 'تقادم الشيكات' : 'Checks Aging'}
+                                {i18n.t('treasury.checks_aging')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                             <div className="link-item" onClick={() => navigate('/finance/cashflow')}>
                                 <span className="link-icon">📉</span>
-                                {i18n.language === 'ar' ? 'توقعات التدفق النقدي' : 'Cash Flow Forecast'}
+                                {i18n.t('treasury.cash_flow_forecast')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                             <div className="link-item" onClick={() => navigate('/treasury/bank-import')}>
                                 <span className="link-icon">🏦</span>
-                                {i18n.language === 'ar' ? 'استيراد كشف البنك' : 'Bank Statement Import'}
+                                {i18n.t('bank_import.title')}
                                 <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                             </div>
                         </div>

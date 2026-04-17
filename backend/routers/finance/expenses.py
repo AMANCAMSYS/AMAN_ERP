@@ -4,6 +4,7 @@ AMAN ERP - Expenses Module
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date, datetime
@@ -263,7 +264,7 @@ def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -293,7 +294,7 @@ def update_expense_policy(policy_id: int, policy: dict, current_user=Depends(get
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -309,7 +310,7 @@ def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -379,7 +380,7 @@ async def get_expense_details(expense_id: int, current_user: dict = Depends(get_
         """), {"id": expense_id}).fetchone()
         
         if not result:
-            raise HTTPException(status_code=404, detail="المصروف غير موجود")
+            raise HTTPException(**http_error(404, "expense_not_found"))
         
         expense = dict(result._mapping)
         
@@ -570,7 +571,7 @@ async def create_expense(
         db.rollback()
         logger.error(f"Error creating expense: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -592,7 +593,7 @@ async def update_expense(
         ), {"id": expense_id}).fetchone()
         
         if not existing:
-            raise HTTPException(status_code=404, detail="المصروف غير موجود")
+            raise HTTPException(**http_error(404, "expense_not_found"))
         
         if existing.approval_status != "pending":
             raise HTTPException(status_code=400, detail="لا يمكن تعديل مصروف معتمد أو مرفوض")
@@ -610,7 +611,7 @@ async def update_expense(
                 params[field] = value
         
         if not update_fields:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
         
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
         
@@ -633,7 +634,7 @@ async def update_expense(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -659,7 +660,7 @@ async def approve_expense(
         """), {"id": expense_id}).fetchone()
         
         if not expense_row:
-            raise HTTPException(status_code=404, detail="المصروف غير موجود")
+            raise HTTPException(**http_error(404, "expense_not_found"))
         
         expense = dict(expense_row._mapping)
         
@@ -772,7 +773,7 @@ async def approve_expense(
         db.rollback()
         logger.error(f"Error approving expense: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -792,7 +793,7 @@ async def delete_expense(
         ), {"id": expense_id}).fetchone()
         
         if not expense:
-            raise HTTPException(status_code=404, detail="المصروف غير موجود")
+            raise HTTPException(**http_error(404, "expense_not_found"))
         
         if expense.approval_status != "pending":
             raise HTTPException(status_code=400, detail="لا يمكن حذف مصروف معتمد - يجب إنشاء قيد عكسي")
@@ -812,7 +813,7 @@ async def delete_expense(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

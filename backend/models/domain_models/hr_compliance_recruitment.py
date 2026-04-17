@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin, SoftDeleteMixin
 
 
-class EmployeeDocument(ModelBase):
+class EmployeeDocument(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employee_documents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -18,11 +18,9 @@ class EmployeeDocument(ModelBase):
     notes: Mapped[str | None] = mapped_column(Text)
     alert_days: Mapped[int | None] = mapped_column(Integer, default=30)
     status: Mapped[str | None] = mapped_column(String(20), default="valid")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EmployeeViolation(ModelBase):
+class EmployeeViolation(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employee_violations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -37,11 +35,9 @@ class EmployeeViolation(ModelBase):
     payroll_period_id: Mapped[int | None] = mapped_column(ForeignKey("payroll_periods.id"))
     reported_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     status: Mapped[str | None] = mapped_column(String(20), default="open")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EmployeeCustody(ModelBase):
+class EmployeeCustody(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employee_custody"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -56,11 +52,9 @@ class EmployeeCustody(ModelBase):
     value: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(20), default="assigned")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class JobOpening(ModelBase):
+class JobOpening(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "job_openings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -76,10 +70,9 @@ class JobOpening(ModelBase):
     published_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     closing_date: Mapped[Date | None] = mapped_column(Date)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class JobApplication(ModelBase):
+class JobApplication(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "job_applications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -95,8 +88,6 @@ class JobApplication(ModelBase):
     interviewer_id: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(30), default="pending")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 __all__ = [

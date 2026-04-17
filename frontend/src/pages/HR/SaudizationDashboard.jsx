@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react'
 import { wpsAPI } from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
 import { useTranslation } from 'react-i18next'
-import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
 
 function SaudizationDashboard() {
     const { t } = useTranslation()
-    const { showToast } = useToast()
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         wpsAPI.getSaudizationDashboard()
             .then(r => setData(r.data))
-            .catch(err => showToast(err.response?.data?.detail || t('common.error'), 'error'))
+            .catch(err => toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error'))
             .finally(() => setLoading(false))
     }, [])
 

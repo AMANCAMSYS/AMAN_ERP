@@ -34,7 +34,7 @@ def _fetch_routing(conn, routing_id: int) -> dict | None:
             SELECT r.*, p.product_name
             FROM manufacturing_routes r
             LEFT JOIN products p ON p.id = r.product_id
-            WHERE r.id = :rid
+            WHERE r.id = :rid AND r.is_deleted = false
         """),
         {"rid": routing_id},
     ).fetchone()
@@ -51,7 +51,7 @@ def _fetch_operations(conn, route_id: int) -> list[dict]:
             SELECT mo.*, wc.name AS work_center_name
             FROM manufacturing_operations mo
             LEFT JOIN work_centers wc ON wc.id = mo.work_center_id
-            WHERE mo.route_id = :rid
+            WHERE mo.route_id = :rid AND mo.is_deleted = false
             ORDER BY mo.sequence
         """),
         {"rid": route_id},
@@ -145,6 +145,7 @@ def list_routings(
                 SELECT r.*, p.product_name
                 FROM manufacturing_routes r
                 LEFT JOIN products p ON p.id = r.product_id
+                WHERE r.is_deleted = false
                 ORDER BY r.name
             """)
         ).fetchall()
@@ -175,7 +176,7 @@ def get_routings_for_product(
                 SELECT r.*, p.product_name
                 FROM manufacturing_routes r
                 LEFT JOIN products p ON p.id = r.product_id
-                WHERE r.product_id = :pid
+                WHERE r.product_id = :pid AND r.is_deleted = false
                 ORDER BY r.is_default DESC, r.name
             """),
             {"pid": product_id},
@@ -225,7 +226,7 @@ def update_routing(
     txn = db.begin()
     try:
         existing = db.execute(
-            text("SELECT id FROM manufacturing_routes WHERE id = :rid"),
+            text("SELECT id FROM manufacturing_routes WHERE id = :rid AND is_deleted = false"),
             {"rid": routing_id},
         ).fetchone()
         if not existing:
@@ -311,7 +312,7 @@ def get_routing_estimate(
     db = get_db_connection(current_user.company_id)
     try:
         route = db.execute(
-            text("SELECT id, name FROM manufacturing_routes WHERE id = :rid"),
+            text("SELECT id, name FROM manufacturing_routes WHERE id = :rid AND is_deleted = false"),
             {"rid": routing_id},
         ).fetchone()
         if not route:
@@ -321,7 +322,7 @@ def get_routing_estimate(
             text("""
                 SELECT setup_time, cycle_time, labor_rate_per_hour
                 FROM manufacturing_operations
-                WHERE route_id = :rid
+                WHERE route_id = :rid AND is_deleted = false
             """),
             {"rid": routing_id},
         ).fetchall()

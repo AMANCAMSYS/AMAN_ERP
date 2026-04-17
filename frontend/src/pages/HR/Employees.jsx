@@ -6,6 +6,7 @@ import {
     DollarSign, Plus, Search, MoreVertical
 } from 'lucide-react';
 import { hrAPI, branchesAPI, rolesAPI, currenciesAPI } from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { useBranch } from '../../context/BranchContext';
 import { getCurrency, getUser } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
@@ -82,7 +83,7 @@ const Employees = () => {
             const res = await currenciesAPI.list();
             setCurrencies(res.data || []);
         } catch (err) {
-            console.error('Error fetching currencies', err);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -108,7 +109,7 @@ const Employees = () => {
             setPositions(posRes.data);
             setAvailableRoles(rolesRes.data);
         } catch (err) {
-            console.error("Error fetching common data", err);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -117,7 +118,7 @@ const Employees = () => {
             const res = await branchesAPI.list();
             setBranches(res.data);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -130,7 +131,7 @@ const Employees = () => {
             const response = await hrAPI.listEmployees(params);
             setEmployees(response.data);
         } catch (error) {
-            console.error("Failed to fetch employees", error);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -320,7 +321,7 @@ const Employees = () => {
                                     </td>
                                     <td>
                                         <div className="fw-bold">
-                                            {((emp.salary || 0) + (emp.housing_allowance || 0) + (emp.transport_allowance || 0) + (emp.other_allowances || 0)).toLocaleString()} {emp.currency || companyCurrency}
+                                            {formatNumber((emp.salary || 0) + (emp.housing_allowance || 0) + (emp.transport_allowance || 0) + (emp.other_allowances || 0))} {emp.currency || companyCurrency}
                                         </div>
                                     </td>
                                     <td>
@@ -351,7 +352,7 @@ const Employees = () => {
                                             return a.localeCompare(b);
                                         });
                                         return sorted.map(([c, total]) => (
-                                            <div key={c}>{total.toLocaleString()} {c}</div>
+                                            <div key={c}>{formatNumber(total)} {c}</div>
                                         ));
                                     })()}
                                 </td>
@@ -453,16 +454,16 @@ const Employees = () => {
                                                 onChange={e => setFormData({ ...formData, nationality: e.target.value })}
                                             >
                                                 <option value="">{t("common.not_specified")}</option>
-                                                <option value="SA">سعودي</option>
-                                                <option value="AE">إماراتي</option>
-                                                <option value="EG">مصري</option>
-                                                <option value="JO">أردني</option>
-                                                <option value="SY">سوري</option>
-                                                <option value="LB">لبناني</option>
-                                                <option value="PK">باكستاني</option>
-                                                <option value="IN">هندي</option>
-                                                <option value="BD">بنغلاديشي</option>
-                                                <option value="PH">فلبيني</option>
+                                                <option value="SA">{t('hr.nationality.saudi')}</option>
+                                                <option value="AE">{t('hr.nationality.emirati')}</option>
+                                                <option value="EG">{t('hr.nationality.egyptian')}</option>
+                                                <option value="JO">{t('hr.nationality.jordanian')}</option>
+                                                <option value="SY">{t('hr.nationality.syrian')}</option>
+                                                <option value="LB">{t('hr.nationality.lebanese')}</option>
+                                                <option value="PK">{t('hr.nationality.pakistani')}</option>
+                                                <option value="IN">{t('hr.nationality.indian')}</option>
+                                                <option value="BD">{t('hr.nationality.bangladeshi')}</option>
+                                                <option value="PH">{t('hr.nationality.filipino')}</option>
                                                 <option value="OTHER">{t('common.other', 'أخرى')}</option>
                                             </select>
                                         </div>
@@ -676,7 +677,7 @@ const Employees = () => {
                                                         type="number"
                                                         className="form-input"
                                                         value={formData.salary}
-                                                        onChange={e => setFormData({ ...formData, salary: parseFloat(e.target.value) || 0 })}
+                                                        onChange={e => setFormData({ ...formData, salary: e.target.value })}
                                                     />
                                                     <span className="input-group-text bg-white border-end-0">{formData.currency || companyCurrency}</span>
                                                 </div>
@@ -688,7 +689,7 @@ const Employees = () => {
                                                         type="number"
                                                         className="form-input"
                                                         value={formData.housing_allowance}
-                                                        onChange={e => setFormData({ ...formData, housing_allowance: parseFloat(e.target.value) || 0 })}
+                                                        onChange={e => setFormData({ ...formData, housing_allowance: e.target.value })}
                                                     />
                                                     <span className="input-group-text bg-white border-end-0">{formData.currency || companyCurrency}</span>
                                                 </div>
@@ -700,7 +701,7 @@ const Employees = () => {
                                                         type="number"
                                                         className="form-input"
                                                         value={formData.transport_allowance}
-                                                        onChange={e => setFormData({ ...formData, transport_allowance: parseFloat(e.target.value) || 0 })}
+                                                        onChange={e => setFormData({ ...formData, transport_allowance: e.target.value })}
                                                     />
                                                     <span className="input-group-text bg-white border-end-0">{formData.currency || companyCurrency}</span>
                                                 </div>
@@ -712,7 +713,7 @@ const Employees = () => {
                                                         type="number"
                                                         className="form-input"
                                                         value={formData.other_allowances}
-                                                        onChange={e => setFormData({ ...formData, other_allowances: parseFloat(e.target.value) || 0 })}
+                                                        onChange={e => setFormData({ ...formData, other_allowances: e.target.value })}
                                                     />
                                                     <span className="input-group-text bg-white border-end-0">{formData.currency || companyCurrency}</span>
                                                 </div>

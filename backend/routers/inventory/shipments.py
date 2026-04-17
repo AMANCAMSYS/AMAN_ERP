@@ -3,6 +3,7 @@ Inventory Module - Shipments Lifecycle
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
@@ -40,7 +41,7 @@ def create_shipment(
                         {"id": shipment.destination_warehouse_id}).fetchone()
 
         if not src or not dst:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-S01: Branch access check on both warehouses
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -129,7 +130,7 @@ def create_shipment(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -246,7 +247,7 @@ def get_shipment_details(
         """), {"id": id}).fetchone()
 
         if not shipment:
-            raise HTTPException(status_code=404, detail="الشحنة غير موجودة")
+            raise HTTPException(**http_error(404, "shipment_not_found"))
 
         # INV-S03: Branch access check
         src_branch = db.execute(text("SELECT branch_id FROM warehouses WHERE id = :id"), {"id": shipment.source_warehouse_id}).scalar()
@@ -293,7 +294,7 @@ def confirm_shipment(
         """), {"id": id}).fetchone()
 
         if not shipment:
-            raise HTTPException(status_code=404, detail="الشحنة غير موجودة")
+            raise HTTPException(**http_error(404, "shipment_not_found"))
 
         if shipment.status != 'pending':
             raise HTTPException(status_code=400, detail="لا يمكن تأكيد هذه الشحنة")
@@ -454,7 +455,7 @@ def confirm_shipment(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -478,7 +479,7 @@ def cancel_shipment(
         """), {"id": id}).fetchone()
 
         if not shipment:
-            raise HTTPException(status_code=404, detail="الشحنة غير موجودة")
+            raise HTTPException(**http_error(404, "shipment_not_found"))
 
         if shipment.status != 'pending':
             raise HTTPException(status_code=400, detail="لا يمكن إلغاء هذه الشحنة")
@@ -513,6 +514,6 @@ def cancel_shipment(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

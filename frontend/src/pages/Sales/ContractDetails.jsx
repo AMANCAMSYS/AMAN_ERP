@@ -33,7 +33,6 @@ export default function ContractDetails() {
             const res = await contractsAPI.getContract(id)
             setContract(res.data)
         } catch (err) {
-            console.error('Failed to fetch contract', err)
             showToast(t('contracts.details.load_error'), 'error')
         } finally {
             setLoading(false)

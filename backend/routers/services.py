@@ -4,6 +4,7 @@ Service Management Router — SVC-001 + SVC-002
 - Document Management (upload + versions + search)
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date
@@ -116,7 +117,7 @@ def get_service_request(request_id: int, current_user: UserResponse = Depends(ge
             WHERE sr.id = :id
         """), {"id": request_id}).fetchone()
         if not req:
-            raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
         result = dict(req._mapping)
         # Fetch costs
         costs = db.execute(text(
@@ -174,7 +175,7 @@ def create_service_request(data: dict, current_user: UserResponse = Depends(get_
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -185,7 +186,7 @@ def update_service_request(request_id: int, data: dict, current_user: UserRespon
     try:
         existing = db.execute(text("SELECT id, status FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
 
         fields = []
         params = {"id": request_id}
@@ -219,7 +220,7 @@ def update_service_request(request_id: int, data: dict, current_user: UserRespon
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -230,7 +231,7 @@ def delete_service_request(request_id: int, current_user: UserResponse = Depends
     try:
         deleted = db.execute(text("DELETE FROM service_requests WHERE id = :id RETURNING id"), {"id": request_id}).fetchone()
         if not deleted:
-            raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
         db.commit()
         return {"message": "تم حذف طلب الصيانة بنجاح"}
     except HTTPException:
@@ -238,7 +239,7 @@ def delete_service_request(request_id: int, current_user: UserResponse = Depends
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -250,7 +251,7 @@ def assign_technician(request_id: int, data: dict, current_user: UserResponse = 
     try:
         existing = db.execute(text("SELECT id FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
 
         db.execute(text("""
             UPDATE service_requests
@@ -266,7 +267,7 @@ def assign_technician(request_id: int, data: dict, current_user: UserResponse = 
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -278,7 +279,7 @@ def add_service_cost(request_id: int, data: dict, current_user: UserResponse = D
     try:
         existing = db.execute(text("SELECT id FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="طلب الصيانة غير موجود")
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
 
         qty = _dec(data.get("quantity", 1))
         unit = _dec(data.get("unit_cost", 0))
@@ -309,7 +310,7 @@ def add_service_cost(request_id: int, data: dict, current_user: UserResponse = D
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -332,7 +333,7 @@ def delete_service_cost(request_id: int, cost_id: int, current_user: UserRespons
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -384,7 +385,7 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
             WHERE d.id = :id
         """), {"id": doc_id}).fetchone()
         if not doc:
-            raise HTTPException(status_code=404, detail="المستند غير موجود")
+            raise HTTPException(**http_error(404, "document_not_found"))
         result = dict(doc._mapping)
         # Fetch versions
         versions = db.execute(text("""
@@ -475,7 +476,7 @@ async def upload_document(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -487,7 +488,7 @@ def update_document_meta(doc_id: int, data: dict, current_user: UserResponse = D
     try:
         existing = db.execute(text("SELECT id FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المستند غير موجود")
+            raise HTTPException(**http_error(404, "document_not_found"))
 
         fields = []
         params = {"id": doc_id}
@@ -504,7 +505,7 @@ def update_document_meta(doc_id: int, data: dict, current_user: UserResponse = D
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -521,7 +522,7 @@ async def upload_new_version(
     try:
         doc = db.execute(text("SELECT id, current_version FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
         if not doc:
-            raise HTTPException(status_code=404, detail="المستند غير موجود")
+            raise HTTPException(**http_error(404, "document_not_found"))
 
         new_version = doc.current_version + 1
 
@@ -574,7 +575,7 @@ async def upload_new_version(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -587,7 +588,7 @@ def delete_document(doc_id: int, current_user: UserResponse = Depends(get_curren
         versions = db.execute(text("SELECT file_path FROM document_versions WHERE document_id = :id"), {"id": doc_id}).fetchall()
         doc = db.execute(text("SELECT file_path FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
         if not doc:
-            raise HTTPException(status_code=404, detail="المستند غير موجود")
+            raise HTTPException(**http_error(404, "document_not_found"))
 
         db.execute(text("DELETE FROM documents WHERE id = :id"), {"id": doc_id})
         db.commit()
@@ -616,7 +617,7 @@ def delete_document(doc_id: int, current_user: UserResponse = Depends(get_curren
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

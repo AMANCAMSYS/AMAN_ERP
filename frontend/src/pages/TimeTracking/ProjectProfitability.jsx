@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { timesheetAPI, projectsAPI } from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { TrendingUp, TrendingDown, Clock, DollarSign, Search } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -34,7 +35,7 @@ const BarChart = ({ data }) => {
                             }} />
                         </div>
                         <span style={{ width: 80, fontSize: 12, textAlign: 'right' }}>
-                            {d.revenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {formatNumber(d.revenue, 0)}
                         </span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
@@ -49,7 +50,7 @@ const BarChart = ({ data }) => {
                             }} />
                         </div>
                         <span style={{ width: 80, fontSize: 12, textAlign: 'right' }}>
-                            {d.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {formatNumber(d.cost, 0)}
                         </span>
                     </div>
                 </div>
@@ -91,7 +92,7 @@ const ProjectProfitability = () => {
         if (selectedProjectId) loadReport(selectedProjectId);
     }, [selectedProjectId]);
 
-    const fmt = (n) => (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt = (n) => formatNumber(n || 0);
 
     return (
         <div className="module-container" dir={isRTL ? 'rtl' : 'ltr'}>

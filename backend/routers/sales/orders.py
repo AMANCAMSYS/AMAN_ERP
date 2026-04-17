@@ -1,5 +1,6 @@
 """Sales orders endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -63,7 +64,7 @@ def get_sales_order(order_id: int, current_user: dict = Depends(get_current_user
         """
         header_row = db.execute(text(query), {"id": order_id}).fetchone()
         if not header_row:
-            raise HTTPException(status_code=404, detail="أمر البيع غير موجود")
+            raise HTTPException(**http_error(404, "sales_order_not_found"))
 
         # Enforce branch access for single resource
         from utils.permissions import validate_branch_access
@@ -229,7 +230,7 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
             action="sales.order.create",
             resource_type="sales_order",
             resource_id=str(so_id),
-            details={"so_number": so_num, "total": float(grand_total), "customer_id": data.customer_id, "customer_name": cust_name},
+            details={"so_number": so_num, "total": str(grand_total or 0), "customer_id": data.customer_id, "customer_name": cust_name},
             request=request,
             branch_id=data.branch_id
         )
@@ -238,6 +239,6 @@ def create_sales_order(request: Request, data: SOCreate, current_user: dict = De
         db.rollback()
         logger.error(f"Error creating Sales Order: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

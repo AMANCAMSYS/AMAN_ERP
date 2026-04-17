@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import { ModuleKPISection } from '../../components/kpi';
@@ -9,6 +10,7 @@ import { ModuleKPISection } from '../../components/kpi';
 const StockReports = () => {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [warehouseStock, setWarehouseStock] = useState([]);
     const [filter, setFilter] = useState('');
@@ -22,7 +24,7 @@ const StockReports = () => {
             const res = await inventoryAPI.getInventoryBalance({ branch_id: currentBranch?.id });
             setWarehouseStock(res.data);
         } catch (err) {
-            console.error("Failed to load reports", err);
+            showToast(t('errors.fetch_failed'), 'error');
         } finally {
             setLoading(false);
         }

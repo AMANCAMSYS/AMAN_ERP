@@ -31,4 +31,6 @@ export const authAPI = {
             username,
             password,
         }),
+    verify2FALogin: (temp_token, code) =>
+        api.post('/auth/2fa/verify-login', { temp_token, code }),
 }

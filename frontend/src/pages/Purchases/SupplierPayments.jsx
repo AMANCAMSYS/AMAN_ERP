@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { purchasesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -13,6 +13,7 @@ function SupplierPayments() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const currency = getCurrency();
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -27,8 +28,7 @@ function SupplierPayments() {
             const res = await purchasesAPI.listPayments({ branch_id: currentBranch?.id });
             setPayments(res.data);
         } catch (error) {
-            console.error('Error fetching payments:', error);
-            toastEmitter.emit(t('buying.payments.error_loading'), 'error');
+            showToast(t('buying.payments.error_loading'), 'error');
         } finally {
             setLoading(false);
         }

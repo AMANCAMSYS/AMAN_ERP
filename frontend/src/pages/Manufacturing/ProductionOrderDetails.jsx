@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, ArrowLeft, Play, CheckCircle, XCircle, Factory, Package, DollarSign, AlertTriangle, Clock } from 'lucide-react'
 import api from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
 import { formatNumber, formatCurrency } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
@@ -31,7 +32,7 @@ export default function ProductionOrderDetails() {
             const res = await api.get(`/manufacturing/orders/${id}`)
             setOrder(res.data)
         } catch (err) {
-            console.error('Failed to fetch order', err)
+            toastEmitter.emit(t('common.error'), 'error')
             showToast(t('manufacturing.details.load_error'), 'error')
         } finally {
             setLoading(false)

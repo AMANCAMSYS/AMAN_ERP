@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Search, FileText } from 'lucide-react';
 import { inventoryAPI } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
-
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -13,6 +13,7 @@ const StockAdjustments = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [adjustments, setAdjustments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +28,7 @@ const StockAdjustments = () => {
             const response = await inventoryAPI.listAdjustments({ branch_id: currentBranch?.id });
             setAdjustments(response.data || []);
         } catch (err) {
-            console.error("Failed to fetch adjustments", err);
+            showToast(t('stock.adjustments.validation.error_fetch'), 'error');
         } finally {
             setLoading(false);
         }

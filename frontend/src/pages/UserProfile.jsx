@@ -15,6 +15,8 @@ function UserProfile() {
     const [passwordMessage, setPasswordMessage] = useState('')
     const [profileError, setProfileError] = useState('')
     const [passwordError, setPasswordError] = useState('')
+    const [sessions, setSessions] = useState([])
+    const [loadingSessions, setLoadingSessions] = useState(false)
     const companyId = getCompanyId()
 
     useEffect(() => {
@@ -24,7 +26,29 @@ function UserProfile() {
             full_name: currentUser?.full_name || '',
             email: currentUser?.email || ''
         })
+        fetchSessions()
     }, [])
+
+    const fetchSessions = async () => {
+        setLoadingSessions(true)
+        try {
+            const res = await securityAPI.listSessions()
+            setSessions(res.data || [])
+        } catch {
+            setSessions([])
+        } finally {
+            setLoadingSessions(false)
+        }
+    }
+
+    const handleTerminateSession = async (sessionId) => {
+        try {
+            await securityAPI.terminateSession(sessionId)
+            setSessions(prev => prev.filter(s => s.id !== sessionId))
+        } catch {
+            // silently ignore
+        }
+    }
 
     const handleProfileSave = async (e) => {
         e.preventDefault()
@@ -234,6 +258,46 @@ function UserProfile() {
                         <div style={{ padding: '12px', background: 'var(--bg-hover)', borderRadius: '8px', border: '1px solid var(--border-color)', fontFamily: 'monospace' }}>
                             {companyId}
                         </div>
+                    </div>
+                )}
+
+                <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: '8px 0 24px 0' }} />
+
+                <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.active_sessions', 'الجلسات النشطة')}</h3>
+                {loadingSessions ? (
+                    <div className="text-center p-4"><span className="loading"></span></div>
+                ) : sessions.length === 0 ? (
+                    <p style={{ color: '#888', fontSize: '14px' }}>{t('common.profile_page.no_sessions', 'لا توجد جلسات نشطة')}</p>
+                ) : (
+                    <div className="data-table-container">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{t('common.profile_page.ip_address', 'عنوان IP')}</th>
+                                    <th>{t('common.profile_page.device', 'الجهاز')}</th>
+                                    <th>{t('common.profile_page.last_active', 'آخر نشاط')}</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {sessions.map(session => (
+                                    <tr key={session.id}>
+                                        <td><code>{session.ip_address || '—'}</code></td>
+                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{session.user_agent || '—'}</td>
+                                        <td>{session.last_active || session.created_at || '—'}</td>
+                                        <td>
+                                            <button
+                                                className="btn btn-sm btn-outline"
+                                                style={{ color: 'var(--danger)' }}
+                                                onClick={() => handleTerminateSession(session.id)}
+                                            >
+                                                {t('common.profile_page.terminate', 'إنهاء')}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
             </div>

@@ -1,5 +1,6 @@
 """Sales returns endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -213,7 +214,7 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -495,7 +496,7 @@ def approve_sales_return(return_id: int, request: Request, current_user: dict = 
             action="sales.return.approve",
             resource_type="sales_return",
             resource_id=str(return_id),
-            details={"return_number": header.return_number, "total": float(header.total), "info": "Return Approved"},
+            details={"return_number": header.return_number, "total": str(header.total or 0), "info": "Return Approved"},
             request=request,
             branch_id=header.branch_id
         )
@@ -505,6 +506,6 @@ def approve_sales_return(return_id: int, request: Request, current_user: dict = 
         db.rollback()
         logger.error(f"Error approving return: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

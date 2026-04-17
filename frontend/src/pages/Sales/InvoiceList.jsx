@@ -31,7 +31,6 @@ function InvoiceList() {
                 setInvoices(normalizedInvoices)
             } catch (err) {
                 setError(t('common.error_loading'))
-                console.error(err)
             } finally {
                 setLoading(false)
             }

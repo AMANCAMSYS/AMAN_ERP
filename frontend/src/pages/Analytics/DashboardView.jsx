@@ -57,8 +57,9 @@ function GaugeWidget({ title, data }) {
 }
 
 function TableWidget({ title, data }) {
+    const { t } = useTranslation()
     if (!Array.isArray(data) || data.length === 0) {
-        return <div className="card h-100"><div className="card-body"><h6>{title}</h6><p className="text-muted">No data</p></div></div>
+        return <div className="card h-100"><div className="card-body"><h6>{title}</h6><p className="text-muted">{t('common.no_data')}</p></div></div>
     }
     const keys = Object.keys(data[0]).filter(k => k !== 'party_id' && k !== 'product_id')
     return (
@@ -87,9 +88,10 @@ function TableWidget({ title, data }) {
 }
 
 function ChartWidget({ widget }) {
+    const { t } = useTranslation()
     const { widget_type, title, data } = widget
     if (!Array.isArray(data) || data.length === 0) {
-        return <div className="card h-100"><div className="card-body"><h6>{title}</h6><p className="text-muted">No data</p></div></div>
+        return <div className="card h-100"><div className="card-body"><h6>{title}</h6><p className="text-muted">{t('common.no_data')}</p></div></div>
     }
 
     const numericKeys = Object.keys(data[0]).filter(k => typeof data[0][k] === 'number' || !isNaN(Number(data[0][k])))

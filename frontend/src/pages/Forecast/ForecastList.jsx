@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { demandForecastAPI } from '../../utils/api';
 import { TrendingUp, Eye, Plus } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
@@ -11,13 +12,14 @@ const ForecastList = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [forecasts, setForecasts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         demandForecastAPI.list()
             .then(res => setForecasts(res.data || []))
-            .catch(e => console.error(e))
+            .catch(e => showToast(t('errors.fetch_failed'), 'error'))
             .finally(() => setLoading(false));
     }, []);
 

@@ -13,8 +13,9 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import text
 
 from database import get_db_connection
@@ -85,7 +86,7 @@ def _check_delay(db, log_id: int, work_order_id: int):
     ).fetchone()
     if not row or not row.started_at or not row.cycle_time:
         return False
-    planned_minutes = float(row.cycle_time) * float(row.quantity)
+    planned_minutes = Decimal(str(row.cycle_time)) * Decimal(str(row.quantity))
     elapsed = (datetime.now(timezone.utc) - row.started_at).total_seconds() / 60
     return elapsed > (planned_minutes + _DELAY_THRESHOLD_HOURS * 60)
 
@@ -161,15 +162,20 @@ async def start_operation(
     try:
         # 1) Verify work order exists and is active
         wo = db.execute(
-            text("SELECT id, status FROM production_orders WHERE id = :wid"),
+            text("SELECT id, status, branch_id FROM production_orders WHERE id = :wid"),
             {"wid": body.work_order_id},
         ).fetchone()
         if not wo:
             raise HTTPException(status_code=404, detail="Work order not found")
 
+        # Branch validation
+        from utils.permissions import validate_branch_access
+        if wo.branch_id:
+            validate_branch_access(current_user, wo.branch_id)
+
         # 2) Verify operation exists
         op = db.execute(
-            text("SELECT id, sequence FROM manufacturing_operations WHERE id = :oid"),
+            text("SELECT id, sequence FROM manufacturing_operations WHERE id = :oid AND is_deleted = false"),
             {"oid": body.routing_operation_id},
         ).fetchone()
         if not op:
@@ -186,6 +192,7 @@ async def start_operation(
                         SELECT route_id FROM manufacturing_operations WHERE id = :oid
                     )
                     AND mo.sequence = :prev_seq
+                    AND mo.is_deleted = false
                 """),
                 {"oid": body.routing_operation_id, "prev_seq": op.sequence - 1},
             ).fetchone()
@@ -201,9 +208,10 @@ async def start_operation(
                     {"wid": body.work_order_id, "prev_oid": prev_op.id},
                 ).fetchone()
                 if not prev_complete:
+                    logger.warning(f"Operation sequence {op.sequence} started before previous completed for work order {body.work_order_id}")
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Previous operation (sequence {op.sequence - 1}) must be completed first",
+                        detail="يجب إكمال العملية السابقة أولاً",
                     )
 
         # 4) Check no duplicate in-progress log
@@ -279,7 +287,14 @@ async def complete_operation(
         if not log:
             raise HTTPException(status_code=404, detail="Log entry not found")
         if log.status != "in_progress":
-            raise HTTPException(status_code=400, detail=f"Cannot complete — current status is '{log.status}'")
+            logger.warning(f"Cannot complete log {body.log_id} with status {log.status}")
+            raise HTTPException(status_code=400, detail="لا يمكن إكمال العملية في حالتها الحالية")
+
+        # Branch validation via work order
+        from utils.permissions import validate_branch_access
+        po = db.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": log.work_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
 
         now = datetime.now(timezone.utc)
         delayed = _check_delay(db, body.log_id, log.work_order_id)
@@ -369,7 +384,14 @@ async def pause_operation(
         if not log:
             raise HTTPException(status_code=404, detail="Log entry not found")
         if log.status != "in_progress":
-            raise HTTPException(status_code=400, detail=f"Cannot pause — current status is '{log.status}'")
+            logger.warning(f"Cannot pause log {body.log_id} with status {log.status}")
+            raise HTTPException(status_code=400, detail="لا يمكن إيقاف العملية في حالتها الحالية")
+
+        # Branch validation via work order
+        from utils.permissions import validate_branch_access
+        po = db.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": log.work_order_id}).fetchone()
+        if po and po.branch_id:
+            validate_branch_access(current_user, po.branch_id)
 
         db.execute(
             text("""
@@ -423,6 +445,12 @@ def get_work_order_progress(
         if not wo:
             raise HTTPException(status_code=404, detail="Work order not found")
 
+        # Branch validation
+        from utils.permissions import validate_branch_access
+        po_branch = db.execute(text("SELECT branch_id FROM production_orders WHERE id = :id"), {"id": work_order_id}).fetchone()
+        if po_branch and po_branch.branch_id:
+            validate_branch_access(current_user, po_branch.branch_id)
+
         ops = db.execute(
             text("""
                 SELECT mo.id AS operation_id,
@@ -444,6 +472,7 @@ def get_work_order_progress(
                 ) sfl ON TRUE
                 LEFT JOIN employees e ON e.id = sfl.operator_id
                 WHERE mo.route_id = (SELECT route_id FROM production_orders WHERE id = :wid)
+                  AND mo.is_deleted = false
                 ORDER BY mo.sequence
             """),
             {"wid": work_order_id},

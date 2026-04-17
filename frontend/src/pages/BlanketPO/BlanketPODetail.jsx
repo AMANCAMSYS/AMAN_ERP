@@ -55,7 +55,7 @@ const BlanketPODetail = () => {
         setSubmitting(true);
         try {
             const payload = {
-                release_quantity: parseFloat(releaseForm.release_quantity),
+                release_quantity: String(releaseForm.release_quantity),
                 release_date: releaseForm.release_date || null,
             };
             const res = await purchasesAPI.createBlanketPORelease(id, payload);
@@ -80,7 +80,7 @@ const BlanketPODetail = () => {
         setSubmitting(true);
         try {
             const payload = {
-                new_price: parseFloat(amendForm.new_price),
+                new_price: String(amendForm.new_price),
                 effective_date: amendForm.effective_date,
                 reason: amendForm.reason || null,
             };

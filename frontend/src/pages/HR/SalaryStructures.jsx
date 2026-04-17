@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
+import { formatNumber } from '../../utils/format';
 import { hasPermission } from '../../utils/auth';
 import { Plus, Edit2, Trash2, DollarSign, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import '../../index.css';
@@ -29,7 +31,7 @@ const SalaryStructures = () => {
             ]);
             setStructures(sRes.data || []);
             setComponents(cRes.data || []);
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
         setLoading(false);
     };
 
@@ -46,7 +48,7 @@ const SalaryStructures = () => {
             setEditItem(null);
             setForm({ name: '', name_en: '', description: '' });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleSaveComponent = async () => {
@@ -60,7 +62,7 @@ const SalaryStructures = () => {
             setEditItem(null);
             setCompForm({ name: '', name_en: '', type: 'earning', calculation_type: 'fixed', default_amount: 0, is_taxable: true });
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const handleDeleteStructure = async (id) => {
@@ -68,7 +70,7 @@ const SalaryStructures = () => {
         try {
             await hrAdvancedAPI.deleteSalaryStructure(id);
             fetchData();
-        } catch (e) { console.error(e); }
+        } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     return (
@@ -168,8 +170,8 @@ const SalaryStructures = () => {
                                         <td>{i + 1}</td>
                                         <td style={{ fontWeight: 600 }}>{c.name}</td>
                                         <td><span className={`badge ${c.type === 'earning' ? 'badge-success' : 'badge-danger'}`}>{c.type === 'earning' ? (t('hr.salary_structures.earning')) : (t('hr.salary_structures.deduction'))}</span></td>
-                                        <td>{c.calculation_type === 'fixed' ? (t('hr.salary_structures.fixed')) : c.calculation_type === 'percentage' ? (t('hr.salary_structures.')) : (t('hr.salary_structures.formula'))}</td>
-                                        <td>{c.default_amount?.toLocaleString() || 0}</td>
+                                        <td>{c.calculation_type === 'fixed' ? (t('hr.salary_structures.fixed')) : c.calculation_type === 'percentage' ? (t('hr.salary_structures.percentage')) : (t('hr.salary_structures.formula'))}</td>
+                                        <td>{formatNumber(c.default_amount) || 0}</td>
                                         <td>{c.is_taxable ? '✅' : '❌'}</td>
                                         <td>
                                             <button className="btn btn-sm btn-secondary" onClick={() => { setEditItem(c); setCompForm({ name: c.name, name_en: c.name_en || '', type: c.type, calculation_type: c.calculation_type, default_amount: c.default_amount || 0, is_taxable: c.is_taxable }); setShowComponentModal(true); }}><Edit2 size={14} /></button>
@@ -239,7 +241,7 @@ const SalaryStructures = () => {
                         </div>
                         <div className="form-group">
                             <label>{t('hr.salary_structures.default_amount')}</label>
-                            <input type="number" className="form-input" value={compForm.default_amount} onChange={e => setCompForm({ ...compForm, default_amount: parseFloat(e.target.value) || 0 })} />
+                            <input type="number" className="form-input" value={compForm.default_amount} onChange={e => setCompForm({ ...compForm, default_amount: e.target.value })} />
                         </div>
                         <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <input type="checkbox" checked={compForm.is_taxable} onChange={e => setCompForm({ ...compForm, is_taxable: e.target.checked })} />

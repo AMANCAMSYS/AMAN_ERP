@@ -4,6 +4,7 @@ import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
 import { formatShortDate } from '../../../utils/dateUtils';
+import { formatNumber } from '../../../utils/format';
 
 
 const POSReturns = ({ onClose, onComplete }) => {
@@ -176,7 +177,7 @@ const POSReturns = ({ onClose, onComplete }) => {
                         <div className="return-summary">
                             <div className="total-refund">
                                 <span>{t('pos.refund_amount')}</span>
-                                <span className="amount">{calculateTotal().toLocaleString()} {t('common.currency')}</span>
+                                <span className="amount">{formatNumber(calculateTotal())} {t('common.currency')}</span>
                             </div>
                         </div>
 

@@ -3,6 +3,7 @@ Inventory Module - Categories CRUD
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 import logging
@@ -104,7 +105,7 @@ def create_category(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -120,7 +121,7 @@ def update_category(
     try:
         exists = db.execute(text("SELECT id FROM product_categories WHERE id = :id"), {"id": id}).scalar()
         if not exists:
-            raise HTTPException(status_code=404, detail="الفئة غير موجودة")
+            raise HTTPException(**http_error(404, "category_not_found"))
 
         db.execute(text("""
             UPDATE product_categories SET category_name = :name, category_code = :code
@@ -145,7 +146,7 @@ def update_category(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -161,7 +162,7 @@ def delete_category(
         # INV-008: Check existence
         cat = db.execute(text("SELECT id FROM product_categories WHERE id = :id"), {"id": id}).fetchone()
         if not cat:
-            raise HTTPException(status_code=404, detail="الفئة غير موجودة")
+            raise HTTPException(**http_error(404, "category_not_found"))
 
         # INV-008: Check for linked products before deletion
         product_count = db.execute(text("SELECT COUNT(*) FROM products WHERE category_id = :id"), {"id": id}).scalar()
@@ -186,6 +187,6 @@ def delete_category(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

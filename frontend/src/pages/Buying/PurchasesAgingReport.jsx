@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { reportsAPI } from '../../utils/api';
@@ -9,6 +10,7 @@ import BackButton from '../../components/common/BackButton';
 function PurchasesAgingReport() {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -21,7 +23,7 @@ function PurchasesAgingReport() {
             const res = await reportsAPI.getPurchasesAging(currentBranch?.id);
             setData(res.data || []);
         } catch (err) {
-            console.error('Failed to fetch purchases aging', err);
+            showToast(t('common.error'), 'error');
             setError(t('errors.fetch_failed'));
         } finally {
             setLoading(false);

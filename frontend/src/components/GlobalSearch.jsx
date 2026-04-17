@@ -395,7 +395,7 @@ export default function GlobalSearch({ isOpen, onClose }) {
               ref={inputRef}
               type="text"
               className="global-search-input"
-              placeholder={isArabic ? 'ابحث في النظام... (صفحات، تقارير، إعدادات)' : 'Search pages, reports, settings...'}
+              placeholder={t('globalsearch.search_pages_reports_settings')}
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -412,13 +412,13 @@ export default function GlobalSearch({ isOpen, onClose }) {
           {groupedResults.flatList.length === 0 && query.trim() ? (
             <div className="global-search-empty">
               <span style={{ fontSize: 32, opacity: 0.4 }}>🔍</span>
-              <p>{isArabic ? 'لا توجد نتائج لـ' : 'No results for'} "{query}"</p>
+              <p>{t('globalsearch.no_results_for')} "{query}"</p>
             </div>
           ) : (
             <>
               {!query.trim() && (
                 <div className="global-search-section-label">
-                  {isArabic ? '⚡ الصفحات الشائعة' : '⚡ Quick Access'}
+                  {t('globalsearch._quick_access')}
                 </div>
               )}
               {Object.entries(groupedResults.groups).map(([category, items]) => (
@@ -456,9 +456,9 @@ export default function GlobalSearch({ isOpen, onClose }) {
 
         {/* Footer */}
         <div className="global-search-footer">
-          <span><kbd>↑</kbd> <kbd>↓</kbd> {isArabic ? 'للتنقل' : 'Navigate'}</span>
-          <span><kbd>↵</kbd> {isArabic ? 'للفتح' : 'Open'}</span>
-          <span><kbd>ESC</kbd> {isArabic ? 'للإغلاق' : 'Close'}</span>
+          <span><kbd>↑</kbd> <kbd>↓</kbd> {t('globalsearch.navigate')}</span>
+          <span><kbd>↵</kbd> {t('hr.status_open')}</span>
+          <span><kbd>ESC</kbd> {t('common.close')}</span>
         </div>
       </div>
     </div>

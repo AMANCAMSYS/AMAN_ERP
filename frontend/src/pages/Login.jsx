@@ -25,6 +25,12 @@ function Login() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
+    // 2FA state
+    const [show2FA, setShow2FA] = useState(false)
+    const [tempToken, setTempToken] = useState('')
+    const [totpCode, setTotpCode] = useState('')
+    const [twoFAMessage, setTwoFAMessage] = useState('')
+
     // SSO state
     const [ssoProviders, setSsoProviders] = useState([])
     const [ssoLoading, setSsoLoading] = useState(false)
@@ -86,6 +92,16 @@ function Login() {
                 formData.password,
                 isSystemAdmin ? null : formData.company_code
             )
+
+            // Handle 2FA challenge
+            if (response.data?.requires_2fa) {
+                setTempToken(response.data.temp_token)
+                setTwoFAMessage(response.data.message || '')
+                setShow2FA(true)
+                setLoading(false)
+                return
+            }
+
             const { access_token, refresh_token, user, company_id } = response.data
 
             setAuth(access_token, user, company_id, refresh_token)
@@ -96,7 +112,35 @@ function Login() {
                 window.location.href = '/dashboard'
             }
         } catch (err) {
-            setError(err.response?.data?.detail || t('auth.login_failed'))
+            if (err.response?.status === 429) {
+                setError(t('auth.rate_limited', 'محاولات كثيرة، يرجى الانتظار قبل المحاولة مجدداً'))
+            } else {
+                setError(err.response?.data?.detail || t('auth.login_failed'))
+            }
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handle2FASubmit = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        setError('')
+        try {
+            const response = await authAPI.verify2FALogin(tempToken, totpCode)
+            const { access_token, refresh_token, user, company_id } = response.data
+            setAuth(access_token, user, company_id, refresh_token)
+            if (user?.role !== 'system_admin' && !hasIndustryTypeSet()) {
+                window.location.href = '/setup/industry'
+            } else {
+                window.location.href = '/dashboard'
+            }
+        } catch (err) {
+            if (err.response?.status === 429) {
+                setError(t('auth.rate_limited', 'محاولات كثيرة، يرجى الانتظار قبل المحاولة مجدداً'))
+            } else {
+                setError(err.response?.data?.detail || t('auth.2fa_invalid', 'رمز المصادقة الثنائية غير صحيح'))
+            }
         } finally {
             setLoading(false)
         }
@@ -123,6 +167,42 @@ function Login() {
 
                 {error && <div className="alert alert-error">{error}</div>}
 
+                {show2FA ? (
+                    <form onSubmit={handle2FASubmit}>
+                        <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+                            {twoFAMessage || t('auth.2fa_prompt', 'يرجى إدخال رمز المصادقة الثنائية')}
+                        </p>
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="totp_code">
+                                {t('auth.2fa_code', 'رمز التحقق')}
+                            </label>
+                            <input
+                                type="text"
+                                id="totp_code"
+                                className="form-input"
+                                value={totpCode}
+                                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="000000"
+                                maxLength={6}
+                                autoComplete="one-time-code"
+                                inputMode="numeric"
+                                required
+                                autoFocus
+                            />
+                        </div>
+                        <button type="submit" className="btn btn-primary btn-block" disabled={loading || totpCode.length !== 6}>
+                            {loading ? t('auth.verifying', 'جار التحقق...') : t('auth.verify_2fa', 'تحقق')}
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-light btn-block"
+                            style={{ marginTop: '8px' }}
+                            onClick={() => { setShow2FA(false); setTotpCode(''); setTempToken(''); setError('') }}
+                        >
+                            {t('common.back', 'رجوع')}
+                        </button>
+                    </form>
+                ) : (
                 <form onSubmit={handleSubmit}>
                     {/* رمز الشركة — يُخفى تلقائياً إذا كان المستخدم "admin" */}
                     {formData.username.trim() !== 'admin' && (
@@ -198,6 +278,7 @@ function Login() {
                         {loading ? <span className="loading"></span> : t('auth.login_btn')}
                     </button>
                 </form>
+                )}
 
                 {/* SSO Providers */}
                 {ssoProviders.length > 0 && (

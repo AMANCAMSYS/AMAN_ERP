@@ -7,13 +7,14 @@ import { formatShortDate } from '../../utils/dateUtils'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
 function BuyingReturnForm() {
     const { t } = useTranslation()
     const navigate = useNavigate()
+    const { showToast } = useToast()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
     const [receiveRefund, setReceiveRefund] = useState(false)
@@ -54,7 +55,7 @@ function BuyingReturnForm() {
                 setProducts(prodRes.data)
                 setWarehouses(whRes.data)
             } catch (err) {
-                console.error("Error fetching resources", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchResources()
@@ -65,7 +66,7 @@ function BuyingReturnForm() {
         if (formData.supplier_id) {
             purchasesAPI.listInvoices({ supplier_id: formData.supplier_id })
                 .then(res => setInvoices(res.data))
-                .catch(err => console.error(err))
+                .catch(err => showToast(t('common.error'), 'error'))
         } else {
             setInvoices([])
         }
@@ -109,7 +110,7 @@ function BuyingReturnForm() {
 
             setItems(returnItems)
         } catch (err) {
-            console.error(err)
+            showToast(t('common.error'), 'error')
             setError(t('common.error_loading'))
         }
     }
@@ -154,8 +155,8 @@ function BuyingReturnForm() {
 
                 if (field === 'quantity') {
                     // Validation against max_quantity if linked
-                    if (item.max_quantity && parseFloat(value) > item.max_quantity) {
-                        toastEmitter.emit(`Cannot return more than purchased: ${item.max_quantity}`, 'error')
+                    if (item.max_quantity && Number(value) > item.max_quantity) {
+                        showToast(`Cannot return more than purchased: ${item.max_quantity}`, 'error')
                         updatedItem[field] = item.max_quantity
                         // Don't return here, proceed to calc discount
                         // return updatedItem 
@@ -166,13 +167,13 @@ function BuyingReturnForm() {
                 updatedItem[field] = value
 
                 // Calculate discount logic
-                const qty = parseFloat(field === 'quantity' ? value : updatedItem.quantity) || 0
-                const price = parseFloat(field === 'unit_price' ? value : updatedItem.unit_price) || 0
-                let discount = parseFloat(updatedItem.discount) || 0
-                let discountPercent = parseFloat(updatedItem.discount_percent) || 0
+                const qty = Number(field === 'quantity' ? value : updatedItem.quantity) || 0
+                const price = Number(field === 'unit_price' ? value : updatedItem.unit_price) || 0
+                let discount = Number(updatedItem.discount) || 0
+                let discountPercent = Number(updatedItem.discount_percent) || 0
 
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(value) || 0
+                    discountPercent = Number(value) || 0
                     discount = (qty * price) * (discountPercent / 100)
                     updatedItem.discount = discount
                 } else if (field === 'quantity' || field === 'unit_price') {
@@ -229,17 +230,17 @@ function BuyingReturnForm() {
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id) || null,
                     description: item.description || '',
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    tax_rate: String(item.tax_rate || 0),
+                    discount: String(item.discount || 0)
                 }))
             }
 
             await purchasesAPI.createReturn(payload)
             navigate('/buying/returns')
         } catch (err) {
-            console.error(err)
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
             const errMsg = err.response?.data?.detail
             setError(typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) || t('buying.returns.form.error_saving'))
         } finally {

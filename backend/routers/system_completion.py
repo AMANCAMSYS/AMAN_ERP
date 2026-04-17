@@ -4,6 +4,7 @@ Bank Import | Zakat Calculator | Consolidation Reports | Fiscal Period Lock | Ba
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
@@ -201,7 +202,7 @@ async def import_bank_statement(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -336,7 +337,7 @@ def auto_match_bank_lines(batch_id: int, current_user: dict = Depends(get_curren
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -632,12 +633,12 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             if trading_investments:
                 additions.append({"label": "Trading Investments (Short-term)", "label_ar": "استثمارات المضاربة (قصيرة الأجل)", "amount": float(Decimal(str(trading_investments)).quantize(Decimal('0.01')))})
 
-            total_additions = float(gross_zakatable.quantize(Decimal('0.01')))
+            total_additions = str(gross_zakatable.quantize(Decimal('0.01')))
 
             deductions = []
             if current_liabilities:
                 deductions.append({"label": "Current Liabilities (Short-term Debts)", "label_ar": "الالتزامات المتداولة (الديون الحالة قصيرة الأجل)", "amount": float(cl_decimal.quantize(Decimal('0.01')))})
-            total_deductions = float(cl_decimal.quantize(Decimal('0.01')))
+            total_deductions = str(cl_decimal.quantize(Decimal('0.01')))
 
             # الأصول المستبعدة (للعرض فقط — informational)
             excluded_info = []
@@ -757,7 +758,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 {"label": "Provisions", "label_ar": "المخصصات", "amount": float(Decimal(str(provisions)).quantize(Decimal('0.01')))},
                 {"label": "Net Profit", "label_ar": "صافي الربح", "amount": float(net_profit.quantize(Decimal('0.01'))) if net_profit > 0 else 0},
             ]
-            total_additions = float(total_add.quantize(Decimal('0.01')))
+            total_additions = str(total_add.quantize(Decimal('0.01')))
 
             deductions = [
                 {"label": "Fixed Assets & Equipment", "label_ar": "الأصول الثابتة والمعدات", "amount": float(Decimal(str(fixed_assets)).quantize(Decimal('0.01')))},
@@ -766,7 +767,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             ]
             if wip:
                 deductions.append({"label": "Work in Progress / Under Construction", "label_ar": "مشروعات تحت التنفيذ", "amount": float(Decimal(str(wip)).quantize(Decimal('0.01')))})
-            total_deductions = float(total_ded.quantize(Decimal('0.01')))
+            total_deductions = str(total_ded.quantize(Decimal('0.01')))
 
             details = {
                 "method_name_ar": "طريقة صافي الملكية — ZATCA (المعتمدة نظامياً)",
@@ -815,9 +816,9 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
                 {"label": "Add: Provisions", "label_ar": "(+) المخصصات", "amount": float(Decimal(str(provision_expense)).quantize(Decimal('0.01')))},
                 {"label": "Add: Penalties & Fines", "label_ar": "(+) الغرامات والجزاءات", "amount": float(Decimal(str(penalties)).quantize(Decimal('0.01')))},
             ]
-            total_additions = float(adjusted_profit.quantize(Decimal('0.01')))
+            total_additions = str(adjusted_profit.quantize(Decimal('0.01')))
             deductions = []
-            total_deductions = 0
+            total_deductions = "0.00"
 
             details = {
                 "method_name_ar": "طريقة الربح المُعدَّل",
@@ -861,10 +862,10 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
             "total_additions": total_additions,
             "deductions": deductions,
             "total_deductions": total_deductions,
-            "zakat_base": float(zakat_base.quantize(Decimal('0.01'))),
+            "zakat_base": str(zakat_base.quantize(Decimal('0.01'))),
             "zakat_rate": float(rate),
             "rate_display": f"{float(rate)}%" if body.use_gregorian_rate else f"{body.zakat_rate}%",
-            "zakat_amount": float(zakat_amount),
+            "zakat_amount": str(zakat_amount),
             "branch_id": branch_id,
             "message": f"الزكاة المستحقة: {zakat_amount:,.2f}"
         }
@@ -873,7 +874,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -893,9 +894,9 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
         if not zakat:
             raise HTTPException(404, "لم يتم حساب الزكاة لهذا العام")
         if zakat.status == 'posted':
-            raise HTTPException(400, "تم ترحيل الزكاة بالفعل")
+            raise HTTPException(400, "تم ترحيل الزكاة بالفعل لهذا العام المالي")
 
-        amount = float(zakat.zakat_amount)
+        amount = Decimal(str(zakat.zakat_amount))
         if amount <= 0:
             raise HTTPException(400, "مبلغ الزكاة صفر")
 
@@ -922,8 +923,8 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
             db.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
                 VALUES (:jeid, :aid, :amt, 0, 'مصروف زكاة')
-            """), {"jeid": je_id, "aid": exp_acc, "amt": amount})
-            update_account_balance(db, exp_acc, amount, 0)
+            """), {"jeid": je_id, "aid": exp_acc, "amt": str(amount)})
+            update_account_balance(db, exp_acc, float(amount), 0)
 
         # Cr: Zakat Payable
         pay_acc = get_mapped_account_id(db, "acc_map_zakat_payable")
@@ -931,8 +932,8 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
             db.execute(text("""
                 INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
                 VALUES (:jeid, :aid, 0, :amt, 'زكاة مستحقة')
-            """), {"jeid": je_id, "aid": pay_acc, "amt": amount})
-            update_account_balance(db, pay_acc, 0, amount)
+            """), {"jeid": je_id, "aid": pay_acc, "amt": str(amount)})
+            update_account_balance(db, pay_acc, 0, float(amount))
 
         db.execute(text("""
             UPDATE zakat_calculations SET status = 'posted', journal_entry_id = :jeid
@@ -943,12 +944,12 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
 
         log_activity(db, user_id, _u(current_user, "username", ""),
                      "zakat.post", "zakat_calculation", str(fiscal_year),
-                     {"amount": amount, "journal_entry": je_number})
+                     {"amount": str(amount), "journal_entry": je_number})
 
         return {
             "journal_entry_id": je_id,
             "entry_number": je_number,
-            "amount": amount,
+            "amount": str(amount),
             "message": f"تم ترحيل قيد الزكاة بمبلغ {amount:,.2f}"
         }
     except HTTPException:
@@ -956,7 +957,7 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1367,7 +1368,7 @@ def fx_gain_loss_report(
     except Exception as e:
         logger.error(f"FX gain/loss report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1755,7 +1756,7 @@ def create_print_template(body: PrintTemplateCreate, current_user: dict = Depend
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1768,7 +1769,7 @@ def get_print_template(template_id: int, current_user: dict = Depends(get_curren
     try:
         row = db.execute(text("SELECT * FROM print_templates WHERE id = :id"), {"id": template_id}).fetchone()
         if not row:
-            raise HTTPException(404, "القالب غير موجود")
+            raise HTTPException(**http_error(404, "template_not_found"))
         return dict(row._mapping)
     finally:
         db.close()

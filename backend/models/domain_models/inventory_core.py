@@ -18,6 +18,9 @@ class ProductCategory(ModelBase):
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int | None] = mapped_column(Integer, default=0)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
 
 
 class ProductUnit(ModelBase):
@@ -132,6 +135,8 @@ class StockAdjustment(ModelBase):
     status: Mapped[str | None] = mapped_column(String(20), default="pending")
     created_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
 
 
 __all__ = [

@@ -1,10 +1,10 @@
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin
 
 
-class LandedCost(ModelBase):
+class LandedCost(ModelBase, AuditMixin):
     __tablename__ = "landed_costs"
     __table_args__ = (UniqueConstraint("lc_number", name="landed_costs_lc_number_key"),)
 
@@ -27,7 +27,7 @@ class LandedCost(ModelBase):
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class LandedCostItem(ModelBase):
+class LandedCostItem(ModelBase, AuditMixin):
     __tablename__ = "landed_cost_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -56,7 +56,7 @@ class PendingPayable(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PurchaseAgreementLine(ModelBase):
+class PurchaseAgreementLine(ModelBase, AuditMixin):
     __tablename__ = "purchase_agreement_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -68,7 +68,7 @@ class PurchaseAgreementLine(ModelBase):
     delivered_qty: Mapped[float | None] = mapped_column(Numeric(12, 3), default=0)
 
 
-class PurchaseAgreement(ModelBase):
+class PurchaseAgreement(ModelBase, AuditMixin):
     __tablename__ = "purchase_agreements"
     __table_args__ = (UniqueConstraint("agreement_number", name="purchase_agreements_agreement_number_key"),)
 

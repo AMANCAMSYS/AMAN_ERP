@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { hrAdvancedAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Star, Award, Target, BarChart3 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -19,7 +20,7 @@ const ReviewResult = () => {
             try {
                 const res = await hrAdvancedAPI.getReviewDetail(id);
                 setReview(res.data);
-            } catch (e) { console.error(e); }
+            } catch (e) { toastEmitter.emit(t('common.error'), 'error'); }
             setLoading(false);
         };
         fetchReview();

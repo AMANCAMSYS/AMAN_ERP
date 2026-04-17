@@ -7,7 +7,7 @@ import { formatNumber, getStep } from '../../utils/format'
 import { useTranslation } from 'react-i18next'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
@@ -23,6 +23,7 @@ function InvoiceForm() {
     const [productStocks, setProductStocks] = useState({})
     const [warehouses, setWarehouses] = useState([])
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [error, setError] = useState(null)
     const [currencies, setCurrencies] = useState([])
     const [treasuryAccounts, setTreasuryAccounts] = useState([])
@@ -79,9 +80,9 @@ function InvoiceForm() {
                         due_date: order.expected_delivery_date ? new Date(order.expected_delivery_date).toISOString().split('T')[0] : ''
                     }))
                     setItems(order.items.map(item => {
-                        const quantity = parseFloat(item.quantity) || 0
-                        const unitPrice = parseFloat(item.unit_price) || 0
-                        const discount = parseFloat(item.discount) || 0
+                        const quantity = Number(item.quantity) || 0
+                        const unitPrice = Number(item.unit_price) || 0
+                        const discount = Number(item.discount) || 0
                         const discountPercent = (quantity * unitPrice) > 0 ? (discount / (quantity * unitPrice)) * 100 : 0
 
                         return {
@@ -89,14 +90,14 @@ function InvoiceForm() {
                             description: item.description || '',
                             quantity: quantity,
                             unit_price: unitPrice,
-                            tax_rate: parseFloat(item.tax_rate) || 0,
+                            tax_rate: Number(item.tax_rate) || 0,
                             discount: discount,
                             discount_percent: discountPercent
                         }
                     }))
                 }
             } catch (err) {
-                console.error("Failed to load data", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchData()
@@ -168,23 +169,23 @@ function InvoiceForm() {
                 if (field === 'quantity' && item.product_id) {
                     const productId = parseInt(item.product_id)
                     const availableStock = productStocks[productId] || 0
-                    const enteredQty = parseFloat(value) || 0
+                    const enteredQty = Number(value) || 0
 
                     if (enteredQty > availableStock) {
-                        toastEmitter.emit(t('sales.invoices.form.error_stock', { stock: availableStock }), 'error')
+                        showToast(t('sales.invoices.form.error_stock', { stock: availableStock }), 'error')
                         updatedItem.quantity = 0
                         return updatedItem
                     }
                 }
 
                 // Calculate discount based on percentage if needed
-                const qty = parseFloat(updatedItem.quantity) || 0
-                const price = parseFloat(updatedItem.unit_price) || 0
-                let discount = parseFloat(updatedItem.discount) || 0
-                let discountPercent = parseFloat(updatedItem.discount_percent) || 0
+                const qty = Number(updatedItem.quantity) || 0
+                const price = Number(updatedItem.unit_price) || 0
+                let discount = Number(updatedItem.discount) || 0
+                let discountPercent = Number(updatedItem.discount_percent) || 0
 
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(value) || 0
+                    discountPercent = Number(value) || 0
                     discount = (qty * price) * (discountPercent / 100)
                     updatedItem.discount = discount
                 } else if (field === 'quantity' || field === 'unit_price') {
@@ -207,7 +208,7 @@ function InvoiceForm() {
             const res = await inventoryAPI.getProductStock(productId, warehouseId)
             setProductStocks(prev => ({ ...prev, [productId]: res.data }))
         } catch (err) {
-            console.error('Failed to fetch stock:', err)
+            showToast(t('common.error'), 'error')
         }
     }
 
@@ -244,7 +245,7 @@ function InvoiceForm() {
             const group = customerGroups.find(g => g.id === customer.group_id);
             if (group && group.application_scope === 'total' && group.discount_percentage > 0) {
                 globalEffectType = group.effect_type;
-                globalEffectPercent = parseFloat(group.discount_percentage);
+                globalEffectPercent = Number(group.discount_percentage);
             }
         }
 
@@ -312,7 +313,7 @@ function InvoiceForm() {
             window.scrollTo(0, 0)
             return
         }
-        if (items.some(i => i.product_id && (!i.quantity || parseFloat(i.quantity) <= 0))) {
+        if (items.some(i => i.product_id && (!i.quantity || Number(i.quantity) <= 0))) {
             setError(t('sales.invoices.form.error_quantity'))
             window.scrollTo(0, 0)
             return
@@ -329,9 +330,9 @@ function InvoiceForm() {
                 customer_id: parseInt(formData.customer_id),
                 due_date: formData.due_date || null,
                 down_payment_method: formData.down_payment_method || 'cash',
-                paid_amount: parseFloat(formData.paid_amount) || 0,
+                paid_amount: String(formData.paid_amount || 0),
                 currency: formData.currency,
-                exchange_rate: parseFloat(formData.exchange_rate) || 1.0,
+                exchange_rate: String(formData.exchange_rate || 1.0),
                 treasury_id: formData.treasury_id ? parseInt(formData.treasury_id) : null,
                 effect_type: totals.globalEffectType,
                 effect_percentage: totals.globalEffectPercent,
@@ -339,10 +340,10 @@ function InvoiceForm() {
                 items: items.map(item => ({
                     ...item,
                     product_id: item.product_id ? parseInt(item.product_id) : null,
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0,
-                    discount: parseFloat(item.discount) || 0,
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    tax_rate: String(item.tax_rate || 0),
+                    discount: String(item.discount || 0),
                     markup: 0 // Handled at line level unit_price for sales now, or could pass to backend
                 }))
             }
@@ -494,7 +495,7 @@ function InvoiceForm() {
                                                 step={isDiscreteUnit(item.unit) ? "1" : getStep()}
                                                 value={item.quantity}
                                                 onChange={(e) => {
-                                                    let val = parseFloat(e.target.value) || 0;
+                                                    let val = Number(e.target.value) || 0;
                                                     if (isDiscreteUnit(item.unit)) val = Math.round(val);
                                                     handleItemChange(index, 'quantity', val);
                                                 }}
@@ -509,21 +510,21 @@ function InvoiceForm() {
                                             <input
                                                 type="number" className="form-input" min="0" step={getStep()}
                                                 value={item.unit_price}
-                                                onChange={(e) => handleItemChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                onChange={(e) => handleItemChange(index, 'unit_price', Number(e.target.value) || 0)}
                                             />
                                         </td>
                                         <td>
                                             <input
                                                 type="number" className="form-input" min="0" max="100" step="0.01"
                                                 value={item.discount_percent}
-                                                onChange={(e) => handleItemChange(index, 'discount_percent', parseFloat(e.target.value) || 0)}
+                                                onChange={(e) => handleItemChange(index, 'discount_percent', Number(e.target.value) || 0)}
                                             />
                                         </td>
                                         <td>
                                             <input
                                                 type="number" className="form-input"
                                                 value={item.tax_rate}
-                                                onChange={(e) => handleItemChange(index, 'tax_rate', parseFloat(e.target.value) || 0)}
+                                                onChange={(e) => handleItemChange(index, 'tax_rate', Number(e.target.value) || 0)}
                                             />
                                         </td>
                                         <td style={{ fontWeight: 'bold' }}>{formatNumber(lineTotal)}</td>
@@ -579,7 +580,7 @@ function InvoiceForm() {
                                         step="0.000001"
                                         className="form-input form-input-sm font-mono"
                                         value={formData.exchange_rate}
-                                        onChange={e => setFormData({ ...formData, exchange_rate: Math.max(parseFloat(e.target.value) || 1, 0.0001) })}
+                                        onChange={e => setFormData({ ...formData, exchange_rate: Math.max(Number(e.target.value) || 1, 0.0001) })}
                                     />
                                 </FormField>
                             )}
@@ -652,7 +653,7 @@ function InvoiceForm() {
                                     <input
                                         type="number" className="form-input" step={getStep()}
                                         value={formData.paid_amount}
-                                        onChange={e => setFormData({ ...formData, paid_amount: parseFloat(e.target.value) || 0 })}
+                                        onChange={e => setFormData({ ...formData, paid_amount: Number(e.target.value) || 0 })}
                                     />
                                     <span className="input-suffix">{formData.currency}</span>
                                 </div>

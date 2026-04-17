@@ -19,6 +19,24 @@ export function useNotificationSocket(onNotification) {
         const token = localStorage.getItem('token')
         if (!token) return
 
+        // Basic JWT expiry pre-check — avoid opening a WS with an expired token
+        try {
+            const payloadB64 = token.split('.')[1]
+            if (payloadB64) {
+                const payload = JSON.parse(atob(payloadB64))
+                const now = Math.floor(Date.now() / 1000)
+                if (payload.exp && payload.exp < now) {
+                    // Token is expired — wait and retry (token refresh may be in progress)
+                    const delay = Math.min(1000 * Math.pow(2, attempt.current), 30000)
+                    attempt.current++
+                    reconnectTimer.current = setTimeout(() => connect(abortSignal), delay)
+                    return
+                }
+            }
+        } catch {
+            // If we can't parse, just proceed — the backend will validate
+        }
+
         // Determine WS URL — use same host so Vite proxy handles it in dev
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
         const host = window.location.host
@@ -53,8 +71,12 @@ export function useNotificationSocket(onNotification) {
                 ws.onclose = (e) => {
                     setConnected(false)
                     wsRef.current = null
-                    // Don't reconnect if cleanup already ran (StrictMode) or auth failure
-                    if (abortSignal?.aborted || e.code === 4001) return
+                    // Don't reconnect if cleanup already ran (StrictMode)
+                    if (abortSignal?.aborted) return
+                    // Auth failure (token invalid/expired) — stop reconnecting
+                    // code 4001 = explicit auth failure from backend
+                    // code 1006 = abnormal close (often happens with expired tokens)
+                    if (e.code === 4001) return
                     // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
                     const delay = Math.min(1000 * Math.pow(2, attempt.current), 30000)
                     attempt.current++
@@ -89,6 +111,21 @@ export function useNotificationSocket(onNotification) {
         const controller = new AbortController()
         connect(controller.signal)
 
+        // Listen for token refresh events — reconnect with fresh token
+        const handleTokenRefresh = () => {
+            // Close existing WS and reconnect with new token
+            clearTimeout(reconnectTimer.current)
+            clearTimeout(wsRef._connectTimer)
+            if (wsRef.current) {
+                clearInterval(wsRef.current._pingInterval)
+                wsRef.current.close()
+                wsRef.current = null
+            }
+            attempt.current = 0
+            connect(controller.signal)
+        }
+        window.addEventListener('token_refreshed', handleTokenRefresh)
+
         return () => {
             controller.abort()
             clearTimeout(reconnectTimer.current)
@@ -98,6 +135,7 @@ export function useNotificationSocket(onNotification) {
                 wsRef.current.close()
                 wsRef.current = null
             }
+            window.removeEventListener('token_refreshed', handleTokenRefresh)
         }
     }, [connect])
 

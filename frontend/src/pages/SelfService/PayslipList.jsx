@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { selfServiceAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
+import { formatNumber } from '../../utils/format';
 import { FileText, Eye } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -22,7 +24,7 @@ const PayslipList = () => {
             const res = await selfServiceAPI.listPayslips();
             setPayslips(res.data?.data || []);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -57,10 +59,10 @@ const PayslipList = () => {
                             {payslips.map(ps => (
                                 <tr key={ps.id}>
                                     <td>{ps.period_name || `${ps.month}/${ps.year}`}</td>
-                                    <td>{Number(ps.basic_salary || 0).toLocaleString()}</td>
-                                    <td>{Number(ps.total_earnings || 0).toLocaleString()}</td>
-                                    <td>{Number(ps.total_deductions || 0).toLocaleString()}</td>
-                                    <td><strong>{Number(ps.net_salary || 0).toLocaleString()}</strong></td>
+                                    <td>{formatNumber(ps.basic_salary || 0)}</td>
+                                    <td>{formatNumber(ps.total_earnings || 0)}</td>
+                                    <td>{formatNumber(ps.total_deductions || 0)}</td>
+                                    <td><strong>{formatNumber(ps.net_salary || 0)}</strong></td>
                                     <td>{ps.status}</td>
                                     <td>
                                         <button className="btn btn-sm btn-secondary" onClick={() => navigate(`/hr/self-service/payslips/${ps.id}`)}>

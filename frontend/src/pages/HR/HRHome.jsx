@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../../utils/auth';
 import { hrAPI, hrAdvancedAPI, attendanceAPI } from '../../utils/api';
+import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
     Users,
@@ -51,7 +52,7 @@ const HRHome = () => {
                     present: attRes.data?.today_count || attRes.data?.length || 0
                 }));
             } catch (err) {
-                console.error('Failed to fetch HR stats', err);
+                toastEmitter.emit(t('common.error'), 'error');
             }
         };
         if (hasPermission('hr.view')) fetchStats();
@@ -61,7 +62,7 @@ const HRHome = () => {
         try {
             const res = await hrAPI.listEmployees({ limit: 500 });
             setEmployees(res.data?.items || res.data || []);
-        } catch (err) { console.error(err); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); }
         setEosResult(null);
         setShowEOSModal(true);
     };
@@ -73,7 +74,7 @@ const HRHome = () => {
             const res = await hrAPI.calculateEndOfService(eosData);
             setEosResult(res.data);
         } catch (error) {
-            console.error("Failed to calculate EOS", error);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setEosLoading(false);
         }
@@ -93,7 +94,6 @@ const HRHome = () => {
             window.URL.revokeObjectURL(url);
             toastEmitter.emit(t('hr.gosi_file_exported_successfully'), 'success');
         } catch (error) {
-            console.error("Failed to export GOSI", error);
             toastEmitter.emit(t('hr.export_failed'), 'error');
         } finally {
             setExportingGOSI(false);
@@ -213,7 +213,7 @@ const HRHome = () => {
                     <div className="links-list">
                         <div className="link-item" onClick={() => navigate('/hr/salary-structures')}>
                             <span className="link-icon">🏗️</span>
-                            {t('hr.salary_structures')}
+                            {t('hr.salary_structures.title')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/overtime')}>
@@ -326,9 +326,9 @@ const HRHome = () => {
                                     <div><span style={{ color: 'var(--text-secondary)' }}>{t('hr.service_years')}</span></div>
                                     <div style={{ fontWeight: 700 }}>{eosResult.service_years || eosResult.years || '-'}</div>
                                     <div><span style={{ color: 'var(--text-secondary)' }}>{t('hr.base_salary')}</span></div>
-                                    <div style={{ fontWeight: 700 }}>{(eosResult.base_salary || eosResult.salary || 0).toLocaleString()}</div>
+                                    <div style={{ fontWeight: 700 }}>{formatNumber(eosResult.base_salary || eosResult.salary || 0)}</div>
                                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8 }}><span style={{ fontWeight: 700, color: 'var(--primary)' }}>{t('hr.eos_amount')}</span></div>
-                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8, fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>{(eosResult.total_amount || eosResult.amount || 0).toLocaleString()}</div>
+                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 8, fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>{formatNumber(eosResult.total_amount || eosResult.amount || 0)}</div>
                                 </div>
                             </div>
                         )}

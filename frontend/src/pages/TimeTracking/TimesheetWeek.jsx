@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { timesheetAPI, projectsAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { CheckCircle, Plus, Trash2, Send } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
@@ -117,7 +118,7 @@ const TimesheetWeek = () => {
             const res = await timesheetAPI.listOwn({ date_from: weekStart, date_to: weekDates[6] });
             setSavedEntries(res.data || []);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setSaving(false);
         }
@@ -135,7 +136,7 @@ const TimesheetWeek = () => {
             const refresh = await timesheetAPI.listOwn({ date_from: weekStart, date_to: weekDates[6] });
             setSavedEntries(refresh.data || []);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setSubmitting(false);
         }

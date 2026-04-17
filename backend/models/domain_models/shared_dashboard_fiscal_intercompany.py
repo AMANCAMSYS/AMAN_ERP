@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin
 
 
 class DashboardLayout(ModelBase):
@@ -67,7 +67,7 @@ class IntercompanyTransaction(ModelBase):
     processed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
 
 
-class LandedCostAllocation(ModelBase):
+class LandedCostAllocation(ModelBase, AuditMixin):
     __tablename__ = "landed_cost_allocations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

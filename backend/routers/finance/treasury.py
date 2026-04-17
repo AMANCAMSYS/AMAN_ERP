@@ -4,6 +4,7 @@ AMAN ERP - Treasury Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -20,6 +21,7 @@ from utils.audit import log_activity
 from utils.accounting import update_account_balance, validate_je_lines
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.cache import cache
+from utils.treasury_gl import ensure_treasury_gl_accounts
 from fastapi import Request
 from schemas.treasury import TreasuryAccountCreate, TreasuryAccountResponse, TransactionCreate, TransactionResponse
 
@@ -142,6 +144,8 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
 
         # 1. Determine Parent Account from Chart of Accounts
         # 1101 = Cash & Equivalents
+        # Also ensure standard treasury GL accounts (1205, 2105, 1210, 2110) exist
+        ensure_treasury_gl_accounts(db, user_id=current_user.id, username=current_user.username)
         parent_account = db.execute(text("SELECT id FROM accounts WHERE account_number = '1101'")).fetchone()
         if not parent_account:
             # Fallback: Check code column
@@ -198,9 +202,9 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
 
         # 4. Create Treasury Account
         treasury_query = text("""
-            INSERT INTO treasury_accounts (name, name_en, account_type, currency, bank_name, account_number, iban, gl_account_id, branch_id)
-            VALUES (:name, :name_en, :type, :curr, :bank, :acc_num, :iban, :gl_id, :branch_id)
-            RETURNING id, name, name_en, account_type, currency, bank_name, account_number, iban, gl_account_id, current_balance, is_active, branch_id
+            INSERT INTO treasury_accounts (name, name_en, account_type, currency, bank_name, account_number, iban, gl_account_id, branch_id, allow_overdraft)
+            VALUES (:name, :name_en, :type, :curr, :bank, :acc_num, :iban, :gl_id, :branch_id, :allow_overdraft)
+            RETURNING id, name, name_en, account_type, currency, bank_name, account_number, iban, gl_account_id, current_balance, is_active, branch_id, allow_overdraft
         """)
         
         new_treasury = db.execute(treasury_query, {
@@ -212,11 +216,15 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
             "acc_num": account.account_number,
             "iban": account.iban,
             "gl_id": gl_id,
-            "branch_id": account.branch_id
+            "branch_id": account.branch_id,
+            "allow_overdraft": getattr(account, 'allow_overdraft', None)
         }).fetchone()
         
         # 5. Handle Opening Balance
         if account.opening_balance and account.opening_balance > 0:
+            # Fiscal lock check before posting opening balance GL entry
+            check_fiscal_period_open(db, date.today().isoformat())
+
             # Update Treasury Balance (Current Balance is always in account currency)
             db.execute(text("UPDATE treasury_accounts SET current_balance = :bal WHERE id = :id"), 
                        {"bal": account.opening_balance, "id": new_treasury[0]})
@@ -280,7 +288,7 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
         db.rollback()
         logger.error(f"Error creating treasury account: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -297,8 +305,10 @@ def update_treasury_account(
         # Check existence
         existing = db.execute(text("SELECT id, gl_account_id FROM treasury_accounts WHERE id = :id"), {"id": id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
         
+        old_gl_account_id = existing.gl_account_id
+
         # Check for duplicate name (excluding current account)
         dup = db.execute(text("SELECT id FROM treasury_accounts WHERE name = :name AND id != :id"), 
                         {"name": account.name, "id": id}).fetchone()
@@ -316,6 +326,7 @@ def update_treasury_account(
                 account_number = :acc_num,
                 iban = :iban,
                 branch_id = :branch_id,
+                allow_overdraft = :allow_overdraft,
                 updated_at = NOW()
             WHERE id = :id
         """), {
@@ -327,7 +338,8 @@ def update_treasury_account(
             "bank": account.bank_name,
             "acc_num": account.account_number,
             "iban": account.iban,
-            "branch_id": account.branch_id
+            "branch_id": account.branch_id,
+            "allow_overdraft": getattr(account, 'allow_overdraft', None)
         })
         
         # Update linked GL account name
@@ -348,6 +360,12 @@ def update_treasury_account(
         db.commit()
         
         # AUDIT LOG
+        audit_details = {"name": account.name}
+        # Track GL account linkage changes
+        new_gl_account_id = existing.gl_account_id  # GL ID doesn't change in this endpoint, but track if it were
+        if old_gl_account_id != new_gl_account_id:
+            audit_details["gl_account_id_before"] = old_gl_account_id
+            audit_details["gl_account_id_after"] = new_gl_account_id
         log_activity(
             db,
             user_id=current_user.id,
@@ -355,7 +373,7 @@ def update_treasury_account(
             action="treasury_account.update",
             resource_type="treasury_account",
             resource_id=str(id),
-            details={"name": account.name},
+            details=audit_details,
             request=request,
             branch_id=account.branch_id
         )
@@ -367,7 +385,7 @@ def update_treasury_account(
         db.rollback()
         logger.error(f"Error updating treasury account: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -384,7 +402,7 @@ def delete_treasury_account(
         account = db.execute(text("SELECT id, name, current_balance, gl_account_id FROM treasury_accounts WHERE id = :id"), 
                            {"id": id}).fetchone()
         if not account:
-            raise HTTPException(status_code=404, detail="حساب الخزينة غير موجود")
+            raise HTTPException(**http_error(404, "treasury_account_not_found"))
         
         # Check if account has balance
         if account.current_balance and abs(account.current_balance) > 0.01:
@@ -427,7 +445,7 @@ def delete_treasury_account(
         db.rollback()
         logger.error(f"Error deleting treasury account: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -439,7 +457,7 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
     
     # Validate amount
     if data.amount is None or data.amount <= 0:
-        raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون أكبر من صفر")
+        raise HTTPException(**http_error(400, "amount_must_be_positive"))
         
     db = get_db_connection(current_user.company_id)
     try:
@@ -457,47 +475,35 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
         import uuid
         trans_num = f"EXP-{str(uuid.uuid4())[:8].upper()}"
         
-        # 1. Get Treasury Account GL ID & Branch & Currency
-        treasury = db.execute(text("SELECT gl_account_id, current_balance, branch_id, currency FROM treasury_accounts WHERE id = :id"), {"id": data.treasury_id}).fetchone()
+        # 1. Get Treasury Account GL ID & Branch & Currency — SELECT FOR UPDATE to prevent concurrent balance drift
+        treasury = db.execute(text("""
+            SELECT gl_account_id, current_balance, branch_id, currency, account_type, allow_overdraft
+            FROM treasury_accounts WHERE id = :id FOR UPDATE
+        """), {"id": data.treasury_id}).fetchone()
         if not treasury:
             raise HTTPException(status_code=404, detail="الخزينة غير موجودة")
             
-        treasury_gl_id, _, treasury_branch_id, treasury_currency = treasury
+        treasury_gl_id = treasury.gl_account_id
+        treasury_branch_id = treasury.branch_id
+        treasury_currency = treasury.currency
         exchange_rate = _dec(data.exchange_rate or 1)
         amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
         
         # Determine the branch for this transaction (Allocation Branch)
         final_branch_id = data.branch_id if data.branch_id is not None else treasury_branch_id
-        
-        # Check Balance (Optional logic, maybe warn but allow?)
-        # For now, allow negative balance for cash? No, let's just log it.
 
-        # 2. Insert Treasury Transaction
-        trans_id = db.execute(text("""
-            INSERT INTO treasury_transactions (
-                transaction_number, transaction_date, transaction_type, amount, 
-                treasury_id, target_account_id, description, reference_number, created_by, branch_id
-            ) VALUES (
-                :num, :date, :type, :amount, :tid, :target, :desc, :ref, :uid, :bid
-            ) RETURNING id
-        """), {
-            "num": trans_num,
-            "date": data.transaction_date,
-            "type": 'expense',
-            "amount": data.amount,
-            "tid": data.treasury_id,
-            "target": data.target_account_id,
-            "desc": data.description,
-            "ref": data.reference_number,
-            "uid": current_user.id,
-            "bid": final_branch_id
-        }).scalar()
-        
-        # 3. Update Treasury Balance
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), 
-                   {"amt": data.amount, "id": data.treasury_id})
-        
-        # 4. Create Journal Entry
+        # Overdraft validation: reject on cash unless allow_overdraft is set
+        new_balance = _dec(treasury.current_balance) - _dec(data.amount)
+        if new_balance < 0:
+            is_bank = treasury.account_type == 'bank'
+            allow_od = treasury.allow_overdraft
+            if not is_bank and not allow_od:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"الرصيد غير كافٍ. الرصيد الحالي: {float(treasury.current_balance):,.2f}"
+                )
+
+        # 2. Create Journal Entry — GL-first before updating balance
         check_fiscal_period_open(db, data.transaction_date)
         
         je_lines = [
@@ -518,8 +524,36 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
             currency=treasury_currency,
             exchange_rate=float(exchange_rate),
             source="expense_transaction",
-            source_id=trans_id
         )
+
+        # 3. Insert Treasury Transaction — with exchange_rate and currency
+        trans_id = db.execute(text("""
+            INSERT INTO treasury_transactions (
+                transaction_number, transaction_date, transaction_type, amount, 
+                treasury_id, target_account_id, description, reference_number,
+                created_by, branch_id, exchange_rate, currency
+            ) VALUES (
+                :num, :date, :type, :amount, :tid, :target, :desc, :ref,
+                :uid, :bid, :exr, :cur
+            ) RETURNING id
+        """), {
+            "num": trans_num,
+            "date": data.transaction_date,
+            "type": 'expense',
+            "amount": data.amount,
+            "tid": data.treasury_id,
+            "target": data.target_account_id,
+            "desc": data.description,
+            "ref": data.reference_number,
+            "uid": current_user.id,
+            "bid": final_branch_id,
+            "exr": float(exchange_rate),
+            "cur": treasury_currency,
+        }).scalar()
+        
+        # 4. Update Treasury Balance — after GL entry is posted
+        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), 
+                   {"amt": data.amount, "id": data.treasury_id})
         
         db.commit()
 
@@ -544,7 +578,7 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
         db.rollback()
         logger.error(f"Expense Error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -556,7 +590,7 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
     
     # Validate amount
     if data.amount is None or data.amount <= 0:
-        raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون أكبر من صفر")
+        raise HTTPException(**http_error(400, "amount_must_be_positive"))
     
     # Prevent self-transfer
     if data.treasury_id == data.target_treasury_id:
@@ -570,57 +604,54 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
         import uuid
         trans_num = f"TRF-{str(uuid.uuid4())[:8].upper()}"
         
-        # Get Source & Target Info
-        source = db.execute(text("SELECT gl_account_id, name, branch_id, currency FROM treasury_accounts WHERE id = :id"), {"id": data.treasury_id}).fetchone()
+        # Get Source & Target Info — SELECT FOR UPDATE both rows to prevent concurrent balance drift
+        # Lock in consistent order (lower id first) to prevent deadlocks
+        first_id, second_id = sorted([data.treasury_id, data.target_treasury_id])
+        db.execute(text("SELECT id FROM treasury_accounts WHERE id = :id FOR UPDATE"), {"id": first_id})
+        db.execute(text("SELECT id FROM treasury_accounts WHERE id = :id FOR UPDATE"), {"id": second_id})
+
+        source = db.execute(text("""
+            SELECT gl_account_id, name, branch_id, currency, current_balance, account_type, allow_overdraft
+            FROM treasury_accounts WHERE id = :id
+        """), {"id": data.treasury_id}).fetchone()
         target = db.execute(text("SELECT gl_account_id, name, currency FROM treasury_accounts WHERE id = :id"), {"id": data.target_treasury_id}).fetchone()
         
         if not source or not target:
             raise HTTPException(status_code=404, detail="حساب المصدر أو المستلم غير موجود")
             
-        source_gl, source_name, branch_id, source_currency = source
-        target_gl, target_name, target_currency = target
+        source_gl = source.gl_account_id
+        source_name = source.name
+        branch_id = source.branch_id
+        source_currency = source.currency
+        target_gl = target.gl_account_id
+        target_name = target.name
+        target_currency = target.currency
         
         exchange_rate = _dec(data.exchange_rate or 1)
         amount_base = (_dec(data.amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
-        # 1. Insert Transaction Log
-        trans_id = db.execute(text("""
-            INSERT INTO treasury_transactions (
-                transaction_number, transaction_date, transaction_type, amount, 
-                treasury_id, target_treasury_id, description, reference_number, created_by
-            ) VALUES (
-                :num, :date, :type, :amount, :src, :dst, :desc, :ref, :uid
-            ) RETURNING id
-        """), {
-            "num": trans_num,
-            "date": data.transaction_date,
-            "type": 'transfer',
-            "amount": data.amount,
-            "src": data.treasury_id,
-            "dst": data.target_treasury_id,
-            "desc": data.description or f"Transfer from {source_name} to {target_name}",
-            "ref": data.reference_number,
-            "uid": current_user.id
-        }).scalar()
-        
-        # 2. Update Treasury Balances
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), {"amt": data.amount, "id": data.treasury_id})
-        
+        # Overdraft validation on source account
+        new_balance = _dec(source.current_balance) - _dec(data.amount)
+        if new_balance < 0:
+            is_bank = source.account_type == 'bank'
+            allow_od = source.allow_overdraft
+            if not is_bank and not allow_od:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"رصيد حساب المصدر غير كافٍ. الرصيد الحالي: {float(source.current_balance):,.2f}"
+                )
+
+        # 1. Create Journal Entry — GL-first
+        check_fiscal_period_open(db, data.transaction_date)
+
         # Cross-currency: convert amount to target currency before adding to target treasury
         if source_currency != target_currency and exchange_rate != Decimal('1'):
-            # data.amount is in source currency, exchange_rate converts source->base
-            # For target treasury, we need to convert: source_amount * source_rate / target_rate
             target_rate_row = db.execute(text("SELECT current_rate FROM currencies WHERE code = :code"), {"code": target_currency}).fetchone()
             target_rate = _dec(target_rate_row.current_rate) if target_rate_row else Decimal('1')
             target_amount = ((_dec(data.amount) * exchange_rate) / target_rate).quantize(_D2, ROUND_HALF_UP) if target_rate else _dec(data.amount)
         else:
             target_amount = data.amount
-        
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), {"amt": target_amount, "id": data.target_treasury_id})
-        
-        # 3. Create Journal Entry
-        check_fiscal_period_open(db, data.transaction_date)
-        
+
         target_rate = (_dec(amount_base) / _dec(target_amount)) if _dec(target_amount) else Decimal('1')
         
         je_lines = [
@@ -647,8 +678,35 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
             currency=source_currency,
             exchange_rate=float(exchange_rate),
             source="treasury_transfer",
-            source_id=trans_id
         )
+
+        # 2. Insert Transaction Log — with exchange_rate and currency
+        trans_id = db.execute(text("""
+            INSERT INTO treasury_transactions (
+                transaction_number, transaction_date, transaction_type, amount, 
+                treasury_id, target_treasury_id, description, reference_number,
+                created_by, exchange_rate, currency
+            ) VALUES (
+                :num, :date, :type, :amount, :src, :dst, :desc, :ref,
+                :uid, :exr, :cur
+            ) RETURNING id
+        """), {
+            "num": trans_num,
+            "date": data.transaction_date,
+            "type": 'transfer',
+            "amount": data.amount,
+            "src": data.treasury_id,
+            "dst": data.target_treasury_id,
+            "desc": data.description or f"Transfer from {source_name} to {target_name}",
+            "ref": data.reference_number,
+            "uid": current_user.id,
+            "exr": float(exchange_rate),
+            "cur": source_currency,
+        }).scalar()
+        
+        # 3. Update Treasury Balances — after GL entry is posted
+        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), {"amt": data.amount, "id": data.treasury_id})
+        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), {"amt": target_amount, "id": data.target_treasury_id})
         
         db.commit()
 
@@ -673,7 +731,7 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
         db.rollback()
         logger.error(f"Transfer Error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -710,6 +768,21 @@ def get_treasury_balances_report(
         params = {"branch_id": branch_id} if branch_id else {}
         rows = db.execute(q, params).fetchall()
 
+        # T033: Batch-fetch GL balances for all treasury GL accounts
+        gl_account_ids = [r.gl_account_id for r in rows if r.gl_account_id]
+        gl_balances: dict = {}
+        if gl_account_ids:
+            gl_rows = db.execute(text("""
+                SELECT jl.account_id,
+                       COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS gl_balance
+                FROM journal_lines jl
+                JOIN journal_entries je ON jl.journal_entry_id = je.id
+                WHERE jl.account_id = ANY(:ids) AND je.status = 'posted'
+                GROUP BY jl.account_id
+            """), {"ids": gl_account_ids}).fetchall()
+            for gr in gl_rows:
+                gl_balances[gr.account_id] = _dec(gr.gl_balance)
+
         accounts = []
         total_cash = Decimal('0')
         total_bank = Decimal('0')
@@ -742,6 +815,7 @@ def get_treasury_balances_report(
                 "current_balance": float(bal),
                 "balance_in_currency": float(bal),
                 "balance_in_base": float(bal_base),
+                "gl_balance": float(gl_balances.get(r.gl_account_id, Decimal('0')).quantize(_D2, ROUND_HALF_UP)) if r.gl_account_id else None,
                 "exchange_rate": float(rate),
                 "base_currency": base_currency,
                 "branch_name": r.branch_name
@@ -787,7 +861,7 @@ def get_treasury_balances_report(
     except Exception as e:
         logger.error(f"Treasury balances report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -892,6 +966,6 @@ def get_treasury_cashflow_report(
     except Exception as e:
         logger.error(f"Treasury cashflow report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

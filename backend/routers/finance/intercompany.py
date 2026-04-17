@@ -8,6 +8,7 @@ This module will be removed in a future release.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
@@ -125,7 +126,7 @@ def create_intercompany_transaction(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -195,7 +196,7 @@ def process_intercompany_transaction(txn_id: int, current_user=Depends(get_curre
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -330,7 +331,7 @@ def create_revenue_schedule(data: RevenueScheduleCreate, current_user=Depends(ge
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -435,7 +436,7 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

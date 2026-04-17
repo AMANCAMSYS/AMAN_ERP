@@ -53,10 +53,11 @@ function TaxCalendar() {
             setSummary(summaryRes.data || {});
         } catch (e) {
             console.error('Error loading tax calendar:', e);
+            showToast(e.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل التقويم الضريبي'), 'error');
         } finally {
             setLoading(false);
         }
-    }, [filter]);
+    }, [filter, showToast, t]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -100,7 +101,7 @@ function TaxCalendar() {
             await taxesAPI.completeCalendarItem(item.id);
             loadData();
         } catch (e) {
-            showToast('Error', 'error');
+            showToast(t('common.error'), 'error');
         }
     };
 
@@ -110,7 +111,7 @@ function TaxCalendar() {
             await taxesAPI.deleteCalendarItem(item.id);
             loadData();
         } catch (e) {
-            showToast('Error', 'error');
+            showToast(t('common.error'), 'error');
         }
     };
 
@@ -181,7 +182,7 @@ function TaxCalendar() {
                 ) : items.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
                         📅 {t('tax_calendar.empty', 'لا توجد مواعيد ضريبية')}
-                        <br /><button className="btn btn-primary" style={{ marginTop: 12 }} onClick={openNew}>+ إضافة أول موعد</button>
+                        <br /><button className="btn btn-primary" style={{ marginTop: 12 }} onClick={openNew}>{t('taxes.add_first_appointment')}</button>
                     </div>
                 ) : (
                     <table className="data-table">
@@ -281,10 +282,10 @@ function TaxCalendar() {
                                     <div className="form-group">
                                         <label className="form-label">{t('tax_calendar.recurrence', 'التكرار (أشهر)')}</label>
                                         <select className="form-input" value={form.recurrence_months} onChange={e => setForm(f => ({ ...f, recurrence_months: parseInt(e.target.value) }))}>
-                                            <option value={1}>شهري</option>
-                                            <option value={3}>ربع سنوي</option>
+                                            <option value={1}>{t('common.monthly')}</option>
+                                            <option value={3}>{t('common.quarterly')}</option>
                                             <option value={6}>نصف سنوي</option>
-                                            <option value={12}>سنوي</option>
+                                            <option value={12}>{t('common.annual')}</option>
                                         </select>
                                     </div>
                                 )}

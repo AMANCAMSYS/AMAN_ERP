@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportsAPI } from '../../../utils/api';
+import { toastEmitter } from '../../../utils/toastEmitter';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CustomDatePicker from '../../../components/common/CustomDatePicker';
 
@@ -27,7 +28,7 @@ const LeaveReport = () => {
                 }));
                 setData(formattedData);
             } catch (error) {
-                console.error("Failed to fetch leave usage", error);
+                toastEmitter.emit(t('common.error'), 'error');
             } finally {
                 setLoading(false);
             }

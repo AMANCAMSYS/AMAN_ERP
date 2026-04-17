@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { demandForecastAPI } from '../../utils/api';
 import { TrendingUp, Save, ArrowLeft } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
+import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 
 const ForecastDetail = () => {
@@ -12,6 +14,7 @@ const ForecastDetail = () => {
     const isRTL = i18n.language === 'ar';
     const { id } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [forecast, setForecast] = useState(null);
     const [loading, setLoading] = useState(true);
     const [adjustments, setAdjustments] = useState({});
@@ -24,11 +27,11 @@ const ForecastDetail = () => {
                 setForecast(res.data);
                 const adj = {};
                 (res.data.periods || []).forEach(p => {
-                    adj[p.id] = parseFloat(p.manual_adjustment) || 0;
+                    adj[p.id] = Number(p.manual_adjustment) || 0;
                 });
                 setAdjustments(adj);
             })
-            .catch(e => console.error(e))
+            .catch(e => showToast(t('errors.fetch_failed'), 'error'))
             .finally(() => setLoading(false));
     }, [id]);
 
@@ -42,7 +45,7 @@ const ForecastDetail = () => {
     };
 
     const handleAdjustmentChange = (periodId, value) => {
-        setAdjustments(prev => ({ ...prev, [periodId]: parseFloat(value) || 0 }));
+        setAdjustments(prev => ({ ...prev, [periodId]: Number(value) || 0 }));
     };
 
     const handleSaveAdjustments = async () => {
@@ -71,7 +74,7 @@ const ForecastDetail = () => {
     const periods = forecast.periods || [];
 
     // Simple bar chart using divs
-    const maxQty = Math.max(...periods.map(p => parseFloat(p.confidence_upper) || 0), 1);
+    const maxQty = Math.max(...periods.map(p => Number(p.confidence_upper) || 0), 1);
 
     return (
         <div className="module-container" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -108,9 +111,9 @@ const ForecastDetail = () => {
                 <h3>{t('forecast.projection_chart')}</h3>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 200, padding: '16px 0' }}>
                     {periods.map(p => {
-                        const proj = parseFloat(p.adjusted_quantity) || 0;
-                        const lower = parseFloat(p.confidence_lower) || 0;
-                        const upper = parseFloat(p.confidence_upper) || 0;
+                        const proj = Number(p.adjusted_quantity) || 0;
+                        const lower = Number(p.confidence_lower) || 0;
+                        const upper = Number(p.confidence_upper) || 0;
                         const barH = (proj / maxQty) * 160;
                         const lowerH = (lower / maxQty) * 160;
                         const upperH = (upper / maxQty) * 160;
@@ -146,9 +149,9 @@ const ForecastDetail = () => {
                         {periods.map(p => (
                             <tr key={p.id}>
                                 <td>{p.period_start} → {p.period_end}</td>
-                                <td>{parseFloat(p.projected_quantity).toFixed(2)}</td>
-                                <td>{parseFloat(p.confidence_lower).toFixed(2)}</td>
-                                <td>{parseFloat(p.confidence_upper).toFixed(2)}</td>
+                                <td>{formatNumber(p.projected_quantity)}</td>
+                                <td>{formatNumber(p.confidence_lower)}</td>
+                                <td>{formatNumber(p.confidence_upper)}</td>
                                 <td>
                                     <input
                                         type="number"
@@ -160,7 +163,7 @@ const ForecastDetail = () => {
                                     />
                                 </td>
                                 <td style={{ fontWeight: 'bold' }}>
-                                    {(parseFloat(p.projected_quantity) + (adjustments[p.id] || 0)).toFixed(2)}
+                                    {formatNumber(Number(p.projected_quantity) + (adjustments[p.id] || 0))}
                                 </td>
                             </tr>
                         ))}

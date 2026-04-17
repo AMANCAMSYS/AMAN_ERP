@@ -6,6 +6,7 @@ import { FileText, Plus, Save, X, BarChart3, Calendar, DollarSign, TrendingUp } 
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
+import { formatNumber } from '../../utils/format';
 
 const ContractAmendments = () => {
     const { t, i18n } = useTranslation();
@@ -32,7 +33,7 @@ const ContractAmendments = () => {
             const list = res.data?.contracts || res.data || [];
             setContracts(list);
             if (list.length > 0) setSelectedContract(list[0].id);
-        } catch (err) { console.error(err); }
+        } catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const fetchData = async () => {
@@ -45,7 +46,7 @@ const ContractAmendments = () => {
                 const res = await contractsAPI.getContractKPIs(selectedContract);
                 setKpis(res.data);
             }
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { showToast(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleSubmit = async (e) => {
@@ -233,7 +234,7 @@ const ContractAmendments = () => {
                             <div className="metric-card">
                                 <div className="metric-icon" style={{ background: '#e3f2fd' }}><TrendingUp size={22} color="#1565c0" /></div>
                                 <div className="metric-info">
-                                    <span className="metric-value">{(kpis.utilization_pct || 0).toFixed(1)}%</span>
+                                    <span className="metric-value">{formatNumber(kpis.utilization_pct || 0, 1)}%</span>
                                     <span className="metric-label">{t('sales.utilization')}</span>
                                 </div>
                             </div>
@@ -282,7 +283,7 @@ const ContractAmendments = () => {
                                             <tr><td><strong>{t('sales.start_date')}</strong></td><td>{kpis.start_date || '—'}</td></tr>
                                             <tr><td><strong>{t('sales.end_date')}</strong></td><td>{kpis.end_date || '—'}</td></tr>
                                             <tr><td><strong>{t('sales.amendments_2')}</strong></td><td>{kpis.amendment_count || 0}</td></tr>
-                                            <tr><td><strong>{t('sales.profit_margin')}</strong></td><td>{(kpis.profit_margin || 0).toFixed(1)}%</td></tr>
+                                            <tr><td><strong>{t('sales.profit_margin')}</strong></td><td>{formatNumber(kpis.profit_margin || 0, 1)}%</td></tr>
                                         </tbody>
                                     </table>
                                 </div>

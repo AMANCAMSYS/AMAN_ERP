@@ -4,13 +4,14 @@ import { salesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 
 const SalesReturnDetails = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const { id } = useParams();
     const navigate = useNavigate();
     const currency = getCurrency();
@@ -27,7 +28,7 @@ const SalesReturnDetails = () => {
             const response = await salesAPI.getReturn(id);
             setRet(response.data);
         } catch (error) {
-            console.error('Error fetching return:', error);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -39,11 +40,10 @@ const SalesReturnDetails = () => {
         try {
             setApproving(true);
             await salesAPI.approveReturn(id);
-            toastEmitter.emit(t('sales.returns.details.success_approve'), 'success');
+            showToast(t('sales.returns.details.success_approve'), 'success');
             fetchData();
         } catch (error) {
-            console.error('Error approving return:', error);
-            toastEmitter.emit('Failed to approve', 'error');
+            showToast(t('common.error'), 'error');
         } finally {
             setApproving(false);
         }

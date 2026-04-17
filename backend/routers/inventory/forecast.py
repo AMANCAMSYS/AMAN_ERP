@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from utils.i18n import http_error
 from sqlalchemy import text
 
 from database import get_db_connection
@@ -36,7 +37,7 @@ def generate_forecast(
         return result
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     finally:
         db.close()
 

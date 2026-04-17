@@ -47,7 +47,7 @@ function PurchaseDebitNotes() {
             const res = await purchasesAPI.listDebitNotes(params)
             setItems(res.data.items || [])
             setTotal(res.data.total || 0)
-        } catch (err) { console.error(err) }
+        } catch (err) { showToast(t('common.error'), 'error') }
         finally { setLoading(false) }
     }, [page, search, statusFilter, currentBranch])
 
@@ -61,7 +61,7 @@ function PurchaseDebitNotes() {
             ])
             setSuppliers(suppRes.data?.data || suppRes.data || [])
             setProducts(prodRes.data?.items || prodRes.data?.data || prodRes.data || [])
-        } catch (err) { console.error(err) }
+        } catch (err) { showToast(t('common.error'), 'error') }
     }
 
     const loadSupplierInvoices = async (partyId) => {
@@ -69,7 +69,7 @@ function PurchaseDebitNotes() {
         try {
             const res = await purchasesAPI.listInvoices({ supplier_id: partyId, limit: 200 })
             setPurchaseInvoices(res.data?.items || res.data || [])
-        } catch (err) { console.error(err) }
+        } catch (err) { showToast(t('common.error'), 'error') }
     }
 
     const openCreate = () => {
@@ -132,7 +132,7 @@ function PurchaseDebitNotes() {
             const res = await purchasesAPI.getDebitNote(id)
             setDetailItem(res.data)
             setShowDetail(true)
-        } catch (err) { console.error(err) }
+        } catch (err) { showToast(t('common.error'), 'error') }
     }
 
     const statusBadge = (s) => {
@@ -259,10 +259,10 @@ function PurchaseDebitNotes() {
                                                     </select>
                                                 </td>
                                                 <td><input className="form-input" value={line.description} onChange={e => updateLine(i, 'description', e.target.value)} /></td>
-                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.quantity} onChange={e => updateLine(i, 'quantity', parseFloat(e.target.value) || 0)} /></td>
-                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateLine(i, 'unit_price', parseFloat(e.target.value) || 0)} /></td>
-                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.tax_rate} onChange={e => updateLine(i, 'tax_rate', parseFloat(e.target.value) || 0)} /></td>
-                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.discount} onChange={e => updateLine(i, 'discount', parseFloat(e.target.value) || 0)} /></td>
+                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.quantity} onChange={e => updateLine(i, 'quantity', Number(e.target.value) || 0)} /></td>
+                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateLine(i, 'unit_price', Number(e.target.value) || 0)} /></td>
+                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.tax_rate} onChange={e => updateLine(i, 'tax_rate', Number(e.target.value) || 0)} /></td>
+                                                <td><input className="form-input" type="number" min="0" step="0.01" value={line.discount} onChange={e => updateLine(i, 'discount', Number(e.target.value) || 0)} /></td>
                                                 <td style={{ fontWeight: 'bold', textAlign: 'center' }}>{formatNumber(calcLineTotal(line))}</td>
                                                 <td><button className="btn btn-sm" style={{ color: 'red', background: 'none', border: 'none' }} onClick={() => removeLine(i)}>✕</button></td>
                                             </tr>

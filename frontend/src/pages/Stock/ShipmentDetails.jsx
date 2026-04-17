@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
-
+import { useToast } from '../../context/ToastContext';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
@@ -10,6 +10,7 @@ const ShipmentDetails = () => {
     const { t, i18n } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [shipment, setShipment] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -22,7 +23,7 @@ const ShipmentDetails = () => {
             const res = await inventoryAPI.getShipmentDetails(id);
             setShipment(res.data);
         } catch (err) {
-            console.error("Failed to load shipment", err);
+            showToast(t('stock.shipments.validation.error_load_details'), 'error');
         } finally {
             setLoading(false);
         }

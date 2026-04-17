@@ -39,6 +39,9 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     "buying.reports":   ["buying.view"],
     # hr.reports routes to hr.view
     "hr.reports":       ["hr.view"],
+    # hr.pii grants access to unmasked PII fields (IBAN, national ID, GOSI, etc.)
+    "hr.manage":        ["hr.pii", "hr.view"],
+    "hr.payroll":       ["hr.pii"],
     # reports.financial implies reports.view
     "reports.financial": ["reports.view"],
     # manufacturing.reports implies manufacturing.view

@@ -1,10 +1,10 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin, SoftDeleteMixin
 
 
-class PayrollPeriod(ModelBase):
+class PayrollPeriod(AuditMixin, ModelBase):
     __tablename__ = "payroll_periods"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -13,10 +13,9 @@ class PayrollPeriod(ModelBase):
     end_date: Mapped[Date] = mapped_column(Date, nullable=False)
     payment_date: Mapped[Date | None] = mapped_column(Date)
     status: Mapped[str | None] = mapped_column(String(20), default="draft")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class Department(ModelBase):
+class Department(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "departments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -28,10 +27,9 @@ class Department(ModelBase):
     manager_id: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EmployeePosition(ModelBase):
+class EmployeePosition(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employee_positions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -42,10 +40,9 @@ class EmployeePosition(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
     level: Mapped[int | None] = mapped_column(Integer, default=1)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class Employee(ModelBase):
+class Employee(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employees"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -89,12 +86,10 @@ class Employee(ModelBase):
     iqama_expiry: Mapped[Date | None] = mapped_column(Date)
     passport_number: Mapped[str | None] = mapped_column(String(50))
     sponsor: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sa_text("1"))
 
 
-class Attendance(ModelBase):
+class Attendance(AuditMixin, ModelBase):
     __tablename__ = "attendance"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -104,10 +99,9 @@ class Attendance(ModelBase):
     check_out: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str | None] = mapped_column(String(20), default="present")
     notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EmployeeLoan(ModelBase):
+class EmployeeLoan(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "employee_loans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -121,11 +115,9 @@ class EmployeeLoan(ModelBase):
     reason: Mapped[str | None] = mapped_column(Text)
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class LeaveRequest(ModelBase):
+class LeaveRequest(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "leave_requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -137,11 +129,9 @@ class LeaveRequest(ModelBase):
     status: Mapped[str | None] = mapped_column(String(20), default="pending")
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     attachment_url: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SalaryStructure(ModelBase):
+class SalaryStructure(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "salary_structures"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -150,11 +140,9 @@ class SalaryStructure(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
     base_type: Mapped[str | None] = mapped_column(String(50), default="monthly")
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SalaryComponent(ModelBase):
+class SalaryComponent(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "salary_components"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -170,10 +158,9 @@ class SalaryComponent(ModelBase):
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int | None] = mapped_column(Integer, default=0)
     structure_id: Mapped[int | None] = mapped_column(ForeignKey("salary_structures.id", ondelete="SET NULL"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class EmployeeSalaryComponent(ModelBase):
+class EmployeeSalaryComponent(AuditMixin, ModelBase):
     __tablename__ = "employee_salary_components"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -182,10 +169,9 @@ class EmployeeSalaryComponent(ModelBase):
     amount: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     effective_date: Mapped[Date | None] = mapped_column(Date)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PayrollEntry(ModelBase):
+class PayrollEntry(AuditMixin, ModelBase):
     __tablename__ = "payroll_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -208,7 +194,6 @@ class PayrollEntry(ModelBase):
     exchange_rate: Mapped[float | None] = mapped_column(Numeric(18, 6), default=1.0)
     net_salary_base: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     status: Mapped[str | None] = mapped_column(String(20), default="draft")
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 __all__ = [

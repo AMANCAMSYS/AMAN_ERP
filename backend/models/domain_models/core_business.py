@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -74,12 +75,13 @@ class TreasuryAccount(ModelBase):
     name_en: Mapped[str | None] = mapped_column(String(255))
     account_type: Mapped[str] = mapped_column(String(50), nullable=False)
     currency: Mapped[str | None] = mapped_column(String(3))
-    current_balance: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
+    current_balance: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), default=0)
     gl_account_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
     bank_name: Mapped[str | None] = mapped_column(String(255))
     account_number: Mapped[str | None] = mapped_column(String(100))
     iban: Mapped[str | None] = mapped_column(String(100))
+    allow_overdraft: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())

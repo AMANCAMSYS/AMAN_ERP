@@ -18,7 +18,7 @@ const KitchenDisplay = () => {
 
     const fetchOrders = async () => {
         try { setLoading(true); const res = await posAPI.listKitchenOrders({ status: filter !== 'all' ? filter : undefined }); setOrders(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        catch (err) { showToast(t('common.error_occurred'), 'error'); } finally { setLoading(false); }
     };
 
     const updateStatus = async (id, status) => {

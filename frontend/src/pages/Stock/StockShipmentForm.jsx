@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
-import { toastEmitter } from '../../utils/toastEmitter';
+import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 
 const StockShipmentForm = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [loading, setLoading] = useState(false);
     const [warehouses, setWarehouses] = useState([]);
     const [products, setProducts] = useState([]);
@@ -35,7 +36,7 @@ const StockShipmentForm = () => {
                 setWarehouses(whRes.data);
                 setProducts(prodRes.data);
             } catch (err) {
-                console.error("Failed to load data", err);
+                showToast(t('stock.shipments.form.validation.error_load'), 'error');
             }
         };
         fetchData();
@@ -46,7 +47,7 @@ const StockShipmentForm = () => {
 
         const exists = formData.items.find(i => i.product_id === parseInt(currentItem.product_id));
         if (exists) {
-            toastEmitter.emit(t('stock.shipments.form.validation.already_added'), 'error');
+            showToast(t('stock.shipments.form.validation.already_added'), 'error');
             return;
         }
 
@@ -57,7 +58,7 @@ const StockShipmentForm = () => {
             items: [...prev.items, {
                 product_id: parseInt(currentItem.product_id),
                 product_name: product.item_name,
-                quantity: parseFloat(currentItem.quantity)
+                quantity: String(currentItem.quantity)
             }]
         }));
 
@@ -73,12 +74,12 @@ const StockShipmentForm = () => {
 
     const handleSubmit = async () => {
         if (!formData.source_warehouse_id || !formData.destination_warehouse_id || formData.items.length === 0) {
-            toastEmitter.emit(t('stock.shipments.form.validation.fill_required'), 'error');
+            showToast(t('stock.shipments.form.validation.fill_required'), 'error');
             return;
         }
 
         if (formData.source_warehouse_id === formData.destination_warehouse_id) {
-            toastEmitter.emit(t('stock.shipments.form.validation.source_dest_same'), 'error');
+            showToast(t('stock.shipments.form.validation.source_dest_same'), 'error');
             return;
         }
 
@@ -90,10 +91,10 @@ const StockShipmentForm = () => {
                 notes: formData.notes,
                 items: formData.items.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
             });
-            toastEmitter.emit(t('stock.shipments.form.validation.success'), 'success');
+            showToast(t('stock.shipments.form.validation.success'), 'success');
             navigate('/stock/shipments');
         } catch (err) {
-            toastEmitter.emit(err.response?.data?.detail || t('stock.shipments.form.validation.error'), 'error');
+            showToast(err.response?.data?.detail || t('stock.shipments.form.validation.error'), 'error');
         } finally {
             setLoading(false);
         }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
@@ -11,7 +11,6 @@ import BackButton from '../../components/common/BackButton';
 
 const Payslips = () => {
     const { t, i18n } = useTranslation();
-    const { showToast } = useToast();
     const { currentBranch } = useBranch();
     const currency = getCurrency();
     const isRTL = i18n.language === 'ar';
@@ -39,7 +38,7 @@ const Payslips = () => {
             if (currentBranch?.id) params.branch_id = currentBranch.id;
             const res = await hrAPI.listEmployees(params);
             setEmployees(res.data?.items || res.data || []);
-        } catch (err) { console.error(err); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); }
     };
 
     const fetchPayslips = async () => {
@@ -49,16 +48,16 @@ const Payslips = () => {
             if (currentBranch?.id) params.branch_id = currentBranch.id;
             const res = await hrImprovementsAPI.listPayslips(params);
             setPayslips(res.data || []);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleGenerate = async (e) => {
         e.preventDefault();
         try {
             await hrImprovementsAPI.generatePayslip({ employee_id: parseInt(genForm.employee_id), month: parseInt(genForm.month), year: parseInt(genForm.year) });
-            showToast(t('hr.payslip_generated'), 'success');
+            toastEmitter.emit(t('hr.payslip_generated'), 'success');
             setShowGenerate(false); fetchPayslips();
-        } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
+        } catch (err) { toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error'); }
     };
 
     const viewDetail = async (payslipId) => {
@@ -68,7 +67,7 @@ const Payslips = () => {
             const res = await hrImprovementsAPI.getPayslip(payslipId);
             setSelectedPayslip(res.data || res);
         } catch (err) {
-            showToast(t('common.error'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
             setShowDetail(false);
         } finally { setDetailLoading(false); }
     };

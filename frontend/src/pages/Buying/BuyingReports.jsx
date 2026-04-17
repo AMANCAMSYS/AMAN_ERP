@@ -4,6 +4,7 @@ import { getCurrency } from '../../utils/auth';
 import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
+import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
@@ -17,6 +18,7 @@ const BuyingReports = () => {
     const [topSuppliers, setTopSuppliers] = useState([]);
     const currency = getCurrency();
     const { currentBranch } = useBranch();
+    const { showToast } = useToast();
     const [dates, setDates] = useState({
         start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
@@ -41,7 +43,7 @@ const BuyingReports = () => {
             setTrend(trendRes.data);
             setTopSuppliers(suppRes.data);
         } catch (error) {
-            console.error("Failed to load reports", error);
+            showToast(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

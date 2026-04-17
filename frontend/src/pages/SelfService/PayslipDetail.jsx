@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { selfServiceAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
+import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -23,13 +25,13 @@ const PayslipDetail = () => {
             const res = await selfServiceAPI.getPayslip(id);
             setPayslip(res.data?.data || res.data);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
     };
 
-    const fmt = (v) => Number(v || 0).toLocaleString();
+    const fmt = (v) => formatNumber(v || 0);
 
     if (loading) return <div className="module-loading"><div className="spinner" /></div>;
     if (!payslip) return <div className="module-container"><BackButton /><p>{t('common.not_found')}</p></div>;

@@ -1,4 +1,5 @@
 """HR module Pydantic schemas."""
+from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import date, datetime
@@ -6,7 +7,7 @@ from datetime import date, datetime
 
 class LoanCreate(BaseModel):
     employee_id: int
-    amount: float
+    amount: Decimal
     total_installments: int
     start_date: date
     reason: Optional[str] = None
@@ -14,8 +15,8 @@ class LoanCreate(BaseModel):
 
 class LoanResponse(LoanCreate):
     id: int
-    monthly_installment: float
-    paid_amount: float
+    monthly_installment: Decimal
+    paid_amount: Decimal
     status: str
     created_at: datetime
     employee_name: Optional[str] = None
@@ -31,11 +32,11 @@ class EmployeeCreate(BaseModel):
     phone: Optional[str] = None
     position_title: Optional[str] = None
     department_name: Optional[str] = None
-    salary: float = 0
-    housing_allowance: float = 0
-    transport_allowance: float = 0
-    other_allowances: float = 0
-    hourly_cost: float = 0
+    salary: Decimal = Decimal("0")
+    housing_allowance: Decimal = Decimal("0")
+    transport_allowance: Decimal = Decimal("0")
+    other_allowances: Decimal = Decimal("0")
+    hourly_cost: Decimal = Decimal("0")
     hire_date: Optional[date] = None
     create_user: bool = False
     username: Optional[str] = None
@@ -56,11 +57,11 @@ class EmployeeUpdate(BaseModel):
     phone: Optional[str] = None
     position_title: Optional[str] = None
     department_name: Optional[str] = None
-    salary: Optional[float] = None
-    housing_allowance: Optional[float] = None
-    transport_allowance: Optional[float] = None
-    other_allowances: Optional[float] = None
-    hourly_cost: Optional[float] = None
+    salary: Optional[Decimal] = None
+    housing_allowance: Optional[Decimal] = None
+    transport_allowance: Optional[Decimal] = None
+    other_allowances: Optional[Decimal] = None
+    hourly_cost: Optional[Decimal] = None
     currency: Optional[str] = None
     nationality: Optional[str] = None
     branch_id: Optional[int] = None
@@ -81,7 +82,7 @@ class EmployeeResponse(BaseModel):
     branch_id: Optional[int] = None
     allowed_branches: List[int] = []
     role: Optional[str] = None
-    hourly_cost: float = 0
+    hourly_cost: Decimal = Decimal("0")
 
 
 class DepartmentCreate(BaseModel):
@@ -120,23 +121,23 @@ class PayrollEntryResponse(BaseModel):
     id: int
     employee_name: str
     position: Optional[str] = None
-    basic_salary: float
-    housing_allowance: float
-    transport_allowance: float
-    other_allowances: float
-    deductions: float
-    net_salary: float
+    basic_salary: Decimal
+    housing_allowance: Decimal
+    transport_allowance: Decimal
+    other_allowances: Decimal
+    deductions: Decimal
+    net_salary: Decimal
     status: Optional[str] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
-    net_salary_base: Optional[float] = None
-    gosi_employee_share: Optional[float] = 0
-    gosi_employer_share: Optional[float] = 0
-    overtime_amount: Optional[float] = 0
-    violation_deduction: Optional[float] = 0
-    loan_deduction: Optional[float] = 0
-    salary_components_earning: Optional[float] = 0
-    salary_components_deduction: Optional[float] = 0
+    exchange_rate: Optional[Decimal] = Decimal("1")
+    net_salary_base: Optional[Decimal] = None
+    gosi_employee_share: Optional[Decimal] = Decimal("0")
+    gosi_employer_share: Optional[Decimal] = Decimal("0")
+    overtime_amount: Optional[Decimal] = Decimal("0")
+    violation_deduction: Optional[Decimal] = Decimal("0")
+    loan_deduction: Optional[Decimal] = Decimal("0")
+    salary_components_earning: Optional[Decimal] = Decimal("0")
+    salary_components_deduction: Optional[Decimal] = Decimal("0")
 
 
 class PayrollPeriodResponse(BaseModel):
@@ -145,7 +146,7 @@ class PayrollPeriodResponse(BaseModel):
     start_date: date
     end_date: date
     status: str
-    total_net: float = 0
+    total_net: Decimal = Decimal("0")
     created_at: datetime
 
 

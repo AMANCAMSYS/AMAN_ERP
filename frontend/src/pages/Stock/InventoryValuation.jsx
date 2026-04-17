@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { inventoryAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
@@ -9,6 +10,7 @@ import BackButton from '../../components/common/BackButton';
 function InventoryValuation() {
     const { t, i18n } = useTranslation()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [data, setData] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -21,7 +23,7 @@ function InventoryValuation() {
             const response = await inventoryAPI.getValuationReport({ branch_id: currentBranch?.id })
             setData(response.data)
         } catch (err) {
-            console.error("Failed to fetch inventory valuation", err)
+            showToast(t('errors.fetch_failed'), 'error')
             setError(t('errors.fetch_failed'))
         } finally {
             setLoading(false)

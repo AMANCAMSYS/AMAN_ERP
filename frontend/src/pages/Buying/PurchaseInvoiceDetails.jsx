@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber, formatCurrency } from '../../utils/format'
 import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileText, User } from 'lucide-react'
@@ -12,6 +13,7 @@ function PurchaseInvoiceDetails() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
+    const { showToast } = useToast()
     const [invoice, setInvoice] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -30,7 +32,7 @@ function PurchaseInvoiceDetails() {
                 }
             } catch (err) {
                 setError(t('common.error_loading_details'))
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }

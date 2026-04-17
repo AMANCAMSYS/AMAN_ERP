@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportsAPI } from '../../../utils/api';
+import { toastEmitter } from '../../../utils/toastEmitter';
 import { getCurrency } from '../../../utils/auth';
 import { formatNumber } from '../../../utils/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -17,7 +18,7 @@ const PayrollReport = () => {
                 const response = await reportsAPI.getPayrollTrend(12); // Last 12 months
                 setData(response.data);
             } catch (error) {
-                console.error("Failed to fetch payroll trend", error);
+                toastEmitter.emit(t('common.error'), 'error');
             } finally {
                 setLoading(false);
             }

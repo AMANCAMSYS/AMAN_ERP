@@ -7,6 +7,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from utils.i18n import http_error
 from sqlalchemy import text
 
 from database import get_db_connection
@@ -110,7 +111,7 @@ def create_plan(body: PlanCreate, current_user=Depends(get_current_user)):
         db.rollback()
         logger.exception("Failed to create subscription plan")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -154,7 +155,7 @@ def update_plan(plan_id: int, body: PlanUpdate, current_user=Depends(get_current
         db.rollback()
         logger.exception("Failed to update subscription plan")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -184,12 +185,12 @@ def enroll(body: EnrollmentCreate, current_user=Depends(get_current_user)):
         return EnrollmentRead.model_validate(row)
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.exception("Failed to enroll customer")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -283,12 +284,12 @@ def pause(enrollment_id: int, current_user=Depends(get_current_user)):
         pause_enrollment(db, enrollment_id=enrollment_id, user=str(current_user.id))
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.exception("Failed to pause enrollment")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -304,12 +305,12 @@ def resume(enrollment_id: int, current_user=Depends(get_current_user)):
         resume_enrollment(db, enrollment_id=enrollment_id, user=str(current_user.id))
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.exception("Failed to resume enrollment")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -335,12 +336,12 @@ def cancel(enrollment_id: int, body: CancelRequest, current_user=Depends(get_cur
         return EnrollmentRead.model_validate(row)
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.exception("Failed to cancel enrollment")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -361,11 +362,11 @@ def change_plan(enrollment_id: int, body: PlanChangeRequest, current_user=Depend
         return {"success": True, "data": result}
     except ValueError as e:
         logger.exception("Internal error")
-        raise HTTPException(status_code=400, detail="طلب غير صالح")
+        raise HTTPException(**http_error(400, "invalid_data"))
     except Exception as e:
         db.rollback()
         logger.exception("Failed to change plan")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

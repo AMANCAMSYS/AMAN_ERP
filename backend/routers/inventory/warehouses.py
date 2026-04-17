@@ -3,6 +3,7 @@ Inventory Module - Warehouses CRUD + Current Stock
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 import logging
@@ -94,7 +95,7 @@ def create_warehouse(warehouse: WarehouseCreate, request: Request, current_user:
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -105,7 +106,7 @@ def update_warehouse(id: int, warehouse: WarehouseCreate, request: Request, curr
     try:
         existing = db.execute(text("SELECT id, branch_id FROM warehouses WHERE id = :id"), {"id": id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-003: Branch access enforcement
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -138,7 +139,7 @@ def update_warehouse(id: int, warehouse: WarehouseCreate, request: Request, curr
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -153,7 +154,7 @@ def delete_warehouse(id: int, request: Request, current_user: dict = Depends(get
             FROM warehouses w WHERE w.id = :id
         """), {"id": id}).fetchone()
         if not warehouse:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-001: Block deleting default warehouse
         if getattr(warehouse, 'is_default', False):
@@ -196,7 +197,7 @@ def delete_warehouse(id: int, request: Request, current_user: dict = Depends(get
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -214,7 +215,7 @@ def get_warehouse(id: int, current_user: dict = Depends(get_current_user)):
             WHERE w.id = :id
         """), {"id": id}).fetchone()
         if not warehouse:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         # INV-003: Branch access enforcement
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -235,7 +236,7 @@ def get_warehouse_current_stock(id: int, current_user: dict = Depends(get_curren
         # Check if warehouse exists
         exists = db.execute(text("SELECT 1 FROM warehouses WHERE id = :id"), {"id": id}).scalar()
         if not exists:
-            raise HTTPException(status_code=404, detail="المستودع غير موجود")
+            raise HTTPException(**http_error(404, "warehouse_not_found"))
 
         result = db.execute(text("""
             SELECT p.id, p.product_name, p.product_code, i.quantity, u.unit_name
@@ -251,7 +252,7 @@ def get_warehouse_current_stock(id: int, current_user: dict = Depends(get_curren
                 "id": row.id,
                 "product_name": row.product_name,
                 "product_code": row.product_code,
-                "quantity": float(row.quantity),
+                "quantity": str(row.quantity),
                 "unit_name": row.unit_name or "قطعة"
             }
             for row in result

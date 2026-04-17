@@ -1,7 +1,7 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin
 
 
 class SupplierBalance(ModelBase):
@@ -99,7 +99,7 @@ class SupplierPayment(ModelBase):
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class SupplierRating(ModelBase):
+class SupplierRating(ModelBase, AuditMixin):
     __tablename__ = "supplier_ratings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

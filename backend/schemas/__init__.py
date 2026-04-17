@@ -53,6 +53,7 @@ class CompanyUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
     address: Optional[str] = None
     currency: Optional[str] = Field(None, max_length=3)
+    plan_type: Optional[str] = Field(None, max_length=50)
 
 
 class Token(BaseModel):

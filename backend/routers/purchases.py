@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -114,7 +115,7 @@ def create_supplier_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -153,7 +154,7 @@ def update_supplier_group(
         })
         
         if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+            raise HTTPException(**http_error(404, "group_not_found"))
             
         db.commit()
 
@@ -174,7 +175,7 @@ def update_supplier_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -196,7 +197,7 @@ def delete_supplier_group(
         result = db.execute(text("DELETE FROM supplier_groups WHERE id = :id"), {"id": id})
         
         if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+            raise HTTPException(**http_error(404, "group_not_found"))
             
         db.commit()
 
@@ -217,7 +218,7 @@ def delete_supplier_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -283,7 +284,7 @@ def get_purchase_order(
         """), {"id": id}).fetchone()
         
         if not po:
-            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            raise HTTPException(**http_error(404, "purchase_order_not_found"))
             
         # Enforce branch access for single resource
         from utils.permissions import validate_branch_access
@@ -291,7 +292,7 @@ def get_purchase_order(
             validate_branch_access(current_user, po.branch_id)
         
         if not po:
-            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            raise HTTPException(**http_error(404, "purchase_order_not_found"))
             
         lines = db.execute(text("""
             SELECT l.*, p.product_name, p.product_code 
@@ -399,11 +400,11 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
             "id": r.id, 
             "invoice_number": r.invoice_number,
             "date": r.invoice_date,
-            "total": float(_dec(r.total)), 
-            "paid": float(_dec(r.paid_amount or 0)),
+            "total": str(_dec(r.total)), 
+            "paid": str(_dec(r.paid_amount or 0)),
             "status": r.status,
             "currency": r.currency or base_currency,
-            "exchange_rate": float(_dec(r.exchange_rate or 1.0))
+            "exchange_rate": str(_dec(r.exchange_rate or 1.0))
         } for r in invoices_res]
         
         # Calculate total purchases in Base Currency
@@ -428,7 +429,7 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
             "id": r.id,
             "voucher_number": r.voucher_number,
             "date": r.voucher_date,
-            "amount": float(r.amount),
+            "amount": str(r.amount),
             "method": r.payment_method,
             "status": r.status,
             "currency": r.currency or base_currency
@@ -446,7 +447,7 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
             "id": r.id,
             "voucher_number": r.voucher_number,
             "date": r.voucher_date,
-            "amount": float(r.amount),
+            "amount": str(r.amount),
             "method": r.payment_method,
             "status": r.status,
             "currency": r.currency or base_currency
@@ -470,11 +471,11 @@ def get_supplier_transactions(id: int, branch_id: Optional[int] = None, current_
         return {
             "supplier": {
                 "name": supplier.supplier_name if supplier else "Unknown",
-                "balance": float(balance.quantize(_D2, ROUND_HALF_UP)),
-                "balance_bc": float(balance_bc),
+                "balance": str(balance.quantize(_D2, ROUND_HALF_UP)),
+                "balance_bc": str(balance_bc),
                 "currency": supplier_currency,
-                "exchange_rate": float(exchange_rate),
-                "total_purchases": float(total_purchases)
+                "exchange_rate": str(exchange_rate),
+                "total_purchases": str(total_purchases)
             },
             "invoices": invoices,
             "payments": payments,
@@ -533,7 +534,7 @@ def create_purchase_order(
                 "unit_price": item.unit_price,
                 "tax_rate": item.tax_rate,
                 "discount": item.discount,
-                "total": float(final_total)
+                "total": str(final_total)
             })
 
         grand_total = subtotal - total_discount + total_tax
@@ -630,7 +631,7 @@ def create_purchase_order(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -651,7 +652,7 @@ def approve_purchase_order(
         """), {"id": id}).fetchone()
         
         if not po:
-            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            raise HTTPException(**http_error(404, "purchase_order_not_found"))
         
         if po.status != 'draft':
             raise HTTPException(status_code=400, detail="يمكن اعتماد أوامر الشراء في حالة 'مسودة' فقط")
@@ -711,7 +712,7 @@ def approve_purchase_order(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -732,7 +733,7 @@ def receive_purchase_order(
         """), {"id": id}).fetchone()
         
         if not po:
-            raise HTTPException(status_code=404, detail="أمر الشراء غير موجود")
+            raise HTTPException(**http_error(404, "purchase_order_not_found"))
         
         if po.status not in ('approved', 'partial'):
             raise HTTPException(status_code=400, detail="يجب اعتماد أمر الشراء أولاً قبل الاستلام")
@@ -826,7 +827,7 @@ def receive_purchase_order(
                 
                 receipt_details.append({
                     "product": line.product_name,
-                    "received": float(item_qty)
+                    "received": str(item_qty)
                 })
                 
                 # Calculate accrual value
@@ -856,6 +857,9 @@ def receive_purchase_order(
         """), {"status": new_status, "id": id})
         
         # --- ACCOUNTING ENTRY (ACCRUAL) ---
+        # FISCAL-LOCK: Reject if accounting period is closed
+        check_fiscal_period_open(db, datetime.now().date())
+
         if receipt_value_base > _D2:
             acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
             acc_unbilled = get_mapped_account_id(db, "acc_map_unbilled_purchases")
@@ -904,16 +908,16 @@ def receive_purchase_order(
             "message": "تم استلام البضاعة بنجاح",
             "id": int(id),
             "status": str(new_status),
-            "total_expected": float(total_expected_dec),
-            "total_received": float(total_received_dec),
-            "remaining": float(total_expected_dec - total_received_dec)
+            "total_expected": str(total_expected_dec),
+            "total_received": str(total_received_dec),
+            "remaining": str(total_expected_dec - total_received_dec)
         }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1042,7 +1046,7 @@ def get_purchase_invoice(
         """), {"id": id}).fetchone()
         
         if not invoice:
-            raise HTTPException(status_code=404, detail="الفاتورة غير موجودة")
+            raise HTTPException(**http_error(404, "invoice_not_found"))
 
         from utils.permissions import validate_branch_access
         validate_branch_access(current_user, invoice.branch_id)
@@ -1085,9 +1089,9 @@ def get_purchase_invoice(
             "tax_amount": invoice.tax_amount,
             "discount": invoice.discount,
             "total": invoice.total,
-            "paid_amount": float(invoice.paid_amount or 0),
+            "paid_amount": str(invoice.paid_amount or 0),
             "currency": invoice.currency or base_currency,
-            "exchange_rate": float(invoice.exchange_rate or 1.0),
+            "exchange_rate": str(invoice.exchange_rate or 1.0),
             "notes": invoice.notes,
             "items": [{
                 "id": l.id,
@@ -1099,8 +1103,8 @@ def get_purchase_invoice(
                 "tax_rate": l.tax_rate,
                 "discount": l.discount,
                 "total": l.total,
-                "returned_quantity": float(returned_map.get(l.product_id, Decimal('0'))),
-                "remaining_quantity": float(max(Decimal('0'), _dec(l.quantity) - returned_map.get(l.product_id, Decimal('0'))))
+                "returned_quantity": str(returned_map.get(l.product_id, Decimal('0'))),
+                "remaining_quantity": str(max(Decimal('0'), _dec(l.quantity) - returned_map.get(l.product_id, Decimal('0'))))
             } for l in lines]
         }
     finally:
@@ -1294,7 +1298,7 @@ async def create_purchase_invoice(
                     db, 
                     product_id=line["product_id"], 
                     warehouse_id=wh_id, 
-                    new_qty=float(_dec(line["quantity"])), 
+                    new_qty=str(_dec(line["quantity"])), 
                     new_price=new_price_bc
                 )
 
@@ -1306,7 +1310,7 @@ async def create_purchase_invoice(
                             db,
                             product_id=line["product_id"],
                             warehouse_id=wh_id,
-                            quantity=float(_dec(line["quantity"])),
+                            quantity=str(_dec(line["quantity"])),
                             unit_cost=new_price_bc,
                             source_document_type="purchase_invoice",
                             source_document_id=invoice_id,
@@ -1625,7 +1629,7 @@ async def create_purchase_invoice(
         db.rollback()
         logger.error(f"Error creating purchase invoice: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1740,7 +1744,7 @@ def create_purchase_return(
         # 1. Validate Supplier
         supplier = db.execute(text("SELECT * FROM parties WHERE id = :id AND is_supplier = TRUE"), {"id": invoice.supplier_id}).fetchone()
         if not supplier:
-            raise HTTPException(status_code=404, detail="المورد غير موجود")
+            raise HTTPException(**http_error(404, "supplier_not_found"))
 
         # 2. Generate Return Number (PR-YYYY-XXXX)
         year = date.today().year
@@ -1875,7 +1879,7 @@ def create_purchase_return(
         # 5. Update Supplier Balance (Logic: Return reduces balance)
         exchange_rate = _dec(invoice.exchange_rate or 1)
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         def to_base(amount):
             return (_dec(amount) * exchange_rate).quantize(_D2, ROUND_HALF_UP)
 
@@ -1890,6 +1894,9 @@ def create_purchase_return(
         """), {"amount": gl_total, "id": invoice.supplier_id})
 
         # 6. Accounting Entries (Return Itself)
+        # FISCAL-LOCK: Reject if accounting period is closed
+        check_fiscal_period_open(db, invoice.invoice_date)
+
         # Credit: Inventory | Debit: Accounts Payable
         inventory_acc = get_mapped_account_id(db, "acc_map_inventory")
         ap_acc = get_mapped_account_id(db, "acc_map_ap")
@@ -2024,7 +2031,7 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         base_currency = get_base_currency(db)
         # Validate amount
         if data.amount is None or data.amount <= 0:
-            raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "amount_must_be_positive"))
         
         # Check supplier balance (total owed)
         supplier_balance = db.execute(text("""
@@ -2034,12 +2041,12 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
             FOR UPDATE
         """), {"sid": data.supplier_id}).fetchone()
         if not supplier_balance:
-            raise HTTPException(status_code=404, detail="المورد غير موجود")
+            raise HTTPException(**http_error(404, "supplier_not_found"))
         
         # For payments (not refunds), warn if paying more than owed
         voucher_rate = _dec(data.exchange_rate or 1)
         if voucher_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         amount_base = (_dec(data.amount) * voucher_rate).quantize(_D2, ROUND_HALF_UP)
         if data.voucher_type != 'refund' and amount_base > (_dec(supplier_balance.balance) + _D2):
             # Allow overpayment but log warning (some businesses prepay)
@@ -2321,7 +2328,7 @@ def list_supplier_payments(branch_id: Optional[int] = None, current_user: dict =
     except Exception as e:
         logger.error(f"Error listing payments: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2359,7 +2366,7 @@ def get_payment_details(voucher_id: int, current_user: dict = Depends(get_curren
     except Exception as e:
         logger.error(f"Error getting payment: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -2393,7 +2400,7 @@ def get_supplier_outstanding_invoices(
     except Exception as e:
         logger.error(f"Error fetching outstanding invoices: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.get("/invoices/{invoice_id}/payment-history", response_model=List[dict], dependencies=[Depends(require_permission("buying.view"))])
@@ -2419,7 +2426,7 @@ def get_invoice_payment_history(invoice_id: int, current_user: dict = Depends(ge
     except Exception as e:
         logger.error(f"Error getting payment history: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ==================== INV-003: Purchase Credit Notes (إشعار دائن مشتريات) ====================
@@ -2508,7 +2515,7 @@ def get_purchase_credit_note(note_id: int, current_user: dict = Depends(get_curr
             WHERE i.id = :id AND i.invoice_type = 'purchase_credit_note'
         """), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الإشعار الدائن غير موجود")
+            raise HTTPException(**http_error(404, "credit_note_not_found"))
 
         from utils.permissions import validate_branch_access
         validate_branch_access(current_user, note._mapping.get("branch_id"))
@@ -2541,7 +2548,7 @@ def create_purchase_credit_note(
         related_invoice_id = data.get("related_invoice_id")
         lines = data.get("lines", [])
         if not lines:
-            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+            raise HTTPException(**http_error(400, "min_one_item_required"))
         if not party_id:
             raise HTTPException(status_code=400, detail="يجب تحديد المورد")
 
@@ -2557,7 +2564,7 @@ def create_purchase_credit_note(
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
         subtotal = Decimal('0')
@@ -2621,6 +2628,9 @@ def create_purchase_credit_note(
         if not acc_ap or not acc_inv:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
 
+        # FISCAL-LOCK: Reject if accounting period is closed
+        check_fiscal_period_open(db, inv_date)
+
         gl_sub = (_dec(subtotal) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         gl_tax = (_dec(tax_total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         gl_total = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
@@ -2674,7 +2684,7 @@ def create_purchase_credit_note(
         db.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="buying.credit_note.create", resource_type="purchase_credit_note",
-                     resource_id=inv_num, details={"party_id": party_id, "total": float(total)},
+                     resource_id=inv_num, details={"party_id": party_id, "total": str(total)},
                      request=request, branch_id=branch_id)
 
         return {"success": True, "id": note_id, "invoice_number": inv_num,
@@ -2685,7 +2695,7 @@ def create_purchase_credit_note(
         db.rollback()
         logger.error(f"Error creating purchase credit note: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ==================== INV-004: Purchase Debit Notes (إشعار مدين مشتريات) ====================
@@ -2773,7 +2783,7 @@ def get_purchase_debit_note(note_id: int, current_user: dict = Depends(get_curre
             WHERE i.id = :id AND i.invoice_type = 'purchase_debit_note'
         """), {"id": note_id}).fetchone()
         if not note:
-            raise HTTPException(status_code=404, detail="الإشعار المدين غير موجود")
+            raise HTTPException(**http_error(404, "debit_note_not_found"))
 
         from utils.permissions import validate_branch_access
         validate_branch_access(current_user, note._mapping.get("branch_id"))
@@ -2806,7 +2816,7 @@ def create_purchase_debit_note(
         related_invoice_id = data.get("related_invoice_id")
         lines = data.get("lines", [])
         if not lines:
-            raise HTTPException(status_code=400, detail="يجب إضافة بند واحد على الأقل")
+            raise HTTPException(**http_error(400, "min_one_item_required"))
         if not party_id:
             raise HTTPException(status_code=400, detail="يجب تحديد المورد")
 
@@ -2815,7 +2825,7 @@ def create_purchase_debit_note(
         currency = data.get("currency", base_currency)
         exchange_rate = _dec(data.get("exchange_rate", 1))
         if exchange_rate <= 0:
-            raise HTTPException(status_code=400, detail="سعر الصرف يجب أن يكون أكبر من صفر")
+            raise HTTPException(**http_error(400, "exchange_rate_must_be_positive"))
         branch_id = data.get("branch_id") or (current_user.allowed_branches[0] if current_user.allowed_branches else None)
 
         subtotal = Decimal('0')
@@ -2879,6 +2889,9 @@ def create_purchase_debit_note(
         if not acc_ap or not acc_inv:
             raise HTTPException(status_code=400, detail="إعدادات الحسابات غير مكتملة (AP / Inventory)")
 
+        # FISCAL-LOCK: Reject if accounting period is closed
+        check_fiscal_period_open(db, inv_date)
+
         gl_sub = (_dec(subtotal) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         gl_tax = (_dec(tax_total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
         gl_total = (_dec(total) * _dec(exchange_rate)).quantize(_D4, ROUND_HALF_UP)
@@ -2924,7 +2937,7 @@ def create_purchase_debit_note(
         db.commit()
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="buying.debit_note.create", resource_type="purchase_debit_note",
-                     resource_id=inv_num, details={"party_id": party_id, "total": float(total)},
+                     resource_id=inv_num, details={"party_id": party_id, "total": str(total)},
                      request=request, branch_id=branch_id)
 
         return {"success": True, "id": note_id, "invoice_number": inv_num,
@@ -2935,7 +2948,7 @@ def create_purchase_debit_note(
         db.rollback()
         logger.error(f"Error creating purchase debit note: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # =====================================================
@@ -3007,7 +3020,7 @@ def create_rfq(data: dict, request: Request, current_user=Depends(get_current_us
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.put("/rfq/{rfq_id}/send", dependencies=[Depends(require_permission("buying.create"))])
@@ -3049,7 +3062,7 @@ def add_rfq_response(rfq_id: int, data: dict, request: Request, current_user=Dep
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/rfq/{rfq_id}/compare", dependencies=[Depends(require_permission("buying.view"))])
@@ -3083,13 +3096,13 @@ def convert_rfq_to_po(rfq_id: int, data: dict, request: Request, current_user=De
             resource_id=str(rfq_id), details={"response_id": response_id, "supplier_id": resp.supplier_id},
             request=request
         )
-        return {"message": "RFQ converted. Create PO from supplier.", "supplier_id": resp.supplier_id, "total_price": float(resp.total_price)}
+        return {"message": "RFQ converted. Create PO from supplier.", "supplier_id": resp.supplier_id, "total_price": str(resp.total_price)}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ---------- PUR-002: Supplier Ratings ----------
@@ -3151,14 +3164,14 @@ def rate_supplier(data: dict, request: Request, current_user=Depends(get_current
         log_activity(
             db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
             action="buying.supplier_rating.create", resource_type="supplier_rating",
-            resource_id=str(result.id), details={"supplier_id": data["supplier_id"], "overall_score": float(overall)},
+            resource_id=str(result.id), details={"supplier_id": data["supplier_id"], "overall_score": str(overall)},
             request=request
         )
         return dict(result._mapping)
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # ---------- PUR-003: Purchase Agreements (Blanket PO) ----------
@@ -3224,7 +3237,7 @@ def create_agreement(data: dict, request: Request, current_user=Depends(get_curr
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.put("/agreements/{agr_id}/activate", dependencies=[Depends(require_permission("buying.approve"))])
@@ -3261,17 +3274,17 @@ def create_call_off(agr_id: int, data: dict, request: Request, current_user=Depe
         log_activity(
             db, user_id=current_user.id, username=getattr(current_user, "username", "unknown"),
             action="buying.agreement.call_off", resource_type="purchase_agreement",
-            resource_id=str(agr_id), details={"amount": float(amount)},
+            resource_id=str(agr_id), details={"amount": str(amount)},
             request=request
         )
         remaining = (total_amount - consumed_amount - amount).quantize(_D2, ROUND_HALF_UP)
-        return {"message": f"Call-off of {float(amount)} created", "remaining": float(remaining)}
+        return {"message": f"Call-off of {str(amount)} created", "remaining": str(remaining)}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 # =====================================================================
@@ -3306,9 +3319,9 @@ def create_blanket_po(payload: BlanketPOCreate, request: Request, current_user: 
         """), {
             "supplier_id": payload.supplier_id,
             "agr_num": agr_number,
-            "total_qty": float(total_qty),
-            "unit_price": float(unit_price),
-            "total_amount": float(total_amount),
+            "total_qty": str(total_qty),
+            "unit_price": str(unit_price),
+            "total_amount": str(total_amount),
             "valid_from": payload.valid_from,
             "valid_to": payload.valid_to,
             "branch_id": payload.branch_id,
@@ -3360,20 +3373,26 @@ def list_blanket_pos(
 
         where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
 
-        rows = db.execute(text(f"""
-            SELECT b.*, p.name AS supplier_name
-            FROM blanket_purchase_orders b
-            LEFT JOIN parties p ON p.id = b.supplier_id
-            {where_clause}
-            ORDER BY b.created_at DESC
-            OFFSET :skip LIMIT :limit
-        """), params).fetchall()
+        try:
+            rows = db.execute(text(f"""
+                SELECT b.*, p.name AS supplier_name
+                FROM blanket_purchase_orders b
+                LEFT JOIN parties p ON p.id = b.supplier_id
+                {where_clause}
+                ORDER BY b.created_at DESC
+                OFFSET :skip LIMIT :limit
+            """), params).fetchall()
+        except Exception as e:
+            db.rollback()
+            if "does not exist" in str(e):
+                return {"blanket_pos": []}
+            raise
 
         result = []
         for row in rows:
             d = dict(row._mapping)
-            d["remaining_quantity"] = float(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
-            d["remaining_amount"] = float(_dec(d["total_amount"]) - _dec(d["released_amount"]))
+            d["remaining_quantity"] = str(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
+            d["remaining_amount"] = str(_dec(d["total_amount"]) - _dec(d["released_amount"]))
             result.append(d)
 
         return {"blanket_pos": result}
@@ -3396,8 +3415,8 @@ def get_blanket_po(bpo_id: int, current_user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=404, detail="Blanket PO not found")
 
         d = dict(bpo._mapping)
-        d["remaining_quantity"] = float(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
-        d["remaining_amount"] = float(_dec(d["total_amount"]) - _dec(d["released_amount"]))
+        d["remaining_quantity"] = str(_dec(d["total_quantity"]) - _dec(d["released_quantity"]))
+        d["remaining_amount"] = str(_dec(d["total_amount"]) - _dec(d["released_amount"]))
 
         releases = db.execute(text("""
             SELECT r.*, po.po_number
@@ -3442,7 +3461,7 @@ def activate_blanket_po(bpo_id: int, request: Request, current_user: dict = Depe
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 @router.post("/blanket/{bpo_id}/release", dependencies=[Depends(require_permission("buying.blanket_release"))])
@@ -3472,7 +3491,7 @@ def create_release_order(bpo_id: int, payload: ReleaseOrderCreate, request: Requ
         if release_qty > remaining_qty:
             raise HTTPException(
                 status_code=400,
-                detail=f"Release quantity {float(release_qty)} exceeds remaining agreement quantity {float(remaining_qty)}"
+                detail=f"Release quantity {str(release_qty)} exceeds remaining agreement quantity {str(remaining_qty)}"
             )
 
         release_amount = (release_qty * unit_price).quantize(_D4, ROUND_HALF_UP)
@@ -3487,8 +3506,8 @@ def create_release_order(bpo_id: int, payload: ReleaseOrderCreate, request: Requ
             RETURNING id
         """), {
             "bpo_id": bpo_id,
-            "qty": float(release_qty),
-            "amount": float(release_amount),
+            "qty": str(release_qty),
+            "amount": str(release_amount),
             "rel_date": release_dt,
             "created_by": username,
         })
@@ -3505,24 +3524,24 @@ def create_release_order(bpo_id: int, payload: ReleaseOrderCreate, request: Requ
                 status = :status, updated_at = NOW()
             WHERE id = :id
         """), {
-            "rel_qty": float(new_released_qty),
-            "rel_amt": float(new_released_amt),
+            "rel_qty": str(new_released_qty),
+            "rel_amt": str(new_released_amt),
             "status": new_status,
             "id": bpo_id,
         })
 
         log_activity(db, user_id=user_id, username=username, action="blanket_po_release",
                      resource_type="blanket_po_release_order", resource_id=str(release_id),
-                     details={"blanket_po_id": bpo_id, "release_quantity": float(release_qty)},
+                     details={"blanket_po_id": bpo_id, "release_quantity": str(release_qty)},
                      request=request)
         db.commit()
 
         response = {
             "id": release_id,
-            "release_quantity": float(release_qty),
-            "release_amount": float(release_amount),
-            "remaining_quantity": float(total_qty - new_released_qty),
-            "remaining_amount": float(_dec(bpo_data["total_amount"]) - new_released_amt),
+            "release_quantity": str(release_qty),
+            "release_amount": str(release_amount),
+            "remaining_quantity": str(total_qty - new_released_qty),
+            "remaining_amount": str(_dec(bpo_data["total_amount"]) - new_released_amt),
             "message": "Release order created successfully",
         }
         return response
@@ -3562,8 +3581,8 @@ def amend_blanket_po_price(bpo_id: int, payload: PriceAmendRequest, request: Req
         history = bpo_data.get("price_amendment_history") or []
         history.append({
             "effective_date": str(payload.effective_date),
-            "old_price": float(old_price),
-            "new_price": float(new_price),
+            "old_price": str(old_price),
+            "new_price": str(new_price),
             "reason": payload.reason,
             "amended_at": datetime.now().isoformat(),
         })
@@ -3575,8 +3594,8 @@ def amend_blanket_po_price(bpo_id: int, payload: PriceAmendRequest, request: Req
                 price_amendment_history = :history::jsonb, updated_at = NOW()
             WHERE id = :id
         """), {
-            "new_price": float(new_price),
-            "new_total": float(new_total_amount),
+            "new_price": str(new_price),
+            "new_total": str(new_total_amount),
             "history": json.dumps(history),
             "id": bpo_id,
         })
@@ -3585,16 +3604,16 @@ def amend_blanket_po_price(bpo_id: int, payload: PriceAmendRequest, request: Req
         username = current_user.get("username", "unknown") if isinstance(current_user, dict) else getattr(current_user, "username", "unknown")
         log_activity(db, user_id=user_id, username=username, action="blanket_po_price_amended",
                      resource_type="blanket_purchase_order", resource_id=str(bpo_id),
-                     details={"old_price": float(old_price), "new_price": float(new_price)},
+                     details={"old_price": str(old_price), "new_price": str(new_price)},
                      request=request)
         db.commit()
 
         return {
             "message": "Price amended successfully",
-            "old_price": float(old_price),
-            "new_price": float(new_price),
-            "new_total_amount": float(new_total_amount),
-            "remaining_amount": float(new_total_amount - _dec(bpo_data["released_amount"])),
+            "old_price": str(old_price),
+            "new_price": str(new_price),
+            "new_total_amount": str(new_total_amount),
+            "remaining_amount": str(new_total_amount - _dec(bpo_data["released_amount"])),
         }
     except HTTPException:
         raise

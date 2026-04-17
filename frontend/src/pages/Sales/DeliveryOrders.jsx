@@ -6,9 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton'
+import { useToast } from '../../context/ToastContext'
+import { formatNumber } from '../../utils/format'
 
 function DeliveryOrders() {
     const { t } = useTranslation()
+    const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -24,7 +27,7 @@ function DeliveryOrders() {
                 const res = await deliveryOrdersAPI.list(params)
                 setOrders(res.data)
             } catch (err) {
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -84,7 +87,7 @@ function DeliveryOrders() {
                                 <td>{o.party_name}</td>
                                 <td>{formatShortDate(o.do_date)}</td>
                                 <td>{o.shipping_date ? formatShortDate(o.shipping_date) : '-'}</td>
-                                <td className="font-bold">{Number(o.total_amount).toLocaleString()} <small>{currency}</small></td>
+                                <td className="font-bold">{formatNumber(o.total_amount)} <small>{currency}</small></td>
                                 <td><span className={`status-badge ${statusColors[o.status] || o.status}`}>{t(`delivery_orders.status_${o.status}`, o.status)}</span></td>
                                 <td>
                                     <button onClick={() => navigate(`/sales/delivery-orders/${o.id}`)} className="btn-icon" title={t('common.view')}>👁️</button>

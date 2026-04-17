@@ -30,7 +30,7 @@ class CommissionPayRequest(BaseModel):
 
 class PartialInvoiceLine(BaseModel):
     order_line_id: int
-    quantity: float
+    quantity: Decimal
 
 
 class PartialInvoiceCreate(BaseModel):

@@ -1,4 +1,5 @@
 """POS module Pydantic schemas."""
+from decimal import Decimal
 from pydantic import BaseModel, validator
 from typing import List, Optional
 from datetime import datetime
@@ -7,7 +8,7 @@ from datetime import datetime
 class SessionCreate(BaseModel):
     pos_profile_id: Optional[int] = None
     warehouse_id: Optional[int] = None
-    opening_balance: float = 0.0
+    opening_balance: Decimal = Decimal("0")
     notes: Optional[str] = None
     branch_id: Optional[int] = None
     treasury_account_id: Optional[int] = None
@@ -22,8 +23,8 @@ class SessionCreate(BaseModel):
 
 
 class SessionClose(BaseModel):
-    closing_balance: float
-    cash_register_balance: float
+    closing_balance: Decimal
+    cash_register_balance: Decimal
     notes: Optional[str] = None
 
     @validator("closing_balance", "cash_register_balance")
@@ -45,15 +46,15 @@ class SessionResponse(BaseModel):
     cashier_name: Optional[str] = None
     status: str
     opened_at: datetime
-    opening_balance: float = 0.0
-    closing_balance: Optional[float] = 0.0
-    total_sales: Optional[float] = 0.0
-    total_cash: Optional[float] = 0.0
-    total_bank: Optional[float] = 0.0
-    total_returns: Optional[float] = 0.0
-    total_returns_cash: Optional[float] = 0.0
+    opening_balance: Decimal = Decimal("0")
+    closing_balance: Optional[Decimal] = Decimal("0")
+    total_sales: Optional[Decimal] = Decimal("0")
+    total_cash: Optional[Decimal] = Decimal("0")
+    total_bank: Optional[Decimal] = Decimal("0")
+    total_returns: Optional[Decimal] = Decimal("0")
+    total_returns_cash: Optional[Decimal] = Decimal("0")
     order_count: Optional[int] = 0
-    difference: Optional[float] = 0.0
+    difference: Optional[Decimal] = Decimal("0")
 
 
 class POSProductResponse(BaseModel):
@@ -61,19 +62,19 @@ class POSProductResponse(BaseModel):
     name: str
     code: Optional[str]
     barcode: Optional[str]
-    price: float
-    stock_quantity: float
+    price: Decimal
+    stock_quantity: Decimal
     category_id: Optional[int]
     image_url: Optional[str]
-    tax_rate: Optional[float] = 0.0
+    tax_rate: Optional[Decimal] = Decimal("0")
 
 
 class OrderLineCreate(BaseModel):
     product_id: int
-    quantity: float
-    unit_price: float
-    discount_amount: float = 0
-    tax_rate: float = 0
+    quantity: Decimal
+    unit_price: Decimal
+    discount_amount: Decimal = Decimal("0")
+    tax_rate: Decimal = Decimal("0")
     notes: Optional[str] = None
 
     @validator("quantity")
@@ -101,7 +102,7 @@ class OrderLineCreate(BaseModel):
 
 class OrderPaymentCreate(BaseModel):
     method: str
-    amount: float
+    amount: Decimal
     reference: Optional[str] = None
 
     @validator("amount")
@@ -120,8 +121,8 @@ class OrderCreate(BaseModel):
     warehouse_id: Optional[int] = None
     branch_id: Optional[int] = None
     items: List[OrderLineCreate]
-    discount_amount: float = 0
-    paid_amount: float = 0
+    discount_amount: Decimal = Decimal("0")
+    paid_amount: Decimal = Decimal("0")
     payments: List[OrderPaymentCreate] = []
     status: str = "paid"
     note: Optional[str] = None
@@ -138,14 +139,14 @@ class OrderCreate(BaseModel):
 class OrderResponse(BaseModel):
     id: int
     order_number: str
-    total_amount: float
+    total_amount: Decimal
     status: str
     created_at: datetime
 
 
 class ReturnItemCreate(BaseModel):
     item_id: int
-    quantity: float
+    quantity: Decimal
     reason: Optional[str] = None
 
     @validator("quantity")

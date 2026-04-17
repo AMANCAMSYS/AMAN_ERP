@@ -6,9 +6,11 @@ import { useTranslation } from 'react-i18next';
 import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext';
 
 const AgingReport = () => {
     const { t } = useTranslation();
+    const { showToast } = useToast();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [buckets, setBuckets] = useState([]);
@@ -40,7 +42,7 @@ const AgingReport = () => {
                     amount: agg[key]
                 })));
             } catch (err) {
-                console.error(err);
+                showToast(t('common.error'), 'error');
             } finally {
                 setLoading(false);
             }

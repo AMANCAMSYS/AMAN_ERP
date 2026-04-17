@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -126,7 +127,7 @@ def get_reconciliation(id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": id}).fetchone()
         
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
 
         # Branch access check
         if rec.branch_id:
@@ -182,7 +183,7 @@ def add_statement_lines(id: int, lines: List[StatementLineCreate], current_user:
     try:
         rec = db.execute(text("SELECT status, start_balance FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن إضافة أسطر إلى تسوية معتمدة")
 
@@ -296,7 +297,7 @@ async def preview_import(
     try:
         rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن الاستيراد في تسوية معتمدة")
 
@@ -315,7 +316,7 @@ async def preview_import(
             ws = wb.active
             all_rows = list(ws.iter_rows(values_only=True))
             if not all_rows:
-                raise HTTPException(status_code=400, detail="الملف فارغ")
+                raise HTTPException(**http_error(400, "file_empty"))
             # Skip empty leading rows
             start_idx = 0
             for i, row in enumerate(all_rows):
@@ -347,7 +348,7 @@ async def preview_import(
             reader = csv.reader(io.StringIO(text_content), delimiter=delimiter)
             all_rows = list(reader)
             if not all_rows:
-                raise HTTPException(status_code=400, detail="الملف فارغ")
+                raise HTTPException(**http_error(400, "file_empty"))
             # Skip empty leading rows
             start_idx = 0
             for i, row in enumerate(all_rows):
@@ -432,7 +433,7 @@ def confirm_import(id: int, lines: List[StatementLineCreate], current_user: dict
     try:
         rec = db.execute(text("SELECT status, start_balance FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن الاستيراد في تسوية معتمدة")
 
@@ -476,14 +477,14 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
     db = get_db_connection(current_user.company_id)
     try:
         rec_info = db.execute(text("""
-            SELECT r.status, t.gl_account_id, r.statement_date
+            SELECT r.status, t.gl_account_id, r.statement_date, r.branch_id
             FROM bank_reconciliations r
             JOIN treasury_accounts t ON r.treasury_account_id = t.id
             WHERE r.id = :id
         """), {"id": id}).fetchone()
 
         if not rec_info:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec_info.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن المطابقة في تسوية معتمدة")
 
@@ -495,8 +496,14 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
             ORDER BY transaction_date
         """), {"id": id}).fetchall()
 
-        # Get unmatched ledger entries
-        ledger = db.execute(text("""
+        # Get unmatched ledger entries (filtered by branch to prevent cross-branch matching)
+        branch_filter = ""
+        ledger_params = {"gl_id": rec_info.gl_account_id, "stmt_date": rec_info.statement_date}
+        if rec_info.branch_id:
+            branch_filter = "AND je.branch_id = :branch_id"
+            ledger_params["branch_id"] = rec_info.branch_id
+
+        ledger = db.execute(text(f"""
             SELECT jl.id, je.entry_date, jl.debit, jl.credit
             FROM journal_lines jl
             JOIN journal_entries je ON jl.journal_entry_id = je.id
@@ -504,8 +511,9 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
             AND (jl.is_reconciled = FALSE OR jl.is_reconciled IS NULL)
             AND je.status = 'posted'
             AND je.entry_date <= :stmt_date
+            {branch_filter}
             ORDER BY je.entry_date
-        """), {"gl_id": rec_info.gl_account_id, "stmt_date": rec_info.statement_date}).fetchall()
+        """), ledger_params).fetchall()
 
         matched_stmt_ids = set()
         matched_jl_ids = set()
@@ -585,7 +593,7 @@ def delete_statement_line(id: int, line_id: int, current_user: dict = Depends(ge
     try:
         rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن حذف أسطر من تسوية معتمدة")
 
@@ -595,7 +603,7 @@ def delete_statement_line(id: int, line_id: int, current_user: dict = Depends(ge
         """), {"lid": line_id, "rid": id}).fetchone()
         
         if not line:
-            raise HTTPException(status_code=404, detail="السطر غير موجود")
+            raise HTTPException(**http_error(404, "line_not_found"))
             
         if line.is_reconciled and line.matched_journal_line_id:
             db.execute(text("""
@@ -622,7 +630,7 @@ def get_ledger_entries(id: int, current_user: dict = Depends(get_current_user)):
         """), {"id": id}).fetchone()
         
         if not rec_info:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
 
         gl_id = rec_info.gl_account_id
         stmt_date = rec_info.statement_date
@@ -651,7 +659,7 @@ def match_transaction(id: int, match: MatchRequest, current_user: dict = Depends
     try:
         rec_status = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec_status:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec_status.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن المطابقة في تسوية معتمدة")
 
@@ -719,7 +727,7 @@ def unmatch_transaction(id: int, data: UnmatchRequest, current_user: dict = Depe
     try:
         rec_status = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec_status:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec_status.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن إلغاء المطابقة في تسوية معتمدة")
 
@@ -729,7 +737,7 @@ def unmatch_transaction(id: int, data: UnmatchRequest, current_user: dict = Depe
         """), {"sid": data.statement_line_id, "rid": id}).fetchone()
         
         if not sl:
-            raise HTTPException(status_code=404, detail="السطر غير موجود")
+            raise HTTPException(**http_error(404, "line_not_found"))
         if not sl.is_reconciled:
             raise HTTPException(status_code=400, detail="السطر غير مطابق أصلاً")
 
@@ -757,7 +765,7 @@ def delete_reconciliation(id: int, current_user: dict = Depends(get_current_user
     try:
         rec = db.execute(text("SELECT status FROM bank_reconciliations WHERE id = :id"), {"id": id}).fetchone()
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
         
         if rec.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن حذف تسوية معتمدة. يمكن حذف التسويات في حالة المسودة فقط")
@@ -792,7 +800,7 @@ def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_us
         """), {"id": id}).fetchone()
         
         if not rec:
-            raise HTTPException(status_code=404, detail="التسوية غير موجودة")
+            raise HTTPException(**http_error(404, "reconciliation_not_found"))
 
         # Branch access check
         if rec.branch_id:
@@ -821,7 +829,25 @@ def finalize_reconciliation(id: int, current_user: dict = Depends(get_current_us
         
         calculated_end = _dec(rec.start_balance) + _dec(calc)
 
-        if abs(calculated_end - _dec(rec.end_balance)) > _D2:
+        # T030: Read configurable reconciliation tolerance from company_settings
+        tolerance = Decimal('1.00')
+        try:
+            tol_row = db.execute(text(
+                "SELECT setting_value FROM company_settings WHERE setting_key = 'reconciliation_tolerance' LIMIT 1"
+            )).fetchone()
+            if tol_row and tol_row.setting_value:
+                tolerance = _dec(tol_row.setting_value)
+            else:
+                # Seed default on first read
+                db.execute(text("""
+                    INSERT INTO company_settings (setting_key, setting_value, description)
+                    VALUES ('reconciliation_tolerance', '1.00', 'حد التفاوت المسموح في تسوية البنك')
+                    ON CONFLICT (setting_key) DO NOTHING
+                """))
+        except Exception:
+            pass  # Fall back to default 1.00 if company_settings unavailable
+
+        if abs(calculated_end - _dec(rec.end_balance)) > tolerance:
              raise HTTPException(
                 status_code=400, 
             detail=f"خطأ في توازن التسوية. الرصيد المحسوب: {float(calculated_end):,.2f}, الرصيد المدخل: {float(_dec(rec.end_balance)):,.2f}"

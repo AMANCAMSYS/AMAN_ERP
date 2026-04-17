@@ -2,10 +2,10 @@ from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Tex
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..base import ModelBase
+from ..base import ModelBase, AuditMixin, SoftDeleteMixin
 
 
-class LeaveCarryover(ModelBase):
+class LeaveCarryover(AuditMixin, ModelBase):
     __tablename__ = "leave_carryover"
     __table_args__ = (
         UniqueConstraint(
@@ -28,7 +28,7 @@ class LeaveCarryover(ModelBase):
     calculated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class OvertimeRequest(ModelBase):
+class OvertimeRequest(AuditMixin, SoftDeleteMixin, ModelBase):
     __tablename__ = "overtime_requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -44,11 +44,9 @@ class OvertimeRequest(ModelBase):
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
     approved_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     branch_id: Mapped[int | None] = mapped_column(ForeignKey("branches.id"))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PerformanceReview(ModelBase):
+class PerformanceReview(AuditMixin, ModelBase):
     __tablename__ = "performance_reviews"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -71,11 +69,9 @@ class PerformanceReview(ModelBase):
     manager_assessment: Mapped[dict | None] = mapped_column(JSONB)
     composite_score: Mapped[float | None] = mapped_column(Numeric(5, 2))
     final_comments: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class ReviewCycle(ModelBase):
+class ReviewCycle(AuditMixin, ModelBase):
     """Review cycle defining the period and deadlines for performance reviews."""
     __tablename__ = "review_cycles"
 
@@ -87,11 +83,9 @@ class ReviewCycle(ModelBase):
     manager_review_deadline: Mapped[Date | None] = mapped_column(Date)
     status: Mapped[str | None] = mapped_column(String(20), default="draft")
     created_by: Mapped[int | None] = mapped_column(Integer)
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class PerformanceGoal(ModelBase):
+class PerformanceGoal(AuditMixin, ModelBase):
     """Individual goal within a performance review with weight and target."""
     __tablename__ = "performance_goals"
 
@@ -101,8 +95,6 @@ class PerformanceGoal(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
     weight: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     target: Mapped[str | None] = mapped_column(String(500))
-    created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 __all__ = [

@@ -92,6 +92,13 @@ def create_branch(
     """Create a new branch"""
     conn = get_db_connection(current_user.company_id)
     try:
+        # Validate country_code — required for tax calculation
+        if not branch.country_code or not branch.country_code.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Branch country_code is required for tax calculation"
+            )
+
         # Check if this is the first branch
         count_res = conn.execute(text("SELECT COUNT(*) FROM branches")).scalar()
         is_first = (count_res == 0)
@@ -194,6 +201,13 @@ def update_branch(
         
         if not existing:
             raise HTTPException(status_code=404, detail="Branch not found")
+
+        # Validate country_code — required for tax calculation
+        if not branch.country_code or not branch.country_code.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="Branch country_code is required for tax calculation"
+            )
 
         # Check duplicate code if changed
         if branch.branch_code:

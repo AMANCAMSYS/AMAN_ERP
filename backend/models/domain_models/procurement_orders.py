@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..base import ModelBase, AuditMixin
 
 
-class PurchaseOrder(ModelBase):
+class PurchaseOrder(ModelBase, AuditMixin):
     __tablename__ = "purchase_orders"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -32,7 +32,7 @@ class PurchaseOrder(ModelBase):
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sa_text("1"))
 
 
-class PurchaseOrderLine(ModelBase):
+class PurchaseOrderLine(ModelBase, AuditMixin):
     __tablename__ = "purchase_order_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

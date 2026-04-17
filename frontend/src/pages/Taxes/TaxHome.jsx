@@ -44,6 +44,7 @@ function TaxHome() {
             setReturns(returnsRes.data)
         } catch (err) {
             console.error('Error fetching tax data:', err)
+            showToast(err.response?.data?.detail || t('common.error', 'حدث خطأ في تحميل بيانات الضرائب'), 'error')
         } finally {
             setLoading(false)
         }
@@ -79,7 +80,7 @@ function TaxHome() {
                 await taxesAPI.updateRate(editingRate.id, {
                     tax_name: rateForm.tax_name,
                     tax_name_en: rateForm.tax_name_en,
-                    rate_value: parseFloat(rateForm.rate_value),
+                    rate_value: String(rateForm.rate_value),
                     description: rateForm.description
                 })
             } else {

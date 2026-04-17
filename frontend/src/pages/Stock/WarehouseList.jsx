@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { inventoryAPI, branchesAPI } from '../../utils/api'
 import { Edit2, Trash2, Plus, X, Warehouse } from 'lucide-react'
 import { useBranch } from '../../context/BranchContext'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -13,6 +13,7 @@ function WarehouseList() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [warehouses, setWarehouses] = useState([])
     const [branches, setBranches] = useState([])
     const [loading, setLoading] = useState(true)
@@ -39,7 +40,7 @@ function WarehouseList() {
             const res = await branchesAPI.list()
             setBranches(res.data)
         } catch (err) {
-            console.error('Error fetching branches:', err)
+            showToast(t('stock.warehouses.validation.error_fetch'), 'error')
         }
     }
 
@@ -56,13 +57,13 @@ function WarehouseList() {
             } else {
                 await inventoryAPI.createWarehouse(formData)
             }
-            toastEmitter.emit(t('stock.warehouses.validation.success_save'), 'success')
+            showToast(t('stock.warehouses.validation.success_save'), 'success')
             setShowModal(false)
             setEditingItem(null)
             setFormData({ name: '', code: '', branch_id: null })
             fetchWarehouses()
         } catch (err) {
-            toastEmitter.emit(t('stock.warehouses.validation.error_save'), 'error')
+            showToast(t('stock.warehouses.validation.error_save'), 'error')
         }
     }
 
@@ -72,7 +73,7 @@ function WarehouseList() {
                 await inventoryAPI.deleteWarehouse(id)
                 fetchWarehouses()
             } catch (err) {
-                toastEmitter.emit(t('stock.warehouses.validation.delete_error'), 'error')
+                showToast(t('stock.warehouses.validation.delete_error'), 'error')
             }
         }
     }

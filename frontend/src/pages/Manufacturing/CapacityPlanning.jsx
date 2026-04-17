@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { useToast } from '../../context/ToastContext';
 import { Gauge, Plus, Save, X, Activity, Settings, Edit3 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
@@ -32,7 +33,7 @@ const CapacityPlanning = () => {
             setLoading(true);
             const res = await manufacturingAPI.listCapacityPlans();
             setPlans(res.data || []);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { toastEmitter.emit(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const calculateOEE = async () => {

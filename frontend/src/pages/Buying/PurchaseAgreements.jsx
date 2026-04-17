@@ -25,12 +25,12 @@ const PurchaseAgreements = () => {
 
     const fetchSuppliers = async () => {
         try { const res = await inventoryAPI.listSuppliers({ limit: 500 }); setSuppliers(res.data || []); }
-        catch (err) { console.error(err); }
+        catch (err) { showToast(t('common.error'), 'error'); }
     };
 
     const fetchAgreements = async () => {
         try { setLoading(true); const res = await purchasesAPI.listAgreements(); setAgreements(res.data || []); }
-        catch (err) { console.error(err); } finally { setLoading(false); }
+        catch (err) { showToast(t('common.error'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreate = async (e) => {
@@ -51,7 +51,7 @@ const PurchaseAgreements = () => {
         const qty = prompt(t('buying.quantity_prompt'));
         if (!qty) return;
         try {
-            await purchasesAPI.callOffAgreement(id, { quantity: parseFloat(qty) });
+            await purchasesAPI.callOffAgreement(id, { quantity: Number(qty) });
             showToast(t('buying.calloff_created'), 'success'); fetchAgreements();
         } catch (err) { showToast(err.response?.data?.detail || t('common.error'), 'error'); }
     };

@@ -166,6 +166,13 @@ def cached(prefix: str, expire: int = 300, company_specific: bool = True):
             cached_result = cache.get(cache_key)
             if cached_result is not None:
                 logger.debug(f"Cache HIT: {cache_key}")
+                # Inject cache metadata for report transparency
+                if isinstance(cached_result, dict) and "_cache_meta" not in cached_result:
+                    cached_result["_cache_meta"] = {
+                        "cached": True,
+                        "ttl_seconds": expire,
+                        "recompute_param": "?no_cache=1",
+                    }
                 return cached_result
 
             # Execute function

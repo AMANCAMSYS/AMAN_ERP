@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ClipboardList, AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
 import api from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
 import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
@@ -28,7 +29,7 @@ export default function MRPView() {
             const res = await api.get(`/manufacturing/mrp/calculate/${id}`)
             setMrp(res.data)
         } catch (err) {
-            console.error('Failed to fetch MRP', err)
+            toastEmitter.emit(t('common.error'), 'error')
             showToast(t('manufacturing.mrp.load_error'), 'error')
         } finally {
             setLoading(false)
@@ -37,7 +38,7 @@ export default function MRPView() {
 
     if (loading) return <div className="page-center"><span className="loading"></span></div>
 
-    if (!mrp) return <div className="workspace p-5 text-center"><h3>MRP Not Found</h3></div>
+    if (!mrp) return <div className="workspace p-5 text-center"><h3>{t('manufacturing.mrp.not_found')}</h3></div>
 
     return (
         <div className="workspace fade-in">

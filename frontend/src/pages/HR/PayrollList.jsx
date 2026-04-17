@@ -39,7 +39,7 @@ const PayrollList = () => {
             const res = await hrAPI.listPayrollPeriods();
             setPeriods(res.data);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

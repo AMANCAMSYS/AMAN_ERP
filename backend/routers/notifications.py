@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
@@ -194,7 +195,7 @@ async def create_and_send_notification(
     except Exception as e:
         db.rollback()
         logger.error(f"Error sending notification: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -289,7 +290,7 @@ async def update_notification_settings(
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating notification settings: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -371,7 +372,7 @@ async def update_preference(body: PreferenceUpdate, request: Request, current_us
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating preference: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -409,7 +410,7 @@ async def test_email_connection(current_user: dict = Depends(get_current_user)):
         raise
     except Exception as e:
         logger.error(f"Error testing email connection: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 

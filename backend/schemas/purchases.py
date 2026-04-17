@@ -1,4 +1,5 @@
 """Purchases module Pydantic schemas."""
+from decimal import Decimal
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
@@ -7,11 +8,11 @@ from datetime import date
 class PurchaseLineItem(BaseModel):
     product_id: Optional[int] = None
     description: str
-    quantity: float
-    unit_price: float
-    tax_rate: float
-    discount: float = 0.0
-    markup: float = 0.0
+    quantity: Decimal
+    unit_price: Decimal
+    tax_rate: Decimal
+    discount: Decimal = Decimal("0")
+    markup: Decimal = Decimal("0")
 
 
 class PurchaseCreate(BaseModel):
@@ -22,26 +23,26 @@ class PurchaseCreate(BaseModel):
     notes: Optional[str] = None
     payment_method: str = "cash"
     down_payment_method: Optional[str] = None
-    paid_amount: float = 0.0
+    paid_amount: Decimal = Decimal("0")
     original_invoice_id: Optional[int] = None
     branch_id: Optional[int] = None
     warehouse_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = None
+    exchange_rate: Optional[Decimal] = None
     treasury_id: Optional[int] = None
     is_prepayment: bool = False
 
     # Group effects
     effect_type: str = "discount"
-    effect_percentage: float = 0.0
-    markup_amount: float = 0.0
+    effect_percentage: Decimal = Decimal("0")
+    markup_amount: Decimal = Decimal("0")
 
 
 class SupplierGroupCreate(BaseModel):
     group_name: str
     group_name_en: Optional[str] = None
     description: Optional[str] = None
-    discount_percentage: float = 0.0
+    discount_percentage: Decimal = Decimal("0")
     effect_type: str = "discount"
     application_scope: str = "total"
     payment_days: int = 30
@@ -57,17 +58,17 @@ class POCreate(BaseModel):
     notes: Optional[str] = None
     branch_id: Optional[int] = None
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1")
 
     # Group effects
     effect_type: str = "discount"
-    effect_percentage: float = 0.0
-    markup_amount: float = 0.0
+    effect_percentage: Decimal = Decimal("0")
+    markup_amount: Decimal = Decimal("0")
 
 
 class ReceiveItem(BaseModel):
     line_id: int
-    received_quantity: float
+    received_quantity: Decimal
 
 
 class POReceiveRequest(BaseModel):
@@ -89,13 +90,13 @@ class SupplierCreate(BaseModel):
 
 class PaymentAllocationSchema(BaseModel):
     invoice_id: int
-    allocated_amount: float
+    allocated_amount: Decimal
 
 
 class SupplierPaymentCreate(BaseModel):
     supplier_id: int
     voucher_date: date
-    amount: float
+    amount: Decimal
     payment_method: str
     bank_account_id: Optional[int] = None
     check_number: Optional[str] = None
@@ -105,7 +106,7 @@ class SupplierPaymentCreate(BaseModel):
     branch_id: Optional[int] = None
     voucher_type: Optional[str] = 'payment'
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal("1")
     treasury_account_id: Optional[int] = None
-    transaction_rate: Optional[float] = None
+    transaction_rate: Optional[Decimal] = None
     allocations: List[PaymentAllocationSchema] = []

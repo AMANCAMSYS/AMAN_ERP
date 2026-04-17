@@ -1,18 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error, i18n_message
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, timedelta
+from decimal import Decimal
 import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from schemas.contracts import ContractCreate, ContractResponse
 from utils.permissions import require_permission
-from utils.accounting import get_base_currency
+from utils.accounting import get_base_currency, compute_line_amounts, compute_invoice_totals
 from utils.audit import log_activity
 
 logger = logging.getLogger(__name__)
+
+
+def _float(v) -> float:
+    """Convert any numeric to float safely for legacy DB inserts."""
+    return float(Decimal(str(v if v is not None else 0)))
 
 router = APIRouter(prefix="/contracts", tags=["Contracts"])
 
@@ -26,7 +33,7 @@ def create_contract(
     try:
         # Validate dates
         if contract.start_date and contract.end_date and contract.end_date < contract.start_date:
-            raise HTTPException(status_code=400, detail="تاريخ نهاية العقد يجب أن يكون بعد تاريخ البداية")
+            raise HTTPException(**http_error(400, "contract_end_before_start"))
 
         # Validate contract number uniqueness
         if contract.contract_number:
@@ -35,15 +42,16 @@ def create_contract(
                 {"num": contract.contract_number}
             ).fetchone()
             if existing:
-                raise HTTPException(status_code=400, detail="رقم العقد مكرر، يرجى استخدام رقم مختلف")
+                raise HTTPException(**http_error(400, "contract_number_duplicate"))
 
         # Recalculate total_amount from items to prevent client manipulation
-        calculated_total = 0
+        calculated_total = Decimal('0')
         for item in contract.items:
-            calculated_total += item.quantity * item.unit_price * (1 + item.tax_rate / 100)
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
+            calculated_total += la['line_total']
         
         # Use calculated total (override client-provided total)
-        final_total = round(calculated_total, 2)
+        final_total = float(calculated_total)
 
         # Create Contract Header
         contract_id = db.execute(
@@ -73,7 +81,7 @@ def create_contract(
 
         # Create Contract Items
         for item in contract.items:
-            item_total = item.quantity * item.unit_price * (1 + item.tax_rate/100)
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
             db.execute(
                 text("""
                     INSERT INTO contract_items (
@@ -90,7 +98,7 @@ def create_contract(
                     "qty": item.quantity,
                     "price": item.unit_price,
                     "tax": item.tax_rate,
-                    "total": item_total
+                    "total": float(la['line_total'])
                 }
             )
         
@@ -128,7 +136,7 @@ def create_contract(
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating contract: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -189,7 +197,7 @@ def get_contract(
         ).fetchone()
         
         if not contract:
-            raise HTTPException(status_code=404, detail="Contract not found")
+            raise HTTPException(**http_error(404, "contract_not_found"))
             
         items = db.execute(
             text("SELECT * FROM contract_items WHERE contract_id = :id"),
@@ -216,7 +224,7 @@ def update_contract(
     try:
         existing = db.execute(text("SELECT * FROM contracts WHERE id = :id"), {"id": contract_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="العقد غير موجود")
+            raise HTTPException(**http_error(404, "contract_not_found"))
 
         db.execute(text("""
             UPDATE contracts SET
@@ -234,13 +242,13 @@ def update_contract(
 
         db.execute(text("DELETE FROM contract_items WHERE contract_id = :id"), {"id": contract_id})
         for item in data.items:
-            total = item.quantity * item.unit_price * (1 + item.tax_rate / 100)
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
             db.execute(text("""
                 INSERT INTO contract_items (contract_id, product_id, description, quantity, unit_price, tax_rate, total)
                 VALUES (:cid, :pid, :desc, :qty, :price, :tax, :total)
             """), {
                 "cid": contract_id, "pid": item.product_id, "desc": item.description,
-                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": total
+                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": float(la['line_total'])
             })
 
         trans.commit()
@@ -260,7 +268,7 @@ def update_contract(
     except Exception as e:
         trans.rollback()
         logger.error(f"Error updating contract: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -280,10 +288,10 @@ def renew_contract(
         ).fetchone()
         
         if not contract:
-            raise HTTPException(status_code=404, detail="Contract not found")
+            raise HTTPException(**http_error(404, "contract_not_found"))
         
         if contract.status != 'active':
-            raise HTTPException(status_code=400, detail="يمكن تجديد العقود النشطة فقط")
+            raise HTTPException(**http_error(400, "only_active_contracts_renew"))
         
         from datetime import timedelta
         from dateutil.relativedelta import relativedelta
@@ -334,7 +342,7 @@ def renew_contract(
     except Exception as e:
         db.rollback()
         logger.error(f"Error renewing contract: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -354,7 +362,7 @@ def generate_contract_invoice(
         ).fetchone()
         
         if not contract:
-            raise HTTPException(status_code=404, detail="العقد غير موجود أو غير نشط")
+            raise HTTPException(**http_error(404, "contract_inactive_or_not_found"))
         
         items = db.execute(
             text("SELECT * FROM contract_items WHERE contract_id = :id"),
@@ -362,16 +370,20 @@ def generate_contract_invoice(
         ).fetchall()
         
         if not items:
-            raise HTTPException(status_code=400, detail="لا توجد بنود في العقد")
+            raise HTTPException(**http_error(400, "contract_items_empty"))
         
         import uuid
         from datetime import date as dt_date
         from utils.accounting import generate_sequential_number
         
         inv_num = generate_sequential_number(db, f"INV-CTR-{dt_date.today().year}", "invoices", "invoice_number")
-        subtotal = sum(float(i.quantity) * float(i.unit_price) for i in items)
-        tax_total = sum(float(i.quantity) * float(i.unit_price) * float(i.tax_rate) / 100 for i in items)
-        total = subtotal + tax_total
+
+        # Centralized Decimal calculation (Constitution: no inline float math)
+        line_dicts = [{"quantity": i.quantity, "unit_price": i.unit_price, "tax_rate": i.tax_rate} for i in items]
+        totals = compute_invoice_totals(line_dicts)
+        subtotal = float(totals["subtotal"])
+        tax_total = float(totals["total_tax"])
+        total = float(totals["grand_total"])
         
         inv_id = db.execute(text("""
             INSERT INTO invoices (
@@ -394,13 +406,13 @@ def generate_contract_invoice(
         }).scalar()
         
         for item in items:
-            item_total = float(item.quantity) * float(item.unit_price) * (1 + float(item.tax_rate) / 100)
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
             db.execute(text("""
                 INSERT INTO invoice_lines (invoice_id, product_id, description, quantity, unit_price, tax_rate, total)
                 VALUES (:iid, :pid, :desc, :qty, :price, :tax, :total)
             """), {
                 "iid": inv_id, "pid": item.product_id, "desc": item.description,
-                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": item_total
+                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": float(la['line_total'])
             })
         
         db.commit()
@@ -420,7 +432,7 @@ def generate_contract_invoice(
     except Exception as e:
         db.rollback()
         logger.error(f"Error generating contract invoice: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -440,10 +452,10 @@ def cancel_contract(
         ).fetchone()
         
         if not contract:
-            raise HTTPException(status_code=404, detail="العقد غير موجود")
+            raise HTTPException(**http_error(404, "contract_not_found"))
         
         if contract.status == 'cancelled':
-            raise HTTPException(status_code=400, detail="العقد ملغي بالفعل")
+            raise HTTPException(**http_error(400, "contract_already_cancelled"))
         
         db.execute(
             text("UPDATE contracts SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = :id"),
@@ -460,13 +472,13 @@ def cancel_contract(
             request=request
         )
 
-        return {"message": "تم إلغاء العقد بنجاح", "id": contract_id}
+        return {"message": i18n_message("contract_cancelled_success"), "id": contract_id}
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error cancelling contract {contract_id}: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -514,7 +526,7 @@ def get_expiring_contracts(
         }
     except Exception as e:
         logger.error(f"Error fetching expiring contracts: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -549,7 +561,7 @@ def get_contracts_summary(
         }
     except Exception as e:
         logger.error(f"Error fetching contract stats: {e}")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -598,11 +610,11 @@ def create_amendment(contract_id: int, amendment: dict, request: Request, curren
             details={"contract_id": contract_id, "type": amendment.get("amendment_type", "modification")},
             request=request
         )
-        return {"id": aid, "message": "تم إنشاء التعديل بنجاح"}
+        return {"id": aid, "message": i18n_message("amendment_created_success")}
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating amendment: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -615,7 +627,7 @@ def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
         contract = db.execute(text("SELECT * FROM contracts WHERE id = :id"),
                               {"id": contract_id}).fetchone()
         if not contract:
-            raise HTTPException(404, "Contract not found")
+            raise HTTPException(**http_error(404, "contract_not_found"))
         c = dict(contract._mapping)
 
         # Amendment count
@@ -655,6 +667,6 @@ def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
         raise
     except Exception as e:
         logger.error(f"Error fetching contract KPIs: {e}")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Play, Pause, CheckCircle, Clock, User as UserIcon, Factory } from 'lucide-react'
 import api from '../../utils/api'
+import { toastEmitter } from '../../utils/toastEmitter'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
@@ -26,7 +27,7 @@ export default function JobCards() {
             const res = await api.get('/manufacturing/orders/operations/active')
             setOperations(res.data)
         } catch (err) {
-            console.error('Failed to fetch operations', err)
+            toastEmitter.emit(t('common.error'), 'error')
         } finally {
             setLoading(false)
         }

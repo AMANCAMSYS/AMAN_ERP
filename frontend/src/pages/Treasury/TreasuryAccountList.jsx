@@ -28,7 +28,7 @@ export default function TreasuryAccountList() {
     const [accountForm, setAccountForm] = useState({
         name: '', name_en: '', account_type: 'cash', currency: '',
         bank_name: '', account_number: '', iban: '', branch_id: '',
-        opening_balance: 0, exchange_rate: 1
+        opening_balance: 0, exchange_rate: 1, allow_overdraft: false
     })
 
     const fetchAccounts = async () => {
@@ -77,7 +77,7 @@ export default function TreasuryAccountList() {
             setAccountForm({
                 name: '', name_en: '', account_type: 'cash', currency: baseCurrency,
                 bank_name: '', account_number: '', iban: '', branch_id: '',
-                opening_balance: 0, exchange_rate: 1
+                opening_balance: 0, exchange_rate: 1, allow_overdraft: false
             })
         } catch (err) {
             console.error(err)
@@ -96,7 +96,8 @@ export default function TreasuryAccountList() {
             iban: account.iban || '',
             branch_id: account.branch_id || '',
             opening_balance: 0,
-            exchange_rate: 1
+            exchange_rate: 1,
+            allow_overdraft: account.allow_overdraft || false
         })
         setShowEdit(true)
     }
@@ -111,7 +112,8 @@ export default function TreasuryAccountList() {
                 bank_name: accountForm.bank_name,
                 account_number: accountForm.account_number,
                 iban: accountForm.iban,
-                branch_id: currentBranch?.id || null
+                branch_id: currentBranch?.id || null,
+                allow_overdraft: accountForm.allow_overdraft
             }
             await treasuryAPI.updateAccount(selectedAccount.id, updateData)
             toastEmitter.emit(t('treasury.success_update_account'), 'success')
@@ -431,6 +433,15 @@ export default function TreasuryAccountList() {
                             </div>
                         </>
                     )}
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                            type="checkbox"
+                            id="edit_allow_overdraft"
+                            checked={accountForm.allow_overdraft}
+                            onChange={e => setAccountForm({ ...accountForm, allow_overdraft: e.target.checked })}
+                        />
+                        <label htmlFor="edit_allow_overdraft" className="form-label" style={{ margin: 0 }}>{t('treasury.allow_overdraft', 'السماح بالسحب على المكشوف')}</label>
+                    </div>
                 </div>
             </SimpleModal>
 

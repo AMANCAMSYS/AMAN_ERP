@@ -52,8 +52,7 @@ const EquipmentMaintenance = () => {
                 }
             }
         } catch (error) {
-            console.error("Error fetching data:", error);
-            toastEmitter.emit(t('error_fetching_data'), 'error');
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -71,7 +70,7 @@ const EquipmentMaintenance = () => {
             });
             fetchData();
         } catch (error) {
-            console.error(error);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 
@@ -88,7 +87,7 @@ const EquipmentMaintenance = () => {
             });
             fetchData();
         } catch (error) {
-            console.error(error);
+            toastEmitter.emit(t('common.error'), 'error');
         }
     };
 

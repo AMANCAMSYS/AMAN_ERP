@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
-import { toastEmitter } from '../../utils/toastEmitter'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 
 function SupplierGroups() {
     const { t } = useTranslation()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [groups, setGroups] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -33,7 +34,7 @@ function SupplierGroups() {
             setError(null)
         } catch (err) {
             setError(t('common.error_loading'))
-            console.error(err)
+            showToast(t('common.error'), 'error')
         } finally {
             setLoading(false)
         }
@@ -78,7 +79,7 @@ function SupplierGroups() {
         try {
             const payload = {
                 ...formData,
-                discount_percentage: parseFloat(formData.discount_percentage) || 0,
+                discount_percentage: String(formData.discount_percentage || 0),
                 payment_days: parseInt(formData.payment_days) || 30,
                 branch_id: currentBranch?.id
             }
@@ -91,7 +92,7 @@ function SupplierGroups() {
             setShowModal(false)
             fetchGroups()
         } catch (err) {
-            console.error(err)
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
             const detail = err.response?.data?.detail
             if (typeof detail === 'string') setError(detail)
             else if (Array.isArray(detail)) setError(detail.map(e => e.msg).join(', '))
@@ -105,8 +106,7 @@ function SupplierGroups() {
             await purchasesAPI.deleteSupplierGroup(id)
             fetchGroups()
         } catch (err) {
-            console.error(err)
-            toastEmitter.emit(t('buying.supplier_groups.form.delete_error'), 'error')
+            showToast(t('buying.supplier_groups.form.delete_error'), 'error')
         }
     }
 
@@ -268,8 +268,8 @@ function SupplierGroups() {
                                         value={formData.effect_type}
                                         onChange={e => setFormData({ ...formData, effect_type: e.target.value })}
                                     >
-                                        <option value="discount">خصم</option>
-                                        <option value="markup">زيادة</option>
+                                        <option value="discount">{t('common.discount')}</option>
+                                        <option value="markup">{t('common.increase')}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -279,7 +279,7 @@ function SupplierGroups() {
                                         value={formData.application_scope}
                                         onChange={e => setFormData({ ...formData, application_scope: e.target.value })}
                                     >
-                                        <option value="total">إجمالي</option>
+                                        <option value="total">{t('pos.receipt.total')}</option>
                                         <option value="line">لكل صنف</option>
                                     </select>
                                 </div>

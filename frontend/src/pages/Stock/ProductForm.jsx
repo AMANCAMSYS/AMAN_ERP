@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { inventoryAPI, settingsAPI } from '../../utils/api'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import { getStep } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
@@ -44,6 +45,7 @@ function ProductForm() {
     const navigate = useNavigate()
     const { id } = useParams()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const currency = getCurrency()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
@@ -103,14 +105,14 @@ function ProductForm() {
                     try {
                         const settingsRes = await settingsAPI.get()
                         if (settingsRes.data && settingsRes.data.vat_rate) {
-                            setFormData(prev => ({ ...prev, tax_rate: parseFloat(settingsRes.data.vat_rate) }))
+                            setFormData(prev => ({ ...prev, tax_rate: Number(settingsRes.data.vat_rate) }))
                         }
                     } catch (err) {
                         console.warn("Failed to load settings", err)
                     }
                 }
             } catch (err) {
-                console.error("Failed to load initial data", err)
+                showToast(t('stock.products.validation.error_load_data'), 'error')
             }
         }
         fetchInitialData()
@@ -128,7 +130,7 @@ function ProductForm() {
                     })
                 } catch (err) {
                     setError(t('stock.products.validation.error_load_data'))
-                    console.error(err)
+                    showToast(t('stock.products.validation.error_load_data'), 'error')
                 } finally {
                     setLoading(false)
                 }
@@ -162,7 +164,7 @@ function ProductForm() {
 
         // Convert number types and category_id to proper types
         if (e.target.type === 'number') {
-            value = value === '' ? '' : parseFloat(value)
+            value = value === '' ? '' : Number(value)
         } else if (e.target.name === 'category_id' && value !== '') {
             value = parseInt(value)
         }

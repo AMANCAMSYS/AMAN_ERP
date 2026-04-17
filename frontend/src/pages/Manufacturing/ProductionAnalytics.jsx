@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
@@ -31,7 +32,7 @@ const ProductionAnalytics = () => {
             if (costRes.status === 'fulfilled') setCostReport(costRes.value.data);
             if (effRes.status === 'fulfilled') setEfficiency(effRes.value.data);
         } catch (e) {
-            console.error(e);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }

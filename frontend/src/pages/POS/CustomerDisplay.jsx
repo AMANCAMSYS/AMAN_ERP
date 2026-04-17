@@ -116,10 +116,10 @@ function CustomerDisplay() {
             `).join('');
             content = `
                 <div style="padding:30px;">
-                    <div style="font-size:20px;font-weight:600;margin-bottom:20px;">العناصر المضافة</div>
+                    <div style="font-size:20px;font-weight:600;margin-bottom:20px;">{t('pos.items_added')}</div>
                     ${itemsHtml}
                     <div style="display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:3px solid ${accent};font-size:28px;font-weight:700;">
-                        <span>الإجمالي</span>
+                        <span>{t('pos.receipt.total')}</span>
                         <span style="color:${accent}">${formatNumber(total)} ${currency}</span>
                     </div>
                 </div>
@@ -127,7 +127,7 @@ function CustomerDisplay() {
         } else if (displayState === 'total') {
             content = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;">
-                    <div style="font-size:24px;opacity:0.7">المبلغ المطلوب</div>
+                    <div style="font-size:24px;opacity:0.7">{t('pos.receipt.amount_due')}</div>
                     <div style="font-size:64px;font-weight:700;color:${accent}">${formatNumber(total)} ${currency}</div>
                     <div style="font-size:18px;opacity:0.5">${cartItems.length} عناصر</div>
                 </div>
@@ -245,13 +245,13 @@ function CustomerDisplay() {
                                     </div>
                                 ))}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 700, fontSize: 18, color: '#4f46e5' }}>
-                                    <span>الإجمالي</span><span>{formatNumber(total)} {currency}</span>
+                                    <span>{t('pos.receipt.total')}</span><span>{formatNumber(total)} {currency}</span>
                                 </div>
                             </div>
                         )}
                         {displayState === 'total' && (
                             <div>
-                                <div style={{ fontSize: 14, opacity: 0.7 }}>المبلغ المطلوب</div>
+                                <div style={{ fontSize: 14, opacity: 0.7 }}>{t('pos.receipt.amount_due')}</div>
                                 <div style={{ fontSize: 42, fontWeight: 700, color: '#4f46e5' }}>{formatNumber(total)} {currency}</div>
                             </div>
                         )}

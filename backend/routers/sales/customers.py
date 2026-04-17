@@ -1,5 +1,6 @@
 """Sales customers and customer groups endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 import logging
@@ -46,9 +47,9 @@ def get_sales_summary(branch_id: Optional[int] = None, current_user: dict = Depe
             "total_customers": total_customers,
             "customer_count": total_customers,
             "total_invoices": total_invoices,
-            "total_revenue": float(total_revenue),
-            "total_receivables": float(total_receivables),
-            "monthly_sales": float(monthly_sales),
+            "total_revenue": str(total_revenue or 0),
+            "total_receivables": str(total_receivables or 0),
+            "monthly_sales": str(monthly_sales or 0),
             "unpaid_count": unpaid_count
         }
     finally:
@@ -101,7 +102,7 @@ def get_customer_transactions(customer_id: int, current_user: dict = Depends(get
             "SELECT branch_id FROM parties WHERE id = :cid AND (party_type = 'customer' OR is_customer = TRUE)"
         ), {"cid": customer_id}).fetchone()
         if not customer_branch:
-            raise HTTPException(status_code=404, detail="العميل غير موجود")
+            raise HTTPException(**http_error(404, "customer_not_found"))
         allowed = getattr(current_user, 'allowed_branches', []) or []
         if allowed and "*" not in getattr(current_user, 'permissions', []):
             if customer_branch.branch_id and customer_branch.branch_id not in allowed:
@@ -182,7 +183,7 @@ def create_customer(request: Request, customer: CustomerCreate, current_user: di
         db.rollback()
         logger.error(f"Error creating customer: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -200,7 +201,7 @@ def get_customer(customer_id: int, current_user: dict = Depends(get_current_user
         """), {"cid": customer_id}).fetchone()
 
         if not customer:
-            raise HTTPException(status_code=404, detail="العميل غير موجود")
+            raise HTTPException(**http_error(404, "customer_not_found"))
 
         # PTY-001: Branch access enforcement
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -221,7 +222,7 @@ def update_customer(customer_id: int, customer: CustomerCreate, request: Request
         # Check if exists
         existing = db.execute(text("SELECT id, branch_id FROM parties WHERE id = :id AND (party_type = 'customer' OR is_customer = TRUE)"), {"id": customer_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="العميل غير موجود")
+            raise HTTPException(**http_error(404, "customer_not_found"))
 
         # PTY-002: Branch access enforcement
         allowed = getattr(current_user, 'allowed_branches', []) or []
@@ -268,7 +269,7 @@ def update_customer(customer_id: int, customer: CustomerCreate, request: Request
         db.rollback()
         logger.error(f"Error updating customer: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -302,7 +303,7 @@ def get_customer_outstanding_invoices(
     except Exception as e:
         logger.error(f"Error fetching outstanding invoices: {str(e)}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -359,7 +360,7 @@ def create_customer_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -402,7 +403,7 @@ def update_customer_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -440,6 +441,6 @@ def delete_customer_group(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

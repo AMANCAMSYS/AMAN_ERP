@@ -4,6 +4,7 @@ AMAN ERP — Landed Costs Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
@@ -190,7 +191,7 @@ def create_landed_cost(body: LandedCostCreate, request: Request, current_user: d
                      action="landed_cost.create",
                      resource_type="landed_cost",
                      resource_id=lc_number,
-                     details={"id": lc_id, "total": float(total)},
+                     details={"id": lc_id, "total": str(total)},
                      request=request)
 
         return {"id": lc_id, "lc_number": lc_number, "total_amount": total}
@@ -199,7 +200,7 @@ def create_landed_cost(body: LandedCostCreate, request: Request, current_user: d
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -275,6 +276,7 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
         db.execute(text("DELETE FROM landed_cost_allocations WHERE landed_cost_id = :lcid"), {"lcid": lc_id})
 
         allocations_data = []
+        allocation_entries = []
         for line in po_lines:
             if method == 'by_value':
                 basis = _dec(line.line_total or 0)
@@ -290,6 +292,28 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
             per_unit = share / qty if qty > 0 else Decimal('0')
             new_cost = (_dec(line.cost_price or 0) + per_unit).quantize(_D4, ROUND_HALF_UP)
 
+            allocation_entries.append({
+                "line": line,
+                "basis": basis,
+                "share_raw": share,
+                "share": share.quantize(_D2, ROUND_HALF_UP),
+                "new_cost": new_cost,
+            })
+
+        # Largest-remainder rounding: ensure allocations sum exactly to total_cost
+        allocated_sum = sum(e["share"] for e in allocation_entries)
+        remainder = total_cost.quantize(_D2, ROUND_HALF_UP) - allocated_sum
+        if remainder != 0 and allocation_entries:
+            largest_idx = max(range(len(allocation_entries)), key=lambda i: allocation_entries[i]["share"])
+            allocation_entries[largest_idx]["share"] += remainder
+            # Recalculate new_cost for the adjusted line
+            adj = allocation_entries[largest_idx]
+            adj_qty = _dec(adj["line"].quantity or 1)
+            adj_per_unit = adj["share"] / adj_qty if adj_qty > 0 else Decimal('0')
+            adj["new_cost"] = (_dec(adj["line"].cost_price or 0) + adj_per_unit).quantize(_D4, ROUND_HALF_UP)
+
+        for entry in allocation_entries:
+            line = entry["line"]
             db.execute(text("""
                 INSERT INTO landed_cost_allocations (
                     landed_cost_id, product_id, po_line_id,
@@ -300,16 +324,16 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
                 "lcid": lc_id, "pid": line.product_id,
                 "lid": line.line_id,
                 "oc": _dec(line.cost_price or 0).quantize(_D4, ROUND_HALF_UP),
-                "aa": share.quantize(_D2, ROUND_HALF_UP),
-                "nc": new_cost,
-                "ab": basis.quantize(_D4, ROUND_HALF_UP),
-                "ash": (basis / total_basis).quantize(_D6, ROUND_HALF_UP)
+                "aa": entry["share"],
+                "nc": entry["new_cost"],
+                "ab": entry["basis"].quantize(_D4, ROUND_HALF_UP),
+                "ash": (entry["basis"] / total_basis).quantize(_D6, ROUND_HALF_UP)
             })
 
             allocations_data.append({
                 "product_id": line.product_id,
-                "allocated": float(share.quantize(_D2, ROUND_HALF_UP)),
-                "new_cost": float(new_cost)
+                "allocated": str(entry["share"]),
+                "new_cost": str(entry["new_cost"])
             })
 
         db.commit()
@@ -319,7 +343,7 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
                      action="landed_cost.allocate",
                      resource_type="landed_cost",
                      resource_id=str(lc_id),
-                     details={"method": method, "total_cost": float(total_cost.quantize(_D2, ROUND_HALF_UP))},
+                     details={"method": method, "total_cost": str(total_cost.quantize(_D2, ROUND_HALF_UP))},
                      request=request)
 
         return {
@@ -331,7 +355,7 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -461,19 +485,19 @@ def post_landed_cost(lc_id: int, request: Request, current_user: dict = Depends(
                      action="landed_cost.post",
                      resource_type="landed_cost",
                      resource_id=str(lc_id),
-                     details={"journal_entry_id": je_id, "total": float(total_cost.quantize(_D2, ROUND_HALF_UP))},
+                     details={"journal_entry_id": je_id, "total": str(total_cost.quantize(_D2, ROUND_HALF_UP))},
                      request=request)
 
         return {
             "message": "تم ترحيل التكاليف المُضافة وتحديث تكلفة المنتجات",
             "journal_entry_id": je_id,
-            "total_allocated": float(total_cost.quantize(_D2, ROUND_HALF_UP))
+            "total_allocated": str(total_cost.quantize(_D2, ROUND_HALF_UP))
         }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

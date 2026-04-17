@@ -29,13 +29,13 @@ const Promotions = () => {
             setLoading(true);
             const res = await posAPI.listPromotions();
             setPromotions(res.data || []);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
+        } catch (err) { showToast(t('common.error_occurred'), 'error'); } finally { setLoading(false); }
     };
 
     const handleCreate = async (e) => {
         e.preventDefault();
         try {
-            const payload = { ...form, value: parseFloat(form.value) || 0, min_order_amount: parseFloat(form.min_order_amount) || 0 };
+            const payload = { ...form, value: String(form.value || 0), min_order_amount: String(form.min_order_amount || 0) };
             if (form.buy_x) payload.buy_x = parseInt(form.buy_x);
             if (form.get_y) payload.get_y = parseInt(form.get_y);
             await posAPI.createPromotion(payload);

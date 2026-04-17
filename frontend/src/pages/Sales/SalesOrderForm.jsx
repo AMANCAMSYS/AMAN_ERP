@@ -7,6 +7,8 @@ import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import { useToast } from '../../context/ToastContext'
+import { formatNumber } from '../../utils/format'
 
 function SalesOrderForm() {
     const { t } = useTranslation()
@@ -14,6 +16,7 @@ function SalesOrderForm() {
     const location = useLocation()
     const currency = getCurrency()
     const { currentBranch } = useBranch()
+    const { showToast } = useToast()
     const [customers, setCustomers] = useState([])
     const [products, setProducts] = useState([])
     const [warehouses, setWarehouses] = useState([])
@@ -45,7 +48,7 @@ function SalesOrderForm() {
                 setProducts(prodRes.data)
                 setWarehouses(whRes.data)
             } catch (err) {
-                console.error("Error fetching data", err)
+                showToast(t('common.error'), 'error')
             }
         }
         fetchData()
@@ -63,9 +66,9 @@ function SalesOrderForm() {
 
             if (quote.items && quote.items.length > 0) {
                 setItems(quote.items.map(item => {
-                    const quantity = parseFloat(item.quantity) || 0
-                    const unitPrice = parseFloat(item.unit_price) || 0
-                    const discount = parseFloat(item.discount) || 0
+                    const quantity = Number(item.quantity) || 0
+                    const unitPrice = Number(item.unit_price) || 0
+                    const discount = Number(item.discount) || 0
                     const discountPercent = (quantity * unitPrice) > 0 ? (discount / (quantity * unitPrice)) * 100 : 0
 
                     return {
@@ -104,14 +107,14 @@ function SalesOrderForm() {
                     }
                 }
 
-                const qty = parseFloat(updatedItem.quantity) || 0
-                const price = parseFloat(updatedItem.unit_price) || 0
-                let discount = parseFloat(updatedItem.discount) || 0
-                let discountPercent = parseFloat(updatedItem.discount_percent) || 0
+                const qty = Number(updatedItem.quantity) || 0
+                const price = Number(updatedItem.unit_price) || 0
+                let discount = Number(updatedItem.discount) || 0
+                let discountPercent = Number(updatedItem.discount_percent) || 0
 
                 // If updating percent, recalculate amount
                 if (field === 'discount_percent') {
-                    discountPercent = parseFloat(value) || 0
+                    discountPercent = Number(value) || 0
                     discount = (qty * price) * (discountPercent / 100)
                     updatedItem.discount = discount
                 }
@@ -124,7 +127,7 @@ function SalesOrderForm() {
                 updatedItem.discount_percent = discountPercent
                 updatedItem.discount = discount // Ensure amount is up to date
 
-                const taxRate = parseFloat(updatedItem.tax_rate) || 0
+                const taxRate = Number(updatedItem.tax_rate) || 0
                 const subtotal = qty * price
                 const taxable = subtotal - discount
                 const tax = taxable * (taxRate / 100)
@@ -139,10 +142,10 @@ function SalesOrderForm() {
 
     const calculateTotals = () => {
         return items.reduce((acc, item) => {
-            const qty = parseFloat(item.quantity) || 0
-            const price = parseFloat(item.unit_price) || 0
-            const discount = parseFloat(item.discount) || 0
-            const taxRate = parseFloat(item.tax_rate) || 0
+            const qty = Number(item.quantity) || 0
+            const price = Number(item.unit_price) || 0
+            const discount = Number(item.discount) || 0
+            const taxRate = Number(item.tax_rate) || 0
             const lineSubtotal = qty * price
             const taxable = lineSubtotal - discount
             const lineTax = taxable * (taxRate / 100)
@@ -192,10 +195,10 @@ function SalesOrderForm() {
                 items: items.map(item => ({
                     product_id: parseInt(item.product_id),
                     description: item.description || '',
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price: parseFloat(item.unit_price) || 0,
-                    discount: parseFloat(item.discount) || 0,
-                    tax_rate: parseFloat(item.tax_rate) || 0
+                    quantity: String(item.quantity || 0),
+                    unit_price: String(item.unit_price || 0),
+                    discount: String(item.discount || 0),
+                    tax_rate: String(item.tax_rate || 0)
                 }))
             }
             await salesAPI.createOrder(payload)
@@ -346,7 +349,7 @@ function SalesOrderForm() {
                                         />
                                     </td>
                                     <td className="font-bold">
-                                        {item.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        {formatNumber(item.total)}
                                     </td>
                                     <td>
                                         <button
@@ -390,15 +393,15 @@ function SalesOrderForm() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>{t('sales.orders.details.subtotal')}</span>
-                            <span>{totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
+                            <span>{formatNumber(totals.subtotal)} <small>{currency}</small></span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>{t('sales.orders.details.discount')}</span>
-                            <span className="text-error">-{totals.discount.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
+                            <span className="text-error">-{formatNumber(totals.discount)} <small>{currency}</small></span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>{t('sales.orders.details.tax')} (15%)</span>
-                            <span>{totals.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
+                            <span>{formatNumber(totals.tax)} <small>{currency}</small></span>
                         </div>
 
                         <div style={{ borderTop: '1px solid var(--border-color)', margin: '16px 0' }}></div>
@@ -412,7 +415,7 @@ function SalesOrderForm() {
                             marginBottom: '24px'
                         }}>
                             <span>{t('sales.orders.details.grand_total')}</span>
-                            <span>{totals.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small>{currency}</small></span>
+                            <span>{formatNumber(totals.total)} <small>{currency}</small></span>
                         </div>
 
                         <div className="form-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

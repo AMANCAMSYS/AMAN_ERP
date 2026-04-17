@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { accountingAPI, companiesAPI } from '../../utils/api'
+import { accountingAPI, companiesAPI, reportsAPI, api } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
+import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 function TrialBalance() {
     const { t } = useTranslation()
@@ -13,6 +14,12 @@ function TrialBalance() {
     const [error, setError] = useState('')
     const [currency, setCurrency] = useState('')
     const [totals, setTotals] = useState({ debit: 0, credit: 0, balance: 0 })
+    const [isCompareMode, setIsCompareMode] = useState(false)
+    const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1))
+    const [endDate, setEndDate] = useState(new Date())
+    const [compareStartDate, setCompareStartDate] = useState(new Date(new Date().getFullYear() - 1, 0, 1))
+    const [compareEndDate, setCompareEndDate] = useState(new Date(new Date().getFullYear() - 1, 11, 31))
+    const [showExport, setShowExport] = useState(false)
 
     useEffect(() => {
         const fetchData = async () => {
@@ -97,10 +104,78 @@ function TrialBalance() {
                     <h1 className="workspace-title">⚖️ {t('accounting.trial_balance.title')}</h1>
                     <p className="workspace-subtitle">{t('accounting.trial_balance.subtitle')}</p>
                 </div>
-                <div className="action-buttons">
+                <div className="action-buttons" style={{ display: 'flex', gap: '8px' }}>
+                    <div className="dropdown" style={{ position: 'relative' }}>
+                        <button className="btn btn-secondary dropdown-toggle" onClick={() => setShowExport(!showExport)}>
+                            📥 {t('common.export', 'تصدير')}
+                        </button>
+                        {showExport && <div className="dropdown-menu" style={{ display: 'block', position: 'absolute', top: '100%', right: 0, zIndex: 1000, background: 'white', border: '1px solid #ddd', borderRadius: '4px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                            <button
+                                onClick={async () => {
+                                    const res = await api.get(`/reports/accounting/trial-balance/export?format=pdf&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}`, { responseType: 'blob' });
+                                    const url = URL.createObjectURL(res.data);
+                                    window.open(url, '_blank');
+                                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                    setShowExport(false);
+                                }}
+                                className="dropdown-item"
+                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'start' }}
+                            >
+                                📄 PDF
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    const res = await api.get(`/reports/accounting/trial-balance/export?format=excel&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}&branch_id=${currentBranch?.id || ''}`, { responseType: 'blob' });
+                                    const url = URL.createObjectURL(res.data);
+                                    const a = document.createElement('a'); a.href = url; a.download = 'trial-balance.xlsx'; a.click();
+                                    setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                    setShowExport(false);
+                                }}
+                                className="dropdown-item"
+                                style={{ display: 'block', padding: '8px 16px', color: 'inherit', textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'start' }}
+                            >
+                                📊 Excel
+                            </button>
+                        </div>}
+                    </div>
                     <button className="btn btn-secondary" onClick={() => window.print()}>
                         {t('accounting.trial_balance.print')}
                     </button>
+                </div>
+            </div>
+
+            {/* Date Filters & Compare Mode */}
+            <div className="card mb-4 mt-4">
+                <div className="card-body">
+                    <div className="display-flex gap-4 align-end flex-wrap">
+                        <div style={{ width: '200px' }}>
+                            <label className="form-label">{t('common.start_date', 'من تاريخ')}</label>
+                            <CustomDatePicker selected={startDate} onChange={date => setStartDate(date)} className="form-input" />
+                        </div>
+                        <div style={{ width: '200px' }}>
+                            <label className="form-label">{t('common.end_date', 'إلى تاريخ')}</label>
+                            <CustomDatePicker selected={endDate} onChange={date => setEndDate(date)} className="form-input" />
+                        </div>
+                        <div className="form-check" style={{ marginBottom: '10px', marginLeft: '20px' }}>
+                            <input type="checkbox" className="form-check-input" id="compareModeTrialBalance"
+                                checked={isCompareMode} onChange={e => setIsCompareMode(e.target.checked)} />
+                            <label className="form-check-label" htmlFor="compareModeTrialBalance">
+                                {t('accounting.reports.compare_periods', 'مقارنة فترات')}
+                            </label>
+                        </div>
+                        {isCompareMode && (
+                            <>
+                                <div style={{ width: '200px' }}>
+                                    <label className="form-label">{t('common.start_date', 'من تاريخ')} (2)</label>
+                                    <CustomDatePicker selected={compareStartDate} onChange={date => setCompareStartDate(date)} className="form-input" />
+                                </div>
+                                <div style={{ width: '200px' }}>
+                                    <label className="form-label">{t('common.end_date', 'إلى تاريخ')} (2)</label>
+                                    <CustomDatePicker selected={compareEndDate} onChange={date => setCompareEndDate(date)} className="form-input" />
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

@@ -5,7 +5,7 @@ export const accountingAPI = {
     create: (data) => api.post('/accounting/accounts', data),
     update: (id, data) => api.put(`/accounting/accounts/${id}`, data),
     delete: (id) => api.delete(`/accounting/accounts/${id}`),
-    createJournalEntry: (data) => api.post('/accounting/journal-entries', data),
+    createJournalEntry: (data, config) => api.post('/accounting/journal-entries', data, config),
     voidJournalEntry: (id) => api.post(`/accounting/journal-entries/${id}/void`),
     getSummary: (params) => api.get('/accounting/summary', { params }),
 

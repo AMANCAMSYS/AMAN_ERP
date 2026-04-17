@@ -199,6 +199,7 @@
       "on_hand": "المتوفر",
       "shortage": "العجز",
       "action": "الإجراء المقترح",
+      "not_found": "تعذر العثور على خطة MRP",
       "load_error": "فشل في حساب متطلبات المواد",
       "create_po": "طلب شراء",
       "stock_available": "مخزون متاح",
@@ -354,7 +355,12 @@
     "capacity_planning": "تخطيط السعة",
     "bom_process_placeholder": "مثال: تصنيع قياسي",
     "bom_code_placeholder": "مثال: BOM-001",
-    "routing_name_placeholder": "مثال: تجميع طاولة قياسي"
+    "routing_name_placeholder": "مثال: تجميع طاولة قياسي",
+    "validation": {
+      "select_component_product": "يرجى اختيار منتج مكوّن",
+      "select_product": "يرجى اختيار منتج",
+      "select_work_center": "يرجى اختيار مركز عمل"
+    }
   },
   "reports": {
     "cash_flow": {
@@ -563,7 +569,7 @@
     "filterStartDate": "من تاريخ",
     "filterEndDate": "إلى تاريخ",
     "noLogs": "لا توجد سجلات",
-    "action": "العملية",
+    "action": "الإجراء",
     "user": "المستخدم",
     "resource": "المورد",
     "details": "التفاصيل",
@@ -737,7 +743,13 @@
       "password_too_short": "كلمة المرور قصيرة جداً",
       "profile_save_failed": "فشل حفظ الملف الشخصي",
       "profile_saved": "تم حفظ الملف الشخصي بنجاح",
-      "save_password": "حفظ كلمة المرور"
+      "save_password": "حفظ كلمة المرور",
+      "active_sessions": "الجلسات النشطة",
+      "device": "الجهاز",
+      "ip_address": "عنوان IP",
+      "last_active": "آخر نشاط",
+      "no_sessions": "لا توجد جلسات نشطة",
+      "terminate": "إنهاء"
     },
     "access_denied": "غير مصرح",
     "access_denied_msg": "ليس لديك صلاحية للقيام بهذا الإجراء",
@@ -972,7 +984,15 @@
     "submitting": "جارٍ الإرسال...",
     "page_not_found": "الصفحة غير موجودة",
     "sorry_the_page_you_are_looking_for_does_not_exist_": "عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
-    "back_to_dashboard": "🏠 العودة للوحة التحكم"
+    "back_to_dashboard": "🏠 العودة للوحة التحكم",
+    "next": "التالي",
+    "page": "صفحة",
+    "previous": "السابق",
+    "monthly": "شهري",
+    "quarterly": "ربع سنوي",
+    "annual": "سنوي",
+    "increase": "زيادة",
+    "cost_center": "مركز التكلفة"
   },
   "status": {
     "active": "نشط",
@@ -1261,7 +1281,13 @@
     "login_failed": "فشل تسجيل الدخول",
     "login_with_sso": "تسجيل الدخول عبر SSO",
     "or_sso": "أو عبر تسجيل الدخول الموحد",
-    "sso_login_failed": "فشل تسجيل الدخول عبر SSO"
+    "sso_login_failed": "فشل تسجيل الدخول عبر SSO",
+    "2fa_code": "رمز التحقق بخطوتين",
+    "2fa_invalid": "رمز التحقق غير صحيح",
+    "2fa_prompt": "أدخل الرمز المكون من 6 أرقام من تطبيق المصادقة",
+    "rate_limited": "محاولات كثيرة. يرجى المحاولة لاحقاً.",
+    "verify_2fa": "تحقق",
+    "verifying": "جارٍ التحقق..."
   },
   "industry_types": {
     "title": "نوع النشاط التجاري",
@@ -4116,7 +4142,9 @@
       "select_supplier_required": "اختر مورداً واحداً على الأقل",
       "supplier_selected": "مورد محدد",
       "suppliers": "الموردون"
-    }
+    },
+    "purchases_aging": "تقادم المشتريات",
+    "matching_quality": "المطابقة والجودة"
   },
   "stock": {
     "home": {
@@ -4320,7 +4348,8 @@
         "error_fetch": "فشل في تحميل فئات المنتجات",
         "error_save": "حدث خطأ أثناء الحفظ. تأكد من عدم تكرار الكود.",
         "delete_confirm": "هل أنت متأكد من حذف هذه الفئة؟",
-        "delete_error": "فشل الحذف. قد تكون الفئة مرتبطة بمنتجات."
+        "delete_error": "فشل الحذف. قد تكون الفئة مرتبطة بمنتجات.",
+        "error_fetch_code": "فشل جلب رمز الفئة"
       },
       "search_placeholder": "ابحث في التصنيفات..."
     },
@@ -4455,11 +4484,16 @@
           "source_dest_same": "لا يمكن الشحن من وإلى نفس المستودع",
           "success": "تم إنشاء الشحنة بنجاح ✅",
           "shipment_num": "رقم الشحنة:",
-          "error": "حدث خطأ أثناء إنشاء الشحنة"
+          "error": "حدث خطأ أثناء إنشاء الشحنة",
+          "error_load": "فشل تحميل الشحنة"
         }
       },
       "not_found": "الشحنة غير موجودة",
-      "search_placeholder": "ابحث في الشحنات..."
+      "search_placeholder": "ابحث في الشحنات...",
+      "validation": {
+        "error_load": "فشل تحميل الشحنات",
+        "error_load_details": "فشل تحميل تفاصيل الشحنة"
+      }
     },
     "details": {
       "table": {
@@ -4590,8 +4624,12 @@
         "select_product": "اختر المنتج",
         "validation": {
           "success": "تم حفظ التسوية بنجاح!",
-          "error": "حدث خطأ أثناء الحفظ"
+          "error": "حدث خطأ أثناء الحفظ",
+          "error_load": "فشل تحميل التسوية"
         }
+      },
+      "validation": {
+        "error_fetch": "فشل جلب التسويات"
       }
     },
     "reports": {
@@ -4649,7 +4687,9 @@
           "adjustment": "جرد",
           "shipment": "شحن"
         },
-        "empty": "لا توجد حركات مخزنية"
+        "empty": "لا توجد حركات مخزنية",
+        "error_filter": "فشل تطبيق الفلاتر",
+        "error_load": "فشل تحميل تقرير الحركات"
       }
     },
     "destination_warehouse": "المستودع المستقبِل",
@@ -5199,7 +5239,18 @@
     "tax_exemption": "الإعفاء الضريبي",
     "transfer_pricing": "التسعير التحويلي",
     "u2190": "\\u2192",
-    "u2192": "\\u2190"
+    "u2192": "\\u2190",
+    "budgeting_planning": "الموازنات والتخطيط",
+    "periods_closing": "الإغلاق والسنوات المالية",
+    "recurring_entries": "القيود المتكررة",
+    "closing_entries": "قيود الإقفال",
+    "advanced_accounting": "المحاسبة المتقدمة",
+    "core_reports": "التقارير الأساسية",
+    "tax_compliance": "الضرائب والامتثال",
+    "performance_analytics": "تحليل الأداء",
+    "financial_kpi_dashboard": "مؤشرات الأداء المالي",
+    "period_comparison": "مقارنة الفترات",
+    "advanced_consolidation": "التقارير المتقدمة والتوحيد"
   },
   "treasury": {
     "title": "إدارة الخزينة والمصروفات",
@@ -5316,7 +5367,8 @@
       "no_reconciliations_subtitle": "أنشئ تسوية جديدة لبدء مطابقة كشف حسابك البنكي",
       "delete_confirm": "هل أنت متأكد من حذف هذه التسوية؟",
       "created_by": "بواسطة",
-      "parse_error": "خطأ في تحليل الملف"
+      "parse_error": "خطأ في تحليل الملف",
+      "tolerance": "هامش تسامح التسوية"
     },
     "sections": {
       "masters": "السجلات الرئيسية",
@@ -5384,7 +5436,13 @@
     "method": "الطريقة",
     "periods": "عدد الفترات",
     "error_same_account": "لا يمكن التحويل إلى نفس الحساب",
-    "search_placeholder": "ابحث في الخزينة..."
+    "search_placeholder": "ابحث في الخزينة...",
+    "allow_overdraft": "السماح بالسحب على المكشوف",
+    "checks_aging": "تقادم الشيكات",
+    "cash_flow_forecast": "توقعات التدفق النقدي",
+    "upload_bank_statement": "ارفع ملف كشف حساب بنكي (CSV أو Excel)",
+    "withdrawal": "سحب",
+    "deposit": "إيداع"
   },
   "hr": {
     "attendance": {
@@ -5879,7 +5937,42 @@
       "select": "-- اختر --",
       "strengths": "نقاط القوة"
     },
-    "salary_structures": "هياكل الرواتب والمكونات",
+    "salary_structures": {
+      "title": "هياكل الرواتب",
+      "actions": "الإجراءات",
+      "active": "نشط",
+      "are_you_sure": "هل أنت متأكد؟",
+      "calculation": "الحساب",
+      "cancel": "إلغاء",
+      "components": "المكونات",
+      "deduction": "خصم",
+      "default_amount": "المبلغ الافتراضي",
+      "description": "الوصف",
+      "earning": "استحقاق",
+      "edit_component": "تعديل المكون",
+      "edit_structure": "تعديل الهيكل",
+      "fixed": "ثابت",
+      "formula": "صيغة",
+      "inactive": "غير نشط",
+      "loading": "جارٍ التحميل...",
+      "manage_salary_structures_and_components": "إدارة هياكل الرواتب ومكوناتها",
+      "name": "الاسم",
+      "name_ar": "الاسم بالعربية",
+      "name_en": "الاسم بالإنجليزية",
+      "name_en_2": "الاسم بالإنجليزية",
+      "name_en_3": "الاسم بالإنجليزية",
+      "new_component": "مكون جديد",
+      "new_structure": "هيكل جديد",
+      "no_components": "لا توجد مكونات محددة",
+      "no_salary_structures": "لا توجد هياكل رواتب",
+      "percentage": "نسبة مئوية",
+      "salary_structures_components": "هياكل الرواتب والمكونات",
+      "save": "حفظ",
+      "status": "الحالة",
+      "structures": "الهياكل",
+      "taxable": "خاضع للضريبة",
+      "type": "النوع"
+    },
     "training": {
       "actions": "إجراءات",
       "cancel": "إلغاء",
@@ -5936,7 +6029,12 @@
       "select_employee": "اختر الموظف",
       "reason_resignation": "استقالة",
       "reason_termination": "إنهاء من صاحب العمل",
-      "reason_end_of_contract": "انتهاء العقد"
+      "reason_end_of_contract": "انتهاء العقد",
+      "calculate": "احتساب",
+      "calculator_title": "حاسبة مكافأة نهاية الخدمة",
+      "end_of_contract": "انتهاء العقد",
+      "resignation": "استقالة",
+      "termination": "إنهاء خدمة"
     },
     "gosi_file_exported_successfully": "تم تصدير ملف التأمينات بنجاح",
     "export_failed": "فشل التصدير",
@@ -5959,7 +6057,19 @@
     "service_years": "سنوات الخدمة:",
     "base_salary": "الراتب الأساسي:",
     "eos_amount": "المكافأة المستحقة:",
-    "enus": "ar-SA"
+    "enus": "ar-SA",
+    "nationality": {
+      "saudi": "سعودي",
+      "emirati": "إماراتي",
+      "egyptian": "مصري",
+      "jordanian": "أردني",
+      "syrian": "سوري",
+      "lebanese": "لبناني",
+      "pakistani": "باكستاني",
+      "indian": "هندي",
+      "bangladeshi": "بنغلاديشي",
+      "filipino": "فلبيني"
+    }
   },
   "cost_centers": {
     "title": "مراكز التكلفة",
@@ -6904,11 +7014,25 @@
     "offline_short": "غير متصل",
     "online": "متصل",
     "online_restored": "تم استعادة الاتصال",
-    "order_saved_offline": "تم حفظ الطلب محلياً (بدون اتصال)"
+    "order_saved_offline": "تم حفظ الطلب محلياً (بدون اتصال)",
+    "receipt": {
+      "total": "إجمالي",
+      "subtotal": "المجموع",
+      "tax": "الضريبة",
+      "paid": "المدفوع",
+      "balance_due": "الباقي",
+      "amount_due": "المبلغ المطلوب"
+    },
+    "items_added": "العناصر المضافة"
   },
   "errors": {
     "fetch_failed": "فشل في تحميل البيانات",
-    "generic": "حدث خطأ غير متوقع"
+    "generic": "حدث خطأ غير متوقع",
+    "comparison_failed": "فشل في مقارنة البيانات",
+    "failed_load_report": "فشل في تحميل التقرير",
+    "failed_save_industry_type": "فشل في حفظ نوع النشاط",
+    "invalid_industry_type": "نوع نشاط غير صالح",
+    "unknown_report_type": "نوع التقرير غير معروف"
   },
   "inventory": {
     "category": "التصنيف",
@@ -7037,7 +7161,12 @@
       "bank": "بنك",
       "creditCard": "بطاقة ائتمان"
     },
-    "status": "الحالة",
+    "status": {
+      "label": "الحالة",
+      "approved": "موافق عليه",
+      "pending": "قيد الانتظار",
+      "rejected": "مرفوض"
+    },
     "sections": {
       "basic": "المعلومات الأساسية",
       "payment": "الدفع والمحاسبة",
@@ -7054,7 +7183,11 @@
       "pendingCount": "بانتظار الاعتماد",
       "approvedCount": "معتمدة"
     },
-    "actions": "إجراءات",
+    "actions": {
+      "label": "الإجراءات",
+      "approve": "موافقة",
+      "reject": "رفض"
+    },
     "messages": {
       "created": "تم إنشاء المصروف بنجاح",
       "updated": "تم تحديث المصروف بنجاح",
@@ -7168,7 +7301,10 @@
       "checkInfo": "شيك رقم {{number}} بمبلغ {{amount}}",
       "checkNumberTitle": "شيك رقم:",
       "dueDateShort": "الاستحقاق",
-      "bouncePlaceholder": "رصيد غير كافٍ، توقيع غير مطابق..."
+      "bouncePlaceholder": "رصيد غير كافٍ، توقيع غير مطابق...",
+      "confirmRepresent": "هل أنت متأكد من إعادة تقديم هذا الشيك؟",
+      "represent": "إعادة تقديم",
+      "representDate": "تاريخ إعادة التقديم"
     },
     "payable": {
       "title": "شيكات تحت الدفع",
@@ -7216,7 +7352,10 @@
       "checkInfo": "شيك رقم {{number}} بمبلغ {{amount}}",
       "checkNumberTitle": "شيك رقم:",
       "dueDateShort": "الاستحقاق",
-      "bouncePlaceholder": "رصيد غير كافٍ، توقيع غير مطابق..."
+      "bouncePlaceholder": "رصيد غير كافٍ، توقيع غير مطابق...",
+      "confirmRepresent": "هل أنت متأكد من إعادة تقديم هذا الشيك؟",
+      "represent": "إعادة تقديم",
+      "representDate": "تاريخ إعادة التقديم"
     }
   },
   "notesReceivable": {
@@ -7620,6 +7759,7 @@
       "steps": "الخطوات",
       "active": "نشط",
       "actions": "إجراءات",
+      "invalid_data": "بيانات غير صالحة",
       "no_workflows": "لا توجد سلاسل اعتماد معرفة. قم بإنشاء واحدة!",
       "id": "المعرف",
       "workflow": "سلسلة الاعتماد",
@@ -8233,7 +8373,8 @@
     "settings_tools": "الإعدادات والأدوات",
     "tax_calendar": "التقويم الضريبي",
     "wht_name_placeholder": "مثال: ضريبة استقطاع الخدمات",
-    "tax_name_placeholder": "مثال: ضريبة القيمة المضافة"
+    "tax_name_placeholder": "مثال: ضريبة القيمة المضافة",
+    "add_first_appointment": "+ إضافة أول موعد"
   },
   "months": {
     "jan": "يناير",
@@ -8267,7 +8408,8 @@
       "recent_transactions": "آخر الحركات",
       "type": "النوع",
       "description": "الوصف",
-      "amount": "المبلغ"
+      "amount": "المبلغ",
+      "gl_balance": "رصيد دفتر الأستاذ"
     },
     "cashflow": {
       "title": "تقرير تدفقات الخزينة",
@@ -8719,7 +8861,9 @@
     "error_creating_rate": "حدث خطأ أثناء إنشاء النسبة",
     "error_creating_tx": "حدث خطأ أثناء إنشاء المعاملة",
     "error_calc": "حدث خطأ أثناء الحساب",
-    "error_calculating": "خطأ في حساب ضريبة الاستقطاع"
+    "error_calculating": "خطأ في حساب ضريبة الاستقطاع",
+    "error_loading_rates": "فشل تحميل معدلات الضريبة المستقطعة",
+    "error_loading_transactions": "فشل تحميل معاملات الضريبة المستقطعة"
   },
   "services": {
     "home_title": "الخدمات والصيانة",
@@ -8980,7 +9124,8 @@
     "zatca_warning_title": "تنبيه:",
     "zatca_warning": "طريقة ZATCA تحسب من جانبي الميزانية (المطلوبات والموجودات) وقد تؤدي للازدواج الزكوي. يُنصح باستخدام طريقة الموجودات الشرعية.",
     "excluded_reason": "هذه الأصول مستبعدة لأنها ليست نقداً ولا عروض تجارة — لا زكاة فيها شرعاً (ملك ناقص أو أصول استهلاكية)",
-    "coming_soon_country": "حاسبة الزكاة غير متوفرة حالياً لدولتك. يعمل الفريق على دعم المزيد من الدول في التحديثات القادمة."
+    "coming_soon_country": "حاسبة الزكاة غير متوفرة حالياً لدولتك. يعمل الفريق على دعم المزيد من الدول في التحديثات القادمة.",
+    "gl_reference": "مرجع دفتر الأستاذ"
   },
   "fiscal_locks": {
     "title": "قفل الفترات المحاسبية",
@@ -9126,7 +9271,12 @@
     "request_new": "طلب رابط جديد",
     "mismatch": "كلمات المرور غير متطابقة",
     "too_short": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-    "error": "حدث خطأ، يرجى المحاولة مرة أخرى"
+    "error": "حدث خطأ، يرجى المحاولة مرة أخرى",
+    "min_length": "8 أحرف على الأقل",
+    "need_lowercase": "حرف صغير واحد على الأقل",
+    "need_number": "رقم واحد على الأقل",
+    "need_special": "رمز خاص واحد على الأقل",
+    "need_uppercase": "حرف كبير واحد على الأقل"
   },
   "manufacturing_costing": {
     "title": "تكاليف التصنيع",
@@ -10369,5 +10519,14 @@
     "you_can_modify_enabled_modules_later_from_settings": "يمكنك تعديل الوحدات المفعّلة لاحقاً من الإعدادات",
     "saving": "⏳ جاري الحفظ...",
     "confirm_start": "✓ تأكيد وبدء العمل"
+  },
+  "globalsearch": {
+    "search_pages_reports_settings": "ابحث في النظام... (صفحات، تقارير، إعدادات)",
+    "no_results_for": "لا توجد نتائج لـ",
+    "_quick_access": "⚡ الصفحات الشائعة",
+    "navigate": "للتنقل"
+  },
+  "asset": {
+    "transfers_reval": "النقل والتقييم"
   }
 }

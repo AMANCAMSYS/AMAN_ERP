@@ -1,6 +1,7 @@
 """Pydantic schemas for 3-way matching."""
 
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -10,10 +11,10 @@ from pydantic import BaseModel, Field
 
 class MatchToleranceCreate(BaseModel):
     name: str = Field(..., max_length=100)
-    quantity_percent: float = 0
-    quantity_absolute: float = 0
-    price_percent: float = 0
-    price_absolute: float = 0
+    quantity_percent: Decimal = Decimal("0")
+    quantity_absolute: Decimal = Decimal("0")
+    price_percent: Decimal = Decimal("0")
+    price_absolute: Decimal = Decimal("0")
     supplier_id: Optional[int] = None
     product_category_id: Optional[int] = None
 
@@ -21,10 +22,10 @@ class MatchToleranceCreate(BaseModel):
 class MatchToleranceRead(BaseModel):
     id: int
     name: str
-    quantity_percent: float
-    quantity_absolute: float
-    price_percent: float
-    price_absolute: float
+    quantity_percent: Decimal
+    quantity_absolute: Decimal
+    price_percent: Decimal
+    price_absolute: Decimal
     supplier_id: Optional[int] = None
     product_category_id: Optional[int] = None
     created_at: Optional[datetime] = None
@@ -41,15 +42,15 @@ class ThreeWayMatchLineRead(BaseModel):
     po_line_id: int
     grn_ids: Optional[list] = None
     invoice_line_id: Optional[int] = None
-    po_quantity: float
-    received_quantity: float
-    invoiced_quantity: float
-    po_unit_price: float
-    invoiced_unit_price: float
-    quantity_variance_pct: float
-    quantity_variance_abs: float
-    price_variance_pct: float
-    price_variance_abs: float
+    po_quantity: Decimal
+    received_quantity: Decimal
+    invoiced_quantity: Decimal
+    po_unit_price: Decimal
+    invoiced_unit_price: Decimal
+    quantity_variance_pct: Decimal
+    quantity_variance_abs: Decimal
+    price_variance_pct: Decimal
+    price_variance_abs: Decimal
     tolerance_id: Optional[int] = None
     line_status: str
 

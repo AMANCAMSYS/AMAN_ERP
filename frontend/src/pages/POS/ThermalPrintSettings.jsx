@@ -260,12 +260,12 @@ function ThermalPrintSettings() {
                             </div>
                         ))}
                         <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>المجموع</span><span>{formatNumber(sampleOrder.subtotal)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>الضريبة</span><span>{formatNumber(sampleOrder.tax_amount)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('pos.receipt.subtotal')}</span><span>{formatNumber(sampleOrder.subtotal)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('pos.receipt.tax')}</span><span>{formatNumber(sampleOrder.tax_amount)}</span></div>
                         <div style={{ borderTop: '2px solid #000', margin: '4px 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.2em' }}><span>الإجمالي</span><span>{formatNumber(sampleOrder.total)} {currency}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>المدفوع</span><span>{formatNumber(100)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>الباقي</span><span>{formatNumber(2.25)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1.2em' }}><span>{t('pos.receipt.total')}</span><span>{formatNumber(sampleOrder.total)} {currency}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('pos.receipt.paid')}</span><span>{formatNumber(100)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{t('pos.receipt.balance_due')}</span><span>{formatNumber(2.25)}</span></div>
                         <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
                         <div style={{ textAlign: 'center', fontSize: '0.85em' }}>شكراً لتعاملكم معنا</div>
                     </div>

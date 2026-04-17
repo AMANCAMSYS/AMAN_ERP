@@ -49,6 +49,17 @@ def create_journal_entry(
             }
         ]
     """
+    # 0. Idempotency guard — if caller supplied a key, return existing JE
+    if idempotency_key:
+        existing = db.execute(text("""
+            SELECT id, entry_number FROM journal_entries
+            WHERE idempotency_key = :key
+            LIMIT 1
+        """), {"key": idempotency_key}).fetchone()
+        if existing:
+            logger.info("Idempotency hit: key=%s → JE %s", idempotency_key, existing[1])
+            return existing[0], existing[1]
+
     # 1. Validation
     if not lines:
         raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
@@ -75,7 +86,19 @@ def create_journal_entry(
     if status not in ("draft", "posted"):
         status = "posted"
 
-    # 1b. Closed Period Check
+    # 1b. Source-level duplicate guard (prevents double-posting from same module action)
+    if source and source != "Manual" and source_id is not None:
+        dup = db.execute(text("""
+            SELECT id, entry_number FROM journal_entries
+            WHERE source = :src AND source_id = :sid AND entry_date = :dt
+            LIMIT 1
+        """), {"src": source, "sid": source_id, "dt": date}).fetchone()
+        if dup:
+            logger.warning("Duplicate source posting blocked: source=%s source_id=%s date=%s → existing JE %s",
+                           source, source_id, date, dup[1])
+            return dup[0], dup[1]
+
+    # 1c. Closed Period Check
     if date and status == "posted":
         closed_period = db.execute(text("""
             SELECT 1 FROM fiscal_periods 

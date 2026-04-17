@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from utils.i18n import http_error
 from sqlalchemy import text
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -15,6 +16,41 @@ from utils.permissions import require_permission, validate_branch_access
 from utils.cache import cached
 
 router = APIRouter(prefix="/reports", tags=["التقارير"])
+
+
+# ---------------------------------------------------------------------------
+# Shared GL query helpers (Constitution: no duplicated report SQL)
+# ---------------------------------------------------------------------------
+
+def _compute_net_income_from_gl(db, *, end_date, start_date=None, branch_id=None) -> float:
+    """
+    Single source of truth for net income = Revenue − Expense from journal_lines.
+    Used by both the income statement and the balance sheet (retained earnings).
+    """
+    branch_filter = ""
+    params: dict = {"as_of": end_date}
+    if start_date:
+        date_clause = "je.entry_date BETWEEN :start AND :as_of"
+        params["start"] = start_date
+    else:
+        date_clause = "je.entry_date <= :as_of"
+    if branch_id:
+        branch_filter = "AND je.branch_id = :branch"
+        params["branch"] = branch_id
+
+    row = db.execute(text(f"""
+        SELECT
+            COALESCE(SUM(CASE WHEN a.account_type = 'revenue' THEN jl.credit - jl.debit ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN a.account_type = 'expense'  THEN jl.debit - jl.credit ELSE 0 END), 0) AS net_income
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        JOIN accounts a ON jl.account_id = a.id
+        WHERE a.account_type IN ('revenue', 'expense')
+          AND {date_clause}
+          AND je.status = 'posted'
+          {branch_filter}
+    """), params).fetchone()
+    return float(row.net_income) if row else 0.0
 
 # --- Schemas ---
 class TrialBalanceItem(BaseModel):
@@ -1216,21 +1252,11 @@ def _get_balance_sheet_data(db, as_of_date, branch_id=None):
     for root in roots:
         rollup(root, 0)
     
-    # Calculate Retained Earnings (Net Income) = Revenue - Expenses
+    # Calculate Retained Earnings (Net Income) using the shared helper
     # This ensures Balance Sheet balances: Assets = Liabilities + Equity + Retained Earnings
-    net_income_query = f"""
-        SELECT 
-            COALESCE(SUM(CASE WHEN a.account_type = 'revenue' THEN jl.credit - jl.debit ELSE 0 END), 0) -
-            COALESCE(SUM(CASE WHEN a.account_type = 'expense' THEN jl.debit - jl.credit ELSE 0 END), 0) as net_income
-        FROM journal_lines jl
-        JOIN journal_entries je ON jl.journal_entry_id = je.id
-        JOIN accounts a ON jl.account_id = a.id
-        WHERE a.account_type IN ('revenue', 'expense')
-        AND je.entry_date <= :as_of AND je.status = 'posted' {branch_filter}
-    """
-    net_income_row = db.execute(text(net_income_query), params).fetchone()
-    
-    retained_earnings = float(net_income_row.net_income) if net_income_row else 0
+    retained_earnings = _compute_net_income_from_gl(
+        db, end_date=as_of_date, branch_id=branch_id,
+    )
     
     # Add retained earnings as a virtual equity item
     if retained_earnings != 0:
@@ -1293,7 +1319,7 @@ def get_budget_report(
         # 1. Get Budget info
         budget = db.execute(text("SELECT * FROM budgets WHERE id = :id"), {"id": budget_id}).fetchone()
         if not budget:
-             raise HTTPException(status_code=404, detail="الميزانية غير موجودة")
+             raise HTTPException(**http_error(404, "budget_not_found"))
              
         start_date = budget.start_date
         end_date = budget.end_date
@@ -1444,9 +1470,9 @@ def get_cashflow_report(
             "period": {"start": start_date, "end": end_date},
             "inflows": [dict(r._mapping) for r in inflows],
             "outflows": [dict(r._mapping) for r in outflows],
-            "total_inflow": float(sum(Decimal(str(r.amount or 0)) for r in inflows).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "total_outflow": float(sum(Decimal(str(r.amount or 0)) for r in outflows).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "net_cash_flow": float((sum(Decimal(str(r.amount or 0)) for r in inflows) - sum(Decimal(str(r.amount or 0)) for r in outflows)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+            "total_inflow": float(sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "total_outflow": float(sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "net_cash_flow": float((sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)) - sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
         }
     finally:
         db.close()
@@ -3006,7 +3032,7 @@ async def preview_custom_report(
     except Exception as e:
         logger.error(f"Error previewing report: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3036,7 +3062,7 @@ async def create_custom_report(
         db.rollback()
         logger.error(f"Error saving report: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3072,7 +3098,7 @@ async def get_custom_report(report_id: int, current_user: dict = Depends(get_cur
     except Exception as e:
         logger.error(f"Error executing saved report: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3740,7 +3766,7 @@ async def food_cost_report(
     except Exception as e:
         logger.error(f"Food cost report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3816,7 +3842,7 @@ async def production_cost_report(
     except Exception as e:
         logger.error(f"Production cost report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3888,7 +3914,7 @@ async def progress_billing_report(
     except Exception as e:
         logger.error(f"Progress billing report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -3970,7 +3996,7 @@ async def drug_expiry_report(
     except Exception as e:
         logger.error(f"Drug expiry report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4040,7 +4066,7 @@ async def fleet_tracking_report(
     except Exception as e:
         logger.error(f"Fleet tracking report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4110,7 +4136,7 @@ async def utilization_report(
     except Exception as e:
         logger.error(f"Utilization report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4182,7 +4208,7 @@ async def workshop_revenue_report(
     except Exception as e:
         logger.error(f"Workshop revenue report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4255,7 +4281,7 @@ async def ecom_returns_report(
     except Exception as e:
         logger.error(f"E-com returns report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4332,7 +4358,7 @@ async def agent_performance_report(
     except Exception as e:
         logger.error(f"Agent performance report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -4401,6 +4427,6 @@ async def crop_yield_report(
     except Exception as e:
         logger.error(f"Crop yield report error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

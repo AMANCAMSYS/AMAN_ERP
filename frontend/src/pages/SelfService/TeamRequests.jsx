@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { selfServiceAPI } from '../../utils/api';
-import { useToast } from '../../context/ToastContext';
+import { toastEmitter } from '../../utils/toastEmitter';
 import { Users, CheckCircle, XCircle, Clock } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import SimpleModal from '../../components/common/SimpleModal';
@@ -9,7 +9,6 @@ import '../../components/ModuleStyles.css';
 
 const TeamRequests = () => {
     const { t } = useTranslation();
-    const { showToast } = useToast();
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(null);
@@ -27,7 +26,7 @@ const TeamRequests = () => {
             const res = await selfServiceAPI.listTeamRequests({ status: filterStatus || undefined });
             setRequests(res.data?.data || []);
         } catch (err) {
-            console.error(err);
+            toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -37,10 +36,10 @@ const TeamRequests = () => {
         setActionLoading(id);
         try {
             await selfServiceAPI.approveLeave(id);
-            showToast(t('self_service.leave_approved'), 'success');
+            toastEmitter.emit(t('self_service.leave_approved'), 'success');
             fetchRequests();
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error');
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setActionLoading(null);
         }
@@ -51,12 +50,12 @@ const TeamRequests = () => {
         setActionLoading(rejectModal.id);
         try {
             await selfServiceAPI.rejectLeave(rejectModal.id, rejectReason);
-            showToast(t('self_service.leave_rejected_msg'), 'success');
+            toastEmitter.emit(t('self_service.leave_rejected_msg'), 'success');
             setRejectModal({ open: false, id: null });
             setRejectReason('');
             fetchRequests();
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error'), 'error');
+            toastEmitter.emit(err.response?.data?.detail || t('common.error'), 'error');
         } finally {
             setActionLoading(null);
         }

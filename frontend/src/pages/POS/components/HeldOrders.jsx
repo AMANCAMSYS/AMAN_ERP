@@ -4,6 +4,7 @@ import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
 import { formatShortDate, formatDateTime } from '../../../utils/dateUtils';
+import { formatNumber } from '../../../utils/format';
 
 
 const HeldOrders = ({ onResume, onClose }) => {
@@ -38,26 +39,18 @@ const HeldOrders = ({ onResume, onClose }) => {
     };
 
     const handleCancel = async (orderId) => {
-        console.log('Delete button clicked for order:', orderId);
-
         const confirmed = window.confirm(t('pos.confirm_cancel_held'));
-        console.log('User confirmed deletion:', confirmed);
 
         if (!confirmed) {
-            console.log('User cancelled deletion');
             return;
         }
 
         try {
-            console.log('Sending DELETE request to:', `/pos/orders/${orderId}/cancel-held`);
             const response = await api.delete(`/pos/orders/${orderId}/cancel-held`);
-            console.log('Delete response:', response);
 
             setHeldOrders(heldOrders.filter(o => o.id !== orderId));
             showToast(t('pos.order_cancelled'), 'success');
         } catch (err) {
-            console.error('Delete error:', err);
-            console.error('Error response:', err.response);
             showToast(err.response?.data?.detail || t('common.error'), 'error');
         }
     };
@@ -98,7 +91,7 @@ const HeldOrders = ({ onResume, onClose }) => {
                                         <span><Package size={14} /> {order.items_count} {t('pos.items')}</span>
                                     </div>
                                     <div className="order-total">
-                                        {order.total_amount?.toLocaleString()} {t('common.currency')}
+                                        {formatNumber(order.total_amount)} {t('common.currency')}
                                     </div>
                                 </div>
                                 <div className="order-actions">

@@ -7,6 +7,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import DateInput from '../../components/common/DateInput';
 
 export default function ProjectForm() {
     const { t, i18n } = useTranslation();

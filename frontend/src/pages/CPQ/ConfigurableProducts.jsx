@@ -6,18 +6,21 @@ import { Settings, Package } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { useToast } from '../../context/ToastContext';
+import { formatNumber } from '../../utils/format';
 
 const ConfigurableProducts = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         cpqAPI.listProducts()
             .then(res => setProducts(res.data || []))
-            .catch(e => console.error(e))
+            .catch(() => showToast(t('common.error'), 'error'))
             .finally(() => setLoading(false));
     }, []);
 
@@ -61,7 +64,7 @@ const ConfigurableProducts = () => {
                                     <td>{p.product_code}</td>
                                     <td>{p.product_name}</td>
                                     <td>{p.name}</td>
-                                    <td>{Number(p.selling_price || 0).toFixed(2)}</td>
+                                    <td>{formatNumber(p.selling_price || 0)}</td>
                                     <td>
                                         <button
                                             className="btn btn-sm btn-primary"

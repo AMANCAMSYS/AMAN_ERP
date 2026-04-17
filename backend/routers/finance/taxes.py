@@ -3,6 +3,7 @@
 إدارة أنواع الضرائب، الإقرارات الضريبية، المدفوعات، التسويات، وتقارير VAT
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from datetime import date, datetime
@@ -70,7 +71,7 @@ def get_tax_rate(rate_id: int, current_user: dict = Depends(get_current_user)):
     try:
         row = db.execute(text("SELECT * FROM tax_rates WHERE id = :id"), {"id": rate_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="نوع الضريبة غير موجود")
+            raise HTTPException(**http_error(404, "tax_type_not_found"))
         return dict(row._mapping)
     finally:
         db.close()
@@ -117,7 +118,7 @@ def create_tax_rate(
         db.rollback()
         logger.error(f"Error creating tax rate: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -132,7 +133,7 @@ def update_tax_rate(
     try:
         existing = db.execute(text("SELECT 1 FROM tax_rates WHERE id = :id"), {"id": rate_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="نوع الضريبة غير موجود")
+            raise HTTPException(**http_error(404, "tax_type_not_found"))
 
         updates = []
         params = {"id": rate_id}
@@ -141,7 +142,7 @@ def update_tax_rate(
             params[field] = val
 
         if not updates:
-            raise HTTPException(status_code=400, detail="لا توجد بيانات للتحديث")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         db.execute(text(f"UPDATE tax_rates SET {', '.join(updates)} WHERE id = :id"), params)
         db.commit()
@@ -157,7 +158,7 @@ def update_tax_rate(
         db.rollback()
         logger.error(f"Error updating tax rate: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -169,7 +170,7 @@ def delete_tax_rate(rate_id: int, request: Request, current_user: dict = Depends
     try:
         existing = db.execute(text("SELECT tax_code FROM tax_rates WHERE id = :id"), {"id": rate_id}).fetchone()
         if not existing:
-            raise HTTPException(status_code=404, detail="نوع الضريبة غير موجود")
+            raise HTTPException(**http_error(404, "tax_type_not_found"))
 
         db.execute(text("UPDATE tax_rates SET is_active = FALSE WHERE id = :id"), {"id": rate_id})
         db.commit()
@@ -185,7 +186,7 @@ def delete_tax_rate(rate_id: int, request: Request, current_user: dict = Depends
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -260,7 +261,7 @@ def create_tax_group(request: Request, data: TaxGroupCreate, current_user: dict 
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -332,7 +333,7 @@ def get_tax_return(return_id: int, current_user: dict = Depends(get_current_user
             WHERE tr.id = :id
         """), {"id": return_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+            raise HTTPException(**http_error(404, "tax_return_not_found"))
         if row.branch_id:
             validate_branch_access(current_user, row.branch_id)
 
@@ -349,8 +350,8 @@ def get_tax_return(return_id: int, current_user: dict = Depends(get_current_user
         result["payments"] = [dict(p._mapping) for p in payments]
         paid_amount = sum((_dec(p.amount) for p in payments if p.status == "confirmed"), Decimal("0"))
         remaining_amount = _dec(result.get("total_amount", 0)) - paid_amount
-        result["paid_amount"] = float(paid_amount.quantize(_D2, ROUND_HALF_UP))
-        result["remaining_amount"] = float(remaining_amount.quantize(_D2, ROUND_HALF_UP))
+        result["paid_amount"] = str(paid_amount.quantize(_D2, ROUND_HALF_UP))
+        result["remaining_amount"] = str(remaining_amount.quantize(_D2, ROUND_HALF_UP))
 
         return result
     finally:
@@ -398,7 +399,7 @@ def create_tax_return(
             "SELECT 1 FROM tax_returns WHERE tax_period = :period AND tax_type = :type AND status != 'cancelled'"
         ), {"period": period, "type": data.tax_type}).fetchone()
         if dup:
-            raise HTTPException(status_code=400, detail=f"يوجد إقرار ضريبي لنفس الفترة ({period}) بالفعل")
+            raise HTTPException(status_code=409, detail=f"يوجد إقرار ضريبي لنفس الفترة ({period}) بالفعل")
 
         # Output VAT (sales)
         output = db.execute(text(f"""
@@ -485,10 +486,10 @@ def create_tax_return(
             "success": True, "id": new_id, "return_number": return_number,
             "message": "تم إنشاء الإقرار الضريبي بنجاح",
             "summary": {
-                "output_vat": float(net_output_vat.quantize(_D2, ROUND_HALF_UP)),
-                "input_vat": float(net_input_vat.quantize(_D2, ROUND_HALF_UP)),
-                "net_payable": float(tax_amount.quantize(_D2, ROUND_HALF_UP)),
-                "taxable_amount": float(taxable_amount.quantize(_D2, ROUND_HALF_UP))
+                "output_vat": str(net_output_vat.quantize(_D2, ROUND_HALF_UP)),
+                "input_vat": str(net_input_vat.quantize(_D2, ROUND_HALF_UP)),
+                "net_payable": str(tax_amount.quantize(_D2, ROUND_HALF_UP)),
+                "taxable_amount": str(taxable_amount.quantize(_D2, ROUND_HALF_UP))
             }
         }
     except HTTPException:
@@ -497,7 +498,7 @@ def create_tax_return(
         db.rollback()
         logger.error(f"Error creating tax return: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -513,7 +514,7 @@ def file_tax_return(
     try:
         row = db.execute(text("SELECT * FROM tax_returns WHERE id = :id"), {"id": return_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+            raise HTTPException(**http_error(404, "tax_return_not_found"))
         if row.branch_id:
             validate_branch_access(current_user, row.branch_id)
         if row.status != "draft":
@@ -536,13 +537,19 @@ def file_tax_return(
                      details={"return_number": row.return_number, "total": float(total)},
                      request=request)
 
-        return {"success": True, "message": "تم تقديم الإقرار الضريبي بنجاح", "total_amount": float(total)}
+        return {
+            "success": True,
+            "message": "تم تقديم الإقرار الضريبي بنجاح",
+            "status": "filed",
+            "filed_date": str(date.today()),
+            "total_amount": str(total)
+        }
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -554,7 +561,7 @@ def cancel_tax_return(return_id: int, request: Request, current_user: dict = Dep
     try:
         row = db.execute(text("SELECT * FROM tax_returns WHERE id = :id"), {"id": return_id}).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+            raise HTTPException(**http_error(404, "tax_return_not_found"))
         if row.branch_id:
             validate_branch_access(current_user, row.branch_id)
         if row.status == "paid":
@@ -580,7 +587,7 @@ def cancel_tax_return(return_id: int, request: Request, current_user: dict = Dep
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -643,7 +650,7 @@ def create_tax_payment(
     try:
         tr = db.execute(text("SELECT * FROM tax_returns WHERE id = :id"), {"id": data.tax_return_id}).fetchone()
         if not tr:
-            raise HTTPException(status_code=404, detail="الإقرار الضريبي غير موجود")
+            raise HTTPException(**http_error(404, "tax_return_not_found"))
         if tr.status in ("cancelled", "draft"):
             raise HTTPException(status_code=400, detail="لا يمكن الدفع على إقرار ملغى أو مسودة. يجب تقديمه أولاً")
 
@@ -741,7 +748,7 @@ def create_tax_payment(
         db.rollback()
         logger.error(f"Error creating tax payment: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -809,9 +816,9 @@ def get_vat_report(
 
         return {
             "period": {"start": start_date, "end": end_date},
-            "output_vat": {"taxable": float(net_output_taxable), "vat": float(net_output_vat)},
-            "input_vat": {"taxable": float(net_input_taxable), "vat": float(net_input_vat)},
-            "net_vat_payable": float(net_vat_payable)
+            "output_vat": {"taxable": str(net_output_taxable), "vat": str(net_output_vat)},
+            "input_vat": {"taxable": str(net_input_taxable), "vat": str(net_input_vat)},
+            "net_vat_payable": str(net_vat_payable)
         }
     finally:
         db.close()
@@ -859,7 +866,7 @@ def get_tax_audit(
             {
                 "id": r.id, "number": r.invoice_number, "date": r.invoice_date,
                 "type": r.invoice_type, "party": r.party_name, "tax_number": r.tax_number,
-                "taxable": float(r.taxable_amount or 0), "vat": float(r.vat_amount or 0)
+                "taxable": str(_dec(r.taxable_amount or 0).quantize(_D2, ROUND_HALF_UP)), "vat": str(_dec(r.vat_amount or 0).quantize(_D2, ROUND_HALF_UP))
             }
             for r in results
         ]
@@ -962,13 +969,13 @@ def get_tax_summary(
             "returns": {
                 "total": returns_stats.total or 0, "draft": returns_stats.draft or 0,
                 "filed": returns_stats.filed or 0, "paid": returns_stats.paid or 0,
-                "pending_amount": float(returns_stats.pending_amount or 0),
-                "paid_amount": float(returns_stats.paid_amount or 0)
+                "pending_amount": str(_dec(returns_stats.pending_amount or 0).quantize(_D2, ROUND_HALF_UP)),
+                "paid_amount": str(_dec(returns_stats.paid_amount or 0).quantize(_D2, ROUND_HALF_UP))
             },
             "current_period": {
-                "output_vat": float(current_vat.output_vat or 0),
-                "input_vat": float(current_vat.input_vat or 0),
-                "net_vat": float((_dec(current_vat.output_vat) - _dec(current_vat.input_vat)).quantize(_D2, ROUND_HALF_UP))
+                "output_vat": str(_dec(current_vat.output_vat or 0).quantize(_D2, ROUND_HALF_UP)),
+                "input_vat": str(_dec(current_vat.input_vat or 0).quantize(_D2, ROUND_HALF_UP)),
+                "net_vat": str((_dec(current_vat.output_vat) - _dec(current_vat.input_vat)).quantize(_D2, ROUND_HALF_UP))
             },
             "overdue_returns": overdue,
             "employee_taxes": emp_tax,
@@ -1077,7 +1084,7 @@ def create_tax_settlement(
         db.rollback()
         logger.error(f"Error creating tax settlement: {e}")
         logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1451,7 +1458,7 @@ def get_tax_calendar_item(
     except Exception as e:
         logger.error(f"Error: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1489,7 +1496,7 @@ def create_tax_calendar_item(
         db.rollback()
         logger.error(f"Error creating calendar item: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1534,7 +1541,7 @@ def update_tax_calendar_item(
         db.rollback()
         logger.error(f"Error updating calendar item: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1561,7 +1568,7 @@ def delete_tax_calendar_item(
     except Exception as e:
         db.rollback()
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
 
@@ -1619,6 +1626,6 @@ def complete_tax_calendar_item(
         db.rollback()
         logger.error(f"Error completing calendar item: {e}")
         logger.exception("Internal error")
-        raise HTTPException(500, "حدث خطأ داخلي")
+        raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()

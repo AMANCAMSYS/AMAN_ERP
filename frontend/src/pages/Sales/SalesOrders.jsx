@@ -5,10 +5,13 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
+import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
+import { formatNumber } from '../../utils/format';
 
 function SalesOrders() {
     const { t } = useTranslation()
+    const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
@@ -21,7 +24,7 @@ function SalesOrders() {
                 const response = await salesAPI.listOrders({ branch_id: currentBranch?.id })
                 setOrders(response.data)
             } catch (err) {
-                console.error(err)
+                showToast(t('common.error'), 'error')
             } finally {
                 setLoading(false)
             }
@@ -75,7 +78,7 @@ function SalesOrders() {
                                     <td>{formatShortDate(order.order_date)}</td>
                                     <td>{order.expected_delivery_date ? formatShortDate(order.expected_delivery_date) : '-'}</td>
                                     <td className="font-bold">
-                                        {Number(order.total).toLocaleString()} <small>{currency}</small>
+                                        {formatNumber(order.total)} <small>{currency}</small>
                                     </td>
                                     <td>
                                         <span className={`status-badge ${order.status}`}>

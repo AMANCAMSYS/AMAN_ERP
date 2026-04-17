@@ -18,7 +18,7 @@ const CashFlowWidget = ({ config = {}, currency = '' }) => {
     }, [days]);
 
     if (loading) return <div className="animate-pulse h-[250px] bg-slate-100 rounded-lg" />;
-    if (!data.length) return <div className="text-sm text-slate-400 text-center py-12">لا توجد بيانات</div>;
+    if (!data.length) return <div className="text-sm text-slate-400 text-center py-12">{t('common.no_data')}</div>;
 
     const option = {
         tooltip: {

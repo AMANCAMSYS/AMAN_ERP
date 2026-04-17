@@ -95,6 +95,7 @@ function TreasuryBalancesReport() {
                                             <th>{t('treasury_reports.balances.account_name')}</th>
                                             <th>{t('treasury_reports.balances.branch')}</th>
                                             <th className="text-end">{t('treasury_reports.balances.balance')}</th>
+                                            <th className="text-end">{t('treasury_reports.balances.gl_balance', 'رصيد الأستاذ العام')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -107,10 +108,15 @@ function TreasuryBalancesReport() {
                                                         {formatNumber(acc.current_balance)} {currency}
                                                     </span>
                                                 </td>
+                                                <td className="text-end">
+                                                    <span style={{ fontWeight: 600 }}>
+                                                        {acc.gl_balance != null ? `${formatNumber(acc.gl_balance)} ${currency}` : '—'}
+                                                    </span>
+                                                </td>
                                             </tr>
                                         ))}
                                         {cashAccounts.length === 0 && (
-                                            <tr><td colSpan="3" className="text-center text-muted p-4">{t('common.no_data')}</td></tr>
+                                            <tr><td colSpan="4" className="text-center text-muted p-4">{t('common.no_data')}</td></tr>
                                         )}
                                     </tbody>
                                     {cashAccounts.length > 0 && (
@@ -118,6 +124,7 @@ function TreasuryBalancesReport() {
                                             <tr style={{ fontWeight: 700, background: 'var(--bg-secondary)' }}>
                                                 <td colSpan="2">{t('treasury_reports.balances.cash_total')}</td>
                                                 <td className="text-end text-success">{formatNumber(data.summary.total_cash)} {currency}</td>
+                                                <td className="text-end"></td>
                                             </tr>
                                         </tfoot>
                                     )}
@@ -137,6 +144,7 @@ function TreasuryBalancesReport() {
                                             <th>{t('treasury_reports.balances.account_name')}</th>
                                             <th>{t('treasury_reports.balances.branch')}</th>
                                             <th className="text-end">{t('treasury_reports.balances.balance')}</th>
+                                            <th className="text-end">{t('treasury_reports.balances.gl_balance', 'رصيد الأستاذ العام')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -154,10 +162,15 @@ function TreasuryBalancesReport() {
                                                         </div>
                                                     )}
                                                 </td>
+                                                <td className="text-end">
+                                                    <span style={{ fontWeight: 600 }}>
+                                                        {acc.gl_balance != null ? `${formatNumber(acc.gl_balance)} ${currency}` : '—'}
+                                                    </span>
+                                                </td>
                                             </tr>
                                         ))}
                                         {bankAccounts.length === 0 && (
-                                            <tr><td colSpan="3" className="text-center text-muted p-4">{t('common.no_data')}</td></tr>
+                                            <tr><td colSpan="4" className="text-center text-muted p-4">{t('common.no_data')}</td></tr>
                                         )}
                                     </tbody>
                                     {bankAccounts.length > 0 && (
@@ -165,6 +178,7 @@ function TreasuryBalancesReport() {
                                             <tr style={{ fontWeight: 700, background: 'var(--bg-secondary)' }}>
                                                 <td colSpan="2">{t('treasury_reports.balances.bank_total')}</td>
                                                 <td className="text-end text-info">{formatNumber(data.summary.total_bank)} {currency}</td>
+                                                <td className="text-end"></td>
                                             </tr>
                                         </tfoot>
                                     )}

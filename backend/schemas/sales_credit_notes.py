@@ -5,7 +5,7 @@ from typing import Optional, List
 
 
 class SalesNoteLine(BaseModel):
-    quantity: float = 1
+    quantity: Decimal = Decimal("1")
     unit_price: Decimal = Decimal("0")
     tax_rate: Decimal = Decimal("0")
     discount: Decimal = Decimal("0")

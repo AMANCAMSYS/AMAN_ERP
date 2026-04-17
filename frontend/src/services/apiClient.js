@@ -13,6 +13,30 @@ const api = axios.create({
     }
 })
 
+// --- Token Refresh Mutex ---
+// Prevents multiple concurrent 401s from each trying to refresh (and rotate/blacklist) the token.
+// The first 401 triggers a refresh; subsequent 401s wait for the same promise.
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onRefreshed(newToken) {
+    refreshSubscribers.forEach(cb => cb(newToken));
+    refreshSubscribers = [];
+}
+
+function onRefreshFailed() {
+    refreshSubscribers.forEach(cb => cb(null));
+    refreshSubscribers = [];
+}
+
+function subscribeTokenRefresh(cb) {
+    return new Promise((resolve) => {
+        refreshSubscribers.push((token) => {
+            resolve(cb(token));
+        });
+    });
+}
+
 // Add auth token + AbortController to requests
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token')
@@ -59,12 +83,25 @@ api.interceptors.response.use(
             return api(originalRequest);
         }
 
-        // --- Auto Token Refresh ---
+        // --- Auto Token Refresh (with mutex to prevent race conditions) ---
         if (error.response?.status === 401 && !originalRequest._isRetry) {
             originalRequest._isRetry = true;
+
+            // If a refresh is already in progress, queue this request to retry after it completes
+            if (isRefreshing) {
+                return subscribeTokenRefresh((newToken) => {
+                    if (newToken) {
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                        return api(originalRequest);
+                    }
+                    return Promise.reject(error);
+                });
+            }
+
             const currentRefreshToken = localStorage.getItem('refresh_token');
 
             if (currentRefreshToken) {
+                isRefreshing = true;
                 try {
                     // Attempt to refresh access token using long-lived refresh token
                     const refreshRes = await axios.post(
@@ -79,11 +116,20 @@ api.interceptors.response.use(
                         if (newRefreshToken) {
                             localStorage.setItem('refresh_token', newRefreshToken);
                         }
+                        // Notify all queued requests with the new token
+                        onRefreshed(newToken);
+                        isRefreshing = false;
+
+                        // Notify WebSocket hooks to reconnect with fresh token
+                        window.dispatchEvent(new Event('token_refreshed'));
+
                         originalRequest.headers.Authorization = `Bearer ${newToken}`;
                         return api(originalRequest); // retry original request
                     }
                 } catch (refreshError) {
-                    // Refresh failed — session truly expired
+                    // Refresh failed — notify all queued requests
+                    onRefreshFailed();
+                    isRefreshing = false;
                 }
             }
 
