@@ -48,7 +48,7 @@ const ProjectRisks = () => {
             } else {
                 const [depRes, taskRes] = await Promise.all([
                     projectsAPI.listTaskDependencies(selectedProject),
-                    projectsAPI.listTasks ? projectsAPI.listTasks(selectedProject) : Promise.resolve({ data: [] })
+                    projectsAPI.getTasks ? projectsAPI.getTasks(selectedProject) : Promise.resolve({ data: [] })
                 ]);
                 setDependencies(depRes.data || []);
                 setTasks(taskRes.data?.tasks || taskRes.data || []);
@@ -132,7 +132,7 @@ const ProjectRisks = () => {
                 <label className="form-label mb-0" style={{ whiteSpace: 'nowrap' }}>{t('project_risks.project', 'المشروع') + ':'}</label>
                 <select className="form-input" style={{ maxWidth: 400 }} value={selectedProject}
                     onChange={e => setSelectedProject(e.target.value)}>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_name}</option>)}
                 </select>
             </div>
 
@@ -263,7 +263,7 @@ const ProjectRisks = () => {
                                     <select className="form-input" required value={depForm.task_id}
                                         onChange={e => setDepForm(p => ({ ...p, task_id: e.target.value }))}>
                                         <option value="">{t('common.select', 'اختر')}</option>
-                                        {tasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        {tasks.map(t => <option key={t.id} value={t.id}>{t.task_name}</option>)}
                                     </select>
                                 </div>
                             </div>
@@ -273,7 +273,7 @@ const ProjectRisks = () => {
                                     <select className="form-input" required value={depForm.depends_on_task_id}
                                         onChange={e => setDepForm(p => ({ ...p, depends_on_task_id: e.target.value }))}>
                                         <option value="">{t('common.select', 'اختر')}</option>
-                                        {tasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        {tasks.map(t => <option key={t.id} value={t.id}>{t.task_name}</option>)}
                                     </select>
                                 </div>
                             </div>

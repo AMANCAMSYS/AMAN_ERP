@@ -192,7 +192,11 @@ function DashboardView() {
     const fetchDashboard = useCallback(async () => {
         try {
             setLoading(true)
-            const response = await dashboardAPI.getAnalyticsDashboard(id)
+            const params = {}
+            if (dateFrom) params.start_date = dateFrom
+            if (dateTo) params.end_date = dateTo
+            if (branchFilter) params.branch_id = branchFilter
+            const response = await dashboardAPI.getAnalyticsDashboard(id, { params })
             setDashboard(response.data)
         } catch (err) {
             setError(t('analytics.error_loading'))
@@ -200,7 +204,7 @@ function DashboardView() {
         } finally {
             setLoading(false)
         }
-    }, [id, t])
+    }, [id, t, dateFrom, dateTo, branchFilter])
 
     useEffect(() => {
         fetchDashboard()

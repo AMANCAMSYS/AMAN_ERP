@@ -211,10 +211,10 @@ const AdminCard = ({ icon, title, desc, link }) => (
 
 /* ── QuickActions ────────────────────────────────────── */
 const ACTIONS = [
-    { icon: <TrendingUp size={20}/>, key: 'nav.sales',       fallbackAR: 'مبيعات',       link: '/sales/invoices/new',            bg: '#dbeafe', fg: '#2563eb', module: 'sales' },
-    { icon: <Package    size={20}/>, key: 'nav.inventory',   fallbackAR: 'مخزون',        link: '/stock/products/new',            bg: '#dcfce7', fg: '#16a34a', module: 'stock' },
-    { icon: <Wallet     size={20}/>, key: 'nav.accounting',  fallbackAR: 'محاسبة',       link: '/accounting/journal-entries/new',bg: '#fef9c3', fg: '#ca8a04', module: 'accounting' },
-    { icon: <Users      size={20}/>, key: 'nav.hr',          fallbackAR: 'موارد بشرية',  link: '/hr/employees',                  bg: '#fae8ff', fg: '#9333ea', module: 'hr' },
+    { icon: <TrendingUp size={20}/>, key: 'nav.sales',       link: '/sales/invoices/new',            bg: '#dbeafe', fg: '#2563eb', module: 'sales' },
+    { icon: <Package    size={20}/>, key: 'nav.inventory',   link: '/stock/products/new',            bg: '#dcfce7', fg: '#16a34a', module: 'stock' },
+    { icon: <Wallet     size={20}/>, key: 'nav.accounting',  link: '/accounting/journal-entries/new',bg: '#fef9c3', fg: '#ca8a04', module: 'accounting' },
+    { icon: <Users      size={20}/>, key: 'nav.hr',          link: '/hr/employees',                  bg: '#fae8ff', fg: '#9333ea', module: 'hr' },
 ];
 
 const QuickActions = ({ t, isRTL, enabledModules }) => {
@@ -232,7 +232,7 @@ const QuickActions = ({ t, isRTL, enabledModules }) => {
                 <span style={{ padding: '0.45rem', background: a.bg, borderRadius: '0.5rem', color: a.fg, display: 'flex' }}>
                     {a.icon}
                 </span>
-                {t(a.key) || (isRTL ? a.fallbackAR : a.key.split('.')[1])}
+                {t(a.key)}
             </button>
         ))}
     </div>

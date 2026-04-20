@@ -54,6 +54,8 @@ export default function CampaignReport() {
     const [executing, setExecuting] = useState(false);
     const [attributeLeadId, setAttributeLeadId] = useState('');
     const [showAttributeModal, setShowAttributeModal] = useState(false);
+    const [opportunities, setOpportunities] = useState([]);
+    const [opportunitySearch, setOpportunitySearch] = useState('');
 
     useEffect(() => { fetchAll(); }, [id]);
 
@@ -89,6 +91,15 @@ export default function CampaignReport() {
         }
     };
 
+    const fetchOpportunities = async () => {
+        try {
+            const res = await crmAPI.listOpportunities({ limit: 200 });
+            setOpportunities(res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch opportunities', err);
+        }
+    };
+
     const handleAttributeLead = async () => {
         if (!attributeLeadId) return;
         try {
@@ -96,6 +107,7 @@ export default function CampaignReport() {
             showToast(t('campaign.lead_attributed', 'Lead attributed'), 'success');
             setShowAttributeModal(false);
             setAttributeLeadId('');
+            setOpportunitySearch('');
             fetchAll();
         } catch (err) {
             showToast(err.response?.data?.detail || t('common.error'), 'error');
@@ -133,7 +145,7 @@ export default function CampaignReport() {
                             {executing ? t('common.loading') : t('campaign.execute', 'Execute Campaign')}
                         </button>
                     )}
-                    <button className="btn btn-secondary" onClick={() => setShowAttributeModal(true)}>
+                    <button className="btn btn-secondary" onClick={() => { setShowAttributeModal(true); fetchOpportunities(); }}>
                         {t('campaign.attribute_lead', 'Attribute Lead')}
                     </button>
                 </div>
@@ -287,20 +299,44 @@ export default function CampaignReport() {
                     )}
             </div>
 
-            {/* Attribute Lead Modal */}
             {showAttributeModal && (
-                <div className="modal-overlay" onClick={() => setShowAttributeModal(false)}>
+                <div className="modal-overlay" onClick={() => { setShowAttributeModal(false); setOpportunitySearch(''); }}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
                         <div className="modal-header">
                             <h3>{t('campaign.attribute_lead', 'Attribute Lead to Campaign')}</h3>
                         </div>
                         <div className="modal-body">
                             <div className="form-group">
-                                <label className="form-label">{t('crm.opportunity_id', 'Lead / Opportunity ID')}</label>
-                                <input type="number" className="form-input" min="1"
-                                    value={attributeLeadId}
-                                    onChange={e => setAttributeLeadId(e.target.value)}
-                                    placeholder={t('crm.enter_opportunity_id')} />
+                                <label className="form-label">{t('crm.opportunity', 'Lead / Opportunity')}</label>
+                                <input
+                                    className="form-input"
+                                    placeholder={t('common.search', 'بحث باسم الفرصة...')}
+                                    value={opportunitySearch}
+                                    onChange={e => setOpportunitySearch(e.target.value)}
+                                    style={{ marginBottom: 4 }}
+                                />
+                                {opportunities.length === 0 ? (
+                                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+                                        {t('common.loading', 'جارٍ التحميل...')}
+                                    </p>
+                                ) : (
+                                    <select
+                                        className="form-input"
+                                        value={attributeLeadId}
+                                        onChange={e => setAttributeLeadId(e.target.value)}
+                                    >
+                                        <option value="">{t('crm.select_opportunity', '-- اختر الفرصة --')}</option>
+                                        {opportunities
+                                            .filter(o => !opportunitySearch ||
+                                                (o.title || '').toLowerCase().includes(opportunitySearch.toLowerCase()) ||
+                                                (o.customer_name || '').toLowerCase().includes(opportunitySearch.toLowerCase()))
+                                            .map(o => (
+                                                <option key={o.id} value={o.id}>
+                                                    {o.title}{o.customer_name ? ` — ${o.customer_name}` : ''}
+                                                </option>
+                                            ))}
+                                    </select>
+                                )}
                             </div>
                         </div>
                         <div className="modal-footer">
@@ -308,7 +344,7 @@ export default function CampaignReport() {
                                 disabled={!attributeLeadId}>
                                 {t('campaign.attribute', 'Attribute')}
                             </button>
-                            <button className="btn btn-secondary" onClick={() => setShowAttributeModal(false)}>
+                            <button className="btn btn-secondary" onClick={() => { setShowAttributeModal(false); setOpportunitySearch(''); }}>
                                 {t('common.cancel', 'Cancel')}
                             </button>
                         </div>

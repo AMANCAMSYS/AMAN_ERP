@@ -21,6 +21,28 @@ const SecurityEvents = () => {
     const [totalEvents, setTotalEvents] = useState(0);
     const PAGE_SIZE = 25;
 
+    const humanizeToken = (value) => {
+        if (!value) return '';
+        return String(value)
+            .replace(/[._-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const translatedOrNull = (key) => {
+        const translated = t(key);
+        return translated === key ? null : translated;
+    };
+
+    const formatSeverity = (severity) => {
+        return translatedOrNull(`security_events.severity_levels.${severity}`) || humanizeToken(severity);
+    };
+
+    const formatEventType = (eventType) => {
+        return translatedOrNull(`security_events.event_types.${eventType}`) || humanizeToken(eventType);
+    };
+
     useEffect(() => { fetchData(); }, [activeTab, filter, page]);
 
     const fetchData = async () => {
@@ -128,14 +150,14 @@ const SecurityEvents = () => {
                         value={filter.severity} onChange={e => { setPage(1); setFilter(p => ({ ...p, severity: e.target.value })); }}>
                         <option value="">{t('security_events.all_severities')}</option>
                         {['critical', 'high', 'medium', 'low', 'info'].map(s => (
-                            <option key={s} value={s}>{s}</option>
+                            <option key={s} value={s}>{formatSeverity(s)}</option>
                         ))}
                     </select>
                     <select className="form-input" style={{ maxWidth: 200 }}
                         value={filter.event_type} onChange={e => { setPage(1); setFilter(p => ({ ...p, event_type: e.target.value })); }}>
                         <option value="">{t('security_events.all_types')}</option>
                         {(summary.by_type || []).map(t => (
-                            <option key={t.event_type} value={t.event_type}>{t.event_type} ({t.cnt})</option>
+                            <option key={t.event_type} value={t.event_type}>{formatEventType(t.event_type)} ({t.cnt})</option>
                         ))}
                     </select>
                 </div>
@@ -162,10 +184,10 @@ const SecurityEvents = () => {
                                 ) : events.map(ev => (
                                     <tr key={ev.id}>
                                         <td style={{ whiteSpace: 'nowrap' }}>{formatDate(ev.created_at)}</td>
-                                        <td><span className="badge bg-secondary">{ev.event_type}</span></td>
+                                        <td><span className="badge bg-secondary">{formatEventType(ev.event_type)}</span></td>
                                         <td>
                                             <span className="badge" style={{ background: severityColor(ev.severity), color: '#fff' }}>
-                                                {ev.severity}
+                                                {formatSeverity(ev.severity)}
                                             </span>
                                         </td>
                                         <td><code>{ev.ip_address || '—'}</code></td>

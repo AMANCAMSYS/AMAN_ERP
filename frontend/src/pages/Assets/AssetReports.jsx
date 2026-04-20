@@ -206,7 +206,11 @@ function AssetReports() {
                 </div>
                 <div className="metric-card">
                     <div className="metric-label">{t('asset_reports.asset_count')}</div>
-                    <div className="metric-value">{data.length}</div>
+                    <div className="metric-value">
+                        {activeTab === 'depreciation'
+                            ? data.reduce((sum, row) => sum + (row.asset_count || row.count || 0), 0)
+                            : data.length}
+                    </div>
                     <div className="metric-change">{t('asset_reports.assets')}</div>
                 </div>
             </div>

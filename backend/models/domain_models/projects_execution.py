@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
+from decimal import Decimal
 
 from ..base import ModelBase
 
@@ -28,7 +29,7 @@ class ProjectRisk(ModelBase):
     description: Mapped[str | None] = mapped_column(Text)
     probability: Mapped[str | None] = mapped_column(String(20), default="medium")
     impact: Mapped[str | None] = mapped_column(String(20), default="medium")
-    risk_score: Mapped[float | None] = mapped_column(Numeric(5, 4), default=0)
+    risk_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), default=0)
     status: Mapped[str | None] = mapped_column(String(30), default="open")
     mitigation_plan: Mapped[str | None] = mapped_column(Text)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("company_users.id"))
@@ -46,7 +47,7 @@ class ProjectTimesheet(ModelBase):
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     task_id: Mapped[int | None] = mapped_column(ForeignKey("project_tasks.id"))
     date: Mapped[Date] = mapped_column(Date, nullable=False)
-    hours: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String(20), default="draft")
     created_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -46,7 +46,7 @@ function TransferForm() {
     const handleSubmit = async (e) => {
         e.preventDefault()
         if (form.treasury_id && form.target_treasury_id && form.treasury_id === form.target_treasury_id) {
-            setError(t('treasury.error_same_account') || 'Source and destination accounts cannot be the same')
+            setError(t('treasury.error_same_account'))
             return
         }
         setLoading(true)
@@ -59,7 +59,7 @@ function TransferForm() {
                 target_treasury_id: Number(form.target_treasury_id),
                 transaction_type: 'transfer',
                 branch_id: currentBranch?.id || null,
-                description: form.notes || form.reference_number || 'Transfer'
+                description: form.notes || form.reference_number || t('treasury.menu.transfer')
             })
             toastEmitter.emit(t('treasury.success_create_transfer'), 'success')
             navigate('/treasury')

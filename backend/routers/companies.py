@@ -346,12 +346,49 @@ def get_enabled_modules(current_user=Depends(get_current_user)):
 def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_current_user)):
     """تحديث الوحدات المفعّلة — يقبل list أو dict"""
     import json
-    
-    modules_json = json.dumps(modules)
+
+    def normalize_modules(raw: Any) -> List[str]:
+        """Normalize incoming modules payload to a clean unique list of module keys."""
+        if raw is None:
+            return []
+
+        value = raw
+        if isinstance(value, str):
+            # Stored DB value may be JSON string or comma-separated text.
+            try:
+                value = json.loads(value)
+            except Exception:
+                value = [p.strip() for p in value.split(",") if p and p.strip()]
+
+        if isinstance(value, dict):
+            if isinstance(value.get("enabled_modules"), list):
+                value = value["enabled_modules"]
+            else:
+                # Fallback for payloads like {"sales": true, "hr": false}
+                value = [k for k, v in value.items() if isinstance(v, bool) and v]
+
+        if isinstance(value, (set, tuple)):
+            value = list(value)
+
+        if not isinstance(value, list):
+            return []
+
+        cleaned = [str(m).strip() for m in value if m is not None and str(m).strip()]
+        # Preserve order while removing duplicates.
+        return list(dict.fromkeys(cleaned))
+
+    old_modules: List[str] = []
+    new_modules: List[str] = normalize_modules(modules)
+    modules_json = json.dumps(new_modules)
     
     # 1. تحديث في system_companies (المصدر الرئيسي — يقرأها Login و GET /modules)
     sys_db = get_system_db()
     try:
+        current_row = sys_db.execute(text(
+            "SELECT enabled_modules FROM system_companies WHERE id = :cid"
+        ), {"cid": current_user.company_id}).fetchone()
+        old_modules = normalize_modules(current_row[0] if current_row else None)
+
         sys_db.execute(text(
             "UPDATE system_companies SET enabled_modules = CAST(:m AS jsonb) WHERE id = :cid"
         ), {"m": modules_json, "cid": current_user.company_id})
@@ -386,17 +423,30 @@ def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_cu
     
     # Audit log for module update
     try:
+        added_modules = [m for m in new_modules if m not in old_modules]
+        removed_modules = [m for m in old_modules if m not in new_modules]
         audit_db = get_db_connection(current_user.company_id)
         try:
             log_activity(audit_db, current_user.id, current_user.username, "update_modules",
-                         resource_type="company", details={"modules": modules})
+                         resource_type="company", details={
+                             "modules": new_modules,
+                             "modules_added": added_modules,
+                             "modules_removed": removed_modules,
+                             "modules_before_count": len(old_modules),
+                             "modules_after_count": len(new_modules),
+                         })
             audit_db.commit()
         finally:
             audit_db.close()
     except Exception:
         logger.warning("Failed to write module update audit log")
     
-    return {"message": "تم تحديث الوحدات بنجاح", "modules": modules}
+    return {
+        "message": "تم تحديث الوحدات بنجاح",
+        "modules": new_modules,
+        "modules_added": added_modules,
+        "modules_removed": removed_modules,
+    }
 
 
 # ===================== Company Details (catch-all path param) =====================
@@ -410,7 +460,7 @@ def get_company(
     # If user is NOT system admin AND requesting a different company -> Forbidden
     if current_user.company_id != company_id:
         if current_user.role != "system_admin":
-             raise HTTPException(status_code=403, detail="Access Denied")
+             raise HTTPException(**http_error(403, "access_denied"))
 
     db = get_system_db()
     
@@ -426,7 +476,7 @@ def get_company(
         ).fetchone()
         
         if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="الشركة غير موجودة")
+            raise HTTPException(**http_error(status.HTTP_404_NOT_FOUND, "company_not_found"))
         
         return {
             "id": result[0],
@@ -470,7 +520,7 @@ def update_company(
     allowed = is_sys_admin or (is_own_company and is_company_admin)
     
     if not allowed:
-        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+        raise HTTPException(**http_error(403, "forbidden_admin_access_required"))
 
     db = get_system_db()
     try:
@@ -481,7 +531,7 @@ def update_company(
         ).fetchone()
         
         if not existing:
-            raise HTTPException(status_code=404, detail="Company not found")
+            raise HTTPException(**http_error(404, "company_not_found"))
 
         # Prepare update query
         update_data = request.dict(exclude_unset=True)
@@ -532,7 +582,7 @@ async def upload_company_logo(
     """رفع شعار الشركة"""
     from database import SessionLocal
     if current_user.company_id != company_id and current_user.role != "system_admin":
-        raise HTTPException(status_code=403, detail="Forbidden")
+        raise HTTPException(**http_error(403, "forbidden"))
 
     from utils.sql_safety import (
         validate_file_size,

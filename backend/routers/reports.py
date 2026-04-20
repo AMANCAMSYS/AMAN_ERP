@@ -22,7 +22,7 @@ router = APIRouter(prefix="/reports", tags=["التقارير"])
 # Shared GL query helpers (Constitution: no duplicated report SQL)
 # ---------------------------------------------------------------------------
 
-def _compute_net_income_from_gl(db, *, end_date, start_date=None, branch_id=None) -> float:
+def _compute_net_income_from_gl(db, *, end_date, start_date=None, branch_id=None) -> Decimal:
     """
     Single source of truth for net income = Revenue − Expense from journal_lines.
     Used by both the income statement and the balance sheet (retained earnings).
@@ -50,7 +50,7 @@ def _compute_net_income_from_gl(db, *, end_date, start_date=None, branch_id=None
           AND je.status = 'posted'
           {branch_filter}
     """), params).fetchone()
-    return float(row.net_income) if row else 0.0
+    return Decimal(str(row.net_income)) if row else Decimal("0")
 
 # --- Schemas ---
 class TrialBalanceItem(BaseModel):
@@ -59,17 +59,17 @@ class TrialBalanceItem(BaseModel):
     name: str
     name_en: Optional[str]
     account_type: str
-    opening_debit: float
-    opening_credit: float
-    period_debit: float
-    period_credit: float
-    closing_debit: float
-    closing_credit: float
+    opening_debit: Decimal
+    opening_credit: Decimal
+    period_debit: Decimal
+    period_credit: Decimal
+    closing_debit: Decimal
+    closing_credit: Decimal
 
 class TrialBalanceResponse(BaseModel):
     period: Dict[str, date]
     data: List[TrialBalanceItem]
-    totals: Dict[str, float]
+    totals: Dict[str, Decimal]
 
 class FinancialStatementItem(BaseModel):
     id: int
@@ -77,7 +77,7 @@ class FinancialStatementItem(BaseModel):
     name: str
     name_en: Optional[str] = None
     account_type: str
-    balance: float
+    balance: Decimal
     level: int = 0
     parent_id: Optional[int] = None
     children: List['FinancialStatementItem'] = []
@@ -85,7 +85,7 @@ class FinancialStatementItem(BaseModel):
 class FinancialStatementResponse(BaseModel):
     period: Dict[str, date]
     data: List[FinancialStatementItem]
-    total: float
+    total: Decimal
 
 @router.get("/sales/summary", response_model=Dict[str, Any], dependencies=[Depends(require_permission(["sales.reports", "reports.view"]))])
 def get_sales_summary(
@@ -182,9 +182,9 @@ def get_sales_summary(
             {profit_branch_filter}
         """), profit_params).fetchone()
 
-        revenue = float(profit_query.total_revenue or 0)
-        cogs = float(profit_query.total_cogs or 0)
-        operating_expenses = float(profit_query.total_opex or 0)
+        revenue = Decimal(str(profit_query.total_revenue or 0))
+        cogs = Decimal(str(profit_query.total_cogs or 0))
+        operating_expenses = Decimal(str(profit_query.total_opex or 0))
         gross_profit = revenue - cogs
         net_profit = gross_profit - operating_expenses
         
@@ -192,11 +192,11 @@ def get_sales_summary(
             "period": {"start": start_date, "end": end_date},
             "stats": {
                 "invoice_count": summary.count,
-                "total_sales": float(summary.total_sales or 0),
-                "total_paid": float(summary.total_paid or 0),
-                "total_due": float(summary.total_due or 0),
+                "total_sales": Decimal(str(summary.total_sales or 0)),
+                "total_paid": Decimal(str(summary.total_paid or 0)),
+                "total_due": Decimal(str(summary.total_due or 0)),
                 "net_revenue": revenue,
-                "total_tax": float(summary.total_tax or 0),
+                "total_tax": Decimal(str(summary.total_tax or 0)),
                 "total_cogs": cogs,
                 "gross_profit": gross_profit,
                 "operating_expenses": operating_expenses,
@@ -253,7 +253,7 @@ def get_sales_trend(
             ORDER BY sale_date
         """), params).fetchall()
         
-        return [{"date": row.date, "count": row.count, "total": float(row.total)} for row in result]
+        return [{"date": row.date, "count": row.count, "total": Decimal(str(row.total))} for row in result]
     finally:
         db.close()
 
@@ -303,7 +303,7 @@ def get_sales_by_customer(
             LIMIT :limit
         """), params).fetchall()
         
-        return [{"name": row.name, "count": row.invoice_count, "value": float(row.total_sales)} for row in result]
+        return [{"name": row.name, "count": row.invoice_count, "value": Decimal(str(row.total_sales))} for row in result]
     finally:
         db.close()
 
@@ -357,7 +357,7 @@ def get_sales_by_product(
             LIMIT :limit
         """), params).fetchall()
         
-        return [{"name": row.name, "quantity": float(row.quantity), "value": float(row.total_sales)} for row in result]
+        return [{"name": row.name, "quantity": Decimal(str(row.quantity)), "value": Decimal(str(row.total_sales))} for row in result]
     finally:
         db.close()
 
@@ -474,11 +474,11 @@ def get_customer_statement(
 
         # 3. Running Balance
         statement = []
-        running_balance = float(opening_balance)
+        running_balance = Decimal(str(opening_balance))
         
         for t in transactions:
-            debit = float(t.debit)
-            credit = float(t.credit or 0) 
+            debit = Decimal(str(t.debit))
+            credit = Decimal(str(t.credit or 0)) 
             
             balance_after = running_balance + debit - credit
             statement.append({
@@ -489,14 +489,14 @@ def get_customer_statement(
                 "credit": credit,
                 "balance": balance_after,
                 "currency": t.currency,
-                "original_amount": float(t.debit / (t.exchange_rate if t.exchange_rate else 1))
+                "original_amount": Decimal(str(t.debit / (t.exchange_rate if t.exchange_rate else 1)))
             })
             running_balance = balance_after
 
         return {
             "customer_id": customer_id,
             "period": {"start": start_date, "end": end_date},
-            "opening_balance": float(opening_balance),
+            "opening_balance": Decimal(str(opening_balance)),
             "transactions": statement,
             "closing_balance": running_balance
         }
@@ -572,8 +572,8 @@ def get_aging_report(
                 "invoice": row.invoice_number,
                 "date": row.invoice_date,
                 "due_date": row.due_date,
-                "amount": float(row.due_amount or 0),
-                "amount_fc": float(row.due_amount_fc or 0),
+                "amount": Decimal(str(row.due_amount or 0)),
+                "amount_fc": Decimal(str(row.due_amount_fc or 0)),
                 "currency": row.currency,
                 "days": days,
                 "bucket": bucket
@@ -626,9 +626,9 @@ def get_purchases_summary(
             "period": {"start": start_date, "end": end_date},
             "stats": {
                 "invoice_count": summary.count,
-                "total_purchases": float(summary.total_purchases or 0),
-                "total_paid": float(summary.total_paid or 0),
-                "total_due": float(summary.total_due or 0)
+                "total_purchases": Decimal(str(summary.total_purchases or 0)),
+                "total_paid": Decimal(str(summary.total_paid or 0)),
+                "total_due": Decimal(str(summary.total_due or 0))
             }
         }
     finally:
@@ -665,7 +665,7 @@ def get_purchases_trend(
             ORDER BY invoice_date
         """), params).fetchall()
         
-        return [{"date": row.date, "count": row.count, "total": float(row.total)} for row in result]
+        return [{"date": row.date, "count": row.count, "total": Decimal(str(row.total))} for row in result]
     finally:
         db.close()
 
@@ -699,7 +699,7 @@ def get_purchases_by_supplier(
             LIMIT :limit
         """), params).fetchall()
         
-        return [{"name": row.name, "count": row.invoice_count, "value": float(row.total_purchases)} for row in result]
+        return [{"name": row.name, "count": row.invoice_count, "value": Decimal(str(row.total_purchases))} for row in result]
     finally:
         db.close()
 
@@ -749,7 +749,7 @@ def get_purchases_aging_report(
             elif days > 30:
                 bucket = "31-60"
 
-            amount = float(row.due_amount or 0)
+            amount = Decimal(str(row.due_amount or 0))
             totals[bucket] += amount
             report.append({
                 "supplier": row.supplier_name,
@@ -757,7 +757,7 @@ def get_purchases_aging_report(
                 "date": row.invoice_date,
                 "due_date": row.due_date,
                 "amount": amount,
-                "amount_fc": float(row.due_amount_fc or 0),
+                "amount_fc": Decimal(str(row.due_amount_fc or 0)),
                 "currency": row.currency,
                 "days": days,
                 "bucket": bucket,
@@ -847,11 +847,11 @@ def get_supplier_statement(
 
         # 3. Running Balance
         statement = []
-        running_balance = float(opening_balance)
+        running_balance = Decimal(str(opening_balance))
         
         for t in transactions:
-            credit = float(t.credit) # Purchase increases debt
-            debit = float(t.debit)   # Payment reduces debt
+            credit = Decimal(str(t.credit)) # Purchase increases debt
+            debit = Decimal(str(t.debit))   # Payment reduces debt
             
             balance_after = running_balance + credit - debit
             statement.append({
@@ -867,7 +867,7 @@ def get_supplier_statement(
         return {
             "supplier_id": supplier_id,
             "period": {"start": start_date, "end": end_date},
-            "opening_balance": float(opening_balance),
+            "opening_balance": Decimal(str(opening_balance)),
             "transactions": statement,
             "closing_balance": running_balance
         }
@@ -923,8 +923,8 @@ def get_payroll_trend(
         return [
             {
                 "month": row.month, 
-                "total_net": float(row.total_net), 
-                "total_gross": float(row.total_gross)
+                "total_net": Decimal(str(row.total_net)), 
+                "total_gross": Decimal(str(row.total_gross))
             } 
             for row in result
         ]
@@ -980,6 +980,127 @@ def get_leave_usage(
         ]
     finally:
         db.close()
+def _get_trial_balance_data(db, start_date, end_date, branch_id=None):
+    """Internal helper: returns trial balance data for programmatic use."""
+    params = {"start": start_date, "end": end_date}
+    
+    branch_filter = ""
+    if branch_id:
+        branch_filter = "AND je.branch_id = :branch_id"
+        params["branch_id"] = branch_id
+
+    query = f"""
+        WITH opening_bal AS (
+            SELECT 
+                jl.account_id,
+                SUM(jl.debit) as open_debit,
+                SUM(jl.credit) as open_credit
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE je.entry_date < :start
+            AND je.status = 'posted'
+            {branch_filter}
+            GROUP BY jl.account_id
+        ),
+        movement AS (
+            SELECT 
+                jl.account_id,
+                SUM(jl.debit) as period_debit,
+                SUM(jl.credit) as period_credit
+            FROM journal_lines jl
+            JOIN journal_entries je ON jl.journal_entry_id = je.id
+            WHERE je.entry_date BETWEEN :start AND :end
+            AND je.status = 'posted'
+            {branch_filter}
+            GROUP BY jl.account_id
+        )
+        SELECT 
+            a.id, a.account_number, a.name, a.name_en, a.account_type,
+            COALESCE(o.open_debit, 0) as open_debit,
+            COALESCE(o.open_credit, 0) as open_credit,
+            COALESCE(m.period_debit, 0) as period_debit,
+            COALESCE(m.period_credit, 0) as period_credit
+        FROM accounts a
+        LEFT JOIN opening_bal o ON a.id = o.account_id
+        LEFT JOIN movement m ON a.id = m.account_id
+        WHERE (o.open_debit IS NOT NULL OR o.open_credit IS NOT NULL OR m.period_debit IS NOT NULL OR m.period_credit IS NOT NULL)
+        ORDER BY a.account_number
+    """
+    
+    result = db.execute(text(query), params).fetchall()
+    
+    data = []
+    total_open_dr = total_open_cr = total_period_dr = total_period_cr = total_close_dr = total_close_cr = 0
+    
+    for row in result:
+        acct_type = row.account_type
+        
+        # Net opening balance by account type direction
+        raw_open_dr = Decimal(str(row.open_debit))
+        raw_open_cr = Decimal(str(row.open_credit))
+        open_net = raw_open_dr - raw_open_cr  # positive = debit balance
+        
+        # Debit-normal accounts (asset, expense): show net in DR if positive
+        # Credit-normal accounts (liability, equity, revenue): show net in CR if positive
+        if acct_type in ('asset', 'expense'):
+            o_dr = open_net if open_net > 0 else 0
+            o_cr = abs(open_net) if open_net < 0 else 0
+        else:
+            # For credit-normal accounts, flip: negative net means debit excess
+            o_cr = abs(open_net) if open_net < 0 else 0  # credit-normal: net < 0 means excess debit
+            o_dr = open_net if open_net > 0 else 0
+            # Actually: credit-normal: positive credit balance = credit - debit > 0 → net < 0
+            # Recalculate: for credit-normal, opening = CR - DR (if positive → show in CR column)
+            credit_net = raw_open_cr - raw_open_dr
+            o_cr = credit_net if credit_net > 0 else 0
+            o_dr = abs(credit_net) if credit_net < 0 else 0
+        
+        # Period movement
+        p_dr = Decimal(str(row.period_debit))
+        p_cr = Decimal(str(row.period_credit))
+        
+        # Closing
+        # Standard Accounting logic: (DR_open + DR_period) - (CR_open + CR_period)
+        # If positive -> Closing DR. If negative -> Closing CR.
+        net_total = (o_dr + p_dr) - (o_cr + p_cr)
+        
+        c_dr = net_total if net_total > 0 else 0
+        c_cr = abs(net_total) if net_total < 0 else 0
+        
+        data.append({
+            "account_id": row.id,
+            "account_number": row.account_number,
+            "name": row.name,
+            "name_en": row.name_en,
+            "account_type": row.account_type,
+            "opening_debit": o_dr,
+            "opening_credit": o_cr,
+            "period_debit": p_dr,
+            "period_credit": p_cr,
+            "closing_debit": c_dr,
+            "closing_credit": c_cr
+        })
+        
+        total_open_dr += o_dr
+        total_open_cr += o_cr
+        total_period_dr += p_dr
+        total_period_cr += p_cr
+        total_close_dr += c_dr
+        total_close_cr += c_cr
+        
+    return {
+        "period": {"start": start_date, "end": end_date},
+        "data": data,
+        "totals": {
+            "opening_debit": total_open_dr,
+            "opening_credit": total_open_cr,
+            "period_debit": total_period_dr,
+            "period_credit": total_period_cr,
+            "closing_debit": total_close_dr,
+            "closing_credit": total_close_cr
+        }
+    }
+
 @router.get("/accounting/trial-balance", response_model=TrialBalanceResponse, dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
 @cached("report_trial_balance", expire=60)
 def get_trial_balance(
@@ -996,125 +1117,7 @@ def get_trial_balance(
             start_date = date.today().replace(day=1, month=1) # Start of year
         if not end_date:
             end_date = date.today()
-            
-        params = {"start": start_date, "end": end_date}
-        
-        branch_filter = ""
-        if branch_id:
-            branch_filter = "AND je.branch_id = :branch_id"
-            params["branch_id"] = branch_id
-
-        query = f"""
-            WITH opening_bal AS (
-                SELECT 
-                    jl.account_id,
-                    SUM(jl.debit) as open_debit,
-                    SUM(jl.credit) as open_credit
-                FROM journal_lines jl
-                JOIN journal_entries je ON jl.journal_entry_id = je.id
-                WHERE je.entry_date < :start
-                AND je.status = 'posted'
-                {branch_filter}
-                GROUP BY jl.account_id
-            ),
-            movement AS (
-                SELECT 
-                    jl.account_id,
-                    SUM(jl.debit) as period_debit,
-                    SUM(jl.credit) as period_credit
-                FROM journal_lines jl
-                JOIN journal_entries je ON jl.journal_entry_id = je.id
-                WHERE je.entry_date BETWEEN :start AND :end
-                AND je.status = 'posted'
-                {branch_filter}
-                GROUP BY jl.account_id
-            )
-            SELECT 
-                a.id, a.account_number, a.name, a.name_en, a.account_type,
-                COALESCE(o.open_debit, 0) as open_debit,
-                COALESCE(o.open_credit, 0) as open_credit,
-                COALESCE(m.period_debit, 0) as period_debit,
-                COALESCE(m.period_credit, 0) as period_credit
-            FROM accounts a
-            LEFT JOIN opening_bal o ON a.id = o.account_id
-            LEFT JOIN movement m ON a.id = m.account_id
-            WHERE (o.open_debit IS NOT NULL OR o.open_credit IS NOT NULL OR m.period_debit IS NOT NULL OR m.period_credit IS NOT NULL)
-            ORDER BY a.account_number
-        """
-        
-        result = db.execute(text(query), params).fetchall()
-        
-        data = []
-        total_open_dr = total_open_cr = total_period_dr = total_period_cr = total_close_dr = total_close_cr = 0
-        
-        for row in result:
-            acct_type = row.account_type
-            
-            # Net opening balance by account type direction
-            raw_open_dr = float(row.open_debit)
-            raw_open_cr = float(row.open_credit)
-            open_net = raw_open_dr - raw_open_cr  # positive = debit balance
-            
-            # Debit-normal accounts (asset, expense): show net in DR if positive
-            # Credit-normal accounts (liability, equity, revenue): show net in CR if positive
-            if acct_type in ('asset', 'expense'):
-                o_dr = open_net if open_net > 0 else 0
-                o_cr = abs(open_net) if open_net < 0 else 0
-            else:
-                # For credit-normal accounts, flip: negative net means debit excess
-                o_cr = abs(open_net) if open_net < 0 else 0  # credit-normal: net < 0 means excess debit
-                o_dr = open_net if open_net > 0 else 0
-                # Actually: credit-normal: positive credit balance = credit - debit > 0 → net < 0
-                # Recalculate: for credit-normal, opening = CR - DR (if positive → show in CR column)
-                credit_net = raw_open_cr - raw_open_dr
-                o_cr = credit_net if credit_net > 0 else 0
-                o_dr = abs(credit_net) if credit_net < 0 else 0
-            
-            # Period movement
-            p_dr = float(row.period_debit)
-            p_cr = float(row.period_credit)
-            
-            # Closing
-            # Standard Accounting logic: (DR_open + DR_period) - (CR_open + CR_period)
-            # If positive -> Closing DR. If negative -> Closing CR.
-            net_total = (o_dr + p_dr) - (o_cr + p_cr)
-            
-            c_dr = net_total if net_total > 0 else 0
-            c_cr = abs(net_total) if net_total < 0 else 0
-            
-            data.append({
-                "account_id": row.id,
-                "account_number": row.account_number,
-                "name": row.name,
-                "name_en": row.name_en,
-                "account_type": row.account_type,
-                "opening_debit": o_dr,
-                "opening_credit": o_cr,
-                "period_debit": p_dr,
-                "period_credit": p_cr,
-                "closing_debit": c_dr,
-                "closing_credit": c_cr
-            })
-            
-            total_open_dr += o_dr
-            total_open_cr += o_cr
-            total_period_dr += p_dr
-            total_period_cr += p_cr
-            total_close_dr += c_dr
-            total_close_cr += c_cr
-            
-        return {
-            "period": {"start": start_date, "end": end_date},
-            "data": data,
-            "totals": {
-                "opening_debit": total_open_dr,
-                "opening_credit": total_open_cr,
-                "period_debit": total_period_dr,
-                "period_credit": total_period_cr,
-                "closing_debit": total_close_dr,
-                "closing_credit": total_close_cr
-            }
-        }
+        return _get_trial_balance_data(db, start_date, end_date, branch_id)
     finally:
         db.close()
 
@@ -1162,7 +1165,7 @@ def _get_profit_loss_data(db, start_date, end_date, branch_id=None):
         child_sum = 0
         for child in node["children"]:
             child_sum += rollup(child, level + 1)
-        node["balance"] = float(node["balance"]) + child_sum
+        node["balance"] = Decimal(str(node["balance"])) + child_sum
         return node["balance"]
 
     total_revenue = 0
@@ -1246,7 +1249,7 @@ def _get_balance_sheet_data(db, as_of_date, branch_id=None):
         child_sum = 0
         for child in node["children"]:
             child_sum += rollup(child, level + 1)
-        node["balance"] = float(node["balance"]) + child_sum
+        node["balance"] = Decimal(str(node["balance"])) + child_sum
         return node["balance"]
 
     for root in roots:
@@ -1359,8 +1362,8 @@ def get_budget_report(
         
         report_data = []
         for r in items:
-            planned = float(r.planned_amount or 0)
-            actual = float(r.actual_amount or 0)
+            planned = Decimal(str(r.planned_amount or 0))
+            actual = Decimal(str(r.actual_amount or 0))
             variance = planned - actual
             performance = (actual / planned * 100) if planned != 0 else 0
             
@@ -1382,6 +1385,84 @@ def get_budget_report(
     finally:
         db.close()
 
+def _get_cashflow_data(db, start_date, end_date, branch_id=None):
+    """Internal helper: returns cash flow data for programmatic use."""
+    branch_filter = "AND je.branch_id = :branch_id" if branch_id else ""
+    params = {"start": start_date, "end": end_date}
+    if branch_id: params["branch_id"] = branch_id
+
+    # 1. Get all Cash/Bank GL Account IDs
+    # From treasury_accounts table
+    treasury_gl_ids = [row[0] for row in db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE is_active = true")).fetchall() if row[0]]
+    
+    # From legacy codes (BOX, BNK)
+    legacy_gl_ids = [row[0] for row in db.execute(text("SELECT id FROM accounts WHERE account_code IN ('BOX', 'BNK')")).fetchall()]
+    
+    # Combine and deduplicate
+    all_cash_ids = list(set(treasury_gl_ids + legacy_gl_ids))
+    
+    if not all_cash_ids:
+        return {
+            "period": {"start": start_date, "end": end_date},
+            "inflows": [], "outflows": [], "total_inflow": 0, "total_outflow": 0, "net_cash_flow": 0
+        }
+
+    # Use parameterized query for safety
+    params["cash_ids"] = all_cash_ids
+
+    # Inflows (Debit Cash/Bank)
+    inflow_query = f"""
+        SELECT 
+            a_other.account_type, 
+            a_other.name as category,
+            SUM(jl_other.credit) as amount
+        FROM journal_lines jl_cash
+        JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
+        JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
+        JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
+        JOIN accounts a_other ON jl_other.account_id = a_other.id
+        WHERE a_cash.id = ANY(:cash_ids)
+          AND jl_cash.debit > 0
+          AND a_other.id != a_cash.id
+          AND je.entry_date BETWEEN :start AND :end
+          AND je.status = 'posted'
+          {branch_filter}
+        GROUP BY a_other.account_type, a_other.name
+    """
+    
+    inflows = db.execute(text(inflow_query), params).fetchall()
+    
+    # Outflows (Credit Cash/Bank)
+    outflow_query = f"""
+        SELECT 
+            a_other.account_type, 
+            a_other.name as category,
+            SUM(jl_other.debit) as amount
+        FROM journal_lines jl_cash
+        JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
+        JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
+        JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
+        JOIN accounts a_other ON jl_other.account_id = a_other.id
+        WHERE a_cash.id = ANY(:cash_ids)
+          AND jl_cash.credit > 0
+          AND a_other.id != a_cash.id
+          AND je.entry_date BETWEEN :start AND :end
+          AND je.status = 'posted'
+          {branch_filter}
+        GROUP BY a_other.account_type, a_other.name
+    """
+    
+    outflows = db.execute(text(outflow_query), params).fetchall()
+    
+    return {
+        "period": {"start": start_date, "end": end_date},
+        "inflows": [dict(r._mapping) for r in inflows],
+        "outflows": [dict(r._mapping) for r in outflows],
+        "total_inflow": Decimal(str(sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
+        "total_outflow": Decimal(str(sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
+        "net_cash_flow": Decimal(str((sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)) - sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)))
+    }
+
 @router.get("/accounting/cashflow", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
 def get_cashflow_report(
     start_date: Optional[date] = None,
@@ -1398,82 +1479,7 @@ def get_cashflow_report(
             start_date = date.today().replace(day=1)
         if not end_date:
             end_date = date.today()
-            
-        branch_filter = "AND je.branch_id = :branch_id" if branch_id else ""
-        params = {"start": start_date, "end": end_date}
-        if branch_id: params["branch_id"] = branch_id
-
-        # 1. Get all Cash/Bank GL Account IDs
-        # From treasury_accounts table
-        treasury_gl_ids = [row[0] for row in db.execute(text("SELECT gl_account_id FROM treasury_accounts WHERE is_active = true")).fetchall() if row[0]]
-        
-        # From legacy codes (BOX, BNK)
-        legacy_gl_ids = [row[0] for row in db.execute(text("SELECT id FROM accounts WHERE account_code IN ('BOX', 'BNK')")).fetchall()]
-        
-        # Combine and deduplicate
-        all_cash_ids = list(set(treasury_gl_ids + legacy_gl_ids))
-        
-        if not all_cash_ids:
-            return {
-                "period": {"start": start_date, "end": end_date},
-                "inflows": [], "outflows": [], "total_inflow": 0, "total_outflow": 0, "net_cash_flow": 0
-            }
-
-        # Use parameterized query for safety
-        params["cash_ids"] = all_cash_ids
-
-        # Inflows (Debit Cash/Bank)
-        inflow_query = f"""
-            SELECT 
-                a_other.account_type, 
-                a_other.name as category,
-                SUM(jl_other.credit) as amount
-            FROM journal_lines jl_cash
-            JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
-            JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
-            JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
-            JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE a_cash.id = ANY(:cash_ids)
-              AND jl_cash.debit > 0
-              AND a_other.id != a_cash.id
-              AND je.entry_date BETWEEN :start AND :end
-              AND je.status = 'posted'
-              {branch_filter}
-            GROUP BY a_other.account_type, a_other.name
-        """
-        
-        inflows = db.execute(text(inflow_query), params).fetchall()
-        
-        # Outflows (Credit Cash/Bank)
-        outflow_query = f"""
-            SELECT 
-                a_other.account_type, 
-                a_other.name as category,
-                SUM(jl_other.debit) as amount
-            FROM journal_lines jl_cash
-            JOIN journal_entries je ON jl_cash.journal_entry_id = je.id
-            JOIN accounts a_cash ON jl_cash.account_id = a_cash.id
-            JOIN journal_lines jl_other ON je.id = jl_other.journal_entry_id
-            JOIN accounts a_other ON jl_other.account_id = a_other.id
-            WHERE a_cash.id = ANY(:cash_ids)
-              AND jl_cash.credit > 0
-              AND a_other.id != a_cash.id
-              AND je.entry_date BETWEEN :start AND :end
-              AND je.status = 'posted'
-              {branch_filter}
-            GROUP BY a_other.account_type, a_other.name
-        """
-        
-        outflows = db.execute(text(outflow_query), params).fetchall()
-        
-        return {
-            "period": {"start": start_date, "end": end_date},
-            "inflows": [dict(r._mapping) for r in inflows],
-            "outflows": [dict(r._mapping) for r in outflows],
-            "total_inflow": float(sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "total_outflow": float(sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "net_cash_flow": float((sum((Decimal(str(r.amount or 0)) for r in inflows), Decimal(0)) - sum((Decimal(str(r.amount or 0)) for r in outflows), Decimal(0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
-        }
+        return _get_cashflow_data(db, start_date, end_date, branch_id)
     finally:
         db.close()
 
@@ -1602,7 +1608,7 @@ def get_cashflow_ias7(
             activities[activity].append({
                 "description": row.account_name,
                 "account_type": row.account_type,
-                "amount": float(amt.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+                "amount": Decimal(str(amt.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
                 "direction": "inflow"
             })
             totals[activity] += amt
@@ -1613,7 +1619,7 @@ def get_cashflow_ias7(
             activities[activity].append({
                 "description": row.account_name,
                 "account_type": row.account_type,
-                "amount": float((-amt).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+                "amount": Decimal(str((-amt).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
                 "direction": "outflow"
             })
             totals[activity] -= amt
@@ -1624,19 +1630,19 @@ def get_cashflow_ias7(
             "period": {"start": start_date, "end": end_date},
             "operating": {
                 "items": activities['operating'],
-                "total": float(totals['operating'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+                "total": Decimal(str(totals['operating'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)))
             },
             "investing": {
                 "items": activities['investing'],
-                "total": float(totals['investing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+                "total": Decimal(str(totals['investing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)))
             },
             "financing": {
                 "items": activities['financing'],
-                "total": float(totals['financing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+                "total": Decimal(str(totals['financing'].quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)))
             },
-            "net_change": float(net_change.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "opening_cash": float(Decimal(str(opening_cash)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
-            "closing_cash": float((Decimal(str(opening_cash)) + net_change).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)),
+            "net_change": Decimal(str(net_change.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
+            "opening_cash": Decimal(str(Decimal(str(opening_cash)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
+            "closing_cash": Decimal(str((Decimal(str(opening_cash)) + net_change).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))),
         }
     finally:
         db.close()
@@ -1721,7 +1727,7 @@ def get_fx_gain_loss_report(
         rate_rows = db.execute(text(
             "SELECT code, COALESCE(current_rate, 1.0) as rate FROM currencies WHERE is_active = TRUE"
         )).fetchall()
-        current_rates = {r.code: float(r.rate) for r in rate_rows}
+        current_rates = {r.code: Decimal(str(r.rate)) for r in rate_rows}
 
         open_invoices = db.execute(text(f"""
             SELECT
@@ -1738,12 +1744,12 @@ def get_fx_gain_loss_report(
         """), {**params, "base_ccy": base_ccy}).fetchall()
 
         unrealized_list = []
-        total_unrealized_gain = 0.0
-        total_unrealized_loss = 0.0
+        total_unrealized_gain = Decimal("0")
+        total_unrealized_loss = Decimal("0")
         for inv in open_invoices:
-            booked = float(inv.booked_rate)
+            booked = Decimal(str(inv.booked_rate))
             current = current_rates.get(inv.currency, booked)
-            open_fc = float(inv.open_fc_amount or 0)
+            open_fc = Decimal(str(inv.open_fc_amount or 0))
             diff = open_fc * (current - booked)
             if inv.invoice_type == 'purchase':
                 diff = -diff
@@ -1768,17 +1774,17 @@ def get_fx_gain_loss_report(
             "reference": r.reference,
             "currency": r.currency,
             "notes": r.description,
-            "fx_gain": float(r.fx_gain or 0),
-            "fx_loss": float(r.fx_loss or 0),
-            "net": float((r.fx_gain or 0) - (r.fx_loss or 0)),
+            "fx_gain": Decimal(str(r.fx_gain or 0)),
+            "fx_loss": Decimal(str(r.fx_loss or 0)),
+            "net": Decimal(str((r.fx_gain or 0) - (r.fx_loss or 0))),
         } for r in realized]
 
         exposure_list = [{
             "currency": r.currency,
             "direction": r.direction,
             "invoice_count": r.invoice_count,
-            "fc_total": float(r.fc_total or 0),
-            "lc_total": float(r.lc_total or 0),
+            "fc_total": Decimal(str(r.fc_total or 0)),
+            "lc_total": Decimal(str(r.lc_total or 0)),
         } for r in invoice_fx]
 
         total_gain = sum(r["fx_gain"] for r in realized_list)
@@ -1804,6 +1810,109 @@ def get_fx_gain_loss_report(
         db.close()
 
 
+def _get_general_ledger_data(db, account_id, start_date, end_date, branch_id=None):
+    """Internal helper: returns general ledger data for programmatic use."""
+    # ── Recursive CTE: collect selected account + all descendants ──
+    tree_rows = db.execute(text("""
+        WITH RECURSIVE account_tree AS (
+            SELECT id, account_type, name, name_en, account_number, parent_id
+            FROM accounts WHERE id = :account_id
+            UNION ALL
+            SELECT a.id, a.account_type, a.name, a.name_en, a.account_number, a.parent_id
+            FROM accounts a
+            INNER JOIN account_tree at ON a.parent_id = at.id
+        )
+        SELECT id, account_type, name, name_en, account_number FROM account_tree
+    """), {"account_id": account_id}).fetchall()
+
+    account_ids = [row.id for row in tree_rows]
+    account_map = {row.id: f"{row.account_number} - {row.name}" for row in tree_rows}
+    
+    # Use the root account's type for sign convention
+    root_row = next((r for r in tree_rows if r.id == account_id), None)
+    acct_type = root_row.account_type if root_row else "asset"
+    is_aggregated = len(account_ids) > 1
+
+    # Build safe IN clause (account_ids are integers from DB — safe)
+    ids_in = ",".join(str(i) for i in account_ids)
+
+    branch_filter = ""
+    params: dict = {"start": start_date, "end": end_date}
+    if branch_id:
+        branch_filter = "AND je.branch_id = :branch_id"
+        params["branch_id"] = branch_id
+
+    # Compute opening balance across all descendant accounts
+    opening_query = f"""
+        SELECT COALESCE(SUM(jl.debit), 0) as total_debit,
+               COALESCE(SUM(jl.credit), 0) as total_credit
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_id IN ({ids_in})
+        AND je.entry_date < :start
+        AND je.status = 'posted'
+        {branch_filter}
+    """
+    opening_row = db.execute(text(opening_query), params).fetchone()
+    opening_debit = Decimal(str(opening_row.total_debit)) if opening_row else 0
+    opening_credit = Decimal(str(opening_row.total_credit)) if opening_row else 0
+    if acct_type in ('asset', 'expense'):
+        opening_balance = opening_debit - opening_credit
+    else:
+        opening_balance = opening_credit - opening_debit
+
+    # Fetch journal lines across all descendant accounts
+    query = f"""
+        SELECT 
+            je.entry_date,
+            je.entry_number,
+            je.description,
+            je.reference,
+            jl.debit,
+            jl.credit,
+            jl.description as line_description,
+            jl.account_id
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_id IN ({ids_in})
+        AND je.entry_date BETWEEN :start AND :end
+        AND je.status = 'posted'
+        {branch_filter}
+        ORDER BY je.entry_date ASC, je.id ASC, jl.id ASC
+    """
+    
+    result = db.execute(text(query), params).fetchall()
+    
+    running_balance = opening_balance
+    entries = []
+    for row in result:
+        debit = Decimal(str(row.debit))
+        credit = Decimal(str(row.credit))
+        if acct_type in ('asset', 'expense'):
+            running_balance += debit - credit
+        else:
+            running_balance += credit - debit
+        entries.append({
+            "entry_date": str(row.entry_date),
+            "entry_number": row.entry_number,
+            "description": row.line_description or row.description,
+            "reference": row.reference,
+            "debit": debit,
+            "credit": credit,
+            "running_balance": round(running_balance, 2),
+            "account_name": account_map.get(row.account_id, "") if is_aggregated else None,
+        })
+    
+    return {
+        "account_id": account_id,
+        "period": {"start": start_date, "end": end_date},
+        "opening_balance": round(opening_balance, 2),
+        "entries": entries,
+        "closing_balance": round(running_balance, 2),
+        "is_aggregated": is_aggregated,
+        "child_accounts_count": len(account_ids) - 1,
+    }
+
 @router.get("/accounting/general-ledger", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
 def get_general_ledger(
     account_id: int = None,
@@ -1823,107 +1932,7 @@ def get_general_ledger(
             start_date = date.today().replace(day=1, month=1)
         if not end_date:
             end_date = date.today()
-
-        # ── Recursive CTE: collect selected account + all descendants ──
-        tree_rows = db.execute(text("""
-            WITH RECURSIVE account_tree AS (
-                SELECT id, account_type, name, name_en, account_number, parent_id
-                FROM accounts WHERE id = :account_id
-                UNION ALL
-                SELECT a.id, a.account_type, a.name, a.name_en, a.account_number, a.parent_id
-                FROM accounts a
-                INNER JOIN account_tree at ON a.parent_id = at.id
-            )
-            SELECT id, account_type, name, name_en, account_number FROM account_tree
-        """), {"account_id": account_id}).fetchall()
-
-        account_ids = [row.id for row in tree_rows]
-        account_map = {row.id: f"{row.account_number} - {row.name}" for row in tree_rows}
-        
-        # Use the root account's type for sign convention
-        root_row = next((r for r in tree_rows if r.id == account_id), None)
-        acct_type = root_row.account_type if root_row else "asset"
-        is_aggregated = len(account_ids) > 1
-
-        # Build safe IN clause (account_ids are integers from DB — safe)
-        ids_in = ",".join(str(i) for i in account_ids)
-
-        branch_filter = ""
-        params: dict = {"start": start_date, "end": end_date}
-        if branch_id:
-            branch_filter = "AND je.branch_id = :branch_id"
-            params["branch_id"] = branch_id
-
-        # Compute opening balance across all descendant accounts
-        opening_query = f"""
-            SELECT COALESCE(SUM(jl.debit), 0) as total_debit,
-                   COALESCE(SUM(jl.credit), 0) as total_credit
-            FROM journal_lines jl
-            JOIN journal_entries je ON jl.journal_entry_id = je.id
-            WHERE jl.account_id IN ({ids_in})
-            AND je.entry_date < :start
-            AND je.status = 'posted'
-            {branch_filter}
-        """
-        opening_row = db.execute(text(opening_query), params).fetchone()
-        opening_debit = float(opening_row.total_debit) if opening_row else 0
-        opening_credit = float(opening_row.total_credit) if opening_row else 0
-        if acct_type in ('asset', 'expense'):
-            opening_balance = opening_debit - opening_credit
-        else:
-            opening_balance = opening_credit - opening_debit
-
-        # Fetch journal lines across all descendant accounts
-        query = f"""
-            SELECT 
-                je.entry_date,
-                je.entry_number,
-                je.description,
-                je.reference,
-                jl.debit,
-                jl.credit,
-                jl.description as line_description,
-                jl.account_id
-            FROM journal_lines jl
-            JOIN journal_entries je ON jl.journal_entry_id = je.id
-            WHERE jl.account_id IN ({ids_in})
-            AND je.entry_date BETWEEN :start AND :end
-            AND je.status = 'posted'
-            {branch_filter}
-            ORDER BY je.entry_date ASC, je.id ASC, jl.id ASC
-        """
-        
-        result = db.execute(text(query), params).fetchall()
-        
-        running_balance = opening_balance
-        entries = []
-        for row in result:
-            debit = float(row.debit)
-            credit = float(row.credit)
-            if acct_type in ('asset', 'expense'):
-                running_balance += debit - credit
-            else:
-                running_balance += credit - debit
-            entries.append({
-                "entry_date": str(row.entry_date),
-                "entry_number": row.entry_number,
-                "description": row.line_description or row.description,
-                "reference": row.reference,
-                "debit": debit,
-                "credit": credit,
-                "running_balance": round(running_balance, 2),
-                "account_name": account_map.get(row.account_id, "") if is_aggregated else None,
-            })
-        
-        return {
-            "account_id": account_id,
-            "period": {"start": start_date, "end": end_date},
-            "opening_balance": round(opening_balance, 2),
-            "entries": entries,
-            "closing_balance": round(running_balance, 2),
-            "is_aggregated": is_aggregated,
-            "child_accounts_count": len(account_ids) - 1,
-        }
+        return _get_general_ledger_data(db, account_id, start_date, end_date, branch_id)
     finally:
         db.close()
 
@@ -1977,7 +1986,7 @@ def compare_profit_loss(
                 WHERE a.account_type IN ('revenue', 'expense')
                 GROUP BY a.id
             """), params).fetchall()
-            bal_map = {r.id: float(r.balance) for r in balances}
+            bal_map = {r.id: Decimal(str(r.balance)) for r in balances}
 
             accounts_with_bal = []
             total_rev = 0
@@ -2060,7 +2069,7 @@ def compare_balance_sheet(
                 WHERE a.account_type IN ('asset', 'liability', 'equity')
                 GROUP BY a.id
             """), params).fetchall()
-            bal_map = {r.id: float(r.balance) for r in balances}
+            bal_map = {r.id: Decimal(str(r.balance)) for r in balances}
 
             accounts_with_bal = []
             total_assets = 0
@@ -2135,7 +2144,7 @@ def export_profit_loss(
             flat_data.append({
                 "Account Number": node["account_number"],
                 "Account Name": f"{'  ' * indent}{node['name']}",
-                "Balance": f"{float(node['balance']):,.2f}",
+                "Balance": f"{Decimal(str(node['balance'])):,.2f}",
                 "Type": node["account_type"]
             })
             if node.get("children"):
@@ -2147,7 +2156,7 @@ def export_profit_loss(
     flat_data.append({
         "Account Number": "",
         "Account Name": "Net Income / صافي الدخل",
-        "Balance": f"{float(data['total']):,.2f}",
+        "Balance": f"{Decimal(str(data['total'])):,.2f}",
         "Type": ""
     })
     
@@ -2186,7 +2195,7 @@ def export_balance_sheet(
             flat_data.append({
                 "Account Number": node.get("account_number", ""),
                 "Account Name": f"{'  ' * indent}{node['name']}",
-                "Balance": f"{float(node['balance']):,.2f}",
+                "Balance": f"{Decimal(str(node['balance'])):,.2f}",
                 "Type": node["account_type"]
             })
             if node.get("children"):
@@ -2249,7 +2258,7 @@ def compare_trial_balance(
                     AND je.status = 'posted' {branch_filter}
                 GROUP BY a.id
             """), params).fetchall()
-            bal_map = {r.id: {"debit": float(r.total_debit), "credit": float(r.total_credit)} for r in balances}
+            bal_map = {r.id: {"debit": Decimal(str(r.total_debit)), "credit": Decimal(str(r.total_credit))} for r in balances}
 
             accounts_with_bal = []
             sum_debit = 0
@@ -2395,7 +2404,7 @@ def export_general_ledger(
     branch_id = validate_branch_access(current_user, branch_id)
     data = get_general_ledger(account_id=account_id, start_date=start_date, end_date=end_date, branch_id=branch_id, current_user=current_user)
     flat = []
-    balance = 0.0
+    balance = Decimal("0")
     for e_row in data["entries"]:
         balance += e_row["debit"] - e_row["credit"]
         flat.append({
@@ -2427,12 +2436,12 @@ def export_cashflow(
     data = get_cashflow_report(start_date=start_date, end_date=end_date, branch_id=branch_id, current_user=current_user)
     flat = []
     for item in data.get("inflows", []):
-        flat.append({"Section": "تدفقات داخلة", "Item": item.get("category", ""), "Amount": f"{float(item.get('amount', 0)):,.2f}"})
-    flat.append({"Section": "تدفقات داخلة", "Item": "المجموع", "Amount": f"{float(data.get('total_inflow', 0)):,.2f}"})
+        flat.append({"Section": "تدفقات داخلة", "Item": item.get("category", ""), "Amount": f"{Decimal(str(item.get('amount', 0))):,.2f}"})
+    flat.append({"Section": "تدفقات داخلة", "Item": "المجموع", "Amount": f"{Decimal(str(data.get('total_inflow', 0))):,.2f}"})
     for item in data.get("outflows", []):
-        flat.append({"Section": "تدفقات خارجة", "Item": item.get("category", ""), "Amount": f"{float(item.get('amount', 0)):,.2f}"})
-    flat.append({"Section": "تدفقات خارجة", "Item": "المجموع", "Amount": f"{float(data.get('total_outflow', 0)):,.2f}"})
-    flat.append({"Section": "", "Item": "صافي التدفقات النقدية", "Amount": f"{float(data.get('net_cash_flow', 0)):,.2f}"})
+        flat.append({"Section": "تدفقات خارجة", "Item": item.get("category", ""), "Amount": f"{Decimal(str(item.get('amount', 0))):,.2f}"})
+    flat.append({"Section": "تدفقات خارجة", "Item": "المجموع", "Amount": f"{Decimal(str(data.get('total_outflow', 0))):,.2f}"})
+    flat.append({"Section": "", "Item": "صافي التدفقات النقدية", "Amount": f"{Decimal(str(data.get('net_cash_flow', 0))):,.2f}"})
     cols = ["Section", "Item", "Amount"]
     fname = f"cashflow_{start_date}_{end_date}"
     if format == "excel":
@@ -2500,7 +2509,7 @@ def horizontal_analysis(
                     WHERE jl.account_id = :acct AND je.entry_date BETWEEN :start AND :end
                       AND je.status = 'posted' {branch_filter}
                 """), params).scalar()
-                period_balances.append(float(bal))
+                period_balances.append(Decimal(str(bal)))
 
             if not any(abs(b) > 0.01 for b in period_balances):
                 continue
@@ -2546,13 +2555,13 @@ def financial_ratios(
             br = "AND je.branch_id = :branch_id" if branch_id else ""
             if branch_id:
                 params["branch_id"] = branch_id
-            return float(db.execute(text(f"""
+            return Decimal(str(db.execute(text(f"""
                 SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
                 FROM journal_lines jl
                 JOIN journal_entries je ON jl.journal_entry_id = je.id
                 JOIN accounts a ON jl.account_id = a.id
                 WHERE a.account_type = :atype AND je.status = 'posted' {date_filter} {br}
-            """), {**params, "atype": type_like}).scalar())
+            """), {**params, "atype": type_like}).scalar()))
 
         def code_sum(like_pattern, start=None, end=None):
             params = {"p": like_pattern}
@@ -2564,13 +2573,13 @@ def financial_ratios(
             br = "AND je.branch_id = :branch_id" if branch_id else ""
             if branch_id:
                 params["branch_id"] = branch_id
-            return float(db.execute(text(f"""
+            return Decimal(str(db.execute(text(f"""
                 SELECT COALESCE(SUM(jl.debit - jl.credit), 0)
                 FROM journal_lines jl
                 JOIN journal_entries je ON jl.journal_entry_id = je.id
                 JOIN accounts a ON jl.account_id = a.id
                 WHERE a.account_number LIKE :p AND je.status='posted' {df} {br}
-            """), params).scalar())
+            """), params).scalar()))
 
         # Balance Sheet items (cumulative to date)
         total_assets = acct_sum("asset", None, None)
@@ -2669,7 +2678,7 @@ def cost_center_report(
             "report_name": "تقرير مراكز التكلفة",
             "period": {"start": str(s), "end": str(e)},
             "data": [dict(r._mapping) for r in rows],
-            "total_net": sum(float(r.net) for r in rows),
+            "total_net": sum(Decimal(str(r.net)) for r in rows),
         }
     finally:
         db.close()
@@ -2707,15 +2716,15 @@ def inventory_valuation_report(
         """), params).fetchall()
 
         items = []
-        grand_total = 0.0
+        grand_total = Decimal("0")
         for r in rows:
             m = r._mapping
-            val = float(m["total_value"] or 0)
+            val = Decimal(str(m["total_value"] or 0))
             grand_total += val
             items.append({
                 "product_id": m["id"], "sku": m["sku"], "product_name": m["product_name"],
                 "warehouse": m["warehouse_name"], "quantity": float(m["total_qty"]),
-                "cost_price": float(m["cost_price"] or 0),
+                "cost_price": Decimal(str(m["cost_price"] or 0)),
                 "total_value": round(val, 2),
             })
 
@@ -2761,8 +2770,8 @@ def inventory_turnover_report(
             m = r._mapping
             avg_inv = float(m["current_qty"] or 0)
             sold = float(m["sold_qty"] or 0)
-            cogs_val = sold * float(m["cost_price"] or 0)
-            turnover = cogs_val / (avg_inv * float(m["cost_price"] or 1)) if avg_inv > 0 and m["cost_price"] else 0
+            cogs_val = sold * Decimal(str(m["cost_price"] or 0))
+            turnover = cogs_val / (avg_inv * Decimal(str(m["cost_price"] or 1))) if avg_inv > 0 and m["cost_price"] else 0
             days_on_hand = round(days_in_period / turnover, 1) if turnover > 0 else None
 
             items.append({
@@ -2802,15 +2811,15 @@ def dead_stock_report(
         """), {"days": days_threshold}).fetchall()
 
         items = []
-        total_val = 0.0
+        total_val = Decimal("0")
         for r in rows:
             m = r._mapping
-            val = float(m["stock_value"] or 0)
+            val = Decimal(str(m["stock_value"] or 0))
             total_val += val
             items.append({
                 "product_id": m["id"], "sku": m["sku"], "product_name": m["product_name"],
                 "stock_qty": float(m["stock_qty"]),
-                "cost_price": float(m["cost_price"] or 0),
+                "cost_price": Decimal(str(m["cost_price"] or 0)),
                 "stock_value": round(val, 2),
                 "last_movement": str(m["last_movement"]) if m["last_movement"] else "لا توجد حركة",
             })
@@ -2852,12 +2861,12 @@ def cogs_report(
         """), {"start": s, "end": e}).fetchall()
 
         items = []
-        total_cogs = 0.0
-        total_rev = 0.0
+        total_cogs = Decimal("0")
+        total_rev = Decimal("0")
         for r in rows:
             m = r._mapping
-            cogs = float(m["cogs_total"] or 0)
-            rev = float(m["revenue_total"] or 0)
+            cogs = Decimal(str(m["cogs_total"] or 0))
+            rev = Decimal(str(m["revenue_total"] or 0))
             gross = rev - cogs
             margin = (gross / rev * 100) if rev > 0 else 0
             total_cogs += cogs
@@ -2865,7 +2874,7 @@ def cogs_report(
             items.append({
                 "product_id": m["id"], "sku": m["sku"], "product_name": m["product_name"],
                 "sold_qty": float(m["sold_qty"] or 0),
-                "unit_cost": float(m["cost_price"] or 0),
+                "unit_cost": Decimal(str(m["cost_price"] or 0)),
                 "cogs": round(cogs, 2), "revenue": round(rev, 2),
                 "gross_profit": round(gross, 2), "margin_pct": round(margin, 2),
             })
@@ -2927,9 +2936,9 @@ def sales_by_cashier(
             "data": [{
                 "user_id": r.id, "name": r.full_name,
                 "invoice_count": r.invoice_count,
-                "total_sales": round(float(r.total_sales), 2),
-                "total_collected": round(float(r.total_collected), 2),
-                "avg_invoice": round(float(r.avg_invoice), 2),
+                "total_sales": round(Decimal(str(r.total_sales)), 2),
+                "total_collected": round(Decimal(str(r.total_collected)), 2),
+                "avg_invoice": round(Decimal(str(r.avg_invoice)), 2),
             } for r in rows],
         }
     finally:
@@ -2952,7 +2961,7 @@ def sales_target_vs_actual(
                 "SELECT month_number, target_amount FROM sales_targets WHERE year = :y"
             ), {"y": yr}).fetchall()
             for t in tgt_rows:
-                targets[t.month_number] = float(t.target_amount)
+                targets[t.month_number] = Decimal(str(t.target_amount))
         except Exception:
             pass  # Table may not exist
 
@@ -2977,7 +2986,7 @@ def sales_target_vs_actual(
             ORDER BY month
         """), {"y": yr}).fetchall()
 
-        actual_map = {r.month: float(r.actual) for r in actuals}
+        actual_map = {r.month: Decimal(str(r.actual)) for r in actuals}
 
         months = []
         for m in range(1, 13):
@@ -3356,8 +3365,8 @@ def detailed_profit_loss(
         total_cogs = 0
 
         for r in rows:
-            revenue = float(r.revenue or 0)
-            cogs = float(r.cogs or 0)
+            revenue = Decimal(str(r.revenue or 0))
+            cogs = Decimal(str(r.cogs or 0))
             gross_profit = revenue - cogs
             margin = round((gross_profit / revenue * 100), 1) if revenue > 0 else 0
 
@@ -3497,9 +3506,9 @@ def sales_commission_report(
                 "salesperson_name": sp_name,
                 "invoice_number": rm.get("invoice_number", ""),
                 "invoice_date": str(rm.get("invoice_date", "")),
-                "invoice_total": float(rm.get("invoice_total", 0)),
+                "invoice_total": Decimal(str(rm.get("invoice_total", 0))),
                 "commission_rate": float(rm.get("commission_rate", 0)),
-                "commission_amount": float(rm.get("commission_amount", 0)),
+                "commission_amount": Decimal(str(rm.get("commission_amount", 0))),
                 "status": rm.get("status", "pending"),
             })
 
@@ -3509,13 +3518,13 @@ def sales_commission_report(
                     "total_sales": 0, "total_commission": 0,
                     "pending": 0, "paid": 0, "invoice_count": 0
                 }
-            sp_summary[sp_id]["total_sales"] += float(rm.get("invoice_total", 0))
-            sp_summary[sp_id]["total_commission"] += float(rm.get("commission_amount", 0))
+            sp_summary[sp_id]["total_sales"] += Decimal(str(rm.get("invoice_total", 0)))
+            sp_summary[sp_id]["total_commission"] += Decimal(str(rm.get("commission_amount", 0)))
             sp_summary[sp_id]["invoice_count"] += 1
             if rm.get("status") == "paid":
-                sp_summary[sp_id]["paid"] += float(rm.get("commission_amount", 0))
+                sp_summary[sp_id]["paid"] += Decimal(str(rm.get("commission_amount", 0)))
             else:
-                sp_summary[sp_id]["pending"] += float(rm.get("commission_amount", 0))
+                sp_summary[sp_id]["pending"] += Decimal(str(rm.get("commission_amount", 0)))
 
         total_commission = sum(s["total_commission"] for s in sp_summary.values())
         total_pending = sum(s["pending"] for s in sp_summary.values())
@@ -3606,8 +3615,8 @@ def get_kpi_dashboard(current_user=Depends(get_current_user)):
         """)).fetchone()
         if rev:
             r = dict(rev._mapping)
-            current = float(r.get("current_month", 0))
-            last = float(r.get("last_month", 0))
+            current = Decimal(str(r.get("current_month", 0)))
+            last = Decimal(str(r.get("last_month", 0)))
             kpis["revenue"] = {
                 "value": current, "previous": last,
                 "change_pct": round((current - last) / last * 100, 2) if last else 0
@@ -3618,21 +3627,21 @@ def get_kpi_dashboard(current_user=Depends(get_current_user)):
             SELECT COALESCE(SUM(total_amount), 0) as current_month
             FROM expenses WHERE expense_date >= date_trunc('month', CURRENT_DATE)
         """)).fetchone()
-        kpis["expenses"] = {"value": float(dict(exp._mapping).get("current_month", 0))} if exp else {"value": 0}
+        kpis["expenses"] = {"value": Decimal(str(dict(exp._mapping).get("current_month", 0)))} if exp else {"value": 0}
 
         # Outstanding receivables
         ar = db.execute(text("""
             SELECT COALESCE(SUM(balance_due), 0) as total
             FROM invoices WHERE status != 'paid' AND invoice_type = 'sale'
         """)).fetchone()
-        kpis["accounts_receivable"] = {"value": float(dict(ar._mapping).get("total", 0))} if ar else {"value": 0}
+        kpis["accounts_receivable"] = {"value": Decimal(str(dict(ar._mapping).get("total", 0)))} if ar else {"value": 0}
 
         # Outstanding payables
         ap = db.execute(text("""
             SELECT COALESCE(SUM(balance_due), 0) as total
             FROM invoices WHERE status != 'paid' AND invoice_type = 'purchase'
         """)).fetchone()
-        kpis["accounts_payable"] = {"value": float(dict(ap._mapping).get("total", 0))} if ap else {"value": 0}
+        kpis["accounts_payable"] = {"value": Decimal(str(dict(ap._mapping).get("total", 0)))} if ap else {"value": 0}
 
         # Cash balance
         cash = db.execute(text("""
@@ -3641,7 +3650,7 @@ def get_kpi_dashboard(current_user=Depends(get_current_user)):
             JOIN accounts a ON a.id = jel.account_id
             WHERE a.account_type = 'cash'
         """)).fetchone()
-        kpis["cash_balance"] = {"value": float(dict(cash._mapping).get("balance", 0))} if cash else {"value": 0}
+        kpis["cash_balance"] = {"value": Decimal(str(dict(cash._mapping).get("balance", 0)))} if cash else {"value": 0}
 
         # Inventory value
         inv = db.execute(text("""
@@ -3651,7 +3660,7 @@ def get_kpi_dashboard(current_user=Depends(get_current_user)):
         """)).fetchone()
         if inv:
             d = dict(inv._mapping)
-            kpis["inventory"] = {"value": float(d.get("total_value", 0)), "items": int(d.get("total_items", 0))}
+            kpis["inventory"] = {"value": Decimal(str(d.get("total_value", 0))), "items": int(d.get("total_items", 0))}
 
         # HR headcount
         hr = db.execute(text("""
@@ -3697,7 +3706,7 @@ def _gl_balance(db, account_prefix: str, from_date: date, to_date: date, side: s
           AND je.entry_date BETWEEN :d1 AND :d2
           AND je.status = 'posted'
     """), {"prefix": f"{account_prefix}%", "d1": from_date, "d2": to_date}).fetchone()
-    return float(row.total) if row else 0.0
+    return Decimal(str(row.total)) if row else Decimal("0")
 
 
 # ─── 1. Food Cost Report (FB - المطاعم) ───
@@ -3744,8 +3753,8 @@ async def food_cost_report(
         items = []
         for r in top_items:
             row = dict(r._mapping)
-            cost = float(row.get("total_cost") or 0)
-            rev  = float(row.get("total_revenue") or 0)
+            cost = Decimal(str(row.get("total_cost") or 0))
+            rev  = Decimal(str(row.get("total_revenue") or 0))
             row["cost_pct"] = round((cost / rev * 100), 2) if rev > 0 else 0
             items.append(row)
 
@@ -3807,7 +3816,7 @@ async def production_cost_report(
             total_planned += float(row.get("planned_qty") or 0)
             total_produced += float(row.get("produced_quantity") or 0)
             total_scrapped += float(row.get("scrapped_quantity") or 0)
-            total_planned_cost += float(row.get("planned_cost") or 0)
+            total_planned_cost += Decimal(str(row.get("planned_cost") or 0))
             order_list.append(row)
 
         # تكلفة المواد الخام الفعلية من journal_lines (حسابات 510xx تصنيع)
@@ -3881,10 +3890,10 @@ async def progress_billing_report(
         total_cost = 0
         for r in projects:
             row = dict(r._mapping)
-            budget = float(row.get("planned_budget") or 0)
-            cost = float(row.get("total_expenses") or 0) or float(row.get("actual_cost") or 0)
+            budget = Decimal(str(row.get("planned_budget") or 0))
+            cost = Decimal(str(row.get("total_expenses") or 0)) or Decimal(str(row.get("actual_cost") or 0))
             # Use actual_cost as billed amount (represents invoiced work in progress billing)
-            invoiced = float(row.get("actual_cost") or 0)
+            invoiced = Decimal(str(row.get("actual_cost") or 0))
             progress = float(row.get("progress_percentage") or 0)
 
             row["profit"] = invoiced - cost
@@ -3957,7 +3966,7 @@ async def drug_expiry_report(
             row = dict(r._mapping)
             exp_date = row.get("expiry_date")
             qty = float(row.get("available_quantity") or 0)
-            cost = float(row.get("unit_cost") or 0)
+            cost = Decimal(str(row.get("unit_cost") or 0))
             row["value_at_risk"] = round(qty * cost, 2)
             total_value_at_risk += row["value_at_risk"]
 
@@ -4177,8 +4186,8 @@ async def workshop_revenue_report(
         total_jobs = 0
         for r in by_service:
             row = dict(r._mapping)
-            rev = float(row.get("total_revenue") or 0)
-            cost = float(row.get("total_cost") or 0)
+            rev = Decimal(str(row.get("total_revenue") or 0))
+            cost = Decimal(str(row.get("total_cost") or 0))
             row["margin"] = rev - cost
             row["margin_pct"] = round(((rev - cost) / rev * 100), 2) if rev > 0 else 0
             total_revenue += rev
@@ -4233,7 +4242,7 @@ async def ecom_returns_report(
               AND status != 'cancelled'
         """), {"d1": d1, "d2": d2}).fetchone()
         sale_count = int(sales.sale_count) if sales else 0
-        sale_total = float(sales.sale_total) if sales else 0
+        sale_total = Decimal(str(sales.sale_total)) if sales else 0
 
         # مبيعات مرتجعة
         returns = db.execute(text("""
@@ -4243,7 +4252,7 @@ async def ecom_returns_report(
               AND status != 'cancelled'
         """), {"d1": d1, "d2": d2}).fetchone()
         return_count = int(returns.return_count) if returns else 0
-        return_total = float(returns.return_total) if returns else 0
+        return_total = Decimal(str(returns.return_total)) if returns else 0
 
         return_rate = round((return_count / sale_count * 100), 2) if sale_count > 0 else 0
         value_return_rate = round((return_total / sale_total * 100), 2) if sale_total > 0 else 0
@@ -4318,8 +4327,8 @@ async def agent_performance_report(
         grand_total = 0
         for r in by_agent:
             row = dict(r._mapping)
-            sales = float(row.get("total_sales") or 0)
-            collected = float(row.get("total_collected") or 0)
+            sales = Decimal(str(row.get("total_sales") or 0))
+            collected = Decimal(str(row.get("total_collected") or 0))
             row["collection_rate_pct"] = round((collected / sales * 100), 2) if sales > 0 else 0
             row["avg_invoice_value"] = round(sales / max(int(row.get("invoice_count") or 1), 1), 2)
             grand_total += sales
@@ -4327,7 +4336,7 @@ async def agent_performance_report(
 
         # حساب النسبة من الإجمالي
         for agent in agent_list:
-            agent["share_pct"] = round((float(agent.get("total_sales") or 0) / grand_total * 100), 2) if grand_total > 0 else 0
+            agent["share_pct"] = round((Decimal(str(agent.get("total_sales") or 0)) / grand_total * 100), 2) if grand_total > 0 else 0
 
         # أكبر العملاء
         top_customers = db.execute(text("""
@@ -4396,8 +4405,8 @@ async def crop_yield_report(
         total_cost = 0
         for r in harvests:
             row = dict(r._mapping)
-            rev = float(row.get("total_revenue") or 0)
-            cost = float(row.get("total_cost") or 0)
+            rev = Decimal(str(row.get("total_revenue") or 0))
+            cost = Decimal(str(row.get("total_cost") or 0))
             row["profit"] = rev - cost
             row["margin_pct"] = round(((rev - cost) / rev * 100), 2) if rev > 0 else 0
             total_revenue += rev

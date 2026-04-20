@@ -1,12 +1,10 @@
 {
-  "ai": "copilot",
-  "ai_commands_dir": null,
-  "ai_skills": false,
+  "ai": "opencode",
   "branch_numbering": "sequential",
+  "context_file": "AGENTS.md",
   "here": true,
-  "integration": "copilot",
-  "offline": false,
+  "integration": "opencode",
   "preset": null,
   "script": "sh",
-  "speckit_version": "0.4.4"
+  "speckit_version": "0.7.4.dev0"
 }

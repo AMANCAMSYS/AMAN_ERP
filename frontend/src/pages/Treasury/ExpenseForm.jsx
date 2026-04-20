@@ -81,7 +81,7 @@ function ExpenseForm() {
                 target_account_id: Number(form.target_account_id),
                 transaction_type: 'expense',
                 branch_id: form.branch_id ? Number(form.branch_id) : null,
-                description: form.notes || form.reference_number || 'Expense'
+                description: form.notes || form.reference_number || t('treasury.menu.expense')
             })
             toastEmitter.emit(t('treasury.success_create_expense'), 'success')
             navigate('/treasury')

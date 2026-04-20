@@ -216,7 +216,7 @@ const EquipmentMaintenance = () => {
                                             <tr key={log.id}>
                                                 <td>{log.maintenance_date}</td>
                                                 <td className="font-bold">{log.equipment_name}</td>
-                                                <td>{log.maintenance_type}</td>
+                                                <td>{t('manufacturing.' + log.maintenance_type)}</td>
                                                 <td>{log.description}</td>
                                                 <td>{log.cost}</td>
                                                 <td>
@@ -257,10 +257,10 @@ const EquipmentMaintenance = () => {
                                 <div className="form-group">
                                     <label className="form-label">{t('common.status_title')}</label>
                                     <select className="form-select-sm w-full" value={equipForm.status} onChange={e => setEquipForm({ ...equipForm, status: e.target.value })}>
-                                        <option value="active">Active</option>
-                                        <option value="maintenance">Maintenance</option>
-                                        <option value="broken">Broken</option>
-                                        <option value="retired">Retired</option>
+                                        <option value="active">{t('status.active')}</option>
+                                        <option value="maintenance">{t('status.maintenance')}</option>
+                                        <option value="broken">{t('status.broken')}</option>
+                                        <option value="retired">{t('status.retired')}</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -301,9 +301,9 @@ const EquipmentMaintenance = () => {
                                     <div className="col-md-6 form-group">
                                         <label className="form-label">{t('common.type')}</label>
                                         <select className="form-input" value={logForm.maintenance_type} onChange={e => setLogForm({ ...logForm, maintenance_type: e.target.value })}>
-                                            <option value="preventive">Preventive</option>
-                                            <option value="corrective">Corrective</option>
-                                            <option value="breakdown">Breakdown</option>
+                                            <option value="preventive">{t('manufacturing.preventive')}</option>
+                                            <option value="corrective">{t('manufacturing.corrective')}</option>
+                                            <option value="breakdown">{t('manufacturing.breakdown')}</option>
                                         </select>
                                     </div>
                                     <div className="col-md-6 form-group">

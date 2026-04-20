@@ -28,7 +28,7 @@ def get_user_company_id(user):
     if cid is None and isinstance(user, dict):
         cid = user.get("company_id")
     if not cid:
-         raise HTTPException(status_code=400, detail="Company ID missing")
+            raise HTTPException(**http_error(400, "company_id_missing"))
     return cid
 
 @router.get("/stats", response_model=Dict[str, Any], dependencies=[Depends(require_permission("dashboard.view"))])
@@ -374,7 +374,7 @@ def get_system_stats(
     """احصائيات النظام (للمدير العام فقط)"""
     # Verify System Admin Role
     if current_user.role != 'system_admin':
-         raise HTTPException(status_code=403, detail="Access denied. System Admin only.")
+            raise HTTPException(**http_error(403, "access_denied_system_admin_only"))
     
     # Return immediately from cache
     if _system_stats_cache["data"]:
@@ -1242,7 +1242,7 @@ def get_widget_data(widget_id: int, current_user: dict = Depends(get_current_use
         """), {"id": widget_id}).fetchone()
 
         if not widget:
-            raise HTTPException(status_code=404, detail="Widget not found")
+            raise HTTPException(**http_error(404, "widget_not_found"))
 
         wd = dict(widget._mapping)
         widget_filters = wd.get("filters") or {}
@@ -1271,14 +1271,14 @@ def get_analytics_dashboard(dashboard_id: int, current_user: dict = Depends(get_
         """), {"id": dashboard_id}).fetchone()
 
         if not dashboard:
-            raise HTTPException(status_code=404, detail="Dashboard not found")
+            raise HTTPException(**http_error(404, "dashboard_not_found"))
 
         d = dict(dashboard._mapping)
         # Check role access
         user_role = current_user.get("role", "")
         roles = d.get("access_roles") or []
         if user_role != "system_admin" and roles and user_role not in roles:
-            raise HTTPException(status_code=403, detail="Access denied for this dashboard")
+            raise HTTPException(**http_error(403, "access_denied_dashboard"))
 
         # Load widgets
         widgets = db.execute(text("""
@@ -1353,7 +1353,7 @@ def create_analytics_dashboard(payload: DashboardCreate, current_user: dict = De
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create analytics dashboard: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create dashboard")
+        raise HTTPException(**http_error(500, "dashboard_create_failed"))
     finally:
         db.close()
 
@@ -1370,7 +1370,7 @@ def update_analytics_dashboard(dashboard_id: int, payload: DashboardUpdate, curr
         ), {"id": dashboard_id}).fetchone()
 
         if not dashboard:
-            raise HTTPException(status_code=404, detail="Dashboard not found")
+            raise HTTPException(**http_error(404, "dashboard_not_found"))
 
         username = current_user.get("username", "unknown")
 
@@ -1428,7 +1428,7 @@ def update_analytics_dashboard(dashboard_id: int, payload: DashboardUpdate, curr
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to update analytics dashboard: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update dashboard")
+        raise HTTPException(**http_error(500, "dashboard_update_failed"))
     finally:
         db.close()
 
@@ -1444,10 +1444,10 @@ def delete_analytics_dashboard(dashboard_id: int, current_user: dict = Depends(g
         ), {"id": dashboard_id}).fetchone()
 
         if not dashboard:
-            raise HTTPException(status_code=404, detail="Dashboard not found")
+            raise HTTPException(**http_error(404, "dashboard_not_found"))
 
         if dashboard._mapping.get("is_system"):
-            raise HTTPException(status_code=403, detail="System dashboards cannot be deleted")
+            raise HTTPException(**http_error(403, "system_dashboard_delete_forbidden"))
 
         # Widgets cascade-deleted via FK constraint
         db.execute(text("DELETE FROM analytics_dashboards WHERE id = :id"), {"id": dashboard_id})
@@ -1458,6 +1458,6 @@ def delete_analytics_dashboard(dashboard_id: int, current_user: dict = Depends(g
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to delete analytics dashboard: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete dashboard")
+        raise HTTPException(**http_error(500, "dashboard_delete_failed"))
     finally:
         db.close()

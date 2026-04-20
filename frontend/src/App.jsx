@@ -800,14 +800,14 @@ function App() {
                 <Route path="/hr/overtime" element={<PrivateRoute permission="hr.view"><OvertimeRequests /></PrivateRoute>} />
                 <Route path="/hr/gosi" element={<PrivateRoute permission="hr.view"><GOSISettings /></PrivateRoute>} />
                 <Route path="/hr/documents" element={<PrivateRoute permission="hr.view"><EmployeeDocuments /></PrivateRoute>} />
-                <Route path="/hr/performance" element={<PrivateRoute permission="hr.view"><PerformanceReviews /></PrivateRoute>} />
-                <Route path="/hr/performance/cycles" element={<PrivateRoute permission="hr.view"><CycleList /></PrivateRoute>} />
-                <Route path="/hr/performance/cycle-new" element={<PrivateRoute permission="hr.view"><CycleForm /></PrivateRoute>} />
-                <Route path="/hr/performance/my-reviews" element={<PrivateRoute permission="hr.view"><MyReviews /></PrivateRoute>} />
-                <Route path="/hr/performance/reviews/:id/self" element={<PrivateRoute permission="hr.view"><SelfAssessment /></PrivateRoute>} />
-                <Route path="/hr/performance/reviews/:id/manager" element={<PrivateRoute permission="hr.view"><ManagerReview /></PrivateRoute>} />
-                <Route path="/hr/performance/reviews/:id/result" element={<PrivateRoute permission="hr.view"><ReviewResult /></PrivateRoute>} />
-                <Route path="/hr/performance/team-reviews" element={<PrivateRoute permission="hr.view"><TeamReviews /></PrivateRoute>} />
+                <Route path="/hr/performance" element={<PrivateRoute permission="hr.performance_view"><PerformanceReviews /></PrivateRoute>} />
+                <Route path="/hr/performance/cycles" element={<PrivateRoute permission="hr.performance_view"><CycleList /></PrivateRoute>} />
+                <Route path="/hr/performance/cycle-new" element={<PrivateRoute permission="hr.performance_view"><CycleForm /></PrivateRoute>} />
+                <Route path="/hr/performance/my-reviews" element={<PrivateRoute permission="hr.performance_view"><MyReviews /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/self" element={<PrivateRoute permission="hr.performance_view"><SelfAssessment /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/manager" element={<PrivateRoute permission="hr.performance_view"><ManagerReview /></PrivateRoute>} />
+                <Route path="/hr/performance/reviews/:id/result" element={<PrivateRoute permission="hr.performance_view"><ReviewResult /></PrivateRoute>} />
+                <Route path="/hr/performance/team-reviews" element={<PrivateRoute permission="hr.performance_view"><TeamReviews /></PrivateRoute>} />
                 <Route path="/hr/training" element={<PrivateRoute permission="hr.view"><TrainingPrograms /></PrivateRoute>} />
                 <Route path="/hr/violations" element={<PrivateRoute permission="hr.view"><Violations /></PrivateRoute>} />
                 <Route path="/hr/custody" element={<PrivateRoute permission="hr.view"><CustodyManagement /></PrivateRoute>} />

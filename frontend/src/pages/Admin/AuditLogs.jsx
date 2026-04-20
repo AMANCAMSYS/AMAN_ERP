@@ -28,6 +28,140 @@ const AuditLogs = () => {
         company_id: ''
     });
 
+    const listFromValue = (value) => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string' && value.includes(',')) {
+            return value.split(',').map(v => v.trim()).filter(Boolean);
+        }
+        return [];
+    };
+
+    const humanizeToken = (value) => {
+        if (!value) return '';
+        return String(value)
+            .replace(/[._-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const translatedOrNull = (key) => {
+        const translated = t(key);
+        return translated === key ? null : translated;
+    };
+
+    const formatAuditAction = (action) => {
+        const translated = translatedOrNull(`audit.actions.${action}`);
+        if (translated) return translated;
+        return String(action)
+            .split('.')
+            .map(humanizeToken)
+            .join(' / ');
+    };
+
+    const formatAuditLabel = (key) => {
+        return (
+            translatedOrNull(`audit.resource_types.${key}`)
+            || translatedOrNull(`common.${key}`)
+            || translatedOrNull(`audit.${key}`)
+            || humanizeToken(key)
+        );
+    };
+
+    const normalizeIndustryType = (value) => {
+        if (!value) return '';
+        const normalized = String(value).trim().toLowerCase();
+        const map = {
+            rt: 'retail',
+            retail: 'retail',
+            fb: 'restaurant',
+            restaurant: 'restaurant',
+            mf: 'manufacturing',
+            manufacturing: 'manufacturing',
+            cn: 'construction',
+            construction: 'construction',
+            sv: 'services',
+            services: 'services',
+            ws: 'wholesale',
+            wholesale: 'wholesale',
+            hp: 'healthcare',
+            healthcare: 'healthcare',
+            ed: 'education',
+            education: 'education',
+            lg: 'logistics',
+            logistics: 'logistics',
+            tc: 'technology',
+            technology: 'technology',
+            ag: 'agriculture',
+            agriculture: 'agriculture',
+            tr: 'travel',
+            travel: 'travel'
+        };
+        return map[normalized] || normalized;
+    };
+
+    const formatIndustryType = (value) => {
+        const normalized = normalizeIndustryType(value);
+        if (!normalized) return '-';
+        const translated = translatedOrNull(`industry_types.${normalized}`);
+        if (translated) return translated;
+        return `${t('audit.unknown_value')} (${value})`;
+    };
+
+    const formatActionWithContext = (log) => {
+        const action = String(log?.action || '');
+        const details = log?.details || {};
+        const keys = [
+            ...listFromValue(details.keys_updated),
+            ...listFromValue(details.updated_fields),
+            ...listFromValue(details.fields)
+        ].map((k) => String(k).toLowerCase());
+
+        if (action === 'configure' || action === 'settings.update') {
+            if (keys.includes('industry_type')) {
+                return t('audit.actions.configure_industry_type');
+            }
+            if (keys.includes('modules') || details.modules_added || details.modules_removed) {
+                return t('audit.actions.configure_modules');
+            }
+            return t('audit.actions.configure_settings');
+        }
+
+        return formatAuditAction(action);
+    };
+
+    const describeActionLocation = (log) => {
+        const action = String(log?.action || '');
+        const details = log?.details || {};
+        const keys = [
+            ...listFromValue(details.keys_updated),
+            ...listFromValue(details.updated_fields),
+            ...listFromValue(details.fields)
+        ].map((k) => String(k).toLowerCase());
+
+        if (action.includes('login')) return t('audit.locations.auth');
+        if (action.startsWith('sales.')) return t('audit.locations.sales');
+        if (action.startsWith('purchase') || action.startsWith('buying.')) return t('audit.locations.purchase');
+        if (action.startsWith('treasury.')) return t('audit.locations.treasury');
+        if (action.startsWith('accounting.')) return t('audit.locations.accounting');
+        if (action.startsWith('hr.')) return t('audit.locations.hr');
+        if (action === 'configure' || action === 'settings.update') {
+            if (keys.includes('industry_type')) return t('audit.locations.company_industry_settings');
+            if (keys.includes('modules') || details.modules_added || details.modules_removed) return t('audit.locations.company_modules_settings');
+            return t('audit.locations.general_settings');
+        }
+        if (String(log?.resource_type || '').toLowerCase() === 'settings') {
+            return t('audit.locations.general_settings');
+        }
+
+        return t('audit.locations.system');
+    };
+
+    const formatActor = (log) => {
+        if (log?.username) return log.username;
+        return t('audit.system_actor');
+    };
+
     useEffect(() => {
         if (!branchLoading) {
             fetchData();
@@ -163,7 +297,7 @@ const AuditLogs = () => {
                     >
                         <option value="">{t('common.all')}</option>
                         {actions.map(action => (
-                            <option key={action} value={action}>{t(`audit.actions.${action}`) || action}</option>
+                            <option key={action} value={action}>{formatAuditAction(action)}</option>
                         ))}
                     </select>
                 </div>
@@ -246,28 +380,36 @@ const AuditLogs = () => {
                                             className="action-badge"
                                             style={{ backgroundColor: getActionColor(log.action) }}
                                         >
-                                            {getActionIcon(log.action)} {t(`audit.actions.${log.action}`) || log.action}
+                                            {getActionIcon(log.action)} {formatActionWithContext(log)}
                                         </span>
+                                        <div style={{ fontSize: '12px', color: '#8fa7c6', marginTop: '4px' }}>
+                                            {describeActionLocation(log)}
+                                        </div>
                                     </td>
-                                    <td>{log.username}</td>
+                                    <td>
+                                        <div style={{ fontWeight: 600 }}>{formatActor(log)}</div>
+                                        <div style={{ fontSize: '12px', color: '#8fa7c6' }}>
+                                            {log.user_id ? `${t('audit.user_id_label')}: ${log.user_id}` : t('audit.system_actor')}
+                                        </div>
+                                    </td>
                                     <td>
                                         {/* Display Name from details if available, otherwise Type #ID */}
                                         {log.details && (log.details.name || log.details.customer_name || log.details.supplier_name || log.details.group_name || log.details.product_name || log.details.username || log.details.full_name) ? (
                                             <span className="resource-name-tag">
                                                 {log.details.name || log.details.customer_name || log.details.supplier_name || log.details.group_name || log.details.product_name || log.details.username || log.details.full_name}
-                                                <small className="resource-id-sub"> ({log.resource_type} #{log.resource_id})</small>
+                                                <small className="resource-id-sub"> ({formatAuditLabel(log.resource_type)} #{log.resource_id})</small>
                                             </span>
                                         ) : (
                                             log.resource_type && (
                                                 <span className="resource-tag">
-                                                    {log.resource_type} #{log.resource_id}
+                                                    {formatAuditLabel(log.resource_type)} #{log.resource_id}
                                                 </span>
                                             )
                                         )}
                                     </td>
                                     <td className="details-cell">
                                         {log.details && Object.keys(log.details).length > 0 ? (
-                                            <DetailsViewer details={log.details} t={t} />
+                                            <DetailsViewer details={log.details} t={t} formatIndustryType={formatIndustryType} />
                                         ) : '-'}
                                     </td>
                                     <td className="ip-cell">{log.ip_address || '-'}</td>
@@ -286,8 +428,133 @@ const AuditLogs = () => {
     );
 };
 
-const DetailsViewer = ({ details, t }) => {
+const DetailsViewer = ({ details, t, formatIndustryType }) => {
     const [expanded, setExpanded] = useState(false);
+
+    const humanizeToken = (value) => {
+        if (!value) return '';
+        return String(value)
+            .replace(/[._-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const translatedOrNull = (key) => {
+        const translated = t(key);
+        return translated === key ? null : translated;
+    };
+
+    const formatDetailsKey = (key) => {
+        return (
+            translatedOrNull(`audit.detail_keys.${key}`)
+            || translatedOrNull(`common.${key}`)
+            || translatedOrNull(`audit.${key}`)
+            || humanizeToken(key)
+        );
+    };
+
+    const listFromValue = (value) => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string' && value.includes(',')) {
+            return value.split(',').map(v => v.trim()).filter(Boolean);
+        }
+        return [];
+    };
+
+    const buildMovementSummary = () => {
+        const parts = [];
+
+        const keysUpdated = listFromValue(details.keys_updated);
+        if (keysUpdated.length) {
+            parts.push(`${t('audit.summary.keys_updated')}: ${keysUpdated.map(formatDetailsKey).join(', ')}`);
+        }
+
+        const updatedFields = listFromValue(details.updated_fields);
+        if (updatedFields.length) {
+            parts.push(`${t('audit.summary.fields_updated')}: ${updatedFields.map(formatDetailsKey).join(', ')}`);
+        }
+
+        const genericFields = listFromValue(details.fields);
+        if (genericFields.length) {
+            parts.push(`${t('audit.summary.fields_changed')}: ${genericFields.map(formatDetailsKey).join(', ')}`);
+        }
+
+        const modulesAdded = listFromValue(details.modules_added);
+        if (modulesAdded.length) {
+            parts.push(`${t('audit.summary.modules_added')}: ${modulesAdded.join(', ')}`);
+        }
+
+        const modulesRemoved = listFromValue(details.modules_removed);
+        if (modulesRemoved.length) {
+            parts.push(`${t('audit.summary.modules_removed')}: ${modulesRemoved.join(', ')}`);
+        }
+
+        if (details.items_count !== undefined) {
+            parts.push(`${t('audit.summary.items_count')}: ${details.items_count}`);
+        }
+        if (details.approved_count !== undefined) {
+            parts.push(`${t('audit.summary.approved_count')}: ${details.approved_count}`);
+        }
+        if (details.generated_count !== undefined) {
+            parts.push(`${t('audit.summary.generated_count')}: ${details.generated_count}`);
+        }
+
+        if (details.amount !== undefined) {
+            parts.push(`${t('common.amount')}: ${details.amount}`);
+        }
+        if (details.total !== undefined) {
+            parts.push(`${t('common.total')}: ${details.total}`);
+        }
+
+        if (parts.length) return parts;
+
+        if (details.description && typeof details.description === 'string') {
+            return [details.description];
+        }
+
+        return [];
+    };
+
+    const renderValueChipList = (items) => {
+        if (!items || items.length === 0) return '-';
+        return (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {items.map((item) => (
+                    <span key={item} className="resource-tag">
+                        {String(item)}
+                    </span>
+                ))}
+            </div>
+        );
+    };
+
+    const formatDetailsValue = (key, value) => {
+        if (key === 'industry_type' && typeof formatIndustryType === 'function') {
+            return formatIndustryType(value);
+        }
+
+        if (['keys_updated', 'updated_fields', 'fields'].includes(key)) {
+            const items = listFromValue(value).map(formatDetailsKey);
+            if (items.length) return renderValueChipList(items);
+        }
+
+        if (Array.isArray(value)) {
+            return renderValueChipList(value);
+        }
+
+        // Backward compatibility with older logs where modules were stored as comma-separated text.
+        if (key === 'modules' && typeof value === 'string' && value.includes(',')) {
+            const modules = value.split(',').map(v => v.trim()).filter(Boolean);
+            return renderValueChipList(modules);
+        }
+
+        if (value && typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+
+        return String(value);
+    };
 
     // Prepare entries to display
     const entries = Object.entries(details).filter(([key, value]) => {
@@ -319,12 +586,21 @@ const DetailsViewer = ({ details, t }) => {
     const showToggle = hasManyEntries || hasDeepChanges;
 
     const visibleEntries = expanded ? entries : entries.slice(0, 1);
+    const movementSummary = buildMovementSummary();
 
     // Use chevron icon
     const toggleIcon = expanded ? '▲' : '▼';
 
     return (
         <div className="details-viewer">
+            {movementSummary.length > 0 && (
+                <div className="details-list" style={{ marginBottom: '6px' }}>
+                    <div className="details-item">
+                        <span className="details-key">{t('audit.summary.title')}:</span>
+                        <span className="details-value">{movementSummary.join(' | ')}</span>
+                    </div>
+                </div>
+            )}
             <div className="details-list">
                 {visibleEntries.map(([key, value]) => {
                     // Handling 'changes' object separately
@@ -339,7 +615,7 @@ const DetailsViewer = ({ details, t }) => {
                                 <div className="changes-list">
                                     {visibleChanges.map(([cKey, cVal]) => (
                                         <div key={cKey} className="change-item">
-                                            <span className="change-key">{t(`common.${cKey}`) || cKey}:</span>
+                                            <span className="change-key">{formatDetailsKey(cKey)}:</span>
                                             <span className="change-val">{String(cVal)}</span>
                                         </div>
                                     ))}
@@ -353,8 +629,8 @@ const DetailsViewer = ({ details, t }) => {
 
                     return (
                         <div key={key} className="details-item">
-                            <span className="details-key">{t(`common.${key}`) || t(`audit.${key}`) || key}:</span>
-                            <span className="details-value">{String(value)}</span>
+                            <span className="details-key">{formatDetailsKey(key)}:</span>
+                            <span className="details-value">{formatDetailsValue(key, value)}</span>
                         </div>
                     );
                 })}

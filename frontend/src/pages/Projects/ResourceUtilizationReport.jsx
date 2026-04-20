@@ -45,7 +45,7 @@ const ResourceUtilizationReport = () => {
     const getUtilizationLabel = (pct) => {
         if (pct >= 100) return t('projects.load_overload', 'حمل زائد');
         if (pct >= 80) return t('projects.load_optimal', 'حمل مثالي');
-        if (pct >= 50) return t('projects.load_light', 'حمل خفيف');
+        if (pct >= 50) return t('projects.load_moderate', 'حمل متوسط');
         return t('projects.load_light', 'حمل خفيف');
     };
 

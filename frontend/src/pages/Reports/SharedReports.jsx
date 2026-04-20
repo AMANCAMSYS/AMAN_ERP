@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { reportSharingAPI } from '../../services/reports';
 import { useToast } from '../../context/ToastContext';
+import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 const SharedReports = () => {
     const { t } = useTranslation();
     const { showToast } = useToast();
+    const navigate = useNavigate();
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -59,7 +62,13 @@ const SharedReports = () => {
                             reports.map(r => (
                                 <tr key={r.id}>
                                     <td style={{ fontWeight: 600 }}>
-                                        {r.report_name || `${r.report_type} #${r.report_id}`}
+                                        <span
+                                            className="text-primary"
+                                            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                            onClick={() => navigate(`/reports/${r.report_type}/${r.report_id}`)}
+                                        >
+                                            {r.report_name || `${r.report_type} #${r.report_id}`}
+                                        </span>
                                     </td>
                                     <td>{r.shared_by_name}</td>
                                     <td>
@@ -68,7 +77,7 @@ const SharedReports = () => {
                                         </span>
                                     </td>
                                     <td>{r.message || '-'}</td>
-                                    <td>{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</td>
+                                    <td>{formatDate(r.created_at)}</td>
                                 </tr>
                             ))
                         )}

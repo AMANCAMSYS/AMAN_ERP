@@ -24,7 +24,7 @@ const FinancialChart = ({ data, loading, currency = '' }) => {
             }
         },
         legend: {
-            data: [t('dashboard.sales') || "Sales", t('dashboard.expenses') || "Expenses"],
+            data: [t('dashboard.sales'), t('dashboard.expenses')],
             bottom: 0
         },
         grid: {
@@ -60,7 +60,7 @@ const FinancialChart = ({ data, loading, currency = '' }) => {
         ],
         series: [
             {
-                name: t('dashboard.sales') || "Sales",
+                name: t('dashboard.sales'),
                 type: 'line',
                 smooth: true,
                 lineStyle: { width: 3, color: '#3B82F6' },
@@ -77,7 +77,7 @@ const FinancialChart = ({ data, loading, currency = '' }) => {
                 data: (data || []).map(d => d.sales || 0)
             },
             {
-                name: t('dashboard.expenses') || "Expenses",
+                name: t('dashboard.expenses'),
                 type: 'line',
                 smooth: true,
                 lineStyle: { width: 3, color: '#EF4444' },
@@ -100,7 +100,7 @@ const FinancialChart = ({ data, loading, currency = '' }) => {
         <div className="card h-full">
             <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-blue-50 text-blue-600">📊</span>
-                {t('dashboard.financial_overview') || "Financial Overview"}
+                {t('dashboard.financial_overview')}
             </h3>
             <div className="relative" style={{ height: '350px' }}>
                 {loading && (

@@ -38,7 +38,8 @@ from schemas.projects import (
     ProjectExpenseCreate, ProjectRevenueCreate,
     TimesheetCreate, TimesheetUpdate, TimesheetApprove,
     ProjectInvoiceCreate, ProjectDocumentCreate,
-    ChangeOrderCreate, ChangeOrderUpdate, ProjectCloseRequest
+    ChangeOrderCreate, ChangeOrderUpdate, ProjectCloseRequest,
+    ProjectRiskCreate, ProjectRiskUpdate, TaskDependencyCreate
 )
 
 
@@ -192,6 +193,638 @@ async def list_own_time_entries(
         db.close()
 
 
+@router.get("/resources/allocation", dependencies=[Depends(require_permission("projects.view"))])
+async def get_resource_allocation(
+    start_date: date,
+    end_date: date,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    تقرير تخصيص الموارد (Resource Allocation)
+    يحسب ساعات العمل المخططة لكل موظف يومياً بناءً على المهام المسندة.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        # Fetch tasks that overlap with the requested period
+        tasks = db.execute(text("""
+            SELECT pt.id, pt.task_name, pt.start_date, pt.end_date, pt.planned_hours,
+                   pt.assigned_to, CONCAT(e.first_name, ' ', e.last_name) as employee_name,
+                   p.project_name
+            FROM project_tasks pt
+            JOIN projects p ON pt.project_id = p.id
+            JOIN employees e ON pt.assigned_to = e.id
+            WHERE pt.start_date <= :end AND pt.end_date >= :start
+            AND pt.assigned_to IS NOT NULL
+            AND p.status IN ('in_progress', 'planning')
+        """), {"start": start_date, "end": end_date}).fetchall()
+
+        # Fetch actual timesheets for verification (Optional, maybe for a different view)
+        # For allocation, we mainly care about "Planned" load to avoid overloading.
+
+        allocation: Dict[int, Dict[str, Any]] = {}
+
+        # Helper to generate date range
+        from datetime import timedelta
+        def daterange(start_date, end_date):
+            for n in range(int((end_date - start_date).days) + 1):
+                yield start_date + timedelta(n)
+
+        req_start = start_date
+        req_end = end_date
+
+        for task in tasks:
+            emp_id = task.assigned_to
+            emp_name = task.employee_name
+            
+            if emp_id not in allocation:
+                allocation[emp_id] = {"id": emp_id, "name": emp_name, "projects": set(), "daily_load": {}}
+
+            allocation[emp_id]["projects"].add(task.project_name)
+
+            # Calculate daily load for this task
+            # Intersection of Task Duration and Requested Period
+            t_start = max(task.start_date.date() if isinstance(task.start_date, datetime) else task.start_date, req_start)
+            t_end = min(task.end_date.date() if isinstance(task.end_date, datetime) else task.end_date, req_end)
+            
+            if t_start > t_end:
+                 continue
+
+            days_count = (task.end_date - task.start_date).days + 1
+            if days_count <= 0: days_count = 1
+            
+            # Simple linear distribution: hours / days
+            daily_hours = _dec(task.planned_hours or 0) / _dec(days_count)
+
+            for single_date in daterange(t_start, t_end):
+                d_str = single_date.isoformat()
+                allocation[emp_id]["daily_load"][d_str] = allocation[emp_id]["daily_load"].get(d_str, Decimal('0')) + daily_hours
+
+        # Format for frontend
+        result = []
+        for emp_id, data in allocation.items():
+            result.append({
+                "id": data["id"],
+                "name": data["name"],
+                "projects": list(data["projects"]),
+                "daily_load": [{"date": d, "hours": float(_dec(h).quantize(_D2, ROUND_HALF_UP))} for d, h in data["daily_load"].items()]
+            })
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error fetching resource allocation: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+@router.post("/retainer/generate-invoices", dependencies=[Depends(require_permission("projects.edit"))])
+async def generate_retainer_invoices(
+    request: Request,
+    billing_date: Optional[date] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    توليد فواتير دورية تلقائية لعقود Retainer المستحقة.
+    Generate automatic periodic invoices for due Retainer contracts.
+    Creates invoice + GL entry (Dr AR / Cr Revenue) for each project.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        target_date = billing_date or date.today()
+        
+        # Find retainer projects due for billing
+        projects = db.execute(text("""
+            SELECT p.*, 
+                   COALESCE(c.name, pa.name, '') as customer_name,
+                   COALESCE(p.customer_id, p.party_id) as bill_to_id
+            FROM projects p
+            LEFT JOIN customers c ON p.customer_id = c.id
+            LEFT JOIN parties pa ON p.party_id = pa.id
+            WHERE p.contract_type = 'retainer'
+              AND p.retainer_amount > 0
+              AND p.status NOT IN ('completed', 'cancelled')
+              AND (p.next_billing_date IS NULL OR p.next_billing_date <= :target)
+        """), {"target": target_date}).fetchall()
+        
+        if not projects:
+            return {"success": True, "generated": 0, "message": i18n_message("no_contracts_due_for_billing")}
+        
+        base_currency = get_base_currency(db)
+        ar_acc = get_mapped_account_id(db, "acc_map_ar")
+        rev_acc = get_mapped_account_id(db, "acc_map_sales_rev") or get_mapped_account_id(db, "acc_map_project_revenue")
+        
+        generated = []
+        
+        for proj in projects:
+            p = proj._mapping
+            amount = _dec(p["retainer_amount"])
+            if amount <= 0:
+                continue
+            
+            # Generate invoice
+            inv_num = generate_sequential_number(db, f"RET-{target_date.year}", "invoices", "invoice_number")
+            bill_to = p.get("bill_to_id") or p.get("customer_id")
+            
+            inv_id = db.execute(text("""
+                INSERT INTO invoices (
+                    invoice_number, party_id, invoice_type, invoice_date, due_date,
+                    subtotal, tax_amount, discount, total, paid_amount, status, notes,
+                    payment_method, created_by, branch_id, currency, exchange_rate
+                ) VALUES (
+                    :num, :cust, 'sales', :inv_date, :due_date,
+                    :amt, 0, 0, :amt, 0, 'unpaid',
+                    :notes, 'credit', :uid, :branch, :curr, 1.0
+                ) RETURNING id
+            """), {
+                "num": inv_num, "cust": bill_to,
+                "inv_date": target_date,
+                "due_date": target_date + timedelta(days=30),
+                "amt": amount,
+                "notes": f"فاتورة دورية (Retainer) — مشروع: {p['project_name']}",
+                "uid": current_user.id, "branch": p.get("branch_id"),
+                "curr": base_currency
+            }).scalar()
+            
+            # Invoice line
+            db.execute(text("""
+                INSERT INTO invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, discount, total)
+                VALUES (:inv_id, :desc, 1, :price, 0, 0, :total)
+            """), {
+                "inv_id": inv_id, "desc": f"رسوم اشتراك — مشروع {p['project_name']}",
+                "price": amount, "total": amount
+            })
+            
+            # Link to project revenues
+            db.execute(text("""
+                INSERT INTO project_revenues (project_id, revenue_type, revenue_date, amount, description, invoice_id, status, created_by)
+                VALUES (:pid, 'retainer', :date, :amt, :desc, :inv_id, 'approved', :uid)
+            """), {
+                "pid": p["id"], "date": target_date, "amt": amount,
+                "desc": f"فاتورة Retainer #{inv_num}", "inv_id": inv_id, "uid": current_user.id
+            })
+            
+            # GL Entry: Dr AR / Cr Revenue
+            je_id = None
+            if ar_acc and rev_acc:
+                cost_center_id = db.execute(text(
+                    "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
+                ), {"name": f"%{p['project_name']}%"}).scalar()
+
+                je_id, entry_num = gl_create_journal_entry(
+                    db=db,
+                    company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
+                    date=target_date,
+                    description=f"فاتورة Retainer — {p['project_name']} — {inv_num}",
+                    status="posted",
+                    currency=base_currency,
+                    exchange_rate=Decimal("1"),
+                    lines=[
+                        {
+                            "account_id": ar_acc, "debit": amount, "credit": 0,
+                            "description": f"ذمم مدينة — Retainer {p['project_name']}", "cost_center_id": cost_center_id
+                        },
+                        {
+                            "account_id": rev_acc, "debit": 0, "credit": amount,
+                            "description": f"إيراد Retainer {p['project_name']}", "cost_center_id": cost_center_id
+                        }
+                    ],
+                    user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
+                    source="project_invoice",
+                    source_id=inv_id
+                )
+            
+            # Calculate next billing date
+            cycle = p.get("billing_cycle", "monthly")
+            if cycle == "monthly":
+                next_date = target_date + timedelta(days=30)
+            elif cycle == "quarterly":
+                next_date = target_date + timedelta(days=90)
+            elif cycle == "yearly":
+                next_date = target_date + timedelta(days=365)
+            else:
+                next_date = target_date + timedelta(days=30)
+            
+            db.execute(text("""
+                UPDATE projects SET last_billed_date = :billed, next_billing_date = :next, updated_at = NOW()
+                WHERE id = :id
+            """), {"billed": target_date, "next": next_date, "id": p["id"]})
+            
+            generated.append({
+                "project_id": p["id"], "project_name": p["project_name"],
+                "invoice_id": inv_id, "invoice_number": inv_num,
+                "amount": amount, "journal_entry_id": je_id
+            })
+        
+        db.commit()
+        log_activity(db, user_id=current_user.id, username=current_user.username, action="generate_retainer_invoices", resource_type="project_invoice", resource_id=None, details={"generated_count": len(generated)})
+        
+        return {
+            "success": True,
+            "generated": len(generated),
+            "invoices": generated,
+            "message": i18n_message("retainer_invoices_created_count_success", count=len(generated))
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error generating retainer invoices: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/reports/profitability", dependencies=[Depends(require_permission("projects.view"))])
+async def report_project_profitability(
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير ربحية المشاريع"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        where = "WHERE 1=1"
+        params = {}
+        if status_filter:
+            where += " AND p.status = :status"
+            params["status"] = status_filter
+
+        rows = db.execute(text(f"""
+            SELECT p.id, p.project_code, p.project_name, p.status,
+                   p.planned_budget, p.progress_percentage,
+                   p.start_date, p.end_date,
+                   COALESCE(exp.total, 0) as total_expenses,
+                   COALESCE(rev.total, 0) as total_revenues
+            FROM projects p
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total
+                FROM project_expenses WHERE status != 'rejected'
+                GROUP BY project_id
+            ) exp ON exp.project_id = p.id
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total
+                FROM project_revenues WHERE status != 'rejected'
+                GROUP BY project_id
+            ) rev ON rev.project_id = p.id
+            {where}
+            ORDER BY (COALESCE(rev.total, 0) - COALESCE(exp.total, 0)) DESC
+        """), params).fetchall()
+
+        projects_list = []
+        total_revenue_sum = Decimal('0')
+        total_expense_sum = Decimal('0')
+        for r in rows:
+            m = r._mapping
+            rev = _dec(m["total_revenues"] or 0)
+            exp = _dec(m["total_expenses"] or 0)
+            net = rev - exp
+            margin = (net / rev * Decimal('100')) if rev > 0 else Decimal('0')
+            budget = _dec(m["planned_budget"] or 0)
+            budget_var = budget - exp
+
+            projects_list.append({
+                "project_id": m["id"],
+                "project_code": m["project_code"],
+                "project_name": m["project_name"],
+                "status": m["status"],
+                "planned_budget": float(budget.quantize(_D2)),
+                "total_expenses": float(exp.quantize(_D2)),
+                "total_revenues": float(rev.quantize(_D2)),
+                "net_profit": float(net.quantize(_D2)),
+                "margin_pct": float(margin.quantize(_D2)),
+                "budget_variance": float(budget_var.quantize(_D2)),
+                "progress": float(m["progress_percentage"] or 0),
+            })
+            total_revenue_sum += rev
+            total_expense_sum += exp
+
+        total_net = total_revenue_sum - total_expense_sum
+        avg_margin = (total_net / total_revenue_sum * Decimal('100')) if total_revenue_sum > 0 else Decimal('0')
+
+        return {
+            "report_name": "تقرير ربحية المشاريع",
+            "projects": projects_list,
+            "totals": {
+                "total_revenue": float(total_revenue_sum.quantize(_D2)),
+                "total_expense": float(total_expense_sum.quantize(_D2)),
+                "total_profit": float(total_net.quantize(_D2)),
+                "avg_margin_pct": float(avg_margin.quantize(_D2)),
+                "project_count": len(projects_list),
+            }
+        }
+    finally:
+        db.close()
+
+@router.get("/reports/variance", dependencies=[Depends(require_permission("projects.view"))])
+async def report_project_variance(current_user: dict = Depends(get_current_user)):
+    """تقرير انحراف المشاريع (Budget vs Actual)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT p.id, p.project_code, p.project_name, p.status,
+                   p.planned_budget, p.progress_percentage,
+                   p.start_date, p.end_date,
+                   COALESCE(exp.total, 0) as actual_expenses,
+                   COALESCE(ts.total_hours, 0) as actual_hours,
+                   COALESCE(tk.planned_hours, 0) as planned_hours
+            FROM projects p
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total
+                FROM project_expenses WHERE status != 'rejected'
+                GROUP BY project_id
+            ) exp ON exp.project_id = p.id
+            LEFT JOIN (
+                SELECT project_id, SUM(hours) as total_hours
+                FROM project_timesheets WHERE status = 'approved'
+                GROUP BY project_id
+            ) ts ON ts.project_id = p.id
+            LEFT JOIN (
+                SELECT project_id, SUM(planned_hours) as planned_hours
+                FROM project_tasks
+                GROUP BY project_id
+            ) tk ON tk.project_id = p.id
+            WHERE p.status != 'cancelled'
+            ORDER BY p.id
+        """)).fetchall()
+
+        projects_list = []
+        for r in rows:
+            m = r._mapping
+            budget = _dec(m["planned_budget"] or 0)
+            actual = _dec(m["actual_expenses"] or 0)
+            cost_var = budget - actual
+            cost_var_pct = (cost_var / budget * Decimal('100')) if budget > 0 else Decimal('0')
+
+            planned_h = _dec(m["planned_hours"] or 0)
+            actual_h = _dec(m["actual_hours"] or 0)
+            hour_var = planned_h - actual_h
+
+            schedule_var_days = None
+            if m["end_date"] and m["status"] not in ["completed", "cancelled"]:
+                schedule_var_days = (m["end_date"] - date.today()).days
+
+            projects_list.append({
+                "project_id": m["id"],
+                "project_code": m["project_code"],
+                "project_name": m["project_name"],
+                "status": m["status"],
+                "planned_budget": float(budget.quantize(_D2)),
+                "actual_cost": float(actual.quantize(_D2)),
+                "cost_variance": float(cost_var.quantize(_D2)),
+                "cost_variance_pct": float(cost_var_pct.quantize(_D2)),
+                "planned_hours": float(planned_h.quantize(_D2)),
+                "actual_hours": float(actual_h.quantize(_D2)),
+                "hours_variance": float(hour_var.quantize(_D2)),
+                "progress": float(m["progress_percentage"] or 0),
+                "schedule_days_remaining": schedule_var_days,
+                "is_over_budget": actual > budget if budget > 0 else False,
+                "is_behind_schedule": schedule_var_days is not None and schedule_var_days < 0,
+            })
+
+        overbudget = sum(1 for p in projects_list if p["is_over_budget"])
+        behind = sum(1 for p in projects_list if p["is_behind_schedule"])
+
+        return {
+            "report_name": "تقرير انحراف المشاريع",
+            "projects": projects_list,
+            "summary": {
+                "total_projects": len(projects_list),
+                "over_budget_count": overbudget,
+                "behind_schedule_count": behind,
+                "on_track_count": len(projects_list) - overbudget - behind,
+            }
+        }
+    finally:
+        db.close()
+
+@router.get("/reports/resource-utilization", dependencies=[Depends(require_permission("projects.view"))])
+async def report_resource_utilization(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقرير استخدام الموارد عبر المشاريع"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        date_filter = ""
+        params = {}
+        if start_date:
+            date_filter += " AND ts.date >= :start"
+            params["start"] = start_date
+        if end_date:
+            date_filter += " AND ts.date <= :end"
+            params["end"] = end_date
+
+        rows = db.execute(text(f"""
+            SELECT u.id as user_id, u.full_name,
+                   COUNT(DISTINCT ts.project_id) as projects_count,
+                   SUM(ts.hours) as total_hours,
+                   AVG(ts.hours) as avg_daily_hours,
+                   COUNT(DISTINCT ts.date) as working_days
+            FROM project_timesheets ts
+            JOIN company_users u ON ts.employee_id = u.id
+            WHERE ts.status = 'approved' {date_filter}
+            GROUP BY u.id, u.full_name
+            ORDER BY total_hours DESC
+        """), params).fetchall()
+
+        resources = []
+        for r in rows:
+            m = r._mapping
+            total_h = _dec(m["total_hours"] or 0)
+            working_days = int(m["working_days"] or 1)
+            standard_hours = _dec(working_days * 8)
+            utilization = (total_h / standard_hours * Decimal('100')) if standard_hours > 0 else Decimal('0')
+
+            resources.append({
+                "user_id": m["user_id"],
+                "name": m["full_name"],
+                "projects_count": m["projects_count"],
+                "total_hours": float(total_h.quantize(_D2)),
+                "avg_daily_hours": round(float(m["avg_daily_hours"] or 0), 2),
+                "working_days": working_days,
+                "utilization_pct": float(utilization.quantize(_D2)),
+            })
+
+        return {
+            "report_name": "تقرير استخدام الموارد",
+            "period": {
+                "start": str(start_date) if start_date else "All",
+                "end": str(end_date) if end_date else "All"
+            },
+            "resources": resources,
+        }
+    finally:
+        db.close()
+
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/alerts/overdue-tasks", dependencies=[Depends(require_permission("projects.view"))])
+async def get_overdue_tasks(current_user: dict = Depends(get_current_user)):
+    """
+    المهام المتأخرة: المهام التي تجاوزت تاريخ الانتهاء ولم تكتمل بعد.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT t.id, t.task_name, t.end_date, t.status,
+                   t.progress,
+                   p.id as project_id, p.project_code, p.project_name,
+                   COALESCE(u.full_name, '') as assigned_to_name,
+                   (CURRENT_DATE - t.end_date) as days_overdue
+            FROM project_tasks t
+            JOIN projects p ON t.project_id = p.id
+            LEFT JOIN company_users u ON t.assigned_to = u.id
+            WHERE t.end_date < CURRENT_DATE
+              AND t.status NOT IN ('completed', 'cancelled')
+              AND p.status NOT IN ('completed', 'cancelled')
+            ORDER BY days_overdue DESC
+        """)).fetchall()
+
+        tasks_list = [dict(r._mapping) for r in rows]
+
+        return {
+            "alert_type": "overdue_tasks",
+            "count": len(tasks_list),
+            "tasks": tasks_list,
+            "message": i18n_message("overdue_tasks_attention_count", count=len(tasks_list)) if tasks_list else i18n_message("overdue_tasks_none"),
+        }
+    finally:
+        db.close()
+
+@router.get("/alerts/over-budget", dependencies=[Depends(require_permission("projects.view"))])
+async def get_over_budget_projects(current_user: dict = Depends(get_current_user)):
+    """المشاريع التي تجاوزت ميزانيتها المخططة."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT p.id, p.project_code, p.project_name, p.status,
+                   p.planned_budget,
+                   COALESCE(exp.total, 0) as actual_cost,
+                   COALESCE(exp.total, 0) - p.planned_budget as overage,
+                   CASE WHEN p.planned_budget > 0
+                        THEN ROUND(((COALESCE(exp.total,0) - p.planned_budget) / p.planned_budget * 100)::numeric, 1)
+                        ELSE 0 END as overage_pct,
+                   p.progress_percentage
+            FROM projects p
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total
+                FROM project_expenses WHERE status != 'rejected'
+                GROUP BY project_id
+            ) exp ON exp.project_id = p.id
+            WHERE p.planned_budget > 0
+              AND COALESCE(exp.total, 0) > p.planned_budget
+              AND p.status NOT IN ('completed', 'cancelled')
+            ORDER BY overage_pct DESC
+        """)).fetchall()
+
+        projects_list = [dict(r._mapping) for r in rows]
+
+        return {
+            "alert_type": "over_budget",
+            "count": len(projects_list),
+            "projects": projects_list,
+            "message": i18n_message("over_budget_projects_count", count=len(projects_list)) if projects_list else i18n_message("over_budget_projects_none"),
+        }
+    finally:
+        db.close()
+
+@router.get("/alerts/dashboard", dependencies=[Depends(require_permission("projects.view"))])
+async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
+    """
+    لوحة تنبيهات المشاريع الشاملة:
+    - مهام متأخرة
+    - مشاريع تجاوزت الميزانية
+    - مشاريع قاربت على الموعد النهائي (<14 يوم)
+    - مشاريع تجاوزت الموعد النهائي
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        today = date.today()
+
+        # Overdue tasks
+        overdue_tasks_count = db.execute(text("""
+            SELECT COUNT(*) FROM project_tasks t
+            JOIN projects p ON t.project_id = p.id
+            WHERE t.end_date < CURRENT_DATE
+              AND t.status NOT IN ('completed', 'cancelled')
+              AND p.status NOT IN ('completed', 'cancelled')
+        """)).scalar()
+
+        # Over-budget projects
+        over_budget_count = db.execute(text("""
+            SELECT COUNT(*) FROM projects p
+            LEFT JOIN (
+                SELECT project_id, SUM(amount) as total FROM project_expenses
+                WHERE status != 'rejected' GROUP BY project_id
+            ) exp ON exp.project_id = p.id
+            WHERE p.planned_budget > 0
+              AND COALESCE(exp.total,0) > p.planned_budget
+              AND p.status NOT IN ('completed','cancelled')
+        """)).scalar()
+
+        # Projects ending within 14 days
+        due_soon = db.execute(text("""
+            SELECT id, project_code, project_name, end_date,
+                   (end_date - CURRENT_DATE) as days_remaining,
+                   progress_percentage
+            FROM projects
+            WHERE end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+              AND status NOT IN ('completed', 'cancelled')
+            ORDER BY end_date
+        """)).fetchall()
+
+        # Projects past end_date
+        overdue_projects = db.execute(text("""
+            SELECT id, project_code, project_name, end_date,
+                   (CURRENT_DATE - end_date) as days_overdue,
+                   progress_percentage
+            FROM projects
+            WHERE end_date < CURRENT_DATE
+              AND status NOT IN ('completed', 'cancelled')
+            ORDER BY days_overdue DESC
+        """)).fetchall()
+
+        # Pending change orders
+        pending_cos = db.execute(text("""
+            SELECT COUNT(*) FROM project_change_orders
+            WHERE status = 'pending'
+        """)).scalar() or 0
+
+        alerts = []
+        if overdue_tasks_count:
+            alerts.append({"type": "overdue_tasks", "severity": "high",
+                           "message": i18n_message("overdue_tasks_count", count=overdue_tasks_count), "count": overdue_tasks_count})
+        if over_budget_count:
+            alerts.append({"type": "over_budget", "severity": "high",
+                           "message": i18n_message("over_budget_count", count=over_budget_count), "count": over_budget_count})
+        if overdue_projects:
+            alerts.append({"type": "overdue_projects", "severity": "critical",
+                           "message": i18n_message("overdue_projects_count", count=len(overdue_projects)), "count": len(overdue_projects)})
+        if due_soon:
+            alerts.append({"type": "due_soon", "severity": "medium",
+                           "message": i18n_message("projects_due_soon_14_days_count", count=len(due_soon)), "count": len(due_soon)})
+        if pending_cos:
+            alerts.append({"type": "pending_change_orders", "severity": "low",
+                           "message": i18n_message("pending_change_orders_count", count=pending_cos), "count": pending_cos})
+
+        return {
+            "total_alerts": len(alerts),
+            "alerts": alerts,
+            "details": {
+                "overdue_tasks_count": int(overdue_tasks_count or 0),
+                "over_budget_count": int(over_budget_count or 0),
+                "overdue_projects": [dict(r._mapping) for r in overdue_projects],
+                "due_soon_projects": [dict(r._mapping) for r in due_soon],
+                "pending_change_orders": int(pending_cos),
+            }
+        }
+    finally:
+        db.close()
+
+
+# ===================== B5: Project Risks =====================
+
 @router.get("/{project_id}", dependencies=[Depends(require_permission("projects.view"))])
 async def get_project(project_id: int, current_user: dict = Depends(get_current_user)):
     """جلب تفاصيل مشروع مع المهام والمصاريف والإيرادات"""
@@ -278,6 +911,10 @@ async def create_project(
     """إنشاء مشروع جديد"""
     db = get_db_connection(current_user.company_id)
     try:
+        # T034: Validate start_date <= end_date
+        if project.start_date and project.end_date and project.end_date < project.start_date:
+            raise HTTPException(**http_error(400, "project_end_before_start"))
+
         code = project.project_code
         if not code:
             code = generate_sequential_number(db, f"PRJ-{datetime.now().year}", "projects", "project_code")
@@ -286,11 +923,13 @@ async def create_project(
             INSERT INTO projects (
                 project_code, project_name, project_name_en, description,
                 project_type, customer_id, manager_id,
-                start_date, end_date, planned_budget, status, created_by
+                start_date, end_date, planned_budget, status, created_by,
+                branch_id, contract_type
             ) VALUES (
                 :code, :name, :name_en, :desc,
                 :type, :cid, :mid,
-                :start, :end, :budget, :status, :uid
+                :start, :end, :budget, :status, :uid,
+                :branch_id, :contract_type
             ) RETURNING id
         """), {
             "code": code, "name": project.project_name,
@@ -299,7 +938,8 @@ async def create_project(
             "mid": project.manager_id,
             "start": project.start_date, "end": project.end_date,
             "budget": project.planned_budget, "status": project.status,
-            "uid": current_user.id
+            "uid": current_user.id,
+            "branch_id": project.branch_id, "contract_type": project.contract_type
         })
         project_id = result.scalar()
         db.commit()
@@ -819,7 +1459,7 @@ async def create_project_revenue(
             reference=None,
             status="posted",
             currency=base_currency,
-            exchange_rate=1.0,
+            exchange_rate=Decimal("1"),
             lines=[
                 {
                     "account_id": debit_acc,
@@ -973,91 +1613,6 @@ async def get_project_financials(project_id: int, current_user: dict = Depends(g
         raise
     except Exception as e:
         logger.error(f"Error fetching financials: {e}")
-        raise HTTPException(**http_error(500, "internal_error"))
-    finally:
-        db.close()
-
-
-@router.get("/resources/allocation", dependencies=[Depends(require_permission("projects.view"))])
-async def get_resource_allocation(
-    start_date: date,
-    end_date: date,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    تقرير تخصيص الموارد (Resource Allocation)
-    يحسب ساعات العمل المخططة لكل موظف يومياً بناءً على المهام المسندة.
-    """
-    db = get_db_connection(current_user.company_id)
-    try:
-        # Fetch tasks that overlap with the requested period
-        tasks = db.execute(text("""
-            SELECT pt.id, pt.task_name, pt.start_date, pt.end_date, pt.planned_hours,
-                   pt.assigned_to, CONCAT(e.first_name, ' ', e.last_name) as employee_name,
-                   p.project_name
-            FROM project_tasks pt
-            JOIN projects p ON pt.project_id = p.id
-            JOIN employees e ON pt.assigned_to = e.id
-            WHERE pt.start_date <= :end AND pt.end_date >= :start
-            AND pt.assigned_to IS NOT NULL
-            AND p.status IN ('in_progress', 'planning')
-        """), {"start": start_date, "end": end_date}).fetchall()
-
-        # Fetch actual timesheets for verification (Optional, maybe for a different view)
-        # For allocation, we mainly care about "Planned" load to avoid overloading.
-
-        allocation: Dict[int, Dict[str, Any]] = {}
-
-        # Helper to generate date range
-        from datetime import timedelta
-        def daterange(start_date, end_date):
-            for n in range(int((end_date - start_date).days) + 1):
-                yield start_date + timedelta(n)
-
-        req_start = start_date
-        req_end = end_date
-
-        for task in tasks:
-            emp_id = task.assigned_to
-            emp_name = task.employee_name
-            
-            if emp_id not in allocation:
-                allocation[emp_id] = {"id": emp_id, "name": emp_name, "projects": set(), "daily_load": {}}
-
-            allocation[emp_id]["projects"].add(task.project_name)
-
-            # Calculate daily load for this task
-            # Intersection of Task Duration and Requested Period
-            t_start = max(task.start_date.date() if isinstance(task.start_date, datetime) else task.start_date, req_start)
-            t_end = min(task.end_date.date() if isinstance(task.end_date, datetime) else task.end_date, req_end)
-            
-            if t_start > t_end:
-                 continue
-
-            days_count = (task.end_date - task.start_date).days + 1
-            if days_count <= 0: days_count = 1
-            
-            # Simple linear distribution: hours / days
-            daily_hours = _dec(task.planned_hours or 0) / _dec(days_count)
-
-            for single_date in daterange(t_start, t_end):
-                d_str = single_date.isoformat()
-                allocation[emp_id]["daily_load"][d_str] = allocation[emp_id]["daily_load"].get(d_str, Decimal('0')) + daily_hours
-
-        # Format for frontend
-        result = []
-        for emp_id, data in allocation.items():
-            result.append({
-                "id": data["id"],
-                "name": data["name"],
-                "projects": list(data["projects"]),
-                "daily_load": [{"date": d, "hours": float(_dec(h).quantize(_D2, ROUND_HALF_UP))} for d, h in data["daily_load"].items()]
-            })
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Error fetching resource allocation: {e}")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
@@ -1249,7 +1804,7 @@ async def approve_timesheets(
             raise HTTPException(status_code=400, detail=i18n_message("labor_cost_accounts_not_configured"))
 
         # 2. Fetch Project Info
-        project = db.execute(text("SELECT project_name FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
+        project = db.execute(text("SELECT project_name, branch_id FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:
             raise HTTPException(**http_error(404, "project_not_found"))
 
@@ -1303,7 +1858,7 @@ async def approve_timesheets(
                     reference=None,
                     status="posted",
                     currency=base_curr,
-                    exchange_rate=1.0,
+                    exchange_rate=Decimal("1"),
                     lines=[
                         {
                             "account_id": acc_labor_exp,
@@ -1432,8 +1987,13 @@ async def delete_project_document(project_id: int, doc_id: int, current_user: di
             # Construct absolute path. stored as /uploads/...
             # We assume running from backend root, so remove leading /
             rel_path = doc.file_url.lstrip("/")
-            if os.path.exists(rel_path):
-                os.remove(rel_path)
+            # T046: Path traversal validation — ensure path stays within uploads/
+            safe_base = os.path.abspath("uploads")
+            abs_path = os.path.abspath(rel_path)
+            if not abs_path.startswith(safe_base):
+                raise HTTPException(status_code=400, detail="Invalid file path")
+            if os.path.exists(abs_path):
+                os.remove(abs_path)
                 
         db.execute(text("DELETE FROM project_documents WHERE id = :id"), {"id": doc_id})
         db.commit()
@@ -1494,7 +2054,7 @@ async def create_project_invoice(
         
         # 3. Create Invoice Header
         inv_currency = invoice_data.currency or get_base_currency(db)
-        exchange_rate = invoice_data.exchange_rate or 1.0
+        exchange_rate = invoice_data.exchange_rate or Decimal("1")
         
         inv_id = db.execute(text("""
             INSERT INTO invoices (
@@ -1896,7 +2456,7 @@ async def close_project(
                         description=f"إقفال مشروع: {p['project_name']} — صافي {'ربح' if net_profit_loss > 0 else 'خسارة'}: {abs(net_profit_loss):.2f}",
                         status="posted",
                         currency=base_currency,
-                        exchange_rate=1.0,
+                        exchange_rate=Decimal("1"),
                         lines=lines,
                         user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
                         source="project_closure",
@@ -1989,163 +2549,6 @@ async def setup_retainer(
         db.close()
 
 
-@router.post("/retainer/generate-invoices", dependencies=[Depends(require_permission("projects.edit"))])
-async def generate_retainer_invoices(
-    request: Request,
-    billing_date: Optional[date] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    توليد فواتير دورية تلقائية لعقود Retainer المستحقة.
-    Generate automatic periodic invoices for due Retainer contracts.
-    Creates invoice + GL entry (Dr AR / Cr Revenue) for each project.
-    """
-    db = get_db_connection(current_user.company_id)
-    try:
-        target_date = billing_date or date.today()
-        
-        # Find retainer projects due for billing
-        projects = db.execute(text("""
-            SELECT p.*, 
-                   COALESCE(c.name, pa.name, '') as customer_name,
-                   COALESCE(p.customer_id, p.party_id) as bill_to_id
-            FROM projects p
-            LEFT JOIN customers c ON p.customer_id = c.id
-            LEFT JOIN parties pa ON p.party_id = pa.id
-            WHERE p.contract_type = 'retainer'
-              AND p.retainer_amount > 0
-              AND p.status NOT IN ('completed', 'cancelled')
-              AND (p.next_billing_date IS NULL OR p.next_billing_date <= :target)
-        """), {"target": target_date}).fetchall()
-        
-        if not projects:
-            return {"success": True, "generated": 0, "message": i18n_message("no_contracts_due_for_billing")}
-        
-        base_currency = get_base_currency(db)
-        ar_acc = get_mapped_account_id(db, "acc_map_ar")
-        rev_acc = get_mapped_account_id(db, "acc_map_sales_rev") or get_mapped_account_id(db, "acc_map_project_revenue")
-        
-        generated = []
-        
-        for proj in projects:
-            p = proj._mapping
-            amount = _dec(p["retainer_amount"])
-            if amount <= 0:
-                continue
-            
-            # Generate invoice
-            inv_num = generate_sequential_number(db, f"RET-{target_date.year}", "invoices", "invoice_number")
-            bill_to = p.get("bill_to_id") or p.get("customer_id")
-            
-            inv_id = db.execute(text("""
-                INSERT INTO invoices (
-                    invoice_number, party_id, invoice_type, invoice_date, due_date,
-                    subtotal, tax_amount, discount, total, paid_amount, status, notes,
-                    payment_method, created_by, branch_id, currency, exchange_rate
-                ) VALUES (
-                    :num, :cust, 'sales', :inv_date, :due_date,
-                    :amt, 0, 0, :amt, 0, 'unpaid',
-                    :notes, 'credit', :uid, :branch, :curr, 1.0
-                ) RETURNING id
-            """), {
-                "num": inv_num, "cust": bill_to,
-                "inv_date": target_date,
-                "due_date": target_date + timedelta(days=30),
-                "amt": amount,
-                "notes": f"فاتورة دورية (Retainer) — مشروع: {p['project_name']}",
-                "uid": current_user.id, "branch": p.get("branch_id"),
-                "curr": base_currency
-            }).scalar()
-            
-            # Invoice line
-            db.execute(text("""
-                INSERT INTO invoice_lines (invoice_id, description, quantity, unit_price, tax_rate, discount, total)
-                VALUES (:inv_id, :desc, 1, :price, 0, 0, :total)
-            """), {
-                "inv_id": inv_id, "desc": f"رسوم اشتراك — مشروع {p['project_name']}",
-                "price": amount, "total": amount
-            })
-            
-            # Link to project revenues
-            db.execute(text("""
-                INSERT INTO project_revenues (project_id, revenue_type, revenue_date, amount, description, invoice_id, status, created_by)
-                VALUES (:pid, 'retainer', :date, :amt, :desc, :inv_id, 'approved', :uid)
-            """), {
-                "pid": p["id"], "date": target_date, "amt": amount,
-                "desc": f"فاتورة Retainer #{inv_num}", "inv_id": inv_id, "uid": current_user.id
-            })
-            
-            # GL Entry: Dr AR / Cr Revenue
-            je_id = None
-            if ar_acc and rev_acc:
-                cost_center_id = db.execute(text(
-                    "SELECT id FROM cost_centers WHERE center_name ILIKE :name LIMIT 1"
-                ), {"name": f"%{p['project_name']}%"}).scalar()
-
-                je_id, entry_num = gl_create_journal_entry(
-                    db=db,
-                    company_id=current_user.get("company_id") if isinstance(current_user, dict) else current_user.company_id,
-                    date=target_date,
-                    description=f"فاتورة Retainer — {p['project_name']} — {inv_num}",
-                    status="posted",
-                    currency=base_currency,
-                    exchange_rate=1.0,
-                    lines=[
-                        {
-                            "account_id": ar_acc, "debit": amount, "credit": 0,
-                            "description": f"ذمم مدينة — Retainer {p['project_name']}", "cost_center_id": cost_center_id
-                        },
-                        {
-                            "account_id": rev_acc, "debit": 0, "credit": amount,
-                            "description": f"إيراد Retainer {p['project_name']}", "cost_center_id": cost_center_id
-                        }
-                    ],
-                    user_id=current_user.get("id") if isinstance(current_user, dict) else current_user.id,
-                    source="project_invoice",
-                    source_id=inv_id
-                )
-            
-            # Calculate next billing date
-            cycle = p.get("billing_cycle", "monthly")
-            if cycle == "monthly":
-                next_date = target_date + timedelta(days=30)
-            elif cycle == "quarterly":
-                next_date = target_date + timedelta(days=90)
-            elif cycle == "yearly":
-                next_date = target_date + timedelta(days=365)
-            else:
-                next_date = target_date + timedelta(days=30)
-            
-            db.execute(text("""
-                UPDATE projects SET last_billed_date = :billed, next_billing_date = :next, updated_at = NOW()
-                WHERE id = :id
-            """), {"billed": target_date, "next": next_date, "id": p["id"]})
-            
-            generated.append({
-                "project_id": p["id"], "project_name": p["project_name"],
-                "invoice_id": inv_id, "invoice_number": inv_num,
-                "amount": amount, "journal_entry_id": je_id
-            })
-        
-        db.commit()
-        log_activity(db, user_id=current_user.id, username=current_user.username, action="generate_retainer_invoices", resource_type="project_invoice", resource_id=None, details={"generated_count": len(generated)})
-        
-        return {
-            "success": True,
-            "generated": len(generated),
-            "invoices": generated,
-            "message": i18n_message("retainer_invoices_created_count_success", count=len(generated))
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error generating retainer invoices: {e}")
-        raise HTTPException(**http_error(500, "internal_error"))
-    finally:
-        db.close()
-
-
 # ═══════════════════════════════════════════════════════════
 # Earned Value Management (EVM)
 # ═══════════════════════════════════════════════════════════
@@ -2233,413 +2636,16 @@ async def get_earned_value_metrics(project_id: int, current_user: dict = Depends
 # ═══════════════════════════════════════════════════════════
 # Project Reports
 # ═══════════════════════════════════════════════════════════
-
-@router.get("/reports/profitability", dependencies=[Depends(require_permission("projects.view"))])
-async def report_project_profitability(
-    status_filter: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """تقرير ربحية المشاريع"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        where = "WHERE 1=1"
-        params = {}
-        if status_filter:
-            where += " AND p.status = :status"
-            params["status"] = status_filter
-
-        rows = db.execute(text(f"""
-            SELECT p.id, p.project_code, p.project_name, p.status,
-                   p.planned_budget, p.progress_percentage,
-                   p.start_date, p.end_date,
-                   COALESCE(exp.total, 0) as total_expenses,
-                   COALESCE(rev.total, 0) as total_revenues
-            FROM projects p
-            LEFT JOIN (
-                SELECT project_id, SUM(amount) as total
-                FROM project_expenses WHERE status != 'rejected'
-                GROUP BY project_id
-            ) exp ON exp.project_id = p.id
-            LEFT JOIN (
-                SELECT project_id, SUM(amount) as total
-                FROM project_revenues WHERE status != 'rejected'
-                GROUP BY project_id
-            ) rev ON rev.project_id = p.id
-            {where}
-            ORDER BY (COALESCE(rev.total, 0) - COALESCE(exp.total, 0)) DESC
-        """), params).fetchall()
-
-        projects_list = []
-        total_revenue_sum = Decimal('0')
-        total_expense_sum = Decimal('0')
-        for r in rows:
-            m = r._mapping
-            rev = _dec(m["total_revenues"] or 0)
-            exp = _dec(m["total_expenses"] or 0)
-            net = rev - exp
-            margin = (net / rev * Decimal('100')) if rev > 0 else Decimal('0')
-            budget = _dec(m["planned_budget"] or 0)
-            budget_var = budget - exp
-
-            projects_list.append({
-                "project_id": m["id"],
-                "project_code": m["project_code"],
-                "project_name": m["project_name"],
-                "status": m["status"],
-                "planned_budget": float(budget.quantize(_D2)),
-                "total_expenses": float(exp.quantize(_D2)),
-                "total_revenues": float(rev.quantize(_D2)),
-                "net_profit": float(net.quantize(_D2)),
-                "margin_pct": float(margin.quantize(_D2)),
-                "budget_variance": float(budget_var.quantize(_D2)),
-                "progress": float(m["progress_percentage"] or 0),
-            })
-            total_revenue_sum += rev
-            total_expense_sum += exp
-
-        total_net = total_revenue_sum - total_expense_sum
-        avg_margin = (total_net / total_revenue_sum * Decimal('100')) if total_revenue_sum > 0 else Decimal('0')
-
-        return {
-            "report_name": "تقرير ربحية المشاريع",
-            "projects": projects_list,
-            "totals": {
-                "total_revenue": float(total_revenue_sum.quantize(_D2)),
-                "total_expense": float(total_expense_sum.quantize(_D2)),
-                "total_profit": float(total_net.quantize(_D2)),
-                "avg_margin_pct": float(avg_margin.quantize(_D2)),
-                "project_count": len(projects_list),
-            }
-        }
-    finally:
-        db.close()
-
-
-@router.get("/reports/variance", dependencies=[Depends(require_permission("projects.view"))])
-async def report_project_variance(current_user: dict = Depends(get_current_user)):
-    """تقرير انحراف المشاريع (Budget vs Actual)"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        rows = db.execute(text("""
-            SELECT p.id, p.project_code, p.project_name, p.status,
-                   p.planned_budget, p.progress_percentage,
-                   p.start_date, p.end_date,
-                   COALESCE(exp.total, 0) as actual_expenses,
-                   COALESCE(ts.total_hours, 0) as actual_hours,
-                   COALESCE(tk.planned_hours, 0) as planned_hours
-            FROM projects p
-            LEFT JOIN (
-                SELECT project_id, SUM(amount) as total
-                FROM project_expenses WHERE status != 'rejected'
-                GROUP BY project_id
-            ) exp ON exp.project_id = p.id
-            LEFT JOIN (
-                SELECT project_id, SUM(hours) as total_hours
-                FROM project_timesheets WHERE status = 'approved'
-                GROUP BY project_id
-            ) ts ON ts.project_id = p.id
-            LEFT JOIN (
-                SELECT project_id, SUM(planned_hours) as planned_hours
-                FROM project_tasks
-                GROUP BY project_id
-            ) tk ON tk.project_id = p.id
-            WHERE p.status != 'cancelled'
-            ORDER BY p.id
-        """)).fetchall()
-
-        projects_list = []
-        for r in rows:
-            m = r._mapping
-            budget = _dec(m["planned_budget"] or 0)
-            actual = _dec(m["actual_expenses"] or 0)
-            cost_var = budget - actual
-            cost_var_pct = (cost_var / budget * Decimal('100')) if budget > 0 else Decimal('0')
-
-            planned_h = _dec(m["planned_hours"] or 0)
-            actual_h = _dec(m["actual_hours"] or 0)
-            hour_var = planned_h - actual_h
-
-            schedule_var_days = None
-            if m["end_date"] and m["status"] not in ["completed", "cancelled"]:
-                schedule_var_days = (m["end_date"] - date.today()).days
-
-            projects_list.append({
-                "project_id": m["id"],
-                "project_code": m["project_code"],
-                "project_name": m["project_name"],
-                "status": m["status"],
-                "planned_budget": float(budget.quantize(_D2)),
-                "actual_cost": float(actual.quantize(_D2)),
-                "cost_variance": float(cost_var.quantize(_D2)),
-                "cost_variance_pct": float(cost_var_pct.quantize(_D2)),
-                "planned_hours": float(planned_h.quantize(_D2)),
-                "actual_hours": float(actual_h.quantize(_D2)),
-                "hours_variance": float(hour_var.quantize(_D2)),
-                "progress": float(m["progress_percentage"] or 0),
-                "schedule_days_remaining": schedule_var_days,
-                "is_over_budget": actual > budget if budget > 0 else False,
-                "is_behind_schedule": schedule_var_days is not None and schedule_var_days < 0,
-            })
-
-        overbudget = sum(1 for p in projects_list if p["is_over_budget"])
-        behind = sum(1 for p in projects_list if p["is_behind_schedule"])
-
-        return {
-            "report_name": "تقرير انحراف المشاريع",
-            "projects": projects_list,
-            "summary": {
-                "total_projects": len(projects_list),
-                "over_budget_count": overbudget,
-                "behind_schedule_count": behind,
-                "on_track_count": len(projects_list) - overbudget - behind,
-            }
-        }
-    finally:
-        db.close()
-
-
-@router.get("/reports/resource-utilization", dependencies=[Depends(require_permission("projects.view"))])
-async def report_resource_utilization(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """تقرير استخدام الموارد عبر المشاريع"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        date_filter = ""
-        params = {}
-        if start_date:
-            date_filter += " AND ts.date >= :start"
-            params["start"] = start_date
-        if end_date:
-            date_filter += " AND ts.date <= :end"
-            params["end"] = end_date
-
-        rows = db.execute(text(f"""
-            SELECT u.id as user_id, u.full_name,
-                   COUNT(DISTINCT ts.project_id) as projects_count,
-                   SUM(ts.hours) as total_hours,
-                   AVG(ts.hours) as avg_daily_hours,
-                   COUNT(DISTINCT ts.date) as working_days
-            FROM project_timesheets ts
-            JOIN company_users u ON ts.employee_id = u.id
-            WHERE ts.status = 'approved' {date_filter}
-            GROUP BY u.id, u.full_name
-            ORDER BY total_hours DESC
-        """), params).fetchall()
-
-        resources = []
-        for r in rows:
-            m = r._mapping
-            total_h = _dec(m["total_hours"] or 0)
-            working_days = int(m["working_days"] or 1)
-            standard_hours = _dec(working_days * 8)
-            utilization = (total_h / standard_hours * Decimal('100')) if standard_hours > 0 else Decimal('0')
-
-            resources.append({
-                "user_id": m["user_id"],
-                "name": m["full_name"],
-                "projects_count": m["projects_count"],
-                "total_hours": float(total_h.quantize(_D2)),
-                "avg_daily_hours": round(float(m["avg_daily_hours"] or 0), 2),
-                "working_days": working_days,
-                "utilization_pct": float(utilization.quantize(_D2)),
-            })
-
-        return {
-            "report_name": "تقرير استخدام الموارد",
-            "period": {
-                "start": str(start_date) if start_date else "All",
-                "end": str(end_date) if end_date else "All"
-            },
-            "resources": resources,
-        }
-    finally:
-        db.close()
-
-
-# ═══════════════════════════════════════════════════════════
 # PRJ-108: Schedule & Budget Alerts Dashboard
-# ═══════════════════════════════════════════════════════════
-
-@router.get("/alerts/overdue-tasks", dependencies=[Depends(require_permission("projects.view"))])
-async def get_overdue_tasks(current_user: dict = Depends(get_current_user)):
-    """
-    المهام المتأخرة: المهام التي تجاوزت تاريخ الانتهاء ولم تكتمل بعد.
-    """
-    db = get_db_connection(current_user.company_id)
-    try:
-        rows = db.execute(text("""
-            SELECT t.id, t.task_name, t.end_date, t.status,
-                   t.progress,
-                   p.id as project_id, p.project_code, p.project_name,
-                   COALESCE(u.full_name, '') as assigned_to_name,
-                   (CURRENT_DATE - t.end_date) as days_overdue
-            FROM project_tasks t
-            JOIN projects p ON t.project_id = p.id
-            LEFT JOIN company_users u ON t.assigned_to = u.id
-            WHERE t.end_date < CURRENT_DATE
-              AND t.status NOT IN ('completed', 'cancelled')
-              AND p.status NOT IN ('completed', 'cancelled')
-            ORDER BY days_overdue DESC
-        """)).fetchall()
-
-        tasks_list = [dict(r._mapping) for r in rows]
-
-        return {
-            "alert_type": "overdue_tasks",
-            "count": len(tasks_list),
-            "tasks": tasks_list,
-            "message": i18n_message("overdue_tasks_attention_count", count=len(tasks_list)) if tasks_list else i18n_message("overdue_tasks_none"),
-        }
-    finally:
-        db.close()
-
-
-@router.get("/alerts/over-budget", dependencies=[Depends(require_permission("projects.view"))])
-async def get_over_budget_projects(current_user: dict = Depends(get_current_user)):
-    """المشاريع التي تجاوزت ميزانيتها المخططة."""
-    db = get_db_connection(current_user.company_id)
-    try:
-        rows = db.execute(text("""
-            SELECT p.id, p.project_code, p.project_name, p.status,
-                   p.planned_budget,
-                   COALESCE(exp.total, 0) as actual_cost,
-                   COALESCE(exp.total, 0) - p.planned_budget as overage,
-                   CASE WHEN p.planned_budget > 0
-                        THEN ROUND(((COALESCE(exp.total,0) - p.planned_budget) / p.planned_budget * 100)::numeric, 1)
-                        ELSE 0 END as overage_pct,
-                   p.progress_percentage
-            FROM projects p
-            LEFT JOIN (
-                SELECT project_id, SUM(amount) as total
-                FROM project_expenses WHERE status != 'rejected'
-                GROUP BY project_id
-            ) exp ON exp.project_id = p.id
-            WHERE p.planned_budget > 0
-              AND COALESCE(exp.total, 0) > p.planned_budget
-              AND p.status NOT IN ('completed', 'cancelled')
-            ORDER BY overage_pct DESC
-        """)).fetchall()
-
-        projects_list = [dict(r._mapping) for r in rows]
-
-        return {
-            "alert_type": "over_budget",
-            "count": len(projects_list),
-            "projects": projects_list,
-            "message": i18n_message("over_budget_projects_count", count=len(projects_list)) if projects_list else i18n_message("over_budget_projects_none"),
-        }
-    finally:
-        db.close()
-
-
-@router.get("/alerts/dashboard", dependencies=[Depends(require_permission("projects.view"))])
-async def get_alerts_dashboard(current_user: dict = Depends(get_current_user)):
-    """
-    لوحة تنبيهات المشاريع الشاملة:
-    - مهام متأخرة
-    - مشاريع تجاوزت الميزانية
-    - مشاريع قاربت على الموعد النهائي (<14 يوم)
-    - مشاريع تجاوزت الموعد النهائي
-    """
-    db = get_db_connection(current_user.company_id)
-    try:
-        today = date.today()
-
-        # Overdue tasks
-        overdue_tasks_count = db.execute(text("""
-            SELECT COUNT(*) FROM project_tasks t
-            JOIN projects p ON t.project_id = p.id
-            WHERE t.end_date < CURRENT_DATE
-              AND t.status NOT IN ('completed', 'cancelled')
-              AND p.status NOT IN ('completed', 'cancelled')
-        """)).scalar()
-
-        # Over-budget projects
-        over_budget_count = db.execute(text("""
-            SELECT COUNT(*) FROM projects p
-            LEFT JOIN (
-                SELECT project_id, SUM(amount) as total FROM project_expenses
-                WHERE status != 'rejected' GROUP BY project_id
-            ) exp ON exp.project_id = p.id
-            WHERE p.planned_budget > 0
-              AND COALESCE(exp.total,0) > p.planned_budget
-              AND p.status NOT IN ('completed','cancelled')
-        """)).scalar()
-
-        # Projects ending within 14 days
-        due_soon = db.execute(text("""
-            SELECT id, project_code, project_name, end_date,
-                   (end_date - CURRENT_DATE) as days_remaining,
-                   progress_percentage
-            FROM projects
-            WHERE end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
-              AND status NOT IN ('completed', 'cancelled')
-            ORDER BY end_date
-        """)).fetchall()
-
-        # Projects past end_date
-        overdue_projects = db.execute(text("""
-            SELECT id, project_code, project_name, end_date,
-                   (CURRENT_DATE - end_date) as days_overdue,
-                   progress_percentage
-            FROM projects
-            WHERE end_date < CURRENT_DATE
-              AND status NOT IN ('completed', 'cancelled')
-            ORDER BY days_overdue DESC
-        """)).fetchall()
-
-        # Pending change orders
-        pending_cos = db.execute(text("""
-            SELECT COUNT(*) FROM project_change_orders
-            WHERE status = 'pending'
-        """)).scalar() or 0
-
-        alerts = []
-        if overdue_tasks_count:
-            alerts.append({"type": "overdue_tasks", "severity": "high",
-                           "message": i18n_message("overdue_tasks_count", count=overdue_tasks_count), "count": overdue_tasks_count})
-        if over_budget_count:
-            alerts.append({"type": "over_budget", "severity": "high",
-                           "message": i18n_message("over_budget_count", count=over_budget_count), "count": over_budget_count})
-        if overdue_projects:
-            alerts.append({"type": "overdue_projects", "severity": "critical",
-                           "message": i18n_message("overdue_projects_count", count=len(overdue_projects)), "count": len(overdue_projects)})
-        if due_soon:
-            alerts.append({"type": "due_soon", "severity": "medium",
-                           "message": i18n_message("projects_due_soon_14_days_count", count=len(due_soon)), "count": len(due_soon)})
-        if pending_cos:
-            alerts.append({"type": "pending_change_orders", "severity": "low",
-                           "message": i18n_message("pending_change_orders_count", count=pending_cos), "count": pending_cos})
-
-        return {
-            "total_alerts": len(alerts),
-            "alerts": alerts,
-            "details": {
-                "overdue_tasks_count": int(overdue_tasks_count or 0),
-                "over_budget_count": int(over_budget_count or 0),
-                "overdue_projects": [dict(r._mapping) for r in overdue_projects],
-                "due_soon_projects": [dict(r._mapping) for r in due_soon],
-                "pending_change_orders": int(pending_cos),
-            }
-        }
-    finally:
-        db.close()
-
-
-# ===================== B5: Project Risks =====================
-
 @router.get("/{project_id}/risks", dependencies=[Depends(require_permission("projects.view"))])
 def list_project_risks(project_id: int, current_user=Depends(get_current_user)):
     """سجل المخاطر"""
     db = get_db_connection(current_user.company_id)
     try:
         rows = db.execute(text("""
-            SELECT pr.*, u.full_name as owner_name
+            SELECT pr.*, cu.full_name as owner_name
             FROM project_risks pr
-            LEFT JOIN users u ON u.id = pr.owner_id
+            LEFT JOIN company_users cu ON cu.id = pr.owner_id
             WHERE pr.project_id = :pid
             ORDER BY pr.risk_score DESC NULLS LAST, pr.created_at DESC
         """), {"pid": project_id}).fetchall()
@@ -2649,23 +2655,22 @@ def list_project_risks(project_id: int, current_user=Depends(get_current_user)):
 
 
 @router.post("/{project_id}/risks", dependencies=[Depends(require_permission("projects.edit"))])
-def create_project_risk(project_id: int, risk: dict, request: Request, current_user=Depends(get_current_user)):
+def create_project_risk(project_id: int, risk: ProjectRiskCreate, request: Request, current_user=Depends(get_current_user)):
     """إضافة خطر"""
     db = get_db_connection(current_user.company_id)
     try:
-        prob = _dec(risk.get("probability", 0.5)).quantize(_D4, ROUND_HALF_UP)
-        impact = _dec(risk.get("impact", 0.5)).quantize(_D4, ROUND_HALF_UP)
-        score = (prob * impact).quantize(_D4, ROUND_HALF_UP)
+        _RISK_WEIGHT = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+        score = _RISK_WEIGHT.get(risk.probability, 2) * _RISK_WEIGHT.get(risk.impact, 2)
         result = db.execute(text("""
             INSERT INTO project_risks (project_id, title, description, probability,
                 impact, risk_score, status, mitigation_plan, owner_id, due_date)
             VALUES (:pid, :t, :d, :p, :i, :s, :st, :mp, :oid, :dd)
             RETURNING id
         """), {
-            "pid": project_id, "t": risk["title"], "d": risk.get("description"),
-            "p": prob, "i": impact, "s": score,
-            "st": risk.get("status", "identified"), "mp": risk.get("mitigation_plan"),
-            "oid": risk.get("owner_id"), "dd": risk.get("due_date")
+            "pid": project_id, "t": risk.title, "d": risk.description,
+            "p": risk.probability, "i": risk.impact, "s": score,
+            "st": risk.status, "mp": risk.mitigation_plan,
+            "oid": risk.owner_id, "dd": risk.due_date
         })
         risk_id = result.fetchone()[0]
         db.commit()
@@ -2673,7 +2678,7 @@ def create_project_risk(project_id: int, risk: dict, request: Request, current_u
             db, user_id=current_user.id, username=current_user.username,
             action="project.risk_create", resource_type="project_risk",
             resource_id=str(risk_id),
-            details={"project_id": project_id, "title": risk["title"]},
+            details={"project_id": project_id, "title": risk.title},
             request=request
         )
         return {"id": risk_id, "message": i18n_message("risk_created_success")}
@@ -2686,30 +2691,47 @@ def create_project_risk(project_id: int, risk: dict, request: Request, current_u
 
 
 @router.put("/risks/{risk_id}", dependencies=[Depends(require_permission("projects.edit"))])
-def update_project_risk(risk_id: int, risk: dict, request: Request, current_user=Depends(get_current_user)):
+def update_project_risk(risk_id: int, risk: ProjectRiskUpdate, request: Request, current_user=Depends(get_current_user)):
     """تحديث خطر"""
     db = get_db_connection(current_user.company_id)
     try:
-        prob = _dec(risk.get("probability", 0.5)).quantize(_D4, ROUND_HALF_UP)
-        impact = _dec(risk.get("impact", 0.5)).quantize(_D4, ROUND_HALF_UP)
-        score = (prob * impact).quantize(_D4, ROUND_HALF_UP)
-        db.execute(text("""
-            UPDATE project_risks SET title = :t, description = :d, probability = :p,
-                impact = :i, risk_score = :s, status = :st, mitigation_plan = :mp,
-                owner_id = :oid, due_date = :dd
-            WHERE id = :id
-        """), {
-            "t": risk["title"], "d": risk.get("description"),
-            "p": prob, "i": impact, "s": score,
-            "st": risk.get("status"), "mp": risk.get("mitigation_plan"),
-            "oid": risk.get("owner_id"), "dd": risk.get("due_date"), "id": risk_id
-        })
+        # Build dynamic SET clause from non-None fields
+        _RISK_WEIGHT = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+        set_parts = []
+        params = {"id": risk_id}
+        fields = {
+            "title": risk.title, "description": risk.description,
+            "probability": risk.probability, "impact": risk.impact,
+            "status": risk.status, "mitigation_plan": risk.mitigation_plan,
+            "owner_id": risk.owner_id, "due_date": risk.due_date
+        }
+        for field, value in fields.items():
+            if value is not None:
+                set_parts.append(f"{field} = :{field}")
+                params[field] = value
+
+        # Recalculate risk_score if probability or impact changed
+        if risk.probability is not None or risk.impact is not None:
+            # Get current values for any not provided
+            current = db.execute(text("SELECT probability, impact FROM project_risks WHERE id = :id"), {"id": risk_id}).fetchone()
+            if current:
+                prob = risk.probability or current.probability
+                imp = risk.impact or current.impact
+                score = _RISK_WEIGHT.get(prob, 2) * _RISK_WEIGHT.get(imp, 2)
+                set_parts.append("risk_score = :risk_score")
+                params["risk_score"] = score
+
+        if set_parts:
+            set_parts.append("updated_at = CURRENT_TIMESTAMP")
+            query = f"UPDATE project_risks SET {', '.join(set_parts)} WHERE id = :id"
+            db.execute(text(query), params)
+
         db.commit()
         log_activity(
             db, user_id=current_user.id, username=current_user.username,
             action="project.risk_update", resource_type="project_risk",
             resource_id=str(risk_id),
-            details={"risk_id": risk_id, "title": risk["title"]},
+            details={"risk_id": risk_id},
             request=request
         )
         return {"message": i18n_message("risk_updated_success")}
@@ -2752,7 +2774,7 @@ def list_task_dependencies(project_id: int, current_user=Depends(get_current_use
     db = get_db_connection(current_user.company_id)
     try:
         rows = db.execute(text("""
-            SELECT td.*, t1.name as task_name, t2.name as depends_on_name
+            SELECT td.*, t1.task_name as task_name, t2.task_name as depends_on_name
             FROM task_dependencies td
             LEFT JOIN project_tasks t1 ON t1.id = td.task_id
             LEFT JOIN project_tasks t2 ON t2.id = td.depends_on_task_id
@@ -2765,18 +2787,22 @@ def list_task_dependencies(project_id: int, current_user=Depends(get_current_use
 
 
 @router.post("/{project_id}/task-dependencies", dependencies=[Depends(require_permission("projects.edit"))])
-def create_task_dependency(project_id: int, dep: dict, request: Request, current_user=Depends(get_current_user)):
+def create_task_dependency(project_id: int, dep: TaskDependencyCreate, request: Request, current_user=Depends(get_current_user)):
     """إنشاء تبعية مهمة"""
     db = get_db_connection(current_user.company_id)
     try:
+        # T034: Validate no self-dependency
+        if dep.task_id == dep.depends_on_task_id:
+            raise HTTPException(**http_error(400, "task_cannot_depend_on_itself"))
+
         result = db.execute(text("""
             INSERT INTO task_dependencies (project_id, task_id, depends_on_task_id,
                 dependency_type, lag_days)
             VALUES (:pid, :tid, :did, :dt, :ld)
             RETURNING id
         """), {
-            "pid": project_id, "tid": dep["task_id"], "did": dep["depends_on_task_id"],
-            "dt": dep.get("dependency_type", "FS"), "ld": dep.get("lag_days", 0)
+            "pid": project_id, "tid": dep.task_id, "did": dep.depends_on_task_id,
+            "dt": dep.dependency_type, "ld": dep.lag_days
         })
         dep_id = result.fetchone()[0]
         db.commit()
@@ -2784,10 +2810,12 @@ def create_task_dependency(project_id: int, dep: dict, request: Request, current
             db, user_id=current_user.id, username=current_user.username,
             action="project.dependency_create", resource_type="task_dependency",
             resource_id=str(dep_id),
-            details={"project_id": project_id, "task_id": dep["task_id"], "depends_on": dep["depends_on_task_id"]},
+            details={"project_id": project_id, "task_id": dep.task_id, "depends_on": dep.depends_on_task_id},
             request=request
         )
         return {"id": dep_id, "message": i18n_message("dependency_created_success")}
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating task dependency: {e}")

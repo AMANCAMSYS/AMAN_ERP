@@ -39,6 +39,7 @@ const LeaseContracts = () => {
             setAssets(aRes.data?.assets || aRes.data || []);
         } catch (err) {
             console.error(err);
+            showToast(err.response?.data?.detail || t('common.error_occurred', 'حدث خطأ'), 'error');
         } finally {
             setLoading(false);
         }

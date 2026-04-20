@@ -8,6 +8,7 @@ import BackButton from '../../components/common/BackButton';
 import DataTable from '../../components/common/DataTable';
 import SearchFilter from '../../components/common/SearchFilter';
 import { useBranch } from '../../context/BranchContext';
+import { hasPermission } from '../../utils/auth';
 import '../../components/ModuleStyles.css';
 
 export default function ProjectList() {
@@ -224,6 +225,16 @@ export default function ProjectList() {
                         <Link to="/projects/resources" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                             <Users size={14} /> {t('projects.resource_allocation')}
                         </Link>
+                        {hasPermission('projects.time_view') && (
+                            <Link to="/projects/timetracking" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                ⏱️ {t('nav.time_tracking')}
+                            </Link>
+                        )}
+                        {hasPermission('projects.resource_view') && (
+                            <Link to="/projects/resources/availability" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
+                                📅 {t('nav.resource_planning')}
+                            </Link>
+                        )}
                         <Link to="/projects/gantt" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                             📅 {t('projects.gantt_chart', 'مخطط جانت')}
                         </Link>

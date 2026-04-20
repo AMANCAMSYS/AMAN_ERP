@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Trash, Save, Trash2, Info, Clock } from 'lucide-react';
+import { Plus, Trash, Save, Trash2, Info, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
@@ -100,6 +100,22 @@ const WorkflowEditor = () => {
         }));
     };
 
+    const handleMoveUp = (index) => {
+        if (index === 0) return;
+        const newSteps = [...formData.steps];
+        [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
+        newSteps.forEach((s, i) => s.step = i + 1);
+        setFormData(prev => ({ ...prev, steps: newSteps }));
+    };
+
+    const handleMoveDown = (index) => {
+        if (index === formData.steps.length - 1) return;
+        const newSteps = [...formData.steps];
+        [newSteps[index], newSteps[index + 1]] = [newSteps[index + 1], newSteps[index]];
+        newSteps.forEach((s, i) => s.step = i + 1);
+        setFormData(prev => ({ ...prev, steps: newSteps }));
+    };
+
     const removeStep = (index) => {
         if (formData.steps.length <= 1) {
             showToast(t('approvals.workflow_min_steps'), "warning");
@@ -128,13 +144,15 @@ const WorkflowEditor = () => {
             }
         }
 
-        // Prepare payload
+        // Prepare payload — wrap amount fields into conditions object
         const payload = {
             name: formData.name,
             document_type: formData.document_type,
             description: formData.description,
-            min_amount: formData.min_amount ? parseFloat(formData.min_amount) : null,
-            max_amount: formData.max_amount ? parseFloat(formData.max_amount) : null,
+            conditions: {
+                min_amount: formData.min_amount ? parseFloat(formData.min_amount) : null,
+                max_amount: formData.max_amount ? parseFloat(formData.max_amount) : null,
+            },
             is_active: formData.is_active,
             steps: formData.steps
         };
@@ -316,7 +334,7 @@ const WorkflowEditor = () => {
                                         <th style={{ width: '60px' }}>#</th>
                                         <th>{t('approvals.approver_role')} *</th>
                                         <th>{t('approvals.step_label')} {t('approvals.optional')}</th>
-                                        <th style={{ width: '80px' }}></th>
+                                         <th style={{ width: '130px' }}></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -350,16 +368,38 @@ const WorkflowEditor = () => {
                                                 />
                                             </td>
                                             <td className="text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeStep(index)}
-                                                    className="table-action-btn"
-                                                    style={{ color: 'var(--danger)' }}
-                                                    title={t('common.delete')}
-                                                    disabled={formData.steps.length === 1}
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                <div className="d-flex" style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMoveUp(index)}
+                                                        className="table-action-btn"
+                                                        title={t('common.move_up', 'Move Up')}
+                                                        disabled={index === 0}
+                                                        style={{ opacity: index === 0 ? 0.3 : 1 }}
+                                                    >
+                                                        <ChevronUp size={16} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleMoveDown(index)}
+                                                        className="table-action-btn"
+                                                        title={t('common.move_down', 'Move Down')}
+                                                        disabled={index === formData.steps.length - 1}
+                                                        style={{ opacity: index === formData.steps.length - 1 ? 0.3 : 1 }}
+                                                    >
+                                                        <ChevronDown size={16} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeStep(index)}
+                                                        className="table-action-btn"
+                                                        style={{ color: 'var(--danger)' }}
+                                                        title={t('common.delete')}
+                                                        disabled={formData.steps.length === 1}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

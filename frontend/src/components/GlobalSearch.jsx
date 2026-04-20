@@ -69,6 +69,8 @@ function useSearchablePages() {
     add('/sales/orders/new', 'أمر بيع جديد', 'New Sales Order', '➕', 'Sales', 'المبيعات', 'sales.view', 'sales', ['create', 'إنشاء'])
     add('/sales/quotations', 'عروض الأسعار', 'Quotations', '📄', 'Sales', 'المبيعات', 'sales.view', 'sales', ['quotation', 'عرض سعر', 'تسعير'])
     add('/sales/quotations/new', 'عرض سعر جديد', 'New Quotation', '➕', 'Sales', 'المبيعات', 'sales.view', 'sales', ['create', 'إنشاء'])
+    add('/sales/cpq/products', 'التسعير المتقدم', 'Configure-Price-Quote', '🧮', 'Sales', 'المبيعات', 'sales.view', 'cpq', ['cpq', 'configure', 'price', 'quote', 'تسعير متقدم'])
+    add('/sales/cpq/quotes', 'عروض التسعير المتقدم', 'CPQ Quotes', '🧾', 'Sales', 'المبيعات', 'sales.view', 'cpq', ['cpq', 'quote', 'تسعير', 'عرض'])
     add('/sales/customer-groups', 'مجموعات العملاء', 'Customer Groups', '👥', 'Sales', 'المبيعات', 'sales.view', 'sales', ['group', 'مجموعة'])
     add('/sales/returns', 'مرتجعات المبيعات', 'Sales Returns', '↩️', 'Sales', 'المبيعات', 'sales.view', 'sales', ['return', 'مرتجع', 'إرجاع'])
     add('/sales/receipts', 'إيصالات القبض', 'Customer Receipts', '🧾', 'Sales', 'المبيعات', 'sales.view', 'sales', ['receipt', 'إيصال', 'قبض', 'تحصيل'])
@@ -96,7 +98,7 @@ function useSearchablePages() {
     add('/buying/invoices', 'فواتير المشتريات', 'Purchase Invoices', '🧾', 'Buying', 'المشتريات', 'buying.view', 'buying', ['invoice', 'فاتورة'])
     add('/buying/invoices/new', 'فاتورة مشتريات جديدة', 'New Purchase Invoice', '➕', 'Buying', 'المشتريات', 'buying.view', 'buying', ['create', 'إنشاء'])
     add('/buying/orders', 'أوامر الشراء', 'Purchase Orders', '📋', 'Buying', 'المشتريات', 'buying.view', 'buying', ['order', 'أمر شراء', 'طلب'])
-    add('/buying/orders/new', 'أمر شراء جديد', 'New Purchase Order', '➕', 'Buying', 'المشتريات', 'buying.view', 'buying', ['create', 'إنشاء'])
+    add('/buying/orders/new', 'أمر شراء جديد', 'New Purchase Order', '➕', 'Buying', 'المشتريات', 'buying.create', 'buying', ['create', 'إنشاء'])
     add('/buying/returns', 'مرتجعات المشتريات', 'Purchase Returns', '↩️', 'Buying', 'المشتريات', 'buying.view', 'buying', ['return', 'مرتجع'])
     add('/buying/payments', 'سداد الموردين', 'Supplier Payments', '💳', 'Buying', 'المشتريات', 'buying.view', 'buying', ['payment', 'سداد', 'دفع'])
     add('/buying/supplier-groups', 'مجموعات الموردين', 'Supplier Groups', '👥', 'Buying', 'المشتريات', 'buying.view', 'buying', ['group', 'مجموعة'])
@@ -105,6 +107,8 @@ function useSearchablePages() {
     add('/buying/rfq', 'طلبات عروض الأسعار', 'RFQ', '📩', 'Buying', 'المشتريات', 'buying.view', 'buying', ['rfq', 'طلب عرض سعر'])
     add('/buying/supplier-ratings', 'تقييم الموردين', 'Supplier Ratings', '⭐', 'Buying', 'المشتريات', 'buying.view', 'buying', ['rating', 'تقييم'])
     add('/buying/agreements', 'اتفاقيات الشراء', 'Purchase Agreements', '📑', 'Buying', 'المشتريات', 'buying.view', 'buying', ['agreement', 'اتفاقية'])
+    add('/buying/blanket-po', 'أوامر الشراء الشاملة', 'Blanket Purchase Orders', '📋', 'Buying', 'المشتريات', 'buying.view', 'buying', ['blanket po', 'blanket', 'أمر شراء شامل', 'شامل'])
+    add('/buying/blanket-po/new', 'أمر شراء شامل جديد', 'New Blanket Purchase Order', '➕', 'Buying', 'المشتريات', 'buying.create', 'buying', ['blanket po', 'create', 'إنشاء', 'شامل'])
     add('/buying/landed-costs', 'التكاليف المضافة', 'Landed Costs', '📦', 'Buying', 'المشتريات', 'buying.view', 'buying', ['landed cost', 'تكاليف', 'شحن'])
     add('/buying/reports/analytics', 'تقارير المشتريات', 'Purchase Reports', '📈', 'Buying', 'المشتريات', 'buying.reports', 'buying', ['analytics', 'تحليلات'])
     add('/buying/reports/supplier-statement', 'كشف حساب المورد', 'Supplier Statement', '📋', 'Buying', 'المشتريات', 'buying.reports', 'buying', ['statement', 'كشف حساب'])
@@ -131,6 +135,8 @@ function useSearchablePages() {
     add('/stock/reports/balance', 'تقارير المخزون', 'Stock Reports', '📊', 'Inventory', 'المخزون', 'stock.reports', 'stock', ['report', 'تقرير', 'رصيد'])
     add('/stock/reports/movements', 'حركات المخزون', 'Stock Movements', '📊', 'Inventory', 'المخزون', 'stock.reports', 'stock', ['movement', 'حركة'])
     add('/stock/valuation-report', 'تقرير التقييم', 'Inventory Valuation', '💰', 'Inventory', 'المخزون', 'reports.view', 'stock', ['valuation', 'تقييم'])
+    add('/inventory/forecast', 'توقعات الطلب', 'Demand Forecasts', '📉', 'Inventory', 'المخزون', 'inventory.forecast_view', 'forecast', ['forecast', 'demand', 'تنبؤ', 'توقعات الطلب'])
+    add('/inventory/forecast/generate', 'توليد توقع الطلب', 'Generate Demand Forecast', '➕', 'Inventory', 'المخزون', 'inventory.forecast_generate', 'forecast', ['forecast', 'generate', 'توليد', 'تنبؤ'])
 
     // Inventory Costing (FIFO/LIFO)
     add('/stock/cost-layers', 'طبقات التكلفة', 'Cost Layers', '📊', 'Inventory', 'المخزون', 'stock.view', 'stock', ['cost layer', 'طبقة', 'FIFO', 'LIFO', 'تكلفة'])
@@ -148,6 +154,7 @@ function useSearchablePages() {
     add('/manufacturing/equipment', 'المعدات والصيانة', 'Equipment', '🔧', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'manufacturing', ['equipment', 'معدة', 'صيانة'])
     add('/manufacturing/schedule', 'جدول الإنتاج', 'Production Schedule', '📅', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'manufacturing', ['schedule', 'جدول', 'موعد'])
     add('/manufacturing/costing', 'تكاليف التصنيع', 'Manufacturing Costing', '💰', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'manufacturing', ['costing', 'تكلفة'])
+    add('/manufacturing/shopfloor', 'أرضية الإنتاج', 'Shop Floor', '⚙️', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'shop_floor', ['shop floor', 'shopfloor', 'أرضية الإنتاج'])
     add('/manufacturing/reports/analytics', 'تحليلات الإنتاج', 'Production Analytics', '📈', 'Manufacturing', 'التصنيع', 'manufacturing.view', 'manufacturing', ['analytics', 'تحليلات'])
 
     // Treasury
@@ -167,6 +174,7 @@ function useSearchablePages() {
     // Cash Flow Forecast
     add('/finance/cashflow', 'توقعات التدفق النقدي', 'Cash Flow Forecasts', '🔮', 'Treasury', 'الخزينة', 'finance.cashflow_view', 'treasury', ['forecast', 'توقع', 'تدفق', 'cash flow'])
     add('/finance/cashflow/generate', 'إنشاء توقع تدفق نقدي', 'Generate Forecast', '➕', 'Treasury', 'الخزينة', 'finance.cashflow_generate', 'treasury', ['generate', 'إنشاء', 'forecast', 'توقع'])
+    add('/finance/subscriptions', 'الاشتراكات', 'Subscriptions', '🔄', 'Treasury', 'الخزينة', 'finance.subscription_view', 'treasury', ['subscription', 'plan', 'اشتراك', 'اشتراكات'])
 
     // HR
     add('/hr', 'الموارد البشرية', 'Human Resources', '👥', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['hr', 'موارد', 'بشرية', 'موظفين'])
@@ -181,7 +189,7 @@ function useSearchablePages() {
     add('/hr/overtime', 'العمل الإضافي', 'Overtime', '⏱️', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['overtime', 'إضافي', 'ساعات'])
     add('/hr/gosi', 'التأمينات الاجتماعية', 'GOSI Settings', '🏥', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['gosi', 'تأمينات', 'اجتماعية'])
     add('/hr/documents', 'مستندات الموظفين', 'Employee Documents', '📄', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['document', 'مستند', 'وثيقة'])
-    add('/hr/performance', 'تقييم الأداء', 'Performance Reviews', '⭐', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['performance', 'أداء', 'تقييم'])
+    add('/hr/performance', 'تقييم الأداء', 'Performance Reviews', '⭐', 'HR', 'الموارد البشرية', 'hr.performance_view', 'hr', ['performance', 'أداء', 'تقييم'])
     add('/hr/training', 'البرامج التدريبية', 'Training Programs', '📚', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['training', 'تدريب'])
     add('/hr/violations', 'المخالفات', 'Violations', '⚠️', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['violation', 'مخالفة', 'جزاء'])
     add('/hr/custody', 'العهد', 'Custody Management', '🔑', 'HR', 'الموارد البشرية', 'hr.view', 'hr', ['custody', 'عهدة'])
@@ -208,6 +216,11 @@ function useSearchablePages() {
     add('/projects', 'المشاريع', 'Projects', '📐', 'Projects', 'المشاريع', 'projects.view', 'projects', ['project', 'مشروع'])
     add('/projects/new', 'مشروع جديد', 'New Project', '➕', 'Projects', 'المشاريع', 'projects.create', 'projects', ['create', 'إنشاء'])
     add('/projects/resources', 'إدارة الموارد', 'Resource Management', '👥', 'Projects', 'المشاريع', 'projects.view', 'projects', ['resource', 'مورد', 'فريق'])
+    add('/projects/timetracking', 'تتبع الوقت', 'Time Tracking', '⏱️', 'Projects', 'المشاريع', 'projects.time_view', 'projects', ['time', 'timesheet', 'تتبع الوقت', 'ساعات'])
+    add('/projects/timetracking/team', 'طلبات الوقت للفريق', 'Team Timesheets', '👥', 'Projects', 'المشاريع', 'projects.time_approve', 'projects', ['team', 'approve', 'اعتماد', 'فريق'])
+    add('/projects/timetracking/profitability', 'ربحية المشاريع', 'Project Profitability', '💰', 'Projects', 'المشاريع', 'projects.time_view', 'projects', ['profitability', 'ربحية', 'ساعات'])
+    add('/projects/resources/availability', 'تخطيط الموارد', 'Resource Planning', '📅', 'Projects', 'المشاريع', 'projects.resource_view', 'projects', ['resource planning', 'availability', 'تخطيط الموارد'])
+    add('/projects/resources/allocate', 'تخصيص الموارد', 'Allocate Resource', '🧭', 'Projects', 'المشاريع', 'projects.resource_manage', 'projects', ['allocate', 'تخصيص', 'resource'])
     add('/projects/reports/financials', 'ماليات المشاريع', 'Project Financials', '💰', 'Projects', 'المشاريع', 'projects.view', 'projects', ['financial', 'مالي', 'ربح'])
     add('/projects/reports/resources', 'استخدام الموارد', 'Resource Utilization', '📊', 'Projects', 'المشاريع', 'projects.view', 'projects', ['utilization', 'استخدام'])
 
@@ -226,7 +239,7 @@ function useSearchablePages() {
     add('/crm', 'إدارة العلاقات', 'CRM', '🤝', 'CRM', 'إدارة العلاقات', 'sales.view', 'crm', ['crm', 'علاقات', 'عملاء'])
     add('/crm/opportunities', 'الفرص البيعية', 'Opportunities', '🎯', 'CRM', 'إدارة العلاقات', 'sales.view', 'crm', ['opportunity', 'فرصة', 'بيعية'])
     add('/crm/tickets', 'تذاكر الدعم', 'Support Tickets', '🎫', 'CRM', 'إدارة العلاقات', 'sales.view', 'crm', ['ticket', 'تذكرة', 'دعم'])
-    add('/crm/campaigns', 'الحملات التسويقية', 'Marketing Campaigns', '📣', 'CRM', 'إدارة العلاقات', 'sales.view', 'crm', ['campaign', 'حملة', 'تسويق'])
+    add('/crm/campaigns', 'الحملات التسويقية', 'Marketing Campaigns', '📣', 'CRM', 'إدارة العلاقات', 'crm.campaign_view', 'crm', ['campaign', 'حملة', 'تسويق'])
     add('/crm/knowledge-base', 'قاعدة المعرفة', 'Knowledge Base', '📚', 'CRM', 'إدارة العلاقات', 'sales.view', 'crm', ['knowledge', 'معرفة'])
 
     // Services
@@ -241,6 +254,8 @@ function useSearchablePages() {
     add('/reports/detailed-pl', 'الأرباح والخسائر التفصيلي', 'Detailed P&L', '📊', 'Reports', 'التقارير', 'accounting.view', 'reports', ['profit', 'loss', 'أرباح', 'خسائر'])
     add('/reports/shared', 'التقارير المشتركة', 'Shared Reports', '🔗', 'Reports', 'التقارير', 'reports.view', 'reports', ['shared', 'مشترك'])
     add('/reports/consolidation', 'تقارير التجميع', 'Consolidation Reports', '📊', 'Reports', 'التقارير', 'reports.view', 'reports', ['consolidation', 'تجميع'])
+    add('/analytics', 'تحليلات IBI', 'BI Analytics', '📊', 'Reports', 'التقارير', 'dashboard.analytics_view', 'reports', ['ibi', 'analytics', 'dashboard', 'تحليلات', 'لوحات'])
+    add('/analytics/new', 'لوحة IBI جديدة', 'New BI Dashboard', '➕', 'Reports', 'التقارير', 'dashboard.analytics_manage', 'reports', ['ibi', 'new dashboard', 'analytics', 'جديد'])
 
     // Admin / Settings
     add('/approvals', 'الاعتمادات', 'Approvals', '✅', 'Admin', 'الإدارة', 'approvals.view', 'approvals', ['approval', 'اعتماد', 'موافقة'])

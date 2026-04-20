@@ -9,7 +9,7 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
-from schemas.contracts import ContractCreate, ContractResponse
+from schemas.contracts import ContractCreate, ContractUpdate, ContractAmendmentCreate, ContractResponse
 from utils.permissions import require_permission
 from utils.accounting import get_base_currency, compute_line_amounts, compute_invoice_totals
 from utils.audit import log_activity
@@ -133,6 +133,9 @@ def create_contract(
             pass
 
         return get_contract(contract_id, current_user)
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating contract: {e}")
@@ -164,20 +167,114 @@ def list_contracts(
         query += " ORDER BY c.created_at DESC"
         contracts = db.execute(text(query), params).fetchall()
         
+        if not contracts:
+            return []
+
+        # Batched item query — eliminates N+1 (T027)
+        contract_ids = [c.id for c in contracts]
+        all_items = db.execute(
+            text("SELECT * FROM contract_items WHERE contract_id = ANY(:ids)"),
+            {"ids": contract_ids}
+        ).fetchall()
+
+        # Group items by contract_id
+        from collections import defaultdict
+        items_by_contract = defaultdict(list)
+        for item in all_items:
+            items_by_contract[item.contract_id].append(dict(item._mapping))
+
         result = []
         for c in contracts:
-            items = db.execute(
-                text("SELECT * FROM contract_items WHERE contract_id = :cid"),
-                {"cid": c.id}
-            ).fetchall()
-            
             result.append({
                 **c._mapping,
-                "items": [dict(row._mapping) for row in items]
+                "items": items_by_contract.get(c.id, [])
             })
         return result
     finally:
         db.close()
+
+@router.get("/alerts/expiring", dependencies=[Depends(require_permission("contracts.view"))])
+def get_expiring_contracts(
+    days: int = 30,
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """جلب العقود التي ستنتهي خلال فترة محددة (افتراضي 30 يوم)"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        today = date.today()
+        future_date = today + timedelta(days=days)
+        
+        contracts = db.execute(text("""
+            SELECT c.*, p.name as party_name,
+                   (c.end_date - CURRENT_DATE) as days_remaining
+            FROM contracts c
+            JOIN parties p ON c.party_id = p.id
+            WHERE c.status = 'active' 
+              AND c.end_date IS NOT NULL
+              AND c.end_date BETWEEN :today AND :future
+            ORDER BY c.end_date ASC
+        """), {"today": today, "future": future_date}).fetchall()
+        
+        result = []
+        for c in contracts:
+            result.append({
+                "id": c.id,
+                "contract_number": c.contract_number,
+                "party_name": c.party_name,
+                "contract_type": c.contract_type,
+                "end_date": str(c.end_date),
+                "days_remaining": c.days_remaining,
+                "total_amount": float(c.total_amount or 0),
+                "billing_interval": c.billing_interval,
+                "currency": c.currency
+            })
+        
+        return {
+            "count": len(result),
+            "contracts": result,
+            "period_days": days
+        }
+    except Exception as e:
+        logger.error(f"Error fetching expiring contracts: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.get("/stats/summary", dependencies=[Depends(require_permission("contracts.view"))])
+def get_contracts_summary(
+    current_user: UserResponse = Depends(get_current_user)
+):
+    """ملخص إحصائيات العقود"""
+    db = get_db_connection(current_user.company_id)
+    try:
+        stats = db.execute(text("""
+            SELECT 
+                COUNT(*) as total_contracts,
+                COUNT(*) FILTER (WHERE status = 'active') as active_count,
+                COUNT(*) FILTER (WHERE status = 'expired') as expired_count,
+                COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_count,
+                COALESCE(SUM(total_amount) FILTER (WHERE status = 'active'), 0) as active_value,
+                COALESCE(SUM(total_amount), 0) as total_value,
+                COUNT(*) FILTER (WHERE status = 'active' AND end_date IS NOT NULL AND end_date <= CURRENT_DATE + INTERVAL '30 days') as expiring_soon
+            FROM contracts
+        """)).fetchone()
+        
+        return {
+            "total_contracts": stats.total_contracts,
+            "active_count": stats.active_count,
+            "expired_count": stats.expired_count,
+            "cancelled_count": stats.cancelled_count,
+            "active_value": float(stats.active_value),
+            "total_value": float(stats.total_value),
+            "expiring_soon": stats.expiring_soon
+        }
+    except Exception as e:
+        logger.error(f"Error fetching contract stats: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
 
 @router.get("/{contract_id}", response_model=ContractResponse, dependencies=[Depends(require_permission("contracts.view"))])
 def get_contract(
@@ -215,7 +312,7 @@ def get_contract(
 @router.put("/{contract_id}", response_model=ContractResponse, dependencies=[Depends(require_permission("contracts.edit"))])
 def update_contract(
     contract_id: int,
-    data: ContractCreate,
+    data: ContractUpdate,
     request: Request,
     current_user: UserResponse = Depends(get_current_user)
 ):
@@ -226,30 +323,41 @@ def update_contract(
         if not existing:
             raise HTTPException(**http_error(404, "contract_not_found"))
 
-        db.execute(text("""
-            UPDATE contracts SET
-                party_id = :party_id, contract_type = :contract_type,
-                start_date = :start_date, end_date = :end_date,
-                billing_interval = :billing_interval, total_amount = :total_amount,
-                currency = :currency, notes = :notes
-            WHERE id = :id
-        """), {
-            "id": contract_id, "party_id": data.party_id,
-            "contract_type": data.contract_type, "start_date": data.start_date,
-            "end_date": data.end_date, "billing_interval": data.billing_interval,
-            "total_amount": data.total_amount, "currency": data.currency, "notes": data.notes
-        })
+        # Build dynamic SET clause from non-None fields (partial update)
+        updatable_fields = {
+            "party_id": data.party_id, "contract_type": data.contract_type,
+            "start_date": data.start_date, "end_date": data.end_date,
+            "billing_interval": data.billing_interval,
+            "currency": data.currency, "notes": data.notes
+        }
+        set_parts = []
+        params = {"id": contract_id}
+        for field, value in updatable_fields.items():
+            if value is not None:
+                set_parts.append(f"{field} = :{field}")
+                params[field] = value
 
-        db.execute(text("DELETE FROM contract_items WHERE contract_id = :id"), {"id": contract_id})
-        for item in data.items:
-            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
-            db.execute(text("""
-                INSERT INTO contract_items (contract_id, product_id, description, quantity, unit_price, tax_rate, total)
-                VALUES (:cid, :pid, :desc, :qty, :price, :tax, :total)
-            """), {
-                "cid": contract_id, "pid": item.product_id, "desc": item.description,
-                "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": float(la['line_total'])
-            })
+        # If items provided, replace them and recalculate total (T026 + T028)
+        if data.items is not None:
+            db.execute(text("DELETE FROM contract_items WHERE contract_id = :id"), {"id": contract_id})
+            calculated_total = Decimal('0')
+            for item in data.items:
+                la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate)
+                calculated_total += la['line_total']
+                db.execute(text("""
+                    INSERT INTO contract_items (contract_id, product_id, description, quantity, unit_price, tax_rate, total)
+                    VALUES (:cid, :pid, :desc, :qty, :price, :tax, :total)
+                """), {
+                    "cid": contract_id, "pid": item.product_id, "desc": item.description,
+                    "qty": item.quantity, "price": item.unit_price, "tax": item.tax_rate, "total": float(la['line_total'])
+                })
+            set_parts.append("total_amount = :total_amount")
+            params["total_amount"] = float(calculated_total)
+
+        if set_parts:
+            set_parts.append("updated_at = CURRENT_TIMESTAMP")
+            query = f"UPDATE contracts SET {', '.join(set_parts)} WHERE id = :id"
+            db.execute(text(query), params)
 
         trans.commit()
 
@@ -483,89 +591,6 @@ def cancel_contract(
         db.close()
 
 
-@router.get("/alerts/expiring", dependencies=[Depends(require_permission("contracts.view"))])
-def get_expiring_contracts(
-    days: int = 30,
-    current_user: UserResponse = Depends(get_current_user)
-):
-    """جلب العقود التي ستنتهي خلال فترة محددة (افتراضي 30 يوم)"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        today = date.today()
-        future_date = today + timedelta(days=days)
-        
-        contracts = db.execute(text("""
-            SELECT c.*, p.name as party_name,
-                   (c.end_date - CURRENT_DATE) as days_remaining
-            FROM contracts c
-            JOIN parties p ON c.party_id = p.id
-            WHERE c.status = 'active' 
-              AND c.end_date IS NOT NULL
-              AND c.end_date BETWEEN :today AND :future
-            ORDER BY c.end_date ASC
-        """), {"today": today, "future": future_date}).fetchall()
-        
-        result = []
-        for c in contracts:
-            result.append({
-                "id": c.id,
-                "contract_number": c.contract_number,
-                "party_name": c.party_name,
-                "contract_type": c.contract_type,
-                "end_date": str(c.end_date),
-                "days_remaining": c.days_remaining,
-                "total_amount": float(c.total_amount or 0),
-                "billing_interval": c.billing_interval,
-                "currency": c.currency
-            })
-        
-        return {
-            "count": len(result),
-            "contracts": result,
-            "period_days": days
-        }
-    except Exception as e:
-        logger.error(f"Error fetching expiring contracts: {e}")
-        raise HTTPException(**http_error(500, "internal_error"))
-    finally:
-        db.close()
-
-
-@router.get("/stats/summary", dependencies=[Depends(require_permission("contracts.view"))])
-def get_contracts_summary(
-    current_user: UserResponse = Depends(get_current_user)
-):
-    """ملخص إحصائيات العقود"""
-    db = get_db_connection(current_user.company_id)
-    try:
-        stats = db.execute(text("""
-            SELECT 
-                COUNT(*) as total_contracts,
-                COUNT(*) FILTER (WHERE status = 'active') as active_count,
-                COUNT(*) FILTER (WHERE status = 'expired') as expired_count,
-                COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled_count,
-                COALESCE(SUM(total_amount) FILTER (WHERE status = 'active'), 0) as active_value,
-                COALESCE(SUM(total_amount), 0) as total_value,
-                COUNT(*) FILTER (WHERE status = 'active' AND end_date IS NOT NULL AND end_date <= CURRENT_DATE + INTERVAL '30 days') as expiring_soon
-            FROM contracts
-        """)).fetchone()
-        
-        return {
-            "total_contracts": stats.total_contracts,
-            "active_count": stats.active_count,
-            "expired_count": stats.expired_count,
-            "cancelled_count": stats.cancelled_count,
-            "active_value": float(stats.active_value),
-            "total_value": float(stats.total_value),
-            "expiring_soon": stats.expiring_soon
-        }
-    except Exception as e:
-        logger.error(f"Error fetching contract stats: {e}")
-        raise HTTPException(**http_error(500, "internal_error"))
-    finally:
-        db.close()
-
-
 # ===================== C2: Contract Amendments =====================
 
 @router.get("/{contract_id}/amendments", dependencies=[Depends(require_permission("contracts.view"))])
@@ -586,7 +611,7 @@ def list_amendments(contract_id: int, current_user=Depends(get_current_user)):
 
 
 @router.post("/{contract_id}/amendments", dependencies=[Depends(require_permission("contracts.edit"))])
-def create_amendment(contract_id: int, amendment: dict, request: Request, current_user=Depends(get_current_user)):
+def create_amendment(contract_id: int, amendment: ContractAmendmentCreate, request: Request, current_user=Depends(get_current_user)):
     """إنشاء تعديل عقد"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -596,9 +621,9 @@ def create_amendment(contract_id: int, amendment: dict, request: Request, curren
             VALUES (:cid, :at, :ov, :nv, :desc, :ed, :ab)
             RETURNING id
         """), {
-            "cid": contract_id, "at": amendment.get("amendment_type", "modification"),
-            "ov": amendment.get("old_value"), "nv": amendment.get("new_value"),
-            "desc": amendment.get("description"), "ed": amendment.get("effective_date"),
+            "cid": contract_id, "at": amendment.amendment_type,
+            "ov": amendment.old_value, "nv": amendment.new_value,
+            "desc": amendment.description, "ed": amendment.effective_date,
             "ab": current_user.id
         })
         aid = result.fetchone()[0]
@@ -607,7 +632,7 @@ def create_amendment(contract_id: int, amendment: dict, request: Request, curren
             db, user_id=current_user.id, username=current_user.username,
             action="contract.amendment_create", resource_type="contract_amendment",
             resource_id=str(aid),
-            details={"contract_id": contract_id, "type": amendment.get("amendment_type", "modification")},
+            details={"contract_id": contract_id, "type": amendment.amendment_type},
             request=request
         )
         return {"id": aid, "message": i18n_message("amendment_created_success")}
@@ -637,8 +662,8 @@ def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
 
         # Related invoices
         invoices = db.execute(text("""
-            SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total,
-                   COALESCE(SUM(balance_due), 0) as outstanding
+            SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total,
+                   COALESCE(SUM(total - COALESCE(paid_amount, 0)), 0) as outstanding
             FROM invoices WHERE contract_id = :cid
         """), {"cid": contract_id}).fetchone()
         inv = dict(invoices._mapping) if invoices else {}

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { subscriptionsAPI } from '../../services/subscriptions'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
+import { formatNumber } from '../../utils/format'
+import { getCurrency } from '../../utils/auth'
 import DataTable from '../../components/common/DataTable'
 import BackButton from '../../components/common/BackButton'
 
@@ -40,7 +42,7 @@ function PlanList() {
         {
             key: 'base_amount',
             label: t('subscription.table.amount'),
-            render: (val, row) => `${Number(val).toLocaleString()} ${row.currency}`,
+            render: (val, row) => `${formatNumber(val)} ${row.currency || getCurrency()}`,
         },
         { key: 'trial_period_days', label: t('subscription.table.trial_days') },
         {

@@ -10,6 +10,7 @@ from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission, require_module
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel
 import logging
@@ -31,10 +32,16 @@ class WorkflowCreateSchema(BaseModel):
     name: str
     document_type: str  # purchase_order, expense, leave_request, payment_voucher
     description: Optional[str] = None
-    min_amount: Optional[float] = None
-    max_amount: Optional[float] = None
+    min_amount: Optional[Decimal] = None
+    max_amount: Optional[Decimal] = None
     steps: List[ApprovalStepSchema]
     is_active: bool = True
+
+class ApprovalRequestCreate(BaseModel):
+    document_type: str
+    document_id: int
+    amount: Decimal
+    description: Optional[str] = None
 
 class ApprovalActionSchema(BaseModel):
     action: str  # approve, reject, return
@@ -100,9 +107,9 @@ def create_workflow(data: WorkflowCreateSchema, current_user=Depends(get_current
         import json
         conditions = {}
         if data.min_amount is not None:
-            conditions["min_amount"] = data.min_amount
+            conditions["min_amount"] = str(data.min_amount)
         if data.max_amount is not None:
-            conditions["max_amount"] = data.max_amount
+            conditions["max_amount"] = str(data.max_amount)
 
         steps_json = [s.dict() for s in data.steps]
 
@@ -149,9 +156,9 @@ def update_workflow(workflow_id: int, data: WorkflowCreateSchema, current_user=D
         import json
         conditions = {}
         if data.min_amount is not None:
-            conditions["min_amount"] = data.min_amount
+            conditions["min_amount"] = str(data.min_amount)
         if data.max_amount is not None:
-            conditions["max_amount"] = data.max_amount
+            conditions["max_amount"] = str(data.max_amount)
 
         steps_json = [s.dict() for s in data.steps]
 
@@ -212,7 +219,7 @@ def delete_workflow(workflow_id: int, current_user=Depends(get_current_user)):
 
 # ===================== Approval Requests =====================
 
-def _find_matching_workflow(db, document_type: str, amount: float = 0):
+def _find_matching_workflow(db, document_type: str, amount: Decimal = Decimal(0)):
     """Find the best matching workflow for a document type and amount."""
     import json
     workflows = db.execute(text("""
@@ -243,25 +250,28 @@ def _create_notification(db, user_id: int, title: str, message: str, link: str =
 
 
 @router.post("/requests", dependencies=[Depends(require_permission("approvals.create"))])
-def create_approval_request(data: dict, current_user=Depends(get_current_user)):
+def create_approval_request(data: ApprovalRequestCreate, current_user=Depends(get_current_user)):
     """
     إنشاء طلب اعتماد جديد.
     يُستدعى عند إنشاء أمر شراء أو مصروف أو طلب إجازة.
     """
     db = get_db_connection(current_user.company_id)
     try:
-        document_type = data.get("document_type")
-        document_id = data.get("document_id")
-        amount = float(data.get("amount", 0))
-        description = data.get("description", "")
-
-        if not document_type or not document_id:
-            raise HTTPException(400, "يجب تحديد نوع المستند ورقمه")
+        document_type = data.document_type
+        document_id = data.document_id
+        amount = data.amount
+        description = data.description or ""
 
         # Find matching workflow
         workflow = _find_matching_workflow(db, document_type, amount)
         if not workflow:
             raise HTTPException(404, f"لا توجد سلسلة اعتماد مفعّلة لنوع المستند '{document_type}' بالمبلغ {amount}")
+
+        # T017: Validate workflow has steps
+        import json as _json
+        _steps = workflow.steps if isinstance(workflow.steps, list) else _json.loads(workflow.steps or "[]")
+        if not _steps:
+            raise HTTPException(status_code=400, detail="workflow_misconfigured_no_steps")
 
         result = db.execute(text("""
             INSERT INTO approval_requests (workflow_id, document_type, document_id, amount, description,
@@ -476,7 +486,7 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
     try:
         import json
 
-        request = db.execute(text("SELECT * FROM approval_requests WHERE id = :id"), {"id": request_id}).fetchone()
+        request = db.execute(text("SELECT * FROM approval_requests WHERE id = :id FOR UPDATE"), {"id": request_id}).fetchone()
         if not request:
             raise HTTPException(**http_error(404, "approval_request_not_found"))
         if request.status != 'pending':
@@ -484,6 +494,13 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
 
         if data.action not in ('approve', 'reject', 'return'):
             raise HTTPException(400, "الإجراء غير صالح. يجب أن يكون: approve, reject, return")
+
+        # T018: Check for existing action on this step
+        existing_action_count = db.execute(text(
+            "SELECT COUNT(*) FROM approval_actions WHERE request_id = :rid AND step = :step"
+        ), {"rid": request_id, "step": request.current_step}).scalar()
+        if existing_action_count > 0:
+            raise HTTPException(409, "already_actioned")
 
         # Record the action
         db.execute(text("""

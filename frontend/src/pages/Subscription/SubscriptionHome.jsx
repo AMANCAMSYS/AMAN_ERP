@@ -28,8 +28,8 @@ function SubscriptionHome() {
         <div className="workspace fade-in">
             <div className="workspace-header">
                 <BackButton />
-                <h1 className="workspace-title">{t('subscription.title') || 'الاشتراكات'}</h1>
-                <p className="workspace-subtitle">{t('subscription.home_subtitle') || 'إدارة خطط الاشتراك وتسجيل العملاء'}</p>
+                <h1 className="workspace-title">{t('subscription.title')}</h1>
+                <p className="workspace-subtitle">{t('subscription.home_subtitle')}</p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>

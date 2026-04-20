@@ -2,7 +2,7 @@ import api from './apiClient'
 
 export const projectsAPI = {
     list: (params) => api.get('/projects/', { params }),
-    summary: () => api.get('/projects/summary'),
+    summary: (params) => api.get('/projects/summary', { params }),
     get: (id) => api.get(`/projects/${id}`),
     create: (data) => api.post('/projects/', data),
     update: (id, data) => api.put(`/projects/${id}`, data),

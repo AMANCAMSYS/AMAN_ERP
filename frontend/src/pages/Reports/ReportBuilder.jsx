@@ -66,7 +66,7 @@ export default function ReportBuilder() {
     const handleAddFilter = () => {
         // Simplified filter UI: just adding a placeholder for now
         // In real app, we need field, operator, value
-        const field = availableTables.find(t => t.id === config.table_name)?.columns[0];
+        const field = availableTables.find(tbl => tbl.id === config.table_name)?.columns[0];
         setConfig(prev => ({
             ...prev,
             filters: { ...prev.filters, [field]: '' }
@@ -88,19 +88,41 @@ export default function ReportBuilder() {
         setConfig(prev => ({ ...prev, filters: newFilters }));
     };
 
-    const handlePreview = async () => {
-        if (config.columns.length === 0) {
+    const handlePreview = async (overrideConfig) => {
+        const effectiveConfig = overrideConfig || config;
+        if (effectiveConfig.columns.length === 0) {
             toastEmitter.emit(t('reports.errors.no_columns'), 'error');
             return;
         }
         setLoading(true);
         try {
-            const res = await customReportsAPI.preview(config);
+            const res = await customReportsAPI.preview(effectiveConfig);
             setPreviewData(res.data);
         } catch (err) {
             toastEmitter.emit(t('common.error'), 'error');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleExport = async () => {
+        if (!previewData || previewData.length === 0) {
+            toastEmitter.emit(t('reports.errors.no_data_to_export'), 'error');
+            return;
+        }
+        try {
+            const res = await customReportsAPI.export(config);
+            const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${config.name || 'report'}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            toastEmitter.emit(t('common.exportError', 'Export failed'), 'error');
         }
     };
 
@@ -122,13 +144,14 @@ export default function ReportBuilder() {
         try {
             const res = await customReportsAPI.get(id);
             const report = res.data;
-            setConfig({
+            const loadedConfig = {
                 ...report.query_config,
                 name: report.report_name,
                 description: report.description
-            });
+            };
+            setConfig(loadedConfig);
             setShowSavedList(false);
-            handlePreview();
+            handlePreview(loadedConfig);
         } catch { }
     };
 
@@ -180,8 +203,8 @@ export default function ReportBuilder() {
                                 <label className="form-label">{t('reports.select_table')}</label>
                                 <select className="form-input" value={config.table_name}
                                     onChange={e => setConfig({ ...config, table_name: e.target.value, columns: [] })}>
-                                    {availableTables.map(t => (
-                                        <option key={t.id} value={t.id}>{t.label}</option>
+                                    {availableTables.map(tbl => (
+                                        <option key={tbl.id} value={tbl.id}>{tbl.label}</option>
                                     ))}
                                 </select>
                             </div>
@@ -192,7 +215,7 @@ export default function ReportBuilder() {
                         <div className="card-body">
                             <h5 className="section-title mb-3"><Columns size={16} /> {t('reports.columns')}</h5>
                             <div className="d-flex flex-wrap gap-2">
-                                {availableTables.find(t => t.id === config.table_name)?.columns.map(col => (
+                                        {availableTables.find(tbl => tbl.id === config.table_name)?.columns.map(col => (
                                     <button
                                         key={col}
                                         className={`btn btn-sm ${config.columns.includes(col) ? 'btn-primary' : 'btn-light'}`}
@@ -218,7 +241,7 @@ export default function ReportBuilder() {
                                 <div key={idx} className="d-flex gap-2 mb-2 align-items-center">
                                     <select className="form-input form-select-sm" value={field}
                                         onChange={(e) => handleFilterChange(field, e.target.value, value)}>
-                                        {availableTables.find(t => t.id === config.table_name)?.columns.map(col => (
+                                {availableTables.find(tbl => tbl.id === config.table_name)?.columns.map(col => (
                                             <option key={col} value={col}>{col}</option>
                                         ))}
                                     </select>
@@ -287,7 +310,7 @@ export default function ReportBuilder() {
                                 <div className="d-flex justify-content-between align-items-center mb-4">
                                     <h5 className="section-title mb-0">{t('reports.results')}</h5>
                                     {previewData && (
-                                        <button className="btn btn-sm btn-outline-secondary">
+                                        <button className="btn btn-sm btn-outline-secondary" onClick={handleExport}>
                                             <Download size={14} /> {t('common.export')}
                                         </button>
                                     )}

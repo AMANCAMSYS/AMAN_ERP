@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportsAPI } from '../../utils/api';
+import { getCurrency } from '../../utils/auth';
 import { useToast } from '../../context/ToastContext';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, Wallet, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
@@ -9,6 +10,7 @@ import '../../components/ModuleStyles.css';
 const KPIDashboard = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
+    const currency = getCurrency() || 'SAR';
     const { showToast } = useToast();
     const [kpiData, setKpiData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ const KPIDashboard = () => {
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '—';
         return new Intl.NumberFormat(t('reports.ensa'), {
-            style: 'currency', currency: 'SAR', maximumFractionDigits: 0
+            style: 'currency', currency: currency, maximumFractionDigits: 0
         }).format(val);
     };
 

@@ -114,7 +114,7 @@ const AssetManagement = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h1 className="workspace-title">
-                            <span className="p-2 rounded-lg bg-violet-50 text-violet-600">
+                            <span className="p-2 rounded bg-light text-primary">
                                 <ArrowRightLeft size={24} />
                             </span>
                             {t('assets.management_title')}
@@ -148,8 +148,8 @@ const AssetManagement = () => {
 
             <div className="card section-card">
                 {loading ? (
-                    <div className="text-center p-8 text-neutral-400">
-                        <Loader2 className="animate-spin mx-auto mb-2" />
+                     <div className="text-center p-5 text-muted">
+                        <Loader2 className="spinner-border mx-auto mb-2" />
                         {t('common.loading')}
                     </div>
                 ) : activeTab === 'transfers' ? (
@@ -172,11 +172,11 @@ const AssetManagement = () => {
                                         <td>{tr.from_branch_name || `#${tr.from_branch_id}`}</td>
                                         <td>{tr.to_branch_name || `#${tr.to_branch_id}`}</td>
                                         <td>
-                                            <span className={`badge ${tr.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            <span className={`badge ${tr.status === 'approved' ? 'bg-success' : 'bg-warning text-dark'}`}>
                                                 {tr.status === 'approved' ? t('assets.status_approved') : t('assets.status_pending')}
                                             </span>
                                         </td>
-                                        <td className="text-sm">{tr.created_at?.split('T')[0]}</td>
+                                        <td className="small">{tr.created_at?.split('T')[0]}</td>
                                         <td>
                                             {tr.status === 'pending' && (
                                                 <button className="btn btn-sm btn-success" onClick={() => handleApproveTransfer(tr.id)}>
@@ -214,12 +214,12 @@ const AssetManagement = () => {
                                         <tr key={r.id}>
                                             <td>{r.asset_name || `#${r.asset_id}`}</td>
                                             <td>{formatNumber(r.old_value)} {currency}</td>
-                                            <td className="font-bold">{formatNumber(r.new_value)} {currency}</td>
+                                            <td className="fw-bold">{formatNumber(r.new_value)} {currency}</td>
                                             <td className={diff >= 0 ? 'text-success' : 'text-danger'}>
                                                 {diff >= 0 ? '+' : ''}{formatNumber(diff)} {currency}
                                             </td>
                                             <td>{r.reason || '—'}</td>
-                                            <td className="text-sm">{r.created_at?.split('T')[0]}</td>
+                                            <td className="small">{r.created_at?.split('T')[0]}</td>
                                         </tr>
                                     );
                                 })}
@@ -239,7 +239,7 @@ const AssetManagement = () => {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
                         <h3 className="modal-title">{t('assets.transfer_modal_title')}</h3>
-                        <form onSubmit={handleCreateTransfer} className="space-y-4">
+                        <form onSubmit={handleCreateTransfer} className="mb-3">
                             <div className="form-group">
                                 <label className="form-label">{t('assets.asset_id')}</label>
                                 <select
@@ -250,11 +250,11 @@ const AssetManagement = () => {
                                 >
                                     <option value="">-- {t('common.select')} --</option>
                                     {assets.map(a => (
-                                        <option key={a.id} value={a.id}>{a.name} ({a.asset_code})</option>
+                                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="row g-3">
                                 <div className="form-group">
                                     <label className="form-label">{t('assets.col_from')}</label>
                                     <select
@@ -265,7 +265,7 @@ const AssetManagement = () => {
                                     >
                                         <option value="">-- {t('common.select')} --</option>
                                         {branches.map(b => (
-                                            <option key={b.id} value={b.id}>{b.branch_name}</option>
+                                            <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -279,7 +279,7 @@ const AssetManagement = () => {
                                     >
                                         <option value="">-- {t('common.select')} --</option>
                                         {branches.map(b => (
-                                            <option key={b.id} value={b.id}>{b.branch_name}</option>
+                                            <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -294,7 +294,7 @@ const AssetManagement = () => {
                                 />
                             </div>
                             <div className="d-flex gap-3 pt-3">
-                                <button type="submit" className="btn btn-primary flex-1">{t('assets.create')}</button>
+                                <button type="submit" className="btn btn-primary flex-grow-1">{t('assets.create')}</button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('assets.cancel')}</button>
                             </div>
                         </form>
@@ -307,7 +307,7 @@ const AssetManagement = () => {
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
                         <h3 className="modal-title">{t('assets.revalue_modal_title')}</h3>
-                        <form onSubmit={handleCreateRevaluation} className="space-y-4">
+                        <form onSubmit={handleCreateRevaluation} className="mb-3">
                             <div className="form-group">
                                 <label className="form-label">{t('assets.asset_id')}</label>
                                 <select
@@ -318,7 +318,7 @@ const AssetManagement = () => {
                                 >
                                     <option value="">-- {t('common.select')} --</option>
                                     {assets.map(a => (
-                                        <option key={a.id} value={a.id}>{a.name} ({a.asset_code})</option>
+                                        <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
                                     ))}
                                 </select>
                             </div>
@@ -344,7 +344,7 @@ const AssetManagement = () => {
                                 />
                             </div>
                             <div className="d-flex gap-3 pt-3">
-                                <button type="submit" className="btn btn-primary flex-1">{t('assets.revalue_btn')}</button>
+                                <button type="submit" className="btn btn-primary flex-grow-1">{t('assets.revalue_btn')}</button>
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('assets.cancel')}</button>
                             </div>
                         </form>

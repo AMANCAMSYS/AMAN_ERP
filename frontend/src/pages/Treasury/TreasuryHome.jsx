@@ -141,37 +141,51 @@ function TreasuryHome() {
                     </div>
                 </div>
 
-                {/* Reports Section */}
-                {/* Reports Section */}
-                {hasPermission('reports.view') && (
+                {/* Reports and Finance Tools */}
+                {(hasPermission('reports.view') || hasPermission('finance.cashflow_view') || hasPermission('finance.subscription_view')) && (
                     <div className="card section-card">
                         <h3 className="section-title">{t('treasury.sections.reports')}</h3>
                         <div className="links-list">
-                            <div className="link-item" onClick={() => navigate('/treasury/reports/cashflow')}>
-                                <span className="link-icon">📈</span>
-                                {t('treasury.menu.cashflow')}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
-                            <div className="link-item" onClick={() => navigate('/treasury/reports/balances')}>
-                                <span className="link-icon">⚖️</span>
-                                {t('treasury.menu.balances')}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
-                            <div className="link-item" onClick={() => navigate('/treasury/reports/checks-aging')}>
-                                <span className="link-icon">⏳</span>
-                                {i18n.t('treasury.checks_aging')}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
-                            <div className="link-item" onClick={() => navigate('/finance/cashflow')}>
-                                <span className="link-icon">📉</span>
-                                {i18n.t('treasury.cash_flow_forecast')}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
-                            <div className="link-item" onClick={() => navigate('/treasury/bank-import')}>
-                                <span className="link-icon">🏦</span>
-                                {i18n.t('bank_import.title')}
-                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                            </div>
+                            {hasPermission('reports.view') && (
+                                <>
+                                    <div className="link-item" onClick={() => navigate('/treasury/reports/cashflow')}>
+                                        <span className="link-icon">📈</span>
+                                        {t('treasury.menu.cashflow')}
+                                        <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                    </div>
+                                    <div className="link-item" onClick={() => navigate('/treasury/reports/balances')}>
+                                        <span className="link-icon">⚖️</span>
+                                        {t('treasury.menu.balances')}
+                                        <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                    </div>
+                                    <div className="link-item" onClick={() => navigate('/treasury/reports/checks-aging')}>
+                                        <span className="link-icon">⏳</span>
+                                        {i18n.t('treasury.checks_aging')}
+                                        <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                    </div>
+                                </>
+                            )}
+                            {hasPermission('finance.cashflow_view') && (
+                                <div className="link-item" onClick={() => navigate('/finance/cashflow')}>
+                                    <span className="link-icon">📉</span>
+                                    {i18n.t('treasury.cash_flow_forecast')}
+                                    <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                </div>
+                            )}
+                            {hasPermission('finance.subscription_view') && (
+                                <div className="link-item" onClick={() => navigate('/finance/subscriptions')}>
+                                    <span className="link-icon">🔄</span>
+                                    {i18n.t('subscription.title')}
+                                    <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                </div>
+                            )}
+                            {hasPermission('treasury.view') && (
+                                <div className="link-item" onClick={() => navigate('/treasury/bank-import')}>
+                                    <span className="link-icon">🏦</span>
+                                    {i18n.t('bank_import.title')}
+                                    <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

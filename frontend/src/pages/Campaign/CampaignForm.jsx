@@ -16,7 +16,6 @@ const EMPTY_FORM = {
     scheduled_date: '',
     estimated_cost: '',
     description: '',
-    branch_id: '',
 };
 
 export default function CampaignForm() {

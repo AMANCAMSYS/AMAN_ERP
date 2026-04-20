@@ -65,7 +65,7 @@ function IntercompanyTransactions() {
     }
 
     const handleProcess = async (id) => {
-        if (!confirm(t('accounting.confirm_process', 'هل تريد معالجة هذه المعاملة وإنشاء القيود المحاسبية؟'))) return
+        if (!confirm(t('accounting.confirm_process'))) return
         try {
             await accountingAPI.processIntercompanyTransaction(id)
             fetchData()
@@ -86,8 +86,8 @@ function IntercompanyTransactions() {
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">{t('accounting.intercompany', 'المعاملات بين الشركات')}</h1>
-                    <p className="workspace-subtitle">{t('accounting.intercompany_desc', 'إدارة المعاملات المالية بين الشركات التابعة والاستبعادات')}</p>
+                    <h1 className="workspace-title">{t('accounting.intercompany')}</h1>
+                    <p className="workspace-subtitle">{t('accounting.intercompany_desc')}</p>
                 </div>
             </div>
 
@@ -95,21 +95,21 @@ function IntercompanyTransactions() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div className="tabs">
                     <button className={`tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
-                        {t('accounting.ic_transactions', 'المعاملات')}
+                        {t('accounting.ic_transactions')}
                     </button>
                     <button className={`tab ${tab === 'elimination' ? 'active' : ''}`} onClick={fetchElimination}>
-                        {t('accounting.elimination_report', 'تقرير الاستبعاد')}
+                        {t('accounting.elimination_report')}
                     </button>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
-                    {showForm ? t('common.cancel', 'إلغاء') : t('accounting.add_ic_transaction', '+ معاملة جديدة')}
+                    {showForm ? t('common.cancel') : t('accounting.add_ic_transaction')}
                 </button>
             </div>
 
             {/* Create Form */}
             {showForm && (
                 <div className="section-card" style={{ marginBottom: 16 }}>
-                    <h3 className="section-title">{t('accounting.new_ic_transaction', 'معاملة جديدة بين الشركات')}</h3>
+                    <h3 className="section-title">{t('accounting.new_ic_transaction')}</h3>
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                             <div className="form-group">
@@ -139,7 +139,7 @@ function IntercompanyTransactions() {
                                     onChange={e => setForm({ ...form, currency: e.target.value })} />
                             </div>
                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                <label className="form-label">{t('common.description', 'الوصف')} *</label>
+                                <label className="form-label">{t('common.description')} *</label>
                                 <input className="form-input" required value={form.description}
                                     onChange={e => setForm({ ...form, description: e.target.value })} />
                             </div>
@@ -147,11 +147,11 @@ function IntercompanyTransactions() {
                                 <label className="form-label">{t('accounting.reference', 'المرجع')}</label>
                                 <input className="form-input" value={form.reference}
                                     onChange={e => setForm({ ...form, reference: e.target.value })}
-                                    placeholder={t('accounting.auto_generated', 'تلقائي')} />
+                                    placeholder={t('accounting.auto_generated')} />
                             </div>
                         </div>
                         <div style={{ marginTop: 12 }}>
-                            <button type="submit" className="btn btn-primary btn-sm">{t('common.save', 'حفظ')}</button>
+                            <button type="submit" className="btn btn-primary btn-sm">{t('common.save')}</button>
                         </div>
                     </form>
                 </div>
@@ -163,7 +163,7 @@ function IntercompanyTransactions() {
                     <h3 className="section-title">{t('accounting.ic_transactions', 'المعاملات')} ({transactions.length})</h3>
                     {transactions.length === 0 ? (
                         <p style={{ color: '#9ca3af', textAlign: 'center', padding: 24 }}>
-                            {t('common.no_data', 'لا توجد بيانات')}
+                            {t('common.no_data')}
                         </p>
                     ) : (
                         <div className="data-table-container">
@@ -171,13 +171,13 @@ function IntercompanyTransactions() {
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>{t('accounting.reference', 'المرجع')}</th>
-                                        <th>{t('accounting.target_company', 'الشركة المستهدفة')}</th>
-                                        <th>{t('accounting.transaction_type', 'النوع')}</th>
-                                        <th>{t('common.amount', 'المبلغ')}</th>
-                                        <th>{t('common.status_title', 'الحالة')}</th>
-                                        <th>{t('common.date', 'التاريخ')}</th>
-                                        <th>{t('common.actions', 'إجراءات')}</th>
+                                        <th>{t('accounting.reference')}</th>
+                                        <th>{t('accounting.target_company')}</th>
+                                        <th>{t('accounting.transaction_type')}</th>
+                                        <th>{t('common.amount')}</th>
+                                        <th>{t('common.status_title')}</th>
+                                        <th>{t('common.date')}</th>
+                                        <th>{t('common.actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -203,11 +203,11 @@ function IntercompanyTransactions() {
                                             <td>
                                                 {tx.status === 'pending' && (
                                                     <button className="btn btn-success btn-sm" onClick={() => handleProcess(tx.id)}>
-                                                        {t('accounting.process', 'معالجة')}
+                                                        {t('accounting.process')}
                                                     </button>
                                                 )}
                                                 {tx.status === 'processed' && (
-                                                    <span style={{ color: '#22c55e', fontSize: '0.85rem' }}>✓ {t('accounting.processed', 'تمت المعالجة')}</span>
+                                                    <span style={{ color: '#22c55e', fontSize: '0.85rem' }}>✓ {t('accounting.processed')}</span>
                                                 )}
                                             </td>
                                         </tr>
@@ -225,22 +225,22 @@ function IntercompanyTransactions() {
                     {/* Totals */}
                     <div className="metrics-grid" style={{ marginBottom: 16 }}>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.total_intercompany', 'إجمالي المعاملات')}</div>
+                            <div className="metric-label">{t('accounting.total_intercompany')}</div>
                             <div className="metric-value text-primary">{formatNumber(eliminationReport.totals?.total_intercompany || 0)} <small>{currency}</small></div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.total_eliminated', 'تم الاستبعاد')}</div>
+                            <div className="metric-label">{t('accounting.total_eliminated')}</div>
                             <div className="metric-value text-success">{formatNumber(eliminationReport.totals?.total_eliminated || 0)} <small>{currency}</small></div>
                         </div>
                         <div className="metric-card">
-                            <div className="metric-label">{t('accounting.pending_elimination', 'بانتظار الاستبعاد')}</div>
+                            <div className="metric-label">{t('accounting.pending_elimination')}</div>
                             <div className="metric-value text-warning">{formatNumber(eliminationReport.totals?.pending_elimination || 0)} <small>{currency}</small></div>
                         </div>
                     </div>
 
                     {/* By Company */}
                     <div className="section-card">
-                        <h3 className="section-title">{t('accounting.elimination_by_company', 'التفاصيل حسب الشركة')}</h3>
+                        <h3 className="section-title">{t('accounting.elimination_by_company')}</h3>
                         {eliminationReport.by_company?.length === 0 ? (
                             <p style={{ color: '#9ca3af', textAlign: 'center', padding: 24 }}>{t('common.no_data', 'لا توجد بيانات')}</p>
                         ) : (
@@ -248,12 +248,12 @@ function IntercompanyTransactions() {
                                 <table className="data-table">
                                     <thead>
                                         <tr>
-                                            <th>{t('accounting.target_company', 'الشركة المستهدفة')}</th>
-                                            <th>{t('accounting.transaction_type', 'النوع')}</th>
-                                            <th>{t('common.count', 'العدد')}</th>
-                                            <th>{t('accounting.total_amount', 'إجمالي المبلغ')}</th>
-                                            <th>{t('accounting.processed_amount', 'تمت المعالجة')}</th>
-                                            <th>{t('accounting.pending_amount', 'معلق')}</th>
+                                            <th>{t('accounting.target_company')}</th>
+                                            <th>{t('accounting.transaction_type')}</th>
+                                            <th>{t('common.count')}</th>
+                                            <th>{t('accounting.total_amount')}</th>
+                                            <th>{t('accounting.processed_amount')}</th>
+                                            <th>{t('accounting.pending_amount')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>

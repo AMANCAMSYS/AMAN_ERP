@@ -66,21 +66,26 @@ const DetailedProfitLoss = () => {
     }));
 
     const handleExport = async (format) => {
-        const params = new URLSearchParams({
-            start_date: startDate,
-            end_date: endDate,
-            group_by: groupBy,
-            format,
-            ...(currentBranch?.id ? { branch_id: currentBranch.id } : {}),
-        });
-        const res = await api.get(`/reports/accounting/profit-loss/detailed?${params}`, { responseType: 'blob' });
-        const url = URL.createObjectURL(res.data);
-        if (format === 'pdf') {
-            window.open(url, '_blank');
-        } else {
-            const a = document.createElement('a'); a.href = url; a.download = `profit-loss.${format === 'excel' ? 'xlsx' : format}`; a.click();
+        try {
+            const params = new URLSearchParams({
+                start_date: startDate,
+                end_date: endDate,
+                group_by: groupBy,
+                format,
+                ...(currentBranch?.id ? { branch_id: currentBranch.id } : {}),
+            });
+            const res = await api.get(`/reports/accounting/profit-loss/detailed?${params}`, { responseType: 'blob' });
+            const url = URL.createObjectURL(res.data);
+            if (format === 'pdf') {
+                window.open(url, '_blank');
+            } else {
+                const a = document.createElement('a'); a.href = url; a.download = `profit-loss.${format === 'excel' ? 'xlsx' : format}`; a.click();
+            }
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        } catch (error) {
+            console.error('Export failed:', error);
+            showToast(t('common.exportError'), 'error');
         }
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
 
     const fmt = (n) => Number(n || 0).toLocaleString(isRTL ? 'ar-SA' : 'en-US', {

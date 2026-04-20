@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { servicesAPI } from '../../utils/api'
 import '../../components/ModuleStyles.css'
@@ -87,7 +87,7 @@ function DocumentManagement() {
 
     const handleUpload = async (e) => {
         e.preventDefault()
-        if (!uploadForm.file) return showToast(t('documents.select_file', 'warning'))
+        if (!uploadForm.file) return showToast(t('documents.select_file'), 'warning')
         try {
             const fd = new FormData()
             fd.append('file', uploadForm.file)
@@ -100,7 +100,7 @@ function DocumentManagement() {
             setShowUploadModal(false)
             fetchDocuments()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -125,7 +125,7 @@ function DocumentManagement() {
             fetchDocuments()
             if (expandedId === id) loadDetail(id)
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -136,7 +136,7 @@ function DocumentManagement() {
 
     const handleVersionUpload = async (e) => {
         e.preventDefault()
-        if (!versionForm.file) return showToast(t('documents.select_file', 'warning'))
+        if (!versionForm.file) return showToast(t('documents.select_file'), 'warning')
         try {
             const fd = new FormData()
             fd.append('file', versionForm.file)
@@ -149,7 +149,7 @@ function DocumentManagement() {
                 setDetail(res.data)
             }
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -160,7 +160,7 @@ function DocumentManagement() {
             if (expandedId === id) setExpandedId(null)
             fetchDocuments()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -247,8 +247,8 @@ function DocumentManagement() {
                         ) : documents.length === 0 ? (
                             <tr><td colSpan="10" style={{ textAlign: 'center', padding: '40px' }}>{t('common.no_data')}</td></tr>
                         ) : documents.map(doc => (
-                            <>
-                                <tr key={doc.id} style={{ cursor: 'pointer' }} onClick={() => loadDetail(doc.id)}>
+                            <Fragment key={doc.id}>
+                                <tr style={{ cursor: 'pointer' }} onClick={() => loadDetail(doc.id)}>
                                     <td><strong>{doc.doc_number}</strong></td>
                                     <td>{doc.title}</td>
                                     <td>{getLabelByValue(categoryOptions, doc.category)}</td>
@@ -312,7 +312,7 @@ function DocumentManagement() {
                                         </td>
                                     </tr>
                                 )}
-                            </>
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>

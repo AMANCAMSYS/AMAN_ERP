@@ -43,7 +43,7 @@ const TopProductsChart = ({ data, loading, currency = '' }) => {
         },
         series: [
             {
-                name: t('dashboard.sales') || "Sales",
+                name: t('dashboard.sales'),
                 type: 'bar',
                 data: (data || []).map((item, index) => ({
                     value: item.value || 0,
@@ -73,7 +73,7 @@ const TopProductsChart = ({ data, loading, currency = '' }) => {
         <div className="card h-full">
             <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
                 <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">🏆</span>
-                {t('dashboard.top_products') || "Top Selling Products"}
+                {t('dashboard.top_products')}
             </h3>
             <div className="relative" style={{ height: '350px' }}>
                 {loading && (

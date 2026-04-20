@@ -4,6 +4,7 @@ AMAN ERP – Subscription Billing
 """
 
 import logging
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,6 +13,7 @@ from sqlalchemy import text
 
 from database import get_db_connection
 from routers.auth import get_current_user
+from utils.fiscal_lock import check_fiscal_period_open
 from schemas.subscription import (
     CancelRequest,
     EnrollmentCreate,
@@ -98,7 +100,7 @@ def create_plan(body: PlanCreate, current_user=Depends(get_current_user)):
                 "name": body.name,
                 "desc": body.description,
                 "freq": body.billing_frequency,
-                "amt": float(body.base_amount),
+                "amt": str(body.base_amount),
                 "cur": body.currency,
                 "trial": body.trial_period_days,
                 "auto": body.auto_renewal,
@@ -127,13 +129,13 @@ def update_plan(plan_id: int, body: PlanUpdate, current_user=Depends(get_current
         # Build dynamic SET clause from provided fields
         updates = body.model_dump(exclude_unset=True)
         if not updates:
-            raise HTTPException(status_code=400, detail="No fields to update")
+            raise HTTPException(**http_error(400, "no_data_to_update"))
 
         set_clauses = []
         params: dict = {"pid": plan_id}
         for key, value in updates.items():
             set_clauses.append(f"{key} = :{key}")
-            params[key] = float(value) if key == "base_amount" and value is not None else value
+            params[key] = str(value) if key == "base_amount" and value is not None else value
         set_clauses.append("updated_at = NOW()")
         set_clauses.append("updated_by = :usr")
         params["usr"] = str(current_user.id)
@@ -146,7 +148,7 @@ def update_plan(plan_id: int, body: PlanUpdate, current_user=Depends(get_current
             params,
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Plan not found")
+            raise HTTPException(**http_error(404, "plan_not_found"))
         db.commit()
         return PlanRead.model_validate(row)
     except HTTPException:
@@ -171,6 +173,10 @@ def update_plan(plan_id: int, body: PlanUpdate, current_user=Depends(get_current
 def enroll(body: EnrollmentCreate, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
+        # Check fiscal period is open for the enrollment start date
+        start_date = body.enrollment_date or __import__('datetime').date.today()
+        check_fiscal_period_open(db, start_date)
+
         result = enroll_customer(
             db,
             customer_id=body.customer_id,
@@ -178,9 +184,33 @@ def enroll(body: EnrollmentCreate, current_user=Depends(get_current_user)):
             enrollment_date=body.enrollment_date,
             user=str(current_user.id),
         )
+        enrollment_id = result["enrollment_id"]
+
+        # Submit for approval workflow
+        try:
+            from utils.approval_utils import try_submit_for_approval
+            plan_row = db.execute(
+                text("SELECT base_amount FROM subscription_plans WHERE id = :pid"),
+                {"pid": body.plan_id},
+            ).fetchone()
+            plan_amount = plan_row.base_amount if plan_row else 0
+            try_submit_for_approval(
+                db,
+                document_type="subscription",
+                document_id=enrollment_id,
+                document_number=f"SUB-{enrollment_id}",
+                amount=Decimal(str(plan_amount)),
+                submitted_by=current_user.id,
+                description=f"اشتراك جديد - خطة {body.plan_id} للعميل {body.customer_id}",
+                link=f"/subscriptions/enrollments/{enrollment_id}",
+            )
+            db.commit()
+        except Exception:
+            pass  # Non-blocking
+
         row = db.execute(
             text("SELECT * FROM subscription_enrollments WHERE id = :eid"),
-            {"eid": result["enrollment_id"]},
+            {"eid": enrollment_id},
         ).fetchone()
         return EnrollmentRead.model_validate(row)
     except ValueError as e:
@@ -255,7 +285,7 @@ def get_enrollment(enrollment_id: int, current_user=Depends(get_current_user)):
             {"eid": enrollment_id},
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Enrollment not found")
+            raise HTTPException(**http_error(404, "enrollment_not_found"))
 
         invoices = db.execute(
             text(
@@ -353,6 +383,10 @@ def cancel(enrollment_id: int, body: CancelRequest, current_user=Depends(get_cur
 def change_plan(enrollment_id: int, body: PlanChangeRequest, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
+        # Check fiscal period is open for today (plan change date)
+        from datetime import date as _date
+        check_fiscal_period_open(db, _date.today())
+
         result = prorate_plan_change(
             db,
             enrollment_id=enrollment_id,

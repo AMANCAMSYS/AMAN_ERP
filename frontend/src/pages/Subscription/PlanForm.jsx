@@ -4,6 +4,7 @@ import { subscriptionsAPI } from '../../services/subscriptions'
 import { useTranslation } from 'react-i18next'
 import BackButton from '../../components/common/BackButton'
 import FormField from '../../components/common/FormField'
+import { getCurrency } from '../../utils/auth'
 
 function PlanForm() {
     const { t } = useTranslation()
@@ -16,7 +17,7 @@ function PlanForm() {
         description: '',
         billing_frequency: 'monthly',
         base_amount: '',
-        currency: 'SAR',
+        currency: getCurrency(),
         trial_period_days: 0,
         auto_renewal: true,
         is_active: true,
@@ -37,7 +38,7 @@ function PlanForm() {
                             description: plan.description || '',
                             billing_frequency: plan.billing_frequency || 'monthly',
                             base_amount: plan.base_amount || '',
-                            currency: plan.currency || 'SAR',
+                            currency: plan.currency || getCurrency(),
                             trial_period_days: plan.trial_period_days || 0,
                             auto_renewal: plan.auto_renewal ?? true,
                             is_active: plan.is_active ?? true,
@@ -72,7 +73,7 @@ function PlanForm() {
         try {
             const data = {
                 ...formData,
-                base_amount: parseFloat(formData.base_amount),
+                base_amount: formData.base_amount,
                 trial_period_days: parseInt(formData.trial_period_days) || 0,
             }
             if (isEdit) {
@@ -106,7 +107,7 @@ function PlanForm() {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="form-section card">
                         <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
-                            <span style={{ fontSize: '24px' }}>📋</span> {t('subscription.form.basic_info') || 'معلومات الخطة'}
+                            <span style={{ fontSize: '24px' }}>📋</span> {t('subscription.form.basic_info')}
                         </h3>
                         <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                             <FormField label={t('subscription.form.name')} required style={{ marginBottom: 0 }}>
@@ -134,7 +135,7 @@ function PlanForm() {
 
                     <div className="form-section card">
                         <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
-                            <span style={{ fontSize: '24px' }}>💰</span> {t('subscription.form.billing_info') || 'الفوترة'}
+                            <span style={{ fontSize: '24px' }}>💰</span> {t('subscription.form.billing_info')}
                         </h3>
                         <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '24px' }}>
                             <FormField label={t('subscription.form.billing_frequency')} style={{ marginBottom: 0 }}>

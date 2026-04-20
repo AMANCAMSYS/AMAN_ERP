@@ -150,7 +150,7 @@ const AssetForm = () => {
                                                     >
                                                         <option value="">{t('common.select_branch', 'Select Branch')}</option>
                                                         {branches.map(branch => (
-                                                            <option key={branch.id} value={branch.id}>{branch.branch_name}</option>
+                                                            <option key={branch.id} value={branch.id}>{branch.name}</option>
                                                         ))}
                                                     </select>
                                                 </FormField>

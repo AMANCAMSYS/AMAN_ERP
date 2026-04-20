@@ -3,20 +3,27 @@ Service Management Router — SVC-001 + SVC-002
 - Service / Maintenance Requests (CRUD + assign + costs + stats)
 - Document Management (upload + versions + search)
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Request
+from fastapi.responses import FileResponse
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+import math
 import os
 import uuid
 import shutil
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
+from utils.audit import log_activity
+from schemas.services import (
+    ServiceRequestCreate, ServiceRequestUpdate, TechnicianAssignRequest,
+    ServiceCostCreate, DocumentMetaUpdate
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +39,14 @@ try:
 except PermissionError as e:
     logger.warning(f"⚠️  Cannot create upload dir {UPLOAD_DIR}: {e} — continuing without it")
 
+# Status transition state machine
+VALID_TRANSITIONS = {
+    "pending": ["assigned", "cancelled"],
+    "assigned": ["in_progress", "cancelled"],
+    "in_progress": ["on_hold", "completed", "cancelled"],
+    "on_hold": ["in_progress", "cancelled"],
+}
+
 
 # ─────────────────────────────────────────────
 # SVC-001: Service / Maintenance Requests
@@ -43,11 +58,33 @@ def list_service_requests(
     priority: Optional[str] = None,
     assigned_to: Optional[int] = None,
     customer_id: Optional[int] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=100),
     current_user: UserResponse = Depends(get_current_user)
 ):
     db = get_db_connection(current_user.company_id)
     try:
-        query = """
+        base_where = " WHERE sr.is_deleted = false"
+        params = {}
+        if status:
+            base_where += " AND sr.status = :status"
+            params["status"] = status
+        if priority:
+            base_where += " AND sr.priority = :priority"
+            params["priority"] = priority
+        if assigned_to:
+            base_where += " AND sr.assigned_to = :assigned_to"
+            params["assigned_to"] = assigned_to
+        if customer_id:
+            base_where += " AND sr.customer_id = :customer_id"
+            params["customer_id"] = customer_id
+
+        # Count total
+        total = db.execute(text(f"SELECT COUNT(*) FROM service_requests sr{base_where}"), params).scalar()
+
+        # Paginated query
+        offset = (page - 1) * per_page
+        query = f"""
             SELECT sr.*,
                    p.name as customer_name,
                    u.full_name as assigned_to_name,
@@ -56,24 +93,20 @@ def list_service_requests(
             LEFT JOIN parties p ON sr.customer_id = p.id
             LEFT JOIN company_users u ON sr.assigned_to = u.id
             LEFT JOIN company_users cu ON sr.created_by = cu.id
-            WHERE 1=1
+            {base_where}
+            ORDER BY sr.created_at DESC
+            LIMIT :limit OFFSET :offset
         """
-        params = {}
-        if status:
-            query += " AND sr.status = :status"
-            params["status"] = status
-        if priority:
-            query += " AND sr.priority = :priority"
-            params["priority"] = priority
-        if assigned_to:
-            query += " AND sr.assigned_to = :assigned_to"
-            params["assigned_to"] = assigned_to
-        if customer_id:
-            query += " AND sr.customer_id = :customer_id"
-            params["customer_id"] = customer_id
-        query += " ORDER BY sr.created_at DESC"
+        params["limit"] = per_page
+        params["offset"] = offset
         rows = db.execute(text(query), params).fetchall()
-        return [dict(r._mapping) for r in rows]
+        return {
+            "items": [dict(r._mapping) for r in rows],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": math.ceil(total / per_page) if total else 0
+        }
     finally:
         db.close()
 
@@ -95,6 +128,7 @@ def get_service_stats(current_user: UserResponse = Depends(get_current_user)):
                 COALESCE(AVG(actual_hours) FILTER (WHERE status = 'completed'), 0) as avg_hours,
                 COALESCE(SUM(actual_cost) FILTER (WHERE status = 'completed'), 0) as total_cost
             FROM service_requests
+            WHERE is_deleted = false
         """)).fetchone()
         return dict(stats._mapping) if stats else {}
     finally:
@@ -114,14 +148,14 @@ def get_service_request(request_id: int, current_user: UserResponse = Depends(ge
             LEFT JOIN parties p ON sr.customer_id = p.id
             LEFT JOIN company_users u ON sr.assigned_to = u.id
             LEFT JOIN company_users cu ON sr.created_by = cu.id
-            WHERE sr.id = :id
+            WHERE sr.id = :id AND sr.is_deleted = false
         """), {"id": request_id}).fetchone()
         if not req:
             raise HTTPException(**http_error(404, "maintenance_request_not_found"))
         result = dict(req._mapping)
         # Fetch costs
         costs = db.execute(text(
-            "SELECT * FROM service_request_costs WHERE service_request_id = :id ORDER BY created_at"
+            "SELECT * FROM service_request_costs WHERE service_request_id = :id AND is_deleted = false ORDER BY created_at"
         ), {"id": request_id}).fetchall()
         result["costs"] = [dict(c._mapping) for c in costs]
         return result
@@ -130,45 +164,55 @@ def get_service_request(request_id: int, current_user: UserResponse = Depends(ge
 
 
 @router.post("/requests", dependencies=[Depends(require_permission("services.create"))])
-def create_service_request(data: dict, current_user: UserResponse = Depends(get_current_user)):
+def create_service_request(data: ServiceRequestCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
+        if data.branch_id:
+            validate_branch_access(current_user, data.branch_id)
+
         req_id = db.execute(text("""
             INSERT INTO service_requests (
                 title, description, category, priority, status,
-                customer_id, asset_id, assigned_to,
+                customer_id, asset_id, assigned_to, branch_id,
                 estimated_hours, estimated_cost, scheduled_date,
                 location, notes, created_by
             ) VALUES (
                 :title, :description, :category, :priority, 'pending',
-                :customer_id, :asset_id, :assigned_to,
+                :customer_id, :asset_id, :assigned_to, :branch_id,
                 :estimated_hours, :estimated_cost, :scheduled_date,
                 :location, :notes, :uid
             ) RETURNING id
         """), {
-            "title": data.get("title", ""),
-            "description": data.get("description"),
-            "category": data.get("category", "maintenance"),
-            "priority": data.get("priority", "medium"),
-            "customer_id": data.get("customer_id") or None,
-            "asset_id": data.get("asset_id") or None,
-            "assigned_to": data.get("assigned_to") or None,
-            "estimated_hours": data.get("estimated_hours") or None,
-            "estimated_cost": data.get("estimated_cost") or 0,
-            "scheduled_date": data.get("scheduled_date") or None,
-            "location": data.get("location"),
-            "notes": data.get("notes"),
+            "title": data.title or "",
+            "description": data.description,
+            "category": data.category or "maintenance",
+            "priority": data.priority or "medium",
+            "customer_id": data.customer_id or None,
+            "asset_id": data.asset_id or None,
+            "assigned_to": data.assigned_to or None,
+            "branch_id": data.branch_id or None,
+            "estimated_hours": data.estimated_hours or None,
+            "estimated_cost": data.estimated_cost or 0,
+            "scheduled_date": data.scheduled_date or None,
+            "location": data.location,
+            "notes": data.notes,
             "uid": current_user.id
         }).scalar()
 
         # If technician assigned immediately, update status
-        if data.get("assigned_to"):
+        if data.assigned_to:
             db.execute(text("""
                 UPDATE service_requests SET status = 'assigned', assigned_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             """), {"id": req_id})
 
         db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.create", resource_type="service_request",
+                     resource_id=req_id, details={"title": data.title},
+                     request=request, branch_id=data.branch_id)
+
         return get_service_request(req_id, current_user)
     except HTTPException:
         raise
@@ -181,12 +225,21 @@ def create_service_request(data: dict, current_user: UserResponse = Depends(get_
 
 
 @router.put("/requests/{request_id}", dependencies=[Depends(require_permission("services.edit"))])
-def update_service_request(request_id: int, data: dict, current_user: UserResponse = Depends(get_current_user)):
+def update_service_request(request_id: int, data: ServiceRequestUpdate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        existing = db.execute(text("SELECT id, status FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
+        existing = db.execute(text("SELECT id, status, branch_id FROM service_requests WHERE id = :id AND is_deleted = false"), {"id": request_id}).fetchone()
         if not existing:
             raise HTTPException(**http_error(404, "maintenance_request_not_found"))
+
+        if existing.branch_id:
+            validate_branch_access(current_user, existing.branch_id)
+
+        # Validate status transition
+        if data.status and data.status != existing.status:
+            allowed = VALID_TRANSITIONS.get(existing.status, [])
+            if data.status not in allowed:
+                raise HTTPException(**http_error(400, "invalid_status_transition"))
 
         fields = []
         params = {"id": request_id}
@@ -197,22 +250,30 @@ def update_service_request(request_id: int, data: dict, current_user: UserRespon
             "scheduled_date", "completion_date", "location", "notes"
         ]
         for f in updatable:
-            if f in data:
+            val = getattr(data, f, None)
+            if val is not None:
                 fields.append(f"{f} = :{f}")
-                params[f] = data[f] if data[f] != "" else None
+                params[f] = val if val != "" else None
 
         # Auto-set assigned_at
-        if "assigned_to" in data and data["assigned_to"]:
+        if data.assigned_to:
             fields.append("assigned_at = CURRENT_TIMESTAMP")
         # Auto-set completion_date
-        if data.get("status") == "completed" and not data.get("completion_date"):
+        if data.status == "completed" and not data.completion_date:
             fields.append("completion_date = CURRENT_DATE")
 
         fields.append("updated_at = CURRENT_TIMESTAMP")
+        fields.append("updated_by = :uid")
+        params["uid"] = current_user.id
 
         if fields:
             db.execute(text(f"UPDATE service_requests SET {', '.join(fields)} WHERE id = :id"), params)
             db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.update", resource_type="service_request",
+                     resource_id=request_id, details={"status": data.status},
+                     request=request, branch_id=existing.branch_id)
 
         return get_service_request(request_id, current_user)
     except HTTPException:
@@ -226,13 +287,30 @@ def update_service_request(request_id: int, data: dict, current_user: UserRespon
 
 
 @router.delete("/requests/{request_id}", dependencies=[Depends(require_permission("services.delete"))])
-def delete_service_request(request_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_service_request(request_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        deleted = db.execute(text("DELETE FROM service_requests WHERE id = :id RETURNING id"), {"id": request_id}).fetchone()
-        if not deleted:
+        existing = db.execute(text("SELECT id, branch_id FROM service_requests WHERE id = :id AND is_deleted = false"), {"id": request_id}).fetchone()
+        if not existing:
             raise HTTPException(**http_error(404, "maintenance_request_not_found"))
+
+        if existing.branch_id:
+            validate_branch_access(current_user, existing.branch_id)
+
+        db.execute(text(
+            "UPDATE service_requests SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE id = :id"
+        ), {"id": request_id, "uid": current_user.id})
+        # Soft-delete associated costs
+        db.execute(text(
+            "UPDATE service_request_costs SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE service_request_id = :id"
+        ), {"id": request_id, "uid": current_user.id})
         db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.delete", resource_type="service_request",
+                     resource_id=request_id, details={},
+                     request=request, branch_id=existing.branch_id)
+
         return {"message": "تم حذف طلب الصيانة بنجاح"}
     except HTTPException:
         raise
@@ -245,22 +323,31 @@ def delete_service_request(request_id: int, current_user: UserResponse = Depends
 
 
 @router.post("/requests/{request_id}/assign", dependencies=[Depends(require_permission("services.edit"))])
-def assign_technician(request_id: int, data: dict, current_user: UserResponse = Depends(get_current_user)):
+def assign_technician(request_id: int, data: TechnicianAssignRequest, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Assign or reassign a technician to a service request."""
     db = get_db_connection(current_user.company_id)
     try:
-        existing = db.execute(text("SELECT id FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
+        existing = db.execute(text("SELECT id, branch_id FROM service_requests WHERE id = :id AND is_deleted = false"), {"id": request_id}).fetchone()
         if not existing:
             raise HTTPException(**http_error(404, "maintenance_request_not_found"))
+
+        if existing.branch_id:
+            validate_branch_access(current_user, existing.branch_id)
 
         db.execute(text("""
             UPDATE service_requests
             SET assigned_to = :tech_id, assigned_at = CURRENT_TIMESTAMP,
                 status = CASE WHEN status = 'pending' THEN 'assigned' ELSE status END,
-                updated_at = CURRENT_TIMESTAMP
+                updated_at = CURRENT_TIMESTAMP, updated_by = :uid
             WHERE id = :id
-        """), {"id": request_id, "tech_id": data.get("assigned_to")})
+        """), {"id": request_id, "tech_id": data.assigned_to, "uid": current_user.id})
         db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.assign", resource_type="service_request",
+                     resource_id=request_id, details={"assigned_to": data.assigned_to},
+                     request=request, branch_id=existing.branch_id)
+
         return get_service_request(request_id, current_user)
     except HTTPException:
         raise
@@ -273,16 +360,16 @@ def assign_technician(request_id: int, data: dict, current_user: UserResponse = 
 
 
 @router.post("/requests/{request_id}/costs", dependencies=[Depends(require_permission("services.edit"))])
-def add_service_cost(request_id: int, data: dict, current_user: UserResponse = Depends(get_current_user)):
+def add_service_cost(request_id: int, data: ServiceCostCreate, request: Request, current_user: UserResponse = Depends(get_current_user)):
     """Add a cost line to a service request."""
     db = get_db_connection(current_user.company_id)
     try:
-        existing = db.execute(text("SELECT id FROM service_requests WHERE id = :id"), {"id": request_id}).fetchone()
+        existing = db.execute(text("SELECT id FROM service_requests WHERE id = :id AND is_deleted = false"), {"id": request_id}).fetchone()
         if not existing:
             raise HTTPException(**http_error(404, "maintenance_request_not_found"))
 
-        qty = _dec(data.get("quantity", 1))
-        unit = _dec(data.get("unit_cost", 0))
+        qty = _dec(data.quantity if data.quantity is not None else 1)
+        unit = _dec(data.unit_cost if data.unit_cost is not None else 0)
         total = (qty * unit).quantize(_D2, ROUND_HALF_UP)
 
         db.execute(text("""
@@ -290,20 +377,26 @@ def add_service_cost(request_id: int, data: dict, current_user: UserResponse = D
             VALUES (:rid, :ctype, :desc, :qty, :ucost, :total)
         """), {
             "rid": request_id,
-            "ctype": data.get("cost_type", "other"),
-            "desc": data.get("description", ""),
+            "ctype": data.cost_type or "other",
+            "desc": data.description or "",
             "qty": qty, "ucost": unit, "total": total
         })
 
         # Update total actual cost on the request
         db.execute(text("""
             UPDATE service_requests
-            SET actual_cost = COALESCE((SELECT SUM(total_cost) FROM service_request_costs WHERE service_request_id = :id), 0),
+            SET actual_cost = COALESCE((SELECT SUM(total_cost) FROM service_request_costs WHERE service_request_id = :id AND is_deleted = false), 0),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {"id": request_id})
 
         db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.add_cost", resource_type="service_request",
+                     resource_id=request_id, details={"cost_type": data.cost_type, "total": str(total)},
+                     request=request, branch_id=None)
+
         return get_service_request(request_id, current_user)
     except HTTPException:
         raise
@@ -316,19 +409,26 @@ def add_service_cost(request_id: int, data: dict, current_user: UserResponse = D
 
 
 @router.delete("/requests/{request_id}/costs/{cost_id}", dependencies=[Depends(require_permission("services.edit"))])
-def delete_service_cost(request_id: int, cost_id: int, current_user: UserResponse = Depends(get_current_user)):
+def delete_service_cost(request_id: int, cost_id: int, request: Request, current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        db.execute(text("DELETE FROM service_request_costs WHERE id = :cid AND service_request_id = :rid"),
-                   {"cid": cost_id, "rid": request_id})
+        db.execute(text(
+            "UPDATE service_request_costs SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE id = :cid AND service_request_id = :rid"
+        ), {"cid": cost_id, "rid": request_id, "uid": current_user.id})
         # Recalculate
         db.execute(text("""
             UPDATE service_requests
-            SET actual_cost = COALESCE((SELECT SUM(total_cost) FROM service_request_costs WHERE service_request_id = :id), 0),
+            SET actual_cost = COALESCE((SELECT SUM(total_cost) FROM service_request_costs WHERE service_request_id = :id AND is_deleted = false), 0),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {"id": request_id})
         db.commit()
+
+        log_activity(db, user_id=current_user.id, username=current_user.username,
+                     action="service_request.delete_cost", resource_type="service_request",
+                     resource_id=request_id, details={"cost_id": cost_id},
+                     request=request, branch_id=None)
+
         return {"message": "تم حذف التكلفة بنجاح"}
     except Exception as e:
         db.rollback()
@@ -347,29 +447,55 @@ def list_documents(
     category: Optional[str] = None,
     search: Optional[str] = None,
     related_module: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=100),
     current_user: UserResponse = Depends(get_current_user)
 ):
     db = get_db_connection(current_user.company_id)
     try:
-        query = """
-            SELECT d.*, u.full_name as created_by_name
-            FROM documents d
-            LEFT JOIN company_users u ON d.created_by = u.id
-            WHERE 1=1
-        """
+        base_where = " WHERE d.is_deleted = false"
         params = {}
         if category:
-            query += " AND d.category = :category"
+            base_where += " AND d.category = :category"
             params["category"] = category
         if related_module:
-            query += " AND d.related_module = :related_module"
+            base_where += " AND d.related_module = :related_module"
             params["related_module"] = related_module
         if search:
-            query += " AND (d.title ILIKE :search OR d.description ILIKE :search OR d.tags ILIKE :search)"
+            base_where += " AND (d.title ILIKE :search OR d.description ILIKE :search OR d.tags::text ILIKE :search)"
             params["search"] = f"%{search}%"
-        query += " ORDER BY d.created_at DESC"
+
+        # Count total
+        total = db.execute(text(f"SELECT COUNT(*) FROM documents d{base_where}"), params).scalar()
+
+        # Paginated query (exclude file_path from response)
+        offset = (page - 1) * per_page
+        query = f"""
+            SELECT d.id, d.doc_number, d.title, d.description, d.category, d.file_name,
+                   d.file_size, d.mime_type, d.tags, d.access_level, d.related_module,
+                   d.related_id, d.current_version, d.created_by, d.created_at,
+                   d.updated_at, u.full_name as created_by_name
+            FROM documents d
+            LEFT JOIN company_users u ON d.created_by = u.id
+            {base_where}
+            ORDER BY d.created_at DESC
+            LIMIT :limit OFFSET :offset
+        """
+        params["limit"] = per_page
+        params["offset"] = offset
         rows = db.execute(text(query), params).fetchall()
-        return [dict(r._mapping) for r in rows]
+        items = []
+        for r in rows:
+            row_dict = dict(r._mapping)
+            row_dict["download_url"] = f"/services/documents/{row_dict['id']}/download"
+            items.append(row_dict)
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": math.ceil(total / per_page) if total else 0
+        }
     finally:
         db.close()
 
@@ -379,17 +505,23 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
     db = get_db_connection(current_user.company_id)
     try:
         doc = db.execute(text("""
-            SELECT d.*, u.full_name as created_by_name
+            SELECT d.id, d.doc_number, d.title, d.description, d.category, d.file_name,
+                   d.file_size, d.mime_type, d.tags, d.access_level, d.related_module,
+                   d.related_id, d.current_version, d.created_by, d.created_at,
+                   d.updated_at, u.full_name as created_by_name
             FROM documents d
             LEFT JOIN company_users u ON d.created_by = u.id
-            WHERE d.id = :id
+            WHERE d.id = :id AND d.is_deleted = false
         """), {"id": doc_id}).fetchone()
         if not doc:
             raise HTTPException(**http_error(404, "document_not_found"))
         result = dict(doc._mapping)
-        # Fetch versions
+        result["download_url"] = f"/services/documents/{doc_id}/download"
+        # Fetch versions (exclude file_path)
         versions = db.execute(text("""
-            SELECT dv.*, u.full_name as uploaded_by_name
+            SELECT dv.id, dv.document_id, dv.version_number, dv.file_name, dv.file_size,
+                   dv.change_notes, dv.uploaded_by, dv.uploaded_at,
+                   u.full_name as uploaded_by_name
             FROM document_versions dv
             LEFT JOIN company_users u ON dv.uploaded_by = u.id
             WHERE dv.document_id = :id ORDER BY dv.version_number DESC
@@ -482,20 +614,21 @@ async def upload_document(
 
 
 @router.put("/documents/{doc_id}", dependencies=[Depends(require_permission("services.edit"))])
-def update_document_meta(doc_id: int, data: dict, current_user: UserResponse = Depends(get_current_user)):
+def update_document_meta(doc_id: int, data: DocumentMetaUpdate, current_user: UserResponse = Depends(get_current_user)):
     """Update document metadata (title, description, category, tags, access_level)."""
     db = get_db_connection(current_user.company_id)
     try:
-        existing = db.execute(text("SELECT id FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
+        existing = db.execute(text("SELECT id FROM documents WHERE id = :id AND is_deleted = false"), {"id": doc_id}).fetchone()
         if not existing:
             raise HTTPException(**http_error(404, "document_not_found"))
 
         fields = []
         params = {"id": doc_id}
         for f in ["title", "description", "category", "tags", "access_level"]:
-            if f in data:
+            val = getattr(data, f, None)
+            if val is not None:
                 fields.append(f"{f} = :{f}")
-                params[f] = data[f]
+                params[f] = val
         fields.append("updated_at = CURRENT_TIMESTAMP")
         db.execute(text(f"UPDATE documents SET {', '.join(fields)} WHERE id = :id"), params)
         db.commit()
@@ -520,7 +653,7 @@ async def upload_new_version(
     """Upload a new version of an existing document."""
     db = get_db_connection(current_user.company_id)
     try:
-        doc = db.execute(text("SELECT id, current_version FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
+        doc = db.execute(text("SELECT id, current_version FROM documents WHERE id = :id AND is_deleted = false"), {"id": doc_id}).fetchone()
         if not doc:
             raise HTTPException(**http_error(404, "document_not_found"))
 
@@ -580,36 +713,43 @@ async def upload_new_version(
         db.close()
 
 
+@router.get("/documents/{doc_id}/download", dependencies=[Depends(require_permission("services.view"))])
+def download_document(doc_id: int, current_user: UserResponse = Depends(get_current_user)):
+    """Download the latest version of a document."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        doc = db.execute(text("""
+            SELECT d.id, d.file_path, d.file_name, d.mime_type, d.access_level
+            FROM documents d
+            WHERE d.id = :id AND d.is_deleted = false
+        """), {"id": doc_id}).fetchone()
+        if not doc:
+            raise HTTPException(**http_error(404, "document_not_found"))
+
+        if not doc.file_path or not os.path.isfile(doc.file_path):
+            raise HTTPException(**http_error(404, "file_not_found"))
+
+        return FileResponse(
+            path=doc.file_path,
+            filename=doc.file_name,
+            media_type=doc.mime_type or "application/octet-stream"
+        )
+    finally:
+        db.close()
+
+
 @router.delete("/documents/{doc_id}", dependencies=[Depends(require_permission("services.delete"))])
 def delete_document(doc_id: int, current_user: UserResponse = Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        # Get file paths to clean up
-        versions = db.execute(text("SELECT file_path FROM document_versions WHERE document_id = :id"), {"id": doc_id}).fetchall()
-        doc = db.execute(text("SELECT file_path FROM documents WHERE id = :id"), {"id": doc_id}).fetchone()
+        doc = db.execute(text("SELECT id, file_path FROM documents WHERE id = :id AND is_deleted = false"), {"id": doc_id}).fetchone()
         if not doc:
             raise HTTPException(**http_error(404, "document_not_found"))
 
-        db.execute(text("DELETE FROM documents WHERE id = :id"), {"id": doc_id})
+        db.execute(text(
+            "UPDATE documents SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE id = :id"
+        ), {"id": doc_id, "uid": current_user.id})
         db.commit()
-
-        # Clean up files
-        paths = set()
-        if doc.file_path:
-            paths.add(doc.file_path)
-        for v in versions:
-            if v.file_path:
-                paths.add(v.file_path)
-        for p in paths:
-            try:
-                # SEC-FIX-018: Prevent path traversal in file deletion
-                from utils.sql_safety import validate_file_path_safety
-                if os.path.exists(p) and validate_file_path_safety(p, UPLOAD_DIR):
-                    os.remove(p)
-                elif os.path.exists(p):
-                    logger.warning(f"Blocked path traversal deletion attempt: {p}")
-            except Exception:
-                pass
 
         return {"message": "تم حذف المستند بنجاح"}
     except HTTPException:

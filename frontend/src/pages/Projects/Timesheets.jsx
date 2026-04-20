@@ -18,6 +18,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
     const [gridData, setGridData] = useState({});
     const [selectedIds, setSelectedIds] = useState([]);
     const [approving, setApproving] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         fetchTimesheets();

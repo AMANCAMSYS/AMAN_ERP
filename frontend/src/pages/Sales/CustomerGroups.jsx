@@ -279,7 +279,7 @@ function CustomerGroups() {
                                         onChange={e => setFormData({ ...formData, application_scope: e.target.value })}
                                     >
                                         <option value="total">{t('pos.receipt.total')}</option>
-                                        <option value="line">لكل صنف</option>
+                                        <option value="line">{t('common.per_item')}</option>
                                     </select>
                                 </div>
                             </div>

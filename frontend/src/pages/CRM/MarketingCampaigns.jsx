@@ -77,8 +77,8 @@ function MarketingCampaigns() {
     // Summary stats
     const totalBudget = campaigns.reduce((s, c) => s + (c.budget || 0), 0);
     const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
-    const totalSent = campaigns.reduce((s, c) => s + (c.sent_count || 0), 0);
-    const totalConversions = campaigns.reduce((s, c) => s + (c.conversion_count || 0), 0);
+    const totalSent = campaigns.reduce((s, c) => s + (c.total_sent || 0), 0);
+    const totalConversions = campaigns.reduce((s, c) => s + (c.total_responded || 0), 0);
 
     return (
         <div className="workspace fade-in">
@@ -138,10 +138,10 @@ function MarketingCampaigns() {
                                     <td><span className={`status-badge ${statusColors[c.status] || ''}`}>{statusLabel(c.status)}</span></td>
                                     <td style={{ fontSize: 12 }}>{c.start_date ? formatShortDate(c.start_date) : '-'} → {c.end_date ? formatShortDate(c.end_date) : '-'}</td>
                                     <td>{formatNumber(c.budget)}</td>
-                                    <td>{c.sent_count || 0}</td>
-                                    <td>{c.open_count || 0}</td>
-                                    <td>{c.click_count || 0}</td>
-                                    <td>{c.conversion_count || 0}</td>
+                                    <td>{c.total_sent || 0}</td>
+                                    <td>{c.total_opened || 0}</td>
+                                    <td>{c.total_clicked || 0}</td>
+                                    <td>{c.total_responded || 0}</td>
                                     <td>
                                         <div style={{ display: 'flex', gap: 4 }}>
                                             <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>{t('crm.edit', 'تعديل')}</button>

@@ -44,7 +44,7 @@ export default function GanttChart({ tasks = [] }) {
             <div className="gantt-scroll-container">
                 <div className="gantt-header" style={{ width: totalDays * colWidth, height: headerHeight }}>
                     {dates.map((date, index) => (
-                        <div key={index} className={`gantt-header-cell ${index % 7 === 0 || index % 7 === 6 ? 'weekend' : ''}`}
+                        <div key={index} className={`gantt-header-cell ${date.getDay() === 0 || date.getDay() === 6 ? 'weekend' : ''}`}
                             style={{ left: index * colWidth, width: colWidth }}>
                             <div className="day-name">{format(date, 'EE', { locale })}</div>
                             <div className="day-number">{format(date, 'd')}</div>

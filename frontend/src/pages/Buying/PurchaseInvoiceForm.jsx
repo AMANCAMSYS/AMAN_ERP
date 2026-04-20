@@ -271,7 +271,7 @@ function PurchaseInvoiceForm() {
 
         const hasEmptyProduct = items.some(item => !item.product_id)
         if (hasEmptyProduct) {
-            setError(t('buying.purchase_invoices.form.error_product_required') || 'Please select a product for all line items')
+            setError(t('buying.purchase_invoices.form.error_product_required'))
             window.scrollTo(0, 0)
             return
         }

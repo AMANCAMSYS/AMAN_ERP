@@ -173,7 +173,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -184,7 +184,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -195,7 +195,7 @@ function ServiceRequests() {
             fetchStats()
             if (expandedId === id) loadDetail(id)
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -232,7 +232,7 @@ function ServiceRequests() {
             fetchRequests()
             fetchStats()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 
@@ -243,7 +243,7 @@ function ServiceRequests() {
             setDetail(res.data)
             fetchRequests()
         } catch (err) {
-            showToast(err.response?.data?.detail || t('common.error', 'error'))
+            showToast(err.response?.data?.detail || t('common.error'), 'error')
         }
     }
 

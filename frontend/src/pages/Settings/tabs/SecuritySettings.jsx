@@ -50,24 +50,24 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
     };
 
     const handleTerminateSession = async (sessionId) => {
-        if (!window.confirm(t('common.confirm_action') || 'Are you sure?')) return;
+        if (!window.confirm(t('common.confirm_action'))) return;
         try {
             await api.delete(`/security/sessions/${sessionId}`);
-            showToast(t('settings.security.session_terminated') || 'Session terminated', 'success');
+            showToast(t('settings.security.session_terminated'), 'success');
             fetchSessions();
         } catch (error) {
-            showToast(t('common.error') || t('common.error'), 'error');
+            showToast(t('common.error'), 'error');
         }
     };
 
     const handleTerminateAllSessions = async () => {
-        if (!window.confirm(t('settings.security.confirm_terminate_all') || 'Terminate all other sessions?')) return;
+        if (!window.confirm(t('settings.security.confirm_terminate_all'))) return;
         try {
             await api.delete('/security/sessions');
-            showToast(t('settings.security.all_sessions_terminated') || 'All sessions terminated', 'success');
+            showToast(t('settings.security.all_sessions_terminated'), 'success');
             fetchSessions();
         } catch (error) {
-            showToast(t('common.error') || t('common.error'), 'error');
+            showToast(t('common.error'), 'error');
         }
     };
 
@@ -87,7 +87,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                 setOtpCode('');
                 setShow2FAModal(true);
             } catch (error) {
-                showToast(error.response?.data?.detail || 'Failed to start 2FA setup', 'error');
+                showToast(error.response?.data?.detail || t('security_page.two_factor.setup_failed'), 'error');
             }
         }
     };
@@ -101,16 +101,16 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
             if (twoFAStep === 'disable') {
                 setIs2FAEnabled(false);
                 setShow2FAModal(false);
-                showToast(t('settings.security.2fa_disabled') || '2FA Disabled', 'success');
+                showToast(t('settings.security.2fa_disabled'), 'success');
             } else {
                 // Enabled successfully
                 setIs2FAEnabled(true);
                 setBackupCodes(response.data.backup_codes || []);
                 setTwoFAStep('success');
-                showToast(t('settings.security.2fa_enabled') || '2FA Enabled', 'success');
+                showToast(t('settings.security.2fa_enabled'), 'success');
             }
         } catch (error) {
-            showToast(error.response?.data?.detail || 'Verification failed', 'error');
+            showToast(error.response?.data?.detail || t('security_page.two_factor.verification_failed'), 'error');
         } finally {
             setVerifying(false);
         }
@@ -159,13 +159,13 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
             <div className="bg-base-50 p-6 rounded-2xl border border-base-200">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Clock size={20} className="text-primary" />
-                    {t('settings.security.session_title') || t('settings.security.session_management')}
+                    {t('settings.security.session_title')}
                 </h3>
 
                 {/* Session Timeout Config */}
                 <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">{t('settings.security.session_timeout') || t('settings.security.session_timeout')}</label>
+                        <label className="form-label">{t('settings.security.session_timeout')}</label>
                         <input
                             type="number"
                             className="form-input"
@@ -175,7 +175,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                             max="1440"
                         />
                         <p className="text-xs text-base-content/40 mt-1">
-                            {t('settings.security.timeout_hint') || t('settings.security.session_timeout_note')}
+                            {t('settings.security.timeout_hint')}
                         </p>
                     </div>
                 </div>
@@ -183,32 +183,32 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                 {/* Active Sessions List */}
                 <div className="overflow-x-auto">
                     <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-semibold">{t('security_page.sessions.title') || 'Active Sessions'}</h4>
+                        <h4 className="font-semibold">{t('security_page.sessions.title')}</h4>
                         <button onClick={handleTerminateAllSessions} className="btn btn-xs btn-error btn-outline">
-                            {t('security_page.sessions.terminate_all') || 'Terminate All'}
+                            {t('security_page.sessions.terminate_all')}
                         </button>
                     </div>
                     <table className="table table-zebra w-full text-sm">
                         <thead>
                             <tr>
-                                <th>{t('security_page.sessions.device') || 'Device'}</th>
-                                <th>{t('security_page.sessions.ip_address') || 'IP Address'}</th>
-                                <th>{t('security_page.sessions.last_active') || 'Last Active'}</th>
+                                <th>{t('security_page.sessions.device')}</th>
+                                <th>{t('security_page.sessions.ip_address')}</th>
+                                <th>{t('security_page.sessions.last_active')}</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             {loadingSessions ? (
-                                <tr><td colSpan="4" className="text-center p-4">{t('common.loading') || 'Loading...'}</td></tr>
+                                <tr><td colSpan="4" className="text-center p-4">{t('common.loading')}</td></tr>
                             ) : sessions.length === 0 ? (
-                                <tr><td colSpan="4" className="text-center p-4">No active sessions</td></tr>
+                                <tr><td colSpan="4" className="text-center p-4">{t('security_page.sessions.no_sessions')}</td></tr>
                             ) : (
                                 sessions.map((session) => (
                                     <tr key={session.id}>
                                         <td className="flex items-center gap-2">
                                             {session.user_agent?.includes('Mobile') ? <Smartphone size={16} /> : <Monitor size={16} />}
                                             <span className="truncate max-w-[200px]" title={session.user_agent}>
-                                                {session.user_agent || 'Unknown Device'}
+                                                {session.user_agent || t('security_page.sessions.unknown_device')}
                                             </span>
                                         </td>
                                         <td>{session.ip_address}</td>
@@ -238,11 +238,11 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                 </h3>
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="font-medium">{t('security_page.two_factor.enable') || 'Enable Two-Factor Authentication'}</p>
+                        <p className="font-medium">{t('security_page.two_factor.enable')}</p>
                         <p className="text-sm text-base-content/60">
                             {is2FAEnabled
-                                ? (t('security_page.two_factor.status_enabled') || '2FA is currently enabled for your account')
-                                : (t('security_page.two_factor.setup_desc') || 'Protect your account with an extra layer of security')}
+                                ? t('security_page.two_factor.status_enabled')
+                                : t('security_page.two_factor.protect_desc')}
                         </p>
                     </div>
                     <input
@@ -258,21 +258,21 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
             <SimpleModal
                 isOpen={show2FAModal}
                 onClose={() => setShow2FAModal(false)}
-                title={twoFAStep === 'setup' ? 'Setup 2FA' : twoFAStep === 'disable' ? 'Disable 2FA' : '2FA Enabled'}
+                title={twoFAStep === 'setup' ? t('security_page.two_factor.setup_title') : twoFAStep === 'disable' ? t('security_page.two_factor.disable_title') : t('security_page.two_factor.enabled_title')}
             >
                 <div className="p-4 space-y-4">
                     {twoFAStep === 'setup' && (
                         <>
                             <div className="bg-base-200 p-4 rounded text-center">
-                                <p className="text-sm mb-2 font-bold">Secret Key:</p>
+                                <p className="text-sm mb-2 font-bold">{t('security_page.two_factor.secret_key')}</p>
                                 <code className="bg-base-300 p-2 rounded text-lg tracking-wider mb-2 block select-all">
                                     {twoFASecret}
                                 </code>
-                                <p className="text-xs opacity-70">Enter this key manually in your authenticator app (Google Authenticator, Authy, etc.)</p>
+                                <p className="text-xs opacity-70">{t('security_page.two_factor.enter_key_hint')}</p>
                             </div>
 
                             <div className="form-group">
-                                <label className="label">Verification Code</label>
+                                <label className="label">{t('security_page.two_factor.verification_code')}</label>
                                 <input
                                     type="text"
                                     className="input input-bordered w-full text-center text-lg tracking-widest"
@@ -286,14 +286,14 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                                 onClick={verify2FA}
                                 disabled={otpCode.length !== 6 || verifying}
                             >
-                                {verifying ? 'Verifying...' : 'Verify & Enable'}
+                                {verifying ? t('security_page.two_factor.verifying') : t('security_page.two_factor.verify_enable')}
                             </button>
                         </>
                     )}
 
                     {twoFAStep === 'disable' && (
                         <>
-                            <p>To disable 2FA, please enter the code from your authenticator app.</p>
+                            <p>{t('security_page.two_factor.disable_hint')}</p>
                             <div className="form-group">
                                 <input
                                     type="text"
@@ -308,7 +308,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                                 onClick={verify2FA}
                                 disabled={otpCode.length !== 6 || verifying}
                             >
-                                {verifying ? 'Verifying...' : 'Disable 2FA'}
+                                {verifying ? t('security_page.two_factor.verifying') : t('security_page.two_factor.disable_btn')}
                             </button>
                         </>
                     )}
@@ -316,14 +316,14 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                     {twoFAStep === 'success' && (
                         <div className="text-center space-y-4">
                             <CheckCircle size={48} className="text-success mx-auto" />
-                            <h3 className="text-lg font-bold text-success">2FA Enabled Successfully!</h3>
+                            <h3 className="text-lg font-bold text-success">{t('security_page.two_factor.enabled_success')}</h3>
 
                             <div className="bg-warning/10 p-4 rounded border border-warning/20 text-left">
                                 <div className="flex items-center gap-2 text-warning mb-2">
                                     <AlertTriangle size={18} />
-                                    <span className="font-bold">Backup Codes</span>
+                                    <span className="font-bold">{t('security_page.two_factor.backup_codes_title')}</span>
                                 </div>
-                                <p className="text-xs mb-3">Save these codes in a safe place. You can use them to recover access if you lose your device.</p>
+                                <p className="text-xs mb-3">{t('security_page.two_factor.backup_codes_warning')}</p>
                                 <div className="grid grid-cols-2 gap-2 font-mono text-sm">
                                     {backupCodes.map(code => (
                                         <span key={code} className="bg-base-100 p-1 rounded">{code}</span>
@@ -331,7 +331,7 @@ const SecuritySettings = ({ settings, handleSettingChange }) => {
                                 </div>
                             </div>
 
-                            <button className="btn btn-outline w-full" onClick={() => setShow2FAModal(false)}>Done</button>
+                            <button className="btn btn-outline w-full" onClick={() => setShow2FAModal(false)}>{t('security_page.two_factor.done')}</button>
                         </div>
                     )}
                 </div>

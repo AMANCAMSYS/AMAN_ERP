@@ -272,17 +272,19 @@ const CompanySettings = () => {
                         </div>
 
                         {/* Advanced Tools */}
-                        {hasPermission('admin.companies') && (
+                        {(hasPermission('settings.view') || hasPermission('admin.companies') || hasPermission('audit.view') || hasPermission('admin.roles') || hasPermission('data_import.view') || hasPermission('branches.view')) && (
                             <div style={{ marginTop: '2.5rem' }}>
                                 <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-secondary, #6b7280)' }}>
                                     {t('settings.advanced_tools') || 'أدوات متقدمة'}
                                 </h2>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                                     {[
-                                        { icon: Layers, label: t('nav.moduleCustomization') || 'تخصيص الوحدات', desc: t('settings.advanced_tools_desc.modules') || 'تفعيل وتعطيل الوحدات حسب نوع النشاط', path: '/setup/modules' },
+                                        { icon: Layers, label: t('nav.moduleCustomization') || 'تخصيص الوحدات', desc: t('settings.advanced_tools_desc.modules') || 'تفعيل وتعطيل الوحدات حسب نوع النشاط', path: '/setup/modules', permission: 'admin.companies' },
                                         { icon: Building2, label: t('nav.branches') || 'الفروع', desc: t('settings.advanced_tools_desc.branches'), path: '/settings/branches', permission: 'branches.view' },
                                         { icon: Scale, label: t('nav.costingPolicy') || 'سياسة التكلفة', desc: t('settings.advanced_tools_desc.costing_policy'), path: '/settings/costing-policy' },
-                                        { icon: Upload, label: t('nav.dataImport') || 'استيراد البيانات', desc: t('settings.advanced_tools_desc.data_import'), path: '/data-import' },
+                                        { icon: Upload, label: t('nav.dataImport') || 'استيراد البيانات', desc: t('settings.advanced_tools_desc.data_import'), path: '/data-import', permission: 'data_import.view' },
+                                        { icon: History, label: t('nav.auditLogs') || 'سجلات المراقبة', desc: t('settings.advanced_tools_desc.audit_logs') || 'مراجعة وتتبع جميع عمليات النظام', path: '/admin/audit-logs', permission: 'audit.view' },
+                                        { icon: ShieldCheck, label: t('nav.roles') || 'إدارة الأدوار', desc: t('settings.advanced_tools_desc.roles') || 'إدارة الأدوار والصلاحيات', path: '/admin/roles', permission: 'admin.roles' },
                                         { icon: Key, label: t('nav.api_keys') || 'مفاتيح API', desc: t('settings.advanced_tools_desc.api_keys'), path: '/settings/api-keys' },
                                         { icon: Globe, label: t('nav.webhooks') || 'الويب هوك', desc: t('settings.advanced_tools_desc.webhooks'), path: '/settings/webhooks' },
                                     ].filter(item => !item.permission || hasPermission(item.permission)).map((item) => {

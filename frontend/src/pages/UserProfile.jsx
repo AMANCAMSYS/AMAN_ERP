@@ -59,7 +59,7 @@ function UserProfile() {
         const email = profileForm.email.trim()
 
         if (!fullName) {
-            setProfileError(t('common.profile_page.full_name_required', 'الاسم الكامل مطلوب'))
+            setProfileError(t('common.profile_page.full_name_required'))
             return
         }
 
@@ -72,9 +72,9 @@ function UserProfile() {
                 full_name: updated.full_name,
                 email: updated.email
             })
-            setProfileMessage(t('common.profile_page.profile_saved', 'تم تحديث بيانات الحساب بنجاح'))
+            setProfileMessage(t('common.profile_page.profile_saved'))
         } catch (err) {
-            setProfileError(err.response?.data?.detail || t('common.profile_page.profile_save_failed', 'تعذر حفظ بيانات الحساب'))
+            setProfileError(err.response?.data?.detail || t('common.profile_page.profile_save_failed'))
         } finally {
             setSavingProfile(false)
         }
@@ -86,11 +86,11 @@ function UserProfile() {
         setPasswordMessage('')
 
         if (passwordForm.new_password !== passwordForm.confirm_password) {
-            setPasswordError(t('common.profile_page.password_mismatch', 'كلمتا المرور غير متطابقتين'))
+            setPasswordError(t('common.profile_page.password_mismatch'))
             return
         }
         if (passwordForm.new_password.length < 8) {
-            setPasswordError(t('common.profile_page.password_too_short', 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'))
+            setPasswordError(t('common.profile_page.password_too_short'))
             return
         }
 
@@ -101,9 +101,9 @@ function UserProfile() {
                 new_password: passwordForm.new_password
             })
             setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-            setPasswordMessage(t('common.profile_page.password_saved', 'تم تغيير كلمة المرور بنجاح'))
+            setPasswordMessage(t('common.profile_page.password_saved'))
         } catch (err) {
-            setPasswordError(err.response?.data?.detail || t('common.profile_page.password_save_failed', 'تعذر تغيير كلمة المرور'))
+            setPasswordError(err.response?.data?.detail || t('common.profile_page.password_save_failed'))
         } finally {
             setSavingPassword(false)
         }
@@ -157,7 +157,7 @@ function UserProfile() {
                     </div>
 
                     <div className="form-group mb-4">
-                        <label className="form-label" htmlFor="full_name_input">{t('common.profile_page.full_name', 'الاسم الكامل')}</label>
+                        <label className="form-label" htmlFor="full_name_input">{t('common.profile_page.full_name')}</label>
                         <input
                             id="full_name_input"
                             className="form-input"
@@ -181,7 +181,7 @@ function UserProfile() {
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}>
                         <button type="submit" className="btn btn-primary" disabled={savingProfile}>
-                            {savingProfile ? t('common.saving', 'جار الحفظ...') : t('common.save', 'حفظ التعديلات')}
+                            {savingProfile ? t('common.saving') : t('common.save')}
                         </button>
                     </div>
                 </form>
@@ -189,12 +189,12 @@ function UserProfile() {
                 <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: '8px 0 24px 0' }} />
 
                 <form onSubmit={handlePasswordSave}>
-                    <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.change_password', 'تغيير كلمة المرور')}</h3>
+                    <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.change_password')}</h3>
                     {passwordError && <div className="alert alert-error">{passwordError}</div>}
                     {passwordMessage && <div className="alert" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>{passwordMessage}</div>}
 
                     <div className="form-group mb-4">
-                        <label className="form-label" htmlFor="current_password_input">{t('common.profile_page.current_password', 'كلمة المرور الحالية')}</label>
+                        <label className="form-label" htmlFor="current_password_input">{t('common.profile_page.current_password')}</label>
                         <div className="input-group">
                             <input
                                 id="current_password_input"
@@ -205,13 +205,13 @@ function UserProfile() {
                                 required
                             />
                             <button className="btn btn-light" type="button" onClick={() => togglePasswordVisibility('current')}>
-                                {showPasswords.current ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                {showPasswords.current ? t('common.hide') : t('common.show')}
                             </button>
                         </div>
                     </div>
 
                     <div className="form-group mb-4">
-                        <label className="form-label" htmlFor="new_password_input">{t('common.profile_page.new_password', 'كلمة المرور الجديدة')}</label>
+                        <label className="form-label" htmlFor="new_password_input">{t('common.profile_page.new_password')}</label>
                         <div className="input-group">
                             <input
                                 id="new_password_input"
@@ -223,13 +223,13 @@ function UserProfile() {
                                 minLength={8}
                             />
                             <button className="btn btn-light" type="button" onClick={() => togglePasswordVisibility('next')}>
-                                {showPasswords.next ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                {showPasswords.next ? t('common.hide') : t('common.show')}
                             </button>
                         </div>
                     </div>
 
                     <div className="form-group mb-4">
-                        <label className="form-label" htmlFor="confirm_password_input">{t('common.profile_page.confirm_password', 'تأكيد كلمة المرور')}</label>
+                        <label className="form-label" htmlFor="confirm_password_input">{t('common.profile_page.confirm_password')}</label>
                         <div className="input-group">
                             <input
                                 id="confirm_password_input"
@@ -240,14 +240,14 @@ function UserProfile() {
                                 required
                             />
                             <button className="btn btn-light" type="button" onClick={() => togglePasswordVisibility('confirm')}>
-                                {showPasswords.confirm ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                {showPasswords.confirm ? t('common.hide') : t('common.show')}
                             </button>
                         </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button type="submit" className="btn btn-primary" disabled={savingPassword}>
-                            {savingPassword ? t('common.saving', 'جار الحفظ...') : t('common.profile_page.save_password', 'تحديث كلمة المرور')}
+                            {savingPassword ? t('common.saving') : t('common.profile_page.save_password')}
                         </button>
                     </div>
                 </form>
@@ -263,19 +263,19 @@ function UserProfile() {
 
                 <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: '8px 0 24px 0' }} />
 
-                <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.active_sessions', 'الجلسات النشطة')}</h3>
+                <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.active_sessions')}</h3>
                 {loadingSessions ? (
                     <div className="text-center p-4"><span className="loading"></span></div>
                 ) : sessions.length === 0 ? (
-                    <p style={{ color: '#888', fontSize: '14px' }}>{t('common.profile_page.no_sessions', 'لا توجد جلسات نشطة')}</p>
+                    <p style={{ color: '#888', fontSize: '14px' }}>{t('common.profile_page.no_sessions')}</p>
                 ) : (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>{t('common.profile_page.ip_address', 'عنوان IP')}</th>
-                                    <th>{t('common.profile_page.device', 'الجهاز')}</th>
-                                    <th>{t('common.profile_page.last_active', 'آخر نشاط')}</th>
+                                    <th>{t('common.profile_page.ip_address')}</th>
+                                    <th>{t('common.profile_page.device')}</th>
+                                    <th>{t('common.profile_page.last_active')}</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -291,7 +291,7 @@ function UserProfile() {
                                                 style={{ color: 'var(--danger)' }}
                                                 onClick={() => handleTerminateSession(session.id)}
                                             >
-                                                {t('common.profile_page.terminate', 'إنهاء')}
+                                                {t('common.profile_page.terminate')}
                                             </button>
                                         </td>
                                     </tr>

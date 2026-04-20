@@ -157,19 +157,19 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">Provider</label>
+                        <label className="form-label">{t('settings.notifications.sms_provider_label')}</label>
                         <select
                             className="form-input"
                             value={settings.sms_provider || ''}
                             onChange={(e) => handleSettingChange('sms_provider', e.target.value)}
                         >
-                            <option value="">Select Provider</option>
+                            <option value="">{t('settings.notifications.select_provider')}</option>
                             <option value="twilio">Twilio</option>
                             <option value="infobip">Infobip</option>
                         </select>
                     </div>
                     <div className="form-group">
-                        <label className="form-label">Account SID / API Key</label>
+                        <label className="form-label">{t('settings.notifications.sms_account_sid')}</label>
                         <input
                             type="text"
                             className="form-input ltr"
@@ -178,7 +178,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">Auth Token / Secret</label>
+                        <label className="form-label">{t('settings.notifications.sms_auth_token')}</label>
                         <input
                             type="password"
                             className="form-input ltr"
@@ -187,7 +187,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         />
                     </div>
                     <div className="form-group">
-                        <label className="form-label">Sender Name / Number</label>
+                        <label className="form-label">{t('settings.notifications.sms_sender_name')}</label>
                         <input
                             type="text"
                             className="form-input ltr"

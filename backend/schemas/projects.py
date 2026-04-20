@@ -1,7 +1,8 @@
 """Projects module Pydantic schemas."""
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import date
+from decimal import Decimal
 
 
 class ProjectCreate(BaseModel):
@@ -14,7 +15,7 @@ class ProjectCreate(BaseModel):
     manager_id: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    planned_budget: float = 0
+    planned_budget: Decimal = Decimal(0)
     status: str = "planning"
     branch_id: Optional[int] = None
     contract_type: Optional[str] = "fixed_price"
@@ -29,7 +30,7 @@ class ProjectUpdate(BaseModel):
     manager_id: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    planned_budget: Optional[float] = None
+    planned_budget: Optional[Decimal] = None
     status: Optional[str] = None
     progress_percentage: Optional[float] = None
 
@@ -61,7 +62,7 @@ class TaskUpdate(BaseModel):
 class ProjectExpenseCreate(BaseModel):
     expense_type: str
     expense_date: date
-    amount: float
+    amount: Decimal
     description: Optional[str] = None
     treasury_id: Optional[int] = None
     expense_account_id: Optional[int] = None
@@ -70,7 +71,7 @@ class ProjectExpenseCreate(BaseModel):
 class ProjectRevenueCreate(BaseModel):
     revenue_type: str
     revenue_date: date
-    amount: float
+    amount: Decimal
     description: Optional[str] = None
     invoice_id: Optional[int] = None
 
@@ -105,9 +106,9 @@ class ProjectInvoiceItem(BaseModel):
     product_id: Optional[int] = None
     description: str
     quantity: float = 1.0
-    unit_price: float
+    unit_price: Decimal
     tax_rate: float = 0.0
-    discount: float = 0.0
+    discount: Decimal = Decimal(0)
 
 
 class ProjectInvoiceCreate(BaseModel):
@@ -119,14 +120,14 @@ class ProjectInvoiceCreate(BaseModel):
     notes: Optional[str] = None
     payment_method: Optional[str] = "credit"
     currency: Optional[str] = None
-    exchange_rate: Optional[float] = 1.0
+    exchange_rate: Optional[Decimal] = Decimal(1)
 
 
 class ChangeOrderCreate(BaseModel):
     title: str
     description: Optional[str] = None
     change_type: str = "scope"      # scope, budget, timeline, requirement
-    cost_impact: float = 0
+    cost_impact: Decimal = Decimal(0)
     time_impact_days: int = 0
 
 
@@ -134,7 +135,7 @@ class ChangeOrderUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     change_type: Optional[str] = None
-    cost_impact: Optional[float] = None
+    cost_impact: Optional[Decimal] = None
     time_impact_days: Optional[int] = None
     status: Optional[str] = None
 
@@ -142,3 +143,34 @@ class ChangeOrderUpdate(BaseModel):
 class ProjectCloseRequest(BaseModel):
     close_date: Optional[date] = None
     notes: Optional[str] = None
+
+
+class ProjectRiskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    probability: Literal["low", "medium", "high", "critical"] = "medium"
+    impact: Literal["low", "medium", "high", "critical"] = "medium"
+    status: str = "identified"
+    mitigation_plan: Optional[str] = None
+    owner_id: Optional[int] = None
+    due_date: Optional[date] = None
+
+
+class ProjectRiskUpdate(BaseModel):
+    """All-Optional schema for risk updates — replaces raw dict."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    probability: Optional[Literal["low", "medium", "high", "critical"]] = None
+    impact: Optional[Literal["low", "medium", "high", "critical"]] = None
+    status: Optional[str] = None
+    mitigation_plan: Optional[str] = None
+    owner_id: Optional[int] = None
+    due_date: Optional[date] = None
+
+
+class TaskDependencyCreate(BaseModel):
+    """Typed schema for task dependencies — replaces raw dict."""
+    task_id: int
+    depends_on_task_id: int
+    dependency_type: str = "FS"
+    lag_days: int = 0

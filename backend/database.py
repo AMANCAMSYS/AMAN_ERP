@@ -966,7 +966,7 @@ def get_additional_tables_sql() -> str:
         report_type VARCHAR(50) NOT NULL,
         report_config JSONB DEFAULT '{}',
         frequency VARCHAR(20) NOT NULL,
-        recipients TEXT NOT NULL,
+        recipients JSONB DEFAULT '[]',
         format VARCHAR(10) DEFAULT 'pdf',
         branch_id INTEGER REFERENCES branches(id),
         next_run_at TIMESTAMPTZ,
@@ -978,6 +978,15 @@ def get_additional_tables_sql() -> str:
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS scheduled_report_results (
+        id SERIAL PRIMARY KEY,
+        scheduled_report_id INTEGER REFERENCES scheduled_reports(id) ON DELETE CASCADE,
+        report_data JSONB NOT NULL,
+        generated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) DEFAULT 'completed'
+    );
+    CREATE INDEX IF NOT EXISTS idx_report_results_schedule ON scheduled_report_results(scheduled_report_id);
+
     CREATE TABLE IF NOT EXISTS shared_reports (
         id SERIAL PRIMARY KEY,
         report_type VARCHAR(30) NOT NULL CHECK (report_type IN ('custom', 'scheduled')),
@@ -987,6 +996,7 @@ def get_additional_tables_sql() -> str:
         permission VARCHAR(20) DEFAULT 'view' CHECK (permission IN ('view', 'edit')),
         message TEXT,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(report_type, report_id, shared_with)
     );
 
@@ -1952,10 +1962,13 @@ def get_financial_tables_sql() -> str:
         parameters JSONB DEFAULT '{}',
         template_content TEXT,
         is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id)
     );
-    
-    -- ===== FIXED ASSETS (5) =====
+
+    CREATE INDEX IF NOT EXISTS idx_report_templates_type ON report_templates(template_type);
+
     CREATE TABLE IF NOT EXISTS asset_categories (
         id SERIAL PRIMARY KEY,
         category_code VARCHAR(50) UNIQUE,
@@ -1982,6 +1995,8 @@ def get_financial_tables_sql() -> str:
         currency VARCHAR(3) DEFAULT NULL,
         depreciation_method VARCHAR(50) DEFAULT 'straight_line',
         status VARCHAR(20) DEFAULT 'active',
+        current_value DECIMAL(18, 4),
+        revaluation_surplus DECIMAL(18, 4) DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -1996,7 +2011,8 @@ def get_financial_tables_sql() -> str:
         book_value DECIMAL(18, 4) DEFAULT 0,
         posted BOOLEAN DEFAULT FALSE,
         journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
     CREATE TABLE IF NOT EXISTS asset_transfers (
@@ -2007,11 +2023,12 @@ def get_financial_tables_sql() -> str:
         transfer_date DATE NOT NULL DEFAULT CURRENT_DATE,
         reason TEXT,
         notes TEXT,
-        book_value_at_transfer NUMERIC(15, 2) DEFAULT 0,
+        book_value_at_transfer DECIMAL(18, 4) DEFAULT 0,
         approved_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_asset_transfers_asset ON asset_transfers(asset_id);
     CREATE INDEX IF NOT EXISTS idx_asset_transfers_status ON asset_transfers(status);
@@ -2037,13 +2054,14 @@ def get_financial_tables_sql() -> str:
         id SERIAL PRIMARY KEY,
         asset_id INTEGER REFERENCES assets(id) ON DELETE CASCADE,
         revaluation_date DATE NOT NULL,
-        old_value NUMERIC(15, 2) NOT NULL,
-        new_value NUMERIC(15, 2) NOT NULL,
-        difference NUMERIC(15, 2) NOT NULL,
+        old_value DECIMAL(18, 4) NOT NULL,
+        new_value DECIMAL(18, 4) NOT NULL,
+        difference DECIMAL(18, 4) NOT NULL,
         reason TEXT,
         journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS asset_insurance (
@@ -2052,13 +2070,14 @@ def get_financial_tables_sql() -> str:
         policy_number VARCHAR(100),
         insurer VARCHAR(255),
         coverage_type VARCHAR(100),
-        premium_amount NUMERIC(15, 2) DEFAULT 0,
-        coverage_amount NUMERIC(15, 2) DEFAULT 0,
+        premium_amount DECIMAL(18, 4) DEFAULT 0,
+        coverage_amount DECIMAL(18, 4) DEFAULT 0,
         start_date DATE,
         end_date DATE,
         status VARCHAR(30) DEFAULT 'active',
         notes TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS asset_maintenance (
@@ -2068,12 +2087,13 @@ def get_financial_tables_sql() -> str:
         description TEXT,
         scheduled_date DATE,
         completed_date DATE,
-        cost NUMERIC(15, 2) DEFAULT 0,
+        cost DECIMAL(18, 4) DEFAULT 0,
         vendor VARCHAR(255),
         status VARCHAR(30) DEFAULT 'scheduled',
         notes TEXT,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT NOW()
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
     );
 
     CREATE INDEX IF NOT EXISTS idx_asset_revaluations_asset ON asset_revaluations(asset_id);
@@ -2212,6 +2232,9 @@ def get_financial_tables_sql() -> str:
         manager_id INTEGER REFERENCES employees(id),
         branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
         contract_type VARCHAR(30) DEFAULT 'fixed_price',
+        retainer_amount DECIMAL(18, 4) DEFAULT 0,
+        billing_cycle VARCHAR(20),
+        next_billing_date DATE,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -2231,8 +2254,10 @@ def get_financial_tables_sql() -> str:
         progress DECIMAL(5, 2) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'pending',
         assigned_to INTEGER REFERENCES employees(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_project_tasks_project ON project_tasks(project_id);
     
     CREATE TABLE IF NOT EXISTS project_budgets (
         id SERIAL PRIMARY KEY,
@@ -2243,8 +2268,10 @@ def get_financial_tables_sql() -> str:
         variance DECIMAL(18, 4) DEFAULT 0,
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_project_budgets_project ON project_budgets(project_id);
     
     CREATE TABLE IF NOT EXISTS project_expenses (
         id SERIAL PRIMARY KEY,
@@ -2257,8 +2284,10 @@ def get_financial_tables_sql() -> str:
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_project_expenses_project ON project_expenses(project_id);
 
     CREATE TABLE IF NOT EXISTS project_revenues (
         id SERIAL PRIMARY KEY,
@@ -2271,8 +2300,10 @@ def get_financial_tables_sql() -> str:
         approved_by INTEGER REFERENCES company_users(id),
         status VARCHAR(20) DEFAULT 'pending',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_project_revenues_project ON project_revenues(project_id);
 
     CREATE TABLE IF NOT EXISTS project_documents (
         id SERIAL PRIMARY KEY,
@@ -2281,8 +2312,10 @@ def get_financial_tables_sql() -> str:
         file_url TEXT NOT NULL,
         file_type VARCHAR(50),
         uploaded_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_project_documents_project ON project_documents(project_id);
 
     CREATE TABLE IF NOT EXISTS project_change_orders (
         id SERIAL PRIMARY KEY,
@@ -2561,6 +2594,8 @@ def get_treasury_tables_sql() -> str:
         expense_date DATE NOT NULL,
         expense_type VARCHAR(50) NOT NULL,
         amount DECIMAL(18, 4) NOT NULL,
+        currency VARCHAR(3),
+        exchange_rate NUMERIC(18,6) DEFAULT 1,
         description TEXT,
         category VARCHAR(50) DEFAULT 'general',
         payment_method VARCHAR(50) DEFAULT 'cash',
@@ -2570,16 +2605,24 @@ def get_treasury_tables_sql() -> str:
         project_id INTEGER REFERENCES projects(id),
         journal_entry_id INTEGER REFERENCES journal_entries(id),
         branch_id INTEGER REFERENCES branches(id),
+        policy_id INTEGER REFERENCES expense_policies(id),
         approval_status VARCHAR(20) DEFAULT 'pending',
         approved_by INTEGER REFERENCES company_users(id),
         approved_at TIMESTAMPTZ,
         approval_notes TEXT,
         receipt_number VARCHAR(100),
         vendor_name VARCHAR(255),
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_expenses_expense_date ON expenses(expense_date);
+    CREATE INDEX IF NOT EXISTS idx_expenses_approval_status ON expenses(approval_status);
+    CREATE INDEX IF NOT EXISTS idx_expenses_branch_id ON expenses(branch_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_created_by ON expenses(created_by);
     """
 
 
@@ -2656,8 +2699,10 @@ def get_contract_tables_sql() -> str:
         unit_price DECIMAL(18, 4) DEFAULT 0,
         tax_rate DECIMAL(5, 2) DEFAULT 15,
         total DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS idx_contract_items_contract ON contract_items(contract_id);
     """
 
 
@@ -3216,9 +3261,12 @@ def get_manufacturing_tables_sql() -> str:
         completion_date DATE,
         location TEXT,
         notes TEXT,
+        branch_id INTEGER REFERENCES branches(id),
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS service_request_costs (
@@ -3229,7 +3277,9 @@ def get_manufacturing_tables_sql() -> str:
         quantity DECIMAL(10, 4) DEFAULT 1,
         unit_cost DECIMAL(15, 2) DEFAULT 0,
         total_cost DECIMAL(15, 2) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== SVC-002: DOCUMENT MANAGEMENT =====
@@ -3242,15 +3292,20 @@ def get_manufacturing_tables_sql() -> str:
         file_path TEXT,
         file_size INTEGER,
         mime_type VARCHAR(100),
-        tags TEXT,
+        tags JSONB DEFAULT '[]',
         access_level VARCHAR(50) DEFAULT 'company',
         related_module VARCHAR(100),
         related_id INTEGER,
         current_version INTEGER DEFAULT 1,
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_documents_related ON documents(related_module, related_id);
+    CREATE INDEX IF NOT EXISTS idx_documents_created_by ON documents(created_by);
 
     CREATE TABLE IF NOT EXISTS document_versions (
         id SERIAL PRIMARY KEY,
@@ -4489,7 +4544,7 @@ def get_approval_tables_sql() -> str:
         request_id INTEGER REFERENCES approval_requests(id) ON DELETE CASCADE,
         step INTEGER NOT NULL,
         action VARCHAR(20) NOT NULL,
-        actioned_by INTEGER,
+        actioned_by INTEGER REFERENCES company_users(id),
         notes TEXT,
         actioned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4497,6 +4552,9 @@ def get_approval_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
     CREATE INDEX IF NOT EXISTS idx_approval_requests_doc ON approval_requests(document_type, document_id);
     CREATE INDEX IF NOT EXISTS idx_approval_actions_request ON approval_actions(request_id);
+    CREATE INDEX IF NOT EXISTS idx_approval_requests_workflow ON approval_requests(workflow_id);
+    CREATE INDEX IF NOT EXISTS idx_approval_requests_requested_by ON approval_requests(requested_by);
+    CREATE INDEX IF NOT EXISTS idx_approval_workflows_doc_type ON approval_workflows(document_type);
 
     -- Advanced Workflow columns (auto-approve, escalation, SLA)
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS action_date TIMESTAMPTZ;
@@ -4504,6 +4562,15 @@ def get_approval_tables_sql() -> str:
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS current_approver_id INTEGER;
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_to INTEGER;
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
+
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_approval_requests_current_approver') THEN
+            ALTER TABLE approval_requests ADD CONSTRAINT fk_approval_requests_current_approver FOREIGN KEY (current_approver_id) REFERENCES company_users(id);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_approval_requests_escalated_to') THEN
+            ALTER TABLE approval_requests ADD CONSTRAINT fk_approval_requests_escalated_to FOREIGN KEY (escalated_to) REFERENCES company_users(id);
+        END IF;
+    END $$;
     """
 
 
@@ -4727,10 +4794,6 @@ def get_security_tables_sql() -> str:
         spent DECIMAL(15,2) DEFAULT 0,
         target_audience TEXT,
         description TEXT,
-        sent_count INT DEFAULT 0,
-        open_count INT DEFAULT 0,
-        click_count INT DEFAULT 0,
-        conversion_count INT DEFAULT 0,
         branch_id INT,
         segment_id INTEGER REFERENCES crm_customer_segments(id),
         subject VARCHAR(500),
@@ -4891,7 +4954,7 @@ def get_security_tables_sql() -> str:
     );
 
     -- ========== Advanced Workflow ==========
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '[]';
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '{}';
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS sla_hours INT DEFAULT 48;
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS escalation_to INT;
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS allow_parallel BOOLEAN DEFAULT FALSE;
@@ -5456,7 +5519,8 @@ def get_system_completion_tables_sql() -> str:
         depends_on_task_id INTEGER NOT NULL REFERENCES project_tasks(id) ON DELETE CASCADE,
         dependency_type VARCHAR(20) DEFAULT 'finish_to_start',
         lag_days INTEGER DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_task_deps_task ON task_dependencies(project_id, task_id);
 
@@ -5477,7 +5541,8 @@ def get_system_completion_tables_sql() -> str:
         accumulated_depreciation NUMERIC(15,4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'active',
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_lease_status ON lease_contracts(status);
 
@@ -5492,7 +5557,8 @@ def get_system_completion_tables_sql() -> str:
         reason TEXT,
         journal_entry_id INTEGER REFERENCES journal_entries(id) ON DELETE SET NULL,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_impairment_asset ON asset_impairments(asset_id);
 
@@ -5509,8 +5575,11 @@ def get_system_completion_tables_sql() -> str:
         requires_approval BOOLEAN DEFAULT TRUE,
         auto_approve_below NUMERIC(15,4) DEFAULT 0,
         is_active BOOLEAN DEFAULT TRUE,
+        is_deleted BOOLEAN DEFAULT FALSE,
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- C2: Contract Amendments
@@ -5524,7 +5593,8 @@ def get_system_completion_tables_sql() -> str:
         effective_date DATE,
         approved_by INTEGER REFERENCES company_users(id),
         created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_amendments_contract ON contract_amendments(contract_id);
 
@@ -5553,8 +5623,8 @@ def get_extended_features_tables_sql() -> str:
         auto_renewal BOOLEAN DEFAULT TRUE,
         is_active BOOLEAN DEFAULT TRUE,
         is_deleted BOOLEAN DEFAULT FALSE,
-        created_by VARCHAR(100),
-        updated_by VARCHAR(100),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -5568,9 +5638,12 @@ def get_extended_features_tables_sql() -> str:
         next_billing_date DATE,
         status VARCHAR(20) DEFAULT 'active',
         failed_payment_count INTEGER DEFAULT 0,
+        trial_end_date DATE,
+        cancelled_at TIMESTAMPTZ,
+        cancellation_reason TEXT,
         is_deleted BOOLEAN DEFAULT FALSE,
-        created_by VARCHAR(100),
-        updated_by VARCHAR(100),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -5582,11 +5655,15 @@ def get_extended_features_tables_sql() -> str:
         billing_period_start DATE,
         billing_period_end DATE,
         amount DECIMAL(18, 4) DEFAULT 0,
+        tax_rate NUMERIC(5,2),
+        tax_amount NUMERIC(18,4) DEFAULT 0,
+        currency VARCHAR(3),
+        journal_entry_id INTEGER REFERENCES journal_entries(id),
         is_prorated BOOLEAN DEFAULT FALSE,
         proration_details JSONB,
         is_deleted BOOLEAN DEFAULT FALSE,
-        created_by VARCHAR(100),
-        updated_by VARCHAR(100),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -5594,6 +5671,25 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_sub_enrollments_customer ON subscription_enrollments(customer_id);
     CREATE INDEX IF NOT EXISTS ix_sub_enrollments_plan ON subscription_enrollments(plan_id);
     CREATE INDEX IF NOT EXISTS ix_sub_invoices_enrollment ON subscription_invoices(enrollment_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS ix_sub_enrollments_active_unique ON subscription_enrollments(customer_id, plan_id) WHERE status IN ('active', 'paused');
+
+    CREATE TABLE IF NOT EXISTS deferred_revenue_schedules (
+        id SERIAL PRIMARY KEY,
+        subscription_invoice_id INTEGER REFERENCES subscription_invoices(id) NOT NULL,
+        enrollment_id INTEGER REFERENCES subscription_enrollments(id) NOT NULL,
+        recognition_date DATE NOT NULL,
+        amount NUMERIC(18,4) NOT NULL,
+        journal_entry_id INTEGER REFERENCES journal_entries(id),
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'posted', 'skipped')),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS ix_deferred_rev_enrollment ON deferred_revenue_schedules(enrollment_id);
+    CREATE INDEX IF NOT EXISTS ix_deferred_rev_recognition ON deferred_revenue_schedules(recognition_date, status);
+    CREATE INDEX IF NOT EXISTS ix_deferred_rev_invoice ON deferred_revenue_schedules(subscription_invoice_id);
 
     -- ========== US6: Employee Self-Service ==========
     CREATE TABLE IF NOT EXISTS self_service_requests (
@@ -5622,8 +5718,8 @@ def get_extended_features_tables_sql() -> str:
         access_roles JSONB DEFAULT '[]',
         branch_scope INTEGER,
         refresh_interval_minutes INTEGER DEFAULT 60,
-        created_by VARCHAR(100),
-        updated_by VARCHAR(100),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );

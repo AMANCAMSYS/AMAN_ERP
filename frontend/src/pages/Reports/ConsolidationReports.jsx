@@ -89,7 +89,7 @@ function ConsolidationReports() {
                         <tbody>
                             {(data.accounts || data).map((a, i) => (
                                 <tr key={i}>
-                                    <td className="font-medium">{a.account_code}</td>
+                                    <td className="fw-medium">{a.account_code}</td>
                                     <td>{a.account_name}</td>
                                     <td className="text-danger">{a.total_debit ? formatNumber(a.total_debit) : '-'}</td>
                                     <td className="text-success">{a.total_credit ? formatNumber(a.total_credit) : '-'}</td>
@@ -105,8 +105,8 @@ function ConsolidationReports() {
                     <h3 className="card-title mb-3">{t('consolidation.consolidated_income_statement')}</h3>
                     {data.companies && data.companies.map((c, i) => (
                         <div key={i} className="mb-3 p-3 border rounded">
-                            <h4 className="font-bold">{c.company_name}</h4>
-                            <div className="grid grid-3 mt-2" style={{ gap: 8 }}>
+                            <h4 className="fw-bold">{c.company_name}</h4>
+                            <div className="row row-cols-3 mt-2" style={{ gap: 8 }}>
                                 <div><span className="text-muted">{t('common.revenue')}:</span> <strong className="text-success">{formatNumber(c.revenue)}</strong></div>
                                 <div><span className="text-muted">{t('common.expenses')}:</span> <strong className="text-danger">{formatNumber(c.expenses)}</strong></div>
                                 <div><span className="text-muted">{t('common.net_income')}:</span> <strong>{formatNumber(c.net_income)}</strong></div>
@@ -115,11 +115,11 @@ function ConsolidationReports() {
                     ))}
                     {data.consolidated && (
                         <div className="p-3 bg-light rounded mt-3">
-                            <h4 className="font-bold text-primary">{t('consolidation.consolidated_total')}</h4>
-                            <div className="grid grid-3 mt-2" style={{ gap: 8 }}>
+                            <h4 className="fw-bold text-primary">{t('consolidation.consolidated_total')}</h4>
+                            <div className="row row-cols-3 mt-2" style={{ gap: 8 }}>
                                 <div>{t('common.revenue')}: <strong>{formatNumber(data.consolidated.revenue)}</strong></div>
                                 <div>{t('common.expenses')}: <strong>{formatNumber(data.consolidated.expenses)}</strong></div>
-                                <div>{t('common.net_income')}: <strong className="text-xl">{formatNumber(data.consolidated.net_income)}</strong></div>
+                                <div>{t('common.net_income')}: <strong className="fs-5">{formatNumber(data.consolidated.net_income)}</strong></div>
                             </div>
                         </div>
                     )}
@@ -131,8 +131,8 @@ function ConsolidationReports() {
                     <h3 className="card-title mb-3">{t('consolidation.consolidated_balance_sheet')}</h3>
                     {data.companies && data.companies.map((c, i) => (
                         <div key={i} className="mb-3 p-3 border rounded">
-                            <h4 className="font-bold">{c.company_name}</h4>
-                            <div className="grid grid-3 mt-2" style={{ gap: 8 }}>
+                            <h4 className="fw-bold">{c.company_name}</h4>
+                            <div className="row row-cols-3 mt-2" style={{ gap: 8 }}>
                                 <div><span className="text-muted">{t('consolidation.total_assets')}:</span> <strong className="text-primary">{formatNumber(c.total_assets)}</strong></div>
                                 <div><span className="text-muted">{t('consolidation.total_liabilities')}:</span> <strong className="text-danger">{formatNumber(c.total_liabilities)}</strong></div>
                                 <div><span className="text-muted">{t('consolidation.total_equity')}:</span> <strong className="text-success">{formatNumber(c.total_equity)}</strong></div>
@@ -141,11 +141,11 @@ function ConsolidationReports() {
                     ))}
                     {data.consolidated && (
                         <div className="p-3 bg-light rounded mt-3">
-                            <h4 className="font-bold text-primary">{t('consolidation.consolidated_total')}</h4>
-                            <div className="grid grid-3 mt-2" style={{ gap: 8 }}>
+                            <h4 className="fw-bold text-primary">{t('consolidation.consolidated_total')}</h4>
+                            <div className="row row-cols-3 mt-2" style={{ gap: 8 }}>
                                 <div>{t('consolidation.total_assets')}: <strong>{formatNumber(data.consolidated.total_assets)}</strong></div>
                                 <div>{t('consolidation.total_liabilities')}: <strong>{formatNumber(data.consolidated.total_liabilities)}</strong></div>
-                                <div>{t('consolidation.total_equity')}: <strong className="text-xl">{formatNumber(data.consolidated.total_equity)}</strong></div>
+                                <div>{t('consolidation.total_equity')}: <strong className="fs-5">{formatNumber(data.consolidated.total_equity)}</strong></div>
                             </div>
                         </div>
                     )}

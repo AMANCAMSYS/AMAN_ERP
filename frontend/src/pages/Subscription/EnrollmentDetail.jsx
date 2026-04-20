@@ -26,6 +26,7 @@ function EnrollmentDetail() {
     const fetchData = async () => {
         try {
             setLoading(true)
+            setError(null)
             const response = await subscriptionsAPI.getEnrollment(id)
             setEnrollment(response.data)
         } catch (err) {
@@ -36,7 +37,7 @@ function EnrollmentDetail() {
         }
     }
 
-    useEffect(() => { fetchData() }, [id])
+    useEffect(() => { fetchData() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handlePause = async () => {
         if (!window.confirm(t('subscription.confirm_pause'))) return

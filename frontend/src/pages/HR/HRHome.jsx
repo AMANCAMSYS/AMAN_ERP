@@ -248,11 +248,13 @@ const HRHome = () => {
                             {t('hr.employee_documents')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
-                        <div className="link-item" onClick={() => navigate('/hr/performance')}>
-                            <span className="link-icon">⭐</span>
-                            {t('hr.performance_reviews')}
-                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
-                        </div>
+                        {hasPermission('hr.performance_view') && (
+                            <div className="link-item" onClick={() => navigate('/hr/performance')}>
+                                <span className="link-icon">⭐</span>
+                                {t('hr.performance_reviews')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                         <div className="link-item" onClick={() => navigate('/hr/training')}>
                             <span className="link-icon">🎓</span>
                             {t('hr.training_programs')}
@@ -282,9 +284,16 @@ const HRHome = () => {
                         </div>
                         <div className="link-item" onClick={() => navigate('/hr/recruitment')}>
                             <span className="link-icon">💼</span>
-                            {t('hr.recruitment')}
+                            {t('hr.recruitment_title')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
+                        {hasPermission('hr.self_service') && (
+                            <div className="link-item" onClick={() => navigate('/hr/self-service')}>
+                                <span className="link-icon">🧑‍💼</span>
+                                {t('nav.self_service')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 

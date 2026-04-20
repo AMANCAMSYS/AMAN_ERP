@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,7 +15,7 @@ import Timesheets from './Timesheets';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate, formatDateTime, formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 export default function ProjectDetails() {

@@ -181,9 +181,9 @@ export default function CurrencyList() {
             style: { textAlign: 'center' },
             headerStyle: { textAlign: 'center' },
             render: (val) => val ? (
-                <span className="badge bg-success-subtle text-success border px-3">Base</span>
+                <span className="badge bg-success-subtle text-success border px-3">{t('accounting.currencies.base_label')}</span>
             ) : (
-                <span className="text-muted small">Secondary</span>
+                <span className="text-muted small">{t('accounting.currencies.secondary_label')}</span>
             ),
         },
         {

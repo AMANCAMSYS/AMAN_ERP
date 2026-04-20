@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../../utils/api'
 import { subscriptionsAPI } from '../../services/subscriptions'
 import { useTranslation } from 'react-i18next'
+import { formatNumber } from '../../utils/format'
+import { getCurrency } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton'
 import FormField from '../../components/common/FormField'
 
@@ -9,6 +12,7 @@ function EnrollmentForm() {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const [plans, setPlans] = useState([])
+    const [customers, setCustomers] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [formData, setFormData] = useState({
@@ -18,17 +22,22 @@ function EnrollmentForm() {
     })
 
     useEffect(() => {
-        const fetchPlans = async () => {
+        const fetchData = async () => {
             try {
-                const response = await subscriptionsAPI.listPlans()
-                const payload = response.data
+                const [plansRes, customersRes] = await Promise.all([
+                    subscriptionsAPI.listPlans(),
+                    api.get('/parties', { params: { party_type: 'customer' } })
+                ])
+                const payload = plansRes.data
                 const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : []
                 setPlans(items.filter(p => p.is_active))
+                const custData = customersRes.data
+                setCustomers(Array.isArray(custData?.items) ? custData.items : Array.isArray(custData) ? custData : [])
             } catch (err) {
                 console.error(err)
             }
         }
-        fetchPlans()
+        fetchData()
     }, [])
 
     const handleChange = (e) => {
@@ -75,17 +84,24 @@ function EnrollmentForm() {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                     <div className="form-section card">
                         <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--primary)' }}>
-                            <span style={{ fontSize: '24px' }}>👥</span> {t('subscription.enrollment_info') || 'معلومات الاشتراك'}
+                            <span style={{ fontSize: '24px' }}>👥</span> {t('subscription.enrollment_info')}
                         </h3>
                         <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
                             <FormField label={t('subscription.table.customer')} required style={{ marginBottom: 0 }}>
-                                <input
-                                    name="customer_id" type="number" min="1"
-                                    value={formData.customer_id} onChange={handleChange}
+                                <select
+                                    name="customer_id"
+                                    value={formData.customer_id}
+                                    onChange={handleChange}
                                     className="form-input"
-                                    placeholder={t('subscription.customer_id_placeholder') || 'رقم العميل'}
                                     required
-                                />
+                                >
+                                    <option value="">{t('common.select')}</option>
+                                    {customers.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name || c.party_name}
+                                        </option>
+                                    ))}
+                                </select>
                             </FormField>
                             <FormField label={t('subscription.table.plan')} required style={{ marginBottom: 0 }}>
                                 <select
@@ -95,7 +111,7 @@ function EnrollmentForm() {
                                     <option value="">{t('common.select')}</option>
                                     {plans.map(plan => (
                                         <option key={plan.id} value={plan.id}>
-                                            {plan.name} — {Number(plan.base_amount).toLocaleString()} {plan.currency}
+                                            {plan.name} — {formatNumber(plan.base_amount)} {plan.currency || getCurrency()}
                                         </option>
                                     ))}
                                 </select>
@@ -117,7 +133,7 @@ function EnrollmentForm() {
                             {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? t('common.saving') : t('subscription.enroll_btn') || 'تسجيل الاشتراك'}
+                            {loading ? t('common.saving') : t('subscription.enroll_btn')}
                         </button>
                     </div>
                 </form>

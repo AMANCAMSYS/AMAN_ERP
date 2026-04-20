@@ -8,6 +8,7 @@ from utils.i18n import http_error
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date, datetime
+from decimal import Decimal
 from database import get_db_connection
 from routers.auth import get_current_user
 from sqlalchemy import text
@@ -22,9 +23,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from schemas.expenses import ExpenseCreate, ExpenseUpdate, ExpenseApproval
+from schemas.expenses import ExpenseCreate, ExpenseUpdate, ExpenseApproval, ExpensePolicyCreate, ExpensePolicyUpdate, ExpenseValidation
 
 router = APIRouter(prefix="/expenses", tags=["المصاريف"], dependencies=[Depends(require_module("expenses"))])
+
+EXPENSE_TYPES = [
+    "travel", "meals", "supplies", "transportation", "entertainment",
+    "materials", "labor", "services", "rent", "utilities", "salaries", "other"
+]
+
+VALID_APPROVAL_STATUSES = ["pending", "approved", "rejected", "submitted"]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -67,7 +75,7 @@ def create_expense_journal_entry(db, expense_data: dict, user_id: int, base_curr
     je_lines = [
         {
             "account_id": expense_data["expense_account_id"], 
-            "debit": float(expense_data["amount"]), 
+            "debit": Decimal(str(expense_data["amount"])), 
             "credit": 0,
             "cost_center_id": expense_data.get("cost_center_id"),
             "description": expense_data.get("description")
@@ -75,14 +83,14 @@ def create_expense_journal_entry(db, expense_data: dict, user_id: int, base_curr
         {
             "account_id": expense_data["cash_account_id"], 
             "debit": 0, 
-            "credit": float(expense_data["amount"]),
+            "credit": Decimal(str(expense_data["amount"])),
             "description": expense_data.get("description")
         },
     ]
 
     je_id, _ = gl_create_journal_entry(
         db=db,
-        company_id=expense_data.get("company_id", 1), # Fallback to 1 if not provided
+        company_id=expense_data.get("company_id"),
         date=expense_data["expense_date"],
         description=f"مصروف {expense_data['expense_type']}: {expense_data.get('description', '')}",
         lines=je_lines,
@@ -121,7 +129,7 @@ async def list_expenses(
     
     try:
         params = {"company_id": current_user.company_id}
-        filters = ["1=1"]
+        filters = ["e.is_deleted = false"]
         
         if branch_id:
             filters.append("e.branch_id = :branch_id")
@@ -185,7 +193,7 @@ async def get_expenses_summary(
     
     try:
         params = {}
-        filters = ["1=1"]
+        filters = ["is_deleted = false"]
         
         if branch_id:
             filters.append("branch_id = :branch_id")
@@ -232,6 +240,7 @@ def list_expense_policies(current_user=Depends(get_current_user)):
             SELECT ep.*, d.department_name as department_name
             FROM expense_policies ep
             LEFT JOIN departments d ON d.id = ep.department_id
+            WHERE ep.is_deleted = false
             ORDER BY ep.name
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
@@ -240,7 +249,7 @@ def list_expense_policies(current_user=Depends(get_current_user)):
 
 
 @router.post("/policies", dependencies=[Depends(require_permission("expenses.manage"))])
-def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
+def create_expense_policy(policy: ExpensePolicyCreate, current_user=Depends(get_current_user)):
     """إنشاء سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
     try:
@@ -251,12 +260,12 @@ def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
             VALUES (:n, :et, :did, :dl, :ml, :al, :rr, :ra, :aab, :ia)
             RETURNING id
         """), {
-            "n": policy["name"], "et": policy.get("expense_type"),
-            "did": policy.get("department_id"), "dl": policy.get("daily_limit"),
-            "ml": policy.get("monthly_limit"), "al": policy.get("annual_limit"),
-            "rr": policy.get("requires_receipt", True),
-            "ra": policy.get("requires_approval", True),
-            "aab": policy.get("auto_approve_below"), "ia": policy.get("is_active", True)
+            "n": policy.name, "et": policy.expense_type,
+            "did": policy.department_id, "dl": policy.daily_limit,
+            "ml": policy.monthly_limit, "al": policy.annual_limit,
+            "rr": policy.requires_receipt,
+            "ra": policy.requires_approval,
+            "aab": policy.auto_approve_below, "ia": policy.is_active
         })
         pid = result.fetchone()[0]
         db.commit()
@@ -270,25 +279,25 @@ def create_expense_policy(policy: dict, current_user=Depends(get_current_user)):
 
 
 @router.put("/policies/{policy_id}", dependencies=[Depends(require_permission("expenses.manage"))])
-def update_expense_policy(policy_id: int, policy: dict, current_user=Depends(get_current_user)):
+def update_expense_policy(policy_id: int, policy: ExpensePolicyUpdate, current_user=Depends(get_current_user)):
     """تحديث سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
     try:
-        db.execute(text("""
-            UPDATE expense_policies SET name = :n, expense_type = :et,
-                department_id = :did, daily_limit = :dl, monthly_limit = :ml,
-                annual_limit = :al, requires_receipt = :rr, requires_approval = :ra,
-                auto_approve_below = :aab, is_active = :ia
-            WHERE id = :id
-        """), {
-            "n": policy["name"], "et": policy.get("expense_type"),
-            "did": policy.get("department_id"), "dl": policy.get("daily_limit"),
-            "ml": policy.get("monthly_limit"), "al": policy.get("annual_limit"),
-            "rr": policy.get("requires_receipt", True),
-            "ra": policy.get("requires_approval", True),
-            "aab": policy.get("auto_approve_below"), "ia": policy.get("is_active", True),
-            "id": policy_id
-        })
+        fields = []
+        params = {"id": policy_id}
+        for field_name in ["name", "expense_type", "department_id", "daily_limit",
+                           "monthly_limit", "annual_limit", "requires_receipt",
+                           "requires_approval", "auto_approve_below", "is_active"]:
+            value = getattr(policy, field_name)
+            if value is not None:
+                fields.append(f"{field_name} = :{field_name}")
+                params[field_name] = value
+        if not fields:
+            raise HTTPException(**http_error(400, "no_data_to_update"))
+        fields.append("updated_at = NOW()")
+        fields.append("updated_by = :uid")
+        params["uid"] = current_user.id
+        db.execute(text(f"UPDATE expense_policies SET {', '.join(fields)} WHERE id = :id AND is_deleted = false"), params)
         db.commit()
         return {"message": "تم تحديث السياسة بنجاح"}
     except Exception as e:
@@ -304,7 +313,9 @@ def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)
     """حذف سياسة مصروفات"""
     db = get_db_connection(current_user.company_id)
     try:
-        db.execute(text("DELETE FROM expense_policies WHERE id = :id"), {"id": policy_id})
+        db.execute(text(
+            "UPDATE expense_policies SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE id = :id"
+        ), {"id": policy_id, "uid": current_user.id})
         db.commit()
         return {"message": "تم حذف السياسة"}
     except Exception as e:
@@ -316,17 +327,17 @@ def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)
 
 
 @router.post("/validate-policy")
-def validate_expense_against_policy(expense: dict, current_user=Depends(get_current_user)):
+def validate_expense_against_policy(expense: ExpenseValidation, current_user=Depends(get_current_user)):
     """التحقق من المصروف ضد السياسات"""
     db = get_db_connection(current_user.company_id)
     try:
-        amount = float(expense.get("amount", 0))
-        exp_type = expense.get("expense_type")
-        dept_id = expense.get("department_id")
+        amount = expense.amount
+        exp_type = expense.expense_type
+        dept_id = expense.department_id
 
         policies = db.execute(text("""
             SELECT * FROM expense_policies
-            WHERE is_active = TRUE
+            WHERE is_active = TRUE AND is_deleted = false
               AND (expense_type IS NULL OR expense_type = :et)
               AND (department_id IS NULL OR department_id = :did)
         """), {"et": exp_type, "did": dept_id}).fetchall()
@@ -335,12 +346,12 @@ def validate_expense_against_policy(expense: dict, current_user=Depends(get_curr
         auto_approve = True
         for p in policies:
             pol = dict(p._mapping)
-            if pol.get("daily_limit") and amount > float(pol["daily_limit"]):
+            if pol.get("daily_limit") and amount > Decimal(str(pol["daily_limit"])):
                 violations.append(f"يتجاوز الحد اليومي ({pol['daily_limit']})")
-            if pol.get("auto_approve_below") and amount >= float(pol["auto_approve_below"]):
+            if pol.get("auto_approve_below") and amount >= Decimal(str(pol["auto_approve_below"])):
                 auto_approve = False
             if pol.get("requires_receipt"):
-                if not expense.get("has_receipt"):
+                if not expense.has_receipt:
                     violations.append("يتطلب إيصال")
 
         return {
@@ -376,7 +387,7 @@ async def get_expense_details(expense_id: int, current_user: dict = Depends(get_
             LEFT JOIN treasury_accounts ta ON e.treasury_id = ta.id
             LEFT JOIN company_users approver ON e.approved_by = approver.id
             LEFT JOIN accounts a ON e.expense_account_id = a.id
-            WHERE e.id = :id
+            WHERE e.id = :id AND e.is_deleted = false
         """), {"id": expense_id}).fetchone()
         
         if not result:
@@ -412,6 +423,42 @@ async def create_expense(
     db = get_db_connection(current_user.company_id)
     
     try:
+        # Check fiscal period is open for the expense date
+        check_fiscal_period_open(db, str(expense.expense_date), raise_error=True)
+        
+        # Validate expense type
+        if expense.expense_type and expense.expense_type not in EXPENSE_TYPES:
+            raise HTTPException(status_code=400, detail=f"Invalid expense type. Must be one of: {', '.join(EXPENSE_TYPES)}")
+        
+        # Policy enforcement: check if expense exceeds policy limits
+        policy = db.execute(text("""
+            SELECT * FROM expense_policies
+            WHERE is_active = true AND is_deleted = false
+              AND (expense_type = :etype OR expense_type IS NULL OR expense_type = '')
+              AND (department_id = :dept OR department_id IS NULL)
+            ORDER BY
+              CASE WHEN expense_type = :etype THEN 0 ELSE 1 END,
+              CASE WHEN department_id = :dept THEN 0 ELSE 1 END
+            LIMIT 1
+        """), {"etype": expense.expense_type, "dept": getattr(expense, 'department_id', None)}).fetchone()
+        
+        policy_warning = None
+        if policy:
+            amount_val = Decimal(str(expense.amount))
+            if policy.daily_limit and amount_val > Decimal(str(policy.daily_limit)):
+                policy_warning = f"Amount exceeds daily limit of {policy.daily_limit} for policy '{policy.name}'"
+            if policy.monthly_limit:
+                # Check monthly total for this type
+                month_total = db.execute(text("""
+                    SELECT COALESCE(SUM(amount), 0) FROM expenses
+                    WHERE expense_type = :etype AND created_by = :uid
+                      AND EXTRACT(MONTH FROM expense_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+                      AND EXTRACT(YEAR FROM expense_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+                      AND is_deleted = false AND approval_status != 'rejected'
+                """), {"etype": expense.expense_type, "uid": current_user.id}).scalar()
+                if (Decimal(str(month_total)) + amount_val) > Decimal(str(policy.monthly_limit)):
+                    policy_warning = f"Total would exceed monthly limit of {policy.monthly_limit} for policy '{policy.name}'"
+        
         base_currency = get_base_currency(db)
         
         # Determine expense account
@@ -456,7 +503,7 @@ async def create_expense(
             ) RETURNING id
         """), {
             "num": expense_number, "date": expense.expense_date, "type": expense.expense_type,
-            "amt": float(expense.amount), "desc": expense.description,
+            "amt": str(expense.amount), "desc": expense.description,
             "cat": expense.category, "pm": expense.payment_method, "tid": expense.treasury_id,
             "eaid": expense_account_id,
             "ccid": expense.cost_center_id, "pid": expense.project_id, "bid": expense.branch_id,
@@ -469,7 +516,7 @@ async def create_expense(
             expense_data = {
                 "expense_date": expense.expense_date,
                 "expense_type": expense.expense_type,
-                "amount": float(expense.amount),
+                "amount": str(expense.amount),
                 "description": expense.description,
                 "expense_account_id": expense_account_id,
                 "cash_account_id": cash_account_id,
@@ -488,15 +535,15 @@ async def create_expense(
             # Update treasury balance (with sufficiency check)
             if expense.treasury_id:
                 treasury_balance = db.execute(text(
-                    "SELECT current_balance FROM treasury_accounts WHERE id = :id"
+                    "SELECT current_balance FROM treasury_accounts WHERE id = :id FOR UPDATE"
                 ), {"id": expense.treasury_id}).scalar() or 0
-                if float(treasury_balance) < float(expense.amount):
-                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {float(treasury_balance):.2f}, المطلوب: {float(expense.amount):.2f}")
+                if Decimal(str(treasury_balance)) < Decimal(str(expense.amount)):
+                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {Decimal(str(treasury_balance)):.2f}, المطلوب: {Decimal(str(expense.amount)):.2f}")
                 db.execute(text("""
                     UPDATE treasury_accounts 
                     SET current_balance = current_balance - :amt 
                     WHERE id = :id
-                """), {"amt": float(expense.amount), "id": expense.treasury_id})
+                """), {"amt": str(expense.amount), "id": expense.treasury_id})
             
             # Update project actual_cost if linked
             if expense.project_id:
@@ -504,14 +551,14 @@ async def create_expense(
                     UPDATE projects 
                     SET actual_cost = actual_cost + :amt
                     WHERE id = :id
-                """), {"amt": float(expense.amount), "id": expense.project_id})
+                """), {"amt": str(expense.amount), "id": expense.project_id})
         
         db.commit()
         
         log_activity(
             db, user_id=current_user.id, username=current_user.username,
             action="expense.create", resource_type="expense", resource_id=str(expense_id),
-            details={"expense_number": expense_number, "amount": float(expense.amount)},
+            details={"expense_number": expense_number, "amount": str(expense.amount)},
             request=request, branch_id=expense.branch_id
         )
         
@@ -525,9 +572,9 @@ async def create_expense(
                     document_type="expense",
                     document_id=expense_id,
                     document_number=expense_number,
-                    amount=float(expense.amount),
+                    amount=Decimal(str(expense.amount)),
                     submitted_by=current_user.id,
-                    description=f"مصروف {expense.expense_type}: {expense.description or ''} - {float(expense.amount):,.2f}",
+                    description=f"مصروف {expense.expense_type}: {expense.description or ''} - {Decimal(str(expense.amount)):,.2f}",
                     link=f"/expenses/{expense_id}"
                 )
                 if approval_info:
@@ -540,7 +587,8 @@ async def create_expense(
             "id": expense_id,
             "expense_number": expense_number,
             "approval_status": approval_status,
-            "message": "تم إنشاء المصروف بنجاح" if approval_status == "approved" else "تم إنشاء المصروف - في انتظار الاعتماد"
+            "message": "تم إنشاء المصروف بنجاح" if approval_status == "approved" else "تم إنشاء المصروف - في انتظار الاعتماد",
+            "policy_warning": policy_warning,
         }
 
         # Notify about expense submission
@@ -554,7 +602,7 @@ async def create_expense(
                     AND u.id != :current_uid
                 """), {
                     "title": "🧳 طلب مصروف جديد",
-                    "message": f"مصروف {expense_number} — {float(expense.amount):,.2f} — {expense.description or expense.expense_type}",
+                    "message": f"مصروف {expense_number} — {Decimal(str(expense.amount)):,.2f} — {expense.description or expense.expense_type}",
                     "link": f"/expenses/{expense_id}",
                     "current_uid": current_user.id
                 })
@@ -589,7 +637,7 @@ async def update_expense(
     try:
         # Check if expense exists and is pending
         existing = db.execute(text(
-            "SELECT id, approval_status FROM expenses WHERE id = :id"
+            "SELECT id, approval_status FROM expenses WHERE id = :id AND is_deleted = false"
         ), {"id": expense_id}).fetchone()
         
         if not existing:
@@ -656,7 +704,7 @@ async def approve_expense(
             FROM expenses e
             LEFT JOIN accounts a ON e.expense_account_id = a.id
             LEFT JOIN treasury_accounts ta ON e.treasury_id = ta.id
-            WHERE e.id = :id
+            WHERE e.id = :id AND e.is_deleted = false
         """), {"id": expense_id}).fetchone()
         
         if not expense_row:
@@ -666,6 +714,13 @@ async def approve_expense(
         
         if expense["approval_status"] != "pending":
             raise HTTPException(status_code=400, detail="المصروف تم اعتماده أو رفضه مسبقاً")
+        
+        # Validate approval_status value
+        if approval.approval_status not in VALID_APPROVAL_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid approval status. Must be one of: {', '.join(VALID_APPROVAL_STATUSES)}"
+            )
         
         # Update approval status
         db.execute(text("""
@@ -697,7 +752,7 @@ async def approve_expense(
             expense_data = {
                 "expense_date": expense["expense_date"],
                 "expense_type": expense["expense_type"],
-                "amount": float(expense["amount"]),
+                "amount": str(expense["amount"]),
                 "description": expense["description"],
                 "expense_account_id": expense["expense_account_id"],
                 "cash_account_id": cash_account_id,
@@ -716,15 +771,15 @@ async def approve_expense(
             # Update treasury balance (with sufficiency check)
             if expense["treasury_id"]:
                 treasury_balance = db.execute(text(
-                    "SELECT current_balance FROM treasury_accounts WHERE id = :id"
+                    "SELECT current_balance FROM treasury_accounts WHERE id = :id FOR UPDATE"
                 ), {"id": expense["treasury_id"]}).scalar() or 0
-                if float(treasury_balance) < float(expense["amount"]):
-                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {float(treasury_balance):.2f}, المطلوب: {float(expense['amount']):.2f}")
+                if Decimal(str(treasury_balance)) < Decimal(str(expense["amount"])):
+                    raise HTTPException(status_code=400, detail=f"رصيد الخزينة غير كافٍ. المتوفر: {Decimal(str(treasury_balance)):.2f}, المطلوب: {Decimal(str(expense['amount'])):.2f}")
                 db.execute(text("""
                     UPDATE treasury_accounts 
                     SET current_balance = current_balance - :amt 
                     WHERE id = :id
-                """), {"amt": float(expense["amount"]), "id": expense["treasury_id"]})
+                """), {"amt": str(expense["amount"]), "id": expense["treasury_id"]})
             
             # Update project actual_cost if linked
             if expense["project_id"]:
@@ -732,7 +787,7 @@ async def approve_expense(
                     UPDATE projects 
                     SET actual_cost = actual_cost + :amt
                     WHERE id = :id
-                """), {"amt": float(expense["amount"]), "id": expense["project_id"]})
+                """), {"amt": str(expense["amount"]), "id": expense["project_id"]})
         
         db.commit()
         
@@ -759,7 +814,7 @@ async def approve_expense(
                 """), {
                     "uid": submitted_by,
                     "title": f"{icon} مصروفك {status_ar}",
-                    "message": f"تم {status_ar} المصروف {exp_num} بمبلغ {float(expense.get('amount', 0)):,.2f}" if isinstance(expense, dict) else f"تم {status_ar} طلب المصروف",
+                    "message": f"تم {status_ar} المصروف {exp_num} بمبلغ {Decimal(str(expense.get('amount', 0))):,.2f}" if isinstance(expense, dict) else f"تم {status_ar} طلب المصروف",
                     "link": f"/expenses/{expense_id}"
                 })
                 db.commit()
@@ -789,7 +844,7 @@ async def delete_expense(
     
     try:
         expense = db.execute(text(
-            "SELECT approval_status FROM expenses WHERE id = :id"
+            "SELECT approval_status FROM expenses WHERE id = :id AND is_deleted = false"
         ), {"id": expense_id}).fetchone()
         
         if not expense:
@@ -798,7 +853,9 @@ async def delete_expense(
         if expense.approval_status != "pending":
             raise HTTPException(status_code=400, detail="لا يمكن حذف مصروف معتمد - يجب إنشاء قيد عكسي")
         
-        db.execute(text("DELETE FROM expenses WHERE id = :id"), {"id": expense_id})
+        db.execute(text(
+            "UPDATE expenses SET is_deleted = true, updated_at = NOW(), updated_by = :uid WHERE id = :id"
+        ), {"id": expense_id, "uid": current_user.id})
         db.commit()
         
         log_activity(
@@ -831,7 +888,7 @@ async def get_expenses_by_type(
     
     try:
         params = {}
-        filters = ["approval_status = 'approved'"]
+        filters = ["approval_status = 'approved'", "is_deleted = false"]
         
         if branch_id:
             filters.append("branch_id = :branch_id")
@@ -877,7 +934,7 @@ async def get_expenses_by_cost_center(
     
     try:
         params = {}
-        filters = ["e.approval_status = 'approved'"]
+        filters = ["e.approval_status = 'approved'", "e.is_deleted = false"]
         
         if branch_id:
             filters.append("e.branch_id = :branch_id")
@@ -923,7 +980,7 @@ async def get_monthly_expenses(
         current_year = year or datetime.now().year
         
         params = {"year": current_year}
-        filters = ["approval_status = 'approved'", "EXTRACT(YEAR FROM expense_date) = :year"]
+        filters = ["approval_status = 'approved'", "is_deleted = false", "EXTRACT(YEAR FROM expense_date) = :year"]
         
         if branch_id:
             filters.append("branch_id = :branch_id")

@@ -18,10 +18,10 @@ const DataImportPage = () => {
     const [importing, setImporting] = useState(false);
 
     const entities = [
-        { value: 'accounts', label: t('data_import.accounts') || 'Chart of Accounts' },
-        { value: 'parties', label: t('data_import.parties') || 'Parties (Customers/Suppliers)' },
-        { value: 'products', label: t('data_import.products') || 'Products' },
-        { value: 'employees', label: t('data_import.employees') || 'Employees' }
+        { value: 'accounts', label: t('data_import.accounts') },
+        { value: 'parties', label: t('data_import.parties') },
+        { value: 'products', label: t('data_import.products') },
+        { value: 'employees', label: t('data_import.employees') }
     ];
 
     const handleFileChange = (e) => {
@@ -93,7 +93,7 @@ const DataImportPage = () => {
             <div className="flex justify-between items-center">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <BackButton />
-                    <h1 className="text-2xl font-bold">{t('data_import.title') || 'Data Import Wizard'}</h1>
+                    <h1 className="text-2xl font-bold">{t('data_import.title')}</h1>
                 </div>
             </div>
 
@@ -158,7 +158,7 @@ const DataImportPage = () => {
                     <div className="card-body">
                         <h2 className="card-title text-lg flex items-center gap-2">
                             <span className="badge badge-primary badge-outline">2</span>
-                            {t('data_import.preview') || 'Preview & Validate'}
+                            {t('data_import.preview')}
                         </h2>
 
                         {!previewData ? (

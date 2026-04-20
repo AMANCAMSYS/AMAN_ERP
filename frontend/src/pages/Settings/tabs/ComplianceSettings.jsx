@@ -55,7 +55,7 @@ const ComplianceSettings = ({ settings, handleSettingChange }) => {
                 // but currently we just show toast. 
                 // In a real app, we would update 'zatca_csid' setting.
             } else {
-                throw new Error(response.data.message || "Failed");
+                throw new Error(response.data.message || t('common.error_occurred'));
             }
         } catch (err) {
             console.error("CSID generation failed", err);

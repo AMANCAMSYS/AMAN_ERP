@@ -85,22 +85,22 @@ function FXGainLossReport() {
                     <div className="metrics-grid" style={{ marginBottom: '24px' }}>
                         <div className="metric-card">
                             <div className="metric-label">{t('fx_report.realized_gain')}</div>
-                            <div className={`metric-value ${(summary.total_fx_gain || realizedTotals.net || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
-                                {formatNumber(summary.total_fx_gain || realizedTotals.net || 0)}
+                            <div className={`metric-value ${(summary.total_fx_gain ?? realizedTotals.net ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {formatNumber(summary.total_fx_gain ?? realizedTotals.net ?? 0)}
                             </div>
                             <div className="metric-change">{currency}</div>
                         </div>
                         <div className="metric-card">
                             <div className="metric-label">{t('fx_report.unrealized_gain')}</div>
-                            <div className={`metric-value ${(unrealizedTotals.net || unrealizedTotals.net_unrealized || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
-                                {formatNumber(unrealizedTotals.net || unrealizedTotals.net_unrealized || 0)}
+                            <div className={`metric-value ${(unrealizedTotals.net ?? unrealizedTotals.net_unrealized ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {formatNumber(unrealizedTotals.net ?? unrealizedTotals.net_unrealized ?? 0)}
                             </div>
                             <div className="metric-change">{currency}</div>
                         </div>
                         <div className="metric-card">
                             <div className="metric-label">{t('fx_report.net_gain_loss')}</div>
-                            <div className={`metric-value ${(summary.net_fx || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
-                                {formatNumber(summary.net_fx || 0)}
+                            <div className={`metric-value ${(summary.net_fx ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                {formatNumber(summary.net_fx ?? 0)}
                             </div>
                             <div className="metric-change">{currency}</div>
                         </div>
@@ -133,10 +133,10 @@ function FXGainLossReport() {
                                             <td>{row.date || row.entry_date}</td>
                                             <td>{row.currency}</td>
                                             <td>{row.account || row.account_name}</td>
-                                            <td className="text-end">{formatNumber(row.debit || row.debit_amount || 0)}</td>
-                                            <td className="text-end">{formatNumber(row.credit || row.credit_amount || 0)}</td>
-                                            <td className={`text-end font-medium ${(row.credit - row.debit) >= 0 ? 'text-success' : 'text-danger'}`}>
-                                                {formatNumber((row.credit || 0) - (row.debit || 0))}
+                                            <td className="text-end">{formatNumber(row.debit ?? row.debit_amount ?? 0)}</td>
+                                            <td className="text-end">{formatNumber(row.credit ?? row.credit_amount ?? 0)}</td>
+                                            <td className={`text-end font-medium ${((row.credit ?? 0) - (row.debit ?? 0)) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                                {formatNumber((row.credit ?? 0) - (row.debit ?? 0))}
                                             </td>
                                         </tr>
                                     ))}
@@ -171,11 +171,11 @@ function FXGainLossReport() {
                                             <td className="font-medium">{row.invoice_number || row.reference}</td>
                                             <td>{row.party || row.party_name}</td>
                                             <td>{row.currency}</td>
-                                            <td className="text-end">{formatNumber(row.booked_rate || row.book_rate, 4)}</td>
-                                            <td className="text-end">{formatNumber(row.current_rate, 4)}</td>
-                                            <td className="text-end">{formatNumber(row.open_fc_amount || row.foreign_amount)}</td>
-                                            <td className={`text-end font-medium ${(row.unrealized_fx || row.unrealized_gl || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
-                                                {formatNumber(row.unrealized_fx || row.unrealized_gl || 0)}
+                                            <td className="text-end">{formatNumber(row.booked_rate ?? row.book_rate ?? 0, 4)}</td>
+                                            <td className="text-end">{formatNumber(row.current_rate ?? 0, 4)}</td>
+                                            <td className="text-end">{formatNumber(row.open_fc_amount ?? row.foreign_amount ?? 0)}</td>
+                                            <td className={`text-end font-medium ${(row.unrealized_fx ?? row.unrealized_gl ?? 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                                                {formatNumber(row.unrealized_fx ?? row.unrealized_gl ?? 0)}
                                             </td>
                                         </tr>
                                     ))}

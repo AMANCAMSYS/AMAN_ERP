@@ -140,7 +140,7 @@ const ReconciliationForm = () => {
         try {
             setImportLoading(true);
             await reconciliationAPI.importConfirm(id, importPreview.all_lines);
-            toastEmitter.emit(`تم استيراد ${importPreview.all_lines.length} سطر بنجاح`, 'success');
+            toastEmitter.emit(t('treasury.reconciliation.imported_success') + ' ' + importPreview.all_lines.length, 'success');
             setImportPreview(null);
             setShowImport(false);
             fetchData();
@@ -409,12 +409,12 @@ const ReconciliationForm = () => {
                                 </button>
                                 <button className="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
                                     onClick={() => setShowImport(!showImport)} style={{ borderRadius: '8px', fontSize: '12px' }}>
-                                    <Upload size={14} /> استيراد ملف
+                                    <Upload size={14} /> {t('treasury.reconciliation.import_file')}
                                 </button>
                                 <button className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1"
                                     onClick={handleAutoMatch} disabled={autoMatchLoading}
                                     style={{ borderRadius: '8px', fontSize: '12px' }}>
-                                    <Zap size={14} /> {autoMatchLoading ? '...' : 'مطابقة تلقائية'}
+                                    <Zap size={14} /> {autoMatchLoading ? '...' : '{t('treasury.reconciliation.auto_match')}'}
                                 </button>
                             </div>
                         )}
@@ -473,11 +473,11 @@ const ReconciliationForm = () => {
                                     <p className="small text-muted mb-3">{t('treasury.upload_bank_statement')}</p>
                                     <label className="btn btn-sm btn-success" style={{ cursor: 'pointer', borderRadius: '8px' }}>
                                         <Upload size={14} style={{ marginInlineEnd: '6px' }} />
-                                        {importLoading ? 'جاري التحليل...' : 'اختيار ملف'}
+                                        {importLoading ? '{t('treasury.reconciliation.analyzing')}' : '{t('treasury.reconciliation.select_file')}'}
                                         <input type="file" accept=".csv,.xlsx,.xls,.tsv" onChange={handleFileSelect} style={{ display: 'none' }} disabled={importLoading} />
                                     </label>
                                     <button className="btn btn-sm btn-light ms-2" onClick={() => setShowImport(false)} style={{ borderRadius: '8px' }}>
-                                        إلغاء
+                                        {t('treasury.reconciliation.cancel')}
                                     </button>
                                 </div>
                             ) : (
@@ -486,21 +486,21 @@ const ReconciliationForm = () => {
                                         <div>
                                             <span className="fw-bold">📄 {importPreview.filename}</span>
                                             <span className="small text-muted ms-3">
-                                                {importPreview.parsed_lines} سطر جاهز للاستيراد
-                                                {importPreview.skipped_rows > 0 && <span className="text-warning"> ({importPreview.skipped_rows} تم تخطيه)</span>}
+                                                {importPreview.parsed_lines} {t('treasury.reconciliation.ready_for_import')}
+                                                {importPreview.skipped_rows > 0 && <span className="text-warning"> ({importPreview.skipped_rows} {t('treasury.reconciliation.skipped')})</span>}
                                             </span>
                                         </div>
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                             <button className="btn btn-sm btn-primary" onClick={handleImportConfirm} disabled={importLoading}
                                                 style={{ borderRadius: '8px' }}>
-                                                {importLoading ? 'جاري الاستيراد...' : `تأكيد الاستيراد (${importPreview.all_lines?.length || 0})`}
+                                                {importLoading ? '{t('treasury.reconciliation.importing')}' : `تأكيد الاستيراد (${importPreview.all_lines?.length || 0})`}
                                             </button>
                                             <button className="btn btn-sm btn-light" onClick={() => setImportPreview(null)} style={{ borderRadius: '8px' }}>
-                                                تغيير الملف
+                                                {t('treasury.reconciliation.change_file')}
                                             </button>
                                             <button className="btn btn-sm btn-outline-danger" onClick={() => { setImportPreview(null); setShowImport(false); }}
                                                 style={{ borderRadius: '8px' }}>
-                                                إلغاء
+                                                {t('treasury.reconciliation.cancel')}
                                             </button>
                                         </div>
                                     </div>
@@ -531,7 +531,7 @@ const ReconciliationForm = () => {
                                         </table>
                                     </div>
                                     {importPreview.all_lines?.length > 200 && (
-                                        <p className="small text-muted mt-2 text-center">يتم عرض أول 200 سطر فقط للمعاينة. سيتم استيراد جميع الأسطر ({importPreview.all_lines.length})</p>
+                                        <p className="small text-muted mt-2 text-center">{t('treasury.reconciliation.preview_limit_msg')} ({importPreview.all_lines.length})</p>
                                     )}
                                 </div>
                             )}

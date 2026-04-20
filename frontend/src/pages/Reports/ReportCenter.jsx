@@ -239,6 +239,16 @@ const ReportCenter = () => {
                 { name: t('reports.sharing.shared_with_me', 'Shared With Me'), path: '/reports/shared', desc: t('reports_center.reports.shared_desc', 'Reports that colleagues have shared with you') }
             ]
         },
+        {
+            title: t('analytics.title'),
+            icon: '📊',
+            color: '#0EA5E9',
+            permission: 'dashboard.analytics_view',
+            module: 'reports',
+            reports: [
+                { name: t('analytics.title'), path: '/analytics', desc: t('reports_center.reports.bi_analytics_desc', 'Interactive BI dashboards and KPI exploration') }
+            ]
+        },
         // ── Industry-specific reports — dynamic ──
         ..._getIndustryReportGroup(t, getUser()),
     ].filter(g => {

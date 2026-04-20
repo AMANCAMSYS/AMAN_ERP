@@ -71,7 +71,7 @@ function RevenueRecognition() {
     }
 
     const handleRecognize = async (scheduleId, periodIndex) => {
-        if (!confirm(t('accounting.confirm_recognize', 'هل تريد الاعتراف بإيرادات هذه الفترة؟'))) return
+        if (!confirm(t('accounting.confirm_recognize'))) return
         try {
             const res = await accountingAPI.recognizeRevenue(scheduleId, periodIndex)
             showToast(res.data.message, 'success')
@@ -89,9 +89,9 @@ function RevenueRecognition() {
 
     const getMethodLabel = (method) => {
         const map = {
-            straight_line: t('accounting.straight_line', 'خطي'),
-            percentage_completion: t('accounting.percentage_completion', 'نسبة الإنجاز'),
-            milestone: t('accounting.milestone', 'عند الإنجاز')
+            straight_line: t('accounting.straight_line'),
+            percentage_completion: t('accounting.percentage_completion'),
+            milestone: t('accounting.milestone')
         }
         return map[method] || method
     }
@@ -103,8 +103,8 @@ function RevenueRecognition() {
             <div className="workspace-header">
                 <BackButton />
                 <div>
-                    <h1 className="workspace-title">{t('accounting.revenue_recognition', 'الاعتراف بالإيراد')}</h1>
-                    <p className="workspace-subtitle">{t('accounting.revenue_desc', 'جداول الاعتراف بالإيرادات وفق IFRS 15')}</p>
+                    <h1 className="workspace-title">{t('accounting.revenue_recognition')}</h1>
+                    <p className="workspace-subtitle">{t('accounting.revenue_desc')}</p>
                 </div>
             </div>
 
@@ -112,27 +112,27 @@ function RevenueRecognition() {
             {summary && (
                 <div className="metrics-grid">
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.total_contract_value', 'إجمالي العقود')}</div>
+                        <div className="metric-label">{t('accounting.total_contract_value')}</div>
                         <div className="metric-value text-primary">{formatNumber(summary.total_contract_value || 0)} <small>{currency}</small></div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.recognized_revenue', 'إيراد معترف به')}</div>
+                        <div className="metric-label">{t('accounting.recognized_revenue')}</div>
                         <div className="metric-value text-success">{formatNumber(summary.total_recognized || 0)} <small>{currency}</small></div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.deferred_revenue', 'إيراد مؤجل')}</div>
+                        <div className="metric-label">{t('accounting.deferred_revenue')}</div>
                         <div className="metric-value text-warning">{formatNumber(summary.total_deferred || 0)} <small>{currency}</small></div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.recognition_pct', 'نسبة الاعتراف')}</div>
+                        <div className="metric-label">{t('accounting.recognition_pct')}</div>
                         <div className="metric-value" style={{ color: '#8b5cf6' }}>{summary.recognition_pct || 0}%</div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.active_schedules', 'جداول نشطة')}</div>
+                        <div className="metric-label">{t('accounting.active_schedules')}</div>
                         <div className="metric-value text-primary">{summary.active_schedules || 0}</div>
                     </div>
                     <div className="metric-card">
-                        <div className="metric-label">{t('accounting.completed_schedules', 'مكتملة')}</div>
+                        <div className="metric-label">{t('accounting.completed_schedules')}</div>
                         <div className="metric-value text-success">{summary.completed_schedules || 0}</div>
                     </div>
                 </div>
@@ -143,23 +143,23 @@ function RevenueRecognition() {
                 <div className="tabs">
                     <button className={`tab ${tab === 'list' ? 'active' : ''}`}
                         onClick={() => { setTab('list'); setSelectedSchedule(null) }}>
-                        {t('accounting.schedules', 'الجداول')}
+                        {t('accounting.schedules')}
                     </button>
                     {selectedSchedule && (
                         <button className={`tab ${tab === 'detail' ? 'active' : ''}`} onClick={() => setTab('detail')}>
-                            {t('common.details', 'التفاصيل')}
+                            {t('common.details')}
                         </button>
                     )}
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
-                    {showForm ? t('common.cancel', 'إلغاء') : t('accounting.add_schedule', '+ جدول جديد')}
+                    {showForm ? t('common.cancel') : t('accounting.add_schedule')}
                 </button>
             </div>
 
             {/* Create Form */}
             {showForm && (
                 <div className="section-card" style={{ marginBottom: 16 }}>
-                    <h3 className="section-title">{t('accounting.new_schedule', 'جدول اعتراف جديد (IFRS 15)')}</h3>
+                    <h3 className="section-title">{t('accounting.new_schedule')}</h3>
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                             <div className="form-group">

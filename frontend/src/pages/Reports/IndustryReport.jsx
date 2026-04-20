@@ -13,62 +13,52 @@ import { formatNumber } from '../../utils/format'
 const REPORT_CONFIG = {
   'food-cost': {
     icon: '🍽️', color: '#EF4444',
-    titleAr: 'تقرير تكلفة الطعام', titleEn: 'Food Cost Report',
-    descAr: 'نسبة تكلفة المواد الغذائية إلى الإيرادات', descEn: 'Food material cost vs revenue ratio',
+    titleKey: 'reports.industry.food_cost_title', descKey: 'reports.industry.food_cost_desc',
     endpoint: '/reports/industry/food-cost',
   },
   'production-cost': {
     icon: '🏭', color: '#6366f1',
-    titleAr: 'تقرير تكلفة الإنتاج', titleEn: 'Production Cost Report',
-    descAr: 'مقارنة التكلفة المخططة بالفعلية للإنتاج', descEn: 'Planned vs actual production cost',
+    titleKey: 'reports.industry.production_cost_title', descKey: 'reports.industry.production_cost_desc',
     endpoint: '/reports/industry/production-cost',
   },
   'progress-billing': {
     icon: '🏗️', color: '#F59E0B',
-    titleAr: 'مستخلصات المشاريع', titleEn: 'Progress Billing Report',
-    descAr: 'نسبة الإنجاز والفواتير لكل مشروع', descEn: 'Project completion & billing progress',
+    titleKey: 'reports.industry.progress_billing_title', descKey: 'reports.industry.progress_billing_desc',
     endpoint: '/reports/industry/progress-billing',
   },
   'utilization': {
     icon: '💼', color: '#8B5CF6',
-    titleAr: 'معدل الاستغلال', titleEn: 'Utilization Report',
-    descAr: 'ساعات العمل المفوترة مقابل المتاحة', descEn: 'Billable vs available hours',
+    titleKey: 'reports.industry.utilization_title', descKey: 'reports.industry.utilization_desc',
     endpoint: '/reports/industry/utilization',
   },
   'drug-expiry': {
     icon: '💊', color: '#10B981',
-    titleAr: 'صلاحية الأدوية والمنتجات', titleEn: 'Drug/Product Expiry Report',
-    descAr: 'المنتجات قريبة الانتهاء أو المنتهية', descEn: 'Products expiring or already expired',
+    titleKey: 'reports.industry.drug_expiry_title', descKey: 'reports.industry.drug_expiry_desc',
     endpoint: '/reports/industry/drug-expiry',
   },
   'workshop-revenue': {
     icon: '🔧', color: '#6B7280',
-    titleAr: 'إيرادات الورشة', titleEn: 'Workshop Revenue Report',
-    descAr: 'الإيرادات مقسومة حسب نوع الخدمة وقطع الغيار', descEn: 'Revenue breakdown by service type',
+    titleKey: 'reports.industry.workshop_revenue_title', descKey: 'reports.industry.workshop_revenue_desc',
     endpoint: '/reports/industry/workshop-revenue',
   },
   'ecom-returns': {
     icon: '🛒', color: '#3B82F6',
-    titleAr: 'تقرير المرتجعات', titleEn: 'Returns Analysis Report',
-    descAr: 'نسبة المرتجعات وأكثر المنتجات ارتجاعاً', descEn: 'Return rates and top returned products',
+    titleKey: 'reports.industry.ecom_returns_title', descKey: 'reports.industry.ecom_returns_desc',
     endpoint: '/reports/industry/ecom-returns',
   },
   'agent-performance': {
     icon: '📦', color: '#0EA5E9',
-    titleAr: 'أداء الوكلاء والمناديب', titleEn: 'Agent Performance Report',
-    descAr: 'مبيعات كل مندوب ونسبة التحصيل', descEn: 'Sales per agent and collection rate',
+    titleKey: 'reports.industry.agent_performance_title', descKey: 'reports.industry.agent_performance_desc',
     endpoint: '/reports/industry/agent-performance',
   },
   'fleet-tracking': {
     icon: '🚛', color: '#14B8A6',
-    titleAr: 'كفاءة الأسطول', titleEn: 'Fleet Efficiency Report',
-    descAr: 'أداء التوصيل والمركبات', descEn: 'Delivery performance & vehicle tracking',
+    titleKey: 'reports.industry.fleet_tracking_title', descKey: 'reports.industry.fleet_tracking_desc',
     endpoint: '/reports/industry/fleet-tracking',
   },
   'crop-yield': {
     icon: '🌾', color: '#65A30D',
-    titleAr: 'إنتاجية المحاصيل', titleEn: 'Crop Yield Report',
-    descAr: 'عوائد المنتجات الزراعية مقابل التكاليف', descEn: 'Crop revenue vs farming costs',
+    titleKey: 'reports.industry.crop_yield_title', descKey: 'reports.industry.crop_yield_desc',
     endpoint: '/reports/industry/crop-yield',
   },
 }
@@ -431,8 +421,7 @@ const RENDERERS = {
 // ═══════════════════════════════════════════
 export default function IndustryReport() {
   const { reportType } = useParams()
-  const { t, i18n } = useTranslation()
-  const isRTL = i18n.language === 'ar'
+  const { t } = useTranslation()
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -467,8 +456,8 @@ export default function IndustryReport() {
     )
   }
 
-  const title = isRTL ? config.titleAr : config.titleEn
-  const desc  = isRTL ? config.descAr  : config.descEn
+  const title = t(config.titleKey)
+  const desc  = t(config.descKey)
   const renderFn = RENDERERS[reportType]
 
   return (

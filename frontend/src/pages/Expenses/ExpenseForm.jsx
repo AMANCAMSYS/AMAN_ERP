@@ -106,7 +106,7 @@ export default function ExpenseForm() {
       
       const payload = {
         ...formData,
-        amount: parseFloat(formData.amount),
+        amount: formData.amount,
         treasury_id: formData.treasury_id ? parseInt(formData.treasury_id) : null,
         expense_account_id: formData.expense_account_id ? parseInt(formData.expense_account_id) : null,
         cost_center_id: formData.cost_center_id ? parseInt(formData.cost_center_id) : null,
@@ -203,10 +203,14 @@ export default function ExpenseForm() {
                 onChange={handleChange}
                 required
               >
+                <option value="travel">{t('expenses.types.travel')}</option>
+                <option value="meals">{t('expenses.types.meals')}</option>
+                <option value="supplies">{t('expenses.types.supplies')}</option>
+                <option value="transportation">{t('expenses.types.transportation')}</option>
+                <option value="entertainment">{t('expenses.types.entertainment')}</option>
                 <option value="materials">{t('expenses.types.materials')}</option>
                 <option value="labor">{t('expenses.types.labor')}</option>
                 <option value="services">{t('expenses.types.services')}</option>
-                <option value="travel">{t('expenses.types.travel')}</option>
                 <option value="rent">{t('expenses.types.rent')}</option>
                 <option value="utilities">{t('expenses.types.utilities')}</option>
                 <option value="salaries">{t('expenses.types.salaries')}</option>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assetsAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
+import { getCurrency } from '../../utils/auth';
 import { AlertTriangle, Play, DollarSign, TrendingDown, FileText, RefreshCw } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -10,6 +11,7 @@ const ImpairmentTest = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const { showToast } = useToast();
+    const currency = getCurrency();
     const [assets, setAssets] = useState([]);
     const [selectedAsset, setSelectedAsset] = useState('');
     const [impairments, setImpairments] = useState([]);
@@ -73,7 +75,7 @@ const ImpairmentTest = () => {
 
     const formatCurrency = (val) => {
         if (!val && val !== 0) return '—';
-        return new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { style: 'currency', currency: 'SAR', maximumFractionDigits: 0 }).format(val);
+        return new Intl.NumberFormat(i18n.language === 'ar' ? 'ar-SA' : 'en-SA', { style: 'currency', currency: currency, maximumFractionDigits: 0 }).format(val);
     };
 
     return (

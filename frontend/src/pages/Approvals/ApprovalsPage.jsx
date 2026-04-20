@@ -48,10 +48,6 @@ const ApprovalsPage = () => {
         fetchAllOnMount();
     }, []);
 
-    useEffect(() => {
-        fetchData();
-    }, [activeTab]);
-
     const fetchAllOnMount = async () => {
         try {
             const [pRes, rRes, wRes] = await Promise.allSettled([
@@ -242,7 +238,27 @@ const ApprovalsPage = () => {
                                                 <td>{item.requested_by_name || '—'}</td>
                                                 <td>{formatDate(item.created_at)}</td>
                                                 <td>
-                                                    <div className="badge badge-outline badge-sm">{t('approvals.table.step')} {item.current_step} / {item.total_steps}</div>
+                                                    {item.steps && item.steps.length > 0 ? (
+                                                        <div className="d-flex align-items-center" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                                            {item.steps.map((step, idx) => (
+                                                                <div key={idx} style={{ display: 'flex', alignItems: 'center' }}>
+                                                                    <span className={`badge badge-sm ${
+                                                                        step.status === 'approved' ? 'badge-success' :
+                                                                        step.status === 'rejected' ? 'badge-error' :
+                                                                        idx === (item.current_step || 1) - 1 ? 'badge-primary' :
+                                                                        'badge-ghost'
+                                                                    }`} style={{ borderRadius: '12px', fontSize: '10px', padding: '2px 8px' }}>
+                                                                        {step.approver_name || step.label || `${idx + 1}`}
+                                                                    </span>
+                                                                    {idx < item.steps.length - 1 && (
+                                                                        <span style={{ margin: '0 2px', opacity: 0.4, fontSize: '10px' }}>›</span>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="badge badge-outline badge-sm">{t('approvals.table.step')} {item.current_step} / {item.total_steps}</div>
+                                                    )}
                                                 </td>
                                                 {canAction && (
                                                     <td>
@@ -308,7 +324,8 @@ const ApprovalsPage = () => {
                                                 <td>{formatDate(item.created_at)}</td>
                                                 <td>{getStatusBadge(item.status)}</td>
                                                 <td>
-                                                    <button className="btn btn-ghost btn-xs text-primary" title={t('common.view_details')}>
+                                                    <button className="btn btn-ghost btn-xs text-primary" title={t('common.view_details')}
+                                                        onClick={() => navigate(`/approvals/requests/${item.id}`)}>
                                                         <Eye size={16} />
                                                     </button>
                                                 </td>

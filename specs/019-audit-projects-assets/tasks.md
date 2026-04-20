@@ -23,11 +23,11 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **CRITICAL**: US6 and US8 depend on T004 (revaluation columns). US3 depends on T003 (money column widening).
 
-- [ ] T001 [P] Add `retainer_amount DECIMAL(18,4) DEFAULT 0`, `billing_cycle VARCHAR(20)`, `next_billing_date DATE` to `projects` table in `backend/database.py` + create Alembic migration `backend/migrations/versions/<ts>_add_project_retainer_columns.py` (FR-009, data-model Change 1)
-- [ ] T002 [P] Add `updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP` to 15 tables in `backend/database.py` + create Alembic migration `backend/migrations/versions/<ts>_add_updated_at_to_project_asset_tables.py` (Constitution XVII, data-model Change 2)
-- [ ] T003 [P] Change 7 money columns from `NUMERIC(15,2)` to `DECIMAL(18,4)` across 4 tables (`asset_transfers`, `asset_revaluations`, `asset_maintenance`, `asset_insurance`) in `backend/database.py` + create Alembic migration `backend/migrations/versions/<ts>_widen_asset_money_columns.py` (Constitution I, data-model Change 3)
-- [ ] T004 [P] Add `current_value DECIMAL(18,4)` and `revaluation_surplus DECIMAL(18,4) DEFAULT 0` to `assets` table in `backend/database.py` + create Alembic migration with backfill `current_value = cost` in `backend/migrations/versions/<ts>_add_asset_revaluation_columns.py` (data-model Change 4)
-- [ ] T005 [P] Add 12 missing `CREATE INDEX IF NOT EXISTS` statements to `backend/database.py` + create Alembic migration `backend/migrations/versions/<ts>_add_project_asset_indexes.py` (data-model Change 5)
+- [X] T001 [P] Add `retainer_amount DECIMAL(18,4) DEFAULT 0`, `billing_cycle VARCHAR(20)`, `next_billing_date DATE` to `projects` table in `backend/database.py` + create Alembic migration `backend/alembic/versions/0003_add_project_retainer_columns.py` (FR-009, data-model Change 1)
+- [X] T002 [P] Add `updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP` to 15 tables in `backend/database.py` + create Alembic migration `backend/alembic/versions/0004_add_updated_at_columns.py` (Constitution XVII, data-model Change 2)
+- [X] T003 [P] Change 7 money columns from `NUMERIC(15,2)` to `DECIMAL(18,4)` across 4 tables (`asset_transfers`, `asset_revaluations`, `asset_maintenance`, `asset_insurance`) in `backend/database.py` + create Alembic migration `backend/alembic/versions/0005_widen_asset_money_columns.py` (Constitution I, data-model Change 3)
+- [X] T004 [P] Add `current_value DECIMAL(18,4)` and `revaluation_surplus DECIMAL(18,4) DEFAULT 0` to `assets` table in `backend/database.py` + create Alembic migration with backfill `current_value = cost` in `backend/alembic/versions/0006_add_asset_revaluation_columns.py` (data-model Change 4)
+- [X] T005 [P] Add 6 missing `CREATE INDEX IF NOT EXISTS` statements to `backend/database.py` + create Alembic migration `backend/alembic/versions/0007_add_project_asset_indexes.py` (data-model Change 5)
 
 **Checkpoint**: All schema changes applied. Backend story implementation can now begin.
 
@@ -39,9 +39,9 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Navigate to each page and verify it renders without console errors and all interactive features function.
 
-- [ ] T006 [P] [US1] Add `useRef` to React import and add `formatDate` to dateUtils import in `frontend/src/pages/Projects/ProjectDetails.jsx` (FR-011, FR-012)
-- [ ] T007 [P] [US1] Add `const [submitting, setSubmitting] = useState(false)` state declaration in `frontend/src/pages/Projects/Timesheets.jsx` (FR-013)
-- [ ] T008 [P] [US1] Fix `projectsAPI.listTasks` → `getTasks`, `p.name` → `p.project_name`, `t.name` → `t.task_name` in `frontend/src/pages/Projects/ProjectRisks.jsx` (FR-014, FR-015, FR-016)
+- [X] T006 [P] [US1] Add `useRef` to React import and add `formatDate` to dateUtils import in `frontend/src/pages/Projects/ProjectDetails.jsx` (FR-011, FR-012)
+- [X] T007 [P] [US1] Add `const [submitting, setSubmitting] = useState(false)` state declaration in `frontend/src/pages/Projects/Timesheets.jsx` (FR-013)
+- [X] T008 [P] [US1] Fix `projectsAPI.listTasks` → `getTasks`, `p.name` → `p.project_name`, `t.name` → `t.task_name` in `frontend/src/pages/Projects/ProjectRisks.jsx` (FR-014, FR-015, FR-016)
 
 **Checkpoint**: All 3 Projects frontend pages load and function without crashes.
 
@@ -53,15 +53,15 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Call each affected endpoint and verify correct data without SQL errors. Verify data types in DB match column definitions.
 
-- [ ] T009 [US2] Fix `t.name` → `t.task_name` in task dependency JOIN queries in `backend/routers/projects.py` (FR-001)
-- [ ] T010 [US2] Fix `JOIN users u` → `JOIN company_users cu` and update column references in risk listing in `backend/routers/projects.py` and amendment listing in `backend/routers/contracts.py` (FR-002)
-- [ ] T011 [US2] Create `ProjectRiskCreate` schema with `Literal["low","medium","high","critical"]` for `probability`/`impact` in `backend/schemas/projects.py`; replace raw `dict` parameter in risk creation endpoint in `backend/routers/projects.py` (FR-003)
-- [ ] T012 [US2] Add `p.branch_id` to SELECT column list in `approve_timesheets` query in `backend/routers/projects.py` (FR-004)
-- [ ] T013 [P] [US2] Fix `asset.purchase_cost` → `asset.cost` in impairment test carrying amount computation in `backend/routers/finance/assets.py` (FR-005)
-- [ ] T014 [US2] Fix `journal_entry_id` variable shadowing — assign GL service return value to the outer-scope variable in impairment test in `backend/routers/finance/assets.py` (FR-006)
-- [ ] T015 [US2] Fix `user_id=current_user.username` → `user_id=current_user.id` in `post_depreciation` GL call in `backend/routers/finance/assets.py` (FR-007)
-- [ ] T016 [US2] Add `branch_id` and `contract_type` to INSERT column list, VALUES, and parameter dict in `create_project` in `backend/routers/projects.py` (FR-008)
-- [ ] T017 [P] [US2] Fix `total_amount` → `total` and replace nonexistent `balance_due` with `total - COALESCE(paid_amount, 0)` in contract KPI queries in `backend/routers/contracts.py` (FR-010)
+- [X] T009 [US2] Fix `t.name` → `t.task_name` in task dependency JOIN queries in `backend/routers/projects.py` (FR-001)
+- [X] T010 [US2] Fix `JOIN users u` → `JOIN company_users cu` and update column references in risk listing in `backend/routers/projects.py` and amendment listing in `backend/routers/contracts.py` (FR-002)
+- [X] T011 [US2] Create `ProjectRiskCreate` schema with `Literal["low","medium","high","critical"]` for `probability`/`impact` in `backend/schemas/projects.py`; replace raw `dict` parameter in risk creation endpoint in `backend/routers/projects.py` (FR-003)
+- [X] T012 [US2] Add `p.branch_id` to SELECT column list in `approve_timesheets` query in `backend/routers/projects.py` (FR-004)
+- [X] T013 [P] [US2] Fix `asset.purchase_cost` → `asset.cost` in impairment test carrying amount computation in `backend/routers/finance/assets.py` (FR-005)
+- [X] T014 [US2] Fix `journal_entry_id` variable shadowing — assign GL service return value to the outer-scope variable in impairment test in `backend/routers/finance/assets.py` (FR-006)
+- [X] T015 [US2] Fix `user_id=current_user.username` → `user_id=current_user.id` in `post_depreciation` GL call in `backend/routers/finance/assets.py` (FR-007)
+- [X] T016 [US2] Add `branch_id` and `contract_type` to INSERT column list, VALUES, and parameter dict in `create_project` in `backend/routers/projects.py` (FR-008)
+- [X] T017 [P] [US2] Fix `total_amount` → `total` and replace nonexistent `balance_due` with `total - COALESCE(paid_amount, 0)` in contract KPI queries in `backend/routers/contracts.py` (FR-010)
 
 **Checkpoint**: All critical backend endpoints return correct data without SQL errors or type mismatches.
 
@@ -73,9 +73,9 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Create entities with precise monetary values (e.g., 1,234,567.89) and verify exact precision on round-trip with no floating-point artifacts.
 
-- [ ] T018 [P] [US3] Convert all monetary `float` fields to `Decimal` in `backend/schemas/projects.py` (9 fields), `backend/schemas/contracts.py` (5 fields), and `backend/schemas/assets.py` (4 fields); add `from decimal import Decimal` to each (FR-019, FR-020, FR-021)
-- [ ] T019 [P] [US3] Replace all `exchange_rate=1.0` float literals with `exchange_rate=Decimal("1")` in `backend/routers/projects.py`, `backend/routers/contracts.py`, and `backend/routers/finance/assets.py`; add `from decimal import Decimal` to each router (FR-022)
-- [ ] T020 [P] [US3] Replace `Mapped[float]` with `Mapped[Decimal]` for all `Numeric` columns in `backend/models/domains/projects_core.py`, `backend/models/domains/projects_execution.py`, and `backend/models/domains/projects_contracts_expenses.py`; add `from decimal import Decimal` (FR-023)
+- [X] T018 [P] [US3] Convert all monetary `float` fields to `Decimal` in `backend/schemas/projects.py` (9 fields), `backend/schemas/contracts.py` (5 fields), and `backend/schemas/assets.py` (4 fields); add `from decimal import Decimal` to each (FR-019, FR-020, FR-021)
+- [X] T019 [P] [US3] Replace all `exchange_rate=1.0` float literals with `exchange_rate=Decimal("1")` in `backend/routers/projects.py`, `backend/routers/contracts.py`, and `backend/routers/finance/assets.py`; add `from decimal import Decimal` to each router (FR-022)
+- [X] T020 [P] [US3] Replace `Mapped[float]` with `Mapped[Decimal]` for all `Numeric` columns in `backend/models/domain_models/projects_core.py`, `backend/models/domain_models/projects_execution.py`, and `backend/models/domain_models/projects_contracts_expenses.py`; add `from decimal import Decimal` (FR-023)
 
 **Checkpoint**: Zero `float` usage for monetary values across all three modules.
 
@@ -87,9 +87,9 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Navigate to each asset page and verify all data columns display correctly with proper Bootstrap styling.
 
-- [ ] T021 [P] [US4] Replace all Tailwind CSS classes (`bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs` etc.) with Bootstrap equivalents (`badge bg-success`, `badge bg-warning`, `badge bg-danger`, `badge bg-info`) in `frontend/src/pages/Assets/AssetManagement.jsx` (FR-018)
-- [ ] T022 [P] [US4] Standardize field names to match API response (`code`/`name` not `asset_code`/`asset_name`, consistent `branch_name`) across `frontend/src/pages/Assets/AssetList.jsx`, `frontend/src/pages/Assets/AssetDetails.jsx`, `frontend/src/pages/Assets/AssetForm.jsx`, and `frontend/src/pages/Assets/AssetManagement.jsx` (FR-042, FR-043)
-- [ ] T023 [P] [US4] Replace hardcoded `"SAR"` currency with company's configured currency from `AuthContext` (`user.currency`) in `frontend/src/pages/Assets/ImpairmentTest.jsx` (FR-049)
+- [X] T021 [P] [US4] Replace all Tailwind CSS classes (`bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs` etc.) with Bootstrap equivalents (`badge bg-success`, `badge bg-warning`, `badge bg-danger`, `badge bg-info`) in `frontend/src/pages/Assets/AssetManagement.jsx` (FR-018)
+- [X] T022 [P] [US4] Standardize field names to match API response (`code`/`name` not `asset_code`/`asset_name`, consistent `branch_name`) across `frontend/src/pages/Assets/AssetList.jsx`, `frontend/src/pages/Assets/AssetDetails.jsx`, `frontend/src/pages/Assets/AssetForm.jsx`, and `frontend/src/pages/Assets/AssetManagement.jsx` (FR-042, FR-043)
+- [X] T023 [P] [US4] Replace hardcoded `"SAR"` currency with company's configured currency from `AuthContext` (`user.currency`) in `frontend/src/pages/Assets/ImpairmentTest.jsx` (FR-049)
 
 **Checkpoint**: All asset pages display correct field values with proper Bootstrap styling and correct currency.
 
@@ -101,11 +101,11 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Trigger validation errors and verify correct HTTP status codes (400/422 not 500). List 50+ contracts and verify batched queries.
 
-- [ ] T024 [US5] Add `except HTTPException: raise` before generic `except Exception` handler in `create_contract` in `backend/routers/contracts.py` (FR-024)
-- [ ] T025 [US5] Create `ContractAmendmentCreate` schema (`amendment_type`, `effective_date`, `description`, `amount_change: Optional[Decimal]`) in `backend/schemas/contracts.py`; replace raw `dict` in `create_amendment` in `backend/routers/contracts.py` (FR-025)
-- [ ] T026 [US5] Add server-side `total` recalculation from `contract_items` (`SUM(quantity * unit_price)`) after update in `update_contract` in `backend/routers/contracts.py` (FR-026)
-- [ ] T027 [US5] Replace N+1 per-contract item query loop with single batched query `SELECT * FROM contract_items WHERE contract_id IN (:ids)` and group in Python in `list_contracts` in `backend/routers/contracts.py` (FR-027)
-- [ ] T028 [US5] Create `ContractUpdate` schema (all fields `Optional`) in `backend/schemas/contracts.py`; replace `ContractCreate` parameter in `update_contract` with `ContractUpdate` and build dynamic SET clause from non-None fields in `backend/routers/contracts.py` (FR-028)
+- [X] T024 [US5] Add `except HTTPException: raise` before generic `except Exception` handler in `create_contract` in `backend/routers/contracts.py` (FR-024)
+- [X] T025 [US5] Create `ContractAmendmentCreate` schema (`amendment_type`, `effective_date`, `description`, `amount_change: Optional[Decimal]`) in `backend/schemas/contracts.py`; replace raw `dict` in `create_amendment` in `backend/routers/contracts.py` (FR-025)
+- [X] T026 [US5] Add server-side `total` recalculation from `contract_items` (`SUM(quantity * unit_price)`) after update in `update_contract` in `backend/routers/contracts.py` (FR-026)
+- [X] T027 [US5] Replace N+1 per-contract item query loop with single batched query `SELECT * FROM contract_items WHERE contract_id IN (:ids)` and group in Python in `list_contracts` in `backend/routers/contracts.py` (FR-027)
+- [X] T028 [US5] Create `ContractUpdate` schema (all fields `Optional`) in `backend/schemas/contracts.py`; replace `ContractCreate` parameter in `update_contract` with `ContractUpdate` and build dynamic SET clause from non-None fields in `backend/routers/contracts.py` (FR-028)
 
 **Checkpoint**: Contract endpoints return correct error codes, validate all input via Pydantic, use batched queries, and support partial updates.
 
@@ -119,9 +119,9 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Depends on**: T003 (money column widening), T004 (revaluation columns)
 
-- [ ] T029 [US6] Persist depreciation schedules for declining balance, sum-of-years, and units-of-production methods in `create_asset` — INSERT into `asset_depreciation_schedule` with method-specific amounts in `backend/routers/finance/assets.py` (FR-029)
-- [ ] T030 [US6] Generate straight-line ROU depreciation schedule over lease term after ROU asset recognition in lease creation endpoint in `backend/routers/finance/assets.py` (FR-030)
-- [ ] T031 [US6] Add `POST /api/assets/leases/{lease_id}/post-payment` endpoint with interest/principal split per IFRS 16 in `backend/routers/finance/assets.py`; create `LeasePaymentCreate` schema (`payment_date`, `amount: Decimal`) in `backend/schemas/assets.py` (FR-031)
+- [X] T029 [US6] Persist depreciation schedules for declining balance, sum-of-years, and units-of-production methods in `create_asset` — INSERT into `asset_depreciation_schedule` with method-specific amounts in `backend/routers/finance/assets.py` (FR-029)
+- [X] T030 [US6] Generate straight-line ROU depreciation schedule over lease term after ROU asset recognition in lease creation endpoint in `backend/routers/finance/assets.py` (FR-030)
+- [X] T031 [US6] Add `POST /api/assets/leases/{lease_id}/post-payment` endpoint with interest/principal split per IFRS 16 in `backend/routers/finance/assets.py`; create `LeasePaymentCreate` schema (`payment_date`, `amount: Decimal`) in `backend/schemas/assets.py` (FR-031)
 
 **Checkpoint**: All depreciation methods persist schedules; IFRS 16 lease workflows (ROU depreciation + payment posting) are functional.
 
@@ -133,11 +133,11 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Access each static route and verify correct response. Submit invalid input (negative amounts, self-dependencies, reversed dates) and verify rejection with clear errors.
 
-- [ ] T032 [P] [US7] Move all static routes (`/resources/allocation`, `/reports/*`, `/alerts/*`, `/retainer/*`, `/summary`) before `/{project_id}` catch-all in `backend/routers/projects.py` (FR-036)
-- [ ] T033 [P] [US7] Move static routes (`/alerts/*`, `/stats/*`) before `/{contract_id}` catch-all in `backend/routers/contracts.py` (FR-037)
-- [ ] T034 [US7] Add `start_date <= end_date` validation in `create_project` and `task_id != depends_on_task_id` validation in `create_task_dependency` in `backend/routers/projects.py` (FR-038, FR-039)
-- [ ] T035 [US7] Create `ProjectRiskUpdate` and `TaskDependencyCreate` schemas in `backend/schemas/projects.py`; replace raw `dict` in risk update and task dependency endpoints in `backend/routers/projects.py` (FR-040)
-- [ ] T036 [P] [US7] Create `AssetTransferCreate`, `AssetRevaluationCreate`, `LeaseContractCreate`, and `ImpairmentTestInput` schemas in `backend/schemas/assets.py`; expand `AssetUpdate` to include all mutable fields; replace raw `dict` in corresponding endpoints in `backend/routers/finance/assets.py` (FR-041)
+- [X] T032 [P] [US7] Move all static routes (`/resources/allocation`, `/reports/*`, `/alerts/*`, `/retainer/*`, `/summary`) before `/{project_id}` catch-all in `backend/routers/projects.py` (FR-036)
+- [X] T033 [P] [US7] Move static routes (`/alerts/*`, `/stats/*`) before `/{contract_id}` catch-all in `backend/routers/contracts.py` (FR-037)
+- [X] T034 [US7] Add `start_date <= end_date` validation in `create_project` and `task_id != depends_on_task_id` validation in `create_task_dependency` in `backend/routers/projects.py` (FR-038, FR-039)
+- [X] T035 [US7] Create `ProjectRiskUpdate` and `TaskDependencyCreate` schemas in `backend/schemas/projects.py`; replace raw `dict` in risk update and task dependency endpoints in `backend/routers/projects.py` (FR-040)
+- [X] T036 [P] [US7] Create `AssetTransferCreate`, `AssetRevaluationCreate`, `LeaseContractCreate`, and `ImpairmentTestInput` schemas in `backend/schemas/assets.py`; expand `AssetUpdate` to include all mutable fields; replace raw `dict` in corresponding endpoints in `backend/routers/finance/assets.py` (FR-041)
 
 **Checkpoint**: All static routes resolve correctly; all endpoints validate input via Pydantic schemas.
 
@@ -151,10 +151,10 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Depends on**: T004 (revaluation columns `current_value`, `revaluation_surplus` must exist)
 
-- [ ] T037 [US8] Fix revaluation endpoint to update `current_value` instead of `cost` — preserve historical purchase cost in `backend/routers/finance/assets.py` (FR-032)
-- [ ] T038 [US8] Implement IAS 16.40 revaluation surplus check — on downward revaluation, reduce existing `revaluation_surplus` first before recognizing excess in P&L in `backend/routers/finance/assets.py` (FR-033)
-- [ ] T039 [US8] Cancel un-posted future depreciation schedule entries (`UPDATE ... SET status='cancelled' WHERE status='pending' AND period_start > :disposal_date`) on disposal in `backend/routers/finance/assets.py` (FR-034)
-- [ ] T040 [US8] Calculate pro-rata depreciation from period start to disposal date and post partial entry to GL on disposal in `backend/routers/finance/assets.py` (FR-035)
+- [X] T037 [US8] Fix revaluation endpoint to update `current_value` instead of `cost` — preserve historical purchase cost in `backend/routers/finance/assets.py` (FR-032)
+- [X] T038 [US8] Implement IAS 16.40 revaluation surplus check — on downward revaluation, reduce existing `revaluation_surplus` first before recognizing excess in P&L in `backend/routers/finance/assets.py` (FR-033)
+- [X] T039 [US8] Cancel un-posted future depreciation schedule entries (`UPDATE ... SET status='cancelled' WHERE status='pending' AND period_start > :disposal_date`) on disposal in `backend/routers/finance/assets.py` (FR-034)
+- [X] T040 [US8] Calculate pro-rata depreciation from period start to disposal date and post partial entry to GL on disposal in `backend/routers/finance/assets.py` (FR-035)
 
 **Checkpoint**: Revaluation preserves cost and tracks surplus per IAS 16; disposal handles partial depreciation and cancels future schedule entries.
 
@@ -166,10 +166,10 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Render Gantt for known date range and verify Saturday/Sunday highlighted. Check utilization labels and asset report counts.
 
-- [ ] T041 [P] [US9] Replace `index % 7` weekend detection with `date.getDay() === 0 || date.getDay() === 6` in `frontend/src/pages/Projects/GanttChart.jsx` (FR-044)
-- [ ] T042 [P] [US9] Fix duplicated utilization range — add distinct labels for <50% ("Light"), 50-79% ("Moderate"), >=80% ("Heavy") in `frontend/src/pages/Projects/ResourceUtilizationReport.jsx` (FR-045)
-- [ ] T043 [P] [US9] Update `summary()` method to accept and forward query parameters (`{ params }`) in `frontend/src/services/projects.js`; pass `branch_id` from caller in `frontend/src/pages/Projects/ProjectList.jsx` (FR-047)
-- [ ] T044 [P] [US9] Fix summary metric to show individual asset count instead of category count in depreciation tab in `frontend/src/pages/Assets/AssetReports.jsx` (FR-048)
+- [X] T041 [P] [US9] Replace `index % 7` weekend detection with `date.getDay() === 0 || date.getDay() === 6` in `frontend/src/pages/Projects/GanttChart.jsx` (FR-044)
+- [X] T042 [P] [US9] Fix duplicated utilization range — add distinct labels for <50% ("Light"), 50-79% ("Moderate"), >=80% ("Heavy") in `frontend/src/pages/Projects/ResourceUtilizationReport.jsx` (FR-045)
+- [X] T043 [P] [US9] Update `summary()` method to accept and forward query parameters (`{ params }`) in `frontend/src/services/projects.js`; pass `branch_id` from caller in `frontend/src/pages/Projects/ProjectList.jsx` (FR-047)
+- [X] T044 [P] [US9] Fix summary metric to show individual asset count instead of category count in depreciation tab in `frontend/src/pages/Assets/AssetReports.jsx` (FR-048)
 
 **Checkpoint**: Gantt weekends are calendar-correct; all report metrics display accurate data.
 
@@ -181,10 +181,10 @@ All 52 FRs from spec.md are covered. FR-017 (AssetManagement import path) is omi
 
 **Independent Test**: Trigger API errors on asset pages and verify toast appears. Attempt path traversal in document deletion and verify blocked. Trigger HTTPException in asset endpoints and verify correct status code (not 500).
 
-- [ ] T045 [P] [US10] Add `toast.error()` notifications to all `catch` blocks that only use `console.log`/`console.error` in `frontend/src/pages/Assets/AssetDetails.jsx` and `frontend/src/pages/Assets/LeaseContracts.jsx` (FR-046)
-- [ ] T046 [P] [US10] Add path traversal validation — `os.path.realpath()` + prefix check against configured uploads directory before `os.remove()` in document deletion in `backend/routers/projects.py` (FR-050)
-- [ ] T047 [P] [US10] Add `except HTTPException: raise` before generic `except Exception` handler in `post_depreciation` and `create_asset` in `backend/routers/finance/assets.py` (FR-051)
-- [ ] T048 [P] [US10] Remove duplicate `check_fiscal_period_open` call in `revalue_asset` in `backend/routers/finance/assets.py` (FR-052)
+- [X] T045 [P] [US10] Add `toast.error()` notifications to all `catch` blocks that only use `console.log`/`console.error` in `frontend/src/pages/Assets/AssetDetails.jsx` and `frontend/src/pages/Assets/LeaseContracts.jsx` (FR-046)
+- [X] T046 [P] [US10] Add path traversal validation — `os.path.realpath()` + prefix check against configured uploads directory before `os.remove()` in document deletion in `backend/routers/projects.py` (FR-050)
+- [X] T047 [P] [US10] Add `except HTTPException: raise` before generic `except Exception` handler in `post_depreciation` and `create_asset` in `backend/routers/finance/assets.py` (FR-051)
+- [X] T048 [P] [US10] Remove duplicate `check_fiscal_period_open` call in `revalue_asset` in `backend/routers/finance/assets.py` (FR-052)
 
 **Checkpoint**: All errors show user-visible feedback; path traversal blocked; HTTPExceptions propagate correctly.
 

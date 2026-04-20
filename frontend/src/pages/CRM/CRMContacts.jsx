@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { crmAPI } from '../../utils/api'
+import { crmAPI, partiesAPI } from '../../utils/api'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { useToast } from '../../context/ToastContext'
@@ -13,13 +13,15 @@ function CRMContacts() {
     const [search, setSearch] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [editingId, setEditingId] = useState(null)
+    const [customers, setCustomers] = useState([])   // T021: customer list for dropdown
+    const [customerSearch, setCustomerSearch] = useState('')  // T021: filter text
     const [form, setForm] = useState({
         customer_id: '', first_name: '', last_name: '', job_title: '',
         email: '', phone: '', mobile: '', department: '',
         is_primary: false, is_decision_maker: false, notes: ''
     })
 
-    useEffect(() => { fetchContacts() }, [])
+    useEffect(() => { fetchContacts(); fetchCustomers() }, [])
 
     const fetchContacts = async () => {
         try {
@@ -30,6 +32,16 @@ function CRMContacts() {
             console.error('Failed to fetch contacts', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    // T021: fetch customer list for the dropdown
+    const fetchCustomers = async () => {
+        try {
+            const res = await partiesAPI.getCustomers({ limit: 200 })
+            setCustomers(res.data?.items || res.data || [])
+        } catch (err) {
+            console.error('Failed to fetch customers', err)
         }
     }
 
@@ -55,6 +67,7 @@ function CRMContacts() {
     const resetForm = () => {
         setShowForm(false)
         setEditingId(null)
+        setCustomerSearch('')
         setForm({
             customer_id: '', first_name: '', last_name: '', job_title: '',
             email: '', phone: '', mobile: '', department: '',
@@ -116,10 +129,35 @@ function CRMContacts() {
                     </h3>
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.customer_id', 'رقم العميل')} *</label>
-                                <input className="form-input" type="number" required value={form.customer_id}
-                                    onChange={e => setForm({ ...form, customer_id: e.target.value })} />
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label className="form-label">{t('common.customer', 'العميل')} *</label>
+                                <input
+                                    className="form-input"
+                                    placeholder={t('common.search', 'بحث باسم العميل...')}
+                                    value={customerSearch}
+                                    onChange={e => setCustomerSearch(e.target.value)}
+                                    style={{ marginBottom: 4 }}
+                                />
+                                {customers.length === 0 ? (
+                                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+                                        {t('common.loading', 'جارٍ التحميل...')}
+                                    </p>
+                                ) : (
+                                    <select
+                                        className="form-input"
+                                        required
+                                        value={form.customer_id}
+                                        onChange={e => setForm({ ...form, customer_id: e.target.value })}
+                                    >
+                                        <option value="">{t('common.select_customer', '-- اختر العميل --')}</option>
+                                        {customers
+                                            .filter(c => !customerSearch ||
+                                                (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()))
+                                            .map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label className="form-label">{t('crm.first_name', 'الاسم الأول')} *</label>

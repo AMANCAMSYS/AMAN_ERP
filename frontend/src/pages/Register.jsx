@@ -86,8 +86,7 @@ function Register() {
                         type="button"
                         className="btn btn-light"
                         onClick={toggleLanguage}
-                        aria-label={t('common.language', 'Language')}
-                        title={t('common.language', 'Language')}
+                        title={t('common.language')}
                     >
                         {i18n.language === 'ar' ? 'EN' : 'AR'}
                     </button>
@@ -225,8 +224,7 @@ function Register() {
                     type="button"
                     className="btn btn-light"
                     onClick={toggleLanguage}
-                    aria-label={t('common.language', 'Language')}
-                    title={t('common.language', 'Language')}
+                    title={t('common.language')}
                 >
                     {i18n.language === 'ar' ? 'EN' : 'AR'}
                 </button>

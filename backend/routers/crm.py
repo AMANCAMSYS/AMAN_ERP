@@ -9,7 +9,7 @@ from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Dict, Any, Optional
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import logging
 
@@ -18,6 +18,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.accounting import generate_sequential_number
 from utils.audit import log_activity
+from services.notification_service import notification_service
 
 router = APIRouter(prefix="/crm", tags=["إدارة العلاقات CRM"], dependencies=[Depends(require_module("crm"))])
 logger = logging.getLogger(__name__)
@@ -90,6 +91,12 @@ OPPORTUNITY_STAGES = {
     "negotiation": 75,
     "won": 100,
     "lost": 0
+}
+
+# Whitelist of fields that may be updated via update_opportunity (FR-008)
+OPPORTUNITY_ALLOWED_FIELDS = {
+    "title", "stage", "probability", "expected_value",
+    "expected_close_date", "assigned_to", "notes", "lost_reason"
 }
 
 
@@ -223,10 +230,11 @@ def create_opportunity(data: OpportunityCreate, request: Request, current_user=D
 
 
 @router.put("/opportunities/{opp_id}", dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Request, current_user=Depends(get_current_user)):
+async def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        updates = {k: v for k, v in data.model_dump().items() if v is not None}
+        updates = {k: v for k, v in data.model_dump().items()
+                   if v is not None and k in OPPORTUNITY_ALLOWED_FIELDS}
         if not updates:
             raise HTTPException(**http_error(400, "no_data_to_update"))
         
@@ -240,6 +248,31 @@ def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Request, c
         db.execute(text(f"UPDATE sales_opportunities SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
         log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_opportunity", resource_type="opportunity", resource_id=str(opp_id), details={"fields_updated": list(updates.keys())}, request=request)
+
+        # Dispatch notification when opportunity stage changes to won or lost
+        stage = updates.get("stage")
+        if stage in ("won", "lost"):
+            try:
+                assigned = db.execute(
+                    text("SELECT assigned_to FROM sales_opportunities WHERE id = :id"),
+                    {"id": opp_id}
+                ).scalar()
+                if assigned:
+                    await notification_service.dispatch(
+                        db=get_db_connection(current_user.company_id),
+                        company_id=current_user.company_id,
+                        recipient_id=assigned,
+                        event_type=f"crm.opportunity_{stage}",
+                        title=f"الفرصة البيعية {'مكتسبة' if stage == 'won' else 'خاسرة'}",
+                        body=f"تم تحديث الفرصة #{opp_id} إلى مرحلة {stage}",
+                        feature_source="crm",
+                        reference_type="opportunity",
+                        reference_id=opp_id,
+                        link=f"/crm/opportunities/{opp_id}",
+                    )
+            except Exception as notif_err:
+                logger.warning("Failed to dispatch opportunity stage notification: %s", notif_err)
+
         return {"message": "تم التحديث"}
     finally:
         db.close()
@@ -361,11 +394,17 @@ def get_ticket(ticket_id: int, current_user=Depends(get_current_user)):
         result = dict(ticket._mapping)
         result["comments"] = [dict(c._mapping) for c in comments]
         
-        # SLA check
+        # SLA check (FR-007)
         if ticket.status not in ('resolved', 'closed'):
-            hours_open = (datetime.now() - ticket.created_at).total_seconds() / 3600
-            result["sla_breached"] = hours_open > (ticket.sla_hours or 24)
-            result["hours_open"] = round(hours_open, 1)
+            sla_hours = ticket.sla_hours
+            if not sla_hours:
+                result["sla_status"] = "sla_not_configured"
+            else:
+                now = datetime.now(timezone.utc)
+                hours_open = (now - ticket.created_at).total_seconds() / 3600
+                result["sla_breached"] = hours_open > sla_hours
+                result["hours_open"] = round(hours_open, 1)
+                result["sla_status"] = "breached" if hours_open > sla_hours else "within_sla"
         
         return result
     finally:
@@ -410,7 +449,7 @@ def create_ticket(data: TicketCreate, request: Request, current_user=Depends(get
 
 
 @router.put("/tickets/{ticket_id}", dependencies=[Depends(require_permission(["sales.create", "projects.edit"]))])
-def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, current_user=Depends(get_current_user)):
+async def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         updates = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -428,6 +467,26 @@ def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, current_
         db.execute(text(f"UPDATE support_tickets SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
         log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_update_ticket", resource_type="ticket", resource_id=str(ticket_id), details={"fields_updated": list(updates.keys())}, request=request)
+
+        # Dispatch notification when ticket is assigned to a user
+        assigned_to = updates.get("assigned_to")
+        if assigned_to:
+            try:
+                await notification_service.dispatch(
+                    db=get_db_connection(current_user.company_id),
+                    company_id=current_user.company_id,
+                    recipient_id=assigned_to,
+                    event_type="crm.ticket_assigned",
+                    title="تم تعيين تذكرة دعم إليك",
+                    body=f"تم تعيين التذكرة #{ticket_id} إليك",
+                    feature_source="crm",
+                    reference_type="ticket",
+                    reference_id=ticket_id,
+                    link=f"/crm/tickets/{ticket_id}",
+                )
+            except Exception as notif_err:
+                logger.warning("Failed to dispatch ticket assignment notification: %s", notif_err)
+
         return {"message": "تم التحديث"}
     finally:
         db.close()
@@ -468,15 +527,24 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
             raise HTTPException(**http_error(404, "opportunity_not_found"))
         opp = opp._mapping
 
+        # T003: Block duplicate conversion — check if quotation already exists
+        if opp.get("won_quotation_id"):
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "quotation_already_exists", "quotation_id": opp["won_quotation_id"]}
+            )
+
+        # T008: Use http_error helper (Constitution IV)
         if not opp.get("customer_id"):
-            raise HTTPException(status_code=400, detail="يجب تحديد عميل للفرصة قبل التحويل")
+            raise HTTPException(**http_error(400, "opportunity_no_customer"))
 
-        # Generate quotation number
-        quot_num = generate_sequential_number(db, f"QT-{datetime.now().year}", "sales_quotations", "quotation_number")
+        # T004: Fix generate_sequential_number column name: "quotation_number" → "sq_number"
+        quot_num = generate_sequential_number(db, f"QT-{datetime.now().year}", "sales_quotations", "sq_number")
 
+        # T005: Fix INSERT column names: quotation_number → sq_number, valid_until → expiry_date
         quot_id = db.execute(text("""
             INSERT INTO sales_quotations (
-                quotation_number, customer_id, quotation_date, valid_until,
+                sq_number, customer_id, quotation_date, expiry_date,
                 subtotal, tax_amount, discount, total, status, notes, created_by, branch_id
             ) VALUES (
                 :num, :cust, CURRENT_DATE, CURRENT_DATE + INTERVAL '30 days',
@@ -492,10 +560,10 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
             "branch": opp.get("branch_id")
         }).scalar()
 
-        # Add a quotation line with opportunity value
+        # T006: Fix line INSERT column name: quotation_id → sq_id
         if opp.get("expected_value") and opp["expected_value"] > 0:
             db.execute(text("""
-                INSERT INTO sales_quotation_lines (quotation_id, description, quantity, unit_price, tax_rate, discount, total)
+                INSERT INTO sales_quotation_lines (sq_id, description, quantity, unit_price, tax_rate, discount, total)
                 VALUES (:qid, :desc, 1, :price, 0, 0, :price)
             """), {
                 "qid": quot_id,
@@ -503,8 +571,12 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
                 "price": opp["expected_value"]
             })
 
-        # Update opportunity stage to 'proposal'
-        db.execute(text("UPDATE sales_opportunities SET stage = 'proposal', updated_at = NOW() WHERE id = :id"), {"id": opp_id})
+        # T007: Write won_quotation_id back to opportunity + update stage to 'proposal'
+        db.execute(text("""
+            UPDATE sales_opportunities
+            SET stage = 'proposal', won_quotation_id = :qid, updated_at = NOW()
+            WHERE id = :id
+        """), {"qid": quot_id, "id": opp_id})
         db.commit()
 
         log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_convert_opportunity_to_quotation", resource_type="opportunity", resource_id=str(opp_id), details={"quotation_id": quot_id, "quotation_number": quot_num}, request=request)
@@ -663,12 +735,12 @@ def delete_campaign(campaign_id: int, request: Request, current_user=Depends(get
 # ---- Campaign Execution ----
 
 @router.post("/campaigns/{campaign_id}/execute", dependencies=[Depends(require_permission("crm.campaign_execute"))])
-def execute_campaign(campaign_id: int, request: Request, current_user=Depends(get_current_user)):
+async def execute_campaign(campaign_id: int, request: Request, current_user=Depends(get_current_user)):
     """Execute campaign: fetch segment contacts, create recipient records, dispatch notifications."""
     db = get_db_connection(current_user.company_id)
     try:
         campaign = db.execute(text("""
-            SELECT id, segment_id, campaign_type, subject, content, status
+            SELECT id, segment_id, campaign_type, subject, content, status, created_by
             FROM marketing_campaigns WHERE id = :id
         """), {"id": campaign_id}).fetchone()
 
@@ -743,6 +815,26 @@ def execute_campaign(campaign_id: int, request: Request, current_user=Depends(ge
 
         db.commit()
         log_activity(db, user_id=current_user.id, username=getattr(current_user, "username", ""), action="crm_execute_campaign", resource_type="campaign", resource_id=str(campaign_id), details={"total_recipients": total_created}, request=request)
+
+        # Notify campaign creator about execution completion
+        campaign_creator = c.get("created_by")
+        if campaign_creator:
+            try:
+                await notification_service.dispatch(
+                    db=get_db_connection(current_user.company_id),
+                    company_id=current_user.company_id,
+                    recipient_id=campaign_creator,
+                    event_type="crm.campaign_executed",
+                    title="تم تنفيذ الحملة التسويقية",
+                    body=f"تم إرسال الحملة #{campaign_id} إلى {total_created} مستلم",
+                    feature_source="crm",
+                    reference_type="campaign",
+                    reference_id=campaign_id,
+                    link=f"/campaigns/{campaign_id}/report",
+                )
+            except Exception as notif_err:
+                logger.warning("Failed to dispatch campaign execution notification: %s", notif_err)
+
         return {
             "message": "Campaign executed successfully",
             "total_recipients": total_created,
@@ -1707,7 +1799,7 @@ def crm_dashboard(current_user=Depends(get_current_user)):
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'active') as active,
                 COALESCE(SUM(budget), 0) as total_budget,
-                COALESCE(SUM(conversion_count), 0) as total_conversions
+                COALESCE(SUM(total_responded), 0) as total_conversions
             FROM marketing_campaigns
         """)).fetchone()
 
@@ -1834,32 +1926,32 @@ def campaign_roi_analytics(current_user=Depends(get_current_user)):
     try:
         rows = db.execute(text("""
             SELECT id, name, campaign_type, status, budget,
-                   COALESCE(sent_count, 0) as sent,
-                   COALESCE(open_count, 0) as opens,
-                   COALESCE(click_count, 0) as clicks,
-                   COALESCE(conversion_count, 0) as conversions,
-                   CASE WHEN COALESCE(sent_count, 0) > 0
-                        THEN ROUND(100.0 * COALESCE(open_count, 0) / sent_count, 1) ELSE 0 END as open_rate,
-                   CASE WHEN COALESCE(open_count, 0) > 0
-                        THEN ROUND(100.0 * COALESCE(click_count, 0) / open_count, 1) ELSE 0 END as click_rate,
-                   CASE WHEN COALESCE(sent_count, 0) > 0
-                        THEN ROUND(100.0 * COALESCE(conversion_count, 0) / sent_count, 1) ELSE 0 END as conversion_rate,
-                   CASE WHEN budget > 0 AND COALESCE(conversion_count, 0) > 0
-                        THEN ROUND(budget / conversion_count, 2) ELSE 0 END as cost_per_conversion,
+                   COALESCE(total_sent, 0) as sent,
+                   COALESCE(total_opened, 0) as opens,
+                   COALESCE(total_clicked, 0) as clicks,
+                   COALESCE(total_responded, 0) as conversions,
+                   CASE WHEN COALESCE(total_sent, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(total_opened, 0) / total_sent, 1) ELSE 0 END as open_rate,
+                   CASE WHEN COALESCE(total_opened, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(total_clicked, 0) / total_opened, 1) ELSE 0 END as click_rate,
+                   CASE WHEN COALESCE(total_sent, 0) > 0
+                        THEN ROUND(100.0 * COALESCE(total_responded, 0) / total_sent, 1) ELSE 0 END as conversion_rate,
+                   CASE WHEN budget > 0 AND COALESCE(total_responded, 0) > 0
+                        THEN ROUND(budget / total_responded, 2) ELSE 0 END as cost_per_conversion,
                    start_date, end_date
             FROM marketing_campaigns
-            ORDER BY COALESCE(conversion_count, 0) DESC
+            ORDER BY COALESCE(total_responded, 0) DESC
         """)).fetchall()
 
         # Summary
         summary = db.execute(text("""
             SELECT
                 COALESCE(SUM(budget), 0) as total_investment,
-                COALESCE(SUM(conversion_count), 0) as total_conversions,
-                CASE WHEN SUM(COALESCE(conversion_count, 0)) > 0
-                     THEN ROUND(SUM(budget) / SUM(conversion_count), 2) ELSE 0 END as avg_cpc,
-                CASE WHEN SUM(COALESCE(sent_count, 0)) > 0
-                     THEN ROUND(100.0 * SUM(COALESCE(conversion_count, 0)) / SUM(sent_count), 2)
+                COALESCE(SUM(total_responded), 0) as total_conversions,
+                CASE WHEN SUM(COALESCE(total_responded, 0)) > 0
+                     THEN ROUND(SUM(budget) / SUM(total_responded), 2) ELSE 0 END as avg_cpc,
+                CASE WHEN SUM(COALESCE(total_sent, 0)) > 0
+                     THEN ROUND(100.0 * SUM(COALESCE(total_responded, 0)) / SUM(total_sent), 2)
                      ELSE 0 END as overall_conversion_rate
             FROM marketing_campaigns
         """)).fetchone()

@@ -182,6 +182,20 @@ function StockHome() {
                             {i18n.t('reports.inventory_valuation.title')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
+                        {hasPermission('inventory.forecast_view') && (
+                            <div className="link-item" onClick={() => navigate('/inventory/forecast')}>
+                                <span className="link-icon">📉</span>
+                                {i18n.t('nav.demand_forecast')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
+                        {hasPermission('inventory.forecast_generate') && (
+                            <div className="link-item" onClick={() => navigate('/inventory/forecast/generate')}>
+                                <span className="link-icon">➕</span>
+                                {i18n.t('forecast.generate_forecast')}
+                                <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -5,23 +5,23 @@ import { dashboardAPI } from '../../services/dashboard'
 import BackButton from '../../components/common/BackButton'
 
 const WIDGET_TYPES = [
-    { value: 'kpi_card', label: 'KPI Card' },
-    { value: 'bar_chart', label: 'Bar Chart' },
-    { value: 'line_chart', label: 'Line Chart' },
-    { value: 'pie_chart', label: 'Pie Chart' },
-    { value: 'table', label: 'Table' },
-    { value: 'gauge', label: 'Gauge' },
+    { value: 'kpi_card', labelKey: 'analytics.editor.widget_kpi_card' },
+    { value: 'bar_chart', labelKey: 'analytics.editor.widget_bar_chart' },
+    { value: 'line_chart', labelKey: 'analytics.editor.widget_line_chart' },
+    { value: 'pie_chart', labelKey: 'analytics.editor.widget_pie_chart' },
+    { value: 'table', labelKey: 'analytics.editor.widget_table' },
+    { value: 'gauge', labelKey: 'analytics.editor.widget_gauge' },
 ]
 
 const DATA_SOURCES = [
-    { value: 'revenue', label: 'Revenue' },
-    { value: 'expenses', label: 'Expenses' },
-    { value: 'cash_position', label: 'Cash Position' },
-    { value: 'top_customers', label: 'Top Customers' },
-    { value: 'inventory_turnover', label: 'Inventory Turnover' },
-    { value: 'ar_aging', label: 'AR Aging' },
-    { value: 'ap_aging', label: 'AP Aging' },
-    { value: 'sales_pipeline', label: 'Sales Pipeline' },
+    { value: 'revenue', labelKey: 'analytics.editor.source_revenue' },
+    { value: 'expenses', labelKey: 'analytics.editor.source_expenses' },
+    { value: 'cash_position', labelKey: 'analytics.editor.source_cash_position' },
+    { value: 'top_customers', labelKey: 'analytics.editor.source_top_customers' },
+    { value: 'inventory_turnover', labelKey: 'analytics.editor.source_inventory_turnover' },
+    { value: 'ar_aging', labelKey: 'analytics.editor.source_ar_aging' },
+    { value: 'ap_aging', labelKey: 'analytics.editor.source_ap_aging' },
+    { value: 'sales_pipeline', labelKey: 'analytics.editor.source_sales_pipeline' },
 ]
 
 function DashboardEditor() {
@@ -81,7 +81,7 @@ function DashboardEditor() {
                 ...form,
                 widgets: widgets.map(w => ({
                     widget_type: w.widget_type,
-                    title: w.title || `${w.data_source} widget`,
+                    title: w.title || `${w.data_source} ${t('analytics.editor.widget')}`,
                     data_source: w.data_source,
                     filters: {},
                     position: w.position,
@@ -196,7 +196,7 @@ function DashboardEditor() {
                                             onChange={(e) => updateWidget(index, 'widget_type', e.target.value)}
                                         >
                                             {WIDGET_TYPES.map(wt => (
-                                                <option key={wt.value} value={wt.value}>{wt.label}</option>
+                                                <option key={wt.value} value={wt.value}>{t(wt.labelKey)}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -208,7 +208,7 @@ function DashboardEditor() {
                                             onChange={(e) => updateWidget(index, 'data_source', e.target.value)}
                                         >
                                             {DATA_SOURCES.map(ds => (
-                                                <option key={ds.value} value={ds.value}>{ds.label}</option>
+                                                <option key={ds.value} value={ds.value}>{t(ds.labelKey)}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -219,10 +219,10 @@ function DashboardEditor() {
                                             value={widget.position?.width || 3}
                                             onChange={(e) => updateWidget(index, 'position', { ...widget.position, width: Number(e.target.value) })}
                                         >
-                                            <option value={3}>3 (quarter)</option>
-                                            <option value={4}>4 (third)</option>
-                                            <option value={6}>6 (half)</option>
-                                            <option value={12}>12 (full)</option>
+                                            <option value={3}>3 ({t('analytics.editor.quarter')})</option>
+                                            <option value={4}>4 ({t('analytics.editor.third')})</option>
+                                            <option value={6}>6 ({t('analytics.editor.half')})</option>
+                                            <option value={12}>12 ({t('analytics.editor.full')})</option>
                                         </select>
                                     </div>
                                 </div>

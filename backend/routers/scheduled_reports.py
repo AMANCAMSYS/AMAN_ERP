@@ -45,7 +45,7 @@ class ScheduledReportCreate(BaseModel):
     report_type: str
     report_config: Optional[dict] = None
     frequency: str  # daily, weekly, monthly
-    recipients: str  # comma-separated emails
+    recipients: List[str]  # list of email addresses (stored as JSONB)
     format: str = "pdf"
     branch_id: Optional[int] = None
 
@@ -129,7 +129,7 @@ def create_scheduled_report(
             "type": data.report_type,
             "config": json.dumps(data.report_config or {}),
             "freq": data.frequency,
-            "recipients": data.recipients,
+            "recipients": json.dumps(data.recipients),
             "fmt": data.format,
             "branch": data.branch_id,
             "uid": current_user.id,
@@ -179,7 +179,7 @@ def update_scheduled_report(
             "type": data.report_type,
             "config": json.dumps(data.report_config or {}),
             "freq": data.frequency,
-            "recipients": data.recipients,
+            "recipients": json.dumps(data.recipients),
             "fmt": data.format,
             "branch": data.branch_id,
             "next_run": next_run,
@@ -447,10 +447,66 @@ def _execute_scheduled_report(company_id: str, report_config: dict):
                    {"id": report_id})
         db.commit()
 
+        # Parse report_config for parameters
+        config = report_config.get("report_config") or {}
+        if isinstance(config, str):
+            config = json.loads(config)
+
+        # Default date range: last 30 days
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        if config:
+            start_date = config.get('start_date', start_date)
+            end_date = config.get('end_date', end_date)
+
+        branch_id = config.get('branch_id') or report_config.get('branch_id')
+        account_id = config.get('account_id')
+
+        # Import report helpers
+        from routers.reports import (
+            _get_profit_loss_data,
+            _get_balance_sheet_data,
+            _get_trial_balance_data,
+            _get_cashflow_data,
+            _get_general_ledger_data,
+        )
+
+        # Dispatcher mapping report_type to helper
+        REPORT_DISPATCHERS = {
+            'profit_loss': lambda: _get_profit_loss_data(db, start_date, end_date, branch_id),
+            'balance_sheet': lambda: _get_balance_sheet_data(db, end_date, branch_id),
+            'trial_balance': lambda: _get_trial_balance_data(db, start_date, end_date, branch_id),
+            'cashflow': lambda: _get_cashflow_data(db, start_date, end_date, branch_id),
+            'general_ledger': lambda: _get_general_ledger_data(db, account_id, start_date, end_date, branch_id),
+        }
+
+        dispatcher = REPORT_DISPATCHERS.get(report_type)
+        if not dispatcher:
+            db.execute(text("""
+                UPDATE scheduled_reports
+                SET last_status = 'failed', last_run_at = NOW(), updated_at = NOW()
+                WHERE id = :id
+            """), {"id": report_id})
+            db.commit()
+            logger.warning(f"Unsupported report type '{report_type}' for scheduled report #{report_id}")
+            return
+
+        result_data = dispatcher()
+
+        # Store result in scheduled_report_results
+        db.execute(text("""
+            INSERT INTO scheduled_report_results
+            (scheduled_report_id, report_data, generated_at, status)
+            VALUES (:report_id, :data, NOW(), 'completed')
+        """), {
+            "report_id": report_id,
+            "data": json.dumps(result_data, default=str),
+        })
+
+        # Update scheduled_reports metadata
         frequency = report_config["frequency"]
         next_run = _calculate_next_run(frequency)
 
-        # Actual report generation + email would be called here
         db.execute(text("""
             UPDATE scheduled_reports SET
                 last_run_at = NOW(), last_status = 'completed',
@@ -462,7 +518,8 @@ def _execute_scheduled_report(company_id: str, report_config: dict):
     except Exception as e:
         logger.error(f"Scheduled report #{report_id} failed: {e}")
         try:
-            db.execute(text("UPDATE scheduled_reports SET last_status = 'failed', updated_at = NOW() WHERE id = :id"),
+            db.rollback()
+            db.execute(text("UPDATE scheduled_reports SET last_status = 'failed', last_run_at = NOW(), updated_at = NOW() WHERE id = :id"),
                        {"id": report_id})
             db.commit()
         except Exception:

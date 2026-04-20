@@ -38,7 +38,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
             flexWrap: 'wrap', gap: '8px', fontSize: '14px'
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary, #6b7280)' }}>
-                <span>{t('pagination.showing', 'عرض')} {startItem}-{endItem} {t('pagination.of', 'من')} {totalItems}</span>
+                <span>{t('pagination.showing')} {startItem}-{endItem} {t('pagination.of')} {totalItems}</span>
                 {onPageSizeChange && (
                     <select
                         value={pageSize}
@@ -51,7 +51,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                         }}
                     >
                         {PAGE_SIZES.map(size => (
-                            <option key={size} value={size}>{size} / {t('pagination.page', 'صفحة')}</option>
+                            <option key={size} value={size}>{size} / {t('pagination.page')}</option>
                         ))}
                     </select>
                 )}
@@ -62,7 +62,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                     onClick={() => onPageChange(1)}
                     disabled={currentPage === 1}
                     className="pagination-btn"
-                    title={t('pagination.first', 'الأولى')}
+                    title={t('pagination.first')}
                     style={btnStyle(currentPage === 1)}
                 >
                     <FirstIcon size={16} />
@@ -71,7 +71,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                     className="pagination-btn"
-                    title={t('pagination.previous', 'السابقة')}
+                    title={t('pagination.previous')}
                     style={btnStyle(currentPage === 1)}
                 >
                     <PrevIcon size={16} />
@@ -100,7 +100,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                     className="pagination-btn"
-                    title={t('pagination.next', 'التالية')}
+                    title={t('pagination.next')}
                     style={btnStyle(currentPage === totalPages)}
                 >
                     <NextIcon size={16} />
@@ -109,7 +109,7 @@ export default function Pagination({ currentPage, totalItems, pageSize, onPageCh
                     onClick={() => onPageChange(totalPages)}
                     disabled={currentPage === totalPages}
                     className="pagination-btn"
-                    title={t('pagination.last', 'الأخيرة')}
+                    title={t('pagination.last')}
                     style={btnStyle(currentPage === totalPages)}
                 >
                     <LastIcon size={16} />

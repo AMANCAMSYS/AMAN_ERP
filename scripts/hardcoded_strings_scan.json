@@ -1,0 +1,2992 @@
+{
+  "frontend_total_hits": 3121,
+  "backend_total_hits": 9471,
+  "frontend_top_files": [
+    [
+      "frontend/src/components/GlobalSearch.jsx",
+      370
+    ],
+    [
+      "frontend/src/pages/Reports/IndustryReport.jsx",
+      63
+    ],
+    [
+      "frontend/src/pages/CRM/PipelineAnalytics.jsx",
+      54
+    ],
+    [
+      "frontend/src/pages/Setup/OnboardingWizard.jsx",
+      38
+    ],
+    [
+      "frontend/src/pages/Manufacturing/ProductionAnalytics.jsx",
+      36
+    ],
+    [
+      "frontend/src/pages/Register.jsx",
+      35
+    ],
+    [
+      "frontend/src/pages/Manufacturing/CapacityPlanning.jsx",
+      35
+    ],
+    [
+      "frontend/src/pages/Taxes/TaxCompliance.jsx",
+      32
+    ],
+    [
+      "frontend/src/pages/Approvals/ApprovalsPage.jsx",
+      32
+    ],
+    [
+      "frontend/src/pages/Projects/ProjectRisks.jsx",
+      31
+    ],
+    [
+      "frontend/src/pages/Buying/PurchaseInvoiceForm.jsx",
+      29
+    ],
+    [
+      "frontend/src/pages/Assets/AssetDetails.jsx",
+      29
+    ],
+    [
+      "frontend/src/pages/HR/Employees.jsx",
+      27
+    ],
+    [
+      "frontend/src/pages/Dashboard.jsx",
+      26
+    ],
+    [
+      "frontend/src/pages/Accounting/ZakatCalculator.jsx",
+      26
+    ],
+    [
+      "frontend/src/pages/POS/CustomerDisplay.jsx",
+      26
+    ],
+    [
+      "frontend/src/pages/CRM/CRMHome.jsx",
+      25
+    ],
+    [
+      "frontend/src/pages/Reports/ReportCenter.jsx",
+      25
+    ],
+    [
+      "frontend/src/pages/Settings/CompanySettings.jsx",
+      25
+    ],
+    [
+      "frontend/src/pages/CRM/SalesForecasts.jsx",
+      24
+    ],
+    [
+      "frontend/src/pages/CRM/CRMDashboard.jsx",
+      24
+    ],
+    [
+      "frontend/src/pages/Taxes/WithholdingTax.jsx",
+      24
+    ],
+    [
+      "frontend/src/pages/Sales/InvoiceForm.jsx",
+      24
+    ],
+    [
+      "frontend/src/pages/Projects/ResourceUtilizationReport.jsx",
+      23
+    ],
+    [
+      "frontend/src/pages/Treasury/ChecksReceivable.jsx",
+      23
+    ],
+    [
+      "frontend/src/pages/Treasury/ChecksPayable.jsx",
+      23
+    ],
+    [
+      "frontend/src/pages/POS/ThermalPrintSettings.jsx",
+      23
+    ],
+    [
+      "frontend/src/pages/Taxes/TaxHome.jsx",
+      22
+    ],
+    [
+      "frontend/src/pages/Manufacturing/ProductionOrderDetails.jsx",
+      22
+    ],
+    [
+      "frontend/src/pages/Reports/ScheduledReports.jsx",
+      21
+    ],
+    [
+      "frontend/src/pages/Sales/InvoicePrintModal.jsx",
+      21
+    ],
+    [
+      "frontend/src/pages/Sales/ReceiptForm.jsx",
+      21
+    ],
+    [
+      "frontend/src/pages/CRM/LeadScoring.jsx",
+      20
+    ],
+    [
+      "frontend/src/pages/Projects/ProjectDetails.jsx",
+      20
+    ],
+    [
+      "frontend/src/config/industryModules.js",
+      19
+    ],
+    [
+      "frontend/src/pages/Assets/AssetForm.jsx",
+      19
+    ],
+    [
+      "frontend/src/pages/Assets/ImpairmentTest.jsx",
+      19
+    ],
+    [
+      "frontend/src/pages/Campaign/CampaignReport.jsx",
+      19
+    ],
+    [
+      "frontend/src/components/Sidebar.jsx",
+      18
+    ],
+    [
+      "frontend/src/components/Topbar.jsx",
+      18
+    ],
+    [
+      "frontend/src/pages/Sales/ContractDetails.jsx",
+      18
+    ],
+    [
+      "frontend/src/pages/Accounting/RevenueRecognition.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/CRM/CRMContacts.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/CRM/Opportunities.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/Taxes/TaxCalendar.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/Purchases/PaymentForm.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/Sales/InvoiceDetails.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/Sales/SalesReturnForm.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/POS/POSOfflineManager.jsx",
+      16
+    ],
+    [
+      "frontend/src/pages/CRM/MarketingCampaigns.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/Buying/BuyingReturnForm.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/Buying/PurchaseInvoiceDetails.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/Manufacturing/JobCards.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/Manufacturing/EquipmentMaintenance.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/HR/Reports/PayrollReport.jsx",
+      15
+    ],
+    [
+      "frontend/src/pages/CRM/CustomerSegments.jsx",
+      14
+    ],
+    [
+      "frontend/src/pages/Expenses/ExpenseForm.jsx",
+      14
+    ],
+    [
+      "frontend/src/pages/Stock/QualityInspections.jsx",
+      14
+    ],
+    [
+      "frontend/src/pages/Stock/ProductForm.jsx",
+      14
+    ],
+    [
+      "frontend/src/pages/CPQ/Configurator.jsx",
+      14
+    ]
+  ],
+  "backend_top_files": [
+    [
+      "backend/routers/roles.py",
+      356
+    ],
+    [
+      "backend/database.py",
+      328
+    ],
+    [
+      "backend/routers/reports.py",
+      277
+    ],
+    [
+      "backend/services/kpi_service.py",
+      240
+    ],
+    [
+      "backend/routers/purchases.py",
+      233
+    ],
+    [
+      "backend/scripts/seed_v3_comprehensive.py",
+      225
+    ],
+    [
+      "backend/routers/manufacturing/core.py",
+      195
+    ],
+    [
+      "backend/routers/projects.py",
+      176
+    ],
+    [
+      "backend/routers/finance/accounting.py",
+      160
+    ],
+    [
+      "backend/routers/crm.py",
+      158
+    ],
+    [
+      "backend/routers/dashboard.py",
+      157
+    ],
+    [
+      "backend/routers/system_completion.py",
+      156
+    ],
+    [
+      "backend/tests/test_29_inventory_advanced.py",
+      126
+    ],
+    [
+      "backend/scripts/populate_all_tables.py",
+      120
+    ],
+    [
+      "backend/services/industry_gl_rules.py",
+      118
+    ],
+    [
+      "backend/main.py",
+      115
+    ],
+    [
+      "backend/routers/hr/core.py",
+      115
+    ],
+    [
+      "backend/tests/test_21_accounting_advanced.py",
+      109
+    ],
+    [
+      "backend/tests/test_40_hr_advanced.py",
+      109
+    ],
+    [
+      "backend/routers/finance/checks.py",
+      102
+    ],
+    [
+      "backend/routers/finance/taxes.py",
+      99
+    ],
+    [
+      "backend/services/industry_kpi_service.py",
+      97
+    ],
+    [
+      "backend/tests/test_18_reports_dashboard.py",
+      90
+    ],
+    [
+      "backend/tests/test_19_checks_notes.py",
+      88
+    ],
+    [
+      "backend/tests/test_20_taxes_fiscal.py",
+      86
+    ],
+    [
+      "backend/routers/approvals.py",
+      85
+    ],
+    [
+      "backend/tests/test_11_sales_scenarios.py",
+      82
+    ],
+    [
+      "backend/tests/test_15_hr_scenarios.py",
+      77
+    ],
+    [
+      "backend/routers/finance/treasury.py",
+      75
+    ],
+    [
+      "backend/routers/finance/tax_compliance.py",
+      74
+    ],
+    [
+      "backend/tests/test_34_complete_business_cycles.py",
+      73
+    ],
+    [
+      "backend/tests/test_17_manufacturing_pos.py",
+      73
+    ],
+    [
+      "backend/routers/finance/expenses.py",
+      73
+    ],
+    [
+      "backend/tests/test_22_integration_workflow.py",
+      72
+    ],
+    [
+      "backend/routers/auth.py",
+      71
+    ],
+    [
+      "backend/tests/test_33_checks_notes_due_alerts.py",
+      67
+    ],
+    [
+      "backend/tests/test_25_budgets_contracts_projects_advanced.py",
+      66
+    ],
+    [
+      "backend/routers/finance/reconciliation.py",
+      65
+    ],
+    [
+      "backend/tests/test_35_crm.py",
+      64
+    ],
+    [
+      "backend/routers/sales/invoices.py",
+      63
+    ],
+    [
+      "backend/tests/test_13_inventory_scenarios.py",
+      62
+    ],
+    [
+      "backend/services/email_service.py",
+      61
+    ],
+    [
+      "backend/routers/finance/notes.py",
+      60
+    ],
+    [
+      "backend/routers/role_dashboards.py",
+      59
+    ],
+    [
+      "backend/routers/hr_wps_compliance.py",
+      59
+    ],
+    [
+      "backend/tests/test_16_assets_projects_contracts.py",
+      59
+    ],
+    [
+      "backend/routers/finance/budgets.py",
+      58
+    ],
+    [
+      "backend/routers/sales/credit_notes.py",
+      58
+    ],
+    [
+      "backend/routers/hr/performance.py",
+      57
+    ],
+    [
+      "backend/routers/scheduled_reports.py",
+      56
+    ],
+    [
+      "backend/tests/test_09_integration.py",
+      56
+    ],
+    [
+      "backend/tests/test_23_recurring_opening_closing.py",
+      56
+    ],
+    [
+      "backend/routers/inventory/shipments.py",
+      56
+    ],
+    [
+      "backend/tests/test_security_authentication.py",
+      55
+    ],
+    [
+      "backend/tests/test_12_purchases_scenarios.py",
+      55
+    ],
+    [
+      "backend/tests/test_accounting_integrity.py",
+      54
+    ],
+    [
+      "backend/routers/inventory/advanced.py",
+      51
+    ],
+    [
+      "backend/routers/finance/assets.py",
+      51
+    ],
+    [
+      "backend/routers/sales/vouchers.py",
+      51
+    ],
+    [
+      "backend/routers/companies.py",
+      50
+    ]
+  ],
+  "frontend_samples": [
+    {
+      "file": "frontend/src/App.jsx",
+      "text": "element={isAuthenticated() ? <Navigate to=",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "text": "replace /> : <Navigate to=",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "text": "replace />} />\n                <Route path=",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/App.jsx",
+      "text": "element={isAuthenticated() ? <PrivateRoute><NotFound /></PrivateRoute> : <Navigate to=",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": ",\n  // US feature modules (cross-cutting)",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "}\n\n// ===== خصائص الصفحات حسب النشاط =====\n// كل مفتاح = ميزة في واجهة المستخدم\n// القيمة = مصفوفة أكواد الأنشطة التي تُظهر هذه الميزة\n//",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                                     // إدارة الطاولات: مطاعم فقط",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                                     // شاشة المطبخ: مطاعم فقط",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                  // شاشة العميل: أنشطة بها POS",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                        // برامج الولاء: تجزئة وصيدليات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                  // العروض والخصومات\n\n  // ------- المبيعات -------",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "], // عقود البيع: أنشطة B2B والمشاريع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": ",                                            // العمولات: جميع الأنشطة\n\n  // ------- المشتريات -------",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],           // طلب عروض الأسعار: مشتريات ضخمة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],    // اتفاقيات الموردين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                       // تقييم الموردين\n\n  // ------- CRM -------",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],    // الحملات التسويقية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],         // قاعدة المعرفة: شركات الخدمات\n\n  // ------- الموارد البشرية -------",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],                // عهد الموظفين: صناعة وورش",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "],   // الإضافي: أنشطة بها وردية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": ",                                           // التأمينات: جميع الأنشطة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": ",                                           // التدريب: جميع الأنشطة\n}\n\n/**\n * تحقق إذا كانت الميزة تظهر لنشاط معين\n * @param {string} featu",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/config/industryModules.js",
+      "text": "* @param {string} industryKey - رمز النشاط مثل",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/utils/auth.js",
+      "text": "auth: partial credentials found:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/utils/auth.js",
+      "text": "Error parsing user from localStorage",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/utils/auth.js",
+      "text": ", companyId)\n    }\n    // حفظ نوع النشاط التجاري أو مسحه (يضمن إعادة التوجيه للمعالج عند الشركات الجديدة)\n    if (user?.industry_type) {\n   ",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/utils/auth.js",
+      "text": ", user.industry_type)\n    } else {\n        // clear any stale value from a previous company login\n        localStorage.removeItem(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/services/apiClient.js",
+      "text": ";\n            } else if (status >= 400 && status < 500) {\n                if (typeof detail ===",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/services/apiClient.js",
+      "text": ";\n                }\n            } else if (status >= 500) {\n                message = lang ===",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/services/inventory.js",
+      "text": "/inventory/warehouses/${id}/current-stock?t=${new Date().getTime()}",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Keep forecast as a direct sidebar link only if user cannot access Treasury home.\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // POS Module\n        if (hasPermission([",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Blanket POs (US10)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // 3-Way Matching (US2)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Demand Forecast (US14)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Manufacturing Module\n        if (hasPermission([",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Shop Floor Control (US15)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Projects Module\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Time Tracking (US17)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Resource Planning (US18)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // CRM Module\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Campaign Management (US11)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Services Module\n        if ((hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Expenses Module\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Taxes Module\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": ")) {\n            // Reports are usually general but we can tie them to",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "module key\n            if (isModuleEnabled(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Sidebar.jsx",
+      "text": "})\n        }\n        // Performance Reviews (US12)\n        if (hasPermission(",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": ") {\n                navigate(`/projects`); // Ideally to specific project if resource_id is project_id\n            } else if (notif.resource",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                    <span style={{ display:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": ")}\n                    </span>\n                    <kbd style={{\n                        fontSize:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}\n                        >\n                            <span style={{ display:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}</span>\n                            </span>\n                            <span style={{ fontSize:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}\n                                </div>\n                                <div style={{ height:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}\n                    >\n                        🔔\n                        {unreadCount > 0 && (\n                            <span style={{\n",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": ",\n                            zIndex: 200,\n                        }}>\n                            <div style={{\n                           ",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                                <span style={{ fontWeight:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                                    <div style={{ fontSize:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}\n                                    >\n                                        <div style={{ fontWeight: notif.is_read ?",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                                            {notif.title}\n                                        </div>\n                               ",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                                            {notif.message}\n                                        </div>\n                             ",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                                            {new Date(notif.created_at).toLocaleDateString(i18n.language ===",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>\n                            <div style={{ fontSize:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>{user?.full_name}</div>\n                            <div style={{ fontSize:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}}>ID: {companyId}</div>\n                        </div>\n                        <div style={{\n                            width:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Topbar.jsx",
+      "text": "}\n                                </div>\n                            )}\n                            <div style={{ height:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "ErrorBoundary caught:",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "Something went wrong",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "An unexpected error occurred. Please try again.",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "Error Details",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "Try Again",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/ErrorBoundary.jsx",
+      "text": "Reload Page",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/Layout.jsx",
+      "text": "Session sync failed",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مساحة العمل",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "شجرة الحسابات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Chart of Accounts",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "القيود اليومية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Journal Entries",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "قيد يومي جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Journal Entry",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "السنوات المالية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Fiscal Years",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "القوالب المتكررة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Recurring Templates",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مقارنة الفترات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Period Comparison",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "الأرصدة الافتتاحية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Opening Balances",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "قيود الإقفال",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Closing Entries",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مراكز التكلفة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Cost Centers",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "cost center",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "الميزانيات المتقدمة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Advanced Budgets",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "advanced budget",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقرير الضريبة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "VAT Report",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "القيمة المضافة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تدقيق الضرائب",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Tax Audit",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "التدفق النقدي",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Cash Flow Report",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "cash flow",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "دفتر الأستاذ",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "General Ledger",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "ميزان المراجعة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Trial Balance",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "قائمة الدخل",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Income Statement",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "الميزانية العمومية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Balance Sheet",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "balance sheet",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Zakat Calculator",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أقفال الفترات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Fiscal Period Locks",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مجموعات الكيانات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Entity Groups",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "بين الشركات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "معاملات بين الشركات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Intercompany Transactions",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "معاملة جديدة بين الشركات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Intercompany Transaction",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تجميع القوائم المالية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "ربط الحسابات بين الشركات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Intercompany Account Mappings",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "عميل جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Customer",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فواتير المبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Sales Invoices",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فاتورة جديدة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Invoice",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أوامر البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Sales Orders",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أمر بيع جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Sales Order",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "عروض الأسعار",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "عرض سعر",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "عرض سعر جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Quotation",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مجموعات العملاء",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Customer Groups",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مرتجعات المبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Sales Returns",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إيصالات القبض",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Customer Receipts",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعارات دائنة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Credit Notes",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "credit note",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعار دائن",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعارات مدينة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Debit Notes",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "debit note",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعار مدين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Sales Commissions",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أوامر التسليم",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Delivery Orders",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقارير المبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Sales Reports",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "كشف حساب العميل",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Customer Statement",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "كشف حساب",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقرير الأعمار",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Aging Report",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Point of Sale",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "بيع مباشر",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "شاشة البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "POS Interface",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "العروض والخصومات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "برامج الولاء",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Loyalty Programs",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إدارة الطاولات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Table Management",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "شاشة المطبخ",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Kitchen Display",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "نقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مورد جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Supplier",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فواتير المشتريات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Invoices",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فاتورة مشتريات جديدة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Purchase Invoice",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أوامر الشراء",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Orders",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أمر شراء",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "أمر شراء جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Purchase Order",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مرتجعات المشتريات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Returns",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "سداد الموردين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Supplier Payments",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "مجموعات الموردين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Supplier Groups",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعارات دائنة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Credit Notes",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعار دائن",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعارات مدينة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Debit Notes",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "إشعار مدين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "طلبات عروض الأسعار",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "طلب عرض سعر",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقييم الموردين",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Supplier Ratings",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "اتفاقيات الشراء",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Agreements",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "التكاليف المضافة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Landed Costs",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "landed cost",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقارير المشتريات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Purchase Reports",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "كشف حساب المورد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Supplier Statement",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "كشف حساب",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "المطابقة الثلاثية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "3-Way Matching",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "حدود التفاوت",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Tolerance Configuration",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "منتج جديد",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "New Product",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فئات المنتجات",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Product Categories",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تحويل مخزون",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Stock Transfer",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تسويات المخزون",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Stock Adjustments",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "الشحنات الواردة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Incoming Shipments",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "قوائم الأسعار",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Price Lists",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "price list",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "الأرقام التسلسلية",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Serial Numbers",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "فحص الجودة",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Quality Inspections",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "العد الدوري",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Cycle Counts",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "cycle count",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقارير المخزون",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Stock Reports",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "حركات المخزون",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Stock Movements",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "تقرير التقييم",
+      "lang": "ar"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "Inventory Valuation",
+      "lang": "en"
+    },
+    {
+      "file": "frontend/src/components/GlobalSearch.jsx",
+      "text": "طبقات التكلفة",
+      "lang": "ar"
+    }
+  ],
+  "backend_samples": [
+    {
+      "file": "backend/test_notif_pref.py",
+      "text": ")\n    except Exception as e:\n        print(",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "AMAN ERP - Configuration Settings",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "إعدادات النظام",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "# Comma-separated trusted proxy IPs/CIDRs allowed to set X-Forwarded-For.\n    # Example:",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "SECRET_KEY: str\n    ALGORITHM: str =",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "ACCESS_TOKEN_EXPIRE_MINUTES: int = 30\n    REFRESH_TOKEN_EXPIRE_DAYS: int = 7\n    \n    # Admin password hash (bcrypt). Generate with: python ",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "# Comma-separated list of allowed origins for production (overrides FRONTEND_URL_PRODUCTION)\n    # e.g.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "# Leave empty to disable Sentry\n    SENTRY_TRACES_SAMPLE_RATE: float = 0.1\n\n    # ── SEC-008: Validate SECRET_KEY strength ─────────────────",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": ")\n    @classmethod\n    def validate_secret_key(cls, v: str) -> str:\n        if len(v) < 32:\n            raise ValueError(",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "SECRET_KEY has insufficient entropy (too many repeated characters).",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "SEC-006: Write a .pgpass file so that CLI tools (psql, pg_dump, etc.)\n    never need PGPASSWORD in the environment.  File is chmod 0600.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": ")\n    # System users (e.g. Docker non-root) may have home=/nonexistent\n    if not os.path.isdir(home):\n        home =",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "try:\n        # Read existing content to avoid duplicates\n        existing =",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": "if os.path.exists(pgpass_path):\n            with open(pgpass_path,",
+      "lang": "en"
+    },
+    {
+      "file": "backend/config.py",
+      "text": ") as f:\n                existing = f.read()\n\n        if line not in existing:\n            with open(pgpass_path,",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Internal helper to get or create a cached engine (LRU eviction).",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "if not company_id:\n        raise ValueError(",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Context manager for safe database connection handling\n    \n    Usage:\n        with db_connection(company_id) as db:\n            result = db.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns a session to the company specific database using cached engine",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "conn.execute(text(f'CREATE DATABASE",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": ": admin_password})\n            conn.execute(text(f'GRANT ALL PRIVILEGES ON DATABASE",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "TO {db_user}'))\n            conn.execute(text(f'ALTER DATABASE",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "OWNER TO {db_user}'))\n        \n        logger.info(f",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": ", db_name, db_user\n        \n    except Exception as e:\n        logger.exception(",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for all 91 tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for remaining tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Organization and HR tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Financial, Assets, Tax, Projects tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for Treasury tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for Multi-Currency System tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for Contracts & Subscriptions tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for Costing Policy tables",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for advanced inventory tables (Batch, Serial, Expiry, QC, Cycle Counts)",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Returns SQL for Phase 2 advanced inventory: Variants, Bins, Kits",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "SQL for Advanced Manufacturing (Phase 5)",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Create tenant schema from canonical SQL blocks, then stamp Alembic head.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Split SQL safely, preserving PostgreSQL $$...$$ and $tag$...$tag$ blocks.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "\" and not in_double_quote:\n                if in_single_quote and i + 1 < len(sql_block) and sql_block[i + 1] == \"",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "' and not in_single_quote:\n                in_double_quote = not in_double_quote\n                current.append(char)\n                i += 1",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "and not in_single_quote and not in_double_quote:\n                statement =",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Stamp Alembic head for a freshly created company database.",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Command not found: {' '.join(alembic_cmd)}",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Execution failed for {' '.join(alembic_cmd)}: {exc}",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "✅ Alembic head stamped for {db_name}",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "stderr = (result.stderr or",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": ").strip()\n            stdout = (result.stdout or",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": ").strip()\n            details = stderr or stdout or",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "except Exception as e:\n        logger.error(f",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Initialize default data for company",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": ": true}'\n            })\n            \n            # Default Roles - comprehensive roles with permissions\n            conn.execute(text(",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "]', true),\n                ('admin', 'مدير', 'صلاحيات إدارية كاملة', '[",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "]', true),\n                ('manager', 'مدير فرع', 'إدارة المبيعات والمشتريات والمخزون', '[",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إدارة المحاسبة والتقارير المالية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إدارة المبيعات ونقاط البيع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أمين مستودع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إدارة المخزون والمنتجات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "نقطة البيع والمبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "صلاحيات محدودة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "حقوق الملكية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Chart of Accounts\n            sub_accounts = [\n                # 1. Assets\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أصول متداولة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Current Assets",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "النقد وما في حكمه",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الصندوق الرئيسي",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Main Box",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "العملاء والذمم المدينة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Accounts Receivable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مخزون المواد الأولية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Raw Materials Inventory",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مخزون الإنتاج التام",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Finished Goods Inventory",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أعمال تحت التشغيل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Work In Progress",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "حسابات بين الفروع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Intercompany Accounts",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "سلف وقروض الموظفين",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Employee Loans",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروفات مدفوعة مقدماً",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Prepaid Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أصول ثابتة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Fixed Assets",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الآلات والمعدات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "السيارات ووسائل النقل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الأثاث والمفروشات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "المباني والإنشاءات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أجهزة حاسوب وأنظمة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الإهلاك المتراكم",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Accumulated Depreciation",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # Prepayments & Special Current Assets\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مدفوعات مقدمة للموردين",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Prepayments to Suppliers",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ضريبة المدخلات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Input VAT (Receivable)",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "شيكات تحت التحصيل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Checks Under Collection",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أوراق قبض",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Notes Receivable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خصوم متداولة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Current Liabilities",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الموردين والذمم الدائنة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Accounts Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصاريف مستحقة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Accrued Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مشتريات مستلمة غير مفوترة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Unbilled Received Purchases",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ضريبة القيمة المضافة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "VAT Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ضريبة المخرجات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Output VAT",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "شيكات تحت الدفع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Checks Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "التأمينات الاجتماعية المستحقة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "GOSI Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "عربون / دفعات مقدمة من العملاء",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Customer Deposits",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أوراق دفع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Notes Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خصوم غير متداولة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Non-Current Liabilities",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "قروض طويلة الأجل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Long Term Loans",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مخصص نهاية الخدمة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "End of Service Provision",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "رأس المال",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الأرباح المبقاة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Retained Earnings",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أرباح العام الحالي",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Current Year Earnings",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الجارى والمسحوبات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Owner Withdrawals",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إيرادات التشغيل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Operating Revenue",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مبيعات البضائع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Sales of Goods",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إيرادات الخدمات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Service Revenue",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مردودات المبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Sales Returns",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خصم مبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Sales Discount",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إيرادات أخرى",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Other Revenue",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أرباح فروقات عملة (محققة)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Realized FX Gain",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أرباح فروقات عملة (غير محققة)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Unrealized FX Gain",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تكلفة البضاعة المباعة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Cost of Goods Sold",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تكلفة مبيعات البضائع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تكلفة التصنيع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Manufacturing Cost",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تكلفة العمالة المباشرة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Direct Labor Cost",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "المصاريف الصناعية العامة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Manufacturing Overhead",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "المصروفات التشغيلية والإدارية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Operating Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الرواتب والأجور",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف الإيجار",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Rent Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الكهرباء والمياه",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الاتصالات والإنترنت",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الرسوم الحكومية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Government Fees",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "التسويق والإعلان",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصاريف السفر والتنقل",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Travel Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروفات عمومية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "General Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف التأمينات الاجتماعية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "GOSI Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف التأمين",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Insurance Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف النظافة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Cleaning Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف القرطاسية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Stationery Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف الضيافة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Hospitality Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "المصروفات المالية والبنكية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Financial Charges",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الرسوم البنكية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Bank Fees",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خسائر فروقات عملة (محققة)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Realized FX Loss",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خسائر فروقات عملة (غير محققة)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Unrealized FX Loss",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروفات أخرى",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Other Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خسائر استبعاد الأصول",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Asset Disposal Loss",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "فروقات صندوق (زيادة/نقصان)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Cash Over/Short",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "فروقات تسوية المخزون",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Inventory Adjustment",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # ── COA-001: Intangible Assets ──\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أصول غير ملموسة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Intangible Assets",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "براءات اختراع وعلامات تجارية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "حقوق التأليف والنشر",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الإطفاء المتراكم",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Accumulated Amortization",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "أصل حق الاستخدام",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Right of Use Asset",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # ── COA-002: Tax accounts ──\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ضريبة الاستقطاع",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Withholding Tax Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ضريبة الدخل المستحقة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Income Tax Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "الزكاة المستحقة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Zakat Payable",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تسوية ضريبة القيمة المضافة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "VAT Settlement",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # ── COA-003/004: Additional Expenses ──\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروفات قانونية",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Legal Expenses",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف التدقيق والمراجعة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Audit Fees",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "عمولات المبيعات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Sales Commissions",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "علاقات عامة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Public Relations",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # ── COA-005: Other Revenue ──\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "فوائد محصلة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Interest Income",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "توزيعات أرباح",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Dividend Income",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "ربح بيع أصول",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Gain on Asset Disposal",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "خصومات مكتسبة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Purchase Discounts",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "),\n\n                # ── COA-006: HR, Provisions, Prepaid sub-accounts ──\n                (",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "بدلات الموظفين",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Employee Allowances",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "العمل الإضافي",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Overtime Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مكافآت نهاية الخدمة (مصروف)",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Termination Benefits Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف الإجازات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Leave Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مصروف ديون معدومة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Bad Debt Expense",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مخصص الإجازات",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Leave Provision",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "مخصص الديون المعدومة",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Allowance for Doubtful Debts",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "إيجار مدفوع مقدماً",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Prepaid Rent",
+      "lang": "en"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "تأمين مدفوع مقدماً",
+      "lang": "ar"
+    },
+    {
+      "file": "backend/database.py",
+      "text": "Prepaid Insurance",
+      "lang": "en"
+    }
+  ]
+}

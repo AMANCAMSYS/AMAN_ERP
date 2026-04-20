@@ -51,7 +51,7 @@ const ExpensePolicies = () => {
             resetForm();
             fetchPolicies();
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error');
+            showToast(err.response?.data?.detail || t('common.error'), 'error');
         }
     };
 
@@ -74,7 +74,7 @@ const ExpensePolicies = () => {
             showToast(t('expenses.policy_deleted'), 'success');
             fetchPolicies();
         } catch (err) {
-            showToast(err.response?.data?.detail || 'Error', 'error');
+            showToast(err.response?.data?.detail || t('common.error'), 'error');
         }
     };
 
@@ -141,12 +141,18 @@ const ExpensePolicies = () => {
                                     <select className="form-input" value={form.expense_type}
                                         onChange={e => setForm(p => ({ ...p, expense_type: e.target.value }))}>
                                         <option value="">{t('expense_policies.filter_all')}</option>
-                                        <option value="travel">{t('expense_policies.filter_travel')}</option>
-                                        <option value="meals">{t('expense_policies.filter_meals')}</option>
-                                        <option value="supplies">{t('expense_policies.filter_supplies')}</option>
-                                        <option value="transportation">{t('expense_policies.filter_transportation')}</option>
-                                        <option value="entertainment">{t('expense_policies.filter_entertainment')}</option>
-                                        <option value="other">{t('expense_policies.filter_other')}</option>
+                                        <option value="travel">{t('expenses.types.travel')}</option>
+                                        <option value="meals">{t('expenses.types.meals')}</option>
+                                        <option value="supplies">{t('expenses.types.supplies')}</option>
+                                        <option value="transportation">{t('expenses.types.transportation')}</option>
+                                        <option value="entertainment">{t('expenses.types.entertainment')}</option>
+                                        <option value="materials">{t('expenses.types.materials')}</option>
+                                        <option value="labor">{t('expenses.types.labor')}</option>
+                                        <option value="services">{t('expenses.types.services')}</option>
+                                        <option value="rent">{t('expenses.types.rent')}</option>
+                                        <option value="utilities">{t('expenses.types.utilities')}</option>
+                                        <option value="salaries">{t('expenses.types.salaries')}</option>
+                                        <option value="other">{t('expenses.types.other')}</option>
                                     </select>
                                 </div>
                             </div>

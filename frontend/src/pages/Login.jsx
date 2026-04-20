@@ -66,7 +66,7 @@ function Login() {
                 window.location.href = '/dashboard'
             }
         } catch (err) {
-            setError(err.response?.data?.detail || t('auth.sso_login_failed', 'SSO login failed'))
+            setError(err.response?.data?.detail || t('auth.sso_login_failed'))
         } finally {
             setSsoLoading(false)
         }
@@ -81,7 +81,7 @@ function Login() {
         const isSystemAdmin = formData.username.trim() === 'admin'
 
         if (!isSystemAdmin && !formData.company_code.trim()) {
-            setError(t('auth.company_code_required', 'رمز الشركة مطلوب'))
+            setError(t('auth.company_code_required'))
             setLoading(false)
             return
         }
@@ -113,7 +113,7 @@ function Login() {
             }
         } catch (err) {
             if (err.response?.status === 429) {
-                setError(t('auth.rate_limited', 'محاولات كثيرة، يرجى الانتظار قبل المحاولة مجدداً'))
+                setError(t('auth.rate_limited'))
             } else {
                 setError(err.response?.data?.detail || t('auth.login_failed'))
             }
@@ -137,9 +137,9 @@ function Login() {
             }
         } catch (err) {
             if (err.response?.status === 429) {
-                setError(t('auth.rate_limited', 'محاولات كثيرة، يرجى الانتظار قبل المحاولة مجدداً'))
+                setError(t('auth.rate_limited'))
             } else {
-                setError(err.response?.data?.detail || t('auth.2fa_invalid', 'رمز المصادقة الثنائية غير صحيح'))
+                setError(err.response?.data?.detail || t('auth.2fa_invalid'))
             }
         } finally {
             setLoading(false)
@@ -153,8 +153,7 @@ function Login() {
                     type="button"
                     className="btn btn-light"
                     onClick={toggleLanguage}
-                    aria-label={t('common.language', 'Language')}
-                    title={t('common.language', 'Language')}
+                    title={t('common.language')}
                 >
                     {i18n.language === 'ar' ? 'EN' : 'AR'}
                 </button>
@@ -170,11 +169,11 @@ function Login() {
                 {show2FA ? (
                     <form onSubmit={handle2FASubmit}>
                         <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
-                            {twoFAMessage || t('auth.2fa_prompt', 'يرجى إدخال رمز المصادقة الثنائية')}
+                            {twoFAMessage || t('auth.2fa_prompt')}
                         </p>
                         <div className="form-group">
                             <label className="form-label" htmlFor="totp_code">
-                                {t('auth.2fa_code', 'رمز التحقق')}
+                                {t('auth.2fa_code')}
                             </label>
                             <input
                                 type="text"
@@ -191,7 +190,7 @@ function Login() {
                             />
                         </div>
                         <button type="submit" className="btn btn-primary btn-block" disabled={loading || totpCode.length !== 6}>
-                            {loading ? t('auth.verifying', 'جار التحقق...') : t('auth.verify_2fa', 'تحقق')}
+                            {loading ? t('auth.verifying') : t('auth.verify_2fa')}
                         </button>
                         <button
                             type="button"
@@ -199,7 +198,7 @@ function Login() {
                             style={{ marginTop: '8px' }}
                             onClick={() => { setShow2FA(false); setTotpCode(''); setTempToken(''); setError('') }}
                         >
-                            {t('common.back', 'رجوع')}
+                            {t('common.back')}
                         </button>
                     </form>
                 ) : (
@@ -208,14 +207,14 @@ function Login() {
                     {formData.username.trim() !== 'admin' && (
                         <div className="form-group">
                             <label className="form-label" htmlFor="company_code">
-                                {t('auth.company_code', 'رمز الشركة')}
+                                {t('auth.company_code')}
                             </label>
                             <input
                                 type="text"
                                 id="company_code"
                                 name="company_code"
                                 className="form-input"
-                                placeholder={t('auth.company_code_placeholder', 'أدخل رمز الشركة')}
+                                placeholder={t('auth.company_code_placeholder')}
                                 value={formData.company_code}
                                 onChange={(e) => setFormData({ ...formData, company_code: e.target.value })}
                                 autoComplete="organization"
@@ -223,7 +222,7 @@ function Login() {
                                 spellCheck={false}
                             />
                             <small className="text-muted" style={{ fontSize: '12px', color: '#888' }}>
-                                {t('auth.company_code_hint', 'يمكن الحصول عليه من مسؤول الشركة')}
+                                {t('auth.company_code_hint')}
                             </small>
                         </div>
                     )}
@@ -261,9 +260,9 @@ function Login() {
                                 type="button"
                                 className="btn btn-light"
                                 onClick={() => setShowPassword((prev) => !prev)}
-                                aria-label={showPassword ? t('common.hide', 'إخفاء كلمة المرور') : t('common.show', 'إظهار كلمة المرور')}
+                                aria-label={showPassword ? t('common.hide') : t('common.show')}
                             >
-                                {showPassword ? t('common.hide', 'إخفاء') : t('common.show', 'إظهار')}
+                                {showPassword ? t('common.hide') : t('common.show')}
                             </button>
                         </div>
                     </div>
@@ -285,7 +284,7 @@ function Login() {
                     <div style={{ marginTop: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '12px 0' }}>
                             <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #e5e7eb' }} />
-                            <span style={{ fontSize: '13px', color: '#888' }}>{t('auth.or_sso', 'أو عبر تسجيل الدخول الموحد')}</span>
+                            <span style={{ fontSize: '13px', color: '#888' }}>{t('auth.or_sso')}</span>
                             <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #e5e7eb' }} />
                         </div>
                         {ssoProviders.map((provider) => (
@@ -298,7 +297,7 @@ function Login() {
                                 disabled={ssoLoading}
                             >
                                 {ssoLoading ? <span className="loading"></span> : (
-                                    <>🔐 {t('auth.login_with_sso', 'تسجيل الدخول عبر')} {provider.display_name}</>
+                                    <>🔐 {t('auth.login_with_sso')} {provider.display_name}</>
                                 )}
                             </button>
                         ))}

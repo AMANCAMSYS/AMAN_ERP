@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { 
@@ -289,9 +289,9 @@ export default function ExpenseDetails() {
                 <div className="info-item">
                   <span className="info-label">{t('expenses.fields.journalEntry')}</span>
                   <span className="info-value">
-                    <a href={`/accounting/journal-entries/${expense.journal_entry.id}`} className="text-primary">
+                    <Link to={`/accounting/journal-entries/${expense.journal_entry.id}`} className="text-primary">
                       {expense.journal_entry.entry_number}
-                    </a>
+                    </Link>
                   </span>
                 </div>
               )}
@@ -323,7 +323,7 @@ export default function ExpenseDetails() {
                 <div className="info-item">
                   <span className="info-label">{t('expenses.fields.createdAt')}</span>
                   <span className="info-value">
-                    {new Date(expense.created_at).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+                    {formatShortDate(expense.created_at)}
                   </span>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function ExpenseDetails() {
                     <div className="info-item">
                       <span className="info-label">{t('expenses.fields.approvedAt')}</span>
                       <span className="info-value">
-                        {new Date(expense.approved_at).toLocaleString(isRTL ? 'ar-EG' : 'en-US')}
+                        {formatShortDate(expense.approved_at)}
                       </span>
                     </div>
                   </div>

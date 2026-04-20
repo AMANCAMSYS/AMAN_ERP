@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { crmAPI, salesAPI } from '../../utils/api'
-import { getCurrency } from '../../utils/auth'
+import { getCurrency, hasPermission } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import '../../components/ModuleStyles.css'
@@ -198,7 +198,7 @@ function CRMHome() {
     const handleAddComment = async (e) => {
         e.preventDefault()
         if (!commentText.trim()) return
-        try { await crmAPI.addComment(expandedId, { content: commentText, is_internal: isInternal }); const res = await crmAPI.getTicket(expandedId); setTicketDetail(res.data); setCommentText(''); setIsInternal(false) }
+        try { await crmAPI.addComment(expandedId, { comment: commentText, is_internal: isInternal }); const res = await crmAPI.getTicket(expandedId); setTicketDetail(res.data); setCommentText(''); setIsInternal(false) }
         catch (err) { showToast(err.response?.data?.detail || t('crm.comment_error', 'error')) }
     }
     const getStatusLabel = (status) => { const opt = statusOptions.find(s => s.value === status); return opt ? opt.label : status }
@@ -299,7 +299,7 @@ function CRMHome() {
                         📣 {t('crm.marketing', 'التسويق')}
                     </h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-                        {getIndustryFeature('crm.campaigns') && (
+                        {getIndustryFeature('crm.campaigns') && hasPermission('crm.campaign_view') && (
                             <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
                                 📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
                             </Link>
@@ -581,13 +581,13 @@ function CRMHome() {
                                                                                 {ticketDetail.comments.map((comment, idx) => (
                                                                                     <div key={idx} style={commentStyle(comment.is_internal)}>
                                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                                                            <strong>{comment.user_name || t('crm.user')}</strong>
+                                                                                            <strong>{comment.author_name || t('crm.user')}</strong>
                                                                                             <span style={{ fontSize: 12, color: '#9ca3af' }}>
                                                                                                 {formatDate(comment.created_at)}
                                                                                                 {comment.is_internal && <span className="badge badge-warning" style={{ marginRight: 6, fontSize: 10 }}>{t('crm.internal')}</span>}
                                                                                             </span>
                                                                                         </div>
-                                                                                        <p style={{ margin: 0 }}>{comment.content}</p>
+                                                                                        <p style={{ margin: 0 }}>{comment.comment}</p>
                                                                                     </div>
                                                                                 ))}
                                                                             </div>

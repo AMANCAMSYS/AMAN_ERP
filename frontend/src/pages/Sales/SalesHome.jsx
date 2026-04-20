@@ -118,6 +118,11 @@ function SalesHome() {
                             {t('sales.menu.quotations')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
+                        <div className="link-item" onClick={() => navigate('/sales/cpq/products')}>
+                            <span className="link-icon">🧮</span>
+                            {t('sales.menu.advanced_pricing')}
+                            <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
+                        </div>
                         <div className="link-item" onClick={() => navigate('/sales/returns')}>
                             <span className="link-icon">🔄</span>
                             {t('sales.menu.returns')}

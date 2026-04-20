@@ -159,7 +159,7 @@ function SupportTickets() {
         if (!commentText.trim()) return
         try {
             await crmAPI.addComment(expandedId, {
-                content: commentText,
+                comment: commentText,
                 is_internal: isInternal
             })
             const res = await crmAPI.getTicket(expandedId)
@@ -313,7 +313,7 @@ function SupportTickets() {
                                                                     {ticketDetail.comments.map((comment, idx) => (
                                                                         <div key={idx} style={commentStyle(comment.is_internal)}>
                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                                                <strong>{comment.user_name || t('crm.user')}</strong>
+                                                                                <strong>{comment.author_name || t('crm.user')}</strong>
                                                                                 <span style={{ fontSize: 12, color: '#9ca3af' }}>
                                                                                     {formatDate(comment.created_at)}
                                                                                     {comment.is_internal && (
@@ -321,7 +321,7 @@ function SupportTickets() {
                                                                                     )}
                                                                                 </span>
                                                                             </div>
-                                                                            <p style={{ margin: 0 }}>{comment.content}</p>
+                                                                            <p style={{ margin: 0 }}>{comment.comment}</p>
                                                                         </div>
                                                                     ))}
                                                                 </div>

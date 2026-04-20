@@ -57,6 +57,7 @@ const AssetDetails = () => {
             fetchData();
         } catch (error) {
             console.error("Failed to post depreciation", error);
+            toastEmitter.emit(error.response?.data?.detail || t('common.error_occurred'), 'error');
         }
     };
 
@@ -87,6 +88,7 @@ const AssetDetails = () => {
             fetchData();
         } catch (error) {
             console.error("Failed to revalue asset", error);
+            toastEmitter.emit(error.response?.data?.detail || t('common.error_occurred'), 'error');
         } finally {
             setRevaluing(false);
         }
@@ -97,7 +99,7 @@ const AssetDetails = () => {
         try {
             const res = await branchesAPI.list();
             setBranches(res.data || []);
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error(err); toastEmitter.emit(t('common.error_occurred'), 'error'); }
         setShowTransferModal(true);
     };
 
@@ -115,6 +117,7 @@ const AssetDetails = () => {
             fetchData();
         } catch (error) {
             console.error("Failed to transfer asset", error);
+            toastEmitter.emit(error.response?.data?.detail || t('common.error_occurred'), 'error');
         } finally {
             setTransferring(false);
         }

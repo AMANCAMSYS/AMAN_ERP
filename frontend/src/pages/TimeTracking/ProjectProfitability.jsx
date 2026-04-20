@@ -24,7 +24,7 @@ const BarChart = ({ data }) => {
                 <div key={i} style={{ marginBottom: 16 }}>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{d.label}</div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <span style={{ width: 80, fontSize: 12, color: '#6c757d' }}>Revenue</span>
+                        <span style={{ width: 80, fontSize: 12, color: '#6c757d' }}>{t('common.revenue')}</span>
                         <div style={{ flex: 1, background: '#e9ecef', borderRadius: 4, height: 18, position: 'relative' }}>
                             <div style={{
                                 width: `${(d.revenue / max) * 100}%`,
@@ -39,7 +39,7 @@ const BarChart = ({ data }) => {
                         </span>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-                        <span style={{ width: 80, fontSize: 12, color: '#6c757d' }}>Cost</span>
+                        <span style={{ width: 80, fontSize: 12, color: '#6c757d' }}>{t('common.cost')}</span>
                         <div style={{ flex: 1, background: '#e9ecef', borderRadius: 4, height: 18, position: 'relative' }}>
                             <div style={{
                                 width: `${(d.cost / max) * 100}%`,

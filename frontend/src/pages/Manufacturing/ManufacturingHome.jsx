@@ -138,6 +138,9 @@ const ManufacturingHome = () => {
                                 <Link to="/manufacturing/schedule" className="btn btn-outline manufacturing-nav-link">
                                     <FaCalendarAlt /> {t('manufacturing.production_schedule')}
                                 </Link>
+                                <Link to="/manufacturing/shopfloor" className="btn btn-outline manufacturing-nav-link">
+                                    ⚙️ {t('nav.shop_floor')}
+                                </Link>
                             </div>
                         </div>
 

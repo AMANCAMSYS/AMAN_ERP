@@ -141,7 +141,7 @@ function CompanyList() {
             {total > 0 && (
                 <div className="flex items-center justify-between mt-6 p-4 border-t border-slate-100">
                     <div className="text-sm text-slate-500">
-                        {t('common.showing') || "Showing"} {Math.min(total, (page - 1) * limit + 1)} - {Math.min(total, page * limit)} {t('common.of') || "of"} {total}
+                        {t('common.showing')} {Math.min(total, (page - 1) * limit + 1)} - {Math.min(total, page * limit)} {t('common.of')} {total}
                     </div>
                     <div className="flex gap-2">
                         <button

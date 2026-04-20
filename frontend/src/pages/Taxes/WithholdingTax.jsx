@@ -514,7 +514,7 @@ export default function WithholdingTax() {
                                 {/* Header */}
                                 <div style={{ textAlign: 'center', borderBottom: '2px solid #1e40af', paddingBottom: 20, marginBottom: 24 }}>
                                     <h1 style={{ color: '#1e40af', fontSize: 22, marginBottom: 4 }}>{t('wht.certificate_heading')}</h1>
-                                    <h2 style={{ fontSize: 15, color: '#6b7280', fontWeight: 500 }}>Withholding Tax Certificate</h2>
+                                    <h2 style={{ fontSize: 15, color: '#6b7280', fontWeight: 500 }}>{t('wht.certificate_heading')}</h2>
                                 </div>
 
                                 {/* Certificate Number */}

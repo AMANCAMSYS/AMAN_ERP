@@ -6,7 +6,7 @@ import { roleDashboardAPI } from '../../services/roleDashboard';
 import { KPICard, KPIChart, AlertBanner, PeriodSelector } from '../../components/kpi';
 import Card from '../../components/common/Card';
 import { useBranch } from '../../context/BranchContext';
-import { getUser } from '../../utils/auth';
+import { getCurrency } from '../../utils/auth';
 
 /**
  * RoleDashboard — universal role-based KPI dashboard page.
@@ -51,9 +51,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
-    const user = getUser();
     const isRTL = i18n.dir() === 'rtl';
-    const currency = user?.currency || 'SAR';
+    const currency = getCurrency() || 'SAR';
     const isEmbedded = !!fixedRoleKey;
 
     const key = fixedRoleKey || roleKey || 'auto';
