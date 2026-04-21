@@ -223,6 +223,15 @@ async def lifespan(app: FastAPI):
         logger.info("⏰ Report Scheduler Started (in-process)")
     else:
         logger.info("⏰ Report Scheduler NOT started in web process (SCHEDULER_MODE=%s)", scheduler_mode)
+
+    # TASK-041: discover and register plugins (drop packages into backend/plugins/).
+    try:
+        from utils.plugin_registry import load_plugins
+        loaded = load_plugins(app)
+        if loaded:
+            logger.info("🔌 Plugins registered: %s", ", ".join(loaded))
+    except Exception:
+        logger.exception("Plugin loading failed (non-fatal)")
     
     # Sync schema for all existing company databases via Alembic migrations
     try:

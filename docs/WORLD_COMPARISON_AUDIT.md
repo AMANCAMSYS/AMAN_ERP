@@ -208,17 +208,19 @@
 
 ### المرحلة 5 — عمق محاسبي عالمي (شهر 2+)
 
-- **TASK-034 [M]** — **Multi-Book Accounting:** دفاتر متوازية (Local GAAP + IFRS) — عمود `ledger_id` على `journal_entries`.
-- **TASK-035 [M]** — **Dimensional Accounting:** 6–8 analytical dimensions على كل JL (segment, project, product_line, customer_group, ...).
-- **TASK-036 [M]** — **IFRS 15 / ASC 606** كامل: Performance Obligations، Contract Modifications، Variable Consideration، SSP.
-- **TASK-037 [M]** — **IFRS 9 ECL:** مخصصات ديون متوقعة على AR aging buckets.
-- **TASK-038 [M]** — **IAS 2 NRV:** job دوري لتخفيض المخزون إلى أقل التكلفة والقيمة القابلة للتحقق.
-- **TASK-039 [M]** — **IAS 36 Impairment:** دورة اختبار هبوط CGU.
-- **TASK-040 [M]** — **E-Invoicing Egypt (ETA)** + **UAE E-Invoicing 2026**.
-- **TASK-041 [M]** — **SDK/Plugin System:** hooks على أحداث GL/Sales/Purchase + Settings UI.
-- **TASK-042 [M]** — **Event Bus** داخلي (domain events) بدلاً من الاستدعاء المتزامن بين الوحدات.
-- **TASK-043 [L]** — تنظيف `.opencode`, `.venv-audit`, `__pycache__`, `fix_db.py`, `test_*.py` من جذر المشروع.
-- **TASK-044 [L]** — إتمام i18n (`hardcoded_strings.json`, `keys_to_translate.json`).
+- **TASK-034 [M]** ✅ — **Multi-Book Accounting:** جدول `ledgers` (primary seeded) + عمود `ledger_id` على `journal_entries` + فهرس `idx_je_ledger_date`. Canonical SQL + Alembic `0012_phase5_world_comparison`.
+- **TASK-035 [M]** ✅ — **Dimensional Accounting:** 6 أعمدة على `journal_lines` (`dim_segment`, `dim_project`, `dim_product_line`, `dim_customer_group`, `dim_employee`, `dim_custom_1`) + فهارس جزئية.
+- **TASK-036 [M]** 🟡 scaffold — جداول `revenue_contracts` و `performance_obligations`. Revenue-recognition engine يحتاج deep policy work (غير مُنفّذ).
+- **TASK-037 [M]** 🟡 scaffold — `ecl_rate_matrix` (7 buckets seeded) + `ecl_provisions` + [ecl_service.py](../backend/services/ecl_service.py) يحسب ECL على AR ويختياري ينشر JE.
+- **TASK-038 [M]** 🟡 scaffold — `inventory_nrv_tests` + [nrv_service.py](../backend/services/nrv_service.py) يقارن cost vs selling·(1−cost_rate) ويسجّل write-downs.
+- **TASK-039 [M]** 🟡 scaffold — `cash_generating_units` + `impairment_tests` + [impairment_service.py](../backend/services/impairment_service.py). VIU discount modelling متروك للتنفيذ لكل tenant.
+- **TASK-040 [M]** 🟡 scaffold — [integrations/einvoicing/](../backend/integrations/einvoicing/) بـ `EInvoiceAdapter` protocol + `EgyptETAAdapter` + `UAEFTAAdapter` (dry-run only). تكامل live يتطلب ASP onboarding + signing keys.
+- **TASK-041 [M]** ✅ — [plugin_registry.py](../backend/utils/plugin_registry.py) يكتشف plugins من `backend/plugins/` و entry-points `aman_erp.plugins`. Hook في [main.py](../backend/main.py). `DISABLE_PLUGINS` env لإيقاف التحميل.
+- **TASK-042 [M]** ✅ — [event_bus.py](../backend/utils/event_bus.py) (in-process pub/sub, thread-safe, handler-isolation). `Events.JOURNAL_ENTRY_POSTED` يُنشر من [gl_service.py](../backend/services/gl_service.py). 6 اختبارات في [test_47_event_bus.py](../backend/tests/test_47_event_bus.py).
+- **TASK-043 [L]** ✅ — حذف `.opencode/`, `backend/fix_db.py`, `backend/test_db.py`, `backend/test_notif*.py`, `backend/test_pg_stats.py`, `backend/test_output*.txt`. `.gitignore` مُحدَّث بـ block جديد يمنع عودتها.
+- **TASK-044 [L]** ✅ — AR/EN parity (9840 keys each, 0 missing). `keys_to_translate.json` و `hardcoded_strings.json` أُعيد تصنيفهما (brand names / ISO codes / standards whitelist).
+
+**ملاحظة نطاق:** المهام المحاسبية العميقة (036-039-040 live) تتطلب قرارات سياسية لكل مؤسسة (Chart of Accounts mapping، discount rates، تراخيص ETA/ASP). أُسست Schema + Services + API surface بحيث يمكن التنفيذ الكامل بدون schema churn لاحقاً.
 
 ---
 

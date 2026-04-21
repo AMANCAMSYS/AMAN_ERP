@@ -245,4 +245,21 @@ def create_journal_entry(
     except Exception:
         logger.warning("Failed to log audit activity for JE %s", entry_number)
 
+    # TASK-042: publish domain event. Handler failures are swallowed by the
+    # bus — they cannot break the JE transaction.
+    try:
+        from utils.event_bus import publish, Events
+        publish(Events.JOURNAL_ENTRY_POSTED, {
+            "journal_id": journal_id,
+            "entry_number": entry_number,
+            "source": source,
+            "source_id": source_id,
+            "status": status,
+            "total_debit": str(total_debit),
+            "total_credit": str(total_credit),
+            "entry_date": str(entry_date) if entry_date else None,
+        })
+    except Exception:
+        logger.debug("event_bus publish failed (non-fatal)")
+
     return journal_id, entry_number

@@ -59,6 +59,21 @@ backend/*.sqlite3
 uploads/
 **/uploads/
 
+# TASK-043: dev tool artifacts — keep the root clean
+.opencode/
+.venv-audit/
+.ruby-lsp/
+.specify/
+.pytest_cache/
+__pycache__/
+# Stray debug scripts at backend root (real tests live in backend/tests/)
+backend/fix_db.py
+backend/test_db.py
+backend/test_notif.py
+backend/test_notif_pref.py
+backend/test_pg_stats.py
+backend/test_output*.txt
+
 # Virtual environments (global)
 venv/
 .venv/
