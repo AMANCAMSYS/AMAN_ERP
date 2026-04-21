@@ -97,6 +97,16 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     "accounting.void_journal_entry": ["accounting.create_journal_entry"],
     # accounting.manage covers all JE granular
     "accounting.manage": ["accounting.create_journal_entry", "accounting.post_journal_entry", "accounting.void_journal_entry"],
+    # Blanket PO: manage implies view; release implies view
+    "buying.blanket_manage": ["buying.blanket_view"],
+    "buying.blanket_release": ["buying.blanket_view"],
+    # Expenses policies: manage implies expense view
+    "expenses.manage": ["expenses.view"],
+    # Finance accounting depth: post implies read/view, read implies view
+    "finance.accounting_post": ["finance.accounting_read", "finance.accounting_view"],
+    "finance.accounting_read": ["finance.accounting_view"],
+    # Finance bank-feed reconciliation: manage implies view
+    "finance.reconciliation_manage": ["finance.reconciliation_view"],
 }
 
 

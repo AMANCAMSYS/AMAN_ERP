@@ -297,6 +297,30 @@ AVAILABLE_PERMISSIONS = [
 
     # ═══════════════════════ Approvals – Granular actions ═══════════════════════
     {"key": "approvals.delete", "section": "approvals", "label_ar": "حذف طلبات الاعتماد", "label_en": "Delete Approval Requests"},
+
+    # ═══════════════════════ Blanket Purchase Orders ═══════════════════════
+    {"key": "buying.blanket_view", "section": "buying", "label_ar": "عرض أوامر الشراء الشاملة", "label_en": "View Blanket Purchase Orders"},
+    {"key": "buying.blanket_manage", "section": "buying", "label_ar": "إدارة أوامر الشراء الشاملة", "label_en": "Manage Blanket Purchase Orders"},
+    {"key": "buying.blanket_release", "section": "buying", "label_ar": "إصدار طلبات من أوامر الشراء الشاملة", "label_en": "Release Blanket PO Calls"},
+
+    # ═══════════════════════ Expenses (Policies) ═══════════════════════
+    {"key": "expenses.manage", "section": "expenses", "label_ar": "إدارة سياسات المصاريف", "label_en": "Manage Expense Policies"},
+
+    # ═══════════════════════ Finance – Accounting Depth & Postings ═══════════════════════
+    {"key": "finance.accounting_view", "section": "finance", "label_ar": "عرض محاسبة المدفوعات (متقدم)", "label_en": "View Payment Accounting (Advanced)"},
+    {"key": "finance.accounting_read", "section": "finance", "label_ar": "قراءة قيود المدفوعات", "label_en": "Read Payment Postings"},
+    {"key": "finance.accounting_post", "section": "finance", "label_ar": "ترحيل قيود المدفوعات محاسبياً", "label_en": "Post Payment Journal Entries"},
+
+    # ═══════════════════════ Finance – Bank Feeds & Auto-Reconciliation ═══════════════════════
+    {"key": "finance.reconciliation_view", "section": "finance", "label_ar": "عرض التسوية البنكية الآلية", "label_en": "View Bank Feed Reconciliation"},
+    {"key": "finance.reconciliation_manage", "section": "finance", "label_ar": "إدارة التسوية البنكية الآلية", "label_en": "Manage Bank Feed Reconciliation"},
+
+    # ═══════════════════════ Admin – Security Events ═══════════════════════
+    {"key": "admin.security", "section": "admin", "label_ar": "إدارة أحداث الأمان والمراقبة", "label_en": "Manage Security Events & Monitoring"},
+
+    # ═══════════════════════ Mobile App Access ═══════════════════════
+    {"key": "mobile.sync", "section": "mobile", "label_ar": "مزامنة بيانات تطبيق الموبايل", "label_en": "Mobile App Data Sync"},
+    {"key": "mobile.dashboard", "section": "mobile", "label_ar": "عرض لوحة الموبايل", "label_en": "View Mobile Dashboard"},
 ]
 
 # Section labels for the frontend permission picker UI
@@ -337,6 +361,7 @@ PERMISSION_SECTIONS = {
     "crm": {"label_ar": "إدارة العلاقات والتسويق", "label_en": "CRM & Marketing", "icon": "Megaphone"},
     "logistics": {"label_ar": "الشحن واللوجستيات", "label_en": "Logistics & Shipments", "icon": "Truck"},
     "forecast": {"label_ar": "توقعات الطلب", "label_en": "Demand Forecasting", "icon": "LineChart"},
+    "mobile": {"label_ar": "تطبيق الموبايل", "label_en": "Mobile App", "icon": "Smartphone"},
 }
 
 

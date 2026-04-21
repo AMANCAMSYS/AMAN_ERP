@@ -93,6 +93,12 @@ const PERMISSION_ALIASES = {
     'dashboard.analytics_manage': ['dashboard.analytics_view'],
     'accounting.post_journal_entry': ['accounting.create_journal_entry'],
     'accounting.void_journal_entry': ['accounting.create_journal_entry'],
+    'buying.blanket_manage': ['buying.blanket_view'],
+    'buying.blanket_release': ['buying.blanket_view'],
+    'expenses.manage': ['expenses.view'],
+    'finance.accounting_post': ['finance.accounting_read', 'finance.accounting_view'],
+    'finance.accounting_read': ['finance.accounting_view'],
+    'finance.reconciliation_manage': ['finance.reconciliation_view'],
 }
 
 export function hasPermission(permission) {
