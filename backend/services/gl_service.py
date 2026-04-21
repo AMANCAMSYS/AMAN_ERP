@@ -245,11 +245,11 @@ def create_journal_entry(
     except Exception:
         logger.warning("Failed to log audit activity for JE %s", entry_number)
 
-    # TASK-042: publish domain event. Handler failures are swallowed by the
+    # TASK-042: publish domain event(s). Handler failures are swallowed by the
     # bus — they cannot break the JE transaction.
     try:
         from utils.event_bus import publish, Events
-        publish(Events.JOURNAL_ENTRY_POSTED, {
+        payload = {
             "journal_id": journal_id,
             "entry_number": entry_number,
             "source": source,
@@ -258,8 +258,51 @@ def create_journal_entry(
             "total_debit": str(total_debit),
             "total_credit": str(total_credit),
             "entry_date": str(entry_date) if entry_date else None,
-        })
+            "company_id": company_id,
+        }
+        publish(Events.JOURNAL_ENTRY_POSTED, payload)
+        # Fan out to domain-specific event based on `source` (TASK-042 completion).
+        domain_event = _SOURCE_EVENT_MAP.get((source or "").lower())
+        if domain_event:
+            publish(domain_event, payload)
     except Exception:
         logger.debug("event_bus publish failed (non-fatal)")
 
     return journal_id, entry_number
+
+
+# Map JE `source` tags to canonical domain events. Keys are lower-cased for
+# case-insensitive matching; callers set `source` in any casing.
+_SOURCE_EVENT_MAP: Dict[str, str] = {}
+
+
+def _init_source_event_map() -> None:
+    """Populated lazily on first import of Events to avoid circular imports."""
+    try:
+        from utils.event_bus import Events as _Events
+        _SOURCE_EVENT_MAP.update({
+            # Sales
+            "sales-invoice": _Events.SALES_INVOICE_POSTED,
+            "sales_invoice": _Events.SALES_INVOICE_POSTED,
+            "salesreturn": _Events.SALES_INVOICE_CANCELLED,
+            "salescreditnote": _Events.SALES_INVOICE_CANCELLED,
+            "customerreceipt": _Events.SALES_PAYMENT_RECEIVED,
+            "customerpayment": _Events.SALES_PAYMENT_RECEIVED,
+            # Purchases
+            "purchase_invoice": _Events.PURCHASE_INVOICE_POSTED,
+            "purchase_order_receipt": _Events.PURCHASE_INVOICE_POSTED,
+            "payment_voucher": _Events.PURCHASE_PAYMENT_MADE,
+            # Inventory movements (stock impact)
+            "shipment_dispatch": _Events.INVENTORY_MOVEMENT_POSTED,
+            "shipment_receive": _Events.INVENTORY_MOVEMENT_POSTED,
+            "deliveryorder": _Events.INVENTORY_MOVEMENT_POSTED,
+            "landed_cost": _Events.INVENTORY_MOVEMENT_POSTED,
+            # HR
+            "payroll": _Events.PAYROLL_RUN_POSTED,
+            "eos_settlement": _Events.PAYROLL_RUN_POSTED,
+        })
+    except Exception:
+        logger.debug("Unable to initialise source→event map")
+
+
+_init_source_event_map()

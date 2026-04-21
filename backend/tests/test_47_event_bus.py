@@ -59,3 +59,36 @@ def test_no_handlers_is_noop():
 def test_canonical_event_names_exist():
     assert Events.JOURNAL_ENTRY_POSTED == "gl.journal_entry.posted"
     assert Events.SALES_INVOICE_POSTED.startswith("sales.")
+
+
+def test_source_to_domain_event_map_covers_core_flows():
+    """gl_service must fan out the right domain event based on JE `source`."""
+    from services.gl_service import _SOURCE_EVENT_MAP
+    # Spot-check representatives from each domain.
+    assert _SOURCE_EVENT_MAP["sales-invoice"] == Events.SALES_INVOICE_POSTED
+    assert _SOURCE_EVENT_MAP["purchase_invoice"] == Events.PURCHASE_INVOICE_POSTED
+    assert _SOURCE_EVENT_MAP["shipment_dispatch"] == Events.INVENTORY_MOVEMENT_POSTED
+    assert _SOURCE_EVENT_MAP["payroll"] == Events.PAYROLL_RUN_POSTED
+    assert _SOURCE_EVENT_MAP["customerreceipt"] == Events.SALES_PAYMENT_RECEIVED
+    assert _SOURCE_EVENT_MAP["payment_voucher"] == Events.PURCHASE_PAYMENT_MADE
+
+
+def test_sample_plugin_registers_subscriptions():
+    """plugins/gl_posting_metrics must subscribe to the 7 canonical events."""
+    bus = EventBus()
+
+    class _FakeApp:
+        def __init__(self): self.routers = []
+        def include_router(self, r, **kw): self.routers.append(r)
+
+    import plugins.gl_posting_metrics as plugin
+    app = _FakeApp()
+    plugin.register(app, bus)
+
+    # At least JE + 6 domain events subscribed, and a router included.
+    assert Events.JOURNAL_ENTRY_POSTED in bus._handlers
+    assert Events.SALES_INVOICE_POSTED in bus._handlers
+    assert Events.PURCHASE_INVOICE_POSTED in bus._handlers
+    assert Events.INVENTORY_MOVEMENT_POSTED in bus._handlers
+    assert Events.PAYROLL_RUN_POSTED in bus._handlers
+    assert len(app.routers) == 1
