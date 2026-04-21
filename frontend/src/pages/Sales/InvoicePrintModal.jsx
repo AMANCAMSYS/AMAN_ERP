@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { formatNumber } from '../../utils/format';
 import { formatShortDate } from '../../utils/dateUtils';
 import { getCurrency } from '../../utils/auth';
@@ -55,9 +56,11 @@ const InvoicePrintModal = ({ invoice, onClose }) => {
             embeddedStyles;
         doc.head.appendChild(style);
 
-        // content.innerHTML is produced by React and already HTML-escaped.
+        // SEC-C4a: Sanitize via DOMPurify. Even though React escapes its own
+        // output, we defensively strip any HTML that may have been injected
+        // via server-side data or a future bug.
         const wrapper = doc.createElement('div');
-        wrapper.innerHTML = content.innerHTML;
+        wrapper.innerHTML = DOMPurify.sanitize(content.innerHTML, { USE_PROFILES: { html: true } });
         doc.body.appendChild(wrapper);
 
         setTimeout(() => { win.print(); win.close(); }, 300);

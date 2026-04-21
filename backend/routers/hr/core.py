@@ -175,11 +175,30 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
                 raise HTTPException(status_code=400, detail="Username already exists")
             
             hashed = hash_password(employee.password)
-            role_key = employee.role or 'user'
-            
+            role_key = (employee.role or 'employee').strip().lower()
+
+            # SEC-C2: Whitelist role against DEFAULT_ROLES. Block privileged
+            # roles (admin / system_admin / superuser) — those can only be
+            # granted from /api/roles (admin.roles) with rank check.
+            if role_key not in DEFAULT_ROLES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"الدور '{role_key}' غير معروف — استخدم دوراً معرَّفاً في DEFAULT_ROLES",
+                )
+            privileged = {"admin", "system_admin", "superuser"}
+            if role_key in privileged:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "لا يمكن إسناد دور إداري من واجهة الموارد البشرية — "
+                        "استخدم /api/roles المحمي بصلاحية admin.roles."
+                    ),
+                )
+
             # Get default permissions for the role
             import json
-            perms = DEFAULT_ROLES.get(role_key, [])
+            perms_def = DEFAULT_ROLES.get(role_key, {})
+            perms = perms_def.get("permissions", []) if isinstance(perms_def, dict) else perms_def
             perms_json = json.dumps(perms)
             
             res = conn.execute(text("""

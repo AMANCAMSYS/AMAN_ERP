@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import DOMPurify from 'dompurify'
 import { externalAPI } from '../../utils/api'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
@@ -181,9 +182,9 @@ export default function WithholdingTax() {
             '@media print { body { padding: 10px; } .cert-container { border-width: 2px; } }';
         doc.head.appendChild(style);
 
-        // certRef content is React-rendered and already HTML-escaped.
+        // SEC-C4a: Sanitize via DOMPurify before injecting into the print window.
         const wrapper = doc.createElement('div');
-        wrapper.innerHTML = certRef.current.innerHTML;
+        wrapper.innerHTML = DOMPurify.sanitize(certRef.current.innerHTML, { USE_PROFILES: { html: true } });
         doc.body.appendChild(wrapper);
 
         setTimeout(() => { printWindow.print(); }, 300);

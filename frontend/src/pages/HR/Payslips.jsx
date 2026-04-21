@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { hrImprovementsAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
@@ -111,9 +112,9 @@ const Payslips = () => {
             '@media print { body { padding: 10px; } .payslip-container { border: none; } }';
         doc.head.appendChild(style);
 
-        // printRef content is React-rendered and already HTML-escaped.
+        // SEC-C4a: Sanitize via DOMPurify before injecting into the print window.
         const wrapper = doc.createElement('div');
-        wrapper.innerHTML = printRef.current.innerHTML;
+        wrapper.innerHTML = DOMPurify.sanitize(printRef.current.innerHTML, { USE_PROFILES: { html: true } });
         doc.body.appendChild(wrapper);
 
         setTimeout(() => { printWindow.print(); }, 300);
