@@ -26,10 +26,10 @@ const PayrollReport = () => {
         fetchData();
     }, []);
 
-    if (loading) return <div className="text-center py-5"><span className="loading"></span></div>;
+    if (loading) return <div className="workspace fade-in text-center py-5"><span className="loading"></span></div>;
 
     return (
-        <div className="fade-in">
+        <div className="workspace fade-in">
             {/* Chart Section */}
             <div className="card mb-4 section-card">
                 <h3 className="section-title mb-4">{t('hr.reports.payroll_trend', 'Payroll Cost Trend (Last 12 Months)')}</h3>

@@ -36,10 +36,10 @@ const LeaveReport = () => {
         fetchData();
     }, [t, dates]);
 
-    if (loading) return <div className="text-center py-5"><span className="loading"></span></div>;
+    if (loading) return <div className="workspace fade-in text-center py-5"><span className="loading"></span></div>;
 
     return (
-        <div className="fade-in">
+        <div className="workspace fade-in">
             {/* Date Filters */}
             <div className="display-flex gap-3 mb-4 align-center flex-wrap">
                 <CustomDatePicker

@@ -256,7 +256,7 @@ const AuditLogs = () => {
     };
 
     return (
-        <div className="audit-logs-container">
+        <div className="workspace fade-in audit-logs-container">
             <div className="audit-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <BackButton />

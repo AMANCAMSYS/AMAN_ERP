@@ -58,11 +58,11 @@ function DashboardList() {
         },
     ]
 
-    if (loading) return <div className="p-4">{t('common.loading')}</div>
-    if (error) return <div className="p-4 text-danger">{error}</div>
+    if (loading) return <div className="workspace fade-in">{t('common.loading')}</div>
+    if (error) return <div className="workspace fade-in text-danger">{error}</div>
 
     return (
-        <div className="p-4">
+        <div className="workspace fade-in">
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <BackButton />

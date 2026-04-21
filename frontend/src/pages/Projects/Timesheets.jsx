@@ -143,7 +143,7 @@ export default function Timesheets({ projectId, tasks = [] }) {
     };
 
     return (
-        <div className="timesheet-container fade-in">
+        <div className="workspace fade-in timesheet-container">
             {/* Toolbar */}
             <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-3">

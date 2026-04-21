@@ -89,7 +89,7 @@ const DataImportPage = () => {
     };
 
     return (
-        <div className="p-6 space-y-6 max-w-6xl mx-auto">
+        <div className="workspace fade-in space-y-6">
             <div className="flex justify-between items-center">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <BackButton />

@@ -40,7 +40,7 @@ export default function GanttChart({ tasks = [] }) {
     const rowHeight = 40;
 
     return (
-        <div className="gantt-container" style={{ direction: 'ltr' }}> {/* Always LTR for timeline logic simplicity, content aligned via CSS */}
+        <div className="workspace fade-in gantt-container" style={{ direction: 'ltr' }}> {/* Always LTR for timeline logic simplicity, content aligned via CSS */}
             <div className="gantt-scroll-container">
                 <div className="gantt-header" style={{ width: totalDays * colWidth, height: headerHeight }}>
                     {dates.map((date, index) => (

@@ -98,7 +98,7 @@ function DashboardEditor() {
     }
 
     return (
-        <div className="p-4">
+        <div className="workspace fade-in">
             <BackButton fallback="/analytics" />
             <h2>{t('analytics.create_dashboard')}</h2>
 
