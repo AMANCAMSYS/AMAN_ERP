@@ -30,6 +30,7 @@ from .cashflow import router as cashflow_router
 from .subscriptions import router as subscriptions_router
 from .accounting_depth import router as accounting_depth_router  # Phase 5 (TASK-036..040)
 from .payments import router as payments_router  # Phase 6 — payment gateways
+from .bank_feeds import router as bank_feeds_router  # Phase 6 ext — MT940/CSV bank feeds
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
@@ -53,3 +54,4 @@ router.include_router(cashflow_router)
 router.include_router(subscriptions_router)
 router.include_router(accounting_depth_router)
 router.include_router(payments_router)
+router.include_router(bank_feeds_router)

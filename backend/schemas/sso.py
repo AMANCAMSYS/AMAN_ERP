@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SsoConfigCreate(BaseModel):
@@ -52,8 +52,7 @@ class SsoConfigRead(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GroupRoleMappingCreate(BaseModel):
@@ -69,8 +68,7 @@ class GroupRoleMappingRead(BaseModel):
     aman_role_id: int
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LdapTestRequest(BaseModel):

@@ -62,6 +62,8 @@ from routers import role_dashboards
 from routers import delivery_orders, landed_costs, hr_wps_compliance
 from routers import system_completion
 from routers import sso, matching, mobile
+from routers import sms as sms_router  # Phase 6 ext — SMS gateways
+from routers import shipping as shipping_router  # Phase 6 ext — carriers
 
 # OPS-001: Structured logging — JSON in production, human-readable in dev
 from utils.logging_config import setup_logging, RequestIDMiddleware
@@ -242,6 +244,20 @@ async def lifespan(app: FastAPI):
                 logger.info("📡 Redis event-bus bridge installed")
     except Exception:
         logger.exception("Redis event bus install failed (non-fatal)")
+
+    # Phase 6 ext: transactional-outbox relay worker.
+    # Enabled by setting OUTBOX_RELAY=1 in the environment.
+    try:
+        if os.getenv("OUTBOX_RELAY", "0") in ("1", "true", "yes"):
+            from utils.outbox_relay import start_worker as _start_outbox
+            from database import get_db_connection as _tenant_db
+            # Relay uses the system/default tenant connection (company_id="system"
+            # resolves to the default DB in get_db_connection). Per-tenant fan-out
+            # is not needed because event_outbox lives in the shared schema.
+            _start_outbox(lambda: _tenant_db("system"),
+                          interval_seconds=int(os.getenv("OUTBOX_INTERVAL_SECONDS", "30")))
+    except Exception:
+        logger.exception("Outbox relay start failed (non-fatal)")
     
     # Sync schema for all existing company databases via Alembic migrations
     try:
@@ -510,6 +526,8 @@ app.include_router(system_completion.router, prefix="/api")
 app.include_router(sso.router, prefix="/api")
 app.include_router(matching.router, prefix="/api")
 app.include_router(mobile.router, prefix="/api")
+app.include_router(sms_router.router, prefix="/api")
+app.include_router(shipping_router.router, prefix="/api")
 
 
 @app.get("/")

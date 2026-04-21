@@ -1,6 +1,6 @@
 """POS module Pydantic schemas."""
 from decimal import Decimal
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -13,7 +13,8 @@ class SessionCreate(BaseModel):
     branch_id: Optional[int] = None
     treasury_account_id: Optional[int] = None
 
-    @validator("opening_balance")
+    @field_validator("opening_balance")
+    @classmethod
     def opening_balance_must_be_valid(cls, v):
         if v < 0:
             raise ValueError("رصيد الافتتاح لا يمكن أن يكون سالباً")
@@ -27,7 +28,8 @@ class SessionClose(BaseModel):
     cash_register_balance: Decimal
     notes: Optional[str] = None
 
-    @validator("closing_balance", "cash_register_balance")
+    @field_validator("closing_balance", "cash_register_balance")
+    @classmethod
     def close_balances_must_be_valid(cls, v):
         if v < 0:
             raise ValueError("أرصدة الإغلاق لا يمكن أن تكون سالبة")
@@ -77,7 +79,8 @@ class OrderLineCreate(BaseModel):
     tax_rate: Decimal = Decimal("0")
     notes: Optional[str] = None
 
-    @validator("quantity")
+    @field_validator("quantity")
+    @classmethod
     def order_line_quantity_must_be_positive(cls, v):
         if v <= 0:
             raise ValueError("الكمية يجب أن تكون أكبر من صفر")
@@ -85,7 +88,8 @@ class OrderLineCreate(BaseModel):
             raise ValueError("الكمية تتجاوز الحد الأقصى المسموح")
         return v
 
-    @validator("unit_price", "discount_amount")
+    @field_validator("unit_price", "discount_amount")
+    @classmethod
     def order_line_amounts_must_be_non_negative(cls, v):
         if v < 0:
             raise ValueError("المبلغ لا يمكن أن يكون سالباً")
@@ -93,7 +97,8 @@ class OrderLineCreate(BaseModel):
             raise ValueError("المبلغ يتجاوز الحد الأقصى المسموح")
         return v
 
-    @validator("tax_rate")
+    @field_validator("tax_rate")
+    @classmethod
     def order_line_tax_must_be_valid(cls, v):
         if v < 0 or v > 100:
             raise ValueError("نسبة الضريبة يجب أن تكون بين 0 و 100")
@@ -105,7 +110,8 @@ class OrderPaymentCreate(BaseModel):
     amount: Decimal
     reference: Optional[str] = None
 
-    @validator("amount")
+    @field_validator("amount")
+    @classmethod
     def payment_amount_must_be_positive(cls, v):
         if v <= 0:
             raise ValueError("مبلغ الدفع يجب أن يكون أكبر من صفر")
@@ -127,7 +133,8 @@ class OrderCreate(BaseModel):
     status: str = "paid"
     note: Optional[str] = None
 
-    @validator("discount_amount", "paid_amount")
+    @field_validator("discount_amount", "paid_amount")
+    @classmethod
     def order_amounts_must_be_non_negative(cls, v):
         if v < 0:
             raise ValueError("المبالغ لا يمكن أن تكون سالبة")
@@ -149,7 +156,8 @@ class ReturnItemCreate(BaseModel):
     quantity: Decimal
     reason: Optional[str] = None
 
-    @validator("quantity")
+    @field_validator("quantity")
+    @classmethod
     def return_item_quantity_must_be_positive(cls, v):
         if v <= 0:
             raise ValueError("كمية المرتجع يجب أن تكون أكبر من صفر")

@@ -6715,6 +6715,18 @@ def get_gl_integrity_guards_sql() -> str:
         ADD COLUMN IF NOT EXISTS ledger_id INTEGER;
     CREATE INDEX IF NOT EXISTS idx_je_ledger ON journal_entries (ledger_id);
 
+    -- Parallel multi-book posting map: source account → per-ledger target.
+    CREATE TABLE IF NOT EXISTS ledger_account_maps (
+        id SERIAL PRIMARY KEY,
+        ledger_id INTEGER NOT NULL,
+        source_account_id INTEGER NOT NULL,
+        target_account_id INTEGER NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (ledger_id, source_account_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ledger_account_maps_ledger
+        ON ledger_account_maps (ledger_id);
+
     -- Distributed event bus: persistent outbox (used by the Redis-Streams
     -- bridge and any future Kafka/RabbitMQ relay).
     CREATE TABLE IF NOT EXISTS event_outbox (
@@ -6729,6 +6741,97 @@ def get_gl_integrity_guards_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_event_outbox_undelivered
         ON event_outbox (created_at)
         WHERE delivered_at IS NULL;
+
+    -- ═════════════════════════════════════════════════════════════════════
+    -- Phase 6 extensions — SMS log, shipments, bank feeds, WHT rules
+    -- ═════════════════════════════════════════════════════════════════════
+    CREATE TABLE IF NOT EXISTS sms_log (
+        id SERIAL PRIMARY KEY,
+        provider VARCHAR(30) NOT NULL,
+        message_id VARCHAR(120),
+        to_number VARCHAR(40) NOT NULL,
+        body TEXT,
+        segments INTEGER DEFAULT 1,
+        status VARCHAR(30) NOT NULL,
+        cost NUMERIC(10,4),
+        error_message TEXT,
+        gateway_response JSONB,
+        created_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_sms_log_created ON sms_log (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_sms_log_msgid ON sms_log (message_id);
+
+    CREATE TABLE IF NOT EXISTS shipments (
+        id SERIAL PRIMARY KEY,
+        carrier VARCHAR(30) NOT NULL,
+        tracking_number VARCHAR(80),
+        reference VARCHAR(80),
+        invoice_id INTEGER,
+        delivery_order_id INTEGER,
+        status VARCHAR(30) NOT NULL DEFAULT 'created',
+        cost NUMERIC(18,2),
+        currency VARCHAR(10),
+        label_url TEXT,
+        awb_label BYTEA,
+        carrier_response JSONB,
+        created_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_shipment_tracking
+        ON shipments (carrier, tracking_number)
+        WHERE tracking_number IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_shipment_invoice ON shipments (invoice_id);
+
+    CREATE TABLE IF NOT EXISTS bank_statements (
+        id SERIAL PRIMARY KEY,
+        bank_account_id INTEGER,
+        account_iban VARCHAR(40),
+        statement_number VARCHAR(40),
+        currency VARCHAR(10),
+        opening_balance NUMERIC(18,2),
+        closing_balance NUMERIC(18,2),
+        period_start DATE,
+        period_end DATE,
+        source_format VARCHAR(20),        -- mt940 | csv | openbanking
+        source_filename TEXT,
+        imported_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS bank_statement_lines (
+        id SERIAL PRIMARY KEY,
+        statement_id INTEGER NOT NULL REFERENCES bank_statements(id) ON DELETE CASCADE,
+        line_no INTEGER NOT NULL,
+        value_date DATE,
+        posting_date DATE,
+        amount NUMERIC(18,2) NOT NULL,
+        currency VARCHAR(10),
+        tx_type VARCHAR(20),
+        reference VARCHAR(120),
+        bank_reference VARCHAR(120),
+        description TEXT,
+        matched_entry_id INTEGER,
+        match_status VARCHAR(20) DEFAULT 'unmatched',
+        raw JSONB
+    );
+    CREATE INDEX IF NOT EXISTS idx_bsl_statement ON bank_statement_lines (statement_id);
+    CREATE INDEX IF NOT EXISTS idx_bsl_unmatched
+        ON bank_statement_lines (match_status) WHERE match_status = 'unmatched';
+
+    CREATE TABLE IF NOT EXISTS wht_rules (
+        id SERIAL PRIMARY KEY,
+        country_code VARCHAR(5) NOT NULL,
+        payment_type VARCHAR(40) NOT NULL,      -- royalties | services | dividends | interest | rent
+        rate NUMERIC(6,4) NOT NULL,             -- 0.0500 = 5%
+        gl_account_id INTEGER,
+        description TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_wht_rule
+        ON wht_rules (country_code, payment_type) WHERE is_active;
 
     -- FIN-H (TASK-018): exchange_rates is append-only FX history
     CREATE OR REPLACE FUNCTION block_exchange_rate_mutation() RETURNS trigger AS $fn5$
