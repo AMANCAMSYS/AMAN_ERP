@@ -35,7 +35,6 @@ function PurchaseOrderReceive() {
 
             // Use the PO branch, or fallback to the current context branch
             const branchId = orderRes.data.branch_id || currentBranch?.id;
-            console.log("Filtering warehouses for branch:", branchId);
 
             const warehousesRes = await inventoryAPI.listWarehouses({ branch_id: branchId });
             setWarehouses(warehousesRes.data || []);
