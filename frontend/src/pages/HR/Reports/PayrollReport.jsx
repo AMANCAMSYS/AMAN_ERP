@@ -28,7 +28,7 @@ const PayrollReport = () => {
         fetchData();
     }, []);
 
-    if (loading) return <div className="workspace fade-in text-center py-5"><PageLoading /></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

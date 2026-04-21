@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { currenciesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
+import { Spinner } from './LoadingStates'
 
 export default function CurrencySelector({ value, onChange, className = '', label = '', disabled = false, required = false }) {
     const { t } = useTranslation()
@@ -37,7 +38,7 @@ export default function CurrencySelector({ value, onChange, className = '', labe
     }
 
     if (loading && currencies.length === 0) {
-        return <div className="loading loading-sm"></div>
+        return <Spinner size="sm" />
     }
 
     return (
