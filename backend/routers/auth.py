@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from pydantic import BaseModel, EmailStr
 import logging
+import os
 import secrets
 import hashlib
 import ipaddress
@@ -470,7 +471,6 @@ async def login(
             
             admin_hash = getattr(settings, 'ADMIN_PASSWORD_HASH', None)
             if not admin_hash:
-                import os
                 admin_hash = os.environ.get('ADMIN_PASSWORD_HASH', None)
             
             if not admin_hash:
