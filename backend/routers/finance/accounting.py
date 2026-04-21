@@ -18,7 +18,7 @@ from utils.accounting import get_base_currency
 from fastapi import Request
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 
-from schemas.accounting import AccountCreate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
+from schemas.accounting import AccountCreate, AccountUpdate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
 from utils.cache import cache
 from utils.limiter import limiter
 
@@ -471,7 +471,7 @@ async def delete_account(
 async def update_account(
     request: Request,
     account_id: int,
-    account_data: dict,  # TODO(FIN-007): Replace raw dict with a Pydantic schema for input validation
+    account_data: AccountUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     """Update account details"""
@@ -481,9 +481,11 @@ async def update_account(
         existing = db.execute(text("SELECT 1 FROM accounts WHERE id = :id"), {"id": account_id}).fetchone()
         if not existing:
              raise HTTPException(**http_error(404, "account_not_found"))
-        
+
+        payload = account_data.dict(exclude_unset=True)
+
         # Check for duplicate account_code
-        new_code = account_data.get("account_code")
+        new_code = payload.get("account_code")
         if new_code:
             dup = db.execute(text("SELECT 1 FROM accounts WHERE account_code = :code AND id != :id"), {"code": new_code, "id": account_id}).fetchone()
             if dup:
@@ -500,14 +502,14 @@ async def update_account(
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :id
         """), {
-            "name": account_data.get("name"),
-            "name_en": account_data.get("name_en"),
+            "name": payload.get("name"),
+            "name_en": payload.get("name_en"),
             "code": new_code,
-            "account_type": account_data.get("account_type"),
-            "parent_id": account_data.get("parent_id"),
-            "currency": account_data.get("currency"),
-            "is_header": account_data.get("is_header"),
-            "is_active": account_data.get("is_active"),
+            "account_type": payload.get("account_type"),
+            "parent_id": payload.get("parent_id"),
+            "currency": payload.get("currency"),
+            "is_header": payload.get("is_header"),
+            "is_active": payload.get("is_active"),
             "id": account_id
         })
         db.commit()
@@ -515,7 +517,7 @@ async def update_account(
         log_activity(db, user_id=current_user.id, username=current_user.username,
                      action="accounting.account.update",
                      resource_type="account", resource_id=str(account_id),
-                     details={"fields": list(account_data.keys())},
+                     details={"fields": list(payload.keys())},
                      request=request)
         
         # Invalidate cache

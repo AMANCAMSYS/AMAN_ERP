@@ -15,6 +15,18 @@ class AccountCreate(BaseModel):
     is_header: bool = False
 
 
+class AccountUpdate(BaseModel):
+    """FIN-007: typed schema for PUT /accounts/{id}. All fields optional (partial update)."""
+    name: Optional[str] = None
+    name_en: Optional[str] = None
+    account_code: Optional[str] = None
+    account_type: Optional[str] = None
+    parent_id: Optional[int] = None
+    currency: Optional[str] = None
+    is_header: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
 # --- Fiscal Year / Year-End Closing ---
 class FiscalYearCreate(BaseModel):
     year: int

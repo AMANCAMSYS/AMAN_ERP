@@ -264,11 +264,14 @@ def transfer_stock(
 
         transfer_ref = f"TRF-{datetime.now().strftime('%Y%m%d')}-{__import__('uuid').uuid4().hex[:8].upper()}"
 
-        # TODO [INV-L04]: Multi-item transfer does NOT create a GL journal entry
-        # (single-item transfer_stock does via gl_create_journal_entry).
-        # A GL entry should be created here aggregating all items' transfer values
-        # with debit/credit to acc_map_inventory, similar to create_stock_transfer above.
-        # Also add fiscal period validation before any GL operation.
+        # INV-L04: Validate fiscal period is open before any inventory/GL movement.
+        from utils.fiscal_lock import check_fiscal_period_open
+        transfer_date = datetime.now().strftime("%Y-%m-%d")
+        check_fiscal_period_open(db, transfer_date)
+
+        # Aggregate total transfer value for GL posting after the loop.
+        total_transfer_value = 0.0
+        item_descriptions: list[str] = []
 
         for item in transfer.items:
             # INV-009: Check source stock with FOR UPDATE to prevent race conditions
@@ -286,6 +289,9 @@ def transfer_stock(
 
             # 1. Get source cost for WAC calculation
             source_cost = float(src_inv.average_cost or 0) if src_inv else 0
+
+            # Track aggregate GL value (INV-L04)
+            total_transfer_value += float(item.quantity) * source_cost
 
             # 2. Deduct from Source
             db.execute(text("""
@@ -348,6 +354,52 @@ def transfer_stock(
                 "notes": f"Transfer from {src.warehouse_name} ({transfer_ref})",
                 "user": current_user.id
             })
+
+        # INV-L04: Emit one aggregate GL journal entry covering all items in this
+        # multi-item transfer (debit destination-side inventory, credit source-side
+        # inventory, both using the same acc_map_inventory account — the goods are
+        # just moving between locations, not changing book value).
+        if total_transfer_value > 0.01:
+            from utils.accounting import get_mapped_account_id
+            acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
+            if acc_inventory:
+                src_branch_id = db.execute(
+                    text("SELECT branch_id FROM warehouses WHERE id = :id"),
+                    {"id": transfer.source_warehouse_id},
+                ).scalar()
+                dst_branch_id = db.execute(
+                    text("SELECT branch_id FROM warehouses WHERE id = :id"),
+                    {"id": transfer.destination_warehouse_id},
+                ).scalar()
+                base_currency = db.execute(
+                    text("SELECT currency FROM companies WHERE id = :cid"),
+                    {"cid": current_user.company_id},
+                ).scalar() or "SAR"
+                lines = [
+                    {
+                        "account_id": acc_inventory,
+                        "debit": total_transfer_value,
+                        "credit": 0,
+                        "description": f"Transfer In - {dst.warehouse_name}",
+                    },
+                    {
+                        "account_id": acc_inventory,
+                        "debit": 0,
+                        "credit": total_transfer_value,
+                        "description": f"Transfer Out - {src.warehouse_name}",
+                    },
+                ]
+                gl_create_journal_entry(
+                    db,
+                    company_id=current_user.company_id,
+                    date=transfer_date,
+                    description=f"تحويل مخزني ({len(transfer.items)} صنف): {src.warehouse_name} → {dst.warehouse_name}",
+                    lines=lines,
+                    user_id=current_user.id,
+                    branch_id=src_branch_id or dst_branch_id,
+                    reference=transfer_ref,
+                    currency=base_currency,
+                )
 
         db.commit()
 
