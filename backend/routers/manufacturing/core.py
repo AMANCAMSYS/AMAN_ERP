@@ -2958,6 +2958,59 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
             WHERE id = :pid
         """), {"cost": actual_unit_cost, "pid": order.product_id})
 
+        # ── 7. GL posting for variance (actual vs standard) ──
+        # Unfavorable (variance>0): Dr Variance Expense, Cr WIP — clears residual WIP
+        # Favorable (variance<0):   Dr WIP, Cr Variance Expense — reverses over-transfer
+        # Idempotent: re-runs of calculate-cost return the same JE, never double-post.
+        variance_je_id = None
+        if variance != 0:
+            settings_res = conn.execute(text(
+                "SELECT setting_key, setting_value FROM company_settings "
+                "WHERE setting_key IN ('acc_map_wip', 'acc_map_mfg_variance', 'acc_map_mfg_overhead', 'acc_map_cogs')"
+            )).fetchall()
+            s = {r.setting_key: r.setting_value for r in settings_res}
+            wip_acc = s.get('acc_map_wip')
+            variance_acc = (
+                s.get('acc_map_mfg_variance')
+                or s.get('acc_map_mfg_overhead')
+                or s.get('acc_map_cogs')
+            )
+            if wip_acc and variance_acc:
+                check_fiscal_period_open(conn, date.today())
+                abs_var = abs(variance)
+                if variance > 0:
+                    je_lines = [
+                        {"account_id": int(variance_acc), "debit": abs_var, "credit": 0,
+                         "description": "Manufacturing Variance (Unfavorable)"},
+                        {"account_id": int(wip_acc), "debit": 0, "credit": abs_var,
+                         "description": "WIP clearing — variance"},
+                    ]
+                else:
+                    je_lines = [
+                        {"account_id": int(wip_acc), "debit": abs_var, "credit": 0,
+                         "description": "WIP clearing — favorable variance"},
+                        {"account_id": int(variance_acc), "debit": 0, "credit": abs_var,
+                         "description": "Manufacturing Variance (Favorable)"},
+                    ]
+                variance_je_id, _ = create_journal_entry(
+                    db=conn,
+                    company_id=current_user.company_id,
+                    date=date.today().isoformat(),
+                    description=(
+                        f"Mfg Variance for PO {order.order_number} "
+                        f"(Actual {actual_total} vs Standard {standard_cost})"
+                    ),
+                    lines=je_lines,
+                    user_id=current_user.id,
+                    reference=order.order_number,
+                    status="posted",
+                    currency=get_base_currency(conn),
+                    source="ProductionVariance",
+                    source_id=order_id,
+                    username=getattr(current_user, "username", None),
+                    idempotency_key=f"mfg-variance-{order_id}",
+                )
+
         conn.commit()
 
         return {
@@ -2977,7 +3030,8 @@ def calculate_actual_cost(order_id: int, body: Optional[ActualCostUpdate] = None
                 "amount": variance,
                 "percentage": variance_pct,
                 "type": variance_type,
-                "type_ar": variance_type_ar
+                "type_ar": variance_type_ar,
+                "journal_entry_id": variance_je_id,
             },
             "costing_status": "calculated",
             "message": f"تم حساب التكلفة الفعلية — الانحراف: {variance:+.2f} ({variance_pct:+.1f}%)"

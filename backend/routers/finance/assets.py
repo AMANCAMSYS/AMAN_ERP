@@ -309,6 +309,126 @@ def asset_depreciation_summary(
         conn.close()
 
 
+# ─────────────────────────────────────────────────────────────
+# Depreciation run — post pending schedule entries to GL
+# Dr Depreciation Expense / Cr Accumulated Depreciation
+# Idempotent per (asset_id, fiscal_year, schedule_id).
+# ─────────────────────────────────────────────────────────────
+class DepreciationRunInput(BaseModel):
+    through_date: Optional[date] = None
+    asset_id: Optional[int] = None
+
+
+@router.post("/run-depreciation", dependencies=[Depends(require_permission("assets.manage"))])
+def run_depreciation(
+    body: Optional[DepreciationRunInput] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """ترحيل استهلاك الأصول إلى دفتر الأستاذ (قيود تلقائية).
+
+    - لكل سطر في asset_depreciation_schedule غير مرحَّل (posted=false)
+      بتاريخ <= through_date (الافتراضي: اليوم) يُنشأ قيد متوازن:
+        مدين : مصروف الإهلاك
+        دائن : مجمع الإهلاك
+    - مُحصَّن من التكرار عبر idempotency_key = dep-sched-{id}.
+    """
+    body = body or DepreciationRunInput()
+    cutoff = body.through_date or date.today()
+    conn = get_db_connection(current_user.company_id)
+    try:
+        from services.gl_service import create_journal_entry as gl_create_journal_entry
+        from utils.accounting import get_base_currency
+
+        settings_res = conn.execute(text(
+            "SELECT setting_key, setting_value FROM company_settings "
+            "WHERE setting_key IN ('acc_map_depr_exp', 'acc_map_acc_depr')"
+        )).fetchall()
+        s = {r.setting_key: r.setting_value for r in settings_res}
+        dep_exp_acc = s.get('acc_map_depr_exp')
+        acc_dep_acc = s.get('acc_map_acc_depr')
+        if not dep_exp_acc or not acc_dep_acc:
+            raise HTTPException(status_code=400, detail="لم يتم ربط حسابات الإهلاك (acc_map_depr_exp / acc_map_acc_depr)")
+
+        params: Dict[str, Any] = {"cutoff": cutoff.isoformat()}
+        asset_filter = ""
+        if body.asset_id:
+            asset_filter = " AND s.asset_id = :aid"
+            params["aid"] = body.asset_id
+
+        rows = conn.execute(text(f"""
+            SELECT s.id, s.asset_id, s.fiscal_year, s.date, s.amount, a.code, a.name, a.currency, a.branch_id
+            FROM asset_depreciation_schedule s
+            JOIN assets a ON a.id = s.asset_id
+            WHERE s.posted = FALSE
+              AND s.date <= :cutoff
+              AND a.status != 'disposed'
+              AND COALESCE(s.amount, 0) > 0
+              {asset_filter}
+            ORDER BY s.date ASC, s.asset_id ASC
+        """), params).fetchall()
+
+        if not rows:
+            return {"posted_count": 0, "total_amount": 0.0, "message": "لا توجد سطور إهلاك بحاجة للترحيل"}
+
+        base_currency = get_base_currency(conn)
+        posted_count = 0
+        total_amount = Decimal("0")
+        posted_ids: List[int] = []
+
+        for r in rows:
+            amount = _dec(r.amount).quantize(_D2, ROUND_HALF_UP)
+            if amount <= 0:
+                continue
+            check_fiscal_period_open(conn, r.date)
+            je_id, _ = gl_create_journal_entry(
+                db=conn,
+                company_id=current_user.company_id,
+                date=r.date.isoformat() if hasattr(r.date, "isoformat") else str(r.date),
+                description=f"Depreciation — {r.code} ({r.name}) FY{r.fiscal_year}",
+                lines=[
+                    {"account_id": int(dep_exp_acc), "debit": amount, "credit": 0,
+                     "description": f"Depr. Expense — {r.code}"},
+                    {"account_id": int(acc_dep_acc), "debit": 0, "credit": amount,
+                     "description": f"Accum. Depr. — {r.code}"},
+                ],
+                user_id=current_user.id,
+                branch_id=r.branch_id,
+                reference=f"{r.code}-FY{r.fiscal_year}",
+                status="posted",
+                currency=r.currency or base_currency,
+                source="AssetDepreciation",
+                source_id=r.id,
+                username=getattr(current_user, "username", None),
+                idempotency_key=f"dep-sched-{r.id}",
+            )
+            conn.execute(text(
+                "UPDATE asset_depreciation_schedule "
+                "SET posted = TRUE, journal_entry_id = :je, updated_at = NOW() "
+                "WHERE id = :id"
+            ), {"je": je_id, "id": r.id})
+            posted_ids.append(r.id)
+            posted_count += 1
+            total_amount += amount
+
+        conn.commit()
+        return {
+            "posted_count": posted_count,
+            "total_amount": float(total_amount.quantize(_D2, ROUND_HALF_UP)),
+            "schedule_ids": posted_ids,
+            "through_date": cutoff.isoformat(),
+            "message": f"تم ترحيل {posted_count} سطر إهلاك بإجمالي {total_amount}",
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        logger.exception("Depreciation run failed")
+        raise HTTPException(status_code=500, detail=f"فشل ترحيل الإهلاك: {e}")
+    finally:
+        conn.close()
+
+
 @router.get("/reports/net-book-value", dependencies=[Depends(require_permission("assets.view"))])
 def asset_net_book_value_report(
     branch_id: Optional[int] = None,
