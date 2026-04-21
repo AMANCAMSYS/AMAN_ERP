@@ -1,0 +1,23 @@
+# Gitleaks configuration for AMAN ERP.
+# Uses the default ruleset and adds project-specific allowlists to avoid
+# false positives from test fixtures and placeholder values.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "AMAN ERP: test fixtures & placeholders are not real secrets"
+paths = [
+    '''\.env\.example$''',
+    '''tests?/.*''',
+    '''docs/.*\.md$''',
+    '''hardcoded_strings\.json$''',
+    '''keys_to_translate\.json$''',
+]
+# Words that commonly appear in dummy config / docs but are not live secrets.
+regexes = [
+    '''CHANGE_THIS''',
+    '''your_secret''',
+    '''example_(token|key|secret)''',
+    '''dev_aman_redis''',
+]

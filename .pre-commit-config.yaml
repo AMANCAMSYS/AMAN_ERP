@@ -1,0 +1,19 @@
+# Pre-commit hooks for AMAN ERP.
+# Install: pipx install pre-commit && pre-commit install
+# Run once over the whole repo: pre-commit run --all-files
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(md|snap|lock)$'
+      - id: end-of-file-fixer
+        exclude: '\.(snap|lock|png|jpg|jpeg|gif)$'
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: detect-private-key

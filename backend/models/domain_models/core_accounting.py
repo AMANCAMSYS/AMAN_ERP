@@ -86,8 +86,8 @@ class JournalLine(ModelBase):
     __tablename__ = "journal_lines"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    journal_entry_id: Mapped[int] = mapped_column(ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False)
-    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    journal_entry_id: Mapped[int] = mapped_column(ForeignKey("journal_entries.id", ondelete="RESTRICT"), nullable=False)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)
     debit: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     credit: Mapped[float | None] = mapped_column(Numeric(18, 4), default=0)
     cost_center_id: Mapped[int | None] = mapped_column(ForeignKey("cost_centers.id", ondelete="SET NULL"))

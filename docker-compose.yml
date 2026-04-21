@@ -44,13 +44,19 @@ services:
     image: redis:7-alpine
     container_name: aman_redis
     restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # SEC-M: require a password even in dev so habit doesn't leak to staging.
+    # REDIS_PASSWORD defaults to 'dev_aman_redis' if not set in .env.
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --requirepass "${REDIS_PASSWORD:-dev_aman_redis}"
     volumes:
       - redis_data:/data
     ports:
       - "127.0.0.1:6379:6379"   # Bind to localhost only
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-dev_aman_redis}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -67,7 +73,7 @@ services:
     env_file: ./backend/.env
     environment:
       POSTGRES_SERVER: db
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD:-dev_aman_redis}@redis:6379/0
       APP_ENV: ${APP_ENV:-development}
     ports:
       - "8000:8000"
