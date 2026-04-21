@@ -235,6 +235,68 @@ AVAILABLE_PERMISSIONS = [
     # ═══════════════════════ Purchases (Landed Costs aliases) ═══════════════════════
     {"key": "purchases.view", "section": "buying", "label_ar": "عرض التكاليف المحملة", "label_en": "View Landed Costs"},
     {"key": "purchases.create", "section": "buying", "label_ar": "إنشاء تكاليف محملة", "label_en": "Create Landed Costs"},
+
+    # ═══════════════════════ Logistics & Shipments ═══════════════════════
+    {"key": "inventory.shipments_view", "section": "logistics", "label_ar": "عرض الشحنات", "label_en": "View Shipments"},
+    {"key": "inventory.shipments_create", "section": "logistics", "label_ar": "إنشاء وتسجيل شحنات", "label_en": "Create & Record Shipments"},
+
+    # ═══════════════════════ Inventory Costing (router-level) ═══════════════════════
+    {"key": "inventory.costing_view", "section": "costing", "label_ar": "عرض تكاليف المخزون (المتقدم)", "label_en": "View Inventory Costing (Advanced)"},
+    {"key": "inventory.costing_manage", "section": "costing", "label_ar": "إدارة طرق تكلفة المخزون", "label_en": "Manage Inventory Costing Methods"},
+
+    # ═══════════════════════ Demand Forecasting ═══════════════════════
+    {"key": "inventory.forecast_view", "section": "forecast", "label_ar": "عرض توقعات الطلب", "label_en": "View Demand Forecasts"},
+    {"key": "inventory.forecast_generate", "section": "forecast", "label_ar": "إنشاء توقعات الطلب", "label_en": "Generate Demand Forecasts"},
+    {"key": "inventory.forecast_manage", "section": "forecast", "label_ar": "إدارة إعدادات التوقع", "label_en": "Manage Forecast Settings"},
+
+    # ═══════════════════════ Manufacturing – Shop Floor ═══════════════════════
+    {"key": "manufacturing.shopfloor_view", "section": "manufacturing", "label_ar": "عرض شاشة الإنتاج الميداني", "label_en": "View Shop Floor"},
+    {"key": "manufacturing.shopfloor_operate", "section": "manufacturing", "label_ar": "تشغيل عمليات الإنتاج الميداني", "label_en": "Operate Shop Floor"},
+    {"key": "manufacturing.routing_view", "section": "manufacturing", "label_ar": "عرض مسارات التصنيع (Routing)", "label_en": "View Manufacturing Routings"},
+    {"key": "manufacturing.routing_manage", "section": "manufacturing", "label_ar": "إدارة مسارات التصنيع", "label_en": "Manage Manufacturing Routings"},
+
+    # ═══════════════════════ CRM – Campaigns & Marketing ═══════════════════════
+    {"key": "crm.campaign_view", "section": "crm", "label_ar": "عرض الحملات التسويقية", "label_en": "View Marketing Campaigns"},
+    {"key": "crm.campaign_manage", "section": "crm", "label_ar": "إدارة الحملات التسويقية", "label_en": "Manage Marketing Campaigns"},
+    {"key": "crm.campaign_execute", "section": "crm", "label_ar": "تنفيذ وإطلاق الحملات", "label_en": "Execute / Launch Campaigns"},
+
+    # ═══════════════════════ Sales – CPQ (Configure Price Quote) ═══════════════════════
+    {"key": "sales.cpq_view", "section": "sales", "label_ar": "عرض تسعير وتهيئة المنتجات (CPQ)", "label_en": "View CPQ Pricing"},
+    {"key": "sales.cpq_create", "section": "sales", "label_ar": "إنشاء عروض أسعار (CPQ)", "label_en": "Create CPQ Quotes"},
+
+    # ═══════════════════════ Projects – Time & Resources (granular) ═══════════════════════
+    {"key": "projects.time_view", "section": "projects", "label_ar": "عرض الأوقات والحضور على المشاريع", "label_en": "View Project Timesheets"},
+    {"key": "projects.time_log", "section": "projects", "label_ar": "تسجيل الوقت على المشاريع", "label_en": "Log Time on Projects"},
+    {"key": "projects.time_approve", "section": "projects", "label_ar": "اعتماد سجلات الأوقات", "label_en": "Approve Project Timesheets"},
+    {"key": "projects.resource_view", "section": "projects", "label_ar": "عرض تخصيص الموارد", "label_en": "View Resource Allocation"},
+    {"key": "projects.resource_manage", "section": "projects", "label_ar": "إدارة تخصيص الموارد", "label_en": "Manage Resource Allocation"},
+
+    # ═══════════════════════ HR – Performance Management ═══════════════════════
+    {"key": "hr.performance_view", "section": "hr", "label_ar": "عرض تقييمات الأداء", "label_en": "View Performance Reviews"},
+    {"key": "hr.performance_manage", "section": "hr", "label_ar": "إدارة دورات تقييم الأداء", "label_en": "Manage Performance Cycles"},
+    {"key": "hr.performance_review", "section": "hr", "label_ar": "تنفيذ تقييم الموظفين", "label_en": "Conduct Employee Reviews"},
+    {"key": "hr.performance_self", "section": "hr", "label_ar": "التقييم الذاتي للموظف", "label_en": "Employee Self-Assessment"},
+
+    # ═══════════════════════ HR – Leaves & PII ═══════════════════════
+    {"key": "hr.leaves.view", "section": "hr", "label_ar": "عرض الإجازات والأرصدة", "label_en": "View Leaves & Balances"},
+    {"key": "hr.pii", "section": "hr", "label_ar": "الوصول لبيانات الموظف الحساسة (رقم هوية، إيبان)", "label_en": "Access Employee PII (Nat. ID, IBAN)"},
+
+    # ═══════════════════════ Finance – Cash Flow & Subscriptions ═══════════════════════
+    {"key": "finance.cashflow_manage", "section": "finance", "label_ar": "إدارة توقعات التدفق النقدي", "label_en": "Manage Cash Flow Forecasts"},
+    {"key": "finance.subscription_view", "section": "finance", "label_ar": "عرض الاشتراكات والفوترة المتكررة", "label_en": "View Subscriptions & Recurring Billing"},
+    {"key": "finance.subscription_manage", "section": "finance", "label_ar": "إدارة الاشتراكات والفوترة المتكررة", "label_en": "Manage Subscriptions & Recurring Billing"},
+
+    # ═══════════════════════ Dashboard – BI & Analytics ═══════════════════════
+    {"key": "dashboard.analytics_view", "section": "dashboard", "label_ar": "عرض لوحات التحليلات (BI)", "label_en": "View BI Dashboards"},
+    {"key": "dashboard.analytics_manage", "section": "dashboard", "label_ar": "إدارة لوحات التحليلات (BI)", "label_en": "Manage BI Dashboards"},
+
+    # ═══════════════════════ Accounting – Journal Entry (granular) ═══════════════════════
+    {"key": "accounting.create_journal_entry", "section": "accounting", "label_ar": "إنشاء قيود يومية", "label_en": "Create Journal Entries"},
+    {"key": "accounting.post_journal_entry", "section": "accounting", "label_ar": "ترحيل قيود يومية", "label_en": "Post Journal Entries"},
+    {"key": "accounting.void_journal_entry", "section": "accounting", "label_ar": "إلغاء قيود يومية", "label_en": "Void Journal Entries"},
+
+    # ═══════════════════════ Approvals – Granular actions ═══════════════════════
+    {"key": "approvals.delete", "section": "approvals", "label_ar": "حذف طلبات الاعتماد", "label_en": "Delete Approval Requests"},
 ]
 
 # Section labels for the frontend permission picker UI
@@ -272,6 +334,9 @@ PERMISSION_SECTIONS = {
     "intercompany": {"label_ar": "بين الشركات", "label_en": "Intercompany", "icon": "Building2"},
     "costing": {"label_ar": "تكاليف المخزون", "label_en": "Inventory Costing", "icon": "Layers"},
     "finance": {"label_ar": "التمويل", "label_en": "Finance", "icon": "TrendingUp"},
+    "crm": {"label_ar": "إدارة العلاقات والتسويق", "label_en": "CRM & Marketing", "icon": "Megaphone"},
+    "logistics": {"label_ar": "الشحن واللوجستيات", "label_en": "Logistics & Shipments", "icon": "Truck"},
+    "forecast": {"label_ar": "توقعات الطلب", "label_en": "Demand Forecasting", "icon": "LineChart"},
 }
 
 

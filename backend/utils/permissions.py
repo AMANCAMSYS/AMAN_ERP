@@ -58,6 +58,45 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     "taxes.manage": ["taxes.view"],
     # settings.manage implies settings.view + settings.edit
     "settings.manage": ["settings.view", "settings.edit"],
+    # === Duplicate-name aliases (same concept, different legacy name used by some routers/pages) ===
+    # approvals.approve is the canonical key; frontend also uses `approvals.action`
+    "approvals.approve": ["approvals.action"],
+    # approvals.manage implies view + create + action
+    "approvals.manage": ["approvals.view", "approvals.create", "approvals.action"],
+    # products.create / delete used under stock.* aliases by ProductList UI
+    "products.create": ["stock.create_product"],
+    "products.delete": ["stock.delete_product"],
+    # data_import.create is canonical; frontend uses `data_import.execute`
+    "data_import.create": ["data_import.execute"],
+    # sso.manage is canonical; sso router uses `auth.sso_manage`
+    "sso.manage": ["auth.sso_manage"],
+    # hr.leaves.manage implies view
+    "hr.leaves.manage": ["hr.leaves.view"],
+    # crm umbrella: manage implies view; execute implies view
+    "crm.campaign_manage": ["crm.campaign_view"],
+    "crm.campaign_execute": ["crm.campaign_view"],
+    # projects granular aliases
+    "projects.resource_manage": ["projects.resource_view"],
+    "projects.time_approve": ["projects.time_view", "projects.time_log"],
+    # inventory forecast manage implies view + generate
+    "inventory.forecast_manage": ["inventory.forecast_view", "inventory.forecast_generate"],
+    # inventory costing manage implies view
+    "inventory.costing_manage": ["inventory.costing_view"],
+    # manufacturing shopfloor/routing manage implies view
+    "manufacturing.shopfloor_operate": ["manufacturing.shopfloor_view"],
+    "manufacturing.routing_manage": ["manufacturing.routing_view"],
+    # hr.performance manage implies view + review + self
+    "hr.performance_manage": ["hr.performance_view", "hr.performance_review", "hr.performance_self"],
+    # finance aliases
+    "finance.subscription_manage": ["finance.subscription_view"],
+    "finance.cashflow_manage": ["finance.cashflow_view", "finance.cashflow_generate"],
+    # dashboard BI
+    "dashboard.analytics_manage": ["dashboard.analytics_view"],
+    # accounting journal entry: post/void imply create
+    "accounting.post_journal_entry": ["accounting.create_journal_entry"],
+    "accounting.void_journal_entry": ["accounting.create_journal_entry"],
+    # accounting.manage covers all JE granular
+    "accounting.manage": ["accounting.create_journal_entry", "accounting.post_journal_entry", "accounting.void_journal_entry"],
 }
 
 

@@ -85,9 +85,14 @@ function Layout({ children }) {
             <Sidebar isOpen={sidebarOpen} isMobile={isMobile} onClose={closeSidebar} onToggle={toggleSidebar} />
             <div className={`main-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
                 <Topbar sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
-                <main className="content-area" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
-                    {children}
-                </main>
+                {/* page-scroll-area: always direction:rtl so the scrollbar
+                    stays pinned to the FAR LEFT regardless of app language.
+                    The inner <main> gets the real dir from i18n. */}
+                <div className="page-scroll-area">
+                    <main className="content-area" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
+                        {children}
+                    </main>
+                </div>
             </div>
         </div>
     )

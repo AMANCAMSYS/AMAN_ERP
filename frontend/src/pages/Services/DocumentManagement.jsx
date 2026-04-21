@@ -67,7 +67,7 @@ function DocumentManagement() {
             if (filterCategory) params.category = filterCategory
             if (searchQuery) params.search = searchQuery
             const res = await servicesAPI.listDocuments(params)
-            setDocuments(res.data)
+            setDocuments(Array.isArray(res.data) ? res.data : (res.data?.items ?? []))
         } catch (err) {
             console.error('Failed to fetch documents', err)
         } finally {

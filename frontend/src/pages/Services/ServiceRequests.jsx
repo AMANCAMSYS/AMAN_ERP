@@ -98,7 +98,7 @@ function ServiceRequests() {
             if (filterStatus) params.status = filterStatus
             if (filterPriority) params.priority = filterPriority
             const res = await servicesAPI.listRequests(params)
-            setRequests(res.data)
+            setRequests(Array.isArray(res.data) ? res.data : (res.data?.items ?? []))
         } catch (err) {
             console.error('Failed to fetch requests', err)
         } finally {
