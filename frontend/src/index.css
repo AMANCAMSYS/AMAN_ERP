@@ -179,19 +179,7 @@
   color: var(--text-main) !important;
 }
 
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
-  background: var(--bg-main);
-  color: var(--text-main);
-  border-color: var(--border-color);
-}
-
-[data-theme="dark"] input:focus,
-[data-theme="dark"] select:focus,
-[data-theme="dark"] textarea:focus {
-  border-color: var(--primary);
-}
+/* Dark mode input colors are defined in the unified form section below. */
 
 [data-theme="dark"] .nav-item.active {
   background-color: rgba(37, 99, 235, 0.15);
@@ -681,21 +669,41 @@ body {
   color: var(--text-secondary);
 }
 
-.form-input {
+.form-input,
+.form-control,
+.form-select,
+.form-textarea {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 1px solid var(--border-color);
   border-radius: 10px;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-main);
   background-color: #ffffff;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-.form-input::placeholder {
+/* Dropdown arrow for form-select in light mode */
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-inline-end: 2.25rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: left 0.75rem center;
+  background-size: 16px 12px;
+}
+
+[dir="ltr"] .form-select {
+  background-position: right 0.75rem center;
+}
+
+.form-input::placeholder,
+.form-control::placeholder,
+.form-textarea::placeholder {
   color: #94a3b8;
-  /* text-muted */
   opacity: 1;
 }
 
@@ -707,25 +715,60 @@ body {
   margin-bottom: 16px;
 }
 
-/* Ensure text is visible in inputs */
+/* Ensure text is visible in inputs (light mode) */
 input,
 select,
 textarea {
-  color: #1e293b !important;
-  /* Force dark text */
+  color: #1e293b;
 }
 
 [data-theme="dark"] input,
 [data-theme="dark"] select,
-[data-theme="dark"] textarea {
+[data-theme="dark"] textarea,
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .form-textarea {
   color: var(--text-main) !important;
-  background: var(--bg-card) !important;
+  background-color: var(--bg-main) !important;
+  border-color: var(--border-color) !important;
 }
 
-.form-input:focus {
+[data-theme="dark"] .form-input::placeholder,
+[data-theme="dark"] .form-control::placeholder,
+[data-theme="dark"] .form-textarea::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Dropdown arrow must be light in dark mode or it disappears */
+[data-theme="dark"] .form-select,
+[data-theme="dark"] select.form-input,
+[data-theme="dark"] select.form-control {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: left 0.75rem center !important;
+  background-size: 16px 12px !important;
+}
+
+[dir="ltr"][data-theme="dark"] .form-select,
+[dir="ltr"][data-theme="dark"] select.form-input,
+[dir="ltr"][data-theme="dark"] select.form-control {
+  background-position: right 0.75rem center !important;
+}
+
+.form-input:focus,
+.form-control:focus,
+.form-select:focus,
+.form-textarea:focus,
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 /* Button Styles */
@@ -1457,32 +1500,7 @@ textarea {
   /* Fallback */
 }
 
-/* Form Styles Extension */
-.form-select {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 15px;
-  color: var(--text-main);
-  background-color: white;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: left 0.75rem center;
-  background-size: 16px 12px;
-}
-
-[dir="ltr"] .form-select {
-  background-position: right 0.75rem center;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-}
+/* Form Styles Extension (legacy duplicate removed — unified .form-select is defined near .form-input) */
 
 .is-invalid {
   border-color: var(--danger) !important;

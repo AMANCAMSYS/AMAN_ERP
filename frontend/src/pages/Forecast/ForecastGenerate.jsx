@@ -5,7 +5,7 @@ import { demandForecastAPI, inventoryAPI } from '../../utils/api';
 import { TrendingUp, Loader } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
-import BackButton from '../../components/common/BackButton';
+import PageLayout from '../../components/common/PageLayout';
 
 const ForecastGenerate = () => {
     const { t, i18n } = useTranslation();
@@ -51,18 +51,16 @@ const ForecastGenerate = () => {
     };
 
     return (
-        <div className="module-container" dir={isRTL ? 'rtl' : 'ltr'}>
-            <BackButton />
-            <div className="module-header">
-                <h1><TrendingUp size={24} /> {t('forecast.generate_forecast')}</h1>
-            </div>
-
-            <div className="form-card" style={{ maxWidth: 600, margin: '0 auto' }}>
+        <PageLayout
+            dir={isRTL ? 'rtl' : 'ltr'}
+            title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><TrendingUp size={22} /> {t('forecast.generate_forecast')}</span>}
+        >
+            <div className="form-card card" style={{ maxWidth: 640, margin: '0 auto', padding: 24 }}>
                 {error && <div className="alert alert-danger">{error}</div>}
 
                 <div className="form-group">
-                    <label>{t('forecast.product')} *</label>
-                    <select className="form-control" value={productId} onChange={e => setProductId(e.target.value)}>
+                    <label className="form-label">{t('forecast.product')} *</label>
+                    <select className="form-select" value={productId} onChange={e => setProductId(e.target.value)}>
                         <option value="">{t('forecast.select_product')}</option>
                         {products.map(p => (
                             <option key={p.id} value={p.id}>{p.product_name || p.name}</option>
@@ -71,8 +69,8 @@ const ForecastGenerate = () => {
                 </div>
 
                 <div className="form-group">
-                    <label>{t('forecast.warehouse')} ({t('common.optional')})</label>
-                    <select className="form-control" value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
+                    <label className="form-label">{t('forecast.warehouse')} ({t('common.optional')})</label>
+                    <select className="form-select" value={warehouseId} onChange={e => setWarehouseId(e.target.value)}>
                         <option value="">{t('forecast.all_warehouses')}</option>
                         {warehouses.map(w => (
                             <option key={w.id} value={w.id}>{w.warehouse_name || w.name}</option>
@@ -81,10 +79,10 @@ const ForecastGenerate = () => {
                 </div>
 
                 <div className="form-group">
-                    <label>{t('forecast.horizon_months')}</label>
+                    <label className="form-label">{t('forecast.horizon_months')}</label>
                     <input
                         type="number"
-                        className="form-control"
+                        className="form-input"
                         min={1}
                         max={24}
                         value={horizonMonths}
@@ -96,7 +94,7 @@ const ForecastGenerate = () => {
                     {loading ? <><Loader size={16} className="spin" /> {t('common.loading')}</> : t('forecast.generate_forecast')}
                 </button>
             </div>
-        </div>
+        </PageLayout>
     );
 };
 
