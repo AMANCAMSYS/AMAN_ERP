@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import { hasPermission, getUser } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates';
 import './RoleManagement.css';
 
 const DynamicIcon = ({ name, size = 18, ...props }) => {
@@ -313,7 +314,7 @@ const RoleManagement = () => {
             )}
 
             {loading ? (
-                <div className="loading"><LucideIcons.Loader2 className="spin" size={24} /> {t('common.loading')}</div>
+                <PageLoading text={t('common.loading')} />
             ) : (
                 <div className="roles-grid">
                     {roles.length === 0 ? (

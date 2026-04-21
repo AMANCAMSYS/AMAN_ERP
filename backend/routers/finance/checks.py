@@ -1259,7 +1259,7 @@ def checks_aging_report(
 
 # ===================== B3: Check Status Lifecycle Log =====================
 
-@router.get("/status-log/{check_type}/{check_id}")
+@router.get("/status-log/{check_type}/{check_id}", dependencies=[Depends(require_permission("treasury.view"))])
 def get_check_status_log(check_type: str, check_id: int, current_user=Depends(get_current_user)):
     """سجل دورة حياة الشيك"""
     conn = get_db_connection(current_user.company_id)
@@ -1279,7 +1279,7 @@ def get_check_status_log(check_type: str, check_id: int, current_user=Depends(ge
         conn.close()
 
 
-@router.get("/status-log/summary")
+@router.get("/status-log/summary", dependencies=[Depends(require_permission("treasury.view"))])
 def check_status_summary(current_user=Depends(get_current_user)):
     """ملخص تغييرات حالة الشيكات"""
     conn = get_db_connection(current_user.company_id)

@@ -3597,7 +3597,7 @@ def sales_commission_report(
 
 # ===================== B8: KPI Dashboard =====================
 
-@router.get("/kpi/dashboard")
+@router.get("/kpi/dashboard", dependencies=[Depends(require_permission("reports.view"))])
 def get_kpi_dashboard(current_user=Depends(get_current_user)):
     """لوحة مؤشرات الأداء الرئيسية"""
     db = get_db_connection(current_user.company_id)
