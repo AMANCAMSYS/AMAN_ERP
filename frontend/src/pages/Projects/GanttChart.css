@@ -103,3 +103,36 @@
     background-color: rgba(255, 255, 255, 0.3);
     z-index: 1;
 }
+
+/* Dark mode overrides */
+[data-theme="dark"] .gantt-container {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .gantt-header {
+    background: var(--bg-secondary);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .gantt-header-cell {
+    color: var(--text-secondary);
+    border-right-color: var(--border-color);
+}
+
+[data-theme="dark"] .gantt-header-cell.weekend {
+    background-color: var(--bg-hover);
+}
+
+[data-theme="dark"] .day-number {
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .gantt-body {
+    background: var(--bg-card);
+}
+
+[data-theme="dark"] .gantt-grid-column {
+    border-right-color: var(--border-color);
+}
+}

@@ -708,3 +708,191 @@
         align-items: flex-start;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE — full override for all hardcoded light colours above
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .role-card {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .role-card-divider {
+    background: var(--border-color);
+}
+
+[data-theme="dark"] .role-info h3,
+[data-theme="dark"] .section-label {
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .role-desc,
+[data-theme="dark"] .role-en-name,
+[data-theme="dark"] .perm-count-row,
+[data-theme="dark"] .chevron {
+    color: var(--text-secondary);
+}
+
+/* Icon box for non-system roles */
+[data-theme="dark"] .role-icon-clean {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+/* System badge */
+[data-theme="dark"] .system-badge {
+    background: rgba(124, 58, 237, 0.18);
+    color: #c4b5fd;
+    border-color: rgba(124, 58, 237, 0.3);
+}
+
+/* Perm tags on role cards */
+[data-theme="dark"] .perm-tag {
+    background: var(--bg-hover);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .perm-tag-full {
+    background: rgba(124, 58, 237, 0.18);
+    color: #c4b5fd;
+    border-color: rgba(124, 58, 237, 0.3);
+}
+
+[data-theme="dark"] .perm-more {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+/* Edit / Delete buttons on role cards */
+[data-theme="dark"] .btn-edit {
+    background: var(--bg-hover);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .btn-edit:hover:not(:disabled) {
+    background: var(--bg-secondary);
+    border-color: var(--primary, #667eea);
+}
+
+[data-theme="dark"] .btn-delete {
+    background: rgba(220, 38, 38, 0.12);
+    color: #f87171;
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="dark"] .btn-delete:hover:not(:disabled) {
+    background: rgba(220, 38, 38, 0.22);
+}
+
+/* Company selector */
+[data-theme="dark"] .company-selector-panel {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .company-select {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+/* ── Permission section cards inside the modal ─────────────────── */
+[data-theme="dark"] .perm-section-card {
+    background: var(--bg-secondary);
+    border-color: transparent;
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .perm-section-card.partial {
+    border-color: rgba(251, 191, 36, 0.5);
+    background: rgba(251, 191, 36, 0.07);
+}
+
+[data-theme="dark"] .perm-section-card.all-selected {
+    border-color: rgba(34, 197, 94, 0.5);
+    background: rgba(34, 197, 94, 0.07);
+}
+
+[data-theme="dark"] .section-count {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .perm-section-card.all-selected .section-count {
+    background: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+[data-theme="dark"] .btn-section-toggle {
+    background: var(--bg-hover);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .btn-section-toggle:hover {
+    background: var(--primary, #667eea);
+    color: white;
+    border-color: var(--primary, #667eea);
+}
+
+[data-theme="dark"] .btn-section-toggle.active {
+    background: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.5);
+}
+
+/* Permission items (checkbox rows) */
+[data-theme="dark"] .perm-item:hover {
+    background: var(--bg-hover) !important;
+}
+
+[data-theme="dark"] .perm-item.checked {
+    background: rgba(102, 126, 234, 0.12);
+}
+
+[data-theme="dark"] .perm-label {
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .perm-key {
+    background: var(--bg-hover) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Search + action buttons inside modal header area */
+[data-theme="dark"] .perm-search {
+    background: var(--bg-hover);
+    border-color: var(--border-color);
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .perm-search input {
+    color: var(--text-main);
+    background: transparent;
+}
+
+[data-theme="dark"] .perm-actions .btn-select-all,
+[data-theme="dark"] .perm-actions .btn-clear-all {
+    background: var(--bg-hover);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+/* Section header hover */
+[data-theme="dark"] .section-header:hover {
+    background: rgba(102, 126, 234, 0.08);
+}
+
+/* Loading / empty state */
+[data-theme="dark"] .loading,
+[data-theme="dark"] .no-data {
+    background: var(--bg-card) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: none;
+}
