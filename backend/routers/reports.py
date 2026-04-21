@@ -3643,12 +3643,20 @@ def get_kpi_dashboard(current_user=Depends(get_current_user)):
         """)).fetchone()
         kpis["accounts_payable"] = {"value": Decimal(str(dict(ap._mapping).get("total", 0)))} if ap else {"value": 0}
 
-        # Cash balance
+        # Cash balance — pulled from GL (journal_lines) using company_settings
+        # acc_map_cash_main + acc_map_bank so the KPI always matches the TB.
         cash = db.execute(text("""
-            SELECT COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE -amount END), 0) as balance
-            FROM journal_entries_lines jel
-            JOIN accounts a ON a.id = jel.account_id
-            WHERE a.account_type = 'cash'
+            WITH cash_accs AS (
+                SELECT CAST(setting_value AS INTEGER) AS account_id
+                FROM company_settings
+                WHERE setting_key IN ('acc_map_cash_main', 'acc_map_bank')
+                  AND setting_value ~ '^[0-9]+$'
+            )
+            SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS balance
+            FROM journal_lines jl
+            JOIN journal_entries je ON je.id = jl.journal_entry_id
+            WHERE jl.account_id IN (SELECT account_id FROM cash_accs)
+              AND je.status = 'posted'
         """)).fetchone()
         kpis["cash_balance"] = {"value": Decimal(str(dict(cash._mapping).get("balance", 0)))} if cash else {"value": 0}
 
