@@ -13,6 +13,7 @@ from utils.accounting import update_account_balance, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.exports import generate_excel, generate_pdf, create_export_response
 from utils.audit import log_activity
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 from schemas import UserResponse
 
 logger = logging.getLogger(__name__)
@@ -1074,34 +1075,27 @@ def start_production_order(order_id: int, request: Request, current_user: UserRe
                 # Validate fiscal period is open before creating GL entry
                 check_fiscal_period_open(conn, date.today())
 
-                # Create Journal Header
-                journal = conn.execute(text("""
-                    INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, currency, exchange_rate, created_by)
-                    VALUES (:enum, CURRENT_DATE, :ref, :desc, 'posted', :currency, 1.0, :uid)
-                    RETURNING id
-                """), {
-                    "enum": f"MFG-START-{order.order_number}",
-                    "ref": order.order_number, 
-                    "desc": f"Material Consumption for Production Order {order.order_number}",
-                    "uid": current_user.id,
-                    "currency": get_base_currency(conn)
-                }).fetchone()
-                
-                # Debit WIP
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                    VALUES (:jid, :aid, :desc, :amt, 0)
-                """), {"jid": journal.id, "aid": int(wip_acc_id), "desc": "WIP - Material Consumption", "amt": total_material_cost})
-                
-                # Credit Inventory
-                conn.execute(text("""
-                    INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                    VALUES (:jid, :aid, :desc, 0, :amt)
-                """), {"jid": journal.id, "aid": int(rm_acc_id), "desc": "Raw Material Inventory", "amt": total_material_cost})
-
-                # Update Account Balances
-                update_account_balance(conn, account_id=int(wip_acc_id), debit_base=total_material_cost, credit_base=0)
-                update_account_balance(conn, account_id=int(rm_acc_id), debit_base=0, credit_base=total_material_cost)
+                # TASK-015: route through centralized GL service
+                create_journal_entry(
+                    db=conn,
+                    company_id=current_user.company_id,
+                    date=date.today().isoformat(),
+                    description=f"Material Consumption for Production Order {order.order_number}",
+                    lines=[
+                        {"account_id": int(wip_acc_id), "debit": total_material_cost, "credit": 0,
+                         "description": "WIP - Material Consumption"},
+                        {"account_id": int(rm_acc_id), "debit": 0, "credit": total_material_cost,
+                         "description": "Raw Material Inventory"},
+                    ],
+                    user_id=current_user.id,
+                    reference=order.order_number,
+                    status="posted",
+                    currency=get_base_currency(conn),
+                    source="ProductionStart",
+                    source_id=order_id,
+                    username=getattr(current_user, "username", None),
+                    idempotency_key=f"mfg-start-{order_id}",
+                )
 
         trans.commit()
 
@@ -1272,58 +1266,44 @@ def complete_production_order(order_id: int, request: Request, current_user: Use
             # Validate fiscal period is open before creating GL entry
             check_fiscal_period_open(conn, date.today())
 
-            # Create Journal Header
-            journal = conn.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, reference, description, status, currency, exchange_rate, created_by)
-                VALUES (:enum, CURRENT_DATE, :ref, :desc, 'posted', :currency, 1.0, :uid)
-                RETURNING id
-            """), {
-                "enum": f"MFG-COMP-{order.order_number}",
-                "ref": order.order_number, 
-                "desc": f"Production Completion (Mat: {total_material_cost}, Lab/OH: {total_labor_overhead_cost})",
-                "uid": current_user.id,
-                "currency": get_base_currency(conn)
-            }).fetchone()
-            
-            # 1. Absorb Labor/Overhead into WIP (Debit WIP, Credit Absorption/Expense)
+            # TASK-015: centralized GL posting — build single balanced JE
+            je_lines = []
+            absorb_acc = None
             if total_labor_overhead_cost > 0 and (labor_absorption_acc_id or overhead_absorption_acc_id):
-                 absorb_acc = labor_absorption_acc_id or overhead_absorption_acc_id # Fallback
-                 if absorb_acc:
-                    # Debit WIP (Adding value)
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                        VALUES (:jid, :aid, :desc, :amt, 0)
-                    """), {"jid": journal.id, "aid": int(wip_acc_id), "desc": "WIP - Labor & Overhead Absorption", "amt": total_labor_overhead_cost})
-                    
-                    # Credit Absorption Account
-                    conn.execute(text("""
-                        INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                        VALUES (:jid, :aid, :desc, 0, :amt)
-                    """), {"jid": journal.id, "aid": int(absorb_acc), "desc": "Absorbed Manufacturing Costs", "amt": total_labor_overhead_cost})
+                absorb_acc = labor_absorption_acc_id or overhead_absorption_acc_id
+                if absorb_acc:
+                    je_lines.append({"account_id": int(wip_acc_id),
+                                     "debit": total_labor_overhead_cost, "credit": 0,
+                                     "description": "WIP - Labor & Overhead Absorption"})
+                    je_lines.append({"account_id": int(absorb_acc),
+                                     "debit": 0, "credit": total_labor_overhead_cost,
+                                     "description": "Absorbed Manufacturing Costs"})
 
-            # 2. Transfer Total Cost from WIP to FG (Debit FG, Credit WIP)
-            # Debit Inventory (FG)
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                VALUES (:jid, :aid, :desc, :amt, 0)
-            """), {"jid": journal.id, "aid": int(fg_acc_id), "desc": "Finished Goods Inventory", "amt": total_production_cost})
-            
-            # Credit WIP (Total Value Transfer)
-            conn.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, description, debit, credit)
-                VALUES (:jid, :aid, :desc, 0, :amt)
-            """), {"jid": journal.id, "aid": int(wip_acc_id), "desc": "WIP - FG Transfer", "amt": total_production_cost})
+            je_lines.append({"account_id": int(fg_acc_id),
+                             "debit": total_production_cost, "credit": 0,
+                             "description": "Finished Goods Inventory"})
+            je_lines.append({"account_id": int(wip_acc_id),
+                             "debit": 0, "credit": total_production_cost,
+                             "description": "WIP - FG Transfer"})
 
-            # Update Account Balances for all lines
-            # Labor/Overhead absorption
-            if total_labor_overhead_cost > 0 and (labor_absorption_acc_id or overhead_absorption_acc_id):
-                absorb_acc_bal = labor_absorption_acc_id or overhead_absorption_acc_id
-                if absorb_acc_bal:
-                    update_account_balance(conn, account_id=int(wip_acc_id), debit_base=total_labor_overhead_cost, credit_base=0)
-                    update_account_balance(conn, account_id=int(absorb_acc_bal), debit_base=0, credit_base=total_labor_overhead_cost)
-            # FG transfer
-            update_account_balance(conn, account_id=int(fg_acc_id), debit_base=total_production_cost, credit_base=0)
-            update_account_balance(conn, account_id=int(wip_acc_id), debit_base=0, credit_base=total_production_cost)
+            create_journal_entry(
+                db=conn,
+                company_id=current_user.company_id,
+                date=date.today().isoformat(),
+                description=(
+                    f"Production Completion (Mat: {total_material_cost}, "
+                    f"Lab/OH: {total_labor_overhead_cost})"
+                ),
+                lines=je_lines,
+                user_id=current_user.id,
+                reference=order.order_number,
+                status="posted",
+                currency=get_base_currency(conn),
+                source="ProductionComplete",
+                source_id=order_id,
+                username=getattr(current_user, "username", None),
+                idempotency_key=f"mfg-complete-{order_id}",
+            )
 
         # 3. Update product cost_price using Weighted Average Cost (WAC)
         if order.quantity and total_production_cost > 0:

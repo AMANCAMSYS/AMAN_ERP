@@ -25,6 +25,7 @@ from utils.accounting import (
     get_base_currency,
     validate_je_lines,
 )
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 import logging
 
 logger = logging.getLogger(__name__)
@@ -309,41 +310,27 @@ def create_sales_credit_note(
         # Validate JE lines
         valid_lines = validate_je_lines(je_lines, source=f"SCN-{inv_num}")
 
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status,
-                created_by, branch_id, currency, exchange_rate, posted_at
-            ) VALUES (
-                :num, :date, :desc, :ref, 'posted',
-                :user, :branch, :curr, :rate, NOW()
-            ) RETURNING id
-        """), {
-            "num": je_num, "date": inv_date,
-            "desc": f"إشعار دائن مبيعات {inv_num}" + (f" - مقابل فاتورة {related_invoice_id}" if related_invoice_id else ""),
-            "ref": inv_num, "user": current_user.id,
-            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
-            "curr": currency, "rate": exchange_rate,
-        }).scalar()
-
-        for jl in valid_lines:
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
-            """), {
-                "jid": je_id, "aid": jl["account_id"],
-                "deb": jl["debit"], "cred": jl["credit"],
-                "desc": jl["description"],
-                "amt": jl["amount_currency"], "curr": jl["currency"],
-            })
-            update_account_balance(
-                db, account_id=jl["account_id"],
-                debit_base=jl["debit"], credit_base=jl["credit"],
-                debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
-                credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
-                currency=jl["currency"],
-            )
+        # TASK-015: centralized GL posting
+        je_id, _je_number = create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(inv_date),
+            description=(
+                f"إشعار دائن مبيعات {inv_num}"
+                + (f" - مقابل فاتورة {related_invoice_id}" if related_invoice_id else "")
+            ),
+            lines=valid_lines,
+            user_id=current_user.id,
+            branch_id=branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
+            reference=inv_num,
+            status="posted",
+            currency=currency,
+            exchange_rate=exchange_rate,
+            source="SalesCreditNote",
+            source_id=related_invoice_id,
+            username=getattr(current_user, "username", None),
+            idempotency_key=f"scn-{inv_num}",
+        )
 
         # Update related invoice paid_amount (credit note reduces what's owed)
         if related_invoice_id:
@@ -647,41 +634,24 @@ def create_sales_debit_note(
         # Validate JE lines
         valid_dn_lines = validate_je_lines(je_lines, source=f"SDN-{inv_num}")
 
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status,
-                created_by, branch_id, currency, exchange_rate, posted_at
-            ) VALUES (
-                :num, :date, :desc, :ref, 'posted',
-                :user, :branch, :curr, :rate, NOW()
-            ) RETURNING id
-        """), {
-            "num": je_num, "date": inv_date,
-            "desc": f"إشعار مدين مبيعات {inv_num}",
-            "ref": inv_num, "user": current_user.id,
-            "branch": branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
-            "curr": currency, "rate": exchange_rate,
-        }).scalar()
-
-        for jl in valid_dn_lines:
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                ) VALUES (:jid, :aid, :deb, :cred, :desc, :amt, :curr)
-            """), {
-                "jid": je_id, "aid": jl["account_id"],
-                "deb": jl["debit"], "cred": jl["credit"],
-                "desc": jl["description"],
-                "amt": jl["amount_currency"], "curr": jl["currency"],
-            })
-            update_account_balance(
-                db, account_id=jl["account_id"],
-                debit_base=jl["debit"], credit_base=jl["credit"],
-                debit_curr=jl["amount_currency"] if jl["debit"] > 0 else 0,
-                credit_curr=jl["amount_currency"] if jl["credit"] > 0 else 0,
-                currency=jl["currency"],
-            )
+        # TASK-015: centralized GL posting
+        je_id, _je_number = create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(inv_date),
+            description=f"إشعار مدين مبيعات {inv_num}",
+            lines=valid_dn_lines,
+            user_id=current_user.id,
+            branch_id=branch_id or (current_user.allowed_branches[0] if current_user.allowed_branches else None),
+            reference=inv_num,
+            status="posted",
+            currency=currency,
+            exchange_rate=exchange_rate,
+            source="SalesDebitNote",
+            source_id=note_id,
+            username=getattr(current_user, "username", None),
+            idempotency_key=f"sdn-{inv_num}",
+        )
 
         # Update customer balance (debit note INCREASES what customer owes)
         gl_total_base = (total * exchange_rate).quantize(_D4, ROUND_HALF_UP)

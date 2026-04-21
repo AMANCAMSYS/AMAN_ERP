@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import text
-from fastapi import Request
+from fastapi import Request, HTTPException
 from database import engine
 import json
 import logging
@@ -16,11 +16,19 @@ def log_activity(
     resource_id: str = None,
     details: dict = None,
     request: Request = None,
-    branch_id: int = None
+    branch_id: int = None,
+    critical: bool = False,
 ):
     """
     سجل نشاط المستخدم في قاعدة البيانات.
     يسجل: من، ماذا، أين، متى، وتفاصيل إضافية.
+
+    Args:
+        critical: TASK-021 — When True, a failure to persist the audit row
+            raises HTTPException(503) so the caller's transaction is rolled
+            back. Use this for operations where losing the audit trail is
+            unacceptable (e.g., financial posts, role grants, user admin).
+            When False (default), failures are only logged.
     """
     try:
         ip_address = None
@@ -47,13 +55,6 @@ def log_activity(
         # Ensure details is JSON serializable
         details_json = json.dumps(details, default=str) if details else '{}'
 
-        # Check if table has branch_id column (backward compatibility/migration)
-        # For performance, we assume it exists or we catch error?
-        # Better: Just insert. If it fails, we might want to wrap in try/catch specific or use flexible insert.
-        # But since we updated schema, we assume it's there. 
-        # CAUTION: If the user hasn't wiped DB, this might error if column missing.
-        # We'll rely on our DB update logic later or manual alter.
-        
         db_conn.execute(
             text("""
                 INSERT INTO audit_logs 
@@ -78,6 +79,18 @@ def log_activity(
 
     except Exception as e:
         logger.error(f"❌ FAILED TO LOG AUDIT: {e}")
+        if critical:
+            # TASK-021: fail-closed — reject the operation so the caller
+            # rolls back. The audit trail is a non-negotiable prerequisite
+            # for critical actions.
+            try:
+                db_conn.rollback()
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=503,
+                detail="تعذّر تسجيل الحدث في سجل التدقيق؛ تم إلغاء العملية للحفاظ على النزاهة.",
+            )
 
 
 def log_system_activity(

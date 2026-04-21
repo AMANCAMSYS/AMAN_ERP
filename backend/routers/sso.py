@@ -230,11 +230,15 @@ async def saml_metadata(
 async def saml_acs(request: Request, response: Response):
     """
     SAML Assertion Consumer Service — receives the POST from the IdP.
-    Provisions the user, creates JWT, sets cookies, and redirects to frontend.
+    Provisions the user, issues a one-time SSO ticket, and redirects the
+    browser to the frontend with `?sso_ticket=...`. The frontend then calls
+    `/auth/sso/exchange` to retrieve the access/refresh tokens.
+
+    This ticket-exchange pattern avoids setting bearer tokens in URL fragments
+    or query strings, and does not require server-side cookie plumbing that
+    the auth router currently does not provide.
     """
-    from routers.auth import (
-        create_access_token, create_refresh_token, _set_auth_cookies, register_session,
-    )
+    from routers.auth import create_access_token, create_refresh_token
 
     form = await request.form()
     saml_response = form.get("SAMLResponse")
@@ -291,12 +295,50 @@ async def saml_acs(request: Request, response: Response):
     auth_payload = _build_auth_payload(user_info, company_id)
     access_token = create_access_token(auth_payload)
     refresh_token = create_refresh_token(auth_payload)
-    register_session(access_token, user_info["username"], company_id)
-    _set_auth_cookies(response, access_token, refresh_token)
 
-    # Redirect to frontend dashboard
+    # One-time ticket stored in short-lived cache; frontend exchanges it
+    ticket = str(uuid.uuid4())
+    cache.set(
+        f"sso_ticket:{ticket}",
+        {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "username": user_info["username"],
+                "role": user_info.get("role"),
+                "company_id": company_id,
+                "permissions": user_info.get("permissions", []),
+            },
+        },
+        expire=120,  # 2 minutes max
+    )
+
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=f"{settings.FRONTEND_URL}/dashboard", status_code=302)
+    return RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/sso/callback?sso_ticket={ticket}",
+        status_code=302,
+    )
+
+
+@router.post("/exchange")
+async def sso_exchange(payload: dict):
+    """
+    Exchange a one-time SSO ticket (issued by /saml/acs) for access & refresh
+    tokens. Ticket is invalidated immediately after exchange.
+    """
+    ticket = (payload or {}).get("ticket")
+    if not ticket:
+        raise HTTPException(status_code=400, detail="Missing ticket")
+    data = cache.get(f"sso_ticket:{ticket}")
+    if not data:
+        raise HTTPException(status_code=400, detail="Invalid or expired ticket")
+    cache.delete(f"sso_ticket:{ticket}")
+    return {
+        "access_token": data["access_token"],
+        "refresh_token": data["refresh_token"],
+        "token_type": "bearer",
+        "user": data["user"],
+    }
 
 
 @router.post("/login")
@@ -306,9 +348,7 @@ async def sso_login(body: SsoLoginRequest, response: Response):
     - SAML: returns {"redirect_url": "..."} for frontend to redirect.
     - LDAP: performs direct auth and returns tokens.
     """
-    from routers.auth import (
-        create_access_token, create_refresh_token, _set_auth_cookies, register_session,
-    )
+    from routers.auth import create_access_token, create_refresh_token
 
     # Look up SSO config — we need the company_id. The schema doesn't carry it,
     # so we look across system_companies for who owns this config.
@@ -364,8 +404,6 @@ async def sso_login(body: SsoLoginRequest, response: Response):
         auth_payload = _build_auth_payload(user_info, company_id)
         access_token = create_access_token(auth_payload)
         refresh_token = create_refresh_token(auth_payload)
-        register_session(access_token, user_info["username"], company_id)
-        _set_auth_cookies(response, access_token, refresh_token)
 
         return {
             "access_token": access_token,

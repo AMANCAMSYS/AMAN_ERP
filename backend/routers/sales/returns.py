@@ -12,6 +12,7 @@ from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 from .schemas import SalesReturnCreate
 
 returns_router = APIRouter()
@@ -440,52 +441,36 @@ def approve_sales_return(return_id: int, request: Request, current_user: dict = 
             je_lines.append({"account_id": acc_inventory, "debit": total_cost_reversal, "credit": 0, "description": f"Inv Increase - {header.return_number}"})
             je_lines.append({"account_id": acc_cogs, "debit": 0, "credit": total_cost_reversal, "description": f"COGS Reduction - {header.return_number}"})
 
-        # Insert Journal Entry
+        # Insert Journal Entry (TASK-015: centralized)
         from utils.accounting import validate_je_lines
         valid_lines = validate_je_lines(je_lines, source=f"RET-{header.return_number}")
 
-        je_num = f"JE-RET-{header.return_number}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status, 
-                created_by, branch_id, currency, exchange_rate
-            )
-            VALUES (:num, :date, :desc, :ref, 'posted', :user, :bid, :curr, :rate) RETURNING id
-        """), {
-            "num": je_num, "date": header.return_date, "desc": f"Sales Return {header.return_number} ({header.currency})",
-            "ref": header.return_number, "user": current_user.id, "bid": header.branch_id,
-            "curr": header.currency, "rate": exchange_rate
-        }).scalar()
-
-        from utils.accounting import update_account_balance as uab_return
+        # Enrich with amount_currency/currency for gl_service
         for line in valid_lines:
-            amt_curr = (((_dec(line["debit"]) + _dec(line["credit"])) / exchange_rate).quantize(_D2, ROUND_HALF_UP)) if exchange_rate else Decimal('0')
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                )
-                VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-            """), {
-                "jid": je_id,
-                "aid": line["account_id"],
-                "deb": line["debit"],
-                "cred": line["credit"],
-                "desc": line["description"],
-                "amt_curr": amt_curr,
-                "curr": header.currency
-            })
-
-            # Update balance using proper utility (handles base + currency)
-            uab_return(
-                db,
-                account_id=line["account_id"],
-                debit_base=line["debit"],
-                credit_base=line["credit"],
-                debit_curr=amt_curr if _dec(line["debit"]) > 0 else Decimal('0'),
-                credit_curr=amt_curr if _dec(line["credit"]) > 0 else Decimal('0'),
-                currency=header.currency
+            amt_curr = (
+                ((_dec(line["debit"]) + _dec(line["credit"])) / exchange_rate).quantize(_D2, ROUND_HALF_UP)
+                if exchange_rate else Decimal('0')
             )
+            line["amount_currency"] = amt_curr
+            line["currency"] = header.currency
+
+        je_id, je_num = create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(header.return_date),
+            description=f"Sales Return {header.return_number} ({header.currency})",
+            lines=valid_lines,
+            user_id=current_user.id,
+            branch_id=header.branch_id,
+            reference=header.return_number,
+            status="posted",
+            currency=header.currency,
+            exchange_rate=float(exchange_rate) if exchange_rate else 1.0,
+            source="SalesReturn",
+            source_id=return_id,
+            username=getattr(current_user, "username", None),
+            idempotency_key=f"ret-{header.return_number}",
+        )
 
         db.commit()
 

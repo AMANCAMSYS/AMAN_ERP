@@ -1,5 +1,6 @@
 import logging
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
 from datetime import datetime
 from typing import List, Dict, Optional, Any
@@ -120,28 +121,49 @@ def create_journal_entry(
         currency = curr_row[0] if curr_row else "SYP"
 
     # Insert header
-    res = db.execute(text("""
-        INSERT INTO journal_entries 
-        (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id, idempotency_key)
-        VALUES 
-        (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id, :idem_key)
-        RETURNING id
-    """), {
-        "num": entry_number,
-        "date": date,
-        "desc": description,
-        "ref": reference,
-        "status": status,
-        "branch_id": branch_id,
-        "user": user_id,
-        "curr": currency,
-        "rate": float(_dec(exchange_rate).quantize(Decimal("0.000001"), ROUND_HALF_UP)),
-        "posted_at": datetime.now() if status == "posted" else None,
-        "source": source,
-        "s_id": source_id,
-        "idem_key": idempotency_key
-    }).fetchone()
-    
+    try:
+        res = db.execute(text("""
+            INSERT INTO journal_entries 
+            (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id, idempotency_key)
+            VALUES 
+            (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id, :idem_key)
+            RETURNING id
+        """), {
+            "num": entry_number,
+            "date": date,
+            "desc": description,
+            "ref": reference,
+            "status": status,
+            "branch_id": branch_id,
+            "user": user_id,
+            "curr": currency,
+            "rate": _dec(exchange_rate).quantize(Decimal("0.000001"), ROUND_HALF_UP),
+            "posted_at": datetime.now() if status == "posted" else None,
+            "source": source,
+            "s_id": source_id,
+            "idem_key": idempotency_key
+        }).fetchone()
+    except IntegrityError as e:
+        # Race: a concurrent request landed the same idempotency_key or source triplet.
+        db.rollback()
+        if idempotency_key:
+            row = db.execute(text(
+                "SELECT id, entry_number FROM journal_entries WHERE idempotency_key = :k LIMIT 1"
+            ), {"k": idempotency_key}).fetchone()
+            if row:
+                logger.info("Idempotency race resolved: key=%s → JE %s", idempotency_key, row[1])
+                return row[0], row[1]
+        if source and source != "Manual" and source_id is not None:
+            row = db.execute(text("""
+                SELECT id, entry_number FROM journal_entries
+                WHERE source = :s AND source_id = :sid AND entry_date = :d LIMIT 1
+            """), {"s": source, "sid": source_id, "d": date}).fetchone()
+            if row:
+                logger.info("Source-duplicate race resolved: %s/%s → JE %s", source, source_id, row[1])
+                return row[0], row[1]
+        logger.exception("IntegrityError creating journal entry: %s", e)
+        raise HTTPException(status_code=409, detail="تعذر إنشاء القيد — تعارض في البيانات")
+
     journal_id = res[0]
 
     # 3. Lines
@@ -171,11 +193,11 @@ def create_journal_entry(
         """), {
             "jid": journal_id,
             "aid": account_id,
-            "deb": float(debit_base),
-            "cred": float(credit_base),
+            "deb": debit_base,
+            "cred": credit_base,
             "desc": line.get("description", description),
             "cc_id": line.get("cost_center_id"),
-            "amt_curr": float(line_amount_currency),
+            "amt_curr": line_amount_currency,
             "curr": line_currency
         })
         
@@ -183,10 +205,10 @@ def create_journal_entry(
             update_account_balance(
                 db, 
                 account_id=account_id, 
-                debit_base=float(debit_base), 
-                credit_base=float(credit_base), 
-                debit_curr=float(input_debit), 
-                credit_curr=float(input_credit), 
+                debit_base=debit_base, 
+                credit_base=credit_base, 
+                debit_curr=input_debit, 
+                credit_curr=input_credit, 
                 currency=line_currency
             )
 

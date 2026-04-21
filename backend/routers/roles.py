@@ -14,6 +14,7 @@ import logging
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission
+from utils.tenant_isolation import resolve_target_company_id
 from schemas.roles import RoleCreate, RoleUpdate
 from utils.audit import log_activity
 
@@ -488,7 +489,7 @@ def init_default_roles(
     تهيئة / تحديث الأدوار الافتراضية للشركة
     يضيف أدوار جديدة ناقصة ويحدث صلاحيات الأدوار الافتراضية الموجودة
     """
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         raise HTTPException(status_code=400, detail="Company ID missing")
 
@@ -538,7 +539,8 @@ def init_default_roles(
             username=getattr(current_user, 'username', ''),
             action="roles_init_defaults", resource_type="role",
             resource_id="system",
-            details={"created": created, "updated": updated}
+            details={"created": created, "updated": updated},
+            critical=True,
         )
         return {"message": f"تم تحديث الأدوار الافتراضية: {created} جديد، {updated} محدث", "created": created, "updated": updated}
     except Exception as e:
@@ -556,7 +558,7 @@ def list_roles(
     current_user: Any = Depends(get_current_user)
 ):
     """عرض قائمة الأدوار"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         return []
 
@@ -593,7 +595,7 @@ def get_role(
     current_user: Any = Depends(get_current_user)
 ):
     """جلب تفاصيل دور محدد"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         raise HTTPException(status_code=400, detail="Company ID missing")
 
@@ -628,7 +630,7 @@ def create_role(
     current_user: Any = Depends(get_current_user)
 ):
     """إنشاء دور جديد"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         raise HTTPException(status_code=400, detail="Company ID missing")
 
@@ -657,7 +659,8 @@ def create_role(
             username=getattr(current_user, 'username', ''),
             action="role_create", resource_type="role",
             resource_id=str(result[0]),
-            details={"role_name": role.role_name, "permissions_count": len(role.permissions)}
+            details={"role_name": role.role_name, "permissions_count": len(role.permissions)},
+            critical=True,
         )
         return {"id": result[0], "message": "تم إنشاء الدور بنجاح"}
     except HTTPException:
@@ -678,7 +681,7 @@ def update_role(
     current_user: Any = Depends(get_current_user)
 ):
     """تحديث دور"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         raise HTTPException(status_code=400, detail="Company ID missing")
 
@@ -720,7 +723,8 @@ def update_role(
                 username=getattr(current_user, 'username', ''),
                 action="role_update", resource_type="role",
                 resource_id=str(role_id),
-                details={"role_name": existing.role_name, "updated_fields": list(params.keys())}
+                details={"role_name": existing.role_name, "updated_fields": list(params.keys())},
+                critical=True,
             )
         
         return {"message": "تم تحديث الدور بنجاح"}
@@ -741,7 +745,7 @@ def delete_role(
     current_user: Any = Depends(get_current_user)
 ):
     """حذف دور"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     if not target_company_id:
         raise HTTPException(status_code=400, detail="Company ID missing")
 
@@ -769,7 +773,8 @@ def delete_role(
             username=getattr(current_user, 'username', ''),
             action="role_delete", resource_type="role",
             resource_id=str(role_id),
-            details={"role_name": role_name}
+            details={"role_name": role_name},
+            critical=True,
         )
         
         return {"message": "تم حذف الدور بنجاح"}

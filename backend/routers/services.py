@@ -471,7 +471,7 @@ def list_documents(
         # Paginated query (exclude file_path from response)
         offset = (page - 1) * per_page
         query = f"""
-            SELECT d.id, d.doc_number, d.title, d.description, d.category, d.file_name,
+            SELECT d.id, d.title, d.description, d.category, d.file_name,
                    d.file_size, d.mime_type, d.tags, d.access_level, d.related_module,
                    d.related_id, d.current_version, d.created_by, d.created_at,
                    d.updated_at, u.full_name as created_by_name
@@ -505,7 +505,7 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
     db = get_db_connection(current_user.company_id)
     try:
         doc = db.execute(text("""
-            SELECT d.id, d.doc_number, d.title, d.description, d.category, d.file_name,
+            SELECT d.id, d.title, d.description, d.category, d.file_name,
                    d.file_size, d.mime_type, d.tags, d.access_level, d.related_module,
                    d.related_id, d.current_version, d.created_by, d.created_at,
                    d.updated_at, u.full_name as created_by_name
@@ -520,7 +520,7 @@ def get_document(doc_id: int, current_user: UserResponse = Depends(get_current_u
         # Fetch versions (exclude file_path)
         versions = db.execute(text("""
             SELECT dv.id, dv.document_id, dv.version_number, dv.file_name, dv.file_size,
-                   dv.change_notes, dv.uploaded_by, dv.uploaded_at,
+                   dv.change_notes, dv.uploaded_by, dv.created_at as uploaded_at,
                    u.full_name as uploaded_by_name
             FROM document_versions dv
             LEFT JOIN company_users u ON dv.uploaded_by = u.id

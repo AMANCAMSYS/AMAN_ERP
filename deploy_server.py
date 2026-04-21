@@ -26,6 +26,8 @@ try:
     else:
         raise RuntimeError("No SSH key or password available. Set AMAN_SSH_KEY_PATH or AMAN_SSH_PASSWORD.")
 
+    COMPOSE_CMD = "docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+
     def _run(cmd: str, label: str) -> None:
         """Execute a remote command and raise on failure."""
         print(f"{label}...")
@@ -41,9 +43,30 @@ try:
                 print(err)
             raise RuntimeError(f"{label} failed with exit code {exit_code}")
 
+    # 1. Pull latest code
     _run("cd /opt/aman && git fetch origin main && git reset --hard origin/main", "Pulling latest code")
-    _run("cd /opt/aman && docker compose -f docker-compose.prod.yml build --no-cache frontend", "Rebuilding frontend container without cache")
-    _run("cd /opt/aman && docker compose -f docker-compose.prod.yml up -d --force-recreate frontend", "Starting frontend container")
+
+    # 2. Build both backend and frontend containers
+    _run(f"cd /opt/aman && {COMPOSE_CMD} build --no-cache backend frontend", "Building backend + frontend containers")
+
+    # 3. Restart all services (db/redis stay up, backend+frontend recreated)
+    _run(f"cd /opt/aman && {COMPOSE_CMD} up -d --force-recreate backend frontend", "Restarting backend + frontend")
+
+    # 4. Wait for backend to be healthy
+    _run(
+        "echo 'Waiting for backend health...' && "
+        "for i in $(seq 1 30); do "
+        "  if curl -sf http://localhost:8000/health > /dev/null 2>&1; then "
+        "    echo 'Backend is healthy'; exit 0; "
+        "  fi; "
+        "  sleep 3; "
+        "done; "
+        "echo 'WARNING: Backend health check timed out after 90s'",
+        "Health check"
+    )
+
+    # 5. Show running services
+    _run(f"cd /opt/aman && {COMPOSE_CMD} ps", "Service status")
 
     print("Done!")
 finally:

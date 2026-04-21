@@ -7,7 +7,7 @@ Developer guidance:
 """
 
 from .base import ModelBase
-from .business_core import (
+from .domain_models.core_business import (
     CompanySetting,
     Invoice,
     InvoiceLine,
@@ -17,7 +17,7 @@ from .business_core import (
     UserBranch,
     Warehouse,
 )
-from .core_accounting import Account, Branch, CompanyUser, JournalEntry, JournalLine
+from .domain_models.core_accounting import Account, Branch, CompanyUser, JournalEntry, JournalLine
 from .domain_models.hr_core_payroll import (
     Attendance,
     Department,

@@ -498,10 +498,8 @@ def create_purchase_order(
         from utils.accounting import generate_sequential_number
         po_num = generate_sequential_number(db, f"PO-{datetime.now().year}", "purchase_orders", "po_number")
         
-        # Calculate Totals (using Decimal for precision)
-        subtotal = Decimal('0')
-        total_tax = Decimal('0')
-        total_discount = Decimal('0')
+        # Calculate Totals (TASK-027: unified via compute_invoice_totals)
+        from utils.accounting import compute_invoice_totals, compute_line_amounts
 
         lines_data = []
         for item in po.items:
@@ -511,22 +509,14 @@ def create_purchase_order(
             if _dec(item.unit_price) < 0:
                 raise HTTPException(status_code=400, detail=f"سعر الوحدة لا يمكن أن يكون سالباً: {item.description}")
 
-            line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
+            line_total_gross = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
             line_discount = _dec(item.discount)
-
             if line_discount < 0:
                 raise HTTPException(status_code=400, detail=f"الخصم لا يمكن أن يكون سالباً: {item.description}")
-            if line_discount > line_total:
-                raise HTTPException(status_code=400, detail=f"الخصم ({line_discount}) يتجاوز إجمالي السطر ({line_total}): {item.description}")
+            if line_discount > line_total_gross:
+                raise HTTPException(status_code=400, detail=f"الخصم ({line_discount}) يتجاوز إجمالي السطر ({line_total_gross}): {item.description}")
 
-            taxable = (line_total - line_discount).quantize(_D2, ROUND_HALF_UP)
-            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-            final_total = taxable + line_tax
-
-            subtotal += line_total
-            total_discount += line_discount
-            total_tax += line_tax
-
+            la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate, item.discount)
             lines_data.append({
                 "product_id": item.product_id,
                 "description": item.description,
@@ -534,10 +524,22 @@ def create_purchase_order(
                 "unit_price": item.unit_price,
                 "tax_rate": item.tax_rate,
                 "discount": item.discount,
-                "total": str(final_total)
+                "total": str(la["line_total"]),
             })
 
-        grand_total = subtotal - total_discount + total_tax
+        totals = compute_invoice_totals([
+            {
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": item.tax_rate,
+                "discount": item.discount,
+            }
+            for item in po.items
+        ])
+        subtotal = totals["subtotal"]
+        total_tax = totals["total_tax"]
+        total_discount = totals["total_discount"]
+        grand_total = totals["grand_total"]
         
         # Insert PO Header
         result = db.execute(text("""
@@ -1182,23 +1184,12 @@ async def create_purchase_invoice(
             for pol in po_lines:
                 po_received_map[pol.product_id] = _dec(pol.received_quantity or 0)
 
-        # 3. Calculate Totals
-        subtotal = Decimal('0')
-        total_tax = Decimal('0')
-        total_discount = Decimal('0')
-        
+        # 3. Calculate Totals (TASK-027: unified via compute_invoice_totals)
+        from utils.accounting import compute_invoice_totals as _cit, compute_line_amounts as _cla
+
         lines_data = []
         for item in invoice.items:
-            line_total = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
-            line_discount = _dec(item.discount)
-            taxable = (line_total - line_discount).quantize(_D2, ROUND_HALF_UP)
-            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-            final_total = (taxable + line_tax).quantize(_D2, ROUND_HALF_UP)
-            
-            subtotal += line_total
-            total_discount += line_discount
-            total_tax += line_tax
-            
+            la = _cla(item.quantity, item.unit_price, item.tax_rate, item.discount)
             lines_data.append({
                 "product_id": item.product_id,
                 "description": item.description,
@@ -1207,10 +1198,22 @@ async def create_purchase_invoice(
                 "tax_rate": item.tax_rate,
                 "discount": item.discount,
                 "markup": getattr(item, "markup", 0.0),
-                "total": final_total
+                "total": la["line_total"],
             })
 
-        grand_total = (subtotal - total_discount + total_tax).quantize(_D2, ROUND_HALF_UP)
+        _totals = _cit([
+            {
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": item.tax_rate,
+                "discount": item.discount,
+            }
+            for item in invoice.items
+        ])
+        subtotal = _totals["subtotal"]
+        total_tax = _totals["total_tax"]
+        total_discount = _totals["total_discount"]
+        grand_total = _totals["grand_total"]
         
         # 3. Handle Payment & Debt
         paid_amount = _dec(invoice.paid_amount)

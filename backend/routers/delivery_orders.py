@@ -21,6 +21,7 @@ from utils.accounting import (
     update_account_balance, get_base_currency
 )
 from utils.fiscal_lock import check_fiscal_period_open
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 
 router = APIRouter(prefix="/sales/delivery-orders", tags=["أوامر التسليم"])
 logger = logging.getLogger(__name__)
@@ -408,16 +409,20 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
         inv_number = generate_sequential_number(db, f"SINV-{year}", "invoices", "invoice_number")
         base_currency = get_base_currency(db)
 
-        # Calculate totals
-        subtotal = Decimal('0')
-        tax_total = Decimal('0')
-        for line in lines:
-            line_total = (_dec(line.delivered_qty) * _dec(line.selling_price or 0)).quantize(_D2, ROUND_HALF_UP)
-            line_tax = (line_total * _dec(line.tax_rate or 0) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-            subtotal += line_total
-            tax_total += line_tax
-
-        grand_total = subtotal + tax_total
+        # Calculate totals (TASK-027: unified via compute_invoice_totals)
+        from utils.accounting import compute_invoice_totals
+        totals = compute_invoice_totals([
+            {
+                "quantity": line.delivered_qty,
+                "unit_price": line.selling_price or 0,
+                "tax_rate": line.tax_rate or 0,
+                "discount": 0,
+            }
+            for line in lines
+        ])
+        subtotal = totals["subtotal"]
+        tax_total = totals["total_tax"]
+        grand_total = totals["grand_total"]
 
         # Create invoice
         inv = db.execute(text("""
@@ -464,66 +469,53 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
         # ── Fiscal period check before GL posting ──
         check_fiscal_period_open(db, datetime.now().date())
 
-        # ── Create Journal Entry ──
-        # Since inventory was already deducted in confirm, we only need AR/Revenue/Tax/COGS
-        je_number = generate_sequential_number(db, f"JE-DO-{year}", "journal_entries", "entry_number")
-        je = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description,
-                status, branch_id, currency, created_by
-            ) VALUES (:num, CURRENT_DATE, :ref, :desc, 'posted', :bid, :curr, :uid)
-            RETURNING id
-        """), {
-            "num": je_number, "ref": inv_number,
-            "desc": f"فاتورة من أمر تسليم {order.delivery_number}",
-            "bid": order.branch_id, "curr": base_currency, "uid": user_id
-        })
-        je_id = je.fetchone()[0]
-
+        # ── Create Journal Entry via centralized GL service (TASK-015) ──
         ar_account = get_mapped_account_id(db, "acc_map_ar")
         revenue_account = get_mapped_account_id(db, "acc_map_sales_rev")
         vat_out_account = get_mapped_account_id(db, "acc_map_vat_out")
         cogs_account = get_mapped_account_id(db, "acc_map_cogs")
         inventory_account = get_mapped_account_id(db, "acc_map_inventory")
 
-        # Dr: AR (total)
+        total_cogs = sum(
+            (_dec(l.delivered_qty) * _dec(l.cost_price or 0)).quantize(_D2, ROUND_HALF_UP)
+            for l in lines
+        )
+
+        je_lines = []
         if ar_account:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, :desc)
-            """), {"jeid": je_id, "aid": ar_account, "amt": grand_total, "desc": "ذمم مدينة - فاتورة تسليم"})
-            update_account_balance(db, ar_account, grand_total, 0)
-
-        # Cr: Revenue (subtotal)
+            je_lines.append({"account_id": ar_account, "debit": grand_total, "credit": 0,
+                             "description": "ذمم مدينة - فاتورة تسليم"})
         if revenue_account:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, :desc)
-            """), {"jeid": je_id, "aid": revenue_account, "amt": subtotal, "desc": "إيرادات مبيعات"})
-            update_account_balance(db, revenue_account, 0, subtotal)
-
-        # Cr: VAT (tax_total)
+            je_lines.append({"account_id": revenue_account, "debit": 0, "credit": subtotal,
+                             "description": "إيرادات مبيعات"})
         if vat_out_account and tax_total > 0:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, :desc)
-            """), {"jeid": je_id, "aid": vat_out_account, "amt": tax_total, "desc": "ضريبة مخرجات"})
-            update_account_balance(db, vat_out_account, 0, tax_total)
-
-        # COGS JE: Dr: COGS, Cr: Inventory
-        total_cogs = sum((_dec(l.delivered_qty) * _dec(l.cost_price or 0)).quantize(_D2, ROUND_HALF_UP) for l in lines)
+            je_lines.append({"account_id": vat_out_account, "debit": 0, "credit": tax_total,
+                             "description": "ضريبة مخرجات"})
         if cogs_account and inventory_account and total_cogs > 0:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, :desc)
-            """), {"jeid": je_id, "aid": cogs_account, "amt": total_cogs, "desc": "تكلفة البضاعة المباعة"})
-            update_account_balance(db, cogs_account, total_cogs, 0)
+            je_lines.append({"account_id": cogs_account, "debit": total_cogs, "credit": 0,
+                             "description": "تكلفة البضاعة المباعة"})
+            je_lines.append({"account_id": inventory_account, "debit": 0, "credit": total_cogs,
+                             "description": "خصم مخزون (COGS)"})
 
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, :desc)
-            """), {"jeid": je_id, "aid": inventory_account, "amt": total_cogs, "desc": "خصم مخزون (COGS)"})
-            update_account_balance(db, inventory_account, 0, total_cogs)
+        if not je_lines:
+            raise HTTPException(400, "خريطة الحسابات غير مكتملة للمبيعات")
+
+        je_id, je_number = create_journal_entry(
+            db=db,
+            company_id=company_id,
+            date=datetime.now().date().isoformat(),
+            description=f"فاتورة من أمر تسليم {order.delivery_number}",
+            lines=je_lines,
+            user_id=user_id,
+            branch_id=order.branch_id,
+            reference=inv_number,
+            status="posted",
+            currency=base_currency,
+            source="DeliveryOrder",
+            source_id=do_id,
+            username=current_user.get("username"),
+            idempotency_key=f"do-invoice-{do_id}",
+        )
 
         # Update invoice with JE
         db.execute(text("UPDATE invoices SET journal_entry_id = :jeid WHERE id = :iid"),

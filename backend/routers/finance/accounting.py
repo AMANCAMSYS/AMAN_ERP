@@ -2004,6 +2004,7 @@ def get_opening_balances(
 @limiter.limit("100/minute")
 def save_opening_balances(
     request: Request,
+    data: dict = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """حفظ الأرصدة الافتتاحية (ينشئ أو يحدث قيد الأرصدة الافتتاحية)"""

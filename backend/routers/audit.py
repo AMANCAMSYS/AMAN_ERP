@@ -13,6 +13,7 @@ import logging
 from database import get_db_connection, get_system_db, engine
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
+from utils.tenant_isolation import resolve_target_company_id
 
 router = APIRouter(prefix="/audit", tags=["سجلات المراقبة"], dependencies=[Depends(require_module("audit"))])
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ def list_audit_logs(
 ):
     """عرض سجلات المراقبة مع فلترة"""
     # 1. Determine which DB to connect to
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     
     # If system admin and no company_id provided, we query the SYSTEM ACTIVITY LOG
     is_system_view = getattr(current_user, 'role', None) == 'system_admin' and not target_company_id
@@ -193,7 +194,7 @@ def list_available_actions(
     current_user: Any = Depends(get_current_user)
 ):
     """جلب قائمة الأحداث المتاحة للفلترة"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     
     if getattr(current_user, 'role', None) == 'system_admin' and not target_company_id:
         db = engine.connect()
@@ -221,7 +222,7 @@ def get_audit_stats(
     current_user: Any = Depends(get_current_user)
 ):
     """إحصائيات سجلات المراقبة مع مراعاة الفرع والصلاحيات"""
-    target_company_id = company_id or getattr(current_user, 'company_id', None)
+    target_company_id = resolve_target_company_id(company_id, current_user)
     
     if getattr(current_user, 'role', None) == 'system_admin' and not target_company_id:
         db = engine.connect()

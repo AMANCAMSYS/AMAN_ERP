@@ -75,3 +75,15 @@ mobile/ios/build/
 # Runtime / temp files
 last_error.txt
 *.pid
+
+# Audit engagement (feature 001-erp-staged-audit)
+# Artefact directories and phase-report JSON are committed for traceability.
+# Raw evidence (log dumps, CSV extracts, PII-adjacent outputs), tenant-id maps,
+# and the isolated audit venv are NOT committed — they must be recreated
+# per-run against the current staging snapshot and deterministic seed.
+.venv-audit/
+docs/audit/evidence/
+docs/audit/synthetic-data-seed/tenant-ids.yaml
+docs/audit/dep-inventory/
+docs/audit/baseline/perf-baseline.md
+docs/audit/backlog.xlsx

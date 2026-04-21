@@ -18,6 +18,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.accounting import get_mapped_account_id, update_account_balance, generate_sequential_number, get_base_currency
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 
 logger = logging.getLogger(__name__)
 sales_improvements_router = APIRouter()
@@ -331,37 +332,32 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
         base_currency = get_base_currency(db)
         
         je_id = None
+        je_number = None
         if commission_acc and bank_acc:
-            entry_num = generate_sequential_number(db, f"COMPAY-{date.today().year}", "journal_entries", "entry_number")
-            
             sp_names = set()
             for c in commissions:
                 sp_names.add(c.salesperson_name or str(c.salesperson_id))
-            
-            je_id = db.execute(text("""
-                INSERT INTO journal_entries (entry_number, entry_date, description, status, currency, exchange_rate, created_by)
-                VALUES (:num, :date, :desc, 'posted', :curr, 1.0, :uid) RETURNING id
-            """), {
-                "num": entry_num, "date": payment_date,
-                "desc": f"صرف عمولات مبيعات — {', '.join(sp_names)} — {total_amount:.2f}",
-                "curr": base_currency, "uid": current_user.id
-            }).scalar()
-            
-            # Dr: Commission Expense
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, :amt, 0, :desc)
-            """), {"jid": je_id, "aid": commission_acc, "amt": total_amount,
-                   "desc": f"عمولات مبيعات — {len(commissions)} عمولة"})
-            update_account_balance(db, commission_acc, debit_base=total_amount, credit_base=0)
-            
-            # Cr: Bank
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jid, :aid, 0, :amt, :desc)
-            """), {"jid": je_id, "aid": bank_acc, "amt": total_amount,
-                   "desc": f"صرف عمولات مبيعات"})
-            update_account_balance(db, bank_acc, debit_base=0, credit_base=total_amount)
+
+            # TASK-015: centralized GL posting
+            je_id, je_number = create_journal_entry(
+                db=db,
+                company_id=current_user.company_id,
+                date=str(payment_date),
+                description=f"صرف عمولات مبيعات — {', '.join(sp_names)} — {total_amount:.2f}",
+                lines=[
+                    {"account_id": commission_acc, "debit": total_amount, "credit": 0,
+                     "description": f"عمولات مبيعات — {len(commissions)} عمولة"},
+                    {"account_id": bank_acc, "debit": 0, "credit": total_amount,
+                     "description": "صرف عمولات مبيعات"},
+                ],
+                user_id=current_user.id,
+                status="posted",
+                currency=base_currency,
+                source="CommissionPayment",
+                source_id=int(sorted(commission_ids)[0]) if commission_ids else None,
+                username=getattr(current_user, "username", None),
+                idempotency_key=f"commpay-{'-'.join(str(i) for i in sorted(commission_ids))}",
+            )
         
         # Update commission status
         db.execute(text(f"""

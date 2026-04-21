@@ -23,6 +23,7 @@ from utils.accounting import (
 )
 from utils.fiscal_lock import check_fiscal_period_open, create_fiscal_lock_table
 from utils.duplicate_detection import find_duplicate_parties, find_duplicate_products
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 import logging
 
 router = APIRouter(tags=["System Completion"])
@@ -901,39 +902,32 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
             raise HTTPException(400, "مبلغ الزكاة صفر")
 
         currency = get_base_currency(db)
-        je_number = generate_sequential_number(db, f"JE-ZKT-{fiscal_year}", "journal_entries", "entry_number")
 
-        je = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, reference, description,
-                status, currency, created_by
-            ) VALUES (:num, :dt, :ref, :desc, 'posted', :curr, :uid)
-            RETURNING id
-        """), {
-            "num": je_number, "dt": f"{fiscal_year}-12-31",
-            "ref": f"ZAKAT-{fiscal_year}",
-            "desc": f"زكاة عام {fiscal_year}",
-            "curr": currency, "uid": user_id
-        })
-        je_id = je.fetchone()[0]
-
-        # Dr: Zakat Expense
+        # TASK-015: route through centralized GL service (idempotent, validated, audited)
         exp_acc = get_mapped_account_id(db, "acc_map_zakat_expense")
-        if exp_acc:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, :amt, 0, 'مصروف زكاة')
-            """), {"jeid": je_id, "aid": exp_acc, "amt": str(amount)})
-            update_account_balance(db, exp_acc, float(amount), 0)
-
-        # Cr: Zakat Payable
         pay_acc = get_mapped_account_id(db, "acc_map_zakat_payable")
-        if pay_acc:
-            db.execute(text("""
-                INSERT INTO journal_lines (journal_entry_id, account_id, debit, credit, description)
-                VALUES (:jeid, :aid, 0, :amt, 'زكاة مستحقة')
-            """), {"jeid": je_id, "aid": pay_acc, "amt": str(amount)})
-            update_account_balance(db, pay_acc, 0, float(amount))
+        if not exp_acc or not pay_acc:
+            raise HTTPException(400, "حسابات الزكاة غير معرّفة في خريطة الحسابات")
+
+        lines = [
+            {"account_id": exp_acc, "debit": amount, "credit": 0, "description": "مصروف زكاة"},
+            {"account_id": pay_acc, "debit": 0, "credit": amount, "description": "زكاة مستحقة"},
+        ]
+        je_id, je_number = create_journal_entry(
+            db=db,
+            company_id=company_id,
+            date=f"{fiscal_year}-12-31",
+            description=f"زكاة عام {fiscal_year}",
+            lines=lines,
+            user_id=user_id,
+            reference=f"ZAKAT-{fiscal_year}",
+            status="posted",
+            currency=currency,
+            source="Zakat",
+            source_id=fiscal_year,
+            username=_u(current_user, "username", ""),
+            idempotency_key=f"zakat-{fiscal_year}",
+        )
 
         db.execute(text("""
             UPDATE zakat_calculations SET status = 'posted', journal_entry_id = :jeid

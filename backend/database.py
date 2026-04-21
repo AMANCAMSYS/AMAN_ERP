@@ -149,7 +149,13 @@ def create_company_database(company_id: str, admin_password: str) -> Tuple[bool,
     from utils.sql_safety import validate_aman_identifier
     validate_aman_identifier(db_name, "database name")
     validate_aman_identifier(db_user, "database user")
-    
+
+    # SEC-C3: The per-tenant PostgreSQL role password MUST NOT equal the
+    # tenant admin's application password. Generate a fresh high-entropy
+    # secret; it is only used by superusers for direct DB access.
+    import secrets as _secrets
+    db_role_password = _secrets.token_urlsafe(32)
+
     # SEC-007: Use _ddl_engine (AUTOCOMMIT) — DDL cannot run inside a transaction.
     try:
         with _ddl_engine.connect() as conn:
@@ -162,7 +168,7 @@ def create_company_database(company_id: str, admin_password: str) -> Tuple[bool,
                 return False, "قاعدة البيانات موجودة", "", ""
             
             conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-            conn.execute(text(f"CREATE USER {db_user} WITH PASSWORD :password"), {"password": admin_password})
+            conn.execute(text(f"CREATE USER {db_user} WITH PASSWORD :password"), {"password": db_role_password})
             conn.execute(text(f'GRANT ALL PRIVILEGES ON DATABASE "{db_name}" TO {db_user}'))
             conn.execute(text(f'ALTER DATABASE "{db_name}" OWNER TO {db_user}'))
         
@@ -174,8 +180,8 @@ def create_company_database(company_id: str, admin_password: str) -> Tuple[bool,
         return False, "حدث خطأ أثناء إنشاء قاعدة البيانات", "", ""
 
 
-def get_all_table_sql() -> str:
-    """Returns SQL for all 91 tables"""
+def get_foundation_tables_sql() -> str:
+    """Returns SQL for foundation tables (Users, Branches, Accounts, Treasury, Settings, Suppliers)"""
     return """
     -- ===== CORE TABLES (7) =====
     CREATE TABLE IF NOT EXISTS company_users (
@@ -235,69 +241,6 @@ def get_all_table_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS parties (
-        id SERIAL PRIMARY KEY,
-        party_type VARCHAR(20) DEFAULT 'individual', -- individual/company
-        party_code VARCHAR(50) UNIQUE,
-        name VARCHAR(255) NOT NULL,
-        name_en VARCHAR(255),
-        
-        -- Contact Info
-        email VARCHAR(255),
-        phone VARCHAR(50),
-        mobile VARCHAR(50),
-        fax VARCHAR(50),
-        website VARCHAR(255),
-        
-        -- Address
-        address TEXT,
-        city VARCHAR(100),
-        country VARCHAR(100),
-        postal_code VARCHAR(20),
-        
-        -- Financial & Legal
-        tax_number VARCHAR(50),
-        commercial_register VARCHAR(50),
-        tax_exempt BOOLEAN DEFAULT FALSE,
-        currency VARCHAR(3),
-        
-        -- Classification
-        is_customer BOOLEAN DEFAULT FALSE,
-        is_supplier BOOLEAN DEFAULT FALSE,
-        party_group_id INTEGER REFERENCES party_groups(id),
-        branch_id INTEGER REFERENCES branches(id),
-        
-        -- Commercial Terms
-        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
-        payment_terms VARCHAR(100),
-        credit_limit DECIMAL(18, 4) DEFAULT 0,
-        
-        -- Balances (Denormalized)
-        current_balance DECIMAL(18, 4) DEFAULT 0,
-        
-        status VARCHAR(20) DEFAULT 'active',
-        notes TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS party_transactions (
-        id SERIAL PRIMARY KEY,
-        party_id INTEGER REFERENCES parties(id),
-        transaction_type VARCHAR(50) NOT NULL,
-        reference_number VARCHAR(100),
-        transaction_date DATE NOT NULL,
-        description TEXT,
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        balance DECIMAL(18, 4) DEFAULT 0,
-        payment_id INTEGER REFERENCES payment_vouchers(id) ON DELETE SET NULL, -- Link to payment_vouchers
-        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL, -- Link to invoices
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-
-
     CREATE TABLE IF NOT EXISTS accounts (
         id SERIAL PRIMARY KEY,
         account_number VARCHAR(50) UNIQUE NOT NULL,
@@ -351,112 +294,6 @@ def get_all_table_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         posted_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-    
-    CREATE TABLE IF NOT EXISTS journal_lines (
-        id SERIAL PRIMARY KEY,
-        journal_entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
-        account_id INTEGER NOT NULL REFERENCES accounts(id),
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        cost_center_id INTEGER REFERENCES cost_centers(id) ON DELETE SET NULL,
-        amount_currency DECIMAL(18, 4) DEFAULT 0,
-        currency VARCHAR(3) DEFAULT NULL,
-        description TEXT,
-        is_reconciled BOOLEAN DEFAULT FALSE,
-        reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE SET NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-    
-    CREATE OR REPLACE FUNCTION check_journal_balance() RETURNS TRIGGER AS $$
-    DECLARE
-        target_journal_entry_id INTEGER;
-        total_debit NUMERIC;
-        total_credit NUMERIC;
-    BEGIN
-        target_journal_entry_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
-
-        SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
-          INTO total_debit, total_credit
-        FROM journal_lines
-        WHERE journal_entry_id = target_journal_entry_id;
-
-        IF ABS(total_debit - total_credit) > 0.01 THEN
-            RAISE EXCEPTION
-                'Journal entry % is not balanced (debit %, credit %)',
-                target_journal_entry_id, total_debit, total_credit;
-        END IF;
-
-        RETURN COALESCE(NEW, OLD);
-    END;
-    $$ LANGUAGE plpgsql;
-
-    DO $$
-    BEGIN
-        IF to_regclass('public.journal_lines') IS NOT NULL THEN
-            IF EXISTS (
-                SELECT 1
-                FROM pg_trigger
-                WHERE tgname = 'trg_journal_balance'
-                  AND tgrelid = 'journal_lines'::regclass
-            ) THEN
-                DROP TRIGGER trg_journal_balance ON journal_lines;
-            END IF;
-
-            CREATE CONSTRAINT TRIGGER trg_journal_balance
-            AFTER INSERT OR UPDATE OR DELETE ON journal_lines
-            DEFERRABLE INITIALLY DEFERRED
-            FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
-        END IF;
-    END
-    $$;
-    
-    CREATE TABLE IF NOT EXISTS invoices (
-        id SERIAL PRIMARY KEY,
-        invoice_number VARCHAR(50) UNIQUE NOT NULL,
-        invoice_type VARCHAR(20) NOT NULL,
-        party_id INTEGER REFERENCES parties(id),
-        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
-        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
-        invoice_date DATE NOT NULL,
-        due_date DATE,
-        subtotal DECIMAL(18, 4) DEFAULT 0,
-        tax_amount DECIMAL(18, 4) DEFAULT 0,
-        discount DECIMAL(18, 4) DEFAULT 0,
-        effect_type VARCHAR(20) DEFAULT 'discount',
-        effect_percentage DECIMAL(5, 2) DEFAULT 0,
-        markup_amount DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) DEFAULT 0,
-        paid_amount DECIMAL(18, 4) DEFAULT 0,
-        status VARCHAR(20) DEFAULT 'draft',
-        notes TEXT,
-        down_payment_method VARCHAR(20),
-        branch_id INTEGER REFERENCES branches(id),
-        warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL,
-        related_invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
-        currency VARCHAR(3) DEFAULT 'SAR',
-        exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_by VARCHAR(100)
-    );
-
-    CREATE TABLE IF NOT EXISTS invoice_lines (
-        id SERIAL PRIMARY KEY,
-        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
-        description VARCHAR(500),
-        quantity DECIMAL(18, 4) DEFAULT 1,
-        unit_price DECIMAL(18, 4) DEFAULT 0,
-        tax_rate DECIMAL(5, 2) DEFAULT 0,
-        discount DECIMAL(18, 4) DEFAULT 0,
-        markup DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        created_by VARCHAR(100),
-        updated_by VARCHAR(100)
     );
     
     CREATE TABLE IF NOT EXISTS company_settings (
@@ -544,22 +381,6 @@ def get_all_table_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
-    CREATE TABLE IF NOT EXISTS supplier_transactions (
-        id SERIAL PRIMARY KEY,
-        supplier_id INTEGER REFERENCES suppliers(id),
-        transaction_type VARCHAR(50) NOT NULL,
-        reference_number VARCHAR(100),
-        transaction_date DATE NOT NULL,
-        description TEXT,
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        balance DECIMAL(18, 4) DEFAULT 0,
-        payment_id INTEGER REFERENCES supplier_payments(id) ON DELETE SET NULL,
-        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-    
     CREATE TABLE IF NOT EXISTS supplier_payments (
         id SERIAL PRIMARY KEY,
         payment_number VARCHAR(50) UNIQUE,
@@ -579,8 +400,8 @@ def get_all_table_sql() -> str:
     """
 
 
-def get_additional_tables_sql() -> str:
-    """Returns SQL for remaining tables"""
+def get_additional_base_tables_sql() -> str:
+    """Returns SQL for additional base tables (Customer groups, Price lists, Products, Warehouses, Inventory, RFQ, etc.)"""
     return """
     -- ===== CUSTOMERS TABLES (7) =====
     CREATE TABLE IF NOT EXISTS customer_groups (
@@ -597,6 +418,22 @@ def get_additional_tables_sql() -> str:
         price_list_id INTEGER,
         payment_days INTEGER DEFAULT 30,
         status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_price_lists (
+        id SERIAL PRIMARY KEY,
+        price_list_code VARCHAR(50) UNIQUE,
+        price_list_name VARCHAR(255) NOT NULL,
+        price_list_name_en VARCHAR(255),
+        customer_group_id INTEGER REFERENCES customer_groups(id),
+        currency VARCHAR(3) DEFAULT NULL,
+        discount_type VARCHAR(20) DEFAULT 'percentage',
+        discount_value DECIMAL(10, 4) DEFAULT 0,
+        valid_from DATE,
+        valid_to DATE,
+        status VARCHAR(20) DEFAULT 'active',
+        is_default BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -627,6 +464,7 @@ def get_additional_tables_sql() -> str:
         tax_exempt BOOLEAN DEFAULT FALSE,
         status VARCHAR(20) DEFAULT 'active',
         notes TEXT,
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -661,21 +499,7 @@ def get_additional_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
-    CREATE TABLE IF NOT EXISTS customer_transactions (
-        id SERIAL PRIMARY KEY,
-        customer_id INTEGER REFERENCES customers(id),
-        transaction_type VARCHAR(50) NOT NULL,
-        reference_number VARCHAR(100),
-        transaction_date DATE NOT NULL,
-        description TEXT,
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        balance DECIMAL(18, 4) DEFAULT 0,
-        receipt_id INTEGER REFERENCES customer_receipts(id) ON DELETE SET NULL,
-        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+    -- customer_transactions moved to additional_dependent
     
     CREATE TABLE IF NOT EXISTS customer_receipts (
         id SERIAL PRIMARY KEY,
@@ -694,21 +518,7 @@ def get_additional_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     
-    CREATE TABLE IF NOT EXISTS customer_price_lists (
-        id SERIAL PRIMARY KEY,
-        price_list_code VARCHAR(50) UNIQUE,
-        price_list_name VARCHAR(255) NOT NULL,
-        price_list_name_en VARCHAR(255),
-        customer_group_id INTEGER REFERENCES customer_groups(id),
-        currency VARCHAR(3) DEFAULT NULL,
-        discount_type VARCHAR(20) DEFAULT 'percentage',
-        discount_value DECIMAL(10, 4) DEFAULT 0,
-        valid_from DATE,
-        valid_to DATE,
-        status VARCHAR(20) DEFAULT 'active',
-        is_default BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+    -- customer_price_lists moved above customers
     
     -- ===== PRODUCTS & INVENTORY TABLES (7) =====
     CREATE TABLE IF NOT EXISTS product_categories (
@@ -771,6 +581,7 @@ def get_additional_tables_sql() -> str:
         reorder_level DECIMAL(18, 4) DEFAULT 0,
         reorder_quantity DECIMAL(18, 4) DEFAULT 0,
         image_url TEXT,
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -806,6 +617,7 @@ def get_additional_tables_sql() -> str:
         quantity DECIMAL(18, 4) DEFAULT 0,
         reserved_quantity DECIMAL(18, 4) DEFAULT 0,
         available_quantity DECIMAL(18, 4) DEFAULT 0,
+        in_transit_quantity DECIMAL(18, 4) DEFAULT 0,  -- TASK-026: stock dispatched but not yet received
         average_cost DECIMAL(18, 4) DEFAULT 0, -- Total company-wide or per-wh cost
         policy_version INTEGER DEFAULT 1,
         last_costing_update TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -887,45 +699,7 @@ def get_additional_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS purchase_orders (
-        id SERIAL PRIMARY KEY,
-        po_number VARCHAR(50) UNIQUE NOT NULL,
-        party_id INTEGER REFERENCES parties(id),
-        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
-        branch_id INTEGER REFERENCES branches(id),
-        order_date DATE NOT NULL,
-        expected_date DATE,
-        subtotal DECIMAL(18, 4) DEFAULT 0,
-        tax_amount DECIMAL(18, 4) DEFAULT 0,
-        discount DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) DEFAULT 0,
-        status VARCHAR(20) DEFAULT 'draft', -- draft, confirmed, received, cancelled
-        notes TEXT,
-        currency VARCHAR(3) DEFAULT 'SAR',
-        exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS purchase_order_lines (
-        id SERIAL PRIMARY KEY,
-        po_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-        product_id INTEGER REFERENCES products(id),
-        description VARCHAR(500),
-        quantity DECIMAL(18, 4) DEFAULT 1,
-        unit_price DECIMAL(18, 4) DEFAULT 0,
-        tax_rate DECIMAL(5, 2) DEFAULT 0,
-        discount DECIMAL(18, 4) DEFAULT 0,
-        total DECIMAL(18, 4) DEFAULT 0,
-        received_quantity DECIMAL(18, 4) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        created_by INTEGER REFERENCES company_users(id),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
+    -- purchase_orders, purchase_order_lines moved to additional_dependent
 
     CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
@@ -998,6 +772,402 @@ def get_additional_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(report_type, report_id, shared_with)
+    );
+
+    -- sales_quotations, sales_orders, sales_returns, payment_vouchers, commissions moved to additional_dependent
+
+    -- ===== REQUEST FOR QUOTATIONS =====
+    CREATE TABLE IF NOT EXISTS request_for_quotations (
+        id SERIAL PRIMARY KEY,
+        rfq_number VARCHAR(50) UNIQUE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        status VARCHAR(30) DEFAULT 'draft',
+        deadline TIMESTAMPTZ,
+        branch_id INTEGER REFERENCES branches(id),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS rfq_lines (
+        id SERIAL PRIMARY KEY,
+        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        product_name VARCHAR(255),
+        quantity NUMERIC(12, 3) NOT NULL,
+        unit VARCHAR(50),
+        specifications TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS rfq_responses (
+        id SERIAL PRIMARY KEY,
+        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+        supplier_name VARCHAR(255),
+        unit_price NUMERIC(15, 2),
+        total_price NUMERIC(15, 2),
+        delivery_days INTEGER,
+        notes TEXT,
+        is_selected BOOLEAN DEFAULT FALSE,
+        submitted_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    -- ===== SUPPLIER RATINGS =====
+    CREATE TABLE IF NOT EXISTS supplier_ratings (
+        id SERIAL PRIMARY KEY,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        po_id INTEGER, -- FK to purchase_orders deferred (created in additional_dependent)
+        quality_score NUMERIC(3, 1) DEFAULT 0,
+        delivery_score NUMERIC(3, 1) DEFAULT 0,
+        price_score NUMERIC(3, 1) DEFAULT 0,
+        service_score NUMERIC(3, 1) DEFAULT 0,
+        overall_score NUMERIC(3, 1) DEFAULT 0,
+        comments TEXT,
+        rated_by INTEGER REFERENCES company_users(id),
+        rated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    -- ===== PURCHASE AGREEMENTS =====
+    CREATE TABLE IF NOT EXISTS purchase_agreements (
+        id SERIAL PRIMARY KEY,
+        agreement_number VARCHAR(50) UNIQUE,
+        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        agreement_type VARCHAR(30) DEFAULT 'blanket',
+        title VARCHAR(255),
+        start_date DATE,
+        end_date DATE,
+        total_amount NUMERIC(15, 2) DEFAULT 0,
+        consumed_amount NUMERIC(15, 2) DEFAULT 0,
+        status VARCHAR(30) DEFAULT 'draft',
+        branch_id INTEGER REFERENCES branches(id),
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS purchase_agreement_lines (
+        id SERIAL PRIMARY KEY,
+        agreement_id INTEGER REFERENCES purchase_agreements(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        product_name VARCHAR(255),
+        quantity NUMERIC(12, 3),
+        unit_price NUMERIC(15, 2),
+        delivered_qty NUMERIC(12, 3) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_rfq_status ON request_for_quotations(status);
+    CREATE INDEX IF NOT EXISTS idx_supplier_ratings_supplier ON supplier_ratings(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_agreements_status ON purchase_agreements(status);
+    """
+
+
+def get_treasury_base_tables_sql() -> str:
+    """Returns SQL for treasury base tables (transactions, reconciliations) — no forward FK deps"""
+    return """
+    -- ===== TREASURY BASE TABLES =====
+
+    CREATE TABLE IF NOT EXISTS treasury_transactions (
+        id SERIAL PRIMARY KEY,
+        transaction_number VARCHAR(50) UNIQUE,
+        transaction_date DATE NOT NULL,
+        transaction_type VARCHAR(50) NOT NULL,
+        amount DECIMAL(18, 4) NOT NULL,
+        treasury_id INTEGER REFERENCES treasury_accounts(id),
+        target_account_id INTEGER REFERENCES accounts(id),
+        target_treasury_id INTEGER REFERENCES treasury_accounts(id),
+        branch_id INTEGER REFERENCES branches(id),
+        description TEXT,
+        reference_number VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'posted',
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS bank_reconciliations (
+        id SERIAL PRIMARY KEY,
+        treasury_account_id INTEGER REFERENCES treasury_accounts(id),
+        statement_date DATE NOT NULL,
+        start_balance DECIMAL(18, 4) DEFAULT 0,
+        end_balance DECIMAL(18, 4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'draft',
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        branch_id INTEGER REFERENCES branches(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
+
+def get_core_dependent_tables_sql() -> str:
+    """Returns SQL for core dependent tables that need bank_reconciliations, cost_centers, customers, warehouses, products, etc."""
+    return """
+    -- ===== CORE DEPENDENT TABLES =====
+
+    CREATE TABLE IF NOT EXISTS journal_lines (
+        id SERIAL PRIMARY KEY,
+        -- FIN-C5 / TASK-016: RESTRICT prevents accidental cascade deletion of
+        -- journal lines. Drafts can still be removed by explicitly deleting
+        -- their lines first; posted entries are further protected by
+        -- trg_je_immutable / trg_jl_immutable.
+        journal_entry_id INTEGER NOT NULL REFERENCES journal_entries(id) ON DELETE RESTRICT,
+        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        cost_center_id INTEGER REFERENCES cost_centers(id) ON DELETE SET NULL,
+        amount_currency DECIMAL(18, 4) DEFAULT 0,
+        currency VARCHAR(3) DEFAULT NULL,
+        description TEXT,
+        is_reconciled BOOLEAN DEFAULT FALSE,
+        reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE OR REPLACE FUNCTION check_journal_balance() RETURNS TRIGGER AS $$
+    DECLARE
+        target_journal_entry_id INTEGER;
+        total_debit NUMERIC;
+        total_credit NUMERIC;
+    BEGIN
+        target_journal_entry_id := COALESCE(NEW.journal_entry_id, OLD.journal_entry_id);
+
+        SELECT COALESCE(SUM(debit), 0), COALESCE(SUM(credit), 0)
+          INTO total_debit, total_credit
+        FROM journal_lines
+        WHERE journal_entry_id = target_journal_entry_id;
+
+        IF ABS(total_debit - total_credit) > 0.01 THEN
+            RAISE EXCEPTION
+                'Journal entry % is not balanced (debit %, credit %)',
+                target_journal_entry_id, total_debit, total_credit;
+        END IF;
+
+        RETURN COALESCE(NEW, OLD);
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DO $$
+    BEGIN
+        IF to_regclass('public.journal_lines') IS NOT NULL THEN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_trigger
+                WHERE tgname = 'trg_journal_balance'
+                  AND tgrelid = 'journal_lines'::regclass
+            ) THEN
+                DROP TRIGGER trg_journal_balance ON journal_lines;
+            END IF;
+
+            CREATE CONSTRAINT TRIGGER trg_journal_balance
+            AFTER INSERT OR UPDATE OR DELETE ON journal_lines
+            DEFERRABLE INITIALLY DEFERRED
+            FOR EACH ROW EXECUTE FUNCTION check_journal_balance();
+        END IF;
+    END
+    $$;
+
+    CREATE TABLE IF NOT EXISTS bank_statement_lines (
+        id SERIAL PRIMARY KEY,
+        reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE CASCADE,
+        transaction_date DATE NOT NULL,
+        description TEXT,
+        reference VARCHAR(100),
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        balance DECIMAL(18, 4) DEFAULT 0,
+        is_reconciled BOOLEAN DEFAULT FALSE,
+        matched_journal_line_id INTEGER REFERENCES journal_lines(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS parties (
+        id SERIAL PRIMARY KEY,
+        party_type VARCHAR(20) DEFAULT 'individual', -- individual/company
+        party_code VARCHAR(50) UNIQUE,
+        name VARCHAR(255) NOT NULL,
+        name_en VARCHAR(255),
+
+        -- Contact Info
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        mobile VARCHAR(50),
+        fax VARCHAR(50),
+        website VARCHAR(255),
+
+        -- Address
+        address TEXT,
+        city VARCHAR(100),
+        country VARCHAR(100),
+        postal_code VARCHAR(20),
+
+        -- Financial & Legal
+        tax_number VARCHAR(50),
+        commercial_register VARCHAR(50),
+        tax_exempt BOOLEAN DEFAULT FALSE,
+        currency VARCHAR(3),
+
+        -- Classification
+        is_customer BOOLEAN DEFAULT FALSE,
+        is_supplier BOOLEAN DEFAULT FALSE,
+        party_group_id INTEGER REFERENCES party_groups(id),
+        branch_id INTEGER REFERENCES branches(id),
+
+        -- Commercial Terms
+        price_list_id INTEGER REFERENCES customer_price_lists(id) ON DELETE SET NULL,
+        payment_terms VARCHAR(100),
+        credit_limit DECIMAL(18, 4) DEFAULT 0,
+
+        -- Balances (Denormalized)
+        current_balance DECIMAL(18, 4) DEFAULT 0,
+
+        status VARCHAR(20) DEFAULT 'active',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        invoice_number VARCHAR(50) UNIQUE NOT NULL,
+        invoice_type VARCHAR(20) NOT NULL,
+        party_id INTEGER REFERENCES parties(id),
+        customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL, -- Deprecated
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
+        invoice_date DATE NOT NULL,
+        due_date DATE,
+        subtotal DECIMAL(18, 4) DEFAULT 0,
+        tax_amount DECIMAL(18, 4) DEFAULT 0,
+        discount DECIMAL(18, 4) DEFAULT 0,
+        effect_type VARCHAR(20) DEFAULT 'discount',
+        effect_percentage DECIMAL(5, 2) DEFAULT 0,
+        markup_amount DECIMAL(18, 4) DEFAULT 0,
+        total DECIMAL(18, 4) DEFAULT 0,
+        paid_amount DECIMAL(18, 4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'draft',
+        notes TEXT,
+        down_payment_method VARCHAR(20),
+        branch_id INTEGER REFERENCES branches(id),
+        warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL,
+        related_invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        currency VARCHAR(3) DEFAULT 'SAR',
+        exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by VARCHAR(100)
+    );
+
+    CREATE TABLE IF NOT EXISTS invoice_lines (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+        description VARCHAR(500),
+        quantity DECIMAL(18, 4) DEFAULT 1,
+        unit_price DECIMAL(18, 4) DEFAULT 0,
+        tax_rate DECIMAL(5, 2) DEFAULT 0,
+        discount DECIMAL(18, 4) DEFAULT 0,
+        markup DECIMAL(18, 4) DEFAULT 0,
+        total DECIMAL(18, 4) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(100),
+        updated_by VARCHAR(100)
+    );
+
+    CREATE TABLE IF NOT EXISTS supplier_transactions (
+        id SERIAL PRIMARY KEY,
+        supplier_id INTEGER REFERENCES suppliers(id),
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_number VARCHAR(100),
+        transaction_date DATE NOT NULL,
+        description TEXT,
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        balance DECIMAL(18, 4) DEFAULT 0,
+        payment_id INTEGER REFERENCES supplier_payments(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+
+
+def get_additional_dependent_tables_sql() -> str:
+    """Returns SQL for additional dependent tables that need parties, invoices, employees, etc."""
+    return """
+    -- ===== ADDITIONAL DEPENDENT TABLES =====
+
+    CREATE TABLE IF NOT EXISTS customer_transactions (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER REFERENCES customers(id),
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_number VARCHAR(100),
+        transaction_date DATE NOT NULL,
+        description TEXT,
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        balance DECIMAL(18, 4) DEFAULT 0,
+        receipt_id INTEGER REFERENCES customer_receipts(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        po_number VARCHAR(50) UNIQUE NOT NULL,
+        party_id INTEGER REFERENCES parties(id),
+        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL, -- Deprecated
+        branch_id INTEGER REFERENCES branches(id),
+        order_date DATE NOT NULL,
+        expected_date DATE,
+        subtotal DECIMAL(18, 4) DEFAULT 0,
+        tax_amount DECIMAL(18, 4) DEFAULT 0,
+        discount DECIMAL(18, 4) DEFAULT 0,
+        total DECIMAL(18, 4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'draft', -- draft, confirmed, received, cancelled
+        notes TEXT,
+        currency VARCHAR(3) DEFAULT 'SAR',
+        exchange_rate DECIMAL(18, 6) DEFAULT 1.0,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS purchase_order_lines (
+        id SERIAL PRIMARY KEY,
+        po_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id),
+        description VARCHAR(500),
+        quantity DECIMAL(18, 4) DEFAULT 1,
+        unit_price DECIMAL(18, 4) DEFAULT 0,
+        tax_rate DECIMAL(5, 2) DEFAULT 0,
+        discount DECIMAL(18, 4) DEFAULT 0,
+        total DECIMAL(18, 4) DEFAULT 0,
+        received_quantity DECIMAL(18, 4) DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        created_by INTEGER REFERENCES company_users(id),
+        updated_by INTEGER REFERENCES company_users(id)
     );
 
     CREATE TABLE IF NOT EXISTS sales_quotations (
@@ -1079,8 +1249,6 @@ def get_additional_tables_sql() -> str:
         updated_by VARCHAR(100)
     );
 
-
-
     CREATE TABLE IF NOT EXISTS sales_returns (
         id SERIAL PRIMARY KEY,
         return_number VARCHAR(50) UNIQUE NOT NULL,
@@ -1157,6 +1325,22 @@ def get_additional_tables_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS party_transactions (
+        id SERIAL PRIMARY KEY,
+        party_id INTEGER REFERENCES parties(id),
+        transaction_type VARCHAR(50) NOT NULL,
+        reference_number VARCHAR(100),
+        transaction_date DATE NOT NULL,
+        description TEXT,
+        debit DECIMAL(18, 4) DEFAULT 0,
+        credit DECIMAL(18, 4) DEFAULT 0,
+        balance DECIMAL(18, 4) DEFAULT 0,
+        payment_id INTEGER REFERENCES payment_vouchers(id) ON DELETE SET NULL,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- ===== SALES COMMISSIONS =====
     CREATE TABLE IF NOT EXISTS commission_rules (
         id SERIAL PRIMARY KEY,
@@ -1193,106 +1377,16 @@ def get_additional_tables_sql() -> str:
         UNIQUE(invoice_id, salesperson_id)
     );
 
-    -- ===== REQUEST FOR QUOTATIONS =====
-    CREATE TABLE IF NOT EXISTS request_for_quotations (
-        id SERIAL PRIMARY KEY,
-        rfq_number VARCHAR(50) UNIQUE,
-        title VARCHAR(255) NOT NULL,
-        description TEXT,
-        status VARCHAR(30) DEFAULT 'draft',
-        deadline TIMESTAMPTZ,
-        branch_id INTEGER REFERENCES branches(id),
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS rfq_lines (
-        id SERIAL PRIMARY KEY,
-        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
-        product_id INTEGER REFERENCES products(id),
-        product_name VARCHAR(255),
-        quantity NUMERIC(12, 3) NOT NULL,
-        unit VARCHAR(50),
-        specifications TEXT,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_by INTEGER REFERENCES company_users(id),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS rfq_responses (
-        id SERIAL PRIMARY KEY,
-        rfq_id INTEGER REFERENCES request_for_quotations(id) ON DELETE CASCADE,
-        supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
-        supplier_name VARCHAR(255),
-        unit_price NUMERIC(15, 2),
-        total_price NUMERIC(15, 2),
-        delivery_days INTEGER,
-        notes TEXT,
-        is_selected BOOLEAN DEFAULT FALSE,
-        submitted_at TIMESTAMPTZ DEFAULT NOW(),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_by INTEGER REFERENCES company_users(id),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    -- ===== SUPPLIER RATINGS =====
-    CREATE TABLE IF NOT EXISTS supplier_ratings (
-        id SERIAL PRIMARY KEY,
-        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
-        po_id INTEGER REFERENCES purchase_orders(id) ON DELETE SET NULL,
-        quality_score NUMERIC(3, 1) DEFAULT 0,
-        delivery_score NUMERIC(3, 1) DEFAULT 0,
-        price_score NUMERIC(3, 1) DEFAULT 0,
-        service_score NUMERIC(3, 1) DEFAULT 0,
-        overall_score NUMERIC(3, 1) DEFAULT 0,
-        comments TEXT,
-        rated_by INTEGER REFERENCES company_users(id),
-        rated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    -- ===== PURCHASE AGREEMENTS =====
-    CREATE TABLE IF NOT EXISTS purchase_agreements (
-        id SERIAL PRIMARY KEY,
-        agreement_number VARCHAR(50) UNIQUE,
-        supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
-        agreement_type VARCHAR(30) DEFAULT 'blanket',
-        title VARCHAR(255),
-        start_date DATE,
-        end_date DATE,
-        total_amount NUMERIC(15, 2) DEFAULT 0,
-        consumed_amount NUMERIC(15, 2) DEFAULT 0,
-        status VARCHAR(30) DEFAULT 'draft',
-        branch_id INTEGER REFERENCES branches(id),
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS purchase_agreement_lines (
-        id SERIAL PRIMARY KEY,
-        agreement_id INTEGER REFERENCES purchase_agreements(id) ON DELETE CASCADE,
-        product_id INTEGER REFERENCES products(id),
-        product_name VARCHAR(255),
-        quantity NUMERIC(12, 3),
-        unit_price NUMERIC(15, 2),
-        delivered_qty NUMERIC(12, 3) DEFAULT 0,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        created_by INTEGER REFERENCES company_users(id),
-        updated_by INTEGER REFERENCES company_users(id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_rfq_status ON request_for_quotations(status);
-    CREATE INDEX IF NOT EXISTS idx_supplier_ratings_supplier ON supplier_ratings(supplier_id);
-    CREATE INDEX IF NOT EXISTS idx_purchase_agreements_status ON purchase_agreements(status);
+    -- Add deferred FK for supplier_ratings.po_id (created in additional_base before purchase_orders)
+    DO $$ BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name = 'supplier_ratings_po_id_fkey' AND table_name = 'supplier_ratings'
+        ) THEN
+            ALTER TABLE supplier_ratings ADD CONSTRAINT supplier_ratings_po_id_fkey
+                FOREIGN KEY (po_id) REFERENCES purchase_orders(id) ON DELETE SET NULL;
+        END IF;
+    END $$;
     """
 
 
@@ -1541,6 +1635,19 @@ def get_organization_tables_sql() -> str:
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS review_cycles (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        period_start DATE NOT NULL,
+        period_end DATE NOT NULL,
+        self_assessment_deadline DATE,
+        manager_review_deadline DATE,
+        status VARCHAR(20) DEFAULT 'draft',
+        created_by VARCHAR(100),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS performance_reviews (
         id SERIAL PRIMARY KEY,
         employee_id INTEGER REFERENCES employees(id) ON DELETE CASCADE,
@@ -1556,7 +1663,7 @@ def get_organization_tables_sql() -> str:
         self_comments TEXT,
         manager_comments TEXT,
         status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'self_review', 'manager_review', 'completed')),
-        cycle_id INTEGER,
+        cycle_id INTEGER REFERENCES review_cycles(id),
         self_assessment JSONB,
         manager_assessment JSONB,
         composite_score DECIMAL(5, 2),
@@ -1997,6 +2104,7 @@ def get_financial_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'active',
         current_value DECIMAL(18, 4),
         revaluation_surplus DECIMAL(18, 4) DEFAULT 0,
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -2236,6 +2344,7 @@ def get_financial_tables_sql() -> str:
         billing_cycle VARCHAR(20),
         next_billing_date DATE,
         created_by INTEGER REFERENCES company_users(id),
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -2428,56 +2537,12 @@ def get_financial_tables_sql() -> str:
     """
 
 
-def get_treasury_tables_sql() -> str:
-    """Returns SQL for Treasury tables"""
+def get_treasury_dependent_tables_sql() -> str:
+    """Returns SQL for treasury dependent tables (checks, notes, expense_policies, expenses) — needs parties, payment_vouchers, etc."""
     return """
-    -- ===== TREASURY TABLES (2) =====
-
-
-    CREATE TABLE IF NOT EXISTS treasury_transactions (
-        id SERIAL PRIMARY KEY,
-        transaction_number VARCHAR(50) UNIQUE,
-        transaction_date DATE NOT NULL,
-        transaction_type VARCHAR(50) NOT NULL,
-        amount DECIMAL(18, 4) NOT NULL,
-        treasury_id INTEGER REFERENCES treasury_accounts(id),
-        target_account_id INTEGER REFERENCES accounts(id),
-        target_treasury_id INTEGER REFERENCES treasury_accounts(id),
-        branch_id INTEGER REFERENCES branches(id),
-        description TEXT,
-        reference_number VARCHAR(100),
-        status VARCHAR(20) DEFAULT 'posted',
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS bank_reconciliations (
-        id SERIAL PRIMARY KEY,
-        treasury_account_id INTEGER REFERENCES treasury_accounts(id),
-        statement_date DATE NOT NULL,
-        start_balance DECIMAL(18, 4) DEFAULT 0,
-        end_balance DECIMAL(18, 4) DEFAULT 0,
-        status VARCHAR(20) DEFAULT 'draft',
-        notes TEXT,
-        created_by INTEGER REFERENCES company_users(id),
-        branch_id INTEGER REFERENCES branches(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS bank_statement_lines (
-        id SERIAL PRIMARY KEY,
-        reconciliation_id INTEGER REFERENCES bank_reconciliations(id) ON DELETE CASCADE,
-        transaction_date DATE NOT NULL,
-        description TEXT,
-        reference VARCHAR(100),
-        debit DECIMAL(18, 4) DEFAULT 0,
-        credit DECIMAL(18, 4) DEFAULT 0,
-        balance DECIMAL(18, 4) DEFAULT 0,
-        is_reconciled BOOLEAN DEFAULT FALSE,
-        matched_journal_line_id INTEGER REFERENCES journal_lines(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    );
+    -- ===== TREASURY DEPENDENT TABLES =====
+    -- treasury_transactions, bank_reconciliations moved to get_treasury_base_tables_sql()
+    -- bank_statement_lines moved to get_core_dependent_tables_sql()
 
     -- ===== CHECKS MANAGEMENT =====
     CREATE TABLE IF NOT EXISTS checks_receivable (
@@ -2587,7 +2652,26 @@ def get_treasury_tables_sql() -> str:
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- ===== EXPENSES TABLE (1) =====
+    -- ===== EXPENSE POLICIES & EXPENSES =====
+    CREATE TABLE IF NOT EXISTS expense_policies (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        expense_type VARCHAR(50),
+        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+        daily_limit NUMERIC(15,4) DEFAULT 0,
+        monthly_limit NUMERIC(15,4) DEFAULT 0,
+        annual_limit NUMERIC(15,4) DEFAULT 0,
+        requires_receipt BOOLEAN DEFAULT TRUE,
+        requires_approval BOOLEAN DEFAULT TRUE,
+        auto_approve_below NUMERIC(15,4) DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        is_deleted BOOLEAN DEFAULT FALSE,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_by INTEGER REFERENCES company_users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS expenses (
         id SERIAL PRIMARY KEY,
         expense_number VARCHAR(50) UNIQUE NOT NULL,
@@ -3264,6 +3348,7 @@ def get_manufacturing_tables_sql() -> str:
         branch_id INTEGER REFERENCES branches(id),
         is_deleted BOOLEAN DEFAULT FALSE,
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_by INTEGER REFERENCES company_users(id)
@@ -3279,12 +3364,14 @@ def get_manufacturing_tables_sql() -> str:
         total_cost DECIMAL(15, 2) DEFAULT 0,
         is_deleted BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_by INTEGER REFERENCES company_users(id)
     );
 
     -- ===== SVC-002: DOCUMENT MANAGEMENT =====
     CREATE TABLE IF NOT EXISTS documents (
         id SERIAL PRIMARY KEY,
+        doc_number VARCHAR(50),
         title VARCHAR(255) NOT NULL,
         description TEXT,
         category VARCHAR(100) DEFAULT 'general',
@@ -3543,25 +3630,29 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
         with company_engine.connect() as conn:
             # Execute all table creation SQL
             sql_blocks = [
-                get_all_table_sql(),                # 0: Core tables (Users, Branches, Parties, Accounts, Treasury Accounts, Invoices)
-                get_additional_tables_sql(),         # 1: Additional/Legacy tables (Customers, Suppliers, Products, Inventories)
-                get_organization_tables_sql(),       # 2: Org tables (Departments, Employees, Roles, Cost Centers)
-                get_financial_tables_sql(),          # 3: Financial tables (Fiscal Years, Payroll, Budgets, Assets, Tax, Projects)
-                get_treasury_tables_sql(),           # 4: Treasury tables (Transactions, Recon, Checks, Notes, Expenses)
-                get_currency_tables_sql(),           # 5: Multi-currency
-                get_pos_tables_sql(),                # 6: POS
-                get_contract_tables_sql(),           # 7: Contracts
-                get_costing_policy_tables_sql(),      # 8: Costing
-                get_advanced_inventory_tables_sql(),  # 9: Adv Inv
-                get_advanced_inventory_phase2_tables_sql(), # 10: Adv Inv Phase 2
-                get_manufacturing_tables_sql(),       # 11: Manufacturing (Phase 5)
-                get_approval_tables_sql(),            # 12: Approval Workflows (Phase 7)
-                get_security_tables_sql(),            # 13: Security - 2FA, Passwords, Sessions (Phase 7)
-                get_performance_indexes_sql(),        # 14: Performance Indexes (Phase 7.5)
-                get_cashflow_forecast_tables_sql(),   # 15: Cash Flow Forecast (US5)
-                get_phase_features_tables_sql(),      # 16: Matching, SSO, Costing, Intercompany, Notifications
-                get_system_completion_tables_sql(),    # 17: System Completion (Phase 9)
-                get_extended_features_tables_sql()     # 18: Extended Features (US6-US18)
+                get_foundation_tables_sql(),              # 0: Foundation (Users, Branches, Accounts, Treasury Accounts, Settings, Suppliers)
+                get_organization_tables_sql(),            # 1: Org (Departments, Employees, Roles, Cost Centers, Review Cycles)
+                get_additional_base_tables_sql(),         # 2: Additional Base (Customers, Products, Warehouses, Inventory, RFQ)
+                get_treasury_base_tables_sql(),           # 3: Treasury Base (Transactions, Reconciliations)
+                get_core_dependent_tables_sql(),          # 4: Core Dependent (Journal Lines, Bank Statements, Parties, Invoices)
+                get_additional_dependent_tables_sql(),    # 5: Additional Dependent (PO, SO, SQ, SR, Payment Vouchers, Commissions)
+                get_financial_tables_sql(),               # 6: Financial (Fiscal Years, Payroll, Budgets, Assets, Tax, Projects)
+                get_treasury_dependent_tables_sql(),      # 7: Treasury Dependent (Checks, Notes, Expense Policies, Expenses)
+                get_currency_tables_sql(),                # 8: Multi-currency
+                get_pos_tables_sql(),                     # 9: POS
+                get_contract_tables_sql(),                # 10: Contracts
+                get_costing_policy_tables_sql(),          # 11: Costing
+                get_advanced_inventory_tables_sql(),      # 12: Adv Inv
+                get_advanced_inventory_phase2_tables_sql(), # 13: Adv Inv Phase 2
+                get_manufacturing_tables_sql(),           # 14: Manufacturing (Phase 5)
+                get_approval_tables_sql(),                # 15: Approval Workflows (Phase 7)
+                get_security_tables_sql(),                # 16: Security (Phase 7)
+                get_performance_indexes_sql(),            # 17: Performance Indexes (Phase 7.5)
+                get_cashflow_forecast_tables_sql(),       # 18: Cash Flow Forecast (US5)
+                get_phase_features_tables_sql(),          # 19: Matching, SSO, Costing, Intercompany
+                get_system_completion_tables_sql(),       # 20: System Completion (Phase 9)
+                get_extended_features_tables_sql(),       # 21: Extended Features (US6-US18)
+                get_gl_integrity_guards_sql()             # 22: GL Integrity Guards (mirrors Alembic 0008)
             ]
             
             deferred_statements = []
@@ -3837,6 +3928,7 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                 ("110302", "FG-INV", "مخزون الإنتاج التام", "Finished Goods Inventory", "asset", "1103"),
                 ("1110", "WIP", "أعمال تحت التشغيل", "Work In Progress", "asset", "11"),
                 ("1111", "INT-CO", "حسابات بين الفروع", "Intercompany Accounts", "asset", "11"),
+                ("1112", "INV-TRN", "مخزون في الطريق", "Inventory In Transit", "asset", "11"),
                 ("1104", "ADV", "سلف وقروض الموظفين", "Employee Loans", "asset", "11"),
                 ("1105", "PRE", "مصروفات مدفوعة مقدماً", "Prepaid Expenses", "asset", "11"),
                 
@@ -4032,6 +4124,7 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                 # Inventory & Intercompany
                 ("acc_map_inventory_adjustment", inserted_ids.get("5503")), # Inventory Adjustment
                 ("acc_map_intercompany", inserted_ids.get("1111")),         # Intercompany Accounts
+                ("acc_map_in_transit", inserted_ids.get("1112")),           # TASK-026: Inventory In Transit
                 ("acc_map_fx_difference", inserted_ids.get("5402")),        # FX Difference (Realized Loss)
 
                 # ── COA-001: Intangible Assets ──
@@ -4518,6 +4611,10 @@ def get_approval_tables_sql() -> str:
         conditions JSONB DEFAULT '{}',
         steps JSONB DEFAULT '[]',
         is_active BOOLEAN DEFAULT TRUE,
+        sla_hours INT DEFAULT 48,
+        escalation_to INT,
+        allow_parallel BOOLEAN DEFAULT FALSE,
+        auto_approve_below DECIMAL(18,2),
         created_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -4535,6 +4632,11 @@ def get_approval_tables_sql() -> str:
         status VARCHAR(20) DEFAULT 'pending',
         requested_by INTEGER REFERENCES company_users(id) ON DELETE SET NULL,
         completed_at TIMESTAMPTZ,
+        action_date TIMESTAMPTZ,
+        action_notes TEXT,
+        current_approver_id INTEGER REFERENCES company_users(id),
+        escalated_to INTEGER REFERENCES company_users(id),
+        escalated_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -4555,22 +4657,6 @@ def get_approval_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_approval_requests_workflow ON approval_requests(workflow_id);
     CREATE INDEX IF NOT EXISTS idx_approval_requests_requested_by ON approval_requests(requested_by);
     CREATE INDEX IF NOT EXISTS idx_approval_workflows_doc_type ON approval_workflows(document_type);
-
-    -- Advanced Workflow columns (auto-approve, escalation, SLA)
-    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS action_date TIMESTAMPTZ;
-    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS action_notes TEXT;
-    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS current_approver_id INTEGER;
-    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_to INTEGER;
-    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS escalated_at TIMESTAMPTZ;
-
-    DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_approval_requests_current_approver') THEN
-            ALTER TABLE approval_requests ADD CONSTRAINT fk_approval_requests_current_approver FOREIGN KEY (current_approver_id) REFERENCES company_users(id);
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_approval_requests_escalated_to') THEN
-            ALTER TABLE approval_requests ADD CONSTRAINT fk_approval_requests_escalated_to FOREIGN KEY (escalated_to) REFERENCES company_users(id);
-        END IF;
-    END $$;
     """
 
 
@@ -4719,6 +4805,7 @@ def get_security_tables_sql() -> str:
         lost_reason TEXT,
         won_quotation_id INT,
         created_by INT,
+        version INTEGER NOT NULL DEFAULT 0,  -- TASK-020: optimistic locking
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -4780,6 +4867,29 @@ def get_security_tables_sql() -> str:
         notes TEXT,
         created_by INT,
         created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ========== CRM Advanced: Customer Segmentation (moved before marketing_campaigns) ==========
+    CREATE TABLE IF NOT EXISTS crm_customer_segments (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        criteria JSONB DEFAULT '{}',
+        color VARCHAR(20) DEFAULT '#3B82F6',
+        auto_assign BOOLEAN DEFAULT FALSE,
+        customer_count INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_by INT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS crm_customer_segment_members (
+        id SERIAL PRIMARY KEY,
+        segment_id INT REFERENCES crm_customer_segments(id) ON DELETE CASCADE,
+        customer_id INT REFERENCES parties(id) ON DELETE CASCADE,
+        added_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(segment_id, customer_id)
     );
 
     -- ========== Marketing Campaigns ==========
@@ -4857,28 +4967,7 @@ def get_security_tables_sql() -> str:
         UNIQUE(opportunity_id)
     );
 
-    -- ========== CRM Advanced: Customer Segmentation ==========
-    CREATE TABLE IF NOT EXISTS crm_customer_segments (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        description TEXT,
-        criteria JSONB DEFAULT '{}',
-        color VARCHAR(20) DEFAULT '#3B82F6',
-        auto_assign BOOLEAN DEFAULT FALSE,
-        customer_count INT DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_by INT,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS crm_customer_segment_members (
-        id SERIAL PRIMARY KEY,
-        segment_id INT REFERENCES crm_customer_segments(id) ON DELETE CASCADE,
-        customer_id INT REFERENCES parties(id) ON DELETE CASCADE,
-        added_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(segment_id, customer_id)
-    );
+    -- crm_customer_segments and crm_customer_segment_members moved above marketing_campaigns
 
     -- ========== CRM Advanced: Contacts Management ==========
     CREATE TABLE IF NOT EXISTS crm_contacts (
@@ -4952,13 +5041,6 @@ def get_security_tables_sql() -> str:
         created_by INT,
         created_at TIMESTAMPTZ DEFAULT NOW()
     );
-
-    -- ========== Advanced Workflow ==========
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS conditions JSONB DEFAULT '{}';
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS sla_hours INT DEFAULT 48;
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS escalation_to INT;
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS allow_parallel BOOLEAN DEFAULT FALSE;
-    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS auto_approve_below DECIMAL(18,2);
     """
 
 
@@ -5562,25 +5644,8 @@ def get_system_completion_tables_sql() -> str:
     );
     CREATE INDEX IF NOT EXISTS idx_impairment_asset ON asset_impairments(asset_id);
 
-    -- C1: Expense Policies
-    CREATE TABLE IF NOT EXISTS expense_policies (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(200) NOT NULL,
-        expense_type VARCHAR(50),
-        department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
-        daily_limit NUMERIC(15,4) DEFAULT 0,
-        monthly_limit NUMERIC(15,4) DEFAULT 0,
-        annual_limit NUMERIC(15,4) DEFAULT 0,
-        requires_receipt BOOLEAN DEFAULT TRUE,
-        requires_approval BOOLEAN DEFAULT TRUE,
-        auto_approve_below NUMERIC(15,4) DEFAULT 0,
-        is_active BOOLEAN DEFAULT TRUE,
-        is_deleted BOOLEAN DEFAULT FALSE,
-        created_by INTEGER REFERENCES company_users(id),
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        updated_by INTEGER REFERENCES company_users(id)
-    );
+    -- expense_policies moved to get_treasury_dependent_tables_sql() (before expenses)
+    -- expenses.policy_id FK now inline in get_treasury_dependent_tables_sql()
 
     -- C2: Contract Amendments
     CREATE TABLE IF NOT EXISTS contract_amendments (
@@ -5954,19 +6019,8 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_resource_alloc_project ON resource_allocations(project_id);
     CREATE INDEX IF NOT EXISTS ix_resource_alloc_dates ON resource_allocations(start_date, end_date);
 
-    -- ========== US16: Performance Review Cycles & Goals ==========
-    CREATE TABLE IF NOT EXISTS review_cycles (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(200) NOT NULL,
-        period_start DATE NOT NULL,
-        period_end DATE NOT NULL,
-        self_assessment_deadline DATE,
-        manager_review_deadline DATE,
-        status VARCHAR(20) DEFAULT 'draft',
-        created_by VARCHAR(100),
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        updated_at TIMESTAMPTZ DEFAULT NOW()
-    );
+    -- review_cycles moved to get_organization_tables_sql()
+    -- performance_reviews.cycle_id FK now inline in get_organization_tables_sql()
 
     CREATE TABLE IF NOT EXISTS performance_goals (
         id SERIAL PRIMARY KEY,
@@ -5980,21 +6034,6 @@ def get_extended_features_tables_sql() -> str:
     );
 
     CREATE INDEX IF NOT EXISTS ix_perf_goals_review ON performance_goals(review_id);
-
-    -- Add FK from performance_reviews to review_cycles when missing.
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE table_name = 'performance_reviews'
-              AND constraint_name = 'fk_perf_reviews_cycle'
-        ) THEN
-            ALTER TABLE performance_reviews
-            ADD CONSTRAINT fk_perf_reviews_cycle
-            FOREIGN KEY (cycle_id) REFERENCES review_cycles(id);
-        END IF;
-    END$$;
 
     -- ========== US17: CPQ (Configure-Price-Quote) ==========
     CREATE TABLE IF NOT EXISTS product_configurations (
@@ -6259,4 +6298,222 @@ def get_performance_indexes_sql() -> str:
 
     CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product_id ON stock_adjustments(product_id);
     CREATE INDEX IF NOT EXISTS idx_stock_adjustments_warehouse_id ON stock_adjustments(warehouse_id);
+    """
+
+
+def get_gl_integrity_guards_sql() -> str:
+    """Returns SQL that enforces GL invariants at the database level.
+
+    Mirrors Alembic migration 0008_gl_integrity_guards so that freshly
+    created tenant databases (which are stamped to head, not upgraded) gain
+    the same protections as migrated tenants.
+
+    Must run AFTER journal_entries, journal_lines, fiscal_periods, and
+    currencies have been created (i.e. last in the bootstrap sequence).
+    Every statement is idempotent.
+    """
+    return """
+    -- ===== GL INTEGRITY GUARDS =====
+    -- FIN-C1 / DB-C1: Idempotency & source-duplicate unique indexes
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_je_idempotency
+        ON journal_entries (idempotency_key)
+        WHERE idempotency_key IS NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_je_source
+        ON journal_entries (source, source_id, entry_date)
+        WHERE source <> 'Manual' AND source_id IS NOT NULL;
+
+    -- FIN-C2 / DB-C2: CHECK constraints on journal_lines
+    DO $chk$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_jl_nonneg') THEN
+            ALTER TABLE journal_lines
+                ADD CONSTRAINT chk_jl_nonneg CHECK (debit >= 0 AND credit >= 0);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_jl_exclusive') THEN
+            ALTER TABLE journal_lines
+                ADD CONSTRAINT chk_jl_exclusive CHECK (NOT (debit > 0 AND credit > 0));
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_jl_nonzero') THEN
+            ALTER TABLE journal_lines
+                ADD CONSTRAINT chk_jl_nonzero CHECK (debit + credit > 0);
+        END IF;
+    END $chk$;
+
+    -- DB-C3: status vocabulary CHECK on journal_entries
+    DO $st$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_je_status') THEN
+            ALTER TABLE journal_entries
+                ADD CONSTRAINT chk_je_status
+                CHECK (status IN ('draft','posted','void','reversed'));
+        END IF;
+    END $st$;
+
+    -- FIN-C8 / DB-C6: at most one base currency
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_currency_one_base
+        ON currencies ((TRUE))
+        WHERE is_base = TRUE;
+
+    -- FIN-C3: Closed-period guard
+    CREATE OR REPLACE FUNCTION assert_period_open() RETURNS trigger AS $fn1$
+    DECLARE
+        v_closed BOOLEAN;
+    BEGIN
+        IF NEW.status IS DISTINCT FROM 'posted' THEN
+            RETURN NEW;
+        END IF;
+        SELECT TRUE INTO v_closed
+        FROM fiscal_periods
+        WHERE NEW.entry_date BETWEEN start_date AND end_date
+          AND is_closed = TRUE
+        LIMIT 1;
+        IF v_closed THEN
+            RAISE EXCEPTION 'Posting into a closed fiscal period is forbidden (entry_date=%)', NEW.entry_date
+                USING ERRCODE = '23514';
+        END IF;
+        RETURN NEW;
+    END;
+    $fn1$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_je_period_open ON journal_entries;
+    CREATE TRIGGER trg_je_period_open
+        BEFORE INSERT OR UPDATE OF status, entry_date ON journal_entries
+        FOR EACH ROW EXECUTE FUNCTION assert_period_open();
+
+    -- FIN-C4: Posted journal entries are immutable
+    CREATE OR REPLACE FUNCTION block_posted_je_changes() RETURNS trigger AS $fn2$
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            IF OLD.status = 'posted' THEN
+                RAISE EXCEPTION 'Posted journal entries cannot be deleted (id=%)', OLD.id
+                    USING ERRCODE = '23514';
+            END IF;
+            RETURN OLD;
+        END IF;
+        IF OLD.status = 'posted' AND NEW.status NOT IN ('void','reversed','posted') THEN
+            RAISE EXCEPTION 'Posted journal entries are immutable (id=%, old=%, new=%)',
+                OLD.id, OLD.status, NEW.status USING ERRCODE = '23514';
+        END IF;
+        IF OLD.status = 'posted' AND NEW.status = 'posted' THEN
+            IF (NEW.entry_date <> OLD.entry_date)
+               OR (NEW.description IS DISTINCT FROM OLD.description)
+               OR (NEW.currency IS DISTINCT FROM OLD.currency)
+               OR (NEW.exchange_rate IS DISTINCT FROM OLD.exchange_rate)
+               OR (NEW.branch_id IS DISTINCT FROM OLD.branch_id)
+               OR (NEW.reference IS DISTINCT FROM OLD.reference) THEN
+                RAISE EXCEPTION 'Posted journal entry fields are immutable (id=%)', OLD.id
+                    USING ERRCODE = '23514';
+            END IF;
+        END IF;
+        RETURN NEW;
+    END;
+    $fn2$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_je_immutable ON journal_entries;
+    CREATE TRIGGER trg_je_immutable
+        BEFORE UPDATE OR DELETE ON journal_entries
+        FOR EACH ROW EXECUTE FUNCTION block_posted_je_changes();
+
+    CREATE OR REPLACE FUNCTION block_posted_jl_changes() RETURNS trigger AS $fn3$
+    DECLARE
+        v_status TEXT;
+        v_id     BIGINT;
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            v_id := OLD.journal_entry_id;
+        ELSE
+            v_id := NEW.journal_entry_id;
+        END IF;
+        SELECT status INTO v_status FROM journal_entries WHERE id = v_id;
+        IF v_status = 'posted' THEN
+            RAISE EXCEPTION 'Lines of a posted journal entry are immutable (je_id=%)', v_id
+                USING ERRCODE = '23514';
+        END IF;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END;
+    $fn3$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_jl_immutable ON journal_lines;
+    CREATE TRIGGER trg_jl_immutable
+        BEFORE UPDATE OR DELETE ON journal_lines
+        FOR EACH ROW EXECUTE FUNCTION block_posted_jl_changes();
+
+    -- Status-aware balance trigger (supersedes legacy trg_journal_balance)
+    DROP TRIGGER IF EXISTS trg_journal_balance ON journal_lines;
+
+    CREATE OR REPLACE FUNCTION assert_je_balanced() RETURNS trigger AS $fn4$
+    DECLARE
+        v_je  BIGINT;
+        v_sum NUMERIC;
+        v_status TEXT;
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            v_je := OLD.journal_entry_id;
+        ELSE
+            v_je := NEW.journal_entry_id;
+        END IF;
+        SELECT status INTO v_status FROM journal_entries WHERE id = v_je;
+        IF v_status IS DISTINCT FROM 'posted' THEN
+            IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+            RETURN NEW;
+        END IF;
+        SELECT COALESCE(SUM(debit),0) - COALESCE(SUM(credit),0)
+          INTO v_sum
+          FROM journal_lines
+         WHERE journal_entry_id = v_je;
+        IF ABS(v_sum) > 0.005 THEN
+            RAISE EXCEPTION 'Unbalanced journal entry (je_id=%, diff=%)', v_je, v_sum
+                USING ERRCODE = '23514';
+        END IF;
+        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+        RETURN NEW;
+    END;
+    $fn4$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_je_balanced ON journal_lines;
+    CREATE CONSTRAINT TRIGGER trg_je_balanced
+        AFTER INSERT OR UPDATE OR DELETE ON journal_lines
+        DEFERRABLE INITIALLY DEFERRED
+        FOR EACH ROW EXECUTE FUNCTION assert_je_balanced();
+
+    -- PERF-H1 / DB-H8: composite indexes
+    CREATE INDEX IF NOT EXISTS idx_je_branch_date ON journal_entries (branch_id, entry_date);
+    CREATE INDEX IF NOT EXISTS idx_je_status_date ON journal_entries (status, entry_date);
+    CREATE INDEX IF NOT EXISTS idx_je_entry_date  ON journal_entries (entry_date);
+    CREATE INDEX IF NOT EXISTS idx_jl_account_je  ON journal_lines (account_id, journal_entry_id);
+    CREATE INDEX IF NOT EXISTS idx_jl_je          ON journal_lines (journal_entry_id);
+
+    -- FIN-H (TASK-018): exchange_rates is append-only FX history
+    CREATE OR REPLACE FUNCTION block_exchange_rate_mutation() RETURNS trigger AS $fn5$
+    BEGIN
+        IF TG_OP = 'UPDATE' THEN
+            RAISE EXCEPTION 'exchange_rates rows are immutable; insert a new row for a new rate_date'
+                USING ERRCODE = '23514';
+        END IF;
+        RAISE EXCEPTION 'exchange_rates rows cannot be deleted; mark corrections via a new dated row'
+            USING ERRCODE = '23514';
+    END;
+    $fn5$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_exchange_rates_immutable ON exchange_rates;
+    CREATE TRIGGER trg_exchange_rates_immutable
+        BEFORE UPDATE OR DELETE ON exchange_rates
+        FOR EACH ROW EXECUTE FUNCTION block_exchange_rate_mutation();
+
+    -- FIN-H (TASK-019): fiscal_periods non-overlap exclusion constraint
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+    DO $fp$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'excl_fp_nooverlap'
+        ) THEN
+            ALTER TABLE fiscal_periods
+                ADD CONSTRAINT excl_fp_nooverlap
+                EXCLUDE USING GIST (
+                    daterange(start_date, end_date, '[]') WITH &&
+                );
+        END IF;
+    END $fp$;
     """

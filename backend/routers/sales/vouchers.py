@@ -13,6 +13,7 @@ from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
+from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 from .schemas import CustomerReceiptCreate, CustomerPaymentCreate
 
 vouchers_router = APIRouter()
@@ -129,68 +130,48 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
                 WHERE id = :cid
             """), {"amt": data.amount, "cid": data.customer_id})
 
-        # 4. Create GL Entry
+        # 4. Create GL Entry (TASK-015: centralized)
         acc_ar = get_mapped_account_id(db, "acc_map_ar")
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
         acc_bank = get_mapped_account_id(db, "acc_map_bank")
 
-        je_num = f"JE-RCV-{voucher_num}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status, 
-                created_by, branch_id, currency, exchange_rate
-            )
-            VALUES (
-                :num, :date, :desc, :ref, 'posted', 
-                :user, :bid, :curr, :rate
-            ) RETURNING id
-        """), {
-            "num": je_num, "date": data.voucher_date,
-            "desc": f"Customer Receipt {voucher_num} ({currency})",
-            "ref": voucher_num, "user": current_user.id,
-            "bid": data.branch_id,
-            "curr": currency, "rate": exchange_rate
-        }).scalar()
-
         je_lines = []
         # Debit: Cash/Bank
-        if data.payment_method == "cash":
-            je_lines.append({"account_id": acc_cash, "debit": amount_base, "credit": 0, "description": f"Cash Receipt - {voucher_num}"})
-        elif data.payment_method in ["bank", "check"]:
-            je_lines.append({"account_id": acc_bank, "debit": amount_base, "credit": 0, "description": f"Bank Receipt - {voucher_num}"})
+        if data.payment_method == "cash" and acc_cash:
+            je_lines.append({"account_id": acc_cash, "debit": amount_base, "credit": 0,
+                             "description": f"Cash Receipt - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
+        elif data.payment_method in ["bank", "check"] and acc_bank:
+            je_lines.append({"account_id": acc_bank, "debit": amount_base, "credit": 0,
+                             "description": f"Bank Receipt - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
 
         # Credit: AR
-        je_lines.append({"account_id": acc_ar, "debit": 0, "credit": amount_base, "description": f"AR Collection - {voucher_num}"})
+        if acc_ar:
+            je_lines.append({"account_id": acc_ar, "debit": 0, "credit": amount_base,
+                             "description": f"AR Collection - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
 
-        for line in je_lines:
-            if line["account_id"]:
-                db.execute(text("""
-                    INSERT INTO journal_lines (
-                        journal_entry_id, account_id, debit, credit, description,
-                        amount_currency, currency
-                    )
-                    VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-                """), {
-                    "jid": je_id,
-                    "aid": line["account_id"],
-                    "deb": line["debit"],
-                    "cred": line["credit"],
-                    "desc": line["description"],
-                    "amt_curr": data.amount,
-                    "curr": currency
-                })
+        if not je_lines:
+            raise HTTPException(400, "خريطة حسابات القبض غير مكتملة")
 
-                # Update account balance (base + currency)
-                from utils.accounting import update_account_balance as uab_receipt
-                uab_receipt(
-                    db,
-                    account_id=line["account_id"],
-                    debit_base=line["debit"],
-                    credit_base=line["credit"],
-                    debit_curr=_dec(data.amount) if line["debit"] > 0 else 0,
-                    credit_curr=_dec(data.amount) if line["credit"] > 0 else 0,
-                    currency=currency
-                )
+        je_id, je_num = create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(data.voucher_date),
+            description=f"Customer Receipt {voucher_num} ({currency})",
+            lines=je_lines,
+            user_id=current_user.id,
+            branch_id=data.branch_id,
+            reference=voucher_num,
+            status="posted",
+            currency=currency,
+            exchange_rate=float(exchange_rate) if exchange_rate else 1.0,
+            source="CustomerReceipt",
+            source_id=voucher_id,
+            username=getattr(current_user, "username", None),
+            idempotency_key=f"rcv-{voucher_num}",
+        )
 
         # 5. Update Treasury Balance
         if hasattr(data, 'treasury_id') and data.treasury_id:
@@ -364,71 +345,49 @@ def create_customer_payment(request: Request, data: CustomerPaymentCreate, curre
                 WHERE id = :cid
             """), {"amt": data.amount, "cid": data.customer_id})
 
-        # 3. Create GL Entry
+        # 3. Create GL Entry (TASK-015: centralized)
         from utils.accounting import get_mapped_account_id, validate_je_lines
         acc_ar = get_mapped_account_id(db, "acc_map_ar")
         acc_cash = get_mapped_account_id(db, "acc_map_cash")
         acc_bank = get_mapped_account_id(db, "acc_map_bank") or get_mapped_account_id(db, "acc_map_cash")
 
-        je_num = f"JE-PAY-{voucher_num}"
-        je_id = db.execute(text("""
-            INSERT INTO journal_entries (
-                entry_number, entry_date, description, reference, status, 
-                created_by, branch_id, currency, exchange_rate
-            )
-            VALUES (
-                :num, :date, :desc, :ref, 'posted', 
-                :user, :bid, :curr, :rate
-            ) RETURNING id
-        """), {
-            "num": je_num, "date": data.voucher_date,
-            "desc": f"Customer Payment {voucher_num} ({currency})",
-            "ref": voucher_num, "user": current_user.id,
-            "bid": data.branch_id,
-            "curr": currency, "rate": exchange_rate
-        }).scalar()
-
         je_lines = []
         # Debit: AR (reduce customer credit)
-        je_lines.append({"account_id": acc_ar, "debit": amount_base, "credit": 0, "description": f"AR Payment - {voucher_num}"})
+        if acc_ar:
+            je_lines.append({"account_id": acc_ar, "debit": amount_base, "credit": 0,
+                             "description": f"AR Payment - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
 
         # Credit: Cash/Bank (money out)
-        if data.payment_method == "cash":
-            je_lines.append({"account_id": acc_cash, "debit": 0, "credit": amount_base, "description": f"Cash Payment - {voucher_num}"})
-        elif data.payment_method in ["bank", "check"]:
-            je_lines.append({"account_id": acc_bank, "debit": 0, "credit": amount_base, "description": f"Bank Payment - {voucher_num}"})
+        if data.payment_method == "cash" and acc_cash:
+            je_lines.append({"account_id": acc_cash, "debit": 0, "credit": amount_base,
+                             "description": f"Cash Payment - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
+        elif data.payment_method in ["bank", "check"] and acc_bank:
+            je_lines.append({"account_id": acc_bank, "debit": 0, "credit": amount_base,
+                             "description": f"Bank Payment - {voucher_num}",
+                             "amount_currency": data.amount, "currency": currency})
 
         # Validate before insert
         valid_lines = validate_je_lines(je_lines, source=f"REFUND-{voucher_num}")
 
-        for line in valid_lines:
-            db.execute(text("""
-                INSERT INTO journal_lines (
-                    journal_entry_id, account_id, debit, credit, description,
-                    amount_currency, currency
-                )
-                VALUES (:jid, :aid, :deb, :cred, :desc, :amt_curr, :curr)
-            """), {
-                "jid": je_id,
-                "aid": line["account_id"],
-                "deb": line["debit"],
-                "cred": line["credit"],
-                "desc": line["description"],
-                "amt_curr": data.amount,
-                "curr": currency
-            })
-
-            # Update account balance (base + currency)
-            from utils.accounting import update_account_balance as uab_payment
-            uab_payment(
-                db,
-                account_id=line["account_id"],
-                debit_base=line["debit"],
-                credit_base=line["credit"],
-                    debit_curr=_dec(data.amount) if line["debit"] > 0 else 0,
-                    credit_curr=_dec(data.amount) if line["credit"] > 0 else 0,
-                currency=currency
-            )
+        je_id, je_num = create_journal_entry(
+            db=db,
+            company_id=current_user.company_id,
+            date=str(data.voucher_date),
+            description=f"Customer Payment {voucher_num} ({currency})",
+            lines=valid_lines,
+            user_id=current_user.id,
+            branch_id=data.branch_id,
+            reference=voucher_num,
+            status="posted",
+            currency=currency,
+            exchange_rate=float(exchange_rate) if exchange_rate else 1.0,
+            source="CustomerPayment",
+            source_id=voucher_id,
+            username=getattr(current_user, "username", None),
+            idempotency_key=f"pay-{voucher_num}",
+        )
 
         db.commit()
         invalidate_company_cache(str(current_user.company_id))

@@ -7,12 +7,15 @@ from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime
+from decimal import Decimal
 import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission, validate_branch_access
+from utils.accounting import get_mapped_account_id
+from services.gl_service import create_journal_entry
 from .schemas import ShipmentCreate
 
 shipments_router = APIRouter()
@@ -313,6 +316,9 @@ def confirm_shipment(
 
         from services.costing_service import CostingService
 
+        # TASK-026: accumulate inventory value in transit for GL posting
+        total_transit_value = Decimal("0")
+
         # Process each item
         for item in items:
             # INV-S05: Lock source inventory row with FOR UPDATE to prevent race conditions
@@ -335,6 +341,7 @@ def confirm_shipment(
 
             # 2. Get Source Cost for Valuation
             source_cost = CostingService.get_cogs_cost(db, item.product_id, shipment.source_warehouse_id)
+            total_transit_value += (Decimal(str(item.quantity)) * Decimal(str(source_cost or 0)))
 
             # 3. Update Destination Cost (WAC Calculation)
             CostingService.update_cost(
@@ -416,6 +423,51 @@ def confirm_shipment(
                 "tcast_b": 0,
                 "tcast_a": float(dest_stats_after.average_cost if dest_stats_after else 0)
             })
+
+        # TASK-026: Post GL entries recording the inter-warehouse transfer via
+        # the Inventory-in-Transit bridge account. We emit two balanced JEs so
+        # that the In-Transit account has a visible (net-zero) round trip in the
+        # GL, which auditors expect for warehouse-to-warehouse movements.
+        if total_transit_value > Decimal("0"):
+            inv_acc = get_mapped_account_id(db, "acc_map_inventory")
+            intransit_acc = get_mapped_account_id(db, "acc_map_in_transit")
+            if inv_acc and intransit_acc:
+                today_str = datetime.utcnow().strftime("%Y-%m-%d")
+                value_f = float(total_transit_value)
+                # Leg A: dispatch — Dr In-Transit / Cr Source Inventory
+                create_journal_entry(
+                    db=db,
+                    company_id=str(company_id),
+                    date=today_str,
+                    description=f"Shipment {shipment.shipment_ref}: dispatch to in-transit",
+                    lines=[
+                        {"account_id": intransit_acc, "debit": value_f, "credit": 0},
+                        {"account_id": inv_acc, "debit": 0, "credit": value_f},
+                    ],
+                    user_id=user_id,
+                    reference=shipment.shipment_ref,
+                    source="shipment_dispatch",
+                    source_id=id,
+                    username=username,
+                    idempotency_key=f"shipment_dispatch:{id}",
+                )
+                # Leg B: receipt — Dr Destination Inventory / Cr In-Transit
+                create_journal_entry(
+                    db=db,
+                    company_id=str(company_id),
+                    date=today_str,
+                    description=f"Shipment {shipment.shipment_ref}: received into destination",
+                    lines=[
+                        {"account_id": inv_acc, "debit": value_f, "credit": 0},
+                        {"account_id": intransit_acc, "debit": 0, "credit": value_f},
+                    ],
+                    user_id=user_id,
+                    reference=shipment.shipment_ref,
+                    source="shipment_receive",
+                    source_id=id,
+                    username=username,
+                    idempotency_key=f"shipment_receive:{id}",
+                )
 
         # Update shipment status
         db.execute(text("""

@@ -412,21 +412,24 @@ def create_order(
     for item in order_in.items:
         validate_quantity_for_product(db, item.product_id, item.quantity)
 
-    # ZATCA-FIX: Calculate tax on (price - item_discount) × qty
-    # Using Decimal for precision (ROUND_HALF_UP per ZATCA).
-    subtotal = sum(
-        ((_dec(item.quantity) * _dec(item.unit_price)) - _dec(item.discount_amount)).quantize(_D2, ROUND_HALF_UP)
+    # TASK-027: unified VAT via compute_invoice_totals
+    from utils.accounting import compute_invoice_totals, compute_line_amounts
+    _totals = compute_invoice_totals([
+        {
+            "quantity": item.quantity,
+            "unit_price": item.unit_price,
+            "tax_rate": item.tax_rate,
+            "discount": item.discount_amount,
+        }
         for item in order_in.items
-    )
-    tax_total = sum(
-        (((_dec(item.quantity) * _dec(item.unit_price)) - _dec(item.discount_amount)) * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-        for item in order_in.items
-    )
+    ])
+    subtotal = _totals["subtotal"] - _totals["total_discount"]  # net taxable base, matches prior semantics
+    tax_total = _totals["total_tax"]
 
     # FISCAL-LOCK: Reject if accounting period is closed
     check_fiscal_period_open(db, datetime.now().date())
     
-    # Apply global discount if any
+    # Apply global discount if any (POS-specific: reduces grand total post-tax)
     total = (subtotal + tax_total - _dec(order_in.discount_amount)).quantize(_D2, ROUND_HALF_UP)
     
     # Validate branch and warehouse access
@@ -493,8 +496,9 @@ def create_order(
         prod_info = db.execute(text("SELECT product_name, product_code, barcode FROM products WHERE id = :id"), {"id": item.product_id}).fetchone()
         
         item_subtotal = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
-        tax_amount = (item_subtotal * (_dec(item.tax_rate) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
-        item_total = (item_subtotal + tax_amount).quantize(_D2, ROUND_HALF_UP)
+        _la = compute_line_amounts(item.quantity, item.unit_price, item.tax_rate, item.discount_amount)
+        tax_amount = _la["tax_amount"]
+        item_total = _la["line_total"]
 
         db.execute(text("""
             INSERT INTO pos_order_lines (

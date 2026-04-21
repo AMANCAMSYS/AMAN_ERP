@@ -100,7 +100,7 @@ services:
       - "80:80"
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     networks:
       - aman_net
 

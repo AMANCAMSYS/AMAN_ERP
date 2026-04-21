@@ -37,12 +37,73 @@ function subscribeTokenRefresh(cb) {
     });
 }
 
-// Add auth token + AbortController to requests
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
+// Decode JWT payload (client-side only, no signature verification needed).
+function getTokenExpiry(token) {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+    } catch {
+        return null;
     }
+}
+
+// Proactively refresh the access token before it expires.
+// Returns the new token string, or null if refresh failed.
+async function proactiveRefresh() {
+    const currentRefreshToken = localStorage.getItem('refresh_token');
+    if (!currentRefreshToken) return null;
+
+    // If another refresh is already running, queue behind it
+    if (isRefreshing) {
+        return new Promise((resolve) => {
+            refreshSubscribers.push((token) => resolve(token));
+        });
+    }
+
+    isRefreshing = true;
+    try {
+        const refreshRes = await axios.post(
+            `${api.defaults.baseURL}/auth/refresh`,
+            { refresh_token: currentRefreshToken }
+        );
+        const newToken = refreshRes.data?.access_token;
+        const newRefreshToken = refreshRes.data?.refresh_token;
+        if (newToken) {
+            localStorage.setItem('token', newToken);
+            if (newRefreshToken) localStorage.setItem('refresh_token', newRefreshToken);
+            onRefreshed(newToken);
+            window.dispatchEvent(new Event('token_refreshed'));
+            return newToken;
+        }
+    } catch {
+        onRefreshFailed();
+    } finally {
+        isRefreshing = false;
+    }
+    return null;
+}
+
+// --- Request Interceptor ---
+// Add auth token + AbortController to requests.
+// Proactively refresh the token if it expires within 60 seconds.
+api.interceptors.request.use(async (config) => {
+    // Skip proactive refresh for the refresh endpoint itself to avoid infinite loops
+    if (config.url?.includes('/auth/refresh') || config._isRetry) {
+        return config;
+    }
+
+    let token = localStorage.getItem('token');
+    if (token) {
+        const expiry = getTokenExpiry(token);
+        const now = Date.now();
+        // Refresh proactively if the token expires within 60 seconds
+        if (expiry !== null && expiry - now < 60_000) {
+            const newToken = await proactiveRefresh();
+            if (newToken) token = newToken;
+        }
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
     // Auto-attach AbortController unless request already has a signal or opts out
     if (!config.signal && !config.skipAbort) {
         const controller = requestManager.createController()
@@ -83,7 +144,7 @@ api.interceptors.response.use(
             return api(originalRequest);
         }
 
-        // --- Auto Token Refresh (with mutex to prevent race conditions) ---
+        // --- Auto Token Refresh — Fallback (reactive, in case proactive missed) ---
         if (error.response?.status === 401 && !originalRequest._isRetry) {
             originalRequest._isRetry = true;
 
@@ -98,42 +159,13 @@ api.interceptors.response.use(
                 });
             }
 
-            const currentRefreshToken = localStorage.getItem('refresh_token');
-
-            if (currentRefreshToken) {
-                isRefreshing = true;
-                try {
-                    // Attempt to refresh access token using long-lived refresh token
-                    const refreshRes = await axios.post(
-                        `${api.defaults.baseURL}/auth/refresh`,
-                        { refresh_token: currentRefreshToken }
-                    );
-
-                    const newToken = refreshRes.data?.access_token;
-                    const newRefreshToken = refreshRes.data?.refresh_token;
-                    if (newToken) {
-                        localStorage.setItem('token', newToken);
-                        if (newRefreshToken) {
-                            localStorage.setItem('refresh_token', newRefreshToken);
-                        }
-                        // Notify all queued requests with the new token
-                        onRefreshed(newToken);
-                        isRefreshing = false;
-
-                        // Notify WebSocket hooks to reconnect with fresh token
-                        window.dispatchEvent(new Event('token_refreshed'));
-
-                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                        return api(originalRequest); // retry original request
-                    }
-                } catch (refreshError) {
-                    // Refresh failed — notify all queued requests
-                    onRefreshFailed();
-                    isRefreshing = false;
-                }
+            const newToken = await proactiveRefresh();
+            if (newToken) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                return api(originalRequest);
             }
 
-            // If we reach here, refresh failed or no token exists
+            // Refresh failed — clear session and redirect to login
             localStorage.removeItem('token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');

@@ -198,47 +198,51 @@ def create_sales_invoice(
         from utils.quantity_validation import validate_quantities_for_products
         validate_quantities_for_products(db, invoice.items)
 
-        # --- 2. Calculate Totals (using Decimal for precision) ---
-        subtotal = Decimal('0')
-        total_tax = Decimal('0')
-        total_discount = Decimal('0')
+        # --- 2. Calculate Totals (TASK-027: unified via compute_invoice_totals) ---
+        from utils.accounting import compute_invoice_totals, compute_line_amounts
+
+        line_dicts = [
+            {
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "tax_rate": item.tax_rate,
+                "discount": item.discount,
+            }
+            for item in invoice.items
+        ]
+
+        # Header-level discount (applies only when effect_type == 'discount')
+        header_disc_pct = (
+            _dec(invoice.effect_percentage)
+            if getattr(invoice, 'effect_type', 'discount') == 'discount'
+            else Decimal('0')
+        )
+        markup_amt = (
+            _dec(invoice.markup_amount)
+            if getattr(invoice, 'effect_type', 'discount') == 'markup'
+            else Decimal('0')
+        )
+
+        totals = compute_invoice_totals(
+            line_dicts,
+            header_discount_pct=header_disc_pct,
+            markup_amount=markup_amt,
+        )
+        subtotal = totals["subtotal"]
+        total_tax = totals["total_tax"]
+        total_discount = totals["total_discount"]
+        grand_total = totals["grand_total"]
+
+        # Rebuild items_to_save with per-line totals (same helper used by the aggregator)
         items_to_save = []
-
         for item in invoice.items:
-            line_subtotal = (_dec(item.quantity) * _dec(item.unit_price)).quantize(_D2, ROUND_HALF_UP)
-            discount = _dec(item.discount)
-            taxable = (line_subtotal - discount).quantize(_D2, ROUND_HALF_UP)
-            line_tax = (taxable * _dec(item.tax_rate) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-            line_total = taxable + line_tax
-
-            subtotal += line_subtotal
-            total_tax += line_tax
-            total_discount += discount
-
+            la = compute_line_amounts(
+                item.quantity, item.unit_price, item.tax_rate, item.discount
+            )
             items_to_save.append({
                 **item.model_dump(),
-                "total": line_total
+                "total": la["line_total"],
             })
-
-        grand_total = subtotal - total_discount + total_tax
-
-        # --- ZATCA FIX: Header-level discount must reduce tax base ---
-        # Customer group effects (discount %) are applied on top of the
-        # line-level subtotal.  ZATCA mandates VAT is computed on the net
-        # amount AFTER all discounts, so we proportionally reduce the tax.
-        header_discount = Decimal('0')
-        if getattr(invoice, 'effect_type', 'discount') == 'discount' and _dec(invoice.effect_percentage) > 0:
-            header_discount = (subtotal * _dec(invoice.effect_percentage) / Decimal('100')).quantize(_D2, ROUND_HALF_UP)
-            # Proportionally reduce tax: new_tax = old_tax * (1 - effect% / 100)
-            adjusted_tax = (total_tax * (Decimal('1') - _dec(invoice.effect_percentage) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
-            total_tax = adjusted_tax
-            grand_total = subtotal - total_discount - header_discount + total_tax
-        elif getattr(invoice, 'effect_type', 'discount') == 'markup' and _dec(invoice.markup_amount) > 0:
-            # Markup case: add the markup to the grand total (tax already calculated on line items)
-            grand_total = grand_total + _dec(invoice.markup_amount).quantize(_D2, ROUND_HALF_UP)
-
-        # Include header discount in total_discount so the stored value is complete
-        total_discount = total_discount + header_discount
 
         # --- 3. Handle Payment ---
         paid_amount = _dec(invoice.paid_amount or 0)

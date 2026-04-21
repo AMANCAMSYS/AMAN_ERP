@@ -1200,21 +1200,58 @@ async def refresh_token(
             if _is_user_tokens_invalidated(company_id, username, token_iat):
                 raise credentials_exception
 
-        # Create new token with same claims but fresh expiry
+        # BUG-C3: Re-read fresh role, permissions, enabled_modules from DB on
+        # every refresh so that revocations take effect immediately instead of
+        # waiting up to the refresh-token TTL.
+        fresh_role = payload.get("role")
+        fresh_permissions = payload.get("permissions")
+        fresh_enabled_modules = payload.get("enabled_modules")
+        fresh_allowed_branches = payload.get("allowed_branches")
+        fresh_user_id = payload.get("user_id")
+        if company_id and username:
+            try:
+                with get_db_connection(company_id) as _conn:
+                    row = _conn.execute(text("""
+                        SELECT id, role, permissions, is_active
+                        FROM company_users WHERE username = :u
+                    """), {"u": username}).fetchone()
+                    if not row or not row.is_active:
+                        raise credentials_exception
+                    fresh_user_id = row.id
+                    fresh_role = row.role
+                    # company_users.permissions is JSONB; can be dict or list
+                    perms = row.permissions
+                    if isinstance(perms, dict):
+                        fresh_permissions = perms.get("permissions") or list(perms.keys())
+                        fresh_enabled_modules = perms.get("enabled_modules") or fresh_enabled_modules
+                    elif isinstance(perms, list):
+                        fresh_permissions = perms
+                    # Allowed branches
+                    branches = _conn.execute(text(
+                        "SELECT branch_id FROM user_branches WHERE user_id = :uid"
+                    ), {"uid": row.id}).fetchall()
+                    if branches:
+                        fresh_allowed_branches = [b[0] for b in branches]
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.warning(f"Refresh: DB re-read failed, falling back to payload claims: {e}")
+
+        # Create new token with FRESH claims and fresh expiry
         new_payload = {
             "sub": payload.get("sub"),
             "type": payload.get("type"),
-            "company_id": payload.get("company_id"),
-            "role": payload.get("role"),
-            "permissions": payload.get("permissions"),
-            "enabled_modules": payload.get("enabled_modules"),
+            "company_id": company_id,
+            "role": fresh_role,
+            "permissions": fresh_permissions,
+            "enabled_modules": fresh_enabled_modules,
         }
 
         # Include optional fields
-        if payload.get("user_id"):
-            new_payload["user_id"] = payload["user_id"]
-        if payload.get("allowed_branches"):
-            new_payload["allowed_branches"] = payload["allowed_branches"]
+        if fresh_user_id:
+            new_payload["user_id"] = fresh_user_id
+        if fresh_allowed_branches:
+            new_payload["allowed_branches"] = fresh_allowed_branches
         
         new_access_token = create_access_token(new_payload)
         new_refresh_token = create_refresh_token(new_payload)
@@ -1237,6 +1274,8 @@ async def refresh_token(
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+    company_code: str  # SEC-FIX: require explicit tenant to avoid cross-tenant lookup
+
 
 class ResetPasswordRequest(BaseModel):
     token: str
@@ -1275,44 +1314,65 @@ def _ensure_reset_table():
 @limiter.limit("5/minute")
 async def forgot_password(request: Request, body: ForgotPasswordRequest):
     """
-    طلب إعادة تعيين كلمة المرور — يرسل رابط عبر البريد الإلكتروني
-    يبحث عن المستخدم بالبريد في جميع الشركات
+    طلب إعادة تعيين كلمة المرور — يُلزم المستخدم بتحديد كود الشركة لتجنّب
+    الاستعلامات عبر المستأجرين وتسريب المعلومات. الاستجابة ثابتة الشكل وثابتة
+    الزمن تقريبًا لمنع تعداد البريد الإلكتروني.
     """
+    import time as _time
+    started = _time.monotonic()
+    _MIN_ELAPSED = 0.35  # seconds — constant-time floor
+
     _ensure_reset_table()
     email = body.email.strip().lower()
+    company_code = (body.company_code or "").strip()
 
-    # Always return success to prevent email enumeration
+    # SEC-FIX: unified success message; do not expose whether email/tenant exists
     success_msg = {"message": "إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين"}
+
+    def _constant_time_return(value):
+        elapsed = _time.monotonic() - started
+        if elapsed < _MIN_ELAPSED:
+            _time.sleep(_MIN_ELAPSED - elapsed)
+        return value
+
+    if not email or not company_code:
+        return _constant_time_return(success_msg)
 
     db = get_system_db()
     try:
-        # Search all company databases for this email
-        companies = db.execute(
-            text("SELECT id FROM system_companies WHERE status = 'active'")
-        ).fetchall()
+        # SEC-FIX: look up the single tenant the user claims to belong to.
+        company_row = db.execute(
+            text(
+                "SELECT id FROM system_companies "
+                "WHERE status = 'active' "
+                "  AND (LOWER(company_code) = LOWER(:c) OR LOWER(id) = LOWER(:c))"
+            ),
+            {"c": company_code},
+        ).fetchone()
 
         found_user = None
         found_company = None
 
-        for company in companies:
-            company_id = company[0]
+        if company_row:
+            company_id = company_row[0]
             try:
                 company_db = get_db_connection(company_id)
                 user = company_db.execute(
-                    text("SELECT id, username, email, full_name FROM company_users WHERE LOWER(email) = :email AND is_active = true"),
-                    {"email": email}
+                    text(
+                        "SELECT id, username, email, full_name FROM company_users "
+                        "WHERE LOWER(email) = :email AND is_active = true"
+                    ),
+                    {"email": email},
                 ).fetchone()
                 company_db.close()
-
                 if user:
                     found_user = user
                     found_company = company_id
-                    break
-            except Exception:
-                continue
+            except Exception as lookup_exc:
+                logger.debug(f"forgot-password tenant lookup failed: {lookup_exc}")
 
         if not found_user:
-            return success_msg
+            return _constant_time_return(success_msg)
 
         # Generate secure reset token
         reset_token = secrets.token_urlsafe(48)
@@ -1390,11 +1450,11 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
             logger.warning(f"SMTP not available — password reset token generated but not delivered for {email}")
             # Return the same generic message regardless (prevent email enumeration)
 
-        return success_msg
+        return _constant_time_return(success_msg)
 
     except Exception as e:
         logger.error(f"Forgot password error: {e}")
-        return success_msg
+        return _constant_time_return(success_msg)
     finally:
         db.close()
 

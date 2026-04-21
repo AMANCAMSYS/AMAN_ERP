@@ -449,9 +449,18 @@ def update_employee(
             for bid in employee.allowed_branch_ids:
                  conn.execute(text("INSERT INTO user_branches (user_id, branch_id) VALUES (:uid, :bid)"), {"uid": user_id, "bid": bid})
 
-        # Update Role if provided
-        if user_id and employee.role:
-            conn.execute(text("UPDATE company_users SET role = :r WHERE id = :uid"), {"r": employee.role, "uid": user_id})
+        # SEC-C2: Role writes are forbidden from the HR endpoint.
+        # Role management lives under /api/roles and is gated by the
+        # `admin.roles` permission with a rank check. Any attempt to send
+        # `role` via the HR employee update is rejected hard.
+        if user_id and getattr(employee, "role", None):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "لا يمكن تعديل الدور من خلال واجهة الموارد البشرية — "
+                    "استخدم /api/roles المحمي بصلاحية admin.roles."
+                ),
+            )
 
         trans.commit()
 

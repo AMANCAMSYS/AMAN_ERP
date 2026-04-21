@@ -241,10 +241,15 @@ def generate_subscription_invoice(db, *, enrollment_id: int, user: str | None = 
     # Fiscal period check
     check_fiscal_period_open(db, billing_start)
 
-    # VAT calculation
+    # VAT calculation (TASK-027: unified via compute_invoice_totals)
+    from utils.accounting import compute_invoice_totals
     tax_rate = _VAT_RATE
-    tax_amount = (amount * tax_rate).quantize(_D4, rounding=ROUND_HALF_UP)
-    total_with_tax = amount + tax_amount
+    _tax_rate_pct = tax_rate * Decimal("100")
+    _totals = compute_invoice_totals([
+        {"quantity": 1, "unit_price": amount, "tax_rate": _tax_rate_pct, "discount": 0}
+    ])
+    tax_amount = _totals["total_tax"]
+    total_with_tax = _totals["grand_total"]
 
     # Create the main invoice
     inv_row = db.execute(
