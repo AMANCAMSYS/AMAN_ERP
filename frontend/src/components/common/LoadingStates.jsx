@@ -11,8 +11,7 @@
  *   Spinner      — inline/button-size spinner   (for submit buttons, inline states)
  *   TableSkeleton, CardSkeleton, DashboardSkeleton — shimmer placeholders
  * ============================================================
- */
-
+ */import { useTranslation } from 'react-i18next'
 // ── Design tokens ─────────────────────────────────────────
 // Edit HERE to change the spinner across the entire app.
 const SIZE = {
@@ -49,10 +48,13 @@ function SpinEl({ w, h, shadow }) {
  *   <div className="loading-spinner">جاري التحميل…</div>
  *   etc.
  *
- * @param {string}  [text]    — optional label shown below the spinner
+ * @param {string}  [text]    — optional label shown below the spinner (defaults to translated "loading")
  * @param {number}  [minH]    — min-height of the wrapper (default 300px)
+ * @param {boolean} [noText]  — set true to hide the text entirely
  */
-export function PageLoading({ text, minH = 300 }) {
+export function PageLoading({ text, minH = 300, noText = false }) {
+    const { t } = useTranslation()
+    const label = noText ? '' : (text ?? t('common.loading', 'Loading...'))
     return (
         <div style={{
             display: 'flex',
@@ -66,7 +68,7 @@ export function PageLoading({ text, minH = 300 }) {
             fontSize: '0.95rem',
         }}>
             <SpinEl {...SIZE.md} />
-            {text && <p style={{ margin: 0 }}>{text}</p>}
+            {label && <p style={{ margin: 0 }}>{label}</p>}
         </div>
     )
 }

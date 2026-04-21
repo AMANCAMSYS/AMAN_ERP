@@ -9,8 +9,8 @@ import { PageLoading } from './components/common/LoadingStates'
 import Layout from './components/Layout'
 import FloatingThemeToggle from './components/common/FloatingThemeToggle'
 
-// Suspense fallback uses unified PageLoading
-const PageLoader = () => <PageLoading text="Loading..." />
+// Suspense fallback uses unified PageLoading (auto-translated)
+const PageLoader = () => <PageLoading />
 
 // Pages
 const Login = React.lazy(() => import('./pages/Login'))

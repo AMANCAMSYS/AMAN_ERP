@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 const Recruitment = () => {
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
@@ -189,7 +190,7 @@ const Recruitment = () => {
             </div>
 
             <div className="card section-card">
-                {loading ? <div className="text-center p-4">...</div> : activeTab === 'openings' ? (
+                {loading ? <PageLoading /> : activeTab === 'openings' ? (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead><tr>

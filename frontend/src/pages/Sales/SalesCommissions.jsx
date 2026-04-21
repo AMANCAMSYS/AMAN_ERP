@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { Plus, DollarSign, Calculator, TrendingUp } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const SalesCommissions = () => {
     const { t, i18n } = useTranslation();
@@ -86,7 +87,7 @@ const SalesCommissions = () => {
             </div>
 
             <div className="card section-card">
-                {loading ? <div className="text-center p-4">...</div> : activeTab === 'commissions' ? (
+                {loading ? <PageLoading /> : activeTab === 'commissions' ? (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead><tr>

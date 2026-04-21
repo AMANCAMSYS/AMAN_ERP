@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { TrendingUp, BarChart3, Plus, GitCompareArrows } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const BudgetAdvanced = () => {
     const { t, i18n } = useTranslation();
@@ -83,7 +84,7 @@ const BudgetAdvanced = () => {
             </div>
 
             <div className="card section-card">
-                {loading && activeTab !== 'comparison' ? <div className="text-center p-4">...</div> : activeTab === 'costcenter' ? (
+                {loading && activeTab !== 'comparison' ? <PageLoading /> : activeTab === 'costcenter' ? (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead><tr>

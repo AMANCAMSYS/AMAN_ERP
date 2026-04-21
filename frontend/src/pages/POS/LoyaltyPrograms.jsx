@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { Award, Plus, Users, Star } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const LoyaltyPrograms = () => {
     const { t, i18n } = useTranslation();
@@ -81,7 +82,7 @@ const LoyaltyPrograms = () => {
 
             {/* Programs List */}
             <div className="card section-card">
-                {loading ? <div className="text-center p-4">...</div> : (
+                {loading ? <PageLoading /> : (
                     <div className="data-table-container">
                         <table className="data-table">
                             <thead><tr>
