@@ -71,6 +71,7 @@ def create_journal_entry(
     source_id: Optional[int] = None,
     username: Optional[str] = None,
     idempotency_key: Optional[str] = None,
+    ledger_id: Optional[int] = None,
 ) -> tuple[int, str]:
     """
     Centralized function to create a journal entry, validate it, insert lines, 
@@ -131,6 +132,22 @@ def create_journal_entry(
 
     # 2. Header
     entry_number = generate_sequential_number(db, "JE", "journal_entries", "entry_number")
+
+    # Multi-book: resolve ledger_id (Phase 6). If caller didn't specify, pick
+    # the tenant's primary ledger (prefer local_gaap framework). Silent no-op
+    # if ledgers table is absent (older tenants / pre-bootstrap).
+    if ledger_id is None:
+        try:
+            row_l = db.execute(text(
+                "SELECT id FROM ledgers "
+                "WHERE is_active = TRUE "
+                "ORDER BY CASE framework WHEN 'local_gaap' THEN 0 WHEN 'ifrs' THEN 1 ELSE 2 END, id "
+                "LIMIT 1"
+            )).fetchone()
+            if row_l:
+                ledger_id = row_l[0]
+        except Exception:
+            ledger_id = None  # ledgers table not provisioned yet — safe to omit
     
     # Get base currency
     if not currency:
@@ -143,9 +160,9 @@ def create_journal_entry(
     try:
         res = db.execute(text("""
             INSERT INTO journal_entries 
-            (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id, idempotency_key)
+            (entry_number, entry_date, description, reference, status, branch_id, created_by, currency, exchange_rate, posted_at, source, source_id, idempotency_key, ledger_id)
             VALUES 
-            (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id, :idem_key)
+            (:num, :date, :desc, :ref, :status, :branch_id, :user, :curr, :rate, :posted_at, :source, :s_id, :idem_key, :ledger_id)
             RETURNING id
         """), {
             "num": entry_number,
@@ -160,7 +177,8 @@ def create_journal_entry(
             "posted_at": datetime.now() if status == "posted" else None,
             "source": source,
             "s_id": source_id,
-            "idem_key": idempotency_key
+            "idem_key": idempotency_key,
+            "ledger_id": ledger_id
         }).fetchone()
     except IntegrityError as e:
         # Race: a concurrent request landed the same idempotency_key or source triplet.

@@ -7,10 +7,12 @@ from typing import Dict, Type
 from .base import EInvoiceAdapter
 from .eta_adapter import EgyptETAAdapter
 from .uae_fta_adapter import UAEFTAAdapter
+from .zatca_adapter import ZATCAAdapter
 
 _REGISTRY: Dict[str, Type[EInvoiceAdapter]] = {
     "EG": EgyptETAAdapter,
     "AE": UAEFTAAdapter,
+    "SA": ZATCAAdapter,
 }
 
 

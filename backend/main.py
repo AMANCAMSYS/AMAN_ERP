@@ -232,6 +232,16 @@ async def lifespan(app: FastAPI):
             logger.info("🔌 Plugins registered: %s", ", ".join(loaded))
     except Exception:
         logger.exception("Plugin loading failed (non-fatal)")
+
+    # Phase 6: optional Redis Streams bridge for the domain event bus.
+    # Enabled by setting REDIS_EVENT_BUS=1 in the environment.
+    try:
+        from utils.redis_event_bus import install as _install_redis_bus, is_enabled as _bus_enabled
+        if _bus_enabled():
+            if _install_redis_bus():
+                logger.info("📡 Redis event-bus bridge installed")
+    except Exception:
+        logger.exception("Redis event bus install failed (non-fatal)")
     
     # Sync schema for all existing company databases via Alembic migrations
     try:

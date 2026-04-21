@@ -6654,6 +6654,82 @@ def get_gl_integrity_guards_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_einv_invoice
         ON e_invoice_submissions (invoice_type, invoice_id);
 
+    -- ═════════════════════════════════════════════════════════════════════
+    -- Phase 6 — Global parity: payment gateways + ZATCA hash chain + multi-book
+    -- ═════════════════════════════════════════════════════════════════════
+
+    -- Payment gateway transactions (Stripe / Tap / PayTabs / …)
+    CREATE TABLE IF NOT EXISTS gateway_charges (
+        id SERIAL PRIMARY KEY,
+        provider VARCHAR(30) NOT NULL,          -- stripe | tap | paytabs | …
+        charge_id VARCHAR(120) NOT NULL,        -- provider's id
+        invoice_id INTEGER,                     -- optional link
+        amount NUMERIC(18,2) NOT NULL,
+        currency VARCHAR(10) NOT NULL,
+        status VARCHAR(30) NOT NULL,            -- pending|authorised|captured|failed|refunded|cancelled
+        error_message TEXT,
+        gateway_response JSONB,
+        idempotency_key VARCHAR(120),
+        created_by INTEGER,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_gateway_charge
+        ON gateway_charges (provider, charge_id);
+    CREATE INDEX IF NOT EXISTS idx_gateway_invoice
+        ON gateway_charges (invoice_id);
+
+    CREATE TABLE IF NOT EXISTS gateway_webhook_events (
+        id SERIAL PRIMARY KEY,
+        provider VARCHAR(30) NOT NULL,
+        event_type VARCHAR(80),
+        charge_id VARCHAR(120),
+        signature VARCHAR(512),
+        verified BOOLEAN NOT NULL DEFAULT FALSE,
+        payload JSONB,
+        received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhook_provider_charge
+        ON gateway_webhook_events (provider, charge_id);
+
+    -- ZATCA hash-chain tracker (Phase 2 requirement: every invoice must
+    -- carry the previous invoice's hash so the sequence is tamper-evident).
+    CREATE TABLE IF NOT EXISTS zatca_invoice_hashes (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER NOT NULL,
+        icv BIGINT NOT NULL,                    -- Invoice Counter Value
+        invoice_hash VARCHAR(128) NOT NULL,     -- base64 SHA-256 of UBL XML
+        previous_invoice_hash VARCHAR(128) NOT NULL DEFAULT '0',
+        qr_payload TEXT NOT NULL,               -- base64 TLV
+        submitted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_zatca_hash_invoice
+        ON zatca_invoice_hashes (invoice_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_zatca_hash_icv
+        ON zatca_invoice_hashes (icv);
+
+    -- Multi-book accounting: allow each JE to belong to a ledger/book
+    -- (primary IFRS, local GAAP, tax book, management book).
+    -- Nullable so existing JEs remain valid; default-populated by service.
+    ALTER TABLE journal_entries
+        ADD COLUMN IF NOT EXISTS ledger_id INTEGER;
+    CREATE INDEX IF NOT EXISTS idx_je_ledger ON journal_entries (ledger_id);
+
+    -- Distributed event bus: persistent outbox (used by the Redis-Streams
+    -- bridge and any future Kafka/RabbitMQ relay).
+    CREATE TABLE IF NOT EXISTS event_outbox (
+        id BIGSERIAL PRIMARY KEY,
+        event_name VARCHAR(80) NOT NULL,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        delivered_at TIMESTAMPTZ,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_event_outbox_undelivered
+        ON event_outbox (created_at)
+        WHERE delivered_at IS NULL;
+
     -- FIN-H (TASK-018): exchange_rates is append-only FX history
     CREATE OR REPLACE FUNCTION block_exchange_rate_mutation() RETURNS trigger AS $fn5$
     BEGIN

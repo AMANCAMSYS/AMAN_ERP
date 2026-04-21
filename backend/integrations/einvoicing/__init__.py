@@ -17,6 +17,7 @@ credentials, sandbox testing, and certified signing keys.
 from .base import EInvoiceAdapter, SubmissionResult
 from .eta_adapter import EgyptETAAdapter
 from .uae_fta_adapter import UAEFTAAdapter
+from .zatca_adapter import ZATCAAdapter, ZATCAConfig, build_qr_payload, build_ubl_xml, invoice_hash
 from .registry import get_adapter
 
 __all__ = [
@@ -24,5 +25,10 @@ __all__ = [
     "SubmissionResult",
     "EgyptETAAdapter",
     "UAEFTAAdapter",
+    "ZATCAAdapter",
+    "ZATCAConfig",
+    "build_qr_payload",
+    "build_ubl_xml",
+    "invoice_hash",
     "get_adapter",
 ]
