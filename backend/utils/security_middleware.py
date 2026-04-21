@@ -112,12 +112,13 @@ XSS_PATTERNS = [
     re.compile(r'vbscript\s*:', re.IGNORECASE),
 ]
 
-# SQL Injection patterns (basic detection — parameterized queries are the real defense)
-SQL_PATTERNS = [
-    re.compile(r"('\s*(OR|AND)\s*'?\s*\d+\s*=\s*\d+)", re.IGNORECASE),
-    re.compile(r"(;\s*(DROP|DELETE|TRUNCATE|ALTER|CREATE)\s+)", re.IGNORECASE),
-    re.compile(r"(UNION\s+(ALL\s+)?SELECT)", re.IGNORECASE),
-]
+# TASK-033: SQL-injection regex middleware removed.
+# Rationale: regex-based SQL-injection detection produced false positives on
+# legitimate payloads (e.g. product names containing "OR 1=1", audit diffs
+# containing SQL keywords) while providing zero real protection — SQLAlchemy
+# parameterized queries are the only correct defence. A static-analysis lint
+# (scripts/check_sql_parameterization.py) now enforces that no router builds
+# SQL via f-strings or `%` / `+` string concatenation on untrusted input.
 
 # Paths to skip sanitization (file upload only — binary content)
 SKIP_PATHS = ["/uploads", "/api/companies/logo"]
@@ -140,22 +141,14 @@ def detect_xss(value: str) -> bool:
     return False
 
 
-def detect_sql_injection(value: str) -> bool:
-    """Detect basic SQL injection patterns"""
-    if not isinstance(value, str):
-        return False
-    for pattern in SQL_PATTERNS:
-        if pattern.search(value):
-            return True
-    return False
-
-
 class InputSanitizationMiddleware(BaseHTTPMiddleware):
     """
     Middleware to detect and block potentially malicious input.
     - Detects XSS patterns in query params and headers
-    - Detects SQL injection patterns
     - Logs suspicious requests
+    Note: SQL-injection regex checks were removed (TASK-033). The only
+    correct defence is parameterized queries, enforced by SQLAlchemy and
+    the scripts/check_sql_parameterization.py CI lint.
     """
 
     async def dispatch(self, request: Request, call_next):
@@ -166,7 +159,7 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
             if path.startswith(skip):
                 return await call_next(request)
 
-        # Check query parameters for XSS/SQLi
+        # Check query parameters for XSS
         for key, value in request.query_params.items():
             if detect_xss(value):
                 logger.warning(f"🚨 XSS detected in query param '{key}' from {request.client.host}: {value[:100]}")
@@ -174,15 +167,9 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
                     status_code=400,
                     content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}
                 )
-            if detect_sql_injection(value):
-                logger.warning(f"🚨 SQLi detected in query param '{key}' from {request.client.host}: {value[:100]}")
-                return JSONResponse(
-                    status_code=400,
-                    content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}
-                )
 
         # Check path parameters
-        if detect_xss(path) or detect_sql_injection(path):
+        if detect_xss(path):
             logger.warning(f"🚨 Malicious path from {request.client.host}: {path[:200]}")
             return JSONResponse(
                 status_code=400,
@@ -201,12 +188,6 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
                     # SEC-FIX-013: Check ALL XSS patterns in body, not just <script>
                     if detect_xss(body_str):
                         logger.warning(f"🚨 XSS injection in body from {request.client.host}")
-                        return JSONResponse(
-                            status_code=400,
-                            content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}
-                        )
-                    if detect_sql_injection(body_str):
-                        logger.warning(f"🚨 SQLi pattern in body from {request.client.host}")
                         return JSONResponse(
                             status_code=400,
                             content={"detail": "تم اكتشاف محتوى غير آمن في الطلب"}

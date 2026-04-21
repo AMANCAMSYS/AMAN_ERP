@@ -6482,6 +6482,9 @@ def get_gl_integrity_guards_sql() -> str:
     CREATE INDEX IF NOT EXISTS idx_je_branch_date ON journal_entries (branch_id, entry_date);
     CREATE INDEX IF NOT EXISTS idx_je_status_date ON journal_entries (status, entry_date);
     CREATE INDEX IF NOT EXISTS idx_je_entry_date  ON journal_entries (entry_date);
+    -- TASK-031: composite index on (source, source_id, entry_date) so gl_service's
+    -- duplicate-source guard uses an index scan instead of a seq scan on JE.
+    CREATE INDEX IF NOT EXISTS idx_je_source_srcid_date ON journal_entries (source, source_id, entry_date);
     CREATE INDEX IF NOT EXISTS idx_jl_account_je  ON journal_lines (account_id, journal_entry_id);
     CREATE INDEX IF NOT EXISTS idx_jl_je          ON journal_lines (journal_entry_id);
 

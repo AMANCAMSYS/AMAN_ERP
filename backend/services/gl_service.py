@@ -16,6 +16,45 @@ _D2 = Decimal("0.01")
 def _dec(v: Any) -> Decimal:
     return Decimal(str(v or 0))
 
+
+def validate_je_lines(lines: List[Dict[str, Any]]) -> tuple[Decimal, Decimal]:
+    """
+    Pure validation helper for journal-entry lines (TASK-032 testable surface).
+
+    Enforces the four hard invariants required by double-entry bookkeeping:
+      1. At least one line is present.
+      2. No line has a negative debit or credit.
+      3. No line has both debit and credit > 0.
+      4. Totals are non-zero and balanced within 0.01.
+
+    Returns `(total_debit, total_credit)` — both quantized to 2 decimals.
+    Raises HTTPException(400) on violation. Pure (no I/O).
+    """
+    if not lines:
+        raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
+
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+
+    for i, line in enumerate(lines):
+        d = _dec(line.get("debit", 0)).quantize(_D2, ROUND_HALF_UP)
+        c = _dec(line.get("credit", 0)).quantize(_D2, ROUND_HALF_UP)
+        if d < 0 or c < 0:
+            raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن إدخال مبالغ سالبة")
+        if d > 0 and c > 0:
+            raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن أن يكون مدين ودائن معاً في نفس السطر")
+        total_debit += d
+        total_credit += c
+
+    if total_debit == 0 and total_credit == 0:
+        raise HTTPException(status_code=400, detail="لا يمكن إنشاء قيد بمبالغ صفرية")
+
+    if abs(total_debit - total_credit) > _D2:
+        raise HTTPException(status_code=400, detail="القيود غير موزونة (المدين لا يساوي الدائن)")
+
+    return total_debit, total_credit
+
+
 def create_journal_entry(
     db,
     company_id: str,
@@ -61,28 +100,8 @@ def create_journal_entry(
             logger.info("Idempotency hit: key=%s → JE %s", idempotency_key, existing[1])
             return existing[0], existing[1]
 
-    # 1. Validation
-    if not lines:
-        raise HTTPException(status_code=400, detail="يجب إضافة سطر واحد على الأقل في القيد")
-
-    total_debit = Decimal("0")
-    total_credit = Decimal("0")
-
-    for i, line in enumerate(lines):
-        d = _dec(line.get("debit", 0)).quantize(_D2, ROUND_HALF_UP)
-        c = _dec(line.get("credit", 0)).quantize(_D2, ROUND_HALF_UP)
-        if d < 0 or c < 0:
-            raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن إدخال مبالغ سالبة")
-        if d > 0 and c > 0:
-            raise HTTPException(status_code=400, detail=f"السطر {i+1}: لا يمكن أن يكون مدين ودائن معاً في نفس السطر")
-        total_debit += d
-        total_credit += c
-
-    if total_debit == 0 and total_credit == 0:
-        raise HTTPException(status_code=400, detail="لا يمكن إنشاء قيد بمبالغ صفرية")
-
-    if abs(total_debit - total_credit) > _D2:
-        raise HTTPException(status_code=400, detail="القيود غير موزونة (المدين لا يساوي الدائن)")
+    # 1. Validation (TASK-032: extracted to validate_je_lines for property-testing)
+    total_debit, total_credit = validate_je_lines(lines)
 
     if status not in ("draft", "posted"):
         status = "posted"

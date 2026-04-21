@@ -10,8 +10,20 @@ const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
     headers: {
         'Content-Type': 'application/json'
-    }
+    },
+    // TASK-030: send cookies on same-origin/CORS requests so the HttpOnly
+    // refresh-token cookie and the readable csrf_token cookie are attached.
+    withCredentials: true
 })
+
+// TASK-030: CSRF — read the `csrf_token` cookie on every mutating request
+// and echo it in the `X-CSRF-Token` header (double-submit pattern).
+function readCookie(name) {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 // --- Token Refresh Mutex ---
 // Prevents multiple concurrent 401s from each trying to refresh (and rotate/blacklist) the token.
@@ -51,7 +63,11 @@ function getTokenExpiry(token) {
 // Returns the new token string, or null if refresh failed.
 async function proactiveRefresh() {
     const currentRefreshToken = localStorage.getItem('refresh_token');
-    if (!currentRefreshToken) return null;
+    // TASK-030: HttpOnly cookie is the preferred carrier. Proceed even if
+    // localStorage has no refresh_token — the browser will send the cookie
+    // automatically (withCredentials=true).
+    const hasCookie = !!readCookie('csrf_token');
+    if (!currentRefreshToken && !hasCookie) return null;
 
     // If another refresh is already running, queue behind it
     if (isRefreshing) {
@@ -62,9 +78,11 @@ async function proactiveRefresh() {
 
     isRefreshing = true;
     try {
+        const payload = currentRefreshToken ? { refresh_token: currentRefreshToken } : {};
         const refreshRes = await axios.post(
             `${api.defaults.baseURL}/auth/refresh`,
-            { refresh_token: currentRefreshToken }
+            payload,
+            { withCredentials: true }
         );
         const newToken = refreshRes.data?.access_token;
         const newRefreshToken = refreshRes.data?.refresh_token;
@@ -102,6 +120,17 @@ api.interceptors.request.use(async (config) => {
             if (newToken) token = newToken;
         }
         config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // TASK-030: attach CSRF header on mutating requests. Safe no-op when the
+    // cookie is missing (anonymous or pure-Bearer clients) — the backend
+    // middleware only enforces when a cookie is present on the request.
+    const method = (config.method || 'get').toLowerCase();
+    if (MUTATING_METHODS.has(method)) {
+        const csrf = readCookie('csrf_token');
+        if (csrf) {
+            config.headers['X-CSRF-Token'] = csrf;
+        }
     }
 
     // Auto-attach AbortController unless request already has a signal or opts out

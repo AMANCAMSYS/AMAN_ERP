@@ -30,15 +30,36 @@ const InvoicePrintModal = ({ invoice, onClose }) => {
         const content = printRef.current;
         if (!content) return;
         const win = window.open('', '_blank', 'width=800,height=600');
-        win.document.write(`<!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>${invoice.invoice_number}</title>
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Segoe UI', Tahoma, sans-serif; direction: ${isRTL ? 'rtl' : 'ltr'}; }
-            @page { size: ${FORMATS[format].width} auto; margin: ${format.startsWith('thermal') ? '2mm' : '10mm'}; }
-            @media print { .no-print { display: none !important; } }
-            ${content.querySelector('style')?.textContent || ''}
-        </style></head><body>${content.innerHTML}</body></html>`);
-        win.document.close();
+        if (!win) return;
+
+        // SEC / TASK-029: build the print document using DOM APIs instead of
+        // document.write with template-literal interpolation. User-controlled
+        // values (invoice_number, customer_name, etc.) go into the DOM via
+        // textContent / setAttribute, never concatenated into HTML strings.
+        const doc = win.document;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>');
+        doc.close();
+        doc.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+        doc.title = String(invoice.invoice_number || '');
+
+        const style = doc.createElement('style');
+        const pageMargin = format.startsWith('thermal') ? '2mm' : '10mm';
+        const embeddedStyles = content.querySelector('style')?.textContent || '';
+        style.textContent =
+            '* { margin: 0; padding: 0; box-sizing: border-box; } ' +
+            "body { font-family: 'Segoe UI', Tahoma, sans-serif; direction: " +
+            (isRTL ? 'rtl' : 'ltr') + '; } ' +
+            '@page { size: ' + FORMATS[format].width + ' auto; margin: ' + pageMargin + '; } ' +
+            '@media print { .no-print { display: none !important; } } ' +
+            embeddedStyles;
+        doc.head.appendChild(style);
+
+        // content.innerHTML is produced by React and already HTML-escaped.
+        const wrapper = doc.createElement('div');
+        wrapper.innerHTML = content.innerHTML;
+        doc.body.appendChild(wrapper);
+
         setTimeout(() => { win.print(); win.close(); }, 300);
     };
 

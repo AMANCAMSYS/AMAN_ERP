@@ -197,12 +197,12 @@
 
 ### المرحلة 4 — Hardening (Week 4)
 
-- **TASK-028 [H]** — فصل APScheduler إلى Worker منفصل (Redis job store أو Celery/RQ).
-- **TASK-029 [H]** — إصلاح XSS في [Sales/InvoicePrintModal.jsx](../frontend/src/pages/Sales/InvoicePrintModal.jsx) و [HR/Payslips.jsx](../frontend/src/pages/HR/Payslips.jsx) و [Taxes/WithholdingTax.jsx](../frontend/src/pages/Taxes/WithholdingTax.jsx): استبدال `document.write`/`innerHTML` بـ DOM APIs آمنة.
-- **TASK-030 [H]** — نقل refresh token إلى **HttpOnly Secure SameSite=Strict cookie**؛ إضافة CSRF token للـ mutations.
-- **TASK-031 [H]** — إضافة composite indexes: `(company_id, entry_date)`, `(account_id, entry_date)`, `(status, entry_date)` على JE/JL.
-- **TASK-032 [H]** — Property-based tests (`hypothesis`) تؤكد `Σ dr = Σ cr` بعد كل flow عشوائي.
-- **TASK-033 [H]** — إزالة الـ SQL-injection regex middleware ([utils/security_middleware.py](../backend/utils/security_middleware.py)) + الاعتماد على parameterized queries + CI lint.
+- **TASK-028 [H]** ✅ — فصل APScheduler إلى Worker منفصل. تم عبر `SCHEDULER_MODE` flag في [config.py](../backend/config.py) + [worker.py](../backend/worker.py) + خدمة `worker` في [docker-compose.prod.yml](../docker-compose.prod.yml). الإنتاج يشغّل `SCHEDULER_MODE=dedicated` والـ worker في replica واحد.
+- **TASK-029 [H]** ✅ — إصلاح XSS في [Sales/InvoicePrintModal.jsx](../frontend/src/pages/Sales/InvoicePrintModal.jsx) و [HR/Payslips.jsx](../frontend/src/pages/HR/Payslips.jsx) و [Taxes/WithholdingTax.jsx](../frontend/src/pages/Taxes/WithholdingTax.jsx): استبدال `document.write`/template-literals بـ DOM APIs (`createElement` + `textContent` + `setAttribute`).
+- **TASK-030 [H]** ✅ — refresh token في HttpOnly Secure SameSite=Strict cookie + CSRF double-submit. ملفات جديدة: [utils/auth_cookies.py](../backend/utils/auth_cookies.py) و [utils/csrf_middleware.py](../backend/utils/csrf_middleware.py)؛ `CSRF_ENFORCEMENT` flag (`permissive` افتراضياً). [apiClient.js](../frontend/src/services/apiClient.js) يقرأ الـ CSRF cookie ويُرسله في `X-CSRF-Token`.
+- **TASK-031 [H]** ✅ — composite index `(source, source_id, entry_date)` على `journal_entries` (مطابق لاستعلام duplicate-guard في `gl_service`). إضافة canonical SQL في [database.py](../backend/database.py) + migration [0011_je_source_composite_index.py](../backend/alembic/versions/0011_je_source_composite_index.py) باستخدام `CREATE INDEX CONCURRENTLY`. ملاحظة: `company_id` غير قابل للتطبيق في architecture DB-per-tenant.
+- **TASK-032 [H]** ✅ — Property-based tests باستخدام `hypothesis` في [test_46_gl_balance_property.py](../backend/tests/test_46_gl_balance_property.py). استخراج `validate_je_lines()` كدالة نقية في [gl_service.py](../backend/services/gl_service.py). 7 tests تُؤكد الـ invariants (الميزان، رفض السالب، رفض المختلط، …).
+- **TASK-033 [H]** ✅ — إزالة `detect_sql_injection` و `SQL_PATTERNS` من [security_middleware.py](../backend/utils/security_middleware.py). CI lint جديد [check_sql_parameterization.py](../scripts/check_sql_parameterization.py) مع baseline [sql_lint_baseline.txt](../scripts/sql_lint_baseline.txt) (349 موقع موروث). الـ XSS detection متبقٍ.
 
 ---
 

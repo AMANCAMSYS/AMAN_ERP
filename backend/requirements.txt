@@ -34,3 +34,6 @@ prometheus-fastapi-instrumentator
 python3-saml
 python-ldap
 firebase-admin
+
+# ── Property-based testing (TASK-032) ─────────
+hypothesis>=6.100

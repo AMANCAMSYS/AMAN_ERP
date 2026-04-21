@@ -2,7 +2,7 @@
 AMAN ERP - Authentication Router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Form, Body
 from utils.i18n import http_error
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -22,6 +22,7 @@ from config import settings
 from schemas import Token, UserResponse
 from utils.audit import log_activity, log_system_activity
 from utils.limiter import limiter
+from utils.auth_cookies import set_auth_cookies, clear_auth_cookies
 
 router = APIRouter(prefix="/auth", tags=["المصادقة"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
@@ -441,6 +442,7 @@ def decode_token(token: str) -> dict:
 @limiter.limit("10/minute")  # SEC-FIX: Production rate limit (reverted from 1000 testing value)
 async def login(
     request: Request,
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     company_code: Optional[str] = Form(None),  # رمز الشركة — إلزامي لمستخدمي الشركات
 ):
@@ -537,7 +539,10 @@ async def login(
                 description="System administrator logged in",
                 request=request
             )
-            
+
+            # TASK-030: set HttpOnly refresh cookie + CSRF cookie.
+            set_auth_cookies(response, refresh_token)
+
             return Token(
                 access_token=access_token,
                 refresh_token=refresh_token,
@@ -785,6 +790,9 @@ async def login(
                     company_conn.commit()
                 except Exception as sess_err:
                     logger.warning(f"Failed to create user_session: {sess_err}")
+
+                # TASK-030: set HttpOnly refresh cookie + CSRF cookie.
+                set_auth_cookies(response, refresh_token)
 
                 return Token(
                     access_token=access_token,
@@ -1107,6 +1115,8 @@ async def update_current_user_profile(
 
 @router.post("/logout")
 async def logout(
+    response: Response,
+    request: Request,
     body: Optional[LogoutRequest] = Body(default=None),
     token: str = Depends(oauth2_scheme)
 ):
@@ -1120,6 +1130,10 @@ async def logout(
     add_token_to_blacklist(token, username=username, reason="logout")
     if body and body.refresh_token:
         add_token_to_blacklist(body.refresh_token, username=username, reason="logout_refresh")
+    # TASK-030: also blacklist the refresh cookie if present.
+    cookie_refresh = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    if cookie_refresh:
+        add_token_to_blacklist(cookie_refresh, username=username, reason="logout_refresh_cookie")
 
     # SEC-FIX: Deactivate user session on logout
     try:
@@ -1138,11 +1152,30 @@ async def logout(
     except Exception as e:
         logger.warning(f"Session deactivation on logout failed: {e}")
 
+    # TASK-030: clear HttpOnly refresh + CSRF cookies.
+    clear_auth_cookies(response)
+
     return {"message": "تم تسجيل الخروج بنجاح"}
+
+
+@router.get("/csrf")
+async def get_csrf_token(response: Response):
+    """
+    TASK-030: bootstrap endpoint. Sets a fresh non-HttpOnly `csrf_token`
+    cookie (readable by JS) and returns its value in the JSON body so
+    SPA clients can prime their state on first load before any mutating
+    request. Safe to call anonymously — the token is just an opaque
+    random value used for the double-submit-cookie check.
+    """
+    from utils.auth_cookies import set_csrf_cookie
+    token = set_csrf_cookie(response)
+    return {"csrf_token": token}
 
 
 @router.post("/refresh")
 async def refresh_token(
+    request: Request,
+    response: Response,
     body: Optional[RefreshTokenRequest] = Body(default=None),
     token: Optional[str] = Depends(oauth2_scheme_optional)
 ):
@@ -1154,7 +1187,11 @@ async def refresh_token(
     )
 
     provided_refresh_token = None
-    if body and body.refresh_token:
+    # TASK-030: prefer HttpOnly cookie over body/header when present.
+    cookie_refresh = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    if cookie_refresh:
+        provided_refresh_token = cookie_refresh.strip()
+    elif body and body.refresh_token:
         provided_refresh_token = body.refresh_token.strip()
     elif token:
         provided_refresh_token = token
@@ -1258,7 +1295,10 @@ async def refresh_token(
         
         # Rotate refresh token: revoke old one and return new one
         add_token_to_blacklist(provided_refresh_token, username=username, reason="refresh_rotate")
-        
+
+        # TASK-030: rotate HttpOnly refresh cookie + CSRF cookie.
+        set_auth_cookies(response, new_refresh_token)
+
         return {
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,

@@ -75,30 +75,47 @@ const Payslips = () => {
     const handlePrint = () => {
         if (!printRef.current) return;
         const printWindow = window.open('', '_blank');
-        const content = printRef.current.innerHTML;
-        printWindow.document.write(`<!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head><title>${t('hr.payslip_print_title')}</title>
-            <style>
-                * { margin:0; padding:0; box-sizing:border-box; }
-                body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #1a1a2e; }
-                .payslip-container { max-width: 700px; margin: auto; border: 2px solid #e0e0e0; border-radius: 12px; padding: 30px; }
-                .payslip-header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; }
-                .payslip-header h2 { color: #2563eb; font-size: 22px; margin-bottom: 4px; }
-                .payslip-header p { font-size: 13px; color: #6b7280; }
-                .payslip-info { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 12px; background: #f8fafc; border-radius: 8px; }
-                .payslip-info div { font-size: 13px; }
-                .payslip-info strong { display: block; margin-bottom: 2px; color: #374151; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-                th { background: #f1f5f9; padding: 10px 12px; text-align: ${isRTL ? 'right' : 'left'}; font-size: 13px; border-bottom: 2px solid #e2e8f0; }
-                td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-                .section-label { font-weight: 600; color: #1e40af; font-size: 14px; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
-                .total-row { background: #eff6ff; font-weight: 700; font-size: 15px; }
-                .total-row td { border-top: 2px solid #2563eb; padding: 12px; }
-                .text-success { color: #16a34a; }
-                .text-danger { color: #dc2626; }
-                .payslip-footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; border-top: 1px dashed #d1d5db; padding-top: 12px; }
-                @media print { body { padding: 10px; } .payslip-container { border: none; } }
-            </style></head><body>${content}</body></html>`);
-        printWindow.document.close();
+        if (!printWindow) return;
+
+        // SEC / TASK-029: build the print document using DOM APIs instead of
+        // document.write with template-literal interpolation. Translated title
+        // and direction go into the DOM via textContent / setAttribute.
+        const doc = printWindow.document;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>');
+        doc.close();
+        doc.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+        doc.title = String(t('hr.payslip_print_title') || '');
+
+        const style = doc.createElement('style');
+        style.textContent =
+            '* { margin:0; padding:0; box-sizing:border-box; } ' +
+            "body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: " +
+            (isRTL ? 'rtl' : 'ltr') + '; color: #1a1a2e; } ' +
+            '.payslip-container { max-width: 700px; margin: auto; border: 2px solid #e0e0e0; border-radius: 12px; padding: 30px; } ' +
+            '.payslip-header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; } ' +
+            '.payslip-header h2 { color: #2563eb; font-size: 22px; margin-bottom: 4px; } ' +
+            '.payslip-header p { font-size: 13px; color: #6b7280; } ' +
+            '.payslip-info { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 12px; background: #f8fafc; border-radius: 8px; } ' +
+            '.payslip-info div { font-size: 13px; } ' +
+            '.payslip-info strong { display: block; margin-bottom: 2px; color: #374151; } ' +
+            'table { width: 100%; border-collapse: collapse; margin-bottom: 16px; } ' +
+            'th { background: #f1f5f9; padding: 10px 12px; text-align: ' + (isRTL ? 'right' : 'left') + '; font-size: 13px; border-bottom: 2px solid #e2e8f0; } ' +
+            'td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; } ' +
+            '.section-label { font-weight: 600; color: #1e40af; font-size: 14px; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; } ' +
+            '.total-row { background: #eff6ff; font-weight: 700; font-size: 15px; } ' +
+            '.total-row td { border-top: 2px solid #2563eb; padding: 12px; } ' +
+            '.text-success { color: #16a34a; } ' +
+            '.text-danger { color: #dc2626; } ' +
+            '.payslip-footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; border-top: 1px dashed #d1d5db; padding-top: 12px; } ' +
+            '@media print { body { padding: 10px; } .payslip-container { border: none; } }';
+        doc.head.appendChild(style);
+
+        // printRef content is React-rendered and already HTML-escaped.
+        const wrapper = doc.createElement('div');
+        wrapper.innerHTML = printRef.current.innerHTML;
+        doc.body.appendChild(wrapper);
+
         setTimeout(() => { printWindow.print(); }, 300);
     };
 

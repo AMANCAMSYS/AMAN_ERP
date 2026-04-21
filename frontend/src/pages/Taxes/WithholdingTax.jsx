@@ -144,31 +144,48 @@ export default function WithholdingTax() {
     const handlePrintCertificate = () => {
         if (!certRef.current) return;
         const printWindow = window.open('', '_blank');
-        const content = certRef.current.innerHTML;
-        printWindow.document.write(`<!DOCTYPE html><html dir="${isRTL ? 'rtl' : 'ltr'}"><head><title>${t('wht.certificate_title')}</title>
-            <style>
-                * { margin:0; padding:0; box-sizing:border-box; }
-                body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #1a1a2e; }
-                .cert-container { max-width: 650px; margin: auto; border: 3px solid #1e40af; border-radius: 12px; padding: 40px; }
-                .cert-header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 20px; margin-bottom: 24px; }
-                .cert-header h1 { color: #1e40af; font-size: 24px; margin-bottom: 4px; }
-                .cert-header h2 { font-size: 16px; color: #6b7280; font-weight: 500; }
-                .cert-number { text-align: center; font-size: 14px; color: #7c3aed; margin-bottom: 20px; padding: 8px; background: #f5f3ff; border-radius: 6px; }
-                .cert-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-                .cert-field { margin-bottom: 8px; }
-                .cert-field .label { font-size: 12px; color: #6b7280; margin-bottom: 2px; }
-                .cert-field .value { font-weight: 600; font-size: 14px; }
-                .cert-amounts { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; }
-                .cert-amounts table { width: 100%; border-collapse: collapse; }
-                .cert-amounts th { text-align: ${isRTL ? 'right' : 'left'}; padding: 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; }
-                .cert-amounts td { padding: 8px; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-                .cert-footer { margin-top: 40px; display: flex; justify-content: space-between; }
-                .cert-footer .sign { text-align: center; min-width: 160px; }
-                .cert-footer .sign-line { border-top: 1px solid #1a1a2e; margin-top: 40px; padding-top: 8px; font-size: 12px; color: #6b7280; }
-                .cert-disclaimer { margin-top: 24px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px dashed #d1d5db; padding-top: 12px; }
-                @media print { body { padding: 10px; } .cert-container { border-width: 2px; } }
-            </style></head><body>${content}</body></html>`);
-        printWindow.document.close();
+        if (!printWindow) return;
+
+        // SEC / TASK-029: build the print document using DOM APIs instead of
+        // document.write with template-literal interpolation. Translated title
+        // and direction go into the DOM via textContent / setAttribute.
+        const doc = printWindow.document;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>');
+        doc.close();
+        doc.documentElement.setAttribute('dir', isRTL ? 'rtl' : 'ltr');
+        doc.title = String(t('wht.certificate_title') || '');
+
+        const style = doc.createElement('style');
+        style.textContent =
+            '* { margin:0; padding:0; box-sizing:border-box; } ' +
+            "body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 30px; direction: " +
+            (isRTL ? 'rtl' : 'ltr') + '; color: #1a1a2e; } ' +
+            '.cert-container { max-width: 650px; margin: auto; border: 3px solid #1e40af; border-radius: 12px; padding: 40px; } ' +
+            '.cert-header { text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 20px; margin-bottom: 24px; } ' +
+            '.cert-header h1 { color: #1e40af; font-size: 24px; margin-bottom: 4px; } ' +
+            '.cert-header h2 { font-size: 16px; color: #6b7280; font-weight: 500; } ' +
+            '.cert-number { text-align: center; font-size: 14px; color: #7c3aed; margin-bottom: 20px; padding: 8px; background: #f5f3ff; border-radius: 6px; } ' +
+            '.cert-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; } ' +
+            '.cert-field { margin-bottom: 8px; } ' +
+            '.cert-field .label { font-size: 12px; color: #6b7280; margin-bottom: 2px; } ' +
+            '.cert-field .value { font-weight: 600; font-size: 14px; } ' +
+            '.cert-amounts { background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 24px; } ' +
+            '.cert-amounts table { width: 100%; border-collapse: collapse; } ' +
+            '.cert-amounts th { text-align: ' + (isRTL ? 'right' : 'left') + '; padding: 8px; font-size: 13px; border-bottom: 1px solid #e2e8f0; } ' +
+            '.cert-amounts td { padding: 8px; font-size: 14px; border-bottom: 1px solid #f1f5f9; } ' +
+            '.cert-footer { margin-top: 40px; display: flex; justify-content: space-between; } ' +
+            '.cert-footer .sign { text-align: center; min-width: 160px; } ' +
+            '.cert-footer .sign-line { border-top: 1px solid #1a1a2e; margin-top: 40px; padding-top: 8px; font-size: 12px; color: #6b7280; } ' +
+            '.cert-disclaimer { margin-top: 24px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px dashed #d1d5db; padding-top: 12px; } ' +
+            '@media print { body { padding: 10px; } .cert-container { border-width: 2px; } }';
+        doc.head.appendChild(style);
+
+        // certRef content is React-rendered and already HTML-escaped.
+        const wrapper = doc.createElement('div');
+        wrapper.innerHTML = certRef.current.innerHTML;
+        doc.body.appendChild(wrapper);
+
         setTimeout(() => { printWindow.print(); }, 300);
     };
 

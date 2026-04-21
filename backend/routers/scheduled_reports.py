@@ -534,8 +534,18 @@ def start_report_scheduler(app):
     """
     Start APScheduler to run scheduled reports.
     Call this from main.py on startup.
+
+    TASK-028: gated by settings.SCHEDULER_MODE — web processes skip starting
+    this when the mode is not `in_process`, so the dedicated worker is the
+    single authority for job firings in multi-replica deployments.
     """
     try:
+        from config import settings
+        mode = (getattr(settings, "SCHEDULER_MODE", "in_process") or "in_process").lower()
+        if mode != "in_process":
+            logger.info("start_report_scheduler skipped (SCHEDULER_MODE=%s)", mode)
+            return
+
         from apscheduler.schedulers.background import BackgroundScheduler
 
         scheduler = BackgroundScheduler()

@@ -50,6 +50,25 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""                  # Leave empty to disable Sentry
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
+    # ── TASK-030: HttpOnly refresh cookie + CSRF ───────────────
+    # off | permissive (log only) | strict (reject on mismatch)
+    CSRF_ENFORCEMENT: str = "permissive"
+    # Name of the non-HttpOnly cookie carrying the CSRF token (readable by JS).
+    CSRF_COOKIE_NAME: str = "csrf_token"
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+    # Name of the HttpOnly cookie carrying the refresh token.
+    REFRESH_COOKIE_NAME: str = "refresh_token"
+    # Cookies are flagged Secure in staging/production automatically.
+    COOKIE_SAMESITE: str = "strict"
+
+    # ── TASK-028: Scheduler / Worker split ─────────────────────
+    # in_process : web process starts APScheduler in-thread (single-replica dev)
+    # disabled   : web does NOT start scheduler; no jobs run (testing)
+    # dedicated  : web does NOT start scheduler; jobs must be run by
+    #              a separate `worker.py` process (required for N>1 web replicas
+    #              to avoid duplicate job firings).
+    SCHEDULER_MODE: str = "in_process"
+
     # ── SEC-008: Validate SECRET_KEY strength ─────────────────
     @field_validator("SECRET_KEY")
     @classmethod

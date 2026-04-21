@@ -212,9 +212,17 @@ async def lifespan(app: FastAPI):
     logger.info("🧹 Token Blacklist Cleanup Worker Started")
     
     # Start Report Scheduler
-    from services.scheduler import start_scheduler
-    start_scheduler()
-    logger.info("⏰ Report Scheduler Started")
+    # TASK-028: web process only starts the in-process scheduler when mode is
+    # `in_process`. For production multi-replica deployments, set
+    # SCHEDULER_MODE=dedicated and run backend/worker.py as a separate service
+    # so jobs fire exactly once regardless of web replica count.
+    scheduler_mode = (getattr(settings, "SCHEDULER_MODE", "in_process") or "in_process").lower()
+    if scheduler_mode == "in_process":
+        from services.scheduler import start_scheduler
+        start_scheduler()
+        logger.info("⏰ Report Scheduler Started (in-process)")
+    else:
+        logger.info("⏰ Report Scheduler NOT started in web process (SCHEDULER_MODE=%s)", scheduler_mode)
     
     # Sync schema for all existing company databases via Alembic migrations
     try:
@@ -376,6 +384,11 @@ else:
     from utils.security_middleware import SecurityHeadersOnlyMiddleware
     app.add_middleware(SecurityHeadersOnlyMiddleware)
 app.add_middleware(InputSanitizationMiddleware)
+
+# SEC / TASK-030: CSRF double-submit-cookie protection. Enforcement mode is
+# controlled via settings.CSRF_ENFORCEMENT (off | permissive | strict).
+from utils.csrf_middleware import CSRFMiddleware
+app.add_middleware(CSRFMiddleware)
 
 # ── Prometheus Metrics ─────────────────────────────────────────────────────────
 try:
