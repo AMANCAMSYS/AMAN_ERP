@@ -2295,6 +2295,51 @@ textarea:focus {
   scrollbar-width: none;
 }
 
+/* ─── Global scrollbar theming ──────────────────────────────────────────
+   Light mode: subtle thin scrollbar
+   Dark mode: matches the dark palette so the track/thumb blend in
+   ──────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 99px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+[data-theme="dark"] * {
+  scrollbar-color: #334155 transparent;
+}
+
 .animate-scale-in {
   animation: scaleIn 0.2s ease-out;
 }
