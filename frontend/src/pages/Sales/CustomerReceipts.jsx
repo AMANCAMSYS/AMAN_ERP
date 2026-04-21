@@ -8,6 +8,7 @@ import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function CustomerReceipts() {
@@ -50,7 +51,7 @@ function CustomerReceipts() {
         (v.customer_name && v.customer_name.toLowerCase().includes(search.toLowerCase()))
     );
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

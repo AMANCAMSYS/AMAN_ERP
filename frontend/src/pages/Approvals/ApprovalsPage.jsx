@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import { getCurrency, hasPermission } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const ApprovalsPage = () => {
     const { t, i18n } = useTranslation();
@@ -206,7 +207,7 @@ const ApprovalsPage = () => {
             <div className="data-table-container">
                 {loading ? (
                     <div className="flex justify-center items-center py-20">
-                        <span className="loading loading-spinner loading-lg text-primary"></span>
+                        <PageLoading />
                     </div>
                 ) : (
                     <>
@@ -419,7 +420,7 @@ const ApprovalsPage = () => {
                                             finally { setRunningAction(null); }
                                         }}
                                     >
-                                        {runningAction === 'auto-approve' ? <span className="loading loading-spinner loading-xs"></span> : <Zap size={14} />}
+                                        {runningAction === 'auto-approve' ? <Spinner size="sm"/> : <Zap size={14} />}
                                         {t('approvals.run_auto_approve', 'تشغيل الموافقة التلقائية')}
                                     </button>
                                     <button
@@ -435,7 +436,7 @@ const ApprovalsPage = () => {
                                             finally { setRunningAction(null); }
                                         }}
                                     >
-                                        {runningAction === 'escalation' ? <span className="loading loading-spinner loading-xs"></span> : <ArrowUpCircle size={14} />}
+                                        {runningAction === 'escalation' ? <Spinner size="sm"/> : <ArrowUpCircle size={14} />}
                                         {t('approvals.run_escalation', 'تشغيل التصعيد')}
                                     </button>
                                 </div>
@@ -569,7 +570,7 @@ const ApprovalsPage = () => {
                                 } finally { setSavingSLA(false); }
                             }}
                         >
-                            {savingSLA ? <span className="loading loading-spinner loading-sm"></span> : t('common.save')}
+                            {savingSLA ? <Spinner size="sm"/> : t('common.save')}
                         </button>
                     </div>
                 </div>
@@ -644,7 +645,7 @@ const ApprovalsPage = () => {
                             disabled={submittingAction}
                         >
                             {submittingAction ?
-                                <span className="loading loading-spinner loading-sm"></span> :
+                                <Spinner size="sm"/> :
                                 (actionType === 'approve' ? t('common.approve') :
                                     actionType === 'reject' ? t('common.reject') :
                                         t('approvals.actions.return'))

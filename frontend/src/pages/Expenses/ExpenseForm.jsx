@@ -8,6 +8,7 @@ import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 export default function ExpenseForm() {
   const { t, i18n } = useTranslation();
@@ -141,11 +142,7 @@ export default function ExpenseForm() {
   if (loading && isEdit) {
     return (
       <div className="workspace fade-in">
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">{t('common.loading')}</span>
-          </div>
-        </div>
+        <PageLoading />
       </div>
     );
   }
@@ -422,7 +419,7 @@ export default function ExpenseForm() {
             >
               {loading ? (
                 <>
-                  <span className="spinner-border spinner-border-sm" />
+                  <Spinner size="sm"/>
                   {t('common.saving')}
                 </>
               ) : (

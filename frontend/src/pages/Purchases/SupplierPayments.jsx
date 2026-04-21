@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function SupplierPayments() {
@@ -39,7 +40,7 @@ function SupplierPayments() {
         (p.supplier_name && p.supplier_name.toLowerCase().includes(search.toLowerCase()))
     );
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

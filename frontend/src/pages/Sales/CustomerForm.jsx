@@ -8,6 +8,7 @@ import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
 import CurrencySelector from '../../components/common/CurrencySelector';
 import FormField from '../../components/common/FormField';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function CustomerForm() {
     const { t } = useTranslation()
@@ -104,7 +105,7 @@ function CustomerForm() {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
-    if (initialLoading) return <div className="page-center"><span className="loading"></span></div>
+    if (initialLoading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

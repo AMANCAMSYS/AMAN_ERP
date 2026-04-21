@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils';
+import { PageLoading } from '../../components/common/LoadingStates';
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 
@@ -43,10 +44,7 @@ function SupplierPayments() {
                     <BackButton />
                     <h1 className="workspace-title">{t('buying.supplier_payments.title')}</h1>
                 </div>
-                <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
-                    <div className="spinner"></div>
-                    <p>{t('common.loading')}</p>
-                </div>
+                <PageLoading />
             </div>
         )
     }

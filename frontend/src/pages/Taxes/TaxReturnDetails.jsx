@@ -9,6 +9,7 @@ import DateInput from '../../components/common/DateInput';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function TaxReturnDetails() {
     const { t } = useTranslation()
@@ -117,7 +118,7 @@ function TaxReturnDetails() {
         return map[method] || method
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (error) return <div className="alert alert-danger m-4">{error}</div>
     if (!data) return null
 

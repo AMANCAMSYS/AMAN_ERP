@@ -7,6 +7,7 @@ import { useBranch } from '../../context/BranchContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const AgingReport = () => {
     const { t } = useTranslation();
@@ -50,7 +51,7 @@ const AgingReport = () => {
         loadData();
     }, [currentBranch]);
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}...</div>;
+    if (loading) return <PageLoading />;
 
     const totalDue = buckets.reduce((a, b) => a + b.amount, 0);
 

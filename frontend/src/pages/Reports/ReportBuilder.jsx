@@ -11,6 +11,7 @@ import '../../components/ModuleStyles.css';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ReportBuilder() {
     const { t, i18n } = useTranslation();
@@ -317,7 +318,7 @@ export default function ReportBuilder() {
                                 </div>
 
                                 {loading ? (
-                                    <div className="text-center py-5"><span className="loading"></span></div>
+                                    <PageLoading />
                                 ) : !previewData ? (
                                     <div className="text-center py-5 text-muted">
                                         <Database size={48} className="mb-3 opacity-25" />

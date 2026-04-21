@@ -6,6 +6,7 @@ import { TrendingUp, TrendingDown, Clock, DollarSign, Search } from 'lucide-reac
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const KpiCard = ({ label, value, sub, color }) => (
     <div className="kpi-card" style={{ borderLeft: `4px solid ${color}` }}>
@@ -116,7 +117,7 @@ const ProjectProfitability = () => {
                 </select>
             </div>
 
-            {loading && <div className="loading-spinner">{t('common.loading')}</div>}
+            {loading && <PageLoading />}
             {error && <div className="alert alert-danger">{error}</div>}
 
             {report && (

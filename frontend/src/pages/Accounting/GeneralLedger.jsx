@@ -7,6 +7,7 @@ import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates';
 
 function GeneralLedger() {
     const { t, i18n } = useTranslation()
@@ -154,10 +155,7 @@ function GeneralLedger() {
                     </div>
                 </div>
             ) : loading ? (
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                    <div className="spinner"></div>
-                    <p style={{ marginTop: '0.75rem' }}>{t('common.loading')}</p>
-                </div>
+                <PageLoading />
             ) : error ? (
                 <div className="card mt-3 p-3" style={{ background: '#FEF2F2', color: '#DC2626', borderRadius: '12px' }}>{error}</div>
             ) : (

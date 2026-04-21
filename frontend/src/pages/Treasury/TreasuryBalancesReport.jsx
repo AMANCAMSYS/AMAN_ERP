@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format';
 import { treasuryAPI } from '../../utils/api';
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function TreasuryBalancesReport() {
     const { t, i18n } = useTranslation();
@@ -58,7 +59,7 @@ function TreasuryBalancesReport() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner"></div><p className="mt-2">{t('common.loading')}</p></div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : data && (

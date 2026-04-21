@@ -6,6 +6,7 @@ import { getCurrency } from '../../../utils/auth';
 import { formatNumber } from '../../../utils/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import BackButton from '../../../components/common/BackButton';
+import { PageLoading } from '../../../components/common/LoadingStates'
 
 const PayrollReport = () => {
     const { t } = useTranslation();
@@ -27,7 +28,7 @@ const PayrollReport = () => {
         fetchData();
     }, []);
 
-    if (loading) return <div className="workspace fade-in text-center py-5"><span className="loading"></span></div>;
+    if (loading) return <div className="workspace fade-in text-center py-5"><PageLoading /></div>;
 
     return (
         <div className="workspace fade-in">

@@ -4,6 +4,7 @@ import { projectsAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProjectFinancialsReport = () => {
     const { t } = useTranslation();
@@ -67,7 +68,7 @@ const ProjectFinancialsReport = () => {
             </div>
 
             {loading ? (
-                <div className="loading-container"><div className="spinner" /></div>
+                <PageLoading />
             ) : (
                 <>
                     {/* KPI Metrics */}

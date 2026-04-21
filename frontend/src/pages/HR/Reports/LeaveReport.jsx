@@ -5,6 +5,7 @@ import { toastEmitter } from '../../../utils/toastEmitter';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CustomDatePicker from '../../../components/common/CustomDatePicker';
 import BackButton from '../../../components/common/BackButton';
+import { PageLoading } from '../../../components/common/LoadingStates'
 
 const LeaveReport = () => {
     const { t } = useTranslation();
@@ -37,7 +38,7 @@ const LeaveReport = () => {
         fetchData();
     }, [t, dates]);
 
-    if (loading) return <div className="workspace fade-in text-center py-5"><span className="loading"></span></div>;
+    if (loading) return <div className="workspace fade-in text-center py-5"><PageLoading /></div>;
 
     return (
         <div className="workspace fade-in">

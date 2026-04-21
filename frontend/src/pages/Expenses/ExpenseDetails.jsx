@@ -12,6 +12,7 @@ import { getCurrency } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 
 export default function ExpenseDetails() {
@@ -103,11 +104,7 @@ export default function ExpenseDetails() {
   if (loading) {
     return (
       <div className="workspace fade-in">
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">{t('common.loading')}</span>
-          </div>
-        </div>
+        <PageLoading />
       </div>
     );
   }
@@ -385,7 +382,7 @@ export default function ExpenseDetails() {
             >
               {processing ? (
                 <>
-                  <span className="spinner-border spinner-border-sm me-2" />
+                  <Spinner size="sm"/>
                   {t('common.processing')}
                 </>
               ) : (

@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function PurchaseOrderReceive() {
     const { t } = useTranslation();
@@ -125,7 +126,7 @@ function PurchaseOrderReceive() {
     };
 
     if (loading) {
-        return <div className="workspace fade-in p-8 text-center">{t('common.loading')}...</div>;
+        return <PageLoading />;
     }
 
     if (!order) {

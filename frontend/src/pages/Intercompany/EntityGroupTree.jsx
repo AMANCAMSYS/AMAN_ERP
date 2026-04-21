@@ -4,6 +4,7 @@ import { accountingAPI } from '../../utils/api'
 import BackButton from '../../components/common/BackButton'
 import FormField from '../../components/common/FormField'
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function EntityGroupTree() {
     const { t } = useTranslation()
@@ -116,7 +117,7 @@ function EntityGroupTree() {
             )}
 
             {loading ? (
-                <div className="text-center py-5"><div className="spinner-border text-primary" role="status" /></div>
+                <PageLoading />
             ) : tree.length === 0 ? (
                 <div className="card text-center py-5"><p className="text-muted">{t('intercompany.no_entities')}</p></div>
             ) : (

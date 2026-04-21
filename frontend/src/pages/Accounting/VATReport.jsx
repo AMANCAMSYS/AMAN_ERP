@@ -5,6 +5,7 @@ import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function VATReport() {
     const { t } = useTranslation()
@@ -43,7 +44,7 @@ function VATReport() {
         fetchReport()
     }, [currentBranch, dates])
 
-    if (loading && !report) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && !report) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

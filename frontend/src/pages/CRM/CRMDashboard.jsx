@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function CRMDashboard() {
     const { t } = useTranslation()
@@ -28,7 +29,7 @@ function CRMDashboard() {
         }
     }
 
-    if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>
+    if (loading) return <PageLoading />
 
     const kpis = data?.kpis || {}
     const tickets = data?.tickets || {}

@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import { ModuleKPISection } from '../../components/kpi';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const StockReports = () => {
     const { t } = useTranslation();
@@ -38,7 +39,7 @@ const StockReports = () => {
         return acc;
     }, {});
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
 
     const filteredWarehouses = Object.keys(groupedStock).filter(wh =>
         wh.includes(filter) ||

@@ -5,6 +5,7 @@ import { useBranch } from '../../context/BranchContext'
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function TrialBalance() {
     const { t } = useTranslation()
@@ -85,7 +86,7 @@ function TrialBalance() {
         fetchData()
     }, [currentBranch, t])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     // Group by high-level type for summary
     const summaryData = [

@@ -7,6 +7,7 @@ import { formatShortDate } from '../../utils/dateUtils';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const STATUS_CLASSES = {
     draft: 'status-pending',
@@ -114,7 +115,7 @@ export default function CampaignReport() {
         }
     };
 
-    if (loading) return <div className="workspace"><div className="empty-state">{t('common.loading')}</div></div>;
+    if (loading) return <div className="workspace"><PageLoading /></div>;
     if (!campaign) return <div className="workspace"><div className="empty-state">{t('campaign.not_found', 'Campaign not found')}</div></div>;
 
     const sent = campaign.total_sent || 0;

@@ -6,6 +6,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import { User, Save } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProfileEdit = () => {
     const { t } = useTranslation();
@@ -51,7 +52,7 @@ const ProfileEdit = () => {
         }
     };
 
-    if (loading) return <div className="module-loading"><div className="spinner" /></div>;
+    if (loading) return <PageLoading />;
     if (!profile) return <div className="module-container"><BackButton /><p>{t('common.error')}</p></div>;
 
     return (

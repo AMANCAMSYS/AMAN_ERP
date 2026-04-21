@@ -5,6 +5,7 @@ import { Plus, Trash, Save, Trash2, Info, Clock, ChevronUp, ChevronDown } from '
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const WorkflowEditor = () => {
     const { t, i18n } = useTranslation();
@@ -178,7 +179,7 @@ const WorkflowEditor = () => {
     if (loading && !roles.length) {
         return (
             <div className="workspace flex justify-center items-center py-20">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
+                <PageLoading />
             </div>
         );
     }

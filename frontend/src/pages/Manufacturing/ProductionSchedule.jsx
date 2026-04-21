@@ -9,6 +9,7 @@ import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProductionSchedule = () => {
     const { t } = useTranslation();
@@ -171,7 +172,7 @@ const ProductionSchedule = () => {
             <div className="schedule-container shadow-sm border">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <div className="loading-spinner"></div>
+                        <PageLoading />
                         <span className="text-gray-400 animate-pulse">{t('common.loading')}</span>
                     </div>
                 ) : (

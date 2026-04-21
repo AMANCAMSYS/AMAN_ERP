@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const QuoteDetail = () => {
     const { t, i18n } = useTranslation();
@@ -64,7 +65,7 @@ const QuoteDetail = () => {
         );
     };
 
-    if (loading) return <div className="loading-spinner">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
     if (!quote) return <div className="empty-state">{t('cpq.quote_not_found')}</div>;
 
     return (

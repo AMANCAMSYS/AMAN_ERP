@@ -6,6 +6,7 @@ import { AlertTriangle, Plus, Trash2, Edit3, Save, X, GitBranch, Link2 } from 'l
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProjectRisks = () => {
     const { t, i18n } = useTranslation();
@@ -305,7 +306,7 @@ const ProjectRisks = () => {
             {/* Tables */}
             <div className="section-card">
                 {loading ? (
-                    <div className="text-center p-5"><div className="spinner-border" /></div>
+                    <PageLoading />
                 ) : activeTab === 'risks' ? (
                     <div className="data-table-container">
                         <table className="data-table">

@@ -7,6 +7,7 @@ import { Play, CheckCircle, Pause, ArrowLeft } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const OperationEntry = () => {
     const { t, i18n } = useTranslation();
@@ -102,7 +103,7 @@ const OperationEntry = () => {
         return m[s] || '#9ca3af';
     };
 
-    if (loading) return <div className="module-container"><div className="loading-spinner">{t('common.loading')}</div></div>;
+    if (loading) return <div className="module-container"><PageLoading /></div>;
     if (!progress) return <div className="module-container"><div className="empty-state">{t('shopfloor.not_found')}</div></div>;
 
     return (

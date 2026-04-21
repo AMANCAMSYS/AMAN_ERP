@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const DirectLaborReport = () => {
     const { t } = useTranslation();
@@ -147,7 +148,7 @@ const DirectLaborReport = () => {
             <div className="section-card">
                 <h3 className="section-title">{t('manufacturing.direct_labor.details', 'التفاصيل')}</h3>
                 {loading ? (
-                    <div className="loading-container"><div className="spinner" /></div>
+                    <PageLoading />
                 ) : !report?.details?.length ? (
                     <div className="empty-state">
                         <p>{t('manufacturing.direct_labor.no_data', 'لا توجد بيانات عمالة في الفترة المحددة')}</p>

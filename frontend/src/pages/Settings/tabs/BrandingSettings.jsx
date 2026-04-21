@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Upload, X, Check, Image as ImageIcon } from 'lucide-react';
 import api from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
+import { Spinner } from '../../../components/common/LoadingStates'
 
 const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
     const { t } = useTranslation();
@@ -69,7 +70,7 @@ const BrandingSettings = ({ settings, handleSettingChange, companyId }) => {
 
                             {uploading && (
                                 <div className="absolute inset-0 bg-base-100/80 flex items-center justify-center">
-                                    <span className="loading loading-spinner text-primary"></span>
+                                    <Spinner size="sm"/>
                                 </div>
                             )}
                         </div>

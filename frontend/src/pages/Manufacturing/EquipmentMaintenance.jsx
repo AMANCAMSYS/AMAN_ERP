@@ -7,6 +7,7 @@ import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 const EquipmentMaintenance = () => {
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState('equipment');
@@ -141,7 +142,7 @@ const EquipmentMaintenance = () => {
             </div>
 
             {loading ? (
-                <div className="page-center"><span className="loading"></span></div>
+                <PageLoading />
             ) : (
                 <>
                     {activeTab === 'equipment' && (

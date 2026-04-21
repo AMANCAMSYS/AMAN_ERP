@@ -11,6 +11,7 @@ import '../../components/ModuleStyles.css'
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 function SalesDebitNotes() {
     const { t, i18n } = useTranslation()
   const { showToast } = useToast()
@@ -141,7 +142,7 @@ function SalesDebitNotes() {
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>
     }
 
-    if (loading && !items.length) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && !items.length) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

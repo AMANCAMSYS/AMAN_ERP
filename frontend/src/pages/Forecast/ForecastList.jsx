@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ForecastList = () => {
     const { t, i18n } = useTranslation();
@@ -50,7 +51,7 @@ const ForecastList = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : forecasts.length === 0 ? (
                 <div className="empty-state">{t('forecast.no_forecasts')}</div>
             ) : (

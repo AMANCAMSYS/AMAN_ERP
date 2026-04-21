@@ -5,6 +5,7 @@ import BackButton from '../../components/common/BackButton';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { hasPermission } from '../../utils/auth';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const DataImportPage = () => {
     const { t } = useTranslation();
@@ -146,7 +147,7 @@ const DataImportPage = () => {
                                 onClick={handlePreview}
                                 disabled={!entity || !file || loading}
                             >
-                                {loading ? <span className="loading loading-spinner loading-sm"></span> : <Eye size={18} />}
+                                {loading ? <Spinner size="sm"/> : <Eye size={18} />}
                                 {t('data_import.preview_data')}
                             </button>
                         </div>
@@ -218,7 +219,7 @@ const DataImportPage = () => {
                                         disabled={importing || previewData.errors?.length > 0 || !canImport}
                                         onClick={handleImport}
                                     >
-                                        {importing ? <span className="loading loading-spinner loading-sm"></span> : <Play size={18} />}
+                                        {importing ? <Spinner size="sm"/> : <Play size={18} />}
                                         {t('data_import.start_import')}
                                     </button>
                                 </div>

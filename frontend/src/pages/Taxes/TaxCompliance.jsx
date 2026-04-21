@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
 import { ShieldCheck, Globe, Building2, FileText, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const COUNTRY_FLAGS = {
     SA: '🇸🇦', SY: '🇸🇾', AE: '🇦🇪', EG: '🇪🇬', JO: '🇯🇴',
@@ -137,7 +138,7 @@ function TaxCompliance() {
         return <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
     }
 
-    if (loading && !overview) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && !overview) return <PageLoading />
 
     return (
         <div className="workspace fade-in">
@@ -334,7 +335,7 @@ function TaxCompliance() {
                                     className="form-input" style={{ width: '150px' }} placeholder="Q1, Q2, 01, 02..." />
                             </div>
                             <button className="btn btn-primary" onClick={handleGenerateReport} disabled={!reportType || reportLoading}>
-                                {reportLoading ? <span className="loading-sm"></span> : <FileText size={16} />}
+                                {reportLoading ? <Spinner size="sm"/> : <FileText size={16} />}
                                 {' '}{t('tax_compliance.generate')}
                             </button>
                         </div>
@@ -481,7 +482,7 @@ function TaxCompliance() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="page-center mt-3"><span className="loading"></span></div>
+                            <PageLoading />
                         )}
                     </div>
                 </div>

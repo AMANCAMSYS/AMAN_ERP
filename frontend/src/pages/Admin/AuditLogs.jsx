@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import { getUser } from '../../utils/auth';
 import './AuditLogs.css';
 import Pagination, { usePagination } from '../../components/common/Pagination';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const AuditLogs = () => {
     const { t } = useTranslation();
@@ -356,7 +357,7 @@ const AuditLogs = () => {
             {/* Logs Table */}
             <div className="logs-table-container">
                 {loading ? (
-                    <div className="loading-spinner">⏳ {t('common.loading')}</div>
+                    <PageLoading />
                 ) : logs.length === 0 ? (
                     <div className="no-data">📭 {t('audit.noLogs')}</div>
                 ) : (

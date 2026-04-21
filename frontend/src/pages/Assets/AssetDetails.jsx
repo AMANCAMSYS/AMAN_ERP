@@ -7,6 +7,7 @@ import { Trash2, Calendar, DollarSign, Activity, FileText, RefreshCw, ArrowRight
 import { getCurrency } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const AssetDetails = () => {
     const { t, i18n } = useTranslation();
@@ -123,7 +124,7 @@ const AssetDetails = () => {
         }
     };
 
-    if (loading) return <div className="text-center py-5"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
     if (!asset) return null;
 
     return (
@@ -280,7 +281,7 @@ const AssetDetails = () => {
                         <div className="d-flex gap-2 justify-content-end">
                             <button className="btn btn-ghost" onClick={() => setShowRevalueModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-primary" onClick={handleRevalue} disabled={revaluing || !revalueData.new_value}>
-                                {revaluing ? <span className="loading loading-spinner loading-sm"></span> : (t('assets.confirm_revalue'))}
+                                {revaluing ? <Spinner size="sm"/> : (t('assets.confirm_revalue'))}
                             </button>
                         </div>
                     </div>
@@ -312,7 +313,7 @@ const AssetDetails = () => {
                         <div className="d-flex gap-2 justify-content-end">
                             <button className="btn btn-ghost" onClick={() => setShowTransferModal(false)}>{t('common.cancel')}</button>
                             <button className="btn btn-primary" onClick={handleTransfer} disabled={transferring || !transferData.to_branch_id}>
-                                {transferring ? <span className="loading loading-spinner loading-sm"></span> : (t('assets.confirm_transfer'))}
+                                {transferring ? <Spinner size="sm"/> : (t('assets.confirm_transfer'))}
                             </button>
                         </div>
                     </div>

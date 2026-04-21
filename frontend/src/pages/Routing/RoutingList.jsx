@@ -6,6 +6,7 @@ import { Plus, Edit2, Eye } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const RoutingList = () => {
     const { t, i18n } = useTranslation();
@@ -48,7 +49,7 @@ const RoutingList = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : filtered.length === 0 ? (
                 <div className="empty-state">{t('routing.no_routings')}</div>
             ) : (

@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { Calendar, FileText, User, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const EmployeeDashboard = () => {
     const { t, i18n } = useTranslation();
@@ -49,7 +50,7 @@ const EmployeeDashboard = () => {
         return <span className={`status-badge ${s.cls}`}>{s.icon} {t(`self_service.status_${status}`) || status}</span>;
     };
 
-    if (loading) return <div className="module-loading"><div className="spinner" /></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="module-container">

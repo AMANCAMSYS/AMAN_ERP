@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const stageBadgeStyles = {
     lead: 'badge-info',
@@ -203,7 +204,7 @@ function Opportunities() {
 
             {/* Table */}
             {loading ? (
-                <div className="empty-state">{t('common.loading')}</div>
+                <PageLoading />
             ) : opportunities.length === 0 ? (
                 <div className="empty-state">{t('crm.no_opportunities')}</div>
             ) : (

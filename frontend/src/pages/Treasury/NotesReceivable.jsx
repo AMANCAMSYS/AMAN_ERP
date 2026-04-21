@@ -9,6 +9,7 @@ import { useBranch } from '../../context/BranchContext';
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 const NotesReceivable = () => {
     const { t } = useTranslation();
     const { currentBranch } = useBranch();
@@ -100,7 +101,7 @@ const NotesReceivable = () => {
         return <span className={`badge ${map[s] || 'badge-secondary'}`}>{labels[s] || s}</span>;
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

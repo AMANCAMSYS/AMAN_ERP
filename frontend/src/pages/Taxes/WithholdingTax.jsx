@@ -9,6 +9,7 @@ import '../../components/ModuleStyles.css'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function WithholdingTax() {
     const { t, i18n } = useTranslation()
@@ -259,7 +260,7 @@ export default function WithholdingTax() {
             {activeTab === 'rates' && (
                 <div className="section-card">
                     {loading ? (
-                        <div className="page-center"><span className="loading"></span></div>
+                        <PageLoading />
                     ) : rates.length === 0 ? (
                         <div className="empty-state">
                             <p>{t('wht.no_rates')}</p>
@@ -386,7 +387,7 @@ export default function WithholdingTax() {
                     {/* Transactions Table */}
                     <div className="section-card">
                         {txLoading ? (
-                            <div className="page-center"><span className="loading"></span></div>
+                            <PageLoading />
                         ) : transactions.length === 0 ? (
                             <div className="empty-state">
                                 <p>{t('wht.no_transactions')}</p>

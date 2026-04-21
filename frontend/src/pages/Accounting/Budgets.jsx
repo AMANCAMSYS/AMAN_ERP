@@ -10,6 +10,7 @@ import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const Budgets = () => {
     const { t } = useTranslation();
@@ -231,9 +232,7 @@ const Budgets = () => {
             <div className="row g-4">
                 {loading ? (
                     <div className="col-12 text-center p-5">
-                        <div className="spinner-border text-primary" role="status">
-                            <span className="visually-hidden">{t('common.loading')}</span>
-                        </div>
+                        <PageLoading />
                     </div>
                 ) : budgets.length === 0 ? (
                     <div className="col-12 text-center p-5">

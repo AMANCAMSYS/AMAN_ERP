@@ -17,6 +17,7 @@ import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime, formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ProjectDetails() {
     const { t, i18n } = useTranslation();
@@ -304,7 +305,7 @@ export default function ProjectDetails() {
     };
 
     if (loading) {
-        return <div className="page-center"><span className="loading"></span></div>;
+        return <PageLoading />;
     }
 
     if (!project) return null;

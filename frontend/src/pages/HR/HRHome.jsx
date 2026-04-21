@@ -22,6 +22,7 @@ import {
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import { getIndustryFeature } from '../../hooks/useIndustryType';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const HRHome = () => {
     const { t, i18n } = useTranslation();
@@ -326,7 +327,7 @@ const HRHome = () => {
                             </select>
                         </div>
                         <button className="btn btn-primary btn-block mb-3" onClick={handleCalculateEOS} disabled={eosLoading || !eosData.employee_id}>
-                            {eosLoading ? <span className="loading loading-spinner loading-sm"></span> : t('hr.eos.calculate')}
+                            {eosLoading ? <Spinner size="sm"/> : t('hr.eos.calculate')}
                         </button>
 
                         {eosResult && (

@@ -7,6 +7,7 @@ import { Activity, Eye, AlertTriangle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ShopFloorDashboard = () => {
     const { t, i18n } = useTranslation();
@@ -135,7 +136,7 @@ const ShopFloorDashboard = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : workOrders.length === 0 ? (
                 <div className="empty-state">{t('shopfloor.no_active_orders')}</div>
             ) : (

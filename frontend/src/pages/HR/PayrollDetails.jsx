@@ -13,6 +13,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const PayrollDetails = () => {
     const { t, i18n } = useTranslation();
@@ -105,7 +106,7 @@ const PayrollDetails = () => {
         }
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
     if (!period) return <div className="page-center text-error">{t('hr.payroll.period_not_found', 'Payroll period not found')}</div>;
 
     const isDraft = period.status === 'draft';

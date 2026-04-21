@@ -8,6 +8,7 @@ import { hasPermission } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../index.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const COUNTRIES = [
     { code: 'SA', name: 'المملكة العربية السعودية', name_en: 'Saudi Arabia', currency: 'SAR', currencyName: 'ريال سعودي', flag: '🇸🇦' },
@@ -119,7 +120,7 @@ const Branches = () => {
         setShowModal(true);
     };
 
-    if (loading) return <div className="p-4">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, Wallet, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const KPIDashboard = () => {
     const { t, i18n } = useTranslation();
@@ -146,7 +147,7 @@ const KPIDashboard = () => {
             </div>
 
             {loading && !kpiData ? (
-                <div className="text-center p-5"><div className="spinner-border" /></div>
+                <PageLoading />
             ) : (
                 <>
                     {/* KPI Cards */}

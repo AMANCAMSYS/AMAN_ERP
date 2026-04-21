@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { budgetsAPI, accountingAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import BackButton from '../../components/common/BackButton';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const BudgetItems = () => {
     const { t, i18n } = useTranslation();
@@ -159,7 +160,7 @@ const BudgetItems = () => {
                             <tbody>
                                 {loading ? (
                                     <tr><td colSpan="5" className="text-center p-8">
-                                        <div className="spinner-border spinner-border-sm text-primary me-2"></div>
+                                        <Spinner size="sm"/>
                                         {t('common.loading')}
                                     </td></tr>
                                 ) : filteredAccounts.length === 0 ? (

@@ -6,6 +6,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function BuyingReturns() {
     const { t, i18n } = useTranslation()
@@ -31,7 +32,7 @@ function BuyingReturns() {
         fetchReturns()
     }, [t, currentBranch])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

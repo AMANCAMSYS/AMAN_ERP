@@ -7,6 +7,7 @@ import {
     Calendar, ShieldCheck, CreditCard, Camera, Copy, CheckCheck
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const CompanyProfile = () => {
     const { t, i18n } = useTranslation();
@@ -39,7 +40,7 @@ const CompanyProfile = () => {
         if (companyId) fetchCompany();
     }, [companyId]);
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
     if (!company) return <div className="p-10 text-center"><h2>{t('common.error_loading_data')}</h2></div>;
 
     const details = [

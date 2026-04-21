@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function SalesOrders() {
     const { t } = useTranslation()
@@ -32,7 +33,7 @@ function SalesOrders() {
         fetchOrders()
     }, [currentBranch])
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

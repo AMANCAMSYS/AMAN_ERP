@@ -5,6 +5,7 @@ import '../../components/ModuleStyles.css'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 const statusBadgeStyles = {
@@ -228,7 +229,7 @@ function SupportTickets() {
 
             {/* Table */}
             {loading ? (
-                <div className="empty-state">{t('common.loading')}</div>
+                <PageLoading />
             ) : tickets.length === 0 ? (
                 <div className="empty-state">{t('crm.no_tickets')}</div>
             ) : (

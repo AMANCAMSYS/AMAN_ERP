@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function BankImport() {
     const { t } = useTranslation()
@@ -56,7 +57,7 @@ function BankImport() {
         }
     }
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

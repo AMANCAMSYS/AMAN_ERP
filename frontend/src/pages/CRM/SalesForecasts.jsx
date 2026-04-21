@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function SalesForecasts() {
     const { t } = useTranslation()
@@ -26,7 +27,7 @@ function SalesForecasts() {
         }
     }
 
-    if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>
+    if (loading) return <PageLoading />
     if (!data) return null
 
     const wp = data.weighted_pipeline || {}

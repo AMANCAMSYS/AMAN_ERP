@@ -7,6 +7,7 @@ import { formatShortDate } from '../../utils/dateUtils';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const STATUS_CLASSES = {
     draft: 'status-pending',
@@ -132,7 +133,7 @@ export default function CampaignList() {
                 </select>
             </div>
 
-            {loading ? <div className="empty-state">{t('common.loading')}</div> :
+            {loading ? <PageLoading /> :
                 campaigns.length === 0
                     ? <div className="empty-state">{t('campaign.no_campaigns', 'No campaigns found')}</div>
                     : (

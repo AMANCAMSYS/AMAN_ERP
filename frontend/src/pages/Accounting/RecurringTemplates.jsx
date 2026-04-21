@@ -7,6 +7,7 @@ import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 export default function RecurringTemplates() {
@@ -237,7 +238,7 @@ export default function RecurringTemplates() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner-border" /></div>
+                <PageLoading />
             ) : templates.length === 0 ? (
                 <div className="text-center text-muted p-5">
                     {t('recurring.no_templates')}

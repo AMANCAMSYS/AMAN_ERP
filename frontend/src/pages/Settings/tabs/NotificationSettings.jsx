@@ -5,6 +5,7 @@ import api from '../../../utils/api';
 import { notificationsAPI } from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
 import DataTable from '../../../components/common/DataTable';
+import { Spinner } from '../../../components/common/LoadingStates'
 
 // ── Notification Preferences (per-user event × channel toggles) ─────────────
 const EVENT_TYPES = [
@@ -143,7 +144,7 @@ const NotificationSettings = ({ settings, handleSettingChange }) => {
                         onClick={testEmailConnection}
                         disabled={testing}
                     >
-                        {testing ? <span className="loading loading-spinner loading-xs"></span> : <CheckCircle size={18} />}
+                        {testing ? <Spinner size="sm"/> : <CheckCircle size={18} />}
                         {t('settings.notifications.test_conn')}
                     </button>
                 </div>

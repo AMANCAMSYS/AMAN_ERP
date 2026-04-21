@@ -7,6 +7,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const LINE_STATUS_COLORS = {
   matched: '#16a34a',
@@ -71,9 +72,7 @@ export default function MatchDetail() {
   if (loading) {
     return (
       <div className="workspace fade-in">
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status" />
-        </div>
+        <PageLoading />
       </div>
     )
   }

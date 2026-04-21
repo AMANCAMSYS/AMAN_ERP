@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ConfigurableProducts = () => {
     const { t, i18n } = useTranslation();
@@ -43,7 +44,7 @@ const ConfigurableProducts = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : products.length === 0 ? (
                 <div className="empty-state">{t('cpq.no_products')}</div>
             ) : (

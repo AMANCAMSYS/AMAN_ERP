@@ -7,6 +7,7 @@ import { toastEmitter } from '../../utils/toastEmitter'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function JobCards() {
     const { t, i18n } = useTranslation()
@@ -59,7 +60,7 @@ export default function JobCards() {
     }
 
     if (loading) {
-        return <div className="page-center"><span className="loading"></span></div>
+        return <PageLoading />
     }
 
     return (

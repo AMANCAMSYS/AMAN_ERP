@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format'
 import { Printer, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function ReceiptDetails() {
     const { t, i18n } = useTranslation();
@@ -39,7 +40,7 @@ function ReceiptDetails() {
         fetchData();
     }, [id, isRefund]);
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
     if (error) return <div className="workspace fade-in"><div className="alert alert-error">{error}</div></div>;
     if (!voucher) return <div className="workspace fade-in"><div className="alert alert-warning">{t('sales.returns.empty')}</div></div>;
 

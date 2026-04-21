@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { ModuleKPISection } from '../../components/kpi'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function PipelineAnalytics() {
     const { t } = useTranslation()
@@ -70,7 +71,7 @@ function PipelineAnalytics() {
             </div>
 
             {loading ? (
-                <div className="loading-spinner"><div className="spinner"></div></div>
+                <PageLoading />
             ) : tab === 'pipeline' ? (
                 renderPipeline()
             ) : tab === 'conversion' ? (

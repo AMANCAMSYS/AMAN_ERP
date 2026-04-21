@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { companiesAPI } from '../utils/api'
 import { useTranslation } from 'react-i18next'
 import BackButton from '../components/common/BackButton'
+import { Spinner } from '../components/common/LoadingStates'
 
 function Register() {
     const { t, i18n } = useTranslation()
@@ -359,7 +360,7 @@ function Register() {
                     </div>
 
                     <button type="submit" className="btn btn-primary btn-block" disabled={loading} style={{ padding: '16px' }}>
-                        {loading ? <span className="loading"></span> : t('auth.register_btn')}
+                        {loading ? <Spinner size="sm"/> : t('auth.register_btn')}
                     </button>
                 </form>
 

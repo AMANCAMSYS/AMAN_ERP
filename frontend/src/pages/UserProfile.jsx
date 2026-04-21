@@ -3,6 +3,7 @@ import { authAPI, securityAPI } from '../utils/api'
 import { getUser, getCompanyId, updateUser } from '../utils/auth'
 import { useTranslation } from 'react-i18next'
 import BackButton from '../components/common/BackButton'
+import { PageLoading } from '../components/common/LoadingStates'
 
 function UserProfile() {
     const { t } = useTranslation()
@@ -114,7 +115,7 @@ function UserProfile() {
         setShowPasswords((prev) => ({ ...prev, [key]: !prev[key] }))
     }
 
-    if (!user) return <div className="page-center"><span className="loading"></span></div>
+    if (!user) return <PageLoading />
 
     return (
         <div className="workspace fade-in">
@@ -269,7 +270,7 @@ function UserProfile() {
 
                 <h3 style={{ marginBottom: '16px' }}>{t('common.profile_page.active_sessions')}</h3>
                 {loadingSessions ? (
-                    <div className="text-center p-4"><span className="loading"></span></div>
+                    <PageLoading />
                 ) : sessions.length === 0 ? (
                     <p style={{ color: '#888', fontSize: '14px' }}>{t('common.profile_page.no_sessions')}</p>
                 ) : (

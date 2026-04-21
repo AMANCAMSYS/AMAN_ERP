@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { ModuleKPISection } from '../../components/kpi';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const BuyingReports = () => {
     const { t } = useTranslation();
@@ -49,7 +50,7 @@ const BuyingReports = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
 
     const trendChartOption = {
         tooltip: {

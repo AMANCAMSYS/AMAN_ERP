@@ -6,6 +6,7 @@ import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 // Report types use t() keys
 
@@ -225,7 +226,7 @@ export default function PeriodComparison() {
             </div>
 
             {/* Results */}
-            {loading && <div className="text-center p-5"><div className="spinner-border" /></div>}
+            {loading && <PageLoading />}
 
             {!loading && result && (
                 <>

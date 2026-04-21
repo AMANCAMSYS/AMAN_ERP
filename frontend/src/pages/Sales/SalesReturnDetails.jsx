@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 const SalesReturnDetails = () => {
@@ -49,7 +50,7 @@ const SalesReturnDetails = () => {
         }
     };
 
-    if (loading) return <div className="p-4 text-center"><span className="loading"></span></div>;
+    if (loading) return <div className="p-4 text-center"><PageLoading /></div>;
     if (!ret) return <div className="p-4 text-center text-red-500">{t('sales.returns.empty')}</div>;
 
     return (

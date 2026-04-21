@@ -9,6 +9,7 @@ import { useToast } from '../../context/ToastContext'
 import SimpleModal from '../../components/common/SimpleModal'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ContractDetails() {
     const { t, i18n } = useTranslation()
@@ -81,7 +82,7 @@ export default function ContractDetails() {
         }
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (!contract) return <div className="page-center"><p>{t('contracts.details.not_found')}</p></div>
 
     const getStatusBadge = (status) => {

@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format';
 import { fxReportAPI } from '../../utils/api';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function FXGainLossReport() {
     const { t } = useTranslation();
@@ -76,7 +77,7 @@ function FXGainLossReport() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner"></div><p className="mt-2">{t('common.loading')}</p></div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : (

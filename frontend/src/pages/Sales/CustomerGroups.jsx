@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function CustomerGroups() {
     const { t } = useTranslation()
@@ -108,7 +109,7 @@ function CustomerGroups() {
         }
     }
 
-    if (loading && groups.length === 0) return <div className="p-4">{t('common.loading')}...</div>
+    if (loading && groups.length === 0) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

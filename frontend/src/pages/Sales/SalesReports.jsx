@@ -9,6 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { useToast } from '../../context/ToastContext';
 import { ModuleKPISection } from '../../components/kpi';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const SalesReports = () => {
     const { t } = useTranslation();
@@ -52,7 +53,7 @@ const SalesReports = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}...</div>;
+    if (loading) return <PageLoading />;
 
     // ECharts Options
     const trendChartOption = {

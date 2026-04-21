@@ -6,6 +6,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber } from '../../utils/format'
 import DataTable from '../../components/common/DataTable'
 import BackButton from '../../components/common/BackButton'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function ForecastDetail() {
     const { id } = useParams()
@@ -37,7 +38,7 @@ function ForecastDetail() {
                 <BackButton />
                 <h1 className="workspace-title">{t('common.loading')}</h1>
             </div>
-            <div className="loading-container"><span className="loading"></span></div>
+            <PageLoading />
         </div>
     )
     if (error) return (

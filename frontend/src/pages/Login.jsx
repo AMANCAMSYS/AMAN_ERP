@@ -4,6 +4,7 @@ import { authAPI } from '../utils/api'
 import { setAuth, isAuthenticated } from '../utils/auth'
 import { hasIndustryTypeSet } from '../hooks/useIndustryType'
 import { useTranslation } from 'react-i18next'
+import { Spinner } from '../components/common/LoadingStates'
 
 function Login() {
     const { t, i18n } = useTranslation()
@@ -274,7 +275,7 @@ function Login() {
                     </div>
 
                     <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
-                        {loading ? <span className="loading"></span> : t('auth.login_btn')}
+                        {loading ? <Spinner size="sm"/> : t('auth.login_btn')}
                     </button>
                 </form>
                 )}
@@ -296,7 +297,7 @@ function Login() {
                                 onClick={() => handleSsoLogin(provider)}
                                 disabled={ssoLoading}
                             >
-                                {ssoLoading ? <span className="loading"></span> : (
+                                {ssoLoading ? <Spinner size="sm"/> : (
                                     <>🔐 {t('auth.login_with_sso')} {provider.display_name}</>
                                 )}
                             </button>

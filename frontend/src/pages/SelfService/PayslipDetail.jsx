@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const PayslipDetail = () => {
     const { t } = useTranslation();
@@ -33,7 +34,7 @@ const PayslipDetail = () => {
 
     const fmt = (v) => formatNumber(v || 0);
 
-    if (loading) return <div className="module-loading"><div className="spinner" /></div>;
+    if (loading) return <PageLoading />;
     if (!payslip) return <div className="module-container"><BackButton /><p>{t('common.not_found')}</p></div>;
 
     return (

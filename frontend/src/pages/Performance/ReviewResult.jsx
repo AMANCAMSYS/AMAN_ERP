@@ -7,6 +7,7 @@ import { Star, Award, Target, BarChart3 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ReviewResult = () => {
     const { t, i18n } = useTranslation();
@@ -26,7 +27,7 @@ const ReviewResult = () => {
         fetchReview();
     }, [id]);
 
-    if (loading) return <div className="loading-spinner">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
     if (!review) return <div className="empty-state">{t('performance.review_not_found')}</div>;
 
     const goals = review.goals || [];

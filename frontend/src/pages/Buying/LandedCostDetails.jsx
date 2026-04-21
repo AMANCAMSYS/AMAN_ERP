@@ -5,6 +5,7 @@ import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function LandedCostDetails() {
     const { id } = useParams()
@@ -47,7 +48,7 @@ function LandedCostDetails() {
         } finally { setActionLoading(false) }
     }
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (!lc) return <div className="p-4 text-muted">{t('common.not_found')}</div>
 
     return (

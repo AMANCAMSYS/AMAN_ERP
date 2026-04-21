@@ -9,6 +9,7 @@ import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function ContractForm() {
     const { t } = useTranslation()
@@ -136,7 +137,7 @@ function ContractForm() {
         }
     }
 
-    if (loading && id) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && id) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

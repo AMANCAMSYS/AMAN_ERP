@@ -6,6 +6,7 @@ import { Users, CheckCircle, XCircle, Clock } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import SimpleModal from '../../components/common/SimpleModal';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const TeamRequests = () => {
     const { t } = useTranslation();
@@ -91,7 +92,7 @@ const TeamRequests = () => {
             </div>
 
             {loading ? (
-                <div className="module-loading"><div className="spinner" /></div>
+                <PageLoading />
             ) : requests.length === 0 ? (
                 <div className="card"><p className="text-muted">{t('self_service.no_team_requests')}</p></div>
             ) : (

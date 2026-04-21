@@ -7,6 +7,7 @@ import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { PageLoading } from '../../components/common/LoadingStates'
 export default function OpeningBalances() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
@@ -174,7 +175,7 @@ export default function OpeningBalances() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner-border" /></div>
+                <PageLoading />
             ) : (
                 <div className="data-table-container">
                     <table className="data-table table-hover">

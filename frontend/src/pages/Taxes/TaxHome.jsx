@@ -8,6 +8,7 @@ import { getCurrency } from '../../utils/auth'
 import './TaxHome.css'
 import { formatShortDate } from '../../utils/dateUtils';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function TaxHome() {
@@ -132,7 +133,7 @@ function TaxHome() {
         </span>
     }
 
-    if (loading && !summary) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && !summary) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

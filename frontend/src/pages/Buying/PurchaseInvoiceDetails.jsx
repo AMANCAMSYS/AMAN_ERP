@@ -8,6 +8,7 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber, formatCurrency } from '../../utils/format'
 import { Printer, ArrowLeft, CreditCard, Clock, CheckCircle, AlertCircle, FileText, User } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function PurchaseInvoiceDetails() {
     const { t, i18n } = useTranslation()
@@ -40,7 +41,7 @@ function PurchaseInvoiceDetails() {
         fetchData()
     }, [id, t])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (error) return <div className="workspace fade-in"><div className="alert alert-error">{error}</div></div>
     if (!invoice) return <div className="workspace fade-in"><div className="alert alert-warning">{t('common.error_not_found')}</div></div>
 

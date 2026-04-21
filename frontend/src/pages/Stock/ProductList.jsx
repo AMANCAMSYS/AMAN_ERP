@@ -11,6 +11,7 @@ import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
 import BackButton from '../../components/common/BackButton'
 import { useToast } from '../../context/ToastContext'
+import { Spinner } from '../../components/common/LoadingStates'
 
 function ProductList() {
     const { t } = useTranslation()
@@ -264,7 +265,7 @@ function ProductList() {
                         <Info size={16} /> {t('stock.products.cost_by_warehouse')}
                     </h4>
                     {loadingBreakdown ? (
-                        <div className="spinner-small"></div>
+                        <Spinner size="sm"/>
                     ) : (
                         <table className="table table-sm" style={{ background: 'white', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                             <thead>

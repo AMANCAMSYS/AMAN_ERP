@@ -1,33 +1,89 @@
 /**
- * Unified Loading & Skeleton Components
- * Drop-in replacements for inconsistent loading patterns across the app.
+ * ============================================================
+ * Unified Loading & Skeleton Components — SINGLE SOURCE OF TRUTH
+ * ============================================================
+ * ALL loading/spinner visuals in the app flow through this file.
+ * To change the look of the spinner: edit spinnerStyle / pageLoadingStyle here.
+ * Changing these objects automatically updates EVERY page.
+ *
+ * Exports:
+ *   PageLoading  — full-page centered spinner  (for page-level loading guards)
+ *   Spinner      — inline/button-size spinner   (for submit buttons, inline states)
+ *   TableSkeleton, CardSkeleton, DashboardSkeleton — shimmer placeholders
+ * ============================================================
  */
 
+// ── Design tokens ─────────────────────────────────────────
+// Edit HERE to change the spinner across the entire app.
+const SIZE = {
+    sm: { w: 20, h: 20, shadow: 'none' },
+    md: { w: 40, h: 40, shadow: '0 0 8px rgba(37, 99, 235, 0.3)' },
+    lg: { w: 58, h: 58, shadow: '0 0 14px rgba(37, 99, 235, 0.45)' },
+}
+
+function SpinEl({ w, h, shadow }) {
+    return (
+        <span
+            className="aman-spinner"
+            style={{
+                display: 'inline-block',
+                width: w,
+                height: h,
+                borderRadius: '50%',
+                background: 'conic-gradient(from 0deg, transparent 0deg, var(--primary, #2563eb) 270deg, transparent 360deg)',
+                WebkitMask: 'radial-gradient(circle, transparent 58%, #000 60%)',
+                mask: 'radial-gradient(circle, transparent 58%, #000 60%)',
+                animation: 'aman-spin 0.9s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite',
+                filter: shadow !== 'none' ? `drop-shadow(${shadow})` : undefined,
+                flexShrink: 0,
+            }}
+        />
+    )
+}
+
 /**
- * Full-page centered spinner — replaces:
+ * Full-page centered spinner.
+ * Replaces all of:
  *   <div className="page-center"><span className="loading"></span></div>
  *   <div className="text-center p-5"><div className="spinner-border" /></div>
+ *   <div className="loading-spinner">جاري التحميل…</div>
+ *   etc.
+ *
+ * @param {string}  [text]    — optional label shown below the spinner
+ * @param {number}  [minH]    — min-height of the wrapper (default 300px)
  */
-export function PageLoading({ text }) {
+export function PageLoading({ text, minH = 300 }) {
     return (
-        <div className="page-center">
-            <div className="spinner"></div>
-            {text && <p style={{ marginTop: 4, color: 'var(--text-secondary)' }}>{text}</p>}
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: minH,
+            padding: '40px 20px',
+            gap: 14,
+            color: 'var(--text-secondary, #64748b)',
+            fontSize: '0.95rem',
+        }}>
+            <SpinEl {...SIZE.md} />
+            {text && <p style={{ margin: 0 }}>{text}</p>}
         </div>
     )
 }
 
 /**
- * Inline/button spinner — replaces:
+ * Inline / button spinner.
+ * Replaces all of:
  *   <span className="loading loading-spinner loading-sm"></span>
  *   <span className="spinner-border spinner-border-sm"></span>
+ *   <Loader2 className="spin" size={16} />
+ *
+ * @param {'sm'|'md'|'lg'} [size='sm']
  */
 export function Spinner({ size = 'sm' }) {
-    const cls = size === 'lg' ? 'spinner spinner-lg'
-        : size === 'md' ? 'spinner'
-        : 'spinner spinner-sm'
-    return <span className={cls}></span>
+    return <SpinEl {...SIZE[size] ?? SIZE.sm} />
 }
+
 
 /**
  * Table skeleton — shows shimmering rows while table data loads

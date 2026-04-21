@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const SalesReturns = () => {
     const { t } = useTranslation();
@@ -66,7 +67,7 @@ const SalesReturns = () => {
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan="6" className="text-center py-8 text-muted"><span className="loading"></span></td>
+                                <td colSpan="6" className="text-center py-8 text-muted"><PageLoading /></td>
                             </tr>
                         ) : returns.length === 0 ? (
                             <tr>

@@ -8,6 +8,7 @@ import { getCurrency } from '../../utils/auth'
 import { useToast } from '../../context/ToastContext'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function SupplierDetails() {
     const { t, i18n } = useTranslation()
@@ -35,7 +36,7 @@ export default function SupplierDetails() {
         fetchData()
     }, [id, currentBranch?.id])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

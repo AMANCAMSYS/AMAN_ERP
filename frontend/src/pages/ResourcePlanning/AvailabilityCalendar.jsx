@@ -6,6 +6,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 // Color by allocation percentage
 function allocColor(pct) {
@@ -95,7 +96,7 @@ const AvailabilityCalendar = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : !data || data.employees.length === 0 ? (
                 <div className="empty-state">{t('resource.no_allocations')}</div>
             ) : (

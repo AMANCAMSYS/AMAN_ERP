@@ -4,6 +4,7 @@ import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, C
 import api, { accountingAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import DateInput from '../../../components/common/DateInput';
+import { Spinner } from '../../../components/common/LoadingStates'
 
 const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
     const { t } = useTranslation();
@@ -93,7 +94,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
         }
     };
 
-    if (loading) return <div className="p-4 text-center"><span className="loading loading-spinner"></span></div>;
+    if (loading) return <div className="p-4 text-center"><Spinner size="sm"/></div>;
 
     return (
         <div className="space-y-8">
@@ -224,7 +225,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
                         </p>
                         <DateInput className="form-input mb-2" value={fxDate} onChange={e => setFxDate(e.target.value)} style={{ fontSize: 13 }} />
                         <button className="btn btn-primary btn-sm btn-block" onClick={handleFxRevaluation} disabled={fxProcessing}>
-                            {fxProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('run')}
+                            {fxProcessing ? <Spinner size="sm"/> : m('run')}
                         </button>
                     </div>
 
@@ -241,7 +242,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
                             <input type="number" className="form-input" value={badDebtDays} onChange={e => setBadDebtDays(e.target.value)} style={{ fontSize: 13 }} />
                         </div>
                         <button className="btn btn-warning btn-sm btn-block" onClick={handleBadDebtProvision} disabled={badDebtProcessing}>
-                            {badDebtProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('create_provision')}
+                            {badDebtProcessing ? <Spinner size="sm"/> : m('create_provision')}
                         </button>
                     </div>
 
@@ -254,7 +255,7 @@ const AccountingMappingSettings = ({ settings, handleSettingChange }) => {
                             {m('leave_provision_desc')}
                         </p>
                         <button className="btn btn-secondary btn-sm btn-block" onClick={handleLeaveProvision} disabled={leaveProvProcessing} style={{ marginTop: 32 }}>
-                            {leaveProvProcessing ? <span className="loading loading-spinner loading-xs"></span> : m('create_provision')}
+                            {leaveProvProcessing ? <Spinner size="sm"/> : m('create_provision')}
                         </button>
                     </div>
                 </div>

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function SalesOrderDetails() {
@@ -31,7 +32,7 @@ function SalesOrderDetails() {
         fetchOrder()
     }, [id])
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (error) return <div className="alert alert-error m-4">{error}</div>
     if (!order) return <div className="p-4 text-center">{t('sales.orders.empty')}</div>
 

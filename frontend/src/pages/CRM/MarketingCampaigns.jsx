@@ -7,6 +7,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const typeColors = {
     email: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -114,7 +115,7 @@ function MarketingCampaigns() {
             </div>
 
             {/* Table */}
-            {loading ? <div className="empty-state">{t('common.loading')}</div> :
+            {loading ? <PageLoading /> :
             campaigns.length === 0 ? <div className="empty-state">{t('crm.no_campaigns', 'لا توجد حملات')}</div> : (
                 <div className="data-table-container">
                     <table className="data-table">

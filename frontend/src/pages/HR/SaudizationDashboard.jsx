@@ -4,6 +4,7 @@ import { toastEmitter } from '../../utils/toastEmitter'
 import { useTranslation } from 'react-i18next'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function SaudizationDashboard() {
     const { t } = useTranslation()
@@ -17,7 +18,7 @@ function SaudizationDashboard() {
             .finally(() => setLoading(false))
     }, [])
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (!data) return <div className="p-4 text-muted">{t('common.no_data')}</div>
 
     const bandColors = {

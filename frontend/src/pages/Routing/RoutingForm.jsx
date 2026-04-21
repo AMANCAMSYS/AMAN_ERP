@@ -6,6 +6,7 @@ import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const RoutingForm = () => {
     const { t, i18n } = useTranslation();
@@ -147,7 +148,7 @@ const RoutingForm = () => {
         } catch (e) { console.error(e); }
     };
 
-    if (loading) return <div className="module-container"><div className="loading-spinner">{t('common.loading')}</div></div>;
+    if (loading) return <div className="module-container"><PageLoading /></div>;
 
     return (
         <div className="module-container" dir={isRTL ? 'rtl' : 'ltr'}>

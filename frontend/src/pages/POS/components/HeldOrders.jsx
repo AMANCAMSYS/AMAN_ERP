@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
 import { formatShortDate, formatDateTime } from '../../../utils/dateUtils';
 import { formatNumber } from '../../../utils/format';
+import { Spinner } from '../../../components/common/LoadingStates'
 
 
 const HeldOrders = ({ onResume, onClose }) => {
@@ -72,7 +73,7 @@ const HeldOrders = ({ onResume, onClose }) => {
 
                 {loading ? (
                     <div className="loading-state">
-                        <span className="loading loading-spinner"></span>
+                        <Spinner size="sm"/>
                     </div>
                 ) : heldOrders.length === 0 ? (
                     <div className="empty-state">

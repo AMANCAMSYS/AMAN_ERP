@@ -18,6 +18,7 @@ import { costingPolicyAPI, branchesAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const CostingPolicy = () => {
     const { t } = useTranslation();
@@ -150,7 +151,7 @@ const CostingPolicy = () => {
         }
     ];
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in" dir="rtl">

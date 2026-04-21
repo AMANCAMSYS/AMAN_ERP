@@ -8,6 +8,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 import { formatNumber } from '../../utils/format';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ForecastDetail = () => {
     const { t, i18n } = useTranslation();
@@ -68,7 +69,7 @@ const ForecastDetail = () => {
         }
     };
 
-    if (loading) return <div className="module-container"><div className="loading-spinner">{t('common.loading')}</div></div>;
+    if (loading) return <div className="module-container"><PageLoading /></div>;
     if (!forecast) return <div className="module-container"><div className="empty-state">{t('forecast.not_found')}</div></div>;
 
     const periods = forecast.periods || [];

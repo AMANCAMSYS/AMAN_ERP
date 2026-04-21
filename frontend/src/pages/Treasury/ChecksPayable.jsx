@@ -11,6 +11,7 @@ import '../../components/ModuleStyles.css'
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 function ChecksPayable() {
     const { t } = useTranslation()
   const { showToast } = useToast()
@@ -183,7 +184,7 @@ function ChecksPayable() {
         return new Date(dueDate) <= new Date()
     }
 
-    if (loading && !items.length) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && !items.length) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

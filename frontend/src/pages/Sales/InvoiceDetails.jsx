@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
 import InvoicePrintModal from './InvoicePrintModal'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function InvoiceDetails() {
     const { t, i18n } = useTranslation()
@@ -41,7 +42,7 @@ function InvoiceDetails() {
         fetchData()
     }, [id, t])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (error) return <div className="workspace fade-in"><div className="alert alert-error">{error}</div></div>
     if (!invoice) return <div className="workspace fade-in"><div className="alert alert-warning">{t('sales.invoices.details.not_found')}</div></div>
 

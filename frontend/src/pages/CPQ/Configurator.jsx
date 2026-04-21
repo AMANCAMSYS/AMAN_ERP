@@ -9,6 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const Configurator = () => {
     const { t, i18n } = useTranslation();
@@ -105,7 +106,7 @@ const Configurator = () => {
         setSaving(false);
     };
 
-    if (loading) return <div className="loading-spinner">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
     if (!config) return <div className="empty-state">{t('cpq.config_not_found')}</div>;
 
     return (

@@ -4,6 +4,7 @@ import { crmAPI } from '../../utils/api'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function LeadScoring() {
     const { t } = useTranslation()
@@ -183,7 +184,7 @@ function LeadScoring() {
             )}
 
             {loading ? (
-                <div className="loading-spinner"><div className="spinner"></div></div>
+                <PageLoading />
             ) : tab === 'rules' ? (
                 /* Rules Table */
                 <div className="section-card">

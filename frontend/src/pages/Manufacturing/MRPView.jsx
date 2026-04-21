@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function MRPView() {
     const { t, i18n } = useTranslation()
@@ -36,7 +37,7 @@ export default function MRPView() {
         }
     }
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     if (!mrp) return <div className="workspace p-5 text-center"><h3>{t('manufacturing.mrp.not_found')}</h3></div>
 

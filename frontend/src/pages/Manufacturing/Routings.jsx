@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const Routings = () => {
     const { t } = useTranslation();
@@ -138,7 +139,7 @@ const Routings = () => {
         }
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

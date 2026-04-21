@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function ManufacturingCosting() {
     const { t } = useTranslation()
@@ -40,7 +41,7 @@ function ManufacturingCosting() {
         } finally { setCalculating(false) }
     }
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

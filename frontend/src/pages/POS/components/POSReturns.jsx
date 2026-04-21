@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
 import { formatShortDate } from '../../../utils/dateUtils';
 import { formatNumber } from '../../../utils/format';
+import { Spinner } from '../../../components/common/LoadingStates'
 
 
 const POSReturns = ({ onClose, onComplete }) => {
@@ -111,7 +112,7 @@ const POSReturns = ({ onClose, onComplete }) => {
                                 disabled={loading}
                             >
                                 {loading ? (
-                                    <span className="loading loading-spinner loading-sm"></span>
+                                    <Spinner size="sm"/>
                                 ) : (
                                     <>
                                         <Search size={18} />
@@ -191,7 +192,7 @@ const POSReturns = ({ onClose, onComplete }) => {
                                 disabled={loading || calculateTotal() === 0}
                             >
                                 {loading ? (
-                                    <span className="loading loading-spinner loading-sm"></span>
+                                    <Spinner size="sm"/>
                                 ) : (
                                     <><Check size={18} /> {t('pos.confirm_return')}</>
                                 )}

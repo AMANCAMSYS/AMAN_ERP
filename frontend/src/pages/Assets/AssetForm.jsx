@@ -10,6 +10,7 @@ import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { Save, Building, DollarSign, Calendar, Hash, Briefcase, MapPin } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const AssetForm = () => {
     const { t, i18n } = useTranslation();
@@ -263,7 +264,7 @@ const AssetForm = () => {
                                     >
                                         {submitting ? (
                                             <>
-                                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                                <Spinner size="sm"/>
                                                 {t('common.saving')}
                                             </>
                                         ) : (

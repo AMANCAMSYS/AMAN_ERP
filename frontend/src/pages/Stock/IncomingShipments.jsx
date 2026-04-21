@@ -7,6 +7,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const IncomingShipments = () => {
     const { t, i18n } = useTranslation();
@@ -54,7 +55,7 @@ const IncomingShipments = () => {
         }
     };
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

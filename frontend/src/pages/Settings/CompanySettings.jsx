@@ -34,6 +34,7 @@ import BranchesSettings from './tabs/BranchesSettings';
 import WorkflowSettings from './tabs/WorkflowSettings';
 import AuditSettings from './tabs/AuditSettings';
 import ComingSoon from './tabs/ComingSoon';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const CompanySettings = () => {
     const { t, i18n } = useTranslation();
@@ -210,7 +211,7 @@ const CompanySettings = () => {
         }
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     // If no tabs accessible at all
     if (tabs.length === 0) {
@@ -395,7 +396,7 @@ const CompanySettings = () => {
                                                 disabled={saving}
                                             >
                                                 {saving ? (
-                                                    <><span className="loading loading-spinner loading-sm"></span> {t('common.saving')}</>
+                                                    <><Spinner size="sm"/> {t('common.saving')}</>
                                                 ) : (
                                                     t('common.save')
                                                 )}

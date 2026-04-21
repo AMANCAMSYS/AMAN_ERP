@@ -7,6 +7,7 @@ import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ContractAmendments = () => {
     const { t, i18n } = useTranslation();
@@ -110,7 +111,7 @@ const ContractAmendments = () => {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner-border" /></div>
+                <PageLoading />
             ) : activeTab === 'amendments' ? (
                 <>
                     <div className="mb-3">

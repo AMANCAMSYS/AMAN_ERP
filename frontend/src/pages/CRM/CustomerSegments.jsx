@@ -4,6 +4,7 @@ import { crmAPI } from '../../utils/api'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function CustomerSegments() {
     const { t } = useTranslation()
@@ -139,7 +140,7 @@ function CustomerSegments() {
             )}
 
             {loading ? (
-                <div className="loading-spinner"><div className="spinner"></div></div>
+                <PageLoading />
             ) : segments.length === 0 ? (
                 <div className="section-card" style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
                     {t('crm.no_segments', 'لا توجد شرائح بعد')}
@@ -199,7 +200,7 @@ function CustomerSegments() {
                         </button>
                     </div>
                     {membersLoading ? (
-                        <div className="loading-spinner"><div className="spinner"></div></div>
+                        <PageLoading />
                     ) : members.length === 0 ? (
                         <p style={{ color: '#9ca3af', textAlign: 'center', padding: 16 }}>
                             {t('crm.no_members', 'لا يوجد أعضاء في هذه الشريحة')}

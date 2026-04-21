@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function InventoryValuation() {
     const { t, i18n } = useTranslation()
@@ -67,10 +68,7 @@ function InventoryValuation() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5">
-                    <div className="spinner"></div>
-                    <p className="mt-2">{t('common.loading')}</p>
-                </div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : (

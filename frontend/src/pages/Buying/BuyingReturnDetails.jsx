@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function BuyingReturnDetails() {
     const { t, i18n } = useTranslation()
@@ -30,7 +31,7 @@ function BuyingReturnDetails() {
         fetchDetails()
     }, [id])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (!returnn) return <div className="p-8 text-center text-error">{t('buying.returns.details.not_found')}</div>
 
     const { invoice, items } = returnn

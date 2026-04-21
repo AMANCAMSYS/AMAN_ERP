@@ -10,6 +10,7 @@ import { useToast } from '../../context/ToastContext'
 import SimpleModal from '../../components/common/SimpleModal'
 import '../../components/ModuleStyles.css'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ProductionOrderDetails() {
     const { t, i18n } = useTranslation()
@@ -84,7 +85,7 @@ export default function ProductionOrderDetails() {
         return (
             <div className="workspace flex items-center justify-center fade-in">
                 <div className="text-center">
-                    <span className="loading"></span>
+                    <PageLoading />
                     <p className="text-slate-500">{t('common.loading')}</p>
                 </div>
             </div>

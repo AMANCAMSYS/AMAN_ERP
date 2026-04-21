@@ -7,6 +7,7 @@ import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function TaxAudit() {
@@ -83,10 +84,7 @@ function TaxAudit() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5">
-                    <div className="spinner"></div>
-                    <p className="mt-2">{t('common.loading')}</p>
-                </div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : (

@@ -7,6 +7,7 @@ import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function RevenueRecognition() {
     const { t } = useTranslation()
@@ -96,7 +97,7 @@ function RevenueRecognition() {
         return map[method] || method
     }
 
-    if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

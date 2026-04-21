@@ -9,6 +9,7 @@ import { formatNumber } from '../../utils/format';
 import { FileText, Calculator, Download, Eye, Printer, Mail, X } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const Payslips = () => {
     const { t, i18n } = useTranslation();
@@ -207,7 +208,7 @@ const Payslips = () => {
             <div className="card section-card">
                 {loading ? (
                     <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                        <div className="spinner" style={{ margin: '0 auto 8px' }} />
+                        <PageLoading />
                         {t('common.loading')}
                     </div>
                 ) : (

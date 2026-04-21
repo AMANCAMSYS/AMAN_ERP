@@ -11,6 +11,7 @@ import DateInput from '../../components/common/DateInput';
 import '../../components/ModuleStyles.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProductionOrders = () => {
     const { t } = useTranslation();
@@ -140,7 +141,7 @@ const ProductionOrders = () => {
         return <span className={`badge ${classMap[status] || 'badge-ghost'}`}>{t(`status.${status}`, t(status))}</span>;
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

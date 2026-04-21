@@ -4,6 +4,7 @@ import { crmAPI, partiesAPI } from '../../utils/api'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function CRMContacts() {
     const { t } = useTranslation()
@@ -221,7 +222,7 @@ function CRMContacts() {
             )}
 
             {loading ? (
-                <div className="loading-spinner"><div className="spinner"></div></div>
+                <PageLoading />
             ) : (
                 <div className="section-card">
                     <h3 className="section-title">{t('crm.contacts_list', 'قائمة جهات الاتصال')} ({filtered.length})</h3>

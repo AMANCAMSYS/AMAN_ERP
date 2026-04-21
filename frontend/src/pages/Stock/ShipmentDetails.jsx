@@ -5,6 +5,7 @@ import { inventoryAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ShipmentDetails = () => {
     const { t, i18n } = useTranslation();
@@ -50,7 +51,7 @@ const ShipmentDetails = () => {
         );
     };
 
-    if (loading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
     if (!shipment) return <div className="p-8 text-center text-danger">{t('stock.shipments.not_found')}</div>;
 
     return (

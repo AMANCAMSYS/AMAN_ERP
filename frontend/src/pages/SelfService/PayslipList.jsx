@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { FileText, Eye } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const PayslipList = () => {
     const { t } = useTranslation();
@@ -30,7 +31,7 @@ const PayslipList = () => {
         }
     };
 
-    if (loading) return <div className="module-loading"><div className="spinner" /></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="module-container">

@@ -6,6 +6,7 @@ import { useBranch } from '../../context/BranchContext';
 import { Calendar, RotateCcw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const LeaveCarryover = () => {
     const { t, i18n } = useTranslation();
@@ -195,7 +196,7 @@ const LeaveCarryover = () => {
 
             {loading && (
                 <div className="card section-card" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                    <div className="spinner" style={{ margin: '0 auto 8px' }} />
+                    <PageLoading />
                     {t('common.loading')}
                 </div>
             )}

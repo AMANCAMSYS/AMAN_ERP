@@ -7,6 +7,7 @@ import { Boxes, Package, ArrowRight, AlertTriangle, CheckCircle, Search } from '
 import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function MRPPlanning() {
     const { t, i18n } = useTranslation();
@@ -42,7 +43,7 @@ export default function MRPPlanning() {
     if (loading) {
         return (
             <div className="workspace flex items-center justify-center pt-5">
-                <span className="loading"></span>
+                <PageLoading />
             </div>
         );
     }

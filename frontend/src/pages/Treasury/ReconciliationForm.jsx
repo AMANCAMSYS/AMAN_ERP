@@ -11,6 +11,7 @@ import DateInput from '../../components/common/DateInput';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import { PageLoading } from '../../components/common/LoadingStates'
 const ReconciliationForm = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
@@ -208,7 +209,7 @@ const ReconciliationForm = () => {
     const fmt = (n) => Number(n || 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     if (loading) return (
-        <div className="page-center"><span className="loading"></span></div>
+        <PageLoading />
     );
 
     // === CREATE FORM ===

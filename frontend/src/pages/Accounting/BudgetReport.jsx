@@ -9,6 +9,7 @@ import { getCurrency } from '../../utils/auth'
 import { toInputDate } from '../../utils/dateUtils'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function BudgetReport() {
     const { t, i18n } = useTranslation()
@@ -115,10 +116,7 @@ function BudgetReport() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5">
-                    <div className="spinner"></div>
-                    <p className="mt-2">{t('common.loading')}</p>
-                </div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : data && (

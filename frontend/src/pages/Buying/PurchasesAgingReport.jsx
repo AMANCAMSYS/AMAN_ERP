@@ -6,6 +6,7 @@ import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
 import { reportsAPI } from '../../utils/api';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function PurchasesAgingReport() {
     const { t } = useTranslation();
@@ -53,7 +54,7 @@ function PurchasesAgingReport() {
             </div>
 
             {loading ? (
-                <div className="text-center p-5"><div className="spinner"></div><p className="mt-2">{t('common.loading')}</p></div>
+                <PageLoading />
             ) : error ? (
                 <div className="alert alert-danger">{error}</div>
             ) : (

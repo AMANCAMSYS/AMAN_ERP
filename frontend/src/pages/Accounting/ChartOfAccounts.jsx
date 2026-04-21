@@ -8,6 +8,7 @@ import { formatNumber } from '../../utils/format'
 import CurrencySelector from '../../components/common/CurrencySelector'
 import { toastEmitter } from '../../utils/toastEmitter'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 // MODULE-001: Module tag labels for COA display
 const MODULE_TAG_LABELS = {
@@ -250,7 +251,7 @@ function ChartOfAccounts() {
         )
     }
 
-    if (loading && accounts.length === 0) return <div className="page-center"><span className="loading"></span></div>
+    if (loading && accounts.length === 0) return <PageLoading />
 
     // MODULE-001: Filter out accounts belonging to disabled modules
     const user = getUser()

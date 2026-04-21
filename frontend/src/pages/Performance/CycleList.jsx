@@ -7,6 +7,7 @@ import { Plus, Play, CheckCircle, Clock } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const CycleList = () => {
     const { t, i18n } = useTranslation();
@@ -83,7 +84,7 @@ const CycleList = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : cycles.length === 0 ? (
                 <div className="empty-state">{t('performance.no_cycles')}</div>
             ) : (

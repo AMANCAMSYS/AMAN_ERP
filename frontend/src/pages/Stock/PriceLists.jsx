@@ -5,6 +5,7 @@ import { inventoryAPI, currenciesAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const PriceLists = () => {
     const { t } = useTranslation();
@@ -118,7 +119,7 @@ const PriceLists = () => {
         }
     };
 
-    if (loading) return <div className="p-4">{t('common.loading')}</div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

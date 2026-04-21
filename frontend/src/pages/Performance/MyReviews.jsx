@@ -7,6 +7,7 @@ import { Eye, ClipboardList } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const MyReviews = () => {
     const { t, i18n } = useTranslation();
@@ -58,7 +59,7 @@ const MyReviews = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : reviews.length === 0 ? (
                 <div className="empty-state">{t('performance.no_reviews')}</div>
             ) : (

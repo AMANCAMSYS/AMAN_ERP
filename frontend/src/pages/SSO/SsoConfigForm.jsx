@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 import FormField from '../../components/common/FormField'
 import DataTable from '../../components/common/DataTable'
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 function SsoConfigForm() {
     const { t } = useTranslation()
@@ -126,7 +127,7 @@ function SsoConfigForm() {
                 <BackButton />
                 <h1 className="workspace-title">{t('sso.loading')}</h1>
             </div>
-            <div className="loading-container"><span className="loading"></span></div>
+            <PageLoading />
         </div>
     )
 
@@ -224,7 +225,7 @@ function SsoConfigForm() {
 
                 <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
                     <button type="submit" className="btn btn-primary" disabled={saving}>
-                        {saving ? <span className="loading"></span> : t('common.save')}
+                        {saving ? <Spinner size="sm"/> : t('common.save')}
                     </button>
                     <button type="button" className="btn btn-outline" onClick={() => navigate('/settings/sso')}>
                         {t('common.cancel')}

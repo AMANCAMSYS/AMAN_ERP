@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext'
 import { formatShortDate } from '../../utils/dateUtils'
 import { Printer, ArrowLeft, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function PaymentDetails() {
     const { t, i18n } = useTranslation()
@@ -33,7 +34,7 @@ function PaymentDetails() {
         fetchData()
     }, [id, t])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
     if (error) return <div className="workspace fade-in"><div className="alert alert-error">{error}</div></div>
     if (!payment) return <div className="workspace fade-in"><div className="alert alert-warning">{t('buying.payments.details.not_found')}</div></div>
 

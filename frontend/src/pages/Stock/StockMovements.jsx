@@ -8,6 +8,7 @@ import { Filter, Search, Warehouse, Activity, Calendar } from 'lucide-react';
 import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const StockMovements = () => {
     const { t, i18n } = useTranslation();
@@ -176,7 +177,7 @@ const StockMovements = () => {
             <div className="section-card section-card-flush" style={{ overflow: 'hidden' }}>
                 {loading ? (
                     <div style={{ padding: '48px', textAlign: 'center' }}>
-                        <span className="loading"></span>
+                        <Spinner size="sm"/>
                         <div className="mt-4 text-muted">{t('common.loading')}</div>
                     </div>
                 ) : movements.length === 0 ? (

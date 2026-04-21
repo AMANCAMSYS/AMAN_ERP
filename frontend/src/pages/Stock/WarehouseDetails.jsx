@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function WarehouseDetails() {
     const { t } = useTranslation();
@@ -48,7 +49,7 @@ function WarehouseDetails() {
         return name.includes(term) || code.includes(term);
     });
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
     if (error) return (
         <div className="p-8 text-center">
             <div className="text-red-600 mb-4">{error}</div>

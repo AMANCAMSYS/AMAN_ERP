@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function BuyingOrderDetails() {
     const { t, i18n } = useTranslation()
@@ -32,7 +33,7 @@ function BuyingOrderDetails() {
         fetchOrder()
     }, [id, t])
 
-    if (loading) return <div className="p-4">{t('common.loading')}</div>
+    if (loading) return <PageLoading />
     if (error) return <div className="alert alert-error m-4">{error}</div>
     if (!order) return <div className="p-4 text-center">{t('common.not_found')}</div>
 

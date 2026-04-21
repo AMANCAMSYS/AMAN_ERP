@@ -5,6 +5,7 @@ import { formatShortDate } from '../../utils/dateUtils';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const categoryColors = {
     faq: { bg: '#dbeafe', color: '#1d4ed8' },
@@ -95,7 +96,7 @@ function KnowledgeBase() {
             </div>
 
             {/* Articles Grid */}
-            {loading ? <div className="empty-state">{t('common.loading')}</div> :
+            {loading ? <PageLoading /> :
             articles.length === 0 ? <div className="empty-state">{t('crm.kb_no_articles', 'لا توجد مقالات')}</div> : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                     {articles.map(a => (

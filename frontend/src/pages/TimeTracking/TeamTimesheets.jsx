@@ -7,6 +7,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const TeamTimesheets = () => {
     const { t, i18n } = useTranslation();
@@ -98,7 +99,7 @@ const TeamTimesheets = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : entries.length === 0 ? (
                 <div className="empty-state">{t('timetracking.no_entries')}</div>
             ) : (

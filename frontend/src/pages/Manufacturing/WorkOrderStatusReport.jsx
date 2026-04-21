@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const WorkOrderStatusReport = () => {
     const { t } = useTranslation();
@@ -108,7 +109,7 @@ const WorkOrderStatusReport = () => {
             </div>
 
             {loading ? (
-                <div className="loading-container"><div className="spinner" /></div>
+                <PageLoading />
             ) : (
                 <>
                     {/* Status Summary Cards */}

@@ -5,6 +5,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import { Clock, Calendar, AlertCircle, Play, Square, LogOut, CheckCircle } from 'lucide-react';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates';
 
 const Attendance = () => {
     const { t } = useTranslation();
@@ -74,12 +75,7 @@ const Attendance = () => {
 
     if (loading) {
         return (
-            <div className="workspace fade-in">
-                <div className="card shadow-sm border-0 p-5 text-center">
-                    <div className="spinner-border text-primary mb-3"></div>
-                    <p className="text-muted">{t('common.loading')}</p>
-                </div>
-            </div>
+            <PageLoading />
         );
     }
 

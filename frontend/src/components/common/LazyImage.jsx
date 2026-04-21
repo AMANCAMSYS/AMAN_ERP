@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react'
+import { Spinner } from './LoadingStates'
 
 const LazyImage = ({ src, alt, className, style, placeholder, ...props }) => {
     const [isLoaded, setIsLoaded] = useState(false)
@@ -58,7 +59,7 @@ const LazyImage = ({ src, alt, className, style, placeholder, ...props }) => {
                         zIndex: 1
                     }}
                 >
-                    {placeholder || <div className="spinner-small" style={{ width: '24px', height: '24px', border: '2px solid #ddd', borderTopColor: '#3498db', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>}
+                    {placeholder || <Spinner size="sm"/>}
                 </div>
             )}
             <style jsx>{`

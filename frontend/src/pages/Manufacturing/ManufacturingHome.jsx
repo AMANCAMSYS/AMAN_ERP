@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ManufacturingHome = () => {
     const { t } = useTranslation();
@@ -70,7 +71,7 @@ const ManufacturingHome = () => {
         );
     };
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>;
+    if (loading) return <PageLoading />;
 
     return (
         <div className="workspace fade-in">

@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 export default function ProjectForm() {
     const { t, i18n } = useTranslation();
@@ -121,7 +122,7 @@ export default function ProjectForm() {
     };
 
     if (loading) {
-        return <div className="text-center py-5"><span className="loading"></span></div>;
+        return <PageLoading />;
     }
 
     return (
@@ -293,7 +294,7 @@ export default function ProjectForm() {
                     </button>
                     <button type="submit" className="btn btn-primary" disabled={submitting}>
                         {submitting ? (
-                            <><span className="loading" style={{ width: 16, height: 16 }}></span> {t('common.saving')}</>
+                            <><Spinner size="sm"/> {t('common.saving')}</>
                         ) : (
                             <><Save size={18} /> {t('common.save')}</>
                         )}

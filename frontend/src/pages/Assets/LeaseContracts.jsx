@@ -8,6 +8,7 @@ import { Building2, Plus, Calendar, DollarSign, TrendingDown, FileText, Save, X 
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const LeaseContracts = () => {
     const { t, i18n } = useTranslation();
@@ -220,7 +221,7 @@ const LeaseContracts = () => {
             {/* Content */}
             <div className="section-card">
                 {loading ? (
-                    <div className="text-center p-5"><div className="spinner-border" /></div>
+                    <PageLoading />
                 ) : activeTab === 'list' ? (
                     <div className="data-table-container">
                         <table className="data-table">

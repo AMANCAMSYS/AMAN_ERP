@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { Plus, ArrowRightLeft, CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { Spinner } from '../../components/common/LoadingStates'
 
 const AssetManagement = () => {
     const { t, i18n } = useTranslation();
@@ -149,7 +150,7 @@ const AssetManagement = () => {
             <div className="card section-card">
                 {loading ? (
                      <div className="text-center p-5 text-muted">
-                        <Loader2 className="spinner-border mx-auto mb-2" />
+                        <Spinner size="md"/>
                         {t('common.loading')}
                     </div>
                 ) : activeTab === 'transfers' ? (

@@ -6,6 +6,7 @@ import { formatNumber } from '../../utils/format'
 import BackButton from '../../components/common/BackButton'
 import '../../components/ModuleStyles.css'
 import { useToast } from '../../context/ToastContext'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function IntercompanyTransactions() {
     const { t } = useTranslation()
@@ -79,7 +80,7 @@ function IntercompanyTransactions() {
         return map[status] || 'badge-secondary'
     }
 
-    if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

@@ -9,6 +9,7 @@ import '../../components/ModuleStyles.css'
 import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
 import { getIndustryFeature } from '../../hooks/useIndustryType'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 // ─── Stage / Status / Priority maps ───────────────────────────────────────────
 const stageBadgeColors = {
@@ -335,7 +336,7 @@ function CRMHome() {
                         <h3 className="section-title" style={{ margin: 0 }}>{t('crm.pipeline_summary')}</h3>
                     </div>
                     {overviewLoading ? (
-                        <div className="empty-state">{t('common.loading')}</div>
+                        <PageLoading />
                     ) : (
                         <div className="data-table-container">
                             <table className="data-table">
@@ -384,7 +385,7 @@ function CRMHome() {
                     </div>
 
                     {oppLoading ? (
-                        <div className="empty-state">{t('common.loading')}</div>
+                        <PageLoading />
                     ) : opportunities.length === 0 ? (
                         <div className="empty-state">{t('crm.no_opportunities')}</div>
                     ) : (
@@ -518,7 +519,7 @@ function CRMHome() {
                     </div>
 
                     {ticketsLoading ? (
-                        <div className="empty-state">{t('common.loading')}</div>
+                        <PageLoading />
                     ) : tickets.length === 0 ? (
                         <div className="empty-state">{t('crm.no_tickets')}</div>
                     ) : (

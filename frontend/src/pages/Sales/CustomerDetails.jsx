@@ -9,6 +9,7 @@ import { getCurrency } from '../../utils/auth'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 export default function CustomerDetails() {
@@ -37,7 +38,7 @@ export default function CustomerDetails() {
         fetchData()
     }, [id, currentBranch?.id])
 
-    if (loading) return <div className="page-center"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     return (
         <div className="workspace fade-in">

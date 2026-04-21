@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format';
 import { FileText, Plus, Trash2, Edit3, CheckCircle, AlertTriangle, Save, X } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ExpensePolicies = () => {
     const { t, i18n } = useTranslation();
@@ -208,7 +209,7 @@ const ExpensePolicies = () => {
             {/* Policies Table */}
             <div className="section-card">
                 {loading ? (
-                    <div className="text-center p-5"><div className="spinner-border" /></div>
+                    <PageLoading />
                 ) : (
                     <div className="data-table-container">
                         <table className="data-table">

@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { Shield, AlertTriangle, Eye, Lock, RefreshCw, Activity } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const SecurityEvents = () => {
     const { t, i18n } = useTranslation();
@@ -165,7 +166,7 @@ const SecurityEvents = () => {
 
             <div className="section-card">
                 {loading ? (
-                    <div className="text-center p-5"><div className="spinner-border" /></div>
+                    <PageLoading />
                 ) : activeTab === 'events' ? (
                     <div className="data-table-container">
                         <table className="data-table">

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import DataTable from '../../components/common/DataTable'
 import BackButton from '../../components/common/BackButton'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const STATUS_COLORS = {
     trial: 'badge-info',
@@ -98,7 +99,7 @@ function EnrollmentDetail() {
         { key: 'invoice_id', label: t('subscription.table.invoice_id') },
     ]
 
-    if (loading) return <div className="workspace"><div className="loading-spinner" /></div>
+    if (loading) return <PageLoading />
 
     if (!enrollment) return (
         <div className="workspace fade-in">

@@ -6,6 +6,7 @@ import { Trash2, Edit, UserPlus } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProjectResources = () => {
     const { t, i18n } = useTranslation();
@@ -64,7 +65,7 @@ const ProjectResources = () => {
             </div>
 
             {loading ? (
-                <div className="loading-spinner">{t('common.loading')}</div>
+                <PageLoading />
             ) : allocations.length === 0 ? (
                 <div className="empty-state">{t('resource.no_allocations')}</div>
             ) : (

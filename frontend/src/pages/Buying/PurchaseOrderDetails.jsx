@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 import { useToast } from '../../context/ToastContext';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function PurchaseOrderDetails() {
@@ -73,7 +74,7 @@ function PurchaseOrderDetails() {
     };
 
     if (loading) {
-        return <div className="workspace fade-in p-8 text-center">{t('common.loading')}...</div>;
+        return <PageLoading />;
     }
 
     if (!order) {

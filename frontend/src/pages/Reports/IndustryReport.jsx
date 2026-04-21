@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import api from '../../services/apiClient'
 import BackButton from '../../components/common/BackButton'
 import { formatNumber } from '../../utils/format'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 // ─── Report type metadata ───
 const REPORT_CONFIG = {
@@ -480,11 +481,7 @@ export default function IndustryReport() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div className="spinner" style={{
-            width: 40, height: 40, border: '3px solid #e2e8f0',
-            borderTopColor: config.color, borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite', margin: '0 auto 16px',
-          }} />
+          <PageLoading />
           <p style={{ color: '#64748b' }}>{t('industry_reports.loading')}</p>
         </div>
       ) : error ? (

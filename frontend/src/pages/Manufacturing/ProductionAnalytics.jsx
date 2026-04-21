@@ -7,6 +7,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
 import { ModuleKPISection } from '../../components/kpi';
+import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProductionAnalytics = () => {
     const { t } = useTranslation();
@@ -92,7 +93,7 @@ const ProductionAnalytics = () => {
             </div>
 
             {loading ? (
-                <div className="loading-container"><div className="spinner" /></div>
+                <PageLoading />
             ) : (
                 <>
                     {/* KPI Metrics */}

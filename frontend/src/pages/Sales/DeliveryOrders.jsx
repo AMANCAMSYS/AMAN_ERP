@@ -8,6 +8,7 @@ import { useBranch } from '../../context/BranchContext'
 import BackButton from '../../components/common/BackButton'
 import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
+import { PageLoading } from '../../components/common/LoadingStates'
 
 function DeliveryOrders() {
     const { t } = useTranslation()
@@ -35,7 +36,7 @@ function DeliveryOrders() {
         fetch()
     }, [currentBranch, statusFilter])
 
-    if (loading) return <div className="p-4"><span className="loading"></span></div>
+    if (loading) return <PageLoading />
 
     const statusColors = {
         draft: 'draft', confirmed: 'confirmed', shipped: 'info',
