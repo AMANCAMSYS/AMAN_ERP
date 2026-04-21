@@ -708,3 +708,133 @@
         padding: 12px;
     }
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * Unified page shell
+ *
+ * Many pages use `module-container` / `module-header` /
+ * `module-loading` / `module-filters` / `stat-card` etc. These
+ * classes previously had no definition, so those pages rendered
+ * without the standard padding, max-width, or card styling. The
+ * definitions below align them 1:1 with the `workspace` / metric
+ * design language so every page has a unified look without
+ * touching any JSX.
+ * ───────────────────────────────────────────────────────────── */
+
+.module-container {
+    padding: 24px;
+    width: 100%;
+    max-width: 1560px;
+    margin: 0 auto;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.module-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.module-header h1,
+.module-header h2,
+.module-header .module-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.module-header .module-subtitle,
+.module-subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.module-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.module-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.module-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px 24px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+@media (max-width: 768px) {
+    .module-container {
+        padding: 16px;
+    }
+
+    .module-header {
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .module-header h1,
+    .module-header h2,
+    .module-header .module-title {
+        font-size: 20px;
+    }
+
+    .stat-card {
+        padding: 16px;
+        min-height: auto;
+    }
+
+    .stat-value {
+        font-size: 22px;
+    }
+}

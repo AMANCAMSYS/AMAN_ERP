@@ -414,7 +414,7 @@ const ReconciliationForm = () => {
                                 <button className="btn btn-sm btn-outline-warning d-flex align-items-center gap-1"
                                     onClick={handleAutoMatch} disabled={autoMatchLoading}
                                     style={{ borderRadius: '8px', fontSize: '12px' }}>
-                                    <Zap size={14} /> {autoMatchLoading ? '...' : '{t('treasury.reconciliation.auto_match')}'}
+                                    <Zap size={14} /> {autoMatchLoading ? '...' : t('treasury.reconciliation.auto_match')}
                                 </button>
                             </div>
                         )}
@@ -473,7 +473,7 @@ const ReconciliationForm = () => {
                                     <p className="small text-muted mb-3">{t('treasury.upload_bank_statement')}</p>
                                     <label className="btn btn-sm btn-success" style={{ cursor: 'pointer', borderRadius: '8px' }}>
                                         <Upload size={14} style={{ marginInlineEnd: '6px' }} />
-                                        {importLoading ? '{t('treasury.reconciliation.analyzing')}' : '{t('treasury.reconciliation.select_file')}'}
+                                        {importLoading ? t('treasury.reconciliation.analyzing') : t('treasury.reconciliation.select_file')}
                                         <input type="file" accept=".csv,.xlsx,.xls,.tsv" onChange={handleFileSelect} style={{ display: 'none' }} disabled={importLoading} />
                                     </label>
                                     <button className="btn btn-sm btn-light ms-2" onClick={() => setShowImport(false)} style={{ borderRadius: '8px' }}>
@@ -493,7 +493,7 @@ const ReconciliationForm = () => {
                                         <div style={{ display: 'flex', gap: '8px' }}>
                                             <button className="btn btn-sm btn-primary" onClick={handleImportConfirm} disabled={importLoading}
                                                 style={{ borderRadius: '8px' }}>
-                                                {importLoading ? '{t('treasury.reconciliation.importing')}' : `تأكيد الاستيراد (${importPreview.all_lines?.length || 0})`}
+                                                {importLoading ? t('treasury.reconciliation.importing') : `تأكيد الاستيراد (${importPreview.all_lines?.length || 0})`}
                                             </button>
                                             <button className="btn btn-sm btn-light" onClick={() => setImportPreview(null)} style={{ borderRadius: '8px' }}>
                                                 {t('treasury.reconciliation.change_file')}
