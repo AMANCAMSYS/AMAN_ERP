@@ -56,7 +56,7 @@ function CostLayerList() {
         { key: 'product_id', label: t('costing.product_id') },
         { key: 'warehouse_id', label: t('costing.warehouse_id') },
         { key: 'costing_method', label: t('costing.method'), render: (val, row) => (
-            <span className="badge" style={{ background: val === 'fifo' ? '#2563eb' : '#7c3aed', color: '#fff', padding: '2px 8px', borderRadius: 4 }}>{val?.toUpperCase()}</span>
+            <span className={`badge ${val === 'fifo' ? 'badge-primary' : 'badge-purple'}`}>{val?.toUpperCase()}</span>
         )},
         { key: 'purchase_date', label: t('costing.purchase_date') },
         { key: 'original_quantity', label: t('costing.original_qty'), render: (val) => formatNumber(parseFloat(val)) },
@@ -76,30 +76,35 @@ function CostLayerList() {
                 </div>
             </div>
 
-            <form onSubmit={handleFilter} className="card" style={{ padding: 16, marginBlockEnd: 16, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div className="form-group">
-                    <label>{t('costing.product_id')}</label>
-                    <input type="number" value={productId} onChange={e => setProductId(e.target.value)} placeholder="ID" style={{ width: 100 }} />
+            <form onSubmit={handleFilter} className="card" style={{ padding: 16, marginBlockEnd: 16 }}>
+                <div className="form-row" style={{ alignItems: 'flex-end', marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 0, minWidth: 160 }}>
+                        <label className="form-label">{t('costing.product_id')}</label>
+                        <input type="number" className="form-input" value={productId} onChange={e => setProductId(e.target.value)} placeholder="ID" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0, minWidth: 160 }}>
+                        <label className="form-label">{t('costing.warehouse_id')}</label>
+                        <input type="number" className="form-input" value={warehouseId} onChange={e => setWarehouseId(e.target.value)} placeholder="ID" />
+                    </div>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 8, color: 'var(--text-main)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={includeExhausted} onChange={e => setIncludeExhausted(e.target.checked)} />
+                        {t('costing.include_exhausted')}
+                    </label>
+                    <button type="submit" className="btn btn-primary">{t('common.search')}</button>
                 </div>
-                <div className="form-group">
-                    <label>{t('costing.warehouse_id')}</label>
-                    <input type="number" value={warehouseId} onChange={e => setWarehouseId(e.target.value)} placeholder="ID" style={{ width: 100 }} />
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input type="checkbox" checked={includeExhausted} onChange={e => setIncludeExhausted(e.target.checked)} />
-                    {t('costing.include_exhausted')}
-                </label>
-                <button type="submit" className="btn btn-primary">{t('common.search')}</button>
             </form>
 
-            <SearchFilter value={search} onChange={setSearch} placeholder={t('common.search')} />
-
-            <DataTable
-                data={filteredLayers}
-                columns={columns}
-                loading={loading}
-                emptyTitle={t('costing.no_layers')}
-            />
+            <div className="card" style={{ padding: 16 }}>
+                <div style={{ marginBottom: 12 }}>
+                    <SearchFilter value={search} onChange={setSearch} placeholder={t('common.search')} />
+                </div>
+                <DataTable
+                    data={filteredLayers}
+                    columns={columns}
+                    loading={loading}
+                    emptyTitle={t('costing.no_layers')}
+                />
+            </div>
         </div>
     )
 }

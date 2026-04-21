@@ -715,6 +715,69 @@ body {
   margin-bottom: 16px;
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   Defensive auto-styling for bare <label>/<input>/<select>/<textarea>
+   dropped inside common container shells.
+   This rescues legacy pages that did not use .form-input / .form-label
+   without overriding any explicit className. Any element that already
+   has a form-* class still wins because .form-input etc. is more
+   specific (single class) than these descendant selectors? No — same
+   specificity. So we use :where() to give them ZERO specificity and
+   let any explicit class override them.
+   ───────────────────────────────────────────────────────────────────── */
+
+:where(.form-group, .form-row, .modal-content, .card, .section-card) > label,
+:where(.form-group, .form-row, .modal-content, .card, .section-card) label:not([class]) {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+:where(.form-group, .form-row, .modal-content, .card, .section-card)
+  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([class*="form-"]):not([class*="react-datepicker"])),
+:where(.form-group, .form-row, .modal-content, .card, .section-card) select:not([class*="form-"]),
+:where(.form-group, .form-row, .modal-content, .card, .section-card) textarea:not([class*="form-"]) {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text-main);
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+[data-theme="dark"] :where(.form-group, .form-row, .modal-content, .card, .section-card)
+  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="range"]):not([class*="form-"]):not([class*="react-datepicker"])),
+[data-theme="dark"] :where(.form-group, .form-row, .modal-content, .card, .section-card) select:not([class*="form-"]),
+[data-theme="dark"] :where(.form-group, .form-row, .modal-content, .card, .section-card) textarea:not([class*="form-"]) {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+/* Bare tables inside cards/modals get themed borders too */
+:where(.card, .section-card, .modal-content) > table:not([class*="table"]) {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text-main);
+}
+
+:where(.card, .section-card, .modal-content) > table:not([class*="table"]) th,
+:where(.card, .section-card, .modal-content) > table:not([class*="table"]) td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+:where(.card, .section-card, .modal-content) > table:not([class*="table"]) thead th {
+  background: var(--table-header-bg);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 /* Ensure text is visible in inputs (light mode) */
 input,
 select,

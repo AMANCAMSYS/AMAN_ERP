@@ -29,8 +29,8 @@ function ForgotPassword() {
     }
 
     return (
-        <div className="login-container">
-            <div className="login-card">
+        <div className="auth-layout">
+            <div className="auth-card">
                 <div style={{ marginBottom: '12px' }}>
                     <BackButton />
                 </div>
