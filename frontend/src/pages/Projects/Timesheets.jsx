@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { format, startOfWeek, endOfWeek, addDays, eachDayOfInterval } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { ChevronRight, ChevronLeft, Save, Trash2, CheckCircle2 } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
+import BackButton from '../../components/common/BackButton';
 import './Timesheets.css';
 
 export default function Timesheets({ projectId, tasks = [] }) {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const locale = isRTL ? ar : enUS;
+    const location = useLocation();
+    const isStandalone = location.pathname === '/projects/timesheets';
 
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 6 })); // Week starts Saturday
     const [timesheets, setTimesheets] = useState([]);
@@ -144,6 +148,12 @@ export default function Timesheets({ projectId, tasks = [] }) {
 
     return (
         <div className="workspace fade-in timesheet-container">
+            {isStandalone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                    <BackButton />
+                    <h1 className="workspace-title" style={{ margin: 0 }}>{t('projects.timesheets', 'Timesheets')}</h1>
+                </div>
+            )}
             {/* Toolbar */}
             <div className="d-flex align-items-center justify-content-between mb-3">
                 <div className="d-flex align-items-center gap-3">

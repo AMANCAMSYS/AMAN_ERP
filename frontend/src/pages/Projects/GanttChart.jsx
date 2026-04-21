@@ -1,14 +1,18 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { format, differenceInDays, addDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import './GanttChart.css';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import BackButton from '../../components/common/BackButton';
 
 export default function GanttChart({ tasks = [] }) {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const locale = isRTL ? ar : enUS;
+    const location = useLocation();
+    const isStandalone = location.pathname === '/projects/gantt';
 
     // Filter tasks with dates
     const validTasks = useMemo(() => tasks.filter(t => t.start_date && t.end_date), [tasks]);
@@ -41,6 +45,12 @@ export default function GanttChart({ tasks = [] }) {
 
     return (
         <div className="workspace fade-in gantt-container" style={{ direction: 'ltr' }}> {/* Always LTR for timeline logic simplicity, content aligned via CSS */}
+            {isStandalone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, direction: isRTL ? 'rtl' : 'ltr' }}>
+                    <BackButton />
+                    <h1 className="workspace-title" style={{ margin: 0 }}>{t('projects.gantt.title', 'Gantt Chart')}</h1>
+                </div>
+            )}
             <div className="gantt-scroll-container">
                 <div className="gantt-header" style={{ width: totalDays * colWidth, height: headerHeight }}>
                     {dates.map((date, index) => (

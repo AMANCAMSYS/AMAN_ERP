@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, Filter } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
 
 const TeamTimesheets = () => {
     const { t, i18n } = useTranslation();
@@ -82,15 +83,13 @@ const TeamTimesheets = () => {
                     <option value="rejected">{t('timetracking.status_rejected')}</option>
                     <option value="draft">{t('timetracking.status_draft')}</option>
                 </select>
-                <input
-                    type="date"
+                <DateInput
                     className="form-control"
                     style={{ maxWidth: 160 }}
                     placeholder={t('timetracking.date_from')}
                     onChange={e => updateFilter('date_from', e.target.value)}
                 />
-                <input
-                    type="date"
+                <DateInput
                     className="form-control"
                     style={{ maxWidth: 160 }}
                     placeholder={t('timetracking.date_to')}

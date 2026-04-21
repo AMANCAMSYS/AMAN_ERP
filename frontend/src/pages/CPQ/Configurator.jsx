@@ -8,6 +8,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext';
 import { formatNumber } from '../../utils/format';
+import DateInput from '../../components/common/DateInput';
 
 const Configurator = () => {
     const { t, i18n } = useTranslation();
@@ -164,7 +165,7 @@ const Configurator = () => {
                 </div>
                 <div>
                     <label className="form-label">{t('cpq.valid_until')}</label>
-                    <input type="date" className="form-input" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
+                    <DateInput className="form-input" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
                 </div>
             </div>
 

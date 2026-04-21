@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { authAPI, securityAPI } from '../utils/api'
 import { getUser, getCompanyId, updateUser } from '../utils/auth'
 import { useTranslation } from 'react-i18next'
+import BackButton from '../components/common/BackButton'
 
 function UserProfile() {
     const { t } = useTranslation()
@@ -117,9 +118,12 @@ function UserProfile() {
 
     return (
         <div className="workspace fade-in">
-            <div className="workspace-header">
-                <h1 className="workspace-title">{t('common.profile_page.title')}</h1>
-                <p className="workspace-subtitle">{t('common.profile_page.subtitle')}</p>
+            <div className="workspace-header" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <BackButton />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <h1 className="workspace-title">{t('common.profile_page.title')}</h1>
+                    <p className="workspace-subtitle">{t('common.profile_page.subtitle')}</p>
+                </div>
             </div>
 
             <div className="card" style={{ maxWidth: '680px' }}>

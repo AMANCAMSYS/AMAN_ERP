@@ -5,6 +5,7 @@ import { selfServiceAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
+import DateInput from '../../components/common/DateInput';
 
 const LeaveRequestForm = () => {
     const { t } = useTranslation();
@@ -69,12 +70,12 @@ const LeaveRequestForm = () => {
 
                 <div className="form-group">
                     <label>{t('self_service.start_date')}</label>
-                    <input type="date" name="start_date" value={form.start_date} onChange={handleChange} className="form-control" required />
+                    <DateInput name="start_date" value={form.start_date} onChange={handleChange} className="form-control" required />
                 </div>
 
                 <div className="form-group">
                     <label>{t('self_service.end_date')}</label>
-                    <input type="date" name="end_date" value={form.end_date} onChange={handleChange} className="form-control" required />
+                    <DateInput name="end_date" value={form.end_date} onChange={handleChange} className="form-control" required />
                 </div>
 
                 {days > 0 && (

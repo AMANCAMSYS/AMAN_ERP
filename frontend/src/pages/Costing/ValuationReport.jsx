@@ -5,6 +5,7 @@ import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
+import DateInput from '../../components/common/DateInput';
 
 function ValuationReport() {
     const { t } = useTranslation()
@@ -47,7 +48,7 @@ function ValuationReport() {
             <div className="card" style={{ padding: 16, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-end' }}>
                 <div className="form-group">
                     <label>{t('costing.as_of_date')}</label>
-                    <input type="date" value={asOfDate} onChange={e => setAsOfDate(e.target.value)} />
+                    <DateInput value={asOfDate} onChange={e => setAsOfDate(e.target.value)} />
                 </div>
                 <button className="btn btn-primary" onClick={fetchReport} disabled={loading}>
                     {loading ? t('common.loading') : t('costing.refresh')}

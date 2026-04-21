@@ -6,6 +6,7 @@ import { CheckCircle, Plus, Trash2, Send } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
 
 // Generate the 7 dates of the week starting from weekStart (ISO date string "YYYY-MM-DD")
 function getWeekDates(weekStart) {
@@ -159,8 +160,7 @@ const TimesheetWeek = () => {
                 <h1>{t('timetracking.weekly_timesheet')}</h1>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <label>{t('timetracking.week_starting')}</label>
-                    <input
-                        type="date"
+                    <DateInput
                         className="form-control"
                         value={weekStart}
                         onChange={e => setWeekStart(e.target.value)}

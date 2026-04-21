@@ -4,6 +4,7 @@ import { reportsAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import CustomDatePicker from '../../../components/common/CustomDatePicker';
+import BackButton from '../../../components/common/BackButton';
 
 const LeaveReport = () => {
     const { t } = useTranslation();
@@ -40,6 +41,10 @@ const LeaveReport = () => {
 
     return (
         <div className="workspace fade-in">
+            <div className="workspace-header" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <BackButton />
+                <h1 className="workspace-title" style={{ margin: 0 }}>{t('hr.reports.leaves_distribution', 'Leave Report')}</h1>
+            </div>
             {/* Date Filters */}
             <div className="display-flex gap-3 mb-4 align-center flex-wrap">
                 <CustomDatePicker

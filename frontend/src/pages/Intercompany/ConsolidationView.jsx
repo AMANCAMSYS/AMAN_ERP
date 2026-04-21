@@ -5,6 +5,7 @@ import BackButton from '../../components/common/BackButton'
 import DataTable from '../../components/common/DataTable'
 import { formatNumber } from '../../utils/format'
 import { useToast } from '../../context/ToastContext'
+import DateInput from '../../components/common/DateInput';
 
 function ConsolidationView() {
     const { t } = useTranslation()
@@ -68,7 +69,7 @@ function ConsolidationView() {
                     </div>
                     <div className="form-group">
                         <label>{t('intercompany.as_of_date')}</label>
-                        <input type="date" value={asOfDate} onChange={e => setAsOfDate(e.target.value)} />
+                        <DateInput value={asOfDate} onChange={e => setAsOfDate(e.target.value)} />
                     </div>
                     <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
                         <button className="btn btn-primary" disabled={!selectedGroup || loading} onClick={runConsolidation}>

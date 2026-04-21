@@ -7,6 +7,7 @@ import {
     BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import DateInput from '../../components/common/DateInput';
 
 const CHART_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B']
 
@@ -240,16 +241,14 @@ function DashboardView() {
                     {dashboard.description && <p className="text-muted">{dashboard.description}</p>}
                 </div>
                 <div className="d-flex gap-2 align-items-center flex-wrap">
-                    <input
-                        type="date"
+                    <DateInput
                         className="form-control form-control-sm"
                         value={dateFrom}
                         onChange={(e) => setDateFrom(e.target.value)}
                         placeholder={t('analytics.date_from')}
                         style={{ width: 150 }}
                     />
-                    <input
-                        type="date"
+                    <DateInput
                         className="form-control form-control-sm"
                         value={dateTo}
                         onChange={(e) => setDateTo(e.target.value)}

@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+import DateInput from '../../components/common/DateInput';
 
 // Color by allocation percentage
 function allocColor(pct) {
@@ -69,10 +70,10 @@ const AvailabilityCalendar = () => {
             <div className="module-header">
                 <h1>{t('resource.availability_calendar')}</h1>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input type="date" className="form-control" value={dateFrom}
+                    <DateInput className="form-control" value={dateFrom}
                            onChange={e => setDateFrom(e.target.value)} style={{ maxWidth: 160 }} />
                     <span>→</span>
-                    <input type="date" className="form-control" value={dateTo}
+                    <DateInput className="form-control" value={dateTo}
                            onChange={e => setDateTo(e.target.value)} style={{ maxWidth: 160 }} />
                 </div>
             </div>

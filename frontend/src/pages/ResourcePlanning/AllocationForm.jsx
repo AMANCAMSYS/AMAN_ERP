@@ -6,6 +6,7 @@ import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
+import DateInput from '../../components/common/DateInput';
 
 const AllocationForm = () => {
     const { t, i18n } = useTranslation();
@@ -152,11 +153,11 @@ const AllocationForm = () => {
 
                 <div style={{ display: 'flex', gap: 16 }}>
                     <FormField label={t('resource.start_date')} required style={{ flex: 1 }}>
-                        <input type="date" className="form-control" value={form.start_date}
+                        <DateInput className="form-control" value={form.start_date}
                                onChange={e => handleChange('start_date', e.target.value)} />
                     </FormField>
                     <FormField label={t('resource.end_date')} required style={{ flex: 1 }}>
-                        <input type="date" className="form-control" value={form.end_date}
+                        <DateInput className="form-control" value={form.end_date}
                                onChange={e => handleChange('end_date', e.target.value)} />
                     </FormField>
                 </div>

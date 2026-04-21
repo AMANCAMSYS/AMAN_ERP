@@ -7,6 +7,7 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton'
 import FormField from '../../components/common/FormField'
+import DateInput from '../../components/common/DateInput';
 
 function EnrollmentForm() {
     const { t } = useTranslation()
@@ -119,8 +120,8 @@ function EnrollmentForm() {
                         </div>
                         <div style={{ marginTop: '24px' }}>
                             <FormField label={t('subscription.table.enrolled')} style={{ marginBottom: 0 }}>
-                                <input
-                                    name="enrollment_date" type="date"
+                                <DateInput
+                                    name="enrollment_date"
                                     value={formData.enrollment_date} onChange={handleChange}
                                     className="form-input"
                                 />

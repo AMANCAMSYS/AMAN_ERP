@@ -5,6 +5,7 @@ import { RefreshCw, ChevronDown, BarChart3, ArrowLeft, ArrowRight } from 'lucide
 import { roleDashboardAPI } from '../../services/roleDashboard';
 import { KPICard, KPIChart, AlertBanner, PeriodSelector } from '../../components/kpi';
 import Card from '../../components/common/Card';
+import BackButton from '../../components/common/BackButton';
 import { useBranch } from '../../context/BranchContext';
 import { getCurrency } from '../../utils/auth';
 
@@ -143,6 +144,8 @@ const RoleDashboard = ({ fixedRoleKey, backPath }) => {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Standalone back button (when NOT embedded in a module) */}
+                        {!isEmbedded && <BackButton />}
                         {/* Back button (when embedded in module) */}
                         {isEmbedded && backPath && (
                             <button

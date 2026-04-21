@@ -5,6 +5,7 @@ import { toastEmitter } from '../../../utils/toastEmitter';
 import { getCurrency } from '../../../utils/auth';
 import { formatNumber } from '../../../utils/format';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import BackButton from '../../../components/common/BackButton';
 
 const PayrollReport = () => {
     const { t } = useTranslation();
@@ -30,6 +31,10 @@ const PayrollReport = () => {
 
     return (
         <div className="workspace fade-in">
+            <div className="workspace-header" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <BackButton />
+                <h1 className="workspace-title" style={{ margin: 0 }}>{t('hr.reports.payroll_trend', 'Payroll Report')}</h1>
+            </div>
             {/* Chart Section */}
             <div className="card mb-4 section-card">
                 <h3 className="section-title mb-4">{t('hr.reports.payroll_trend', 'Payroll Cost Trend (Last 12 Months)')}</h3>
