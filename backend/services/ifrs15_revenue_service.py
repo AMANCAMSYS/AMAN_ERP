@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 def create_contract(db, contract_number: str, customer_id: Optional[int],
                     total_transaction_price: Decimal, currency: str = "SAR",
                     start_date: Optional[date] = None, end_date: Optional[date] = None,
-                    obligations: Optional[list[dict]] = None) -> int:
+                    obligations: Optional[list] = None) -> int:
     """Create a contract; optionally seed its performance obligations.
 
     Each obligation dict: {description, standalone_selling_price, recognition_method}.
@@ -106,7 +106,9 @@ def allocate_transaction_price(db, contract_id: int, commit: bool = True) -> dic
             "allocated": allocations}
 
 
-def recognise_revenue(db, po_id: int, as_of_date: Optional[date] = None,
+def recognise_revenue(db, po_id: int,
+                      company_id: Optional[str] = None,
+                      as_of_date: Optional[date] = None,
                       new_satisfied_pct: Optional[Decimal] = None,
                       post_journal: bool = False,
                       debit_account_id: Optional[int] = None,
@@ -142,7 +144,8 @@ def recognise_revenue(db, po_id: int, as_of_date: Optional[date] = None,
 
     if target_pct <= prev_pct:
         return {"po_id": po_id, "recognised_now": "0.00",
-                "total_recognised": str(prev_rev), "satisfied_pct": str(prev_pct)}
+                "total_recognised": str(prev_rev), "satisfied_pct": str(prev_pct),
+                "journal_entry_id": None}
 
     new_total_rev = (allocated * target_pct).quantize(Decimal("0.01"))
     delta = (new_total_rev - prev_rev).quantize(Decimal("0.01"))
@@ -151,21 +154,26 @@ def recognise_revenue(db, po_id: int, as_of_date: Optional[date] = None,
     if post_journal and delta > 0:
         if not (debit_account_id and credit_account_id):
             raise ValueError("post_journal=True requires debit_account_id + credit_account_id")
+        if not (user_id and company_id):
+            raise ValueError("post_journal=True requires user_id + company_id")
         from services.gl_service import create_journal_entry
         journal_entry_id, _ = create_journal_entry(
             db,
-            entry_date=as_of,
+            company_id=company_id,
+            date=str(as_of),
             description=f"IFRS 15 revenue recognition PO#{po_id}",
             lines=[
-                {"account_id": debit_account_id, "debit": delta, "credit": 0,
+                {"account_id": debit_account_id,
+                 "debit": float(delta), "credit": 0,
                  "description": f"Contract asset — {po.description}"},
-                {"account_id": credit_account_id, "debit": 0, "credit": delta,
+                {"account_id": credit_account_id,
+                 "debit": 0, "credit": float(delta),
                  "description": f"Revenue — {po.description}"},
             ],
-            source="ifrs15_revenue",
-            source_id=po_id,
             user_id=user_id,
             username=username or "revenue_service",
+            source="ifrs15_revenue",
+            source_id=po_id,
             status="posted",
         )
 
