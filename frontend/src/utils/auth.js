@@ -14,8 +14,12 @@ export function getToken() {
     return localStorage.getItem('token')
 }
 
+// SEC-C4b: refresh token is kept in an HttpOnly, SameSite=Strict cookie
+// issued by the backend (see utils/auth_cookies.py). It is NEVER written
+// to localStorage anymore — that closed the XSS-→-token-theft path.
+// This helper is kept only for compatibility; it always returns null.
 export function getRefreshToken() {
-    return localStorage.getItem('refresh_token')
+    return null
 }
 
 export function getUser() {
@@ -114,11 +118,12 @@ export function updateUser(userData) {
     localStorage.setItem('user', JSON.stringify(updatedUser));
 }
 
-export function setAuth(token, user, companyId, refreshToken = null) {
+export function setAuth(token, user, companyId, _refreshToken = null) {
+    // SEC-C4b: refresh token is received as an HttpOnly cookie from /auth/login
+    // and /auth/refresh. We deliberately do NOT persist it in localStorage.
     localStorage.setItem('token', token)
-    if (refreshToken) {
-        localStorage.setItem('refresh_token', refreshToken)
-    }
+    // Purge any stale refresh_token written by older builds.
+    localStorage.removeItem('refresh_token')
     localStorage.setItem('user', JSON.stringify(user))
     if (companyId) {
         localStorage.setItem('company_id', companyId)

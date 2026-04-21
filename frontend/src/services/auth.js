@@ -14,14 +14,10 @@ export const authAPI = {
     },
     me: () => api.get('/auth/me'),
     updateMe: (data) => api.put('/auth/me', data),
-    logout: () => {
-        const refreshToken = localStorage.getItem('refresh_token')
-        return api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {})
-    },
-    refresh: () => {
-        const refreshToken = localStorage.getItem('refresh_token')
-        return api.post('/auth/refresh', { refresh_token: refreshToken })
-    },
+    // SEC-C4b: refresh token travels in the HttpOnly cookie. The backend
+    // picks it from the cookie; we no longer read it from localStorage.
+    logout: () => api.post('/auth/logout', {}),
+    refresh: () => api.post('/auth/refresh', {}),
     getSsoProviders: (companyCode) =>
         api.get('/auth/sso/providers', { params: { company_code: companyCode } }),
     ssoLogin: (ssoConfigurationId, companyCode, username, password) =>

@@ -62,14 +62,9 @@ function getTokenExpiry(token) {
 // Proactively refresh the access token before it expires.
 // Returns the new token string, or null if refresh failed.
 async function proactiveRefresh() {
-    const currentRefreshToken = localStorage.getItem('refresh_token');
-    // TASK-030: HttpOnly cookie is the preferred carrier. Proceed even if
-    // localStorage has no refresh_token — the browser will send the cookie
-    // automatically (withCredentials=true).
-    const hasCookie = !!readCookie('csrf_token');
-    if (!currentRefreshToken && !hasCookie) return null;
-
-    // If another refresh is already running, queue behind it
+    // SEC-C4b: refresh token lives in the HttpOnly cookie. We rely on
+    // withCredentials=true to send it; the server picks it from the cookie.
+    // localStorage no longer stores a refresh token.
     if (isRefreshing) {
         return new Promise((resolve) => {
             refreshSubscribers.push((token) => resolve(token));
@@ -78,17 +73,14 @@ async function proactiveRefresh() {
 
     isRefreshing = true;
     try {
-        const payload = currentRefreshToken ? { refresh_token: currentRefreshToken } : {};
         const refreshRes = await axios.post(
             `${api.defaults.baseURL}/auth/refresh`,
-            payload,
+            {},
             { withCredentials: true }
         );
         const newToken = refreshRes.data?.access_token;
-        const newRefreshToken = refreshRes.data?.refresh_token;
         if (newToken) {
             localStorage.setItem('token', newToken);
-            if (newRefreshToken) localStorage.setItem('refresh_token', newRefreshToken);
             onRefreshed(newToken);
             window.dispatchEvent(new Event('token_refreshed'));
             return newToken;
@@ -196,7 +188,7 @@ api.interceptors.response.use(
 
             // Refresh failed — clear session and redirect to login
             localStorage.removeItem('token');
-            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('refresh_token'); // purge any legacy value
             localStorage.removeItem('user');
             localStorage.removeItem('company_id');
             window.location.href = '/login';
