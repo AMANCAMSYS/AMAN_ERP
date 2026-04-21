@@ -28,6 +28,7 @@ from .revenue_recognition import rev_router as revenue_recognition_router
 from .advanced_workflow import router as advanced_workflow_router
 from .cashflow import router as cashflow_router
 from .subscriptions import router as subscriptions_router
+from .accounting_depth import router as accounting_depth_router  # Phase 5 (TASK-036..040)
 
 # Combined router — each sub-module keeps its own prefix
 router = APIRouter()
@@ -49,3 +50,4 @@ router.include_router(revenue_recognition_router)
 router.include_router(advanced_workflow_router)
 router.include_router(cashflow_router)
 router.include_router(subscriptions_router)
+router.include_router(accounting_depth_router)
