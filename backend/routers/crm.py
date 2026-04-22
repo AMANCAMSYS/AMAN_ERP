@@ -787,9 +787,13 @@ async def execute_campaign(campaign_id: int, request: Request, current_user=Depe
     """Execute campaign: fetch segment contacts, create recipient records, dispatch notifications."""
     db = get_db_connection(current_user.company_id)
     try:
+        # CRM-F2: lock the campaign row for the duration of execution
+        # so concurrent /execute calls can't both pass the idempotency
+        # check and double-insert recipients.
         campaign = db.execute(text("""
             SELECT id, segment_id, campaign_type, subject, content, status, created_by
             FROM marketing_campaigns WHERE id = :id
+            FOR UPDATE
         """), {"id": campaign_id}).fetchone()
 
         if not campaign:
@@ -802,7 +806,8 @@ async def execute_campaign(campaign_id: int, request: Request, current_user=Depe
         if not c["segment_id"]:
             raise HTTPException(status_code=400, detail="Campaign must have a segment to execute")
 
-        # Idempotency: prevent double-execution
+        # CRM-F2: Idempotency — prevent double-execution (backed by the
+        # row-level lock above so two concurrent requests serialize here).
         existing_recipients = db.execute(text(
             "SELECT COUNT(*) FROM campaign_recipients WHERE campaign_id = :id"
         ), {"id": campaign_id}).scalar()

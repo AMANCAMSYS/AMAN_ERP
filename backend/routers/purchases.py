@@ -648,7 +648,7 @@ def approve_purchase_order(
     try:
         # Check current status
         po = db.execute(text("""
-            SELECT id, status, po_number, party_id as supplier_id FROM purchase_orders WHERE id = :id
+            SELECT id, status, po_number, party_id as supplier_id, branch_id, total, order_date FROM purchase_orders WHERE id = :id
         """), {"id": id}).fetchone()
         
         if not po:
@@ -656,7 +656,43 @@ def approve_purchase_order(
         
         if po.status != 'draft':
             raise HTTPException(status_code=400, detail="يمكن اعتماد أوامر الشراء في حالة 'مسودة' فقط")
-        
+
+        # PUR-F1: Budget guard on PO approval.
+        # When an active budget exists for the PO's branch/fiscal period,
+        # refuse to approve if (used_budget + po.total) would exceed
+        # total_budget, unless the caller has 'buying.override_budget'.
+        try:
+            perms = getattr(current_user, "permissions", []) or []
+            can_override = "*" in perms or "buying.override_budget" in perms or "accounting.admin" in perms
+            if not can_override and po.total and _dec(po.total) > 0:
+                po_year = po.order_date.year if po.order_date else None
+                bud = db.execute(text("""
+                    SELECT id, total_budget, used_budget
+                    FROM budgets
+                    WHERE status = 'active'
+                      AND (:branch IS NULL OR branch_id = :branch OR branch_id IS NULL)
+                      AND (fiscal_year = :yr OR fiscal_year IS NULL)
+                      AND (start_date IS NULL OR start_date <= :od)
+                      AND (end_date   IS NULL OR end_date   >= :od)
+                    ORDER BY (branch_id IS NULL) ASC, fiscal_year DESC NULLS LAST, id DESC
+                    LIMIT 1
+                """), {"branch": po.branch_id, "yr": po_year, "od": po.order_date}).fetchone()
+                if bud and bud.total_budget and _dec(bud.total_budget) > 0:
+                    remaining = _dec(bud.total_budget) - _dec(bud.used_budget or 0)
+                    if _dec(po.total) > remaining:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"تجاوز الميزانية: قيمة أمر الشراء {po.total} تتجاوز المتاح "
+                                f"{remaining} في الميزانية النشطة. "
+                                f"يلزم صلاحية buying.override_budget لتجاوز هذا القيد."
+                            ),
+                        )
+        except HTTPException:
+            raise
+        except Exception as be:
+            logger.warning(f"PUR-F1 budget check skipped (non-blocking): {be}")
+
         # Update status to approved
         db.execute(text("""
             UPDATE purchase_orders 

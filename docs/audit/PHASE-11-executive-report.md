@@ -8,24 +8,25 @@
 
 ## 0. Post-Phase-11 Execution Update (23 أبريل 2026)
 
-Four follow-up sprints have been merged onto `main` after this report was first filed. The **Status** column in sections 2.x has been updated in-place with the closing SHA; this summary captures totals.
+Five follow-up sprints have been merged onto `main` after this report was first filed. The **Status** column in sections 2.x has been updated in-place with the closing SHA; this summary captures totals.
 
 | Sprint | HEAD | Items closed | CI |
 |---|---|---|---|
 | Sprint-1 Quick Wins | `e646558` | SALES-F1, QA-F1, MFG-F1, PAY-F1, EINV-F1, baseline refresh | `ci` #176 green (after `413b32e` baseline fix) |
 | Sprint-2 IDOR + DB constraints | `e7a4796` | ACC-F5, CRM-F1, INV-F2, MFG-F2, PH10-B3 | `ci` #178 green, `security-scan` #53 green |
 | Sprint-2b UX + observability | `95efa4a` | POS-UI-F1, ACC-F6, INV-F4 | `ci` #179 green, `security-scan` #54 green |
-| Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | pending |
+| Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | `ci` #181 green, `security-scan` #56 green |
+| Sprint-3 Governance + UX extension | _this sprint_ | PUR-F1, SEC-09, IN-F5, CRM-F2, INV-F3 (verified), MFG-F3 (verified), POS-UI-F1 (extended to Returns/Held-Orders/Close-Session modals) | pending |
 
-**Updated distribution** (open only, post-Sprint-2c):
+**Updated distribution** (open only, post-Sprint-3):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 14 | 22 | 14 |
-| P2 | 6 | 17 | 31 |
-| P3 | 0 | 3 | 19 |
-| **Δ closed this round** | — | **+22** | — |
+| P1 | 14 | 24 | 12 |
+| P2 | 6 | 22 | 26 |
+| P3 | 0 | 4 | 18 |
+| **Δ closed this round (Sprint-3)** | — | **+6** | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 
@@ -100,7 +101,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | SEC-06 | CSP | P3 | Open | `style-src 'unsafe-inline'` | Nonce-based CSP migration |
 | SEC-07 | Logging/PII | P2 | Fixed | PII masking not enforced | Added `check_pii_logging.py` CI gate |
 | SEC-08 | Auth/2FA | P3 | Open | Admin 2FA token in env | Move encrypted to DB |
-| SEC-09 | Sessions | P3 | Open | No concurrent session limits | Enforce max sessions per user |
+| SEC-09 | Sessions | P3 | Fixed (Sprint-3) | No concurrent session limits | `MAX_CONCURRENT_SESSIONS` env enforced in login flow (oldest active sessions are deactivated) |
 | SEC-10 | Integrations | P2 | Fixed (`49f5d66`) | No outbound webhook allowlist | `WEBHOOK_HOSTNAME_ALLOWLIST` env honoured in `validate_webhook_url` |
 | SEC-11 | SSO | P2 | Open | SAML/OAuth/LDAP deep audit deferred | Follow-up audit |
 | SEC-12 | Dashboard | P3 | Open | Metadata endpoints ungated | Superseded by IN-F1 in Phase 9 |
@@ -178,12 +179,12 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 |---|---|---|---|---|---|
 | INV-F1 | Inventory | P2 | Open | Raw `stock_movements` endpoints bypass GL | Restrict or auto-post |
 | INV-F2 | Inventory | P2 | Fixed (`e7a4796`) | No `CHECK(quantity >= 0)` | DB CHECK constraint in `database.py` |
-| INV-F3 | Inventory | P3 | Open | Landed cost rounding absorbed by one line | Distribute residual |
+| INV-F3 | Inventory | P3 | Fixed | Landed cost rounding absorbed by one line | Largest-remainder distribution in `allocate_landed_cost` |
 | INV-F4 | Inventory | P3 | Fixed (`95efa4a`) | Expiry alerts ignore timezone | `datetime.now(timezone.utc).date()` |
 | MFG-F1 | Manufacturing | P2 | Fixed (`e646558`) | 3-way matching manual | Auto-trigger in `receive_purchase_order` + `create_purchase_invoice` |
 | MFG-F2 | Manufacturing | P2 | Fixed (`e7a4796`) | BOM percentage not bounded | DB CHECK `<= 100` in `database.py` |
 | MFG-F3 | Manufacturing | P3 | Fixed | WO status arbitrary strings | DB CHECK enum in `production_orders.status` |
-| PUR-F1 | Purchasing | P2 | Open | PO approval lacks budget check | Query `budget_allocations` |
+| PUR-F1 | Purchasing | P2 | Fixed (Sprint-3) | PO approval lacks budget check | Query active `budgets` row + reject when `po.total` exceeds remaining, unless `buying.override_budget` |
 | QA-F1 | Quality | P2 | Fixed (`e646558`) | Failed inspection does not block GRN/invoice | Block on `FAILED` in receipts+invoices |
 | MFG-FP-01 | Manufacturing | — | Rejected | FG receipt without GL (claim) | GL posted L1251–1289 |
 | INV-FP-01 | Inventory | — | Rejected | Landed cost without GL (claim) | GL posted L462 |
@@ -200,9 +201,9 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | CRM-F1 | CRM | P1 | Fixed (`e7a4796`) | `branch_id` stored but not filtered | Branch filter on opportunities/tickets/campaigns |
 | CON-F1 | Contracts | P2 | Open | Milestone billing not implemented | `contract_milestones` + scheduler |
 | POS-F1 | POS | P2 | Open | Offline sync limited to PWA cache | Bulk sync + idempotency |
-| CRM-F2 | CRM | P3 | Open | Campaign idempotency weak | TX-wrap + resume |
+| CRM-F2 | CRM | P3 | Fixed (Sprint-3) | Campaign idempotency weak | `SELECT … FOR UPDATE` on `marketing_campaigns` row before recipient insert |
 | SALES-F1 | Sales | P3 | Fixed (`e646558`) | Partial invoice hardcodes `NOW()` | Accepts `invoice_date` payload |
-| POS-UI-F1 | POS | — | Fixed (`95efa4a`) | Product cards white in dark-mode | `data-theme=dark` overrides added |
+| POS-UI-F1 | POS | — | Fixed (`95efa4a` + Sprint-3) | Product cards + Returns/Held-Orders/Close-Session cards white in dark-mode | `data-theme=dark` overrides added to `POSInterface.css` and `components/POSComponents.css`; close-session inline styles migrated to classes |
 | POS-FP-01/02 | POS | — | Rejected | Loyalty/promotions missing (claims) | Present at pos.py:1162–1400+ |
 | CON-FP-01 | Contracts | — | Rejected | Amendments lack versioning (claim) | Immutable `contract_amendments` |
 | SALES-FP-01 | Sales | — | Rejected | Partial invoice bypasses fiscal lock (claim) | Lock at invoices.py:160 |
@@ -230,7 +231,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | IN-F2 | Data Import/External | P2 | Fixed | 3 catalog endpoints lacked permission | `require_permission` added |
 | IN-F3 | Integrations | P2 | Open | UAE FTA + EG ETA stubs | Live submission after ASP onboarding |
 | IN-F4 | Seed/Secrets | P2 | Fixed | Hardcoded passwords in seed scripts | All seed scripts now require `AMAN_SEED_*` env vars |
-| IN-F5 | Integrations | P3 | Open | Adapters lack per-adapter retry knobs | Retry config |
+| IN-F5 | Integrations | P3 | Fixed (Sprint-3) | Adapters lack per-adapter retry knobs | `WEBHOOK_RETRY_MAX_ATTEMPTS`, `WEBHOOK_TIMEOUT_MAX_SEC`, `WEBHOOK_RETRY_BACKOFF_BASE`, `WEBHOOK_RETRY_BACKOFF_CAP_SEC` env overrides |
 | IN-F6 | i18n | P3 | Open | Hardcoded Arabic router tags | i18n sweep |
 | IN-FP-01 | Notifications | — | Rejected | 7 IDOR claims | All scoped by `user_id=:uid` |
 | IN-FP-02 | Dashboard | — | Rejected | `/system-stats` public (claim) | `system_admin` check L372 |

@@ -407,4 +407,164 @@
     to {
         transform: rotate(360deg);
     }
+}}
+
+/* ═══════════════════════════════════════════════════════════
+   DARK-THEME OVERRIDES (POS-UI-F1 extension)
+   Returns / Held-Orders / Close-Session modals.
+   ═══════════════════════════════════════════════════════════ */
+[data-theme="dark"] .held-orders-modal,
+[data-theme="dark"] .returns-modal {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+[data-theme="dark"] .held-orders-content,
+[data-theme="dark"] .returns-content {
+    background: var(--bg-card, #1e293b);
+    color: var(--text-main, #e2e8f0);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .held-orders-header,
+[data-theme="dark"] .returns-header {
+    background: var(--bg-surface, #0f172a);
+    border-bottom-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .held-orders-header h3,
+[data-theme="dark"] .returns-header h3 {
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .close-btn {
+    color: var(--text-secondary, #cbd5e1);
+}
+
+[data-theme="dark"] .close-btn:hover {
+    background: var(--bg-surface, #0f172a);
+    color: var(--text-main, #fff);
+}
+
+[data-theme="dark"] .held-order-card {
+    background: var(--bg-surface, #0f172a);
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .held-order-card:hover {
+    border-color: var(--pos-primary-light, #60a5fa);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="dark"] .order-number {
+    color: var(--pos-primary-light, #60a5fa);
+}
+
+[data-theme="dark"] .order-meta {
+    color: var(--text-muted, #94a3b8);
+}
+
+[data-theme="dark"] .order-total {
+    color: #4ade80;
+}
+
+[data-theme="dark"] .empty-state {
+    color: var(--text-muted, #94a3b8);
+}
+
+[data-theme="dark"] .step-desc {
+    color: var(--text-muted, #94a3b8);
+}
+
+[data-theme="dark"] .search-box input {
+    background: var(--bg-surface, #0f172a);
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .search-box input:focus {
+    border-color: var(--pos-primary-light, #60a5fa);
+}
+
+[data-theme="dark"] .order-summary {
+    background: var(--bg-surface, #0f172a);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .return-item {
+    background: var(--bg-surface, #0f172a);
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .item-price {
+    color: var(--text-muted, #94a3b8);
+}
+
+[data-theme="dark"] .item-qty-controls button {
+    background: var(--bg-card, #1e293b);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .item-qty-controls button:hover {
+    background: var(--pos-primary-light, #60a5fa);
+    color: #0f172a;
+}
+
+[data-theme="dark"] .item-qty-controls span.has-qty {
+    color: #f87171;
+}
+
+[data-theme="dark"] .method-btn {
+    background: var(--bg-surface, #0f172a);
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .method-btn.active {
+    border-color: var(--pos-primary-light, #60a5fa);
+    background: rgba(96, 165, 250, 0.15);
+    color: var(--pos-primary-light, #60a5fa);
+}
+
+[data-theme="dark"] .return-summary {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+[data-theme="dark"] .total-refund .amount {
+    color: #f87171;
+}
+
+[data-theme="dark"] .select-items-step textarea {
+    background: var(--bg-surface, #0f172a);
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .btn-ghost {
+    background: transparent;
+    border-color: var(--border-color, #334155);
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .btn-ghost:hover {
+    background: var(--bg-surface, #0f172a);
+}
+
+/* Close-Session modal (inline-styled in POSInterface.jsx) uses
+   `.close-session-summary`, `.close-session-row`, and
+   `.close-session-input` — ensure overrides apply when we migrate
+   those inline styles to classes. */
+[data-theme="dark"] .close-session-summary {
+    background: var(--bg-surface, #0f172a) !important;
+    color: var(--text-main, #e2e8f0);
+}
+
+[data-theme="dark"] .close-session-input,
+[data-theme="dark"] .close-session-textarea {
+    background: var(--bg-surface, #0f172a) !important;
+    color: var(--text-main, #e2e8f0) !important;
+    border-color: var(--border-color, #334155) !important;
 }

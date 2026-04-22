@@ -778,6 +778,29 @@ async def login(
                     session_token_hash = _hash_token(access_token)
                     user_agent = request.headers.get("user-agent", "")[:500]
                     client_ip = _get_client_ip(request)
+
+                    # SEC-09: concurrent-session limit. When
+                    # MAX_CONCURRENT_SESSIONS is set (>0), close the
+                    # oldest active sessions so that at most that many
+                    # remain for this user. Defaults to unlimited.
+                    try:
+                        max_sessions = int(os.environ.get("MAX_CONCURRENT_SESSIONS", "0") or 0)
+                    except ValueError:
+                        max_sessions = 0
+                    if max_sessions > 0:
+                        company_conn.execute(text("""
+                            UPDATE user_sessions
+                            SET is_active = FALSE
+                            WHERE user_id = :uid
+                              AND is_active = TRUE
+                              AND id IN (
+                                SELECT id FROM user_sessions
+                                WHERE user_id = :uid AND is_active = TRUE
+                                ORDER BY last_activity DESC
+                                OFFSET :keep
+                              )
+                        """), {"uid": result[0], "keep": max_sessions - 1})
+
                     company_conn.execute(text("""
                         INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, login_time, last_activity, is_active)
                         VALUES (:uid, :thash, :ip, :ua, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE)

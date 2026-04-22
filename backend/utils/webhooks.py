@@ -196,7 +196,13 @@ def _send_single_webhook(webhook_id: int, url: str, secret: Optional[str],
         
         if attempt < retry_count:
             import time
-            wait = 2 ** attempt  # Exponential backoff: 2, 4, 8 seconds
+            # IN-F5: per-adapter retry backoff knob (env override)
+            try:
+                backoff_base = float(os.environ.get("WEBHOOK_RETRY_BACKOFF_BASE", "2"))
+                backoff_cap = float(os.environ.get("WEBHOOK_RETRY_BACKOFF_CAP_SEC", "60"))
+            except ValueError:
+                backoff_base, backoff_cap = 2.0, 60.0
+            wait = min(backoff_base ** attempt, backoff_cap)
             logger.warning(f"⚠️ Webhook #{webhook_id} failed (attempt {attempt}), retrying in {wait}s...")
             time.sleep(wait)
     
@@ -222,11 +228,24 @@ def fire_webhook_event(db, event: str, payload: dict, db_factory=None):
             WHERE is_active = TRUE AND events @> :event::jsonb
         """), {"event": json.dumps([event])}).fetchall()
         
+        # IN-F5: env-level caps for timeout + retry_count (safety net)
+        try:
+            max_retries_env = int(os.environ.get("WEBHOOK_RETRY_MAX_ATTEMPTS", "0") or 0)
+            max_timeout_env = int(os.environ.get("WEBHOOK_TIMEOUT_MAX_SEC", "0") or 0)
+        except ValueError:
+            max_retries_env, max_timeout_env = 0, 0
+
         for wh in webhooks:
+            effective_retries = wh.retry_count or 3
+            effective_timeout = wh.timeout_seconds or 10
+            if max_retries_env > 0:
+                effective_retries = min(effective_retries, max_retries_env)
+            if max_timeout_env > 0:
+                effective_timeout = min(effective_timeout, max_timeout_env)
             thread = threading.Thread(
                 target=_send_single_webhook,
                 args=(wh.id, wh.url, wh.secret, event, payload,
-                      wh.timeout_seconds or 10, wh.retry_count or 3, db_factory),
+                      effective_timeout, effective_retries, db_factory),
                 daemon=True
             )
             thread.start()

@@ -832,7 +832,7 @@ const POSInterface = () => {
                         </div>
 
                         <div style={{ padding: '20px' }}>
-                            <div style={{ marginBottom: '20px', padding: '16px', background: 'var(--base-200)', borderRadius: '12px' }}>
+                            <div className="close-session-summary" style={{ marginBottom: '20px', padding: '16px', background: 'var(--base-200)', borderRadius: '12px' }}>
                                 <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>{t('pos.session_summary')}</h4>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -877,6 +877,7 @@ const POSInterface = () => {
                                     value={closingData.cashCount}
                                     onChange={(e) => setClosingData({ ...closingData, cashCount: e.target.value })}
                                     placeholder="0.00"
+                                    className="close-session-input"
                                     style={{
                                         width: '100%',
                                         padding: '12px',
@@ -898,6 +899,7 @@ const POSInterface = () => {
                                     onChange={(e) => setClosingData({ ...closingData, notes: e.target.value })}
                                     placeholder={t('pos.closing_notes_placeholder')}
                                     rows="3"
+                                    className="close-session-textarea"
                                     style={{
                                         width: '100%',
                                         padding: '12px',
