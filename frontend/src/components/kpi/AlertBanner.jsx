@@ -18,7 +18,7 @@ const LEVEL_STYLES = {
 };
 
 const AlertBanner = ({ alerts = [] }) => {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
     const isRTL = i18n.dir() === 'rtl';
 
     if (!alerts || alerts.length === 0) return null;
@@ -58,7 +58,7 @@ const AlertBanner = ({ alerts = [] }) => {
                                     whiteSpace: 'nowrap',
                                 }}
                             >
-                                {alert.action_label || (isRTL ? 'عرض' : 'View')} →
+                                {alert.action_label || t('common.view')} →
                             </a>
                         )}
                     </div>

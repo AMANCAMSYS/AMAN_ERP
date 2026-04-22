@@ -74,7 +74,7 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
             setData(res.data);
         } catch (err) {
             console.error('KPI fetch error:', err);
-            setError(err?.response?.data?.detail || (isRTL ? 'خطأ في تحميل المؤشرات' : 'Error loading KPIs'));
+            setError(err?.response?.data?.detail || t('kpi.error_loading'));
         } finally {
             setLoading(false);
         }
@@ -133,7 +133,7 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                             fontSize: '0.7rem', fontWeight: 600,
                             padding: '2px 8px', borderRadius: '10px',
                         }}>
-                            {alerts.length} {isRTL ? 'تنبيه' : 'alert'}
+                            {alerts.length} {t('common.alert')}
                         </span>
                     )}
                 </div>
@@ -254,7 +254,7 @@ const ModuleKPISection = ({ roleKey, color = '#6366f1', defaultOpen = true }) =>
                                 borderBottom: '1px solid var(--border-color)',
                                 display: 'flex', alignItems: 'center', gap: '0.3rem',
                             }}>
-                                🏢 {isRTL ? 'مؤشرات القطاع' : 'Industry KPIs'}
+                                🏢 {t('kpi.industry_kpis')}
                             </h4>
                             <div style={{
                                 display: 'grid',

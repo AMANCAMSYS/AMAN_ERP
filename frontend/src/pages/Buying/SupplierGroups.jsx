@@ -263,7 +263,7 @@ function SupplierGroups() {
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label">نوع التأثير</label>
+                                    <label className="form-label">{t('sales.effect_type')}</label>
                                     <select
                                         className="form-input"
                                         value={formData.effect_type}
@@ -274,7 +274,7 @@ function SupplierGroups() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">نطاق التطبيق</label>
+                                    <label className="form-label">{t('sales.application_scope')}</label>
                                     <select
                                         className="form-input"
                                         value={formData.application_scope}

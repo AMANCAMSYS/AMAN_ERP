@@ -112,7 +112,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
                 <button
                     className="sidebar-toggle"
                     onClick={handleToggleClick}
-                    aria-label={isOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
+                    aria-label={isOpen ? t('common.close_menu') : t('common.open_menu')}
                     aria-expanded={isOpen}
                     type="button"
                 >

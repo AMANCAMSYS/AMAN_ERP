@@ -13,7 +13,7 @@ import { ArrowLeft } from 'lucide-react';
 export default function BackButton({ onClick, label }) {
     const navigate = useNavigate();
     const location = useLocation();
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
 
     const handleBack = () => {
@@ -29,7 +29,7 @@ export default function BackButton({ onClick, label }) {
     return (
         <button
             onClick={handleBack}
-            title={label || (isRTL ? 'رجوع' : 'Back')}
+            title={label || t('common.back')}
             className="back-button"
             style={{
                 display: 'inline-flex',

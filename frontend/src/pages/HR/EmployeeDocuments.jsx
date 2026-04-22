@@ -73,9 +73,9 @@ const EmployeeDocuments = () => {
         const days = getDaysUntilExpiry(expiryDate);
         if (days === null) return null;
         if (days < 0) return <span className="badge badge-danger">{t('hr.documents.expired')}</span>;
-        if (days <= 30) return <span className="badge badge-danger">{isRTL ? `${days} يوم` : `${days} days`}</span>;
-        if (days <= 60) return <span className="badge badge-warning">{isRTL ? `${days} يوم` : `${days} days`}</span>;
-        if (days <= 90) return <span className="badge badge-info">{isRTL ? `${days} يوم` : `${days} days`}</span>;
+        if (days <= 30) return <span className="badge badge-danger">{t('hr.days_count', { count: days })}</span>;
+        if (days <= 60) return <span className="badge badge-warning">{t('hr.days_count', { count: days })}</span>;
+        if (days <= 90) return <span className="badge badge-info">{t('hr.days_count', { count: days })}</span>;
         return <span className="badge badge-success">{t('hr.documents.valid')}</span>;
     };
 

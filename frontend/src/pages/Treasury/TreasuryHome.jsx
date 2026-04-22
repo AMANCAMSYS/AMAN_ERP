@@ -120,22 +120,22 @@ function TreasuryHome() {
                         </div>
                         <div className="link-item" onClick={() => navigate('/treasury/checks-receivable')}>
                             <span className="link-icon">📥</span>
-                            شيكات تحت التحصيل
+                            {t('treasury.checks_for_collection')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/treasury/checks-payable')}>
                             <span className="link-icon">📤</span>
-                            شيكات تحت الدفع
+                            {t('treasury.checks_for_payment')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/treasury/notes-receivable')}>
                             <span className="link-icon">📜</span>
-                            أوراق القبض
+                            {t('treasury.notes_receivable')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                         <div className="link-item" onClick={() => navigate('/treasury/notes-payable')}>
                             <span className="link-icon">📝</span>
-                            أوراق الدفع
+                            {t('treasury.notes_payable')}
                             <span className="link-arrow">{i18n.language === 'ar' ? '←' : '→'}</span>
                         </div>
                     </div>

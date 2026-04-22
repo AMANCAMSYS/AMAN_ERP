@@ -41,9 +41,7 @@ const NotFound = () => {
                 marginBottom: '2rem',
                 maxWidth: '400px'
             }}>
-                {isRTL
-                    ? 'عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.'
-                    : 'Sorry, the page you are looking for does not exist or has been moved.'}
+                {t('common.page_not_found_desc')}
             </p>
             <button
                 onClick={() => navigate('/dashboard')}

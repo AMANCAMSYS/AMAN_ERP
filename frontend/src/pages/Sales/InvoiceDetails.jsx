@@ -249,7 +249,7 @@ function InvoiceDetails() {
                         textAlign: 'center'
                     }}>
                         <h4 style={{ marginBottom: '12px', fontSize: '14px', color: 'var(--text-secondary)' }}>
-                            رمز الفاتورة الإلكترونية (ZATCA)
+                            {t('common.zatca_qr_code')}
                         </h4>
                         <img 
                             src={`data:image/png;base64,${invoice.zatca_qr}`}
@@ -259,8 +259,8 @@ function InvoiceDetails() {
                         {invoice.zatca_status && (
                             <div style={{ marginTop: '8px' }}>
                                 <span className={`badge ${invoice.zatca_status === 'submitted' ? 'badge-success' : 'badge-info'}`}>
-                                    {invoice.zatca_status === 'generated' ? 'تم التوليد' : 
-                                     invoice.zatca_status === 'submitted' ? 'تم الإرسال' : invoice.zatca_status}
+                                    {invoice.zatca_status === 'generated' ? t('common.zatca_generated') : 
+                                     invoice.zatca_status === 'submitted' ? t('common.zatca_submitted') : invoice.zatca_status}
                                 </span>
                             </div>
                         )}

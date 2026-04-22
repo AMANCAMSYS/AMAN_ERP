@@ -137,9 +137,11 @@ const Payslips = () => {
     const totalNet = filteredPayslips.reduce((s, p) => s + (p.net_pay || p.net_salary || 0), 0);
     const totalBasic = filteredPayslips.reduce((s, p) => s + (p.basic_salary || 0), 0);
 
-    const monthNames = isRTL
-        ? ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
-        : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthNames = [
+        t('months.jan'), t('months.feb'), t('months.mar'), t('months.apr'),
+        t('months.may'), t('months.jun'), t('months.jul'), t('months.aug'),
+        t('months.sep'), t('months.oct'), t('months.nov'), t('months.dec'),
+    ];
 
     return (
         <div className="workspace fade-in">

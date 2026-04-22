@@ -35,7 +35,7 @@ const STATUS_COLORS_DARK = {
 };
 
 const KPICard = ({ kpi, currency = '', compact = false }) => {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { darkMode } = useTheme();
     const isRTL = i18n.dir() === 'rtl';
 
@@ -138,7 +138,7 @@ const KPICard = ({ kpi, currency = '', compact = false }) => {
                         display: 'flex', justifyContent: 'space-between',
                         fontSize: '0.65rem', color: 'var(--text-muted, #94a3b8)', marginBottom: 3,
                     }}>
-                        <span>{isRTL ? 'المستهدف' : 'Target'}</span>
+                        <span>{t('kpi.target')}</span>
                         <span>{formatNumber(kpi.target)} {unit}</span>
                     </div>
                     <div style={{

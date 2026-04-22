@@ -163,7 +163,7 @@ const Budgets = () => {
                         <div className={`fw-bold fs-4 ${stats.overrun_items_count > 0 ? 'text-danger' : 'text-success'}`}>
                             {stats.overrun_items_count}
                         </div>
-                        <div className="small text-muted">{stats.overrun_items_count > 0 ? '⚠️ تحذير' : '✅ جيد'}</div>
+                        <div className="small text-muted">{stats.overrun_items_count > 0 ? `⚠️ ${t('common.warning')}` : `✅ ${t('common.good')}`}</div>
                     </div>
                 </div>
             )}

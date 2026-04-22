@@ -281,7 +281,7 @@ const POSHome = () => {
                         )}
                         <div className="link-item" onClick={() => navigate('/pos/kpi')} style={{ background: 'linear-gradient(135deg, rgba(13,148,136,0.06), rgba(13,148,136,0.12))', borderRight: isRTL ? '3px solid #0d9488' : 'none', borderLeft: !isRTL ? '3px solid #0d9488' : 'none' }}>
                             <span className="link-icon">📈</span>
-                            <span style={{ fontWeight: 600, color: '#0d9488' }}>{isRTL ? 'مؤشرات أداء نقاط البيع' : 'POS KPI Dashboard'}</span>
+                            <span style={{ fontWeight: 600, color: '#0d9488' }}>{t('kpi.pos_kpi_dashboard')}</span>
                             <span className="link-arrow">{isRTL ? '←' : '→'}</span>
                         </div>
                     </div>

@@ -33,12 +33,12 @@ const PeriodSelector = ({
     const isRTL = i18n.dir() === 'rtl';
 
     const labels = {
-        today: isRTL ? 'اليوم' : 'Today',
-        wtd:   isRTL ? 'الأسبوع' : 'Week',
-        mtd:   isRTL ? 'الشهر' : 'Month',
-        qtd:   isRTL ? 'الربع' : 'Quarter',
-        ytd:   isRTL ? 'السنة' : 'Year',
-        custom: isRTL ? 'مخصص' : 'Custom',
+        today: t('kpi.period_today'),
+        wtd:   t('kpi.period_week'),
+        mtd:   t('kpi.period_month'),
+        qtd:   t('kpi.period_quarter'),
+        ytd:   t('kpi.period_year'),
+        custom: t('kpi.period_custom'),
     };
 
     return (

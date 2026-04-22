@@ -63,9 +63,7 @@ const KPIHub = () => {
                     {t('kpi.kpi_dashboard_hub')}
                 </h1>
                 <p className="workspace-subtitle">
-                    {isRTL
-                        ? 'اختر لوحة التحكم المناسبة لدورك الوظيفي'
-                        : 'Select the dashboard matching your role'}
+                    {t('kpi.select_dashboard_for_role')}
                 </p>
             </div>
 
@@ -89,9 +87,7 @@ const KPIHub = () => {
                         {t('kpi.my_smart_dashboard')}
                     </div>
                     <div style={{ fontSize: '0.82rem', opacity: 0.85, marginTop: 2 }}>
-                        {isRTL
-                            ? 'لوحة مخصصة تلقائياً حسب دورك الوظيفي ونوع شركتك'
-                            : 'Auto-customized based on your role and company type'}
+                        {t('kpi.auto_dashboard_desc')}
                     </div>
                 </div>
             </div>

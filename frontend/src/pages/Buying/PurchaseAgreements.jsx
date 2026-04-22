@@ -120,7 +120,7 @@ const PurchaseAgreements = () => {
                                 <input className="form-input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
                             <div className="form-group"><label className="form-label">{t('buying.agreement_supplier_id')}</label>
                                 <select className="form-input" required value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}>
-                                    <option value="">-- اختر المورد --</option>
+                                    <option value="">-- {t('common.select_supplier')} --</option>
                                     {suppliers.map(s => (
                                         <option key={s.id} value={s.id}>{s.name || s.supplier_name}{s.party_code ? ` (${s.party_code})` : ''}</option>
                                     ))}

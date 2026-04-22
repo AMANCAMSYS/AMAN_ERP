@@ -188,7 +188,7 @@ const TrainingPrograms = () => {
             {showParticipantsModal && (
                 <div className="modal-overlay" onClick={() => setShowParticipantsModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-                        <h2 className="modal-title">{isRTL ? `المشاركون - ${selectedProgram?.name}` : `Participants - ${selectedProgram?.name}`}</h2>
+                        <h2 className="modal-title">{t('hr.participants_title', { name: selectedProgram?.name })}</h2>
                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                             <select className="form-input" value={partForm.employee_id} onChange={e => setPartForm({ employee_id: e.target.value })} style={{ flex: 1 }}>
                                 <option value="">{t('hr.training.select_employee')}</option>

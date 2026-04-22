@@ -34,7 +34,7 @@ function TaxReturnDetails() {
             setData(res.data)
             setPayForm(prev => ({ ...prev, amount: res.data.remaining_amount || 0 }))
         } catch (err) {
-            setError(err.response?.data?.detail || 'خطأ في تحميل البيانات')
+            setError(err.response?.data?.detail || t('common.error_loading_data'))
         } finally {
             setLoading(false)
         }

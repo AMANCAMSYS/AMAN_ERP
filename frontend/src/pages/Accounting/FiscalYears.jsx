@@ -316,7 +316,7 @@ function FiscalYears() {
                                 }}>
                                     <div style={{ fontSize: '0.85rem', color: '#666' }}>
                                         {isRTL
-                                            ? (preview.net_income >= 0 ? 'صافي الربح' : 'صافي الخسارة')
+                                            ? (preview.net_income >= 0 ? t('common.net_profit') : t('common.net_loss'))
                                             : (preview.net_income >= 0 ? 'Net Profit' : 'Net Loss')}
                                     </div>
                                     <div style={{

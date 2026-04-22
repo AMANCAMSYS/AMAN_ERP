@@ -456,7 +456,7 @@ function IndustrySetup() {
                 onClick={handleNext}
                 disabled={!selected}
               >
-                {isRTL ? 'التالي ←' : '→ Next'}
+                {t('common.next')}
               </button>
             </>
           )}
@@ -516,7 +516,7 @@ function IndustrySetup() {
               {/* Actions */}
               <div className="setup-btn-row">
                 <button className="btn btn-secondary" onClick={handleBack} style={{ flex: 1 }}>
-                  {isRTL ? '→ رجوع' : '← Back'}
+                  {t('common.back')}
                 </button>
                 <button
                   className="btn btn-success"

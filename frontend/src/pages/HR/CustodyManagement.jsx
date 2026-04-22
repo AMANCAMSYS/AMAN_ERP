@@ -196,7 +196,7 @@ const CustodyManagement = () => {
                 <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
                         <h2 className="modal-title">{t('hr.custody.return_custody')}</h2>
-                        <p style={{ color: '#666', marginBottom: '1rem' }}>{isRTL ? `إرجاع: ${returnItem?.item_name}` : `Returning: ${returnItem?.item_name}`}</p>
+                        <p style={{ color: '#666', marginBottom: '1rem' }}>{t('hr.returning_item', { name: returnItem?.item_name })}</p>
                         <div className="form-group">
                             <label>{t('hr.custody.condition')}</label>
                             <select className="form-input" value={returnForm.condition} onChange={e => setReturnForm({ ...returnForm, condition: e.target.value })}>
