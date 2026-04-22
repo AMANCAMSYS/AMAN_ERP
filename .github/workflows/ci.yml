@@ -328,11 +328,6 @@ jobs:
               NEED_FRONTEND=1
             fi
 
-            if [ "$NEED_BACKEND" = "0" ] && [ "$NEED_FRONTEND" = "0" ]; then
-              NEED_BACKEND=1
-              NEED_FRONTEND=1
-            fi
-
             echo "Plan: backend=$NEED_BACKEND frontend=$NEED_FRONTEND"
 
             echo "=== 2. Rebuild Docker images (affected services only) ==="
@@ -344,8 +339,12 @@ jobs:
               BUILD_SERVICES="$BUILD_SERVICES frontend"
             fi
 
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-              build $BUILD_SERVICES
+            if [ -n "$BUILD_SERVICES" ]; then
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+                build $BUILD_SERVICES
+            else
+              echo "No runtime service changes detected — skipping image build/restart."
+            fi
 
             if [ "$NEED_BACKEND" = "1" ]; then
               echo "=== 3. Restart backend + worker first (keep frontend serving) ==="

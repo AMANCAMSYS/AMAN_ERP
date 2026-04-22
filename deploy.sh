@@ -55,12 +55,6 @@ if echo "$CHANGED_FILES" | grep -Eq '^(frontend/|docker-compose\.yml|docker-comp
   NEED_FRONTEND=1
 fi
 
-# Safety fallback: if detection can't decide, deploy both.
-if [ "$NEED_BACKEND" -eq 0 ] && [ "$NEED_FRONTEND" -eq 0 ]; then
-  NEED_BACKEND=1
-  NEED_FRONTEND=1
-fi
-
 echo "Plan: backend=$NEED_BACKEND frontend=$NEED_FRONTEND"
 
 echo ""
@@ -73,8 +67,12 @@ if [ "$NEED_FRONTEND" -eq 1 ]; then
   BUILD_SERVICES="$BUILD_SERVICES frontend"
 fi
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  build $BUILD_SERVICES 2>&1 | grep -E "^(Step|Successfully built|#)" || true
+if [ -n "$BUILD_SERVICES" ]; then
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+    build $BUILD_SERVICES 2>&1 | grep -E "^(Step|Successfully built|#)" || true
+else
+  echo "No runtime service changes detected — skipping image build/restart."
+fi
 
 echo ""
 if [ "$NEED_BACKEND" -eq 1 ]; then
