@@ -65,20 +65,30 @@ def generate_sequential_number(db, prefix: str, table: str, column: str) -> str:
     """
     Generate a sequential document number.
     Example: prefix='SINV-2026' → 'SINV-2026-00001'
-    
+
     Uses MAX extraction of trailing digits from existing numbers to determine next.
     table and column are developer-defined constants (not user input).
-    Uses FOR UPDATE to prevent race conditions under concurrent access.
+
+    Concurrency: uses a PostgreSQL transaction-scoped advisory lock keyed by
+    (table, column, prefix) to serialize concurrent callers without violating
+    PG's restriction against FOR UPDATE on aggregate queries.
     """
     # SEC-003: Validate table/column identifiers to prevent SQL injection
     from utils.sql_safety import validate_sql_identifier
     validate_sql_identifier(table, "table")
     validate_sql_identifier(column, "column")
-    
+
+    # Serialize concurrent number generation for this (table.column, prefix)
+    # pair. pg_advisory_xact_lock releases automatically at COMMIT/ROLLBACK.
+    lock_key = f"{table}.{column}:{prefix}"
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+        {"k": lock_key},
+    )
+
     result = db.execute(text(f"""
         SELECT MAX(CAST(SUBSTRING({column} FROM '[0-9]+$') AS INTEGER))
         FROM {table} WHERE {column} LIKE :pattern
-        FOR UPDATE
     """), {"pattern": f"{prefix}-%"}).scalar()
     next_num = (result or 0) + 1
     return f"{prefix}-{str(next_num).zfill(5)}"
