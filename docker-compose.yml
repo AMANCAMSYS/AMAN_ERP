@@ -28,7 +28,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     ports:
       - "127.0.0.1:5432:5432"   # Bind to localhost only (not exposed externally)
     healthcheck:
