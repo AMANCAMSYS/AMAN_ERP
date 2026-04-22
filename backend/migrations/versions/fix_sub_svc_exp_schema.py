@@ -5,7 +5,6 @@ Revises: a020_fix_schema
 Create Date: 2026-04-20
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = 'a021_fix_sub_svc_exp'
 down_revision = 'a020_fix_schema'

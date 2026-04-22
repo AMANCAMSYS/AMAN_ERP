@@ -12,7 +12,7 @@ import logging
 import socket
 import threading
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Optional
 from urllib.parse import urlparse
 
 import requests

@@ -1,15 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional
-from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from typing import Optional
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
-from schemas.parties import PartyResponse
 import logging
 logger = logging.getLogger(__name__)
 
@@ -56,7 +52,7 @@ async def get_customers(
              parties.append(dict(row._mapping))
              
         return {"items": parties}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -103,7 +99,7 @@ async def get_suppliers(
              parties.append(dict(row._mapping))
              
         return {"items": parties}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

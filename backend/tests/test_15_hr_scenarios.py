@@ -6,8 +6,8 @@ Comprehensive Multi-Scenario Tests: HR Module
 """
 
 import pytest
-from datetime import date, timedelta, datetime
-from helpers import assert_valid_response, assert_error_response
+from datetime import date, timedelta
+from helpers import assert_valid_response
 
 
 # ═══════════════════════════════════════════════════════════════

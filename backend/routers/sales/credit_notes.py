@@ -11,7 +11,7 @@ Debit Note (إشعار مدين): Increases customer balance (e.g., undercharge 
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import Optional, List
+from typing import Optional
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
@@ -21,7 +21,6 @@ from utils.audit import log_activity
 from utils.accounting import (
     get_mapped_account_id,
     generate_sequential_number,
-    update_account_balance,
     get_base_currency,
     validate_je_lines,
 )

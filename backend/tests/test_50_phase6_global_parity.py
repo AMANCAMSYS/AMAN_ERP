@@ -5,9 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import json
 from datetime import datetime, timezone
-from decimal import Decimal
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -15,7 +13,7 @@ from decimal import Decimal
 # ═══════════════════════════════════════════════════════════════════════════
 
 def test_zatca_tlv_qr_includes_mandatory_tags_1_to_5():
-    from integrations.einvoicing.zatca_adapter import build_qr_payload, _tlv
+    from integrations.einvoicing.zatca_adapter import build_qr_payload
 
     qr = build_qr_payload(
         seller_name="Acme KSA",

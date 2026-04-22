@@ -24,15 +24,15 @@ scrape_configs:
         target_label: instance
         replacement: 'aman-backend'
 
-  # ── PostgreSQL metrics (requires postgres_exporter) ─────────────────────────
-  # - job_name: 'postgresql'
-  #   static_configs:
-  #     - targets: ['postgres-exporter:9187']
+  # ── PostgreSQL metrics (postgres_exporter) ─────────────────────────────────
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
 
-  # ── Redis metrics (requires redis_exporter) ─────────────────────────────────
-  # - job_name: 'redis'
-  #   static_configs:
-  #     - targets: ['redis-exporter:9121']
+  # ── Redis metrics (redis_exporter) ─────────────────────────────────────────
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
 
   # ── Prometheus self-monitoring ───────────────────────────────────────────────
   - job_name: 'prometheus'

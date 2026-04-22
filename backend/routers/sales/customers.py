@@ -5,11 +5,11 @@ from sqlalchemy import text
 from typing import List, Optional
 import logging
 
-from database import get_company_db, get_db_connection
+from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
-from .schemas import CustomerCreate, CustomerResponse, CustomerGroupCreate
+from .schemas import CustomerCreate, CustomerGroupCreate
 
 customers_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -357,7 +357,7 @@ def create_customer_group(
         )
 
         return {"id": result[0], "group_name": group.group_name}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -400,7 +400,7 @@ def update_customer_group(
         )
 
         return {"success": True}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -438,7 +438,7 @@ def delete_customer_group(
         return {"success": True}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

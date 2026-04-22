@@ -9,10 +9,8 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
-from typing import Optional
 import logging
 import io
-import json
 from datetime import datetime
 
 logger = logging.getLogger("aman.data_import")
@@ -134,7 +132,7 @@ async def preview_import(
 
     try:
         rows = _parse_file(content, filename)
-    except Exception as e:
+    except Exception:
         logger.exception("Error parsing import file")
         raise HTTPException(**http_error(400, "file_read_error"))
 
@@ -203,7 +201,7 @@ async def execute_import(
 
     try:
         rows = _parse_file(content, filename)
-    except Exception as e:
+    except Exception:
         logger.exception("Error parsing import file")
         raise HTTPException(**http_error(400, "file_read_error"))
 
@@ -272,7 +270,7 @@ async def execute_import(
 
             except HTTPException:
                 raise
-            except Exception as e:
+            except Exception:
                 if skip_errors:
                     skipped += 1
                     errors.append(f"سطر {i + 2}: خطأ في البيانات")
@@ -291,7 +289,7 @@ async def execute_import(
             pass
 
         return {
-            "message": f"تم الاستيراد بنجاح",
+            "message": "تم الاستيراد بنجاح",
             "inserted": inserted,
             "updated": updated,
             "skipped": skipped,
@@ -300,7 +298,7 @@ async def execute_import(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -357,7 +355,7 @@ def export_data(
                 media_type="text/csv",
                 headers={"Content-Disposition": f"attachment; filename={entity_type}_export_{datetime.now().strftime('%Y%m%d')}.csv"}
             )
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

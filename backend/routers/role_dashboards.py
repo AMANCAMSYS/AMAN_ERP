@@ -6,7 +6,6 @@ AMAN ERP - Role-Based KPI Dashboards Router
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text
 from typing import Dict, Any, Optional
 from datetime import date
 import logging

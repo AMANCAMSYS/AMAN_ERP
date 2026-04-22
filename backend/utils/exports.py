@@ -3,13 +3,12 @@ import pandas as pd
 from datetime import datetime
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape, A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_RIGHT, TA_CENTER
 import os
 import logging
 
@@ -385,7 +384,6 @@ def generate_chart_image(chart_type: str, labels: list, datasets: list,
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         import matplotlib.ticker as mticker
-        from matplotlib import rcParams
         
         # Arabic font support
         if rtl:

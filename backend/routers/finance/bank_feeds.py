@@ -8,10 +8,9 @@ Phase 6 ext — Bank feeds ingestion (MT940 + CSV).
 
 from __future__ import annotations
 
-import io
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import text

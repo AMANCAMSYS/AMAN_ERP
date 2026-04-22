@@ -7,12 +7,10 @@ ZATCA-002: Digital signing using SHA-256 with RSA
 import base64
 import hashlib
 import io
-import struct
 from datetime import datetime
 from typing import Optional, Dict, Any
 
 import qrcode
-from qrcode.image.pil import PilImage
 
 import logging
 
@@ -149,8 +147,8 @@ def compute_invoice_hash(
 
 def generate_rsa_keypair() -> tuple:
     """Generate RSA 2048-bit keypair for invoice signing. Returns (private_key_pem, public_key_pem)."""
-    from cryptography.hazmat.primitives.asymmetric import rsa, padding
-    from cryptography.hazmat.primitives import serialization, hashes
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
     
     private_key = rsa.generate_private_key(
         public_exponent=65537,

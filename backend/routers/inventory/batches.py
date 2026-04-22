@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime
 from pydantic import BaseModel
 import logging
 
@@ -429,7 +429,7 @@ def update_batch(
         return {"message": "تم تحديث الدفعة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -774,7 +774,7 @@ def create_serials_bulk(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -819,7 +819,7 @@ def update_serial(
         return {"message": "تم تحديث الرقم التسلسلي بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -872,7 +872,7 @@ def update_product_tracking(
         return {"message": "تم تحديث إعدادات التتبع بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1094,7 +1094,7 @@ def complete_quality_inspection(
         return {"message": "تم إكمال فحص الجودة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1294,7 +1294,7 @@ def start_cycle_count(count_id: int, current_user: dict = Depends(get_current_us
         return {"message": "تم بدء الجرد الدوري"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

@@ -3,11 +3,11 @@ Advanced HR Router - Phase 4
 الموارد البشرية المتقدمة: هياكل الرواتب، مكونات الراتب، العمل الإضافي، GOSI، المستندات، تقييم الأداء، التدريب، المخالفات، العهد
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse, get_current_user_company
@@ -20,9 +20,8 @@ logger = logging.getLogger(__name__)
 from schemas.hr_advanced import (
     SalaryStructureCreate, SalaryStructureUpdate, SalaryStructureResponse,
     SalaryComponentCreate, SalaryComponentUpdate, SalaryComponentResponse,
-    EmployeeSalaryComponentCreate, EmployeeSalaryComponentResponse,
-    OvertimeRequestCreate, OvertimeRequestUpdate, OvertimeRequestResponse,
-    GOSISettingsCreate, GOSISettingsUpdate, GOSISettingsResponse, GOSICalculationResponse,
+    EmployeeSalaryComponentCreate, OvertimeRequestCreate, OvertimeRequestUpdate, OvertimeRequestResponse,
+    GOSISettingsCreate, GOSICalculationResponse,
     EmployeeDocumentCreate, EmployeeDocumentUpdate, EmployeeDocumentResponse,
     PerformanceReviewCreate, PerformanceReviewUpdate, PerformanceReviewResponse,
     TrainingProgramCreate, TrainingProgramUpdate, TrainingProgramResponse,
@@ -499,7 +498,8 @@ def export_gosi(
             return create_export_response(buffer, f"gosi_report_{period_str}.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         elif format == "csv":
-            import csv, io
+            import csv
+            import io
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=columns)
             writer.writeheader()

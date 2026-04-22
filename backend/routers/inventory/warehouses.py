@@ -92,7 +92,7 @@ def create_warehouse(warehouse: WarehouseCreate, request: Request, current_user:
         return {**warehouse.model_dump(), "id": result[0], "branch_name": branch_name}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -136,7 +136,7 @@ def update_warehouse(id: int, warehouse: WarehouseCreate, request: Request, curr
         return {**warehouse.model_dump(), "id": id, "branch_name": branch_name}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -194,7 +194,7 @@ def delete_warehouse(id: int, request: Request, current_user: dict = Depends(get
         return {"message": "تم حذف المستودع بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

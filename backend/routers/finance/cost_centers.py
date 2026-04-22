@@ -2,8 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import List
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
@@ -64,7 +63,7 @@ def create_cost_center(request: Request, cc: CostCenterCreate, current_user: dic
         return dict(result._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -126,7 +125,7 @@ def update_cost_center(request: Request, cc_id: int, cc: CostCenterUpdate, curre
         return dict(result._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -156,7 +155,7 @@ def delete_cost_center(request: Request, cc_id: int, current_user: dict = Depend
         return {"message": "Cost center deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

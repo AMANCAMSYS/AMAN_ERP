@@ -1,7 +1,7 @@
 
 import json
 import logging
-from typing import Any, Optional, Union, Callable
+from typing import Any, Optional, Callable
 import hashlib
 from datetime import date, datetime, timedelta
 from uuid import UUID

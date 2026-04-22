@@ -275,7 +275,7 @@ def create_journal_entry(
             "status": status,
             "total_debit": str(total_debit),
             "total_credit": str(total_credit),
-            "entry_date": str(entry_date) if entry_date else None,
+            "entry_date": str(date) if date else None,
             "company_id": company_id,
         }
         publish(Events.JOURNAL_ENTRY_POSTED, payload)

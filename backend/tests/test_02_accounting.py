@@ -7,8 +7,7 @@ Accounting & Journal Entries Tests
 
 import pytest
 from helpers import (
-    assert_valid_response, assert_error_response,
-    assert_journal_balanced, assert_balance_equation
+    assert_valid_response, assert_journal_balanced
 )
 
 

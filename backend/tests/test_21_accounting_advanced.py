@@ -7,8 +7,8 @@ Comprehensive Multi-Scenario Tests: Advanced Accounting
 """
 
 import pytest
-from datetime import date, timedelta
-from helpers import assert_valid_response, assert_error_response
+from datetime import date
+from helpers import assert_valid_response
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -182,7 +182,7 @@ class TestExpenseScenarios:
 
     def test_filter_expenses_by_date(self, client, admin_headers):
         """✅ فلترة المصروفات بالتاريخ"""
-        r = client.get(f"/api/expenses/?start_date=2025-01-01&end_date=2025-12-31", 
+        r = client.get("/api/expenses/?start_date=2025-01-01&end_date=2025-12-31", 
                       headers=admin_headers)
         assert_valid_response(r)
 

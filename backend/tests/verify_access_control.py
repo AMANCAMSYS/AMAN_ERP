@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi.testclient import TestClient
 from main import app
-from database import get_system_db, hash_password
 from sqlalchemy import text, create_engine
 from config import settings
 import logging

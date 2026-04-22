@@ -230,7 +230,7 @@ def get_dashboard_stats(
             "low_stock": int(low_stock),
             "reserved_stock": reserved_stock_list
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Dashboard calculation error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -537,7 +537,7 @@ def save_dashboard_layout(data: LayoutCreate, current_user=Depends(get_current_u
         layout_id = result.fetchone()[0]
         db.commit()
         return {"id": layout_id, "message": "تم حفظ التخطيط بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to save dashboard layout")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -559,7 +559,7 @@ def update_dashboard_layout(layout_id: int, data: LayoutUpdate, current_user=Dep
         """), {"lid": layout_id, "uid": current_user.id, "widgets": widgets_json})
         db.commit()
         return {"message": "تم تحديث التخطيط بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -578,7 +578,7 @@ def delete_dashboard_layout(layout_id: int, current_user=Depends(get_current_use
         """), {"lid": layout_id, "uid": current_user.id})
         db.commit()
         return {"message": "تم حذف التخطيط"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -678,7 +678,7 @@ def widget_sales_summary(
             "change_percent": change,
             "previous_total": prev_total
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -730,7 +730,7 @@ def widget_top_products(
             {"name": r.name, "quantity": float(r.qty or 0), "value": float(r.value or 0)}
             for r in result
         ]}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -783,7 +783,7 @@ def widget_low_stock(
             }
             for r in result
         ]}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -876,7 +876,7 @@ def widget_pending_tasks(
             pass
 
         return {"tasks": tasks[:limit]}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -950,7 +950,7 @@ def widget_cash_flow(
             })
 
         return {"data": result}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

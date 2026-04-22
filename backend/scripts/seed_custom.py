@@ -1,14 +1,11 @@
 import sys
 import os
-import random
 import logging
-from datetime import datetime, timedelta
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import get_db_connection, engine
-from sqlalchemy import text
+from database import get_db_connection
 from scripts.seed_data import seed_branches, seed_accounts, seed_parties, seed_journal_entries
 import scripts.seed_data as sd
 

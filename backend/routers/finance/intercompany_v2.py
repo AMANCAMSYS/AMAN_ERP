@@ -6,7 +6,7 @@ consolidation elimination, account mappings, and balance reporting.
 Uses intercompany_service.py (entity_groups, intercompany_transactions_v2, intercompany_account_mappings tables).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from typing import Optional
 import logging
@@ -15,9 +15,8 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.limiter import limiter
 from schemas.intercompany import (
-    EntityGroupCreate, EntityGroupRead, IntercompanyTransactionCreate,
-    IntercompanyTransactionRead, ConsolidationRequest, ConsolidationResult,
-    AccountMappingCreate, AccountMappingRead,
+    EntityGroupCreate, IntercompanyTransactionCreate,
+    ConsolidationRequest, AccountMappingCreate,
 )
 from services import intercompany_service
 
@@ -58,7 +57,7 @@ def create_transaction(request: Request, data: IntercompanyTransactionCreate, cu
     user_id = current_user.get("id") if isinstance(current_user, dict) else current_user.id
     try:
         return intercompany_service.create_transaction(data.model_dump(), str(company_id), user_id)
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
 
@@ -104,7 +103,7 @@ def consolidate(request: Request, data: ConsolidationRequest, current_user=Depen
             user_id=user_id,
             as_of_date=data.as_of_date,
         )
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
 

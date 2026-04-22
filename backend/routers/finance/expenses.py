@@ -5,9 +5,8 @@ AMAN ERP - Expenses Module
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from utils.i18n import http_error
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import date, datetime
+from typing import Optional
+from datetime import date
 from decimal import Decimal
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -15,7 +14,7 @@ from sqlalchemy import text
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    get_base_currency, update_account_balance, validate_je_lines
+    get_base_currency
 )
 from utils.audit import log_activity
 from utils.fiscal_lock import check_fiscal_period_open
@@ -270,7 +269,7 @@ def create_expense_policy(policy: ExpensePolicyCreate, current_user=Depends(get_
         pid = result.fetchone()[0]
         db.commit()
         return {"id": pid, "message": "تم إنشاء سياسة المصروفات بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -300,7 +299,7 @@ def update_expense_policy(policy_id: int, policy: ExpensePolicyUpdate, current_u
         db.execute(text(f"UPDATE expense_policies SET {', '.join(fields)} WHERE id = :id AND is_deleted = false"), params)
         db.commit()
         return {"message": "تم تحديث السياسة بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -318,7 +317,7 @@ def delete_expense_policy(policy_id: int, current_user=Depends(get_current_user)
         ), {"id": policy_id, "uid": current_user.id})
         db.commit()
         return {"message": "تم حذف السياسة"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -679,7 +678,7 @@ async def update_expense(
         return {"success": True, "message": "تم تحديث المصروف بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -867,7 +866,7 @@ async def delete_expense(
         return {"success": True, "message": "تم حذف المصروف بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

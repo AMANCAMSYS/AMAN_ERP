@@ -43,7 +43,6 @@ def get_notifications(
 
         return notifications
     except Exception as e:
-        import traceback
         logger.exception("Operation failed")
         logger.exception("Unexpected error")
         raise HTTPException(status_code=500, detail=f"Failed to fetch notifications: {str(e)}")
@@ -68,7 +67,6 @@ def get_unread_count(
         """), {"user": user_id}).scalar()
         return {"count": count}
     except Exception as e:
-        import traceback
         logger.exception("Operation failed")
         logger.exception("Unexpected error")
         raise HTTPException(status_code=500, detail=f"Failed to fetch unread count: {str(e)}")

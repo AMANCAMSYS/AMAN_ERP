@@ -109,7 +109,7 @@ def create_plan(body: PlanCreate, current_user=Depends(get_current_user)):
         ).fetchone()
         db.commit()
         return PlanRead.model_validate(row)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to create subscription plan")
         logger.exception("Internal error")
@@ -153,7 +153,7 @@ def update_plan(plan_id: int, body: PlanUpdate, current_user=Depends(get_current
         return PlanRead.model_validate(row)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to update subscription plan")
         logger.exception("Internal error")
@@ -213,10 +213,10 @@ def enroll(body: EnrollmentCreate, current_user=Depends(get_current_user)):
             {"eid": enrollment_id},
         ).fetchone()
         return EnrollmentRead.model_validate(row)
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to enroll customer")
         logger.exception("Internal error")
@@ -312,10 +312,10 @@ def pause(enrollment_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         pause_enrollment(db, enrollment_id=enrollment_id, user=str(current_user.id))
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to pause enrollment")
         logger.exception("Internal error")
@@ -333,10 +333,10 @@ def resume(enrollment_id: int, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
         resume_enrollment(db, enrollment_id=enrollment_id, user=str(current_user.id))
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to resume enrollment")
         logger.exception("Internal error")
@@ -364,10 +364,10 @@ def cancel(enrollment_id: int, body: CancelRequest, current_user=Depends(get_cur
             {"eid": enrollment_id},
         ).fetchone()
         return EnrollmentRead.model_validate(row)
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to cancel enrollment")
         logger.exception("Internal error")
@@ -394,10 +394,10 @@ def change_plan(enrollment_id: int, body: PlanChangeRequest, current_user=Depend
             user=str(current_user.id),
         )
         return {"success": True, "data": result}
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Failed to change plan")
         logger.exception("Internal error")

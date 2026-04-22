@@ -3,7 +3,6 @@ WebSocket Connection Manager for real-time notifications
 مدير اتصالات WebSocket للإشعارات الفورية
 """
 
-import json
 import logging
 from typing import Dict, List
 from fastapi import WebSocket

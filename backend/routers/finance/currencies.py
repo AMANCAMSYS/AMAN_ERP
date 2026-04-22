@@ -1,12 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional, Any
-from datetime import date, datetime
-from pydantic import BaseModel
+from typing import List, Any
 import logging
-from database import get_db, get_company_db
 from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
@@ -253,6 +249,7 @@ def add_exchange_rate(
 @limiter.limit("200/minute")
 def get_rate_history(
     request: Request,
+    currency_id: int,
     limit: int = 30,
     current_user: Any = Depends(require_permission(["accounting.view", "currencies.view"]))
 ):
@@ -420,7 +417,7 @@ def create_revaluation(
         except HTTPException:
             db.rollback()
             raise
-        except Exception as e:
+        except Exception:
             db.rollback()
             logger.exception("Error during currency revaluation")
             raise HTTPException(status_code=500, detail="خطأ أثناء إعادة التقييم")

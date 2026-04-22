@@ -6,13 +6,13 @@ ZATCA: QR code + signing endpoints
 TAX-001: Withholding Tax (WHT)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import hashlib
 import secrets
 import json
@@ -23,8 +23,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.zatca import (
-    generate_zatca_qr_base64, build_zatca_tlv, decode_zatca_tlv,
-    compute_invoice_hash, sign_invoice, verify_invoice_signature,
+    verify_invoice_signature,
     generate_rsa_keypair, process_invoice_for_zatca
 )
 from utils.webhooks import WEBHOOK_EVENTS, validate_webhook_url, encrypt_webhook_secret
@@ -337,7 +336,7 @@ def generate_qr_code(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("ZATCA QR generation failed")
         raise HTTPException(500, "خطأ في توليد QR")
@@ -509,7 +508,7 @@ def create_wht_transaction(data: WHTTransactionCreate, current_user=Depends(get_
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Error creating WHT transaction")
         raise HTTPException(**http_error(500, "internal_error"))

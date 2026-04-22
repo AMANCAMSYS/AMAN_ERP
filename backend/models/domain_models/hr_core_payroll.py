@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text as sa_text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..base import ModelBase, AuditMixin, SoftDeleteMixin

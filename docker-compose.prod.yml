@@ -90,6 +90,12 @@ services:
   prometheus:
     ports: []
 
+  # ── PG/Redis exporters: internal only ───────────────────────────────────────
+  postgres-exporter:
+    ports: []
+  redis-exporter:
+    ports: []
+
   # ── Grafana: internal only (accessed through a secure tunnel or VPN) ─────────
   grafana:
     ports: []

@@ -1,16 +1,16 @@
 """أوراق القبض والدفع - Notes Receivable & Payable"""
 from decimal import Decimal, ROUND_HALF_UP
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pydantic import BaseModel
 
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
-from utils.accounting import get_base_currency, validate_je_lines
+from utils.accounting import get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
 from utils.treasury_gl import ensure_treasury_gl_accounts
@@ -241,7 +241,7 @@ def create_note_receivable(data: NoteReceivableCreate, current_user: dict = Depe
         return {"id": note_id, "journal_entry_id": je_id, "message": "تم إنشاء ورقة القبض بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -325,7 +325,7 @@ def collect_note_receivable(note_id: int, data: dict = None,
         return {"message": "تم تحصيل ورقة القبض بنجاح", "journal_entry_id": je_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -399,7 +399,7 @@ def protest_note_receivable(note_id: int, data: dict = None,
         return {"message": "تم رفض ورقة القبض", "journal_entry_id": je_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -562,7 +562,7 @@ def create_note_payable(data: NotePayableCreate, current_user: dict = Depends(ge
         return {"id": note_id, "journal_entry_id": je_id, "message": "تم إنشاء ورقة الدفع بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -646,7 +646,7 @@ def pay_note_payable(note_id: int, data: dict = None,
         return {"message": "تم سداد ورقة الدفع بنجاح", "journal_entry_id": je_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -720,7 +720,7 @@ def protest_note_payable(note_id: int, data: dict = None,
         return {"message": "تم رفض ورقة الدفع", "journal_entry_id": je_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

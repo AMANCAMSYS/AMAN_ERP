@@ -18,7 +18,7 @@ from utils.permissions import require_permission, require_module, validate_branc
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    update_account_balance, get_base_currency
+    get_base_currency
 )
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry as gl_create_journal_entry
@@ -197,7 +197,7 @@ def create_landed_cost(body: LandedCostCreate, request: Request, current_user: d
         return {"id": lc_id, "lc_number": lc_number, "total_amount": total}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -352,7 +352,7 @@ def allocate_landed_cost(lc_id: int, request: Request, current_user: dict = Depe
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -495,7 +495,7 @@ def post_landed_cost(lc_id: int, request: Request, current_user: dict = Depends(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

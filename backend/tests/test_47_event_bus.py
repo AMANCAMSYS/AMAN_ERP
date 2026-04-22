@@ -8,7 +8,7 @@ _BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
-from utils.event_bus import EventBus, DomainEvent, Events  # noqa: E402
+from utils.event_bus import EventBus, Events  # noqa: E402
 
 
 def test_publish_delivers_to_subscribers():

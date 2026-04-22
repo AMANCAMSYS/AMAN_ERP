@@ -30,7 +30,7 @@ if _SENTRY_DSN:
             integrations=[FastApiIntegration(), SqlalchemyIntegration()],
             traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
             environment=os.environ.get("APP_ENV", "production"),
-            release=f"aman-erp@2.0.0",
+            release="aman-erp@2.0.0",
         )
         logging.getLogger(__name__).info("✅ Sentry initialized")
     except ImportError:
@@ -261,7 +261,8 @@ async def lifespan(app: FastAPI):
     
     # Sync schema for all existing company databases via Alembic migrations
     try:
-        import subprocess, sys as _sys
+        import subprocess
+        import sys as _sys
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         alembic_ini = os.path.join(backend_dir, "alembic.ini")
         alembic_cmd = [

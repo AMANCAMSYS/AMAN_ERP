@@ -1,6 +1,6 @@
 """Sales module Pydantic schemas."""
 from decimal import Decimal
-from pydantic import BaseModel, EmailStr, validator, field_validator
+from pydantic import BaseModel, validator, field_validator
 from typing import List, Optional
 from datetime import date
 import re

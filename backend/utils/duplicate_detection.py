@@ -4,7 +4,7 @@ AMAN ERP — Duplicate Detection Utility
 """
 
 from sqlalchemy import text
-from typing import List, Optional, Dict
+from typing import List, Dict
 import logging
 import re
 
@@ -44,7 +44,7 @@ def find_duplicate_parties(db, name: str, phone: str = None,
     if phone and phone.strip():
         clean_phone = re.sub(r'[^\d+]', '', phone)
         if len(clean_phone) >= 7:
-            conditions.append(f"REGEXP_REPLACE(p.phone, '[^0-9+]', '', 'g') = :phone")
+            conditions.append("REGEXP_REPLACE(p.phone, '[^0-9+]', '', 'g') = :phone")
             params["phone"] = clean_phone
 
     # 3. Exact email match

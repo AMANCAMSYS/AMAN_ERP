@@ -2112,7 +2112,6 @@ def compare_balance_sheet(
 # ==================== Export Endpoints ====================
 
 from utils.exports import generate_pdf, generate_excel, generate_excel_with_chart, generate_chart_image, create_export_response
-from fastapi.responses import StreamingResponse
 
 @router.get("/accounting/profit-loss/export", dependencies=[Depends(require_permission(["accounting.view", "reports.view"]))])
 def export_profit_loss(
@@ -3124,7 +3123,6 @@ async def delete_custom_report(report_id: int, current_user: dict = Depends(get_
 
 def _generate_custom_report_data(db, config: CustomReportConfig, user_id: int):
     """Engine to build dynamic SQL based on config"""
-    import json
     
     # 1. Source Mapping
     source_map = {

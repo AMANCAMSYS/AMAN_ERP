@@ -102,7 +102,7 @@ def create_category(
         return {**category.model_dump(), "id": result[0]}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -143,7 +143,7 @@ def update_category(
         return {**category.model_dump(), "id": id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -184,7 +184,7 @@ def delete_category(
         )
 
         return {"message": "top deleted"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

@@ -5,7 +5,6 @@ AMAN ERP - Authentication Router
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, Form, Body
 from utils.i18n import http_error
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
 from sqlalchemy import text, create_engine
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from jose import jwt, JWTError
@@ -468,7 +467,7 @@ async def login(
         
         if result and form_data.username == "admin":
             # System admin login - verify password using bcrypt
-            from database import verify_password as verify_pwd, hash_password
+            from database import verify_password as verify_pwd
             
             admin_hash = getattr(settings, 'ADMIN_PASSWORD_HASH', None)
             if not admin_hash:
@@ -665,7 +664,7 @@ async def login(
                         action="auth.login",
                         company_id=company_id,
                         performed_by=result[1],
-                        description=f"User logged in via company_code",
+                        description="User logged in via company_code",
                         request=request
                     )
                 except Exception as log_err:
@@ -821,7 +820,6 @@ async def login(
             raise
         except Exception as e:
             logger.error(f"Login error for company {company_id}: {e}")
-            import traceback
             logger.exception("Unexpected error")
             raise HTTPException(status_code=500, detail="خطأ في الخادم أثناء تسجيل الدخول")
 
@@ -985,7 +983,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
                         import json
                         try:
                             enabled_modules = json.loads(enabled_modules)
-                        except:
+                        except Exception:
                             enabled_modules = []
 
                     return UserResponse(

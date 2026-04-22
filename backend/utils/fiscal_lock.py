@@ -3,11 +3,9 @@ AMAN ERP — Fiscal Period Lock
 قفل الفترة المحاسبية — منع إدخال قيود في فترة مقفلة
 """
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy import text
-from functools import wraps
-from datetime import date, datetime
-from database import get_db_connection
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)

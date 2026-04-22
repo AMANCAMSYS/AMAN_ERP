@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 import logging
 import json
@@ -147,7 +147,7 @@ def create_scheduled_report(
         return dict(row._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
@@ -331,7 +331,7 @@ def share_report(
         return {"message": f"Report shared with {user.full_name}"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))

@@ -6,7 +6,6 @@ from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
-import uuid
 from utils.cache import invalidate_company_cache
 
 _D2 = Decimal('0.01')

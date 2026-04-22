@@ -1,11 +1,10 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,9 +16,8 @@ from utils.permissions import require_permission, validate_branch_access, requir
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
 
-from config import settings
 from schemas import UserResponse
-from schemas.pos import SessionCreate, SessionClose, SessionResponse, POSProductResponse, OrderLineCreate, OrderPaymentCreate, OrderCreate, OrderResponse, ReturnItemCreate, ReturnCreate
+from schemas.pos import SessionCreate, SessionClose, SessionResponse, POSProductResponse, OrderCreate, OrderResponse, ReturnCreate
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -243,7 +241,7 @@ def close_session(
 
     # Create Cash Over/Short GL Entry if there's a difference
     if abs(difference) > _D2:
-        from utils.accounting import get_mapped_account_id, update_account_balance
+        from utils.accounting import get_mapped_account_id
         acc_cash = get_mapped_account_id(db, "acc_map_cash_main")
         acc_over_short = get_mapped_account_id(db, "acc_map_cash_over_short") or get_mapped_account_id(db, "acc_map_expense_other")
         
@@ -336,7 +334,7 @@ def get_pos_warehouses(
         
         result = db.execute(text(stmt), params).fetchall()
         return [{"id": r.id, "name": r.name, "code": r.code, "branch_id": r.branch_id, "branch_name": r.branch_name} for r in result]
-    except Exception as e:
+    except Exception:
         raise HTTPException(**http_error(500, "internal_error"))
 
 
@@ -950,7 +948,7 @@ def create_return(
             raise HTTPException(status_code=404, detail=f"Item {item.item_id} not found in order")
         
         if item.quantity > orig_item.quantity:
-            raise HTTPException(status_code=400, detail=f"Return quantity exceeds original quantity")
+            raise HTTPException(status_code=400, detail="Return quantity exceeds original quantity")
         
         refund_amount = (_dec(item.quantity) * _dec(orig_item.unit_price)).quantize(_D2, ROUND_HALF_UP)
         refund_tax = (refund_amount * (_dec(orig_item.tax_rate) / Decimal('100'))).quantize(_D2, ROUND_HALF_UP)
@@ -1378,7 +1376,7 @@ def earn_points(data: dict, request: Request, current_user: UserResponse = Depen
     db.execute(text("""
         INSERT INTO pos_loyalty_transactions (loyalty_id, order_id, txn_type, points, description)
         VALUES (:lid, :oid, 'earn', :pts, :desc)
-    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": points, "desc": f"Earned from order"})
+    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": points, "desc": "Earned from order"})
     db.commit()
 
     log_activity(
@@ -1412,7 +1410,7 @@ def redeem_points(data: dict, request: Request, current_user: UserResponse = Dep
     db.execute(text("""
         INSERT INTO pos_loyalty_transactions (loyalty_id, order_id, txn_type, points, description)
         VALUES (:lid, :oid, 'redeem', :pts, :desc)
-    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": -points, "desc": f"Redeemed for discount"})
+    """), {"lid": loyalty.id, "oid": data.get("order_id"), "pts": -points, "desc": "Redeemed for discount"})
     db.commit()
 
     log_activity(

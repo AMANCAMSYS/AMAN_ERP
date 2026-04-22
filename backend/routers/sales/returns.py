@@ -212,7 +212,7 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
             branch_id=data.branch_id
         )
         return {"id": ret_id, "return_number": ret_num}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

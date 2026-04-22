@@ -12,10 +12,8 @@ from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import date
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
 from utils.audit import log_activity
 import logging
 logger = logging.getLogger(__name__)
@@ -161,7 +159,7 @@ async def create_variant(data: ProductVariantCreate, request: Request, current_u
                      action="variant.create", resource_type="product_variant",
                      resource_id=str(variant_id), details={"product_id": data.product_id, "sku": data.variant_sku}, request=request)
         return {"id": variant_id, "message": "Variant created successfully"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -190,7 +188,7 @@ async def update_variant(variant_id: int, data: ProductVariantUpdate, request: R
         return {"message": "Variant updated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -254,7 +252,7 @@ async def create_bin(data: BinLocationCreate, request: Request, current_user: di
                      action="bin.create", resource_type="bin_location",
                      resource_id=str(bin_id), details={"warehouse_id": data.warehouse_id, "aisle": data.aisle, "rack": data.rack}, request=request)
         return {"id": bin_id, "message": "Bin location created successfully"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -283,7 +281,7 @@ async def update_bin(bin_id: int, data: BinLocationUpdate, request: Request, cur
         return {"message": "Bin location updated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -376,7 +374,7 @@ async def create_kit(data: ProductKitCreate, request: Request, current_user: dic
                      action="kit.create", resource_type="product_kit",
                      resource_id=str(kit_id), details={"kit_product_id": data.kit_product_id, "components": len(data.components)}, request=request)
         return {"id": kit_id, "message": "Kit created successfully"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -405,7 +403,7 @@ async def update_kit(kit_id: int, data: ProductKitUpdate, request: Request, curr
         return {"message": "Kit updated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -490,7 +488,7 @@ async def get_product_ledger(
         total = count_result.scalar()
         
         return {"data": rows, "total": total}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

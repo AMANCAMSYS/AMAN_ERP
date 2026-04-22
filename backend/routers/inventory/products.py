@@ -446,7 +446,7 @@ def update_product(id: int, product: ProductCreate, request: Request, current_us
         return {**product.model_dump(), "id": id, "category_name": cat_name, "current_stock": stock, "created_at": datetime.now()}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -511,7 +511,7 @@ def delete_product(
         return {"message": "تم حذف المنتج بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

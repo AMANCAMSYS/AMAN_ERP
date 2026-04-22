@@ -7,9 +7,8 @@ PERM-003: Cost-Center-Level Permissions
 PERM-004: Permission Audit Logging
 """
 
-from fastapi import Depends, HTTPException, status, Request
-from functools import wraps
-from typing import List, Union, Any, Optional, Set, Dict
+from fastapi import Depends, HTTPException, status
+from typing import List, Union, Any, Optional, Dict
 import logging
 import json
 
@@ -522,7 +521,7 @@ def build_warehouse_filter(current_user, company_conn=None,
         return "", {}
 
     if not allowed:
-        return f" AND 1=0", {}  # No access
+        return " AND 1=0", {}  # No access
 
     col = f"{table_alias}.{warehouse_column}" if table_alias else warehouse_column
     # Use parameterized query with IN clause
@@ -580,7 +579,7 @@ def build_cost_center_filter(current_user, company_conn=None,
         return "", {}
 
     if not allowed:
-        return f" AND 1=0", {}
+        return " AND 1=0", {}
 
     col = f"{table_alias}.{cc_column}" if table_alias else cc_column
     param_names = [f"_cc_{i}" for i in range(len(allowed))]

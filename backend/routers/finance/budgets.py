@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
-from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
 from sqlalchemy import text
@@ -10,7 +9,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.audit import log_activity
 from utils.limiter import limiter
-from schemas.budgets import BudgetItemBase, BudgetItemCreate, BudgetItemResponse, BudgetCreate, BudgetResponse, BudgetReportItem
+from schemas.budgets import BudgetItemCreate, BudgetCreate, BudgetResponse, BudgetReportItem
 import logging
 
 router = APIRouter(prefix="/accounting/budgets", tags=["Budgets"], dependencies=[Depends(require_module("budgets"))])
@@ -108,7 +107,7 @@ def delete_budget(budget_id: int, request: Request, current_user: UserResponse =
         return {"message": "Budget deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -158,7 +157,7 @@ def set_budget_items(
                      resource_id=str(budget_id), details={"items_count": len(items)},
                      request=request)
         return {"message": "Budget items updated successfully"}
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -169,6 +168,7 @@ def set_budget_items(
 @limiter.limit("200/minute")
 def get_budget_report(
     request: Request,
+    budget_id: int,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     branch_id: Optional[int] = None,
@@ -284,7 +284,7 @@ def get_budget_report(
             })
             
         return report
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -369,7 +369,7 @@ def activate_budget(budget_id: int, request: Request, current_user: UserResponse
         return {"message": "Budget activated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -398,7 +398,7 @@ def close_budget(budget_id: int, request: Request, current_user: UserResponse = 
         return {"message": "Budget closed successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -676,7 +676,7 @@ def create_budget_by_cost_center(request: Request, data: dict, current_user: Use
                 "cost_center_id": data["cost_center_id"]}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -732,6 +732,7 @@ def list_multi_year_budgets(
 @limiter.limit("200/minute")
 def compare_budgets(
     request: Request,
+    budget_ids: str,
     current_user: UserResponse = Depends(get_current_user)
 ):
     """Compare multiple budgets side by side. budget_ids = comma-separated."""
@@ -754,7 +755,7 @@ def compare_budgets(
         return [dict(r._mapping) for r in budgets]
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

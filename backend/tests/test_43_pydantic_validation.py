@@ -9,8 +9,6 @@ migration is working — invalid or missing required fields are caught
 at the FastAPI validation layer before reaching business logic.
 """
 
-import pytest
-from helpers import assert_error_response, assert_valid_response
 
 
 class TestPydanticValidation:
@@ -186,5 +184,5 @@ class TestPydanticValidation:
             headers=admin_headers
         )
         assert response.status_code != 422, \
-            f"Empty body should be accepted for all-optional schema, got 422"
+            "Empty body should be accepted for all-optional schema, got 422"
         assert response.status_code != 500, f"Got 500: {response.text[:300]}"

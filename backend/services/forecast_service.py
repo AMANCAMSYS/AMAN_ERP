@@ -6,7 +6,7 @@ entries, then computes a running balance per bank account + consolidated.
 
 import logging
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from sqlalchemy import text
 

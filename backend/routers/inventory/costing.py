@@ -1,7 +1,7 @@
 """FIFO/LIFO Costing endpoints — cost layers, method changes, valuation."""
 
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from typing import Optional
 
@@ -15,7 +15,6 @@ from schemas.costing import (
     CostingMethodChangeResult,
     ConsumptionHistoryRead,
     InventoryValuationReport,
-    ValuationLineItem,
 )
 
 costing_router = APIRouter(prefix="/costing", tags=["Inventory Costing"])

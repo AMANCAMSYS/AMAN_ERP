@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
-from datetime import date, datetime
-from pydantic import BaseModel, Field
+from datetime import date
+from pydantic import BaseModel
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
@@ -15,7 +15,6 @@ from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number,
     get_mapped_account_id,
-    update_account_balance,
     get_base_currency
 )
 from decimal import Decimal, ROUND_HALF_UP
@@ -183,7 +182,7 @@ def delete_tax_rate(rate_id: int, request: Request, current_user: dict = Depends
         return {"success": True, "message": "تم إيقاف نوع الضريبة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -258,7 +257,7 @@ def create_tax_group(request: Request, data: TaxGroupCreate, current_user: dict 
         return {"success": True, "id": new_id, "message": "تم إنشاء المجموعة الضريبية بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -546,7 +545,7 @@ def file_tax_return(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -584,7 +583,7 @@ def cancel_tax_return(return_id: int, request: Request, current_user: dict = Dep
         return {"success": True, "message": "تم إلغاء الإقرار الضريبي"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1565,7 +1564,7 @@ def delete_tax_calendar_item(
         return {"message": "Deleted"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

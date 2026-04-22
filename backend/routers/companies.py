@@ -4,11 +4,9 @@ AMAN ERP - Companies Router
 
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Body
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import os
-import shutil
 from datetime import datetime, timezone
 from typing import List, Optional, Any
 
@@ -210,8 +208,7 @@ async def register_new_company(request_body: CompanyCreateRequest, request: Requ
                 created_at=datetime.now(timezone.utc)
             )
             
-        except Exception as e:
-            import traceback
+        except Exception:
             logger.exception("Error in register_new_company")
             
             # SEC-FIX-009/010: Don't write errors to file in web root, don't leak details to client
@@ -393,7 +390,7 @@ def update_enabled_modules(modules: Any = Body(...), current_user=Depends(get_cu
             "UPDATE system_companies SET enabled_modules = CAST(:m AS jsonb) WHERE id = :cid"
         ), {"m": modules_json, "cid": current_user.company_id})
         sys_db.commit()
-    except Exception as e:
+    except Exception:
         sys_db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -496,7 +493,7 @@ def get_company(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception(f"Error in get_company {company_id}")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -566,7 +563,7 @@ def update_company(
         return {"success": True, "message": "Company updated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception(f"Error updating company {company_id}")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -643,7 +640,7 @@ async def upload_company_logo(
         finally:
             db.close()
             
-    except Exception as e:
+    except Exception:
         logger.exception("Error uploading logo")
         raise HTTPException(**http_error(500, "internal_error"))
 

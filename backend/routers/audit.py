@@ -3,14 +3,14 @@ AMAN ERP - Audit Logs Router
 API endpoints for viewing audit logs.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from typing import Optional, List, Any
 from datetime import datetime, date
 from pydantic import BaseModel
 import logging
 
-from database import get_db_connection, get_system_db, engine
+from database import get_db_connection, engine
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.tenant_isolation import resolve_target_company_id

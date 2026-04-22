@@ -6,23 +6,24 @@ AMAN ERP — WPS Export, Saudization Tracking, End of Service Settlement
 from fastapi import APIRouter, Depends, HTTPException, Response
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
 from pydantic import BaseModel
-import io, csv, logging
+import io
+import csv
+import logging
 
 from database import get_db_connection
-from routers.auth import get_current_user, get_current_user_company
+from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, check_permission
 from utils.audit import log_activity
 from utils.masking import mask_pii
 from utils.accounting import (
-    generate_sequential_number, get_mapped_account_id,
-    update_account_balance, get_base_currency
+    get_mapped_account_id,
+    get_base_currency
 )
 from services.gl_service import create_journal_entry as gl_create_journal_entry
-import logging
 
 router = APIRouter(prefix="/hr", tags=["HR - WPS & Compliance"])
 logger = logging.getLogger(__name__)
@@ -403,7 +404,7 @@ def saudization_dashboard(branch_id: Optional[int] = None, current_user=Depends(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -640,7 +641,7 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

@@ -268,7 +268,7 @@ def test_ldap_connection(
         return {"success": False, "message": "Invalid bind credentials"}
     except ldap_lib.SERVER_DOWN:
         return {"success": False, "message": "LDAP server unreachable"}
-    except Exception as exc:
+    except Exception:
         logger.exception("LDAP test connection failed")
         return {"success": False, "message": "LDAP connection failed"}
 

@@ -10,7 +10,6 @@ AMAN ERP - Load Tests: Concurrent Users
 ═══════════════════════════════════════
 """
 
-import pytest
 import threading
 import time
 import os

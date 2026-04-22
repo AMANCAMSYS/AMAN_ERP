@@ -53,7 +53,7 @@ def generate_forecast(
             {"fid": result["forecast_id"]},
         ).fetchone()
         return ForecastRead.model_validate(row)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Forecast generation failed")
         logger.exception("Internal error")
@@ -155,7 +155,7 @@ def delete_forecast(forecast_id: int, current_user=Depends(get_current_user)):
         db.commit()
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Forecast deletion failed")
         logger.exception("Internal error")

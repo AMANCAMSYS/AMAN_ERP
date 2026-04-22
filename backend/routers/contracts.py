@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error, i18n_message
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, timedelta
@@ -480,7 +479,6 @@ def generate_contract_invoice(
         if not items:
             raise HTTPException(**http_error(400, "contract_items_empty"))
         
-        import uuid
         from datetime import date as dt_date
         from utils.accounting import generate_sequential_number
         

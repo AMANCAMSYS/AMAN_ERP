@@ -8,7 +8,6 @@ AMAN ERP — Industry GL Auto-Posting Rules
 """
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

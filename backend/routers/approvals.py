@@ -2,14 +2,13 @@
 Approval Workflows Router - WF-001, WF-002, WF-003
 سلسلة اعتمادات متعددة المستويات
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from utils.i18n import http_error
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission, require_module
-from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel
@@ -294,7 +293,7 @@ def create_approval_request(data: ApprovalRequestCreate, current_user=Depends(ge
         if steps:
             first_step = steps[0]
             approver_role = first_step.get("approver_role", "")
-            step_label = first_step.get("label", f"الخطوة 1")
+            step_label = first_step.get("label", "الخطوة 1")
 
             # Find users with this role
             approvers = db.execute(text("""

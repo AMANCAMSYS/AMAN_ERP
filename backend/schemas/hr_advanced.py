@@ -3,8 +3,8 @@ Pydantic schemas for Advanced HR module (Phase 4)
 هياكل الرواتب، مكونات الراتب، العمل الإضافي، GOSI، المستندات، تقييم الأداء، التدريب، المخالفات، العهد
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel
+from typing import Optional
 from datetime import date, datetime
 from decimal import Decimal
 

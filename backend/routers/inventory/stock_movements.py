@@ -106,7 +106,7 @@ def create_stock_receipt(
         )
 
         return {"message": "تم استلام البضاعة بنجاح", "reference": ref}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -192,7 +192,7 @@ def create_stock_delivery(
         return {"message": "تم تسليم البضاعة بنجاح", "reference": ref}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

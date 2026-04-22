@@ -6,10 +6,10 @@
 • الضرائب المطبقة تلقائياً حسب branch → jurisdiction
 • تقارير ضريبية رسمية: إقرار VAT سعودي، ضريبة دخل سورية، إلخ
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Any
 from datetime import date, datetime, timezone
 from pydantic import BaseModel, Field, validator
 from database import get_db_connection
@@ -18,7 +18,6 @@ from utils.permissions import require_permission, validate_branch_access, requir
 from utils.audit import log_activity
 from decimal import Decimal, ROUND_HALF_UP
 import logging
-import json
 
 router = APIRouter(prefix="/tax-compliance", tags=["الامتثال الضريبي"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)

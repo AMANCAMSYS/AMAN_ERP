@@ -1,7 +1,5 @@
 
 import requests
-import sys
-import os
 
 BASE_URL = "http://localhost:8000/api"
 COMPANY_ID = "99900001"
@@ -21,7 +19,7 @@ def get_token(username, password):
         return None
 
 def verify_access():
-    print(f"🔒 Verifying Branch Access Control...")
+    print("🔒 Verifying Branch Access Control...")
     
     # 1. Login as HQ User
     hq_token = get_token(HQ_USER, PASSWORD)

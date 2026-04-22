@@ -17,7 +17,6 @@ AMAN ERP — Industry Chart of Accounts Templates
 """
 
 from sqlalchemy import text
-from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)

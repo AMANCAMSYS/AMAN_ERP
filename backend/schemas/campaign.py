@@ -1,8 +1,8 @@
 """Campaign module Pydantic schemas."""
 
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List
-from datetime import datetime, date
+from typing import Optional
+from datetime import datetime
 
 
 class CampaignCreate(BaseModel):

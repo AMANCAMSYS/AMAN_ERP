@@ -1,20 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import List, Optional, Union, Any, Dict
+from typing import List, Optional, Any, Dict
 from routers.roles import DEFAULT_ROLES
 from pydantic import BaseModel
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
-from database import get_company_db, get_db_connection, get_company_db as get_db, hash_password
-from routers.auth import oauth2_scheme, decode_token, get_current_user, UserResponse, get_current_user_company
+from database import get_db_connection, hash_password
+from routers.auth import get_current_user, UserResponse, get_current_user_company
 from utils.permissions import require_permission, validate_branch_access, check_permission, require_module
 from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
-from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, EmployeeResponse, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollGenerate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
+from schemas.hr import LoanCreate, LoanResponse, EmployeeCreate, EmployeeUpdate, DepartmentCreate, DepartmentResponse, PositionCreate, PositionResponse, PayrollPeriodCreate, PayrollEntryResponse, PayrollPeriodResponse, AttendanceResponse, LeaveRequestCreate, LeaveRequestResponse, EndOfServiceRequest
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 
 logger = logging.getLogger(__name__)
@@ -353,7 +352,7 @@ def create_employee(request: Request, employee: EmployeeCreate, current_user: Us
 
         return {"message": "Success"}
         
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
@@ -497,7 +496,7 @@ def update_employee(
         )
 
         return {"message": "Updated successfully"}
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
@@ -677,7 +676,7 @@ def create_loan_request(loan: LoanCreate, current_user: UserResponse = Depends(g
                      details={"employee_id": loan.employee_id, "amount": loan.amount})
         return {**loan.model_dump(), "id": result.id, "monthly_installment": result.monthly_installment, 
                 "paid_amount": result.paid_amount, "status": result.status, "created_at": result.created_at}
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -730,7 +729,6 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         acc_cash = get_mapped_account_id(conn, "acc_map_cash_main")
         
         if acc_loan and acc_cash:
-            import random
             from utils.accounting import generate_sequential_number
             je_num = generate_sequential_number(conn, f"LOAN-{datetime.now().year}", "journal_entries", "entry_number")
             base_currency = get_base_currency(conn)
@@ -765,7 +763,7 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
                      resource_type="employee_loan", resource_id=loan_id,
                      details={"amount": str(loan.amount), "employee_id": loan.employee_id})
         return {"status": "active"}
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -801,7 +799,9 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
         gosi_emp_pct = _dec(gosi.employee_share_percentage) if gosi else Decimal('9.75')
         gosi_empr_pct = _dec(gosi.employer_share_percentage) if gosi else Decimal('11.75')
         gosi_max_sal = _dec(gosi.max_contributable_salary) if gosi else Decimal('45000')
-        
+
+        base_currency = get_base_currency(conn)
+
         count = 0
         for emp in employees:
             basic: Decimal = _dec(emp.salary)
@@ -917,7 +917,7 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
                      resource_type="payroll_period", resource_id=period_id,
                      details={"employee_count": count})
         return {"message": f"Generated payroll for {count} employees"}
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1164,7 +1164,7 @@ def post_payroll(period_id: int, current_user: UserResponse = Depends(get_curren
                      details={"journal_entry": je_num, "total_net": str(total_net)})
         return {"message": "Payroll posted successfully", "journal_entry": je_num}
 
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1193,7 +1193,7 @@ def create_department(dept: DepartmentCreate, current_user: UserResponse = Depen
         log_activity(conn, user_id=user_id, username=username, action="department.create",
                      resource_type="department", resource_id=0, details={"name": dept.department_name})
         return {"message": "Department created"}
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1219,7 +1219,7 @@ def delete_department(dept_id: int, current_user: UserResponse = Depends(get_cur
         return {"message": "Department deleted"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1263,7 +1263,7 @@ def create_position(pos: PositionCreate, current_user: UserResponse = Depends(ge
         log_activity(conn, user_id=user_id, username=username, action="position.create",
                      resource_type="position", resource_id=0, details={"name": pos.position_name})
         return {"message": "Position created"}
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1289,7 +1289,7 @@ def delete_position(pos_id: int, current_user: UserResponse = Depends(get_curren
         return {"message": "Position deleted"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1379,7 +1379,7 @@ def check_in(current_user: UserResponse = Depends(get_current_user), company_id:
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1440,7 +1440,7 @@ def check_out(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1583,7 +1583,6 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
         # Check leave balance for annual leave type
         if request.leave_type in ('annual', 'سنوية'):
             # Get total approved leave days in current year
-            from datetime import datetime as dt
             year_start = date(date.today().year, 1, 1)
             used_days = conn.execute(text("""
                 SELECT COALESCE(SUM(end_date - start_date + 1), 0) 
@@ -1634,7 +1633,7 @@ def create_leave_request(request: LeaveRequestCreate, current_user: UserResponse
                 amount=str(leave_days),
                 submitted_by=user_id,
                 description=f"طلب إجازة {request.leave_type} - {leave_days} يوم",
-                link=f"/hr/leaves"
+                link="/hr/leaves"
             )
             if approval_info:
                 conn.commit()
@@ -1851,7 +1850,7 @@ def calculate_end_of_service(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -2254,7 +2253,7 @@ def update_application_stage(app_id: int, data: ApplicationStageUpdate, company_
 # --- Leave Balance & Carryover (with branch access) ---
 
 @router.get("/leave-balance/{emp_id}", dependencies=[Depends(require_permission("hr.view"))])
-def get_leave_balance(emp_id: int, company_id: str = Depends(get_current_user_company)):
+def get_leave_balance(emp_id: int, current_user: UserResponse = Depends(get_current_user), company_id: str = Depends(get_current_user_company)):
     conn = get_db_connection(company_id)
     try:
         from datetime import datetime as dt

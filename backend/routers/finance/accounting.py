@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from utils.i18n import http_error
 from pydantic import BaseModel
-from typing import List, Optional
-from sqlalchemy.orm import Session
+from typing import Optional
 from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
 import logging
-from datetime import datetime, date
+from datetime import date
 from dateutil.relativedelta import relativedelta
 from utils.cache import invalidate_company_cache
 from decimal import Decimal, ROUND_HALF_UP
@@ -393,7 +392,7 @@ async def create_account(
         # Invalidate cache
         try:
             cache.delete(f"chart_of_accounts:{current_user.company_id}")
-        except:
+        except Exception:
             pass
         db.close()
 
@@ -452,7 +451,7 @@ async def delete_account(
         # Invalidate cache
         try:
             cache.delete(f"chart_of_accounts:{current_user.company_id}")
-        except:
+        except Exception:
             pass
             
         return {"success": True, "message": "تم حذف الحساب بنجاح"}
@@ -523,7 +522,7 @@ async def update_account(
         # Invalidate cache
         try:
             cache.delete(f"chart_of_accounts:{current_user.company_id}")
-        except:
+        except Exception:
             pass
             
         return {"success": True, "message": "تم تحديث الحساب بنجاح"}
@@ -752,6 +751,7 @@ def list_journal_entries(
 @limiter.limit("200/minute")
 def get_journal_entry(
     request: Request,
+    entry_id: int,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب تفاصيل قيد يومي"""
@@ -1062,6 +1062,7 @@ def list_fiscal_years(request: Request, current_user: dict = Depends(get_current
 @limiter.limit("100/minute")
 def create_fiscal_year(
     request: Request,
+    data: FiscalYearCreate,
     current_user: dict = Depends(get_current_user)
 ):
     """إنشاء سنة مالية جديدة"""
@@ -1143,6 +1144,7 @@ def create_fiscal_year(
 @limiter.limit("200/minute")
 def preview_year_end_closing(
     request: Request,
+    year: int,
     current_user: dict = Depends(get_current_user)
 ):
     """معاينة قيد الإقفال قبل التنفيذ - عرض الإيرادات والمصاريف"""
@@ -1225,6 +1227,7 @@ def preview_year_end_closing(
 @limiter.limit("100/minute")
 def close_fiscal_year(
     request: Request,
+    year: int,
     data: FiscalYearClose = FiscalYearClose(),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1394,6 +1397,7 @@ def close_fiscal_year(
 @limiter.limit("100/minute")
 def reopen_fiscal_year(
     request: Request,
+    year: int,
     data: FiscalYearReopen = FiscalYearReopen(),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1491,6 +1495,7 @@ def reopen_fiscal_year(
 @limiter.limit("200/minute")
 def list_fiscal_periods(
     request: Request,
+    year: int,
     current_user: dict = Depends(get_current_user)
 ):
     """جلب الفترات المحاسبية لسنة مالية"""
@@ -1525,6 +1530,7 @@ def list_fiscal_periods(
 @limiter.limit("100/minute")
 def toggle_fiscal_period(
     request: Request,
+    period_id: int,
     current_user: dict = Depends(get_current_user)
 ):
     """فتح/إغلاق فترة محاسبية"""
@@ -1569,7 +1575,7 @@ def toggle_fiscal_period(
         return {"success": True, "message": f"تم {action} الفترة {period.name}", "is_closed": new_status}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1696,7 +1702,7 @@ def create_recurring_template(request: Request, data: dict = Body(...), current_
         return {"id": template_id, "message": "تم إنشاء القالب بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1777,7 +1783,7 @@ def update_recurring_template(request: Request, template_id: int, data: dict = B
         return {"success": True, "message": "تم تعديل القالب بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1804,7 +1810,7 @@ def delete_recurring_template(request: Request, template_id: int, current_user: 
         return {"success": True, "message": "تم حذف القالب بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1834,7 +1840,7 @@ def generate_from_template(request: Request, template_id: int, current_user: dic
         return {"success": True, "message": "تم توليد القيد بنجاح", "entry_id": entry_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1879,7 +1885,7 @@ def generate_all_due_templates(request: Request, current_user: dict = Depends(ge
             "generated": generated,
             "errors": errors,
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1887,7 +1893,6 @@ def generate_all_due_templates(request: Request, current_user: dict = Depends(ge
         db.close()
 def _create_entry_from_template(db, tmpl, lines, current_user):
     """Helper: إنشاء قيد يومي من قالب متكرر"""
-    from dateutil.relativedelta import relativedelta
 
     today = date.today()
     entry_status = "posted" if tmpl.auto_post else "draft"
@@ -2109,7 +2114,7 @@ def save_opening_balances(
                 "message": "تم حفظ الأرصدة الافتتاحية بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -2121,6 +2126,7 @@ def save_opening_balances(
 @limiter.limit("200/minute")
 def preview_closing_entries(
     request: Request,
+    start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     branch_id: Optional[int] = None,
     current_user: dict = Depends(get_current_user)
@@ -2194,6 +2200,7 @@ def preview_closing_entries(
 @limiter.limit("100/minute")
 def generate_closing_entries(
     request: Request,
+    data: dict = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """توليد قيود الإقفال التلقائي: إقفال الإيرادات والمصاريف → ملخص الدخل → أرباح مبقاة"""
@@ -2385,7 +2392,7 @@ def generate_closing_entries(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -2452,7 +2459,7 @@ def create_bad_debt_provision(request: Request, req: ProvisionRequest, current_u
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -2514,7 +2521,7 @@ def create_leave_provision(request: Request, req: ProvisionRequest, current_user
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -2656,7 +2663,7 @@ def fx_revaluation(request: Request, req: FXRevaluationRequest, current_user: di
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

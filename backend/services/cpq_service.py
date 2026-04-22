@@ -1,7 +1,6 @@
 """CPQ Service — validation, pricing, PDF generation."""
 import os
 from decimal import Decimal, ROUND_HALF_UP
-from io import BytesIO
 
 from sqlalchemy import text
 

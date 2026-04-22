@@ -11,7 +11,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import logging
 import re
 
@@ -106,7 +106,7 @@ def setup_2fa(current_user=Depends(get_current_user)):
         raise
     except ImportError:
         raise HTTPException(**http_error(500, "pyotp_not_installed"))
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -160,7 +160,7 @@ def verify_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user))
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -198,7 +198,7 @@ def disable_2fa(data: TwoFAVerifyRequest, current_user=Depends(get_current_user)
         return {"message": i18n_message("2fa_disabled_success")}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -346,7 +346,7 @@ def change_password(data: PasswordChangeRequest, current_user=Depends(get_curren
         return {"message": i18n_message("password_changed_success")}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -384,7 +384,7 @@ def update_password_policy(data: PasswordPolicySchema, current_user=Depends(get_
         db.commit()
 
         return {"message": i18n_message("password_policy_updated")}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -440,7 +440,7 @@ def terminate_session(session_id: int, current_user=Depends(get_current_user)):
         """), {"sid": session_id, "uid": current_user.id})
         db.commit()
         return {"message": i18n_message("session_terminated")}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -463,7 +463,7 @@ def terminate_all_sessions(current_user=Depends(get_current_user)):
         """), {"uid": current_user.id})
         db.commit()
         return {"message": i18n_message("all_sessions_terminated")}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

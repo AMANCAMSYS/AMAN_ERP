@@ -2,13 +2,12 @@ import sys
 import os
 import argparse
 import logging
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import get_system_db
-from config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("delete_company")
@@ -62,7 +61,7 @@ def delete_company(company_id: str, force: bool = False):
             db.rollback()
 
         # 4. Remove from system_companies
-        logger.info(f"📝 Removing entry from system_companies...")
+        logger.info("📝 Removing entry from system_companies...")
         db.execute(text("DELETE FROM system_companies WHERE id = :id"), {"id": company_id})
         db.commit()
 

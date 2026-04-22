@@ -13,7 +13,7 @@ import logging
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
 from services.gl_service import create_journal_entry
 from .schemas import ShipmentCreate
@@ -106,9 +106,9 @@ def create_shipment(
                 WHERE u.is_active = TRUE 
                 AND (ub.branch_id = :bid OR u.id = :mid OR u.role = 'superuser' OR u.role = 'admin')
             """), {
-                "title": f"📦 شحنة واردة جديدة",
+                "title": "📦 شحنة واردة جديدة",
                 "message": f"شحنة {shipment_ref} من {src.warehouse_name} إلى {dst.warehouse_name} في انتظار التأكيد",
-                "link": f"/stock/shipments/incoming",
+                "link": "/stock/shipments/incoming",
                 "bid": d_branch_id,
                 "mid": d_manager_id
             })
@@ -130,7 +130,7 @@ def create_shipment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -504,7 +504,7 @@ def confirm_shipment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -563,7 +563,7 @@ def cancel_shipment(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

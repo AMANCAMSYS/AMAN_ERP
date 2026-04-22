@@ -6,7 +6,7 @@ External Integration: API Keys, Webhooks, ZATCA QR, WHT
 
 import pytest
 from datetime import date
-from helpers import assert_valid_response, assert_error_response
+from helpers import assert_valid_response
 
 
 # ═══════════════════════════════════════════════════════════════

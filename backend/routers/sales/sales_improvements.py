@@ -17,7 +17,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
-from utils.accounting import get_mapped_account_id, update_account_balance, generate_sequential_number, get_base_currency
+from utils.accounting import get_mapped_account_id, get_base_currency
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ def create_commission_rule(data: dict, current_user=Depends(get_current_user)):
         }).fetchone()
         db.commit()
         return dict(result._mapping)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -268,7 +268,7 @@ def calculate_commission(data: dict, current_user=Depends(get_current_user)):
         return dict(result._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -375,7 +375,7 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -436,7 +436,7 @@ def create_partial_invoice(order_id: int, data: dict, current_user=Depends(get_c
         return {"invoice_id": inv.id, "invoice_number": inv_num, "total": total}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

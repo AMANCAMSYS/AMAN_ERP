@@ -4,11 +4,9 @@ AMAN ERP - Security Tests: Injection Attacks
 ═══════════════════════════════════════
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 from main import app
-from conftest import admin_token, admin_headers
 from routers import auth as auth_router
 
 client = TestClient(app)

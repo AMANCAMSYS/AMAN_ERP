@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
@@ -11,7 +11,6 @@ from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.ws_manager import ws_manager
 import logging
-import asyncio
 
 logger = logging.getLogger("aman.notifications")
 
@@ -174,7 +173,7 @@ async def create_and_send_notification(
                     {"<a href='" + data.link + "' class='btn'>عرض التفاصيل</a>" if data.link else ""}
                 """)
                 results["email"] = send_notification_email(db, data.user_id, data.title, html)
-            except Exception as e:
+            except Exception:
                 logger.exception("Email notification failed")
                 results["email"] = False
 
@@ -184,7 +183,7 @@ async def create_and_send_notification(
                 from services.email_service import send_notification_sms
                 sms_text = f"{data.title}: {data.message or ''}"[:160]
                 results["sms"] = send_notification_sms(db, data.user_id, sms_text)
-            except Exception as e:
+            except Exception:
                 logger.exception("SMS notification failed")
                 results["sms"] = False
 

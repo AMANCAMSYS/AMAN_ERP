@@ -5,7 +5,6 @@ Inventory Module - Stock Transfers (Single-item with GL + Multi-item)
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import Optional
 from datetime import datetime
 import logging
 
@@ -27,7 +26,6 @@ def create_stock_transfer(
     current_user: dict = Depends(get_current_user)
 ):
     """تحويل مخزني مباشر بين المستودعات مع تطبيق سياسة التكلفة"""
-    from services.costing_service import CostingService
 
     db = get_db_connection(current_user.company_id)
     try:
@@ -420,7 +418,7 @@ def transfer_stock(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

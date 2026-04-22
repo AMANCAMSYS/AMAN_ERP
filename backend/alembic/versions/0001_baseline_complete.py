@@ -14,7 +14,6 @@ stamps the DB at this revision via `alembic stamp 0001_baseline_complete`.
 For future schema changes: create a new migration that revises this one.
 """
 
-from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0001_baseline_complete"

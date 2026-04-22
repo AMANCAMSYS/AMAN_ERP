@@ -99,7 +99,7 @@ def try_submit_for_approval(
                 user_id=approver_user_id,
                 title=f"طلب اعتماد جديد: {document_number}",
                 message=description or f"طلب اعتماد {document_type} بمبلغ {amount:,.2f}",
-                link=link or f"/approvals"
+                link=link or "/approvals"
             )
         elif approver_role:
             # Notify all users with this role
@@ -114,7 +114,7 @@ def try_submit_for_approval(
                     user_id=approver.id,
                     title=f"طلب اعتماد جديد: {document_number}",
                     message=description or f"طلب اعتماد {document_type} بمبلغ {amount:,.2f}",
-                    link=link or f"/approvals"
+                    link=link or "/approvals"
                 )
         
         logger.info(f"Created approval request #{request_id} for {document_type} #{document_number}")

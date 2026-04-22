@@ -15,9 +15,8 @@ import hashlib
 import hmac
 import json
 import logging
-import time
 from decimal import Decimal
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Optional
 
 import requests
 

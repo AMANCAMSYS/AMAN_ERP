@@ -4,8 +4,7 @@ Reusable response models for common API patterns.
 """
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List, Dict, Any, Generic, TypeVar
-from datetime import datetime, date
+from typing import Optional, List, Dict, Any
 
 
 # ─── Generic Responses ───────────────────────────────────────────

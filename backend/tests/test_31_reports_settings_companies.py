@@ -9,8 +9,7 @@ Covers UNTESTED endpoints:
 - Companies: register, list, get/{id}, update/{id}, upload-logo/{id}
 """
 import pytest
-from datetime import date, timedelta
-from helpers import assert_valid_response, assert_error_response
+from datetime import date
 
 
 # ══════════════════════════════════════════════════════════════

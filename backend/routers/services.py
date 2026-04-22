@@ -7,14 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from fastapi.responses import FileResponse
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Optional
-from datetime import date
+from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import math
 import os
 import uuid
-import shutil
 
 from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
@@ -216,7 +214,7 @@ def create_service_request(data: ServiceRequestCreate, request: Request, current
         return get_service_request(req_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -278,7 +276,7 @@ def update_service_request(request_id: int, data: ServiceRequestUpdate, request:
         return get_service_request(request_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -314,7 +312,7 @@ def delete_service_request(request_id: int, request: Request, current_user: User
         return {"message": "تم حذف طلب الصيانة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -351,7 +349,7 @@ def assign_technician(request_id: int, data: TechnicianAssignRequest, request: R
         return get_service_request(request_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -400,7 +398,7 @@ def add_service_cost(request_id: int, data: ServiceCostCreate, request: Request,
         return get_service_request(request_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -430,7 +428,7 @@ def delete_service_cost(request_id: int, cost_id: int, request: Request, current
                      request=request, branch_id=None)
 
         return {"message": "تم حذف التكلفة بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -605,7 +603,7 @@ async def upload_document(
         return get_document(doc_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -635,7 +633,7 @@ def update_document_meta(doc_id: int, data: DocumentMetaUpdate, current_user: Us
         return get_document(doc_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -705,7 +703,7 @@ async def upload_new_version(
         return get_document(doc_id, current_user)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -754,7 +752,7 @@ def delete_document(doc_id: int, current_user: UserResponse = Depends(get_curren
         return {"message": "تم حذف المستند بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

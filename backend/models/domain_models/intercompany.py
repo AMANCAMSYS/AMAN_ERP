@@ -1,7 +1,7 @@
 """Intercompany accounting entities: entity groups, IC transactions, account mappings."""
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, func,
+    CheckConstraint, ForeignKey, Integer, Numeric, String,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 

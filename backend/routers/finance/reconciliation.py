@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date, datetime
-from pydantic import BaseModel
 import csv
 import io
 import re
@@ -419,7 +417,7 @@ async def preview_import(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Error parsing reconciliation file")
         raise HTTPException(status_code=400, detail="خطأ في تحليل الملف")
     finally:
@@ -782,7 +780,7 @@ def delete_reconciliation(id: int, current_user: dict = Depends(get_current_user
         return {"message": "تم حذف التسوية بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="حدث خطأ أثناء حذف التسوية")
     finally:

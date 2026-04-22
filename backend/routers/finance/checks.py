@@ -117,7 +117,7 @@ def list_checks_receivable(
             })
 
         return {"items": items, "total": total, "page": page}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -152,7 +152,7 @@ def checks_receivable_stats(branch_id: Optional[int] = None, current_user=Depend
             "bounced": {"count": stats.bounced_count, "amount": float(_dec(stats.bounced_amount))},
             "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -197,7 +197,7 @@ def get_check_receivable(check_id: int, current_user=Depends(get_current_user)):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -302,7 +302,7 @@ def create_check_receivable(data: dict, current_user=Depends(get_current_user)):
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -380,7 +380,7 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
         return {"message": "تم تحصيل الشيك بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -479,7 +479,7 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
         return {"message": "تم تسجيل الشيك كمرتجع"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -552,7 +552,7 @@ def represent_check_receivable(check_id: int, data: dict = None, current_user=De
         return {"message": "تم إعادة تقديم الشيك بنجاح", "journal_entry_id": je_id}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -626,7 +626,7 @@ def list_checks_payable(
             })
 
         return {"items": items, "total": total, "page": page}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -661,7 +661,7 @@ def checks_payable_stats(branch_id: Optional[int] = None, current_user=Depends(g
             "bounced": {"count": stats.bounced_count, "amount": float(_dec(stats.bounced_amount))},
             "overdue": {"count": stats.overdue_count, "amount": float(_dec(stats.overdue_amount))},
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -706,7 +706,7 @@ def get_check_payable(check_id: int, current_user=Depends(get_current_user)):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -807,7 +807,7 @@ def create_check_payable(data: dict, current_user=Depends(get_current_user)):
         return {"id": result.id, "message": "تم تسجيل الشيك بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -892,7 +892,7 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
         return {"message": "تم صرف الشيك بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1012,7 +1012,7 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
         return {"message": "تم تسجيل الشيك كمرتجع"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1088,7 +1088,7 @@ def represent_check_payable(check_id: int, data: dict = {}, current_user=Depends
         return {"message": "تم إعادة تقديم الشيك بنجاح", "re_presentation_count": new_count}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1141,7 +1141,7 @@ def get_due_checks_alerts(days_ahead: int = Query(7, ge=1, le=90), branch_id: Op
 
         alerts.sort(key=lambda x: x["due_date"])
         return {"alerts": alerts, "total": len(alerts)}
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -1250,7 +1250,7 @@ def checks_aging_report(
             "total": len(results),
             "bucket_summary": bucket_summary,
         }
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -1272,7 +1272,7 @@ def get_check_status_log(check_type: str, check_id: int, current_user=Depends(ge
             ORDER BY csl.changed_at DESC
         """), {"ct": check_type, "cid": check_id}).fetchall()
         return [dict(r._mapping) for r in rows]
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
@@ -1292,7 +1292,7 @@ def check_status_summary(current_user=Depends(get_current_user)):
             ORDER BY cnt DESC
         """)).fetchall()
         return [dict(r._mapping) for r in rows]
-    except Exception as e:
+    except Exception:
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
     finally:

@@ -7,7 +7,7 @@ trial management, and failed payment handling.
 import calendar
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import text

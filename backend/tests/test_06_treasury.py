@@ -5,7 +5,7 @@ Treasury, Accounts, Transfers, Expenses Tests
 """
 
 import pytest
-from helpers import assert_valid_response, assert_positive_amount
+from helpers import assert_valid_response
 
 
 class TestTreasuryAccounts:

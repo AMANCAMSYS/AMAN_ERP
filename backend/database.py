@@ -175,7 +175,7 @@ def create_company_database(company_id: str, admin_password: str) -> Tuple[bool,
         logger.info(f"✅ Created database: {db_name}")
         return True, "تم إنشاء قاعدة البيانات", db_name, db_user
         
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to create company database")
         return False, "حدث خطأ أثناء إنشاء قاعدة البيانات", "", ""
 

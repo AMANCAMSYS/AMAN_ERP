@@ -6,25 +6,28 @@ Bank Import | Zakat Calculator | Consolidation Reports | Fiscal Period Lock | Ba
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime, date
 from pydantic import BaseModel
 from decimal import Decimal, ROUND_HALF_UP
-from decimal import Decimal
-import io, csv, json, logging, subprocess, os
+import io
+import csv
+import json
+import logging
+import subprocess
+import os
 
 from database import get_db_connection, engine as system_engine
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import (
-    generate_sequential_number, get_mapped_account_id,
-    update_account_balance, get_base_currency
+    get_mapped_account_id,
+    get_base_currency
 )
-from utils.fiscal_lock import check_fiscal_period_open, create_fiscal_lock_table
+from utils.fiscal_lock import create_fiscal_lock_table
 from utils.duplicate_detection import find_duplicate_parties, find_duplicate_products
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
-import logging
 
 router = APIRouter(tags=["System Completion"])
 logger = logging.getLogger(__name__)
@@ -175,7 +178,7 @@ async def import_bank_statement(
                 })
                 imported += 1
 
-            except Exception as e:
+            except Exception:
                 logger.warning("Bank import line %d failed", idx, exc_info=True)
                 errors.append(f"سطر {idx}: خطأ في البيانات")
 
@@ -200,7 +203,7 @@ async def import_bank_statement(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -335,7 +338,7 @@ def auto_match_bank_lines(batch_id: int, current_user: dict = Depends(get_curren
             "remaining": len(lines) - matched,
             "message": f"تمت مطابقة {matched} من {len(lines)} حركة"
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -872,7 +875,7 @@ def calculate_zakat(body: ZakatCalculateRequest, current_user: dict = Depends(ge
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -948,7 +951,7 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1747,7 +1750,7 @@ def create_print_template(body: PrintTemplateCreate, current_user: dict = Depend
         db.commit()
 
         return {"id": tmpl_id, "message": "تم إنشاء قالب الطباعة"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

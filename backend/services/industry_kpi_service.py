@@ -15,14 +15,14 @@ Standards: NRF, NRA/USALI, APICS/ISO 9001, PMI PMBOK, AICPA, DSCSA, IFRS/IAS
 """
 
 from sqlalchemy import text
-from datetime import date, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import date
+from typing import Optional
 import logging
 
 from services.kpi_service import (
-    kpi_item, calc_trend, calc_trend_inverse, ratio_status,
+    kpi_item, calc_trend, ratio_status,
     build_branch_filter, get_previous_period,
-    _gl_sum, _gl_balance, _count_table, _sum_column
+    _gl_sum, _gl_balance, _gl_balance_by_classification, _count_table, _sum_column
 )
 
 logger = logging.getLogger(__name__)

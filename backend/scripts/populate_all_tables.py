@@ -3,13 +3,12 @@ Comprehensive data population script for ALL empty tables.
 Inserts diverse, realistic Arabic test data for thorough system testing.
 Company: 39a597c9
 """
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from database import get_db_connection
 from sqlalchemy import text
-from datetime import datetime, date, timedelta
-import json
 
 COMPANY_ID = '39a597c9'
 
@@ -688,9 +687,9 @@ def run():
         print("8. Purchases & Sales...")
 
         # purchase_agreements
-        pa_id1 = db.execute(text(f"""INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title, start_date, end_date, total_amount, consumed_amount, status, branch_id, created_by)
+        pa_id1 = db.execute(text("""INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title, start_date, end_date, total_amount, consumed_amount, status, branch_id, created_by)
                VALUES ('PA-2025-001', 1, 'blanket', 'اتفاقية توريد سنوية - مواد خام', '2025-01-01', '2025-12-31', 500000, 320000, 'active', 1, 1) RETURNING id""")).scalar()
-        pa_id2 = db.execute(text(f"""INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title, start_date, end_date, total_amount, consumed_amount, status, branch_id, created_by)
+        pa_id2 = db.execute(text("""INSERT INTO purchase_agreements (agreement_number, supplier_id, agreement_type, title, start_date, end_date, total_amount, consumed_amount, status, branch_id, created_by)
                VALUES ('PA-2026-001', 2, 'contract', 'عقد صيانة معدات', '2026-01-01', '2026-12-31', 120000, 0, 'active', 1, 1) RETURNING id""")).scalar()
         count += 2
 
@@ -726,7 +725,7 @@ def run():
         exe(f"INSERT INTO pending_receivables (customer_id, invoice_id, invoice_number, due_date, amount, paid_amount, outstanding_amount, days_overdue, status) VALUES (7, {INV_IDS[1]}, 'SINV-2025-002', '2026-02-28', 35000, 0, 35000, 0, 'pending')")
 
         # commission_rules
-        exe(f"INSERT INTO commission_rules (name, salesperson_id, rate_type, rate, min_amount, is_active, branch_id) VALUES ('عمولة مبيعات عامة', 1, 'percentage', 5, 1000, true, 1)")
+        exe("INSERT INTO commission_rules (name, salesperson_id, rate_type, rate, min_amount, is_active, branch_id) VALUES ('عمولة مبيعات عامة', 1, 'percentage', 5, 1000, true, 1)")
         exe(f"INSERT INTO commission_rules (name, product_id, rate_type, rate, is_active, branch_id) VALUES ('عمولة منتج خاص', {PROD_IDS[0]}, 'fixed', 50, true, 1)")
 
         # sales_commissions
@@ -762,8 +761,8 @@ def run():
         exe(f"INSERT INTO ticket_comments (ticket_id, comment, is_internal, created_by) VALUES ({TICKET_IDS[2]}, 'جاري العمل على الطلب', false, 1)")
 
         # service_documents
-        exe(f"INSERT INTO service_documents (title, description, category, file_name, file_size, mime_type, version, created_by) VALUES ('دليل الصيانة', 'دليل صيانة المعدات', 'manual', 'maintenance_guide.pdf', 2048000, 'application/pdf', 1, 1)")
-        exe(f"INSERT INTO service_documents (title, description, category, file_name, file_size, mime_type, version, created_by) VALUES ('نموذج طلب خدمة', 'نموذج لتقديم طلبات الخدمة', 'form', 'service_request_form.docx', 512000, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 1, 1)")
+        exe("INSERT INTO service_documents (title, description, category, file_name, file_size, mime_type, version, created_by) VALUES ('دليل الصيانة', 'دليل صيانة المعدات', 'manual', 'maintenance_guide.pdf', 2048000, 'application/pdf', 1, 1)")
+        exe("INSERT INTO service_documents (title, description, category, file_name, file_size, mime_type, version, created_by) VALUES ('نموذج طلب خدمة', 'نموذج لتقديم طلبات الخدمة', 'form', 'service_request_form.docx', 512000, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 1, 1)")
 
         # ============================================================
         # 10. DOCUMENTS & ATTACHMENTS
@@ -881,9 +880,9 @@ def run():
         # ============================================================
         print("14. Recurring Journals...")
 
-        rjt1 = db.execute(text(f"""INSERT INTO recurring_journal_templates (name, description, reference, frequency, start_date, end_date, next_run_date, is_active, auto_post, branch_id, currency, exchange_rate, run_count, max_runs, created_by)
+        rjt1 = db.execute(text("""INSERT INTO recurring_journal_templates (name, description, reference, frequency, start_date, end_date, next_run_date, is_active, auto_post, branch_id, currency, exchange_rate, run_count, max_runs, created_by)
                VALUES ('إيجار شهري', 'قيد إيجار المكتب الشهري', 'RJ-RENT', 'monthly', '2025-01-01', '2025-12-31', '2026-03-01', true, true, 1, 'SAR', 1, 12, 12, 1) RETURNING id""")).scalar()
-        rjt2 = db.execute(text(f"""INSERT INTO recurring_journal_templates (name, description, reference, frequency, start_date, end_date, next_run_date, is_active, auto_post, branch_id, currency, exchange_rate, run_count, max_runs, created_by)
+        rjt2 = db.execute(text("""INSERT INTO recurring_journal_templates (name, description, reference, frequency, start_date, end_date, next_run_date, is_active, auto_post, branch_id, currency, exchange_rate, run_count, max_runs, created_by)
                VALUES ('اشتراك برمجيات', 'قيد اشتراك شهري في البرمجيات', 'RJ-SW', 'monthly', '2025-01-01', '2026-12-31', '2026-03-01', true, false, 1, 'SAR', 1, 14, 24, 1) RETURNING id""")).scalar()
         count += 2
 
@@ -1047,7 +1046,7 @@ def run():
                VALUES ('تقرير مخزون شهري', 'inventory_summary', '{"include_zero": false}'::jsonb, 'monthly', 'warehouse@company.sa', 'xlsx', 1, '2026-03-01', true, 1)""")
 
         # shared_reports
-        exe(f"INSERT INTO shared_reports (report_type, report_id, shared_by, shared_with, permission, message) VALUES ('custom', 1, 1, 1, 'view', 'مشاركة التقرير المالي للربع الرابع')")
+        exe("INSERT INTO shared_reports (report_type, report_id, shared_by, shared_with, permission, message) VALUES ('custom', 1, 1, 1, 'view', 'مشاركة التقرير المالي للربع الرابع')")
 
         # email_templates
         exe("""INSERT INTO email_templates (template_name, subject, body, is_active)

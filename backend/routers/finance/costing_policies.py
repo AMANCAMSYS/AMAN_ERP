@@ -1,11 +1,8 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import Optional, List
-from pydantic import BaseModel
-from datetime import datetime
+from typing import List
 
 from database import get_db_connection
 from routers.auth import get_current_user
@@ -15,7 +12,6 @@ from utils.limiter import limiter
 
 
 from services.costing_service import CostingService
-import json
 
 from schemas.costing_policies import CostingPolicySet, CostingPolicyHistoryResponse
 import logging
@@ -136,7 +132,7 @@ def set_costing_policy(request: Request, policy_data: CostingPolicySet, current_
              
         db.commit()
         return {"message": f"Policy updated to {new_name}", "status": "success", "impact": impact}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

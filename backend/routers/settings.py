@@ -6,12 +6,10 @@ Handles dynamic key-value settings for each company.
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
-from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
+from typing import Dict, Any
 
-from database import get_company_db, get_db_connection
+from database import get_db_connection
 from routers.auth import get_current_user, UserResponse
 from utils.permissions import require_permission
 from schemas.settings import SettingsUpdateRequest
@@ -298,7 +296,7 @@ def get_company_settings(
                 settings_dict[key] = value
 
         return settings_dict
-    except Exception as e:
+    except Exception:
         logger.exception("Operation failed")
         return {} 
     finally:
@@ -421,7 +419,7 @@ def update_settings_bulk(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -436,7 +434,6 @@ def test_email_connection(
     Test SMTP connection using provided settings.
     """
     import smtplib
-    from email.mime.text import MIMEText
     
     settings = request.settings
     host = settings.get("smtp_host")
@@ -455,7 +452,7 @@ def test_email_connection(
         server.quit()
         
         return {"success": True, "message": "Connection successful"}
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="فشل الاتصال بالخادم")
 
 @router.post("/generate-csid", status_code=status.HTTP_200_OK, dependencies=[Depends(require_permission("settings.manage"))])

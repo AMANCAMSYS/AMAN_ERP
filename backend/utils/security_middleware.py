@@ -2,7 +2,7 @@
 SEC-203: HTTPS Enforcement Middleware
 SEC-204: Input Sanitization Middleware
 """
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse, JSONResponse
 import re
@@ -194,7 +194,6 @@ class InputSanitizationMiddleware(BaseHTTPMiddleware):
                         )
 
                     # Reconstruct request with body (since we consumed it)
-                    from starlette.datastructures import State
                     async def receive():
                         return {"type": "http.request", "body": body}
                     request._receive = receive

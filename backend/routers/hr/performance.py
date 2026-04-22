@@ -5,8 +5,7 @@ Performance Reviews Router - US12
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
-from typing import Optional, List
-from datetime import date
+from typing import Optional
 from decimal import Decimal, ROUND_HALF_UP
 import json
 import logging
@@ -16,9 +15,7 @@ from routers.auth import get_current_user, UserResponse, get_current_user_compan
 from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.audit import log_activity
 from schemas.performance import (
-    ReviewCycleCreate, ReviewCycleRead,
-    ReviewRead, GoalCreate, GoalRead,
-    SelfAssessmentSubmit, ManagerAssessmentSubmit,
+    ReviewCycleCreate, GoalCreate, SelfAssessmentSubmit, ManagerAssessmentSubmit,
 )
 
 logger = logging.getLogger(__name__)
@@ -637,7 +634,7 @@ def delete_goal(
         return {"message": "Goal deleted"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete goal")
     finally:

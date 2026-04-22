@@ -5,11 +5,9 @@ AMAN ERP - Treasury Router
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import date
-from pydantic import BaseModel
 import logging
 
 from decimal import Decimal, ROUND_HALF_UP
@@ -18,7 +16,6 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.audit import log_activity
-from utils.accounting import update_account_balance, validate_je_lines
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.cache import cache
 from utils.treasury_gl import ensure_treasury_gl_accounts
@@ -169,7 +166,6 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
                  # If alphanumeric, just append a random number or increment if suffix is numeric
                  # Simple fallback: use timestamp suffix to ensure uniqueness
                  import random
-                 import time
                  new_code = f"1101{random.randint(100000, 999999)}"
         
         
@@ -880,7 +876,7 @@ def get_treasury_cashflow_report(
             from utils.permissions import validate_branch_access
             validate_branch_access(current_user, branch_id)
 
-        from datetime import datetime, timedelta
+        from datetime import datetime
         if not start_date:
             start_date = (datetime.now().replace(day=1)).strftime('%Y-%m-%d')
         if not end_date:

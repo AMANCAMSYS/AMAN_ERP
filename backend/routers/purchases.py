@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from utils.i18n import http_error
-from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP
 import logging
-from pydantic import BaseModel
 from utils.cache import invalidate_company_cache
 
 _D2 = Decimal('0.01')
@@ -20,10 +18,10 @@ from routers.auth import get_current_user
 from fastapi import Request
 from utils.audit import log_activity
 from utils.permissions import require_permission, require_module
-from utils.accounting import get_mapped_account_id, generate_sequential_number, update_account_balance, get_base_currency
+from utils.accounting import get_mapped_account_id, generate_sequential_number, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry as gl_create_journal_entry
-from schemas.purchases import PurchaseLineItem, PurchaseCreate, SupplierGroupCreate, POCreate, ReceiveItem, POReceiveRequest, SupplierCreate, PaymentAllocationSchema, SupplierPaymentCreate
+from schemas.purchases import PurchaseCreate, SupplierGroupCreate, POCreate, POReceiveRequest, SupplierPaymentCreate
 
 router = APIRouter(prefix="/buying", tags=["المشتريات"], dependencies=[Depends(require_module("buying"))])
 logger = logging.getLogger(__name__)
@@ -112,7 +110,7 @@ def create_supplier_group(
             request=request
         )
         return {"message": "تم إنشاء المجموعة بنجاح"}
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -172,7 +170,7 @@ def update_supplier_group(
         return {"message": "تم تحديث المجموعة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -215,7 +213,7 @@ def delete_supplier_group(
         return {"message": "تم حذف المجموعة بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -630,7 +628,7 @@ def create_purchase_order(
         if approval_result:
             response["approval"] = approval_result
         return response
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -711,7 +709,7 @@ def approve_purchase_order(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -916,7 +914,7 @@ def receive_purchase_order(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3020,7 +3018,7 @@ def create_rfq(data: dict, request: Request, current_user=Depends(get_current_us
         return dict(rfq._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3062,7 +3060,7 @@ def add_rfq_response(rfq_id: int, data: dict, request: Request, current_user=Dep
             request=request
         )
         return dict(result._mapping)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3102,7 +3100,7 @@ def convert_rfq_to_po(rfq_id: int, data: dict, request: Request, current_user=De
         return {"message": "RFQ converted. Create PO from supplier.", "supplier_id": resp.supplier_id, "total_price": str(resp.total_price)}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3171,7 +3169,7 @@ def rate_supplier(data: dict, request: Request, current_user=Depends(get_current
             request=request
         )
         return dict(result._mapping)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3237,7 +3235,7 @@ def create_agreement(data: dict, request: Request, current_user=Depends(get_curr
             request=request
         )
         return dict(agr._mapping)
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3284,7 +3282,7 @@ def create_call_off(agr_id: int, data: dict, request: Request, current_user=Depe
         return {"message": f"Call-off of {str(amount)} created", "remaining": str(remaining)}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -3461,7 +3459,7 @@ def activate_blanket_po(bpo_id: int, request: Request, current_user: dict = Depe
         return {"message": "Blanket PO activated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

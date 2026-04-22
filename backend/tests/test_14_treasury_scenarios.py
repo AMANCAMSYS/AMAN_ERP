@@ -7,7 +7,7 @@ Comprehensive Multi-Scenario Tests: Treasury Module
 
 import pytest
 from datetime import date, timedelta
-from helpers import assert_valid_response, assert_error_response
+from helpers import assert_valid_response
 
 
 # ═══════════════════════════════════════════════════════════════

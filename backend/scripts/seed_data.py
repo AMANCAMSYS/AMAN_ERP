@@ -1,16 +1,14 @@
 import sys
 import os
 import random
-import uuid
 from datetime import datetime, timedelta
 import logging
 
 # Add parent directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import engine, get_system_db, create_company_database, get_db_connection
+from database import get_system_db, create_company_database, get_db_connection
 from sqlalchemy import text
-from config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -4,10 +4,10 @@ CRM-002: Sales Opportunities (Leads → Won/Lost pipeline)
 CRM-004: Support Tickets with comments and SLA
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import List, Dict, Any, Optional
+from typing import Optional
 
 from datetime import datetime, timezone
 from pydantic import BaseModel
@@ -593,7 +593,7 @@ def convert_to_quotation(opp_id: int, request: Request, current_user=Depends(get
 
 # ======================== CRM-003: Marketing Campaigns ========================
 
-from schemas.campaign import CampaignCreate, CampaignExecuteRequest, TrackingWebhookPayload
+from schemas.campaign import CampaignCreate, TrackingWebhookPayload
 
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
@@ -896,7 +896,9 @@ def list_campaign_recipients(
 def campaign_tracking_webhook(payload: TrackingWebhookPayload, company_id: str):
     """Public webhook for tracking campaign engagement (opens, clicks, responses).
     Requires company_id query param. Validates a signed payload to prevent tampering."""
-    import hashlib, os, hmac as hmac_lib
+    import hashlib
+    import os
+    import hmac as hmac_lib
     webhook_secret = os.environ.get("CAMPAIGN_WEBHOOK_SECRET")
     if not webhook_secret:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")

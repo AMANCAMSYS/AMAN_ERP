@@ -26,10 +26,8 @@ Pre-existing data (from v1/v2 seeds):
 """
 
 import requests
-import json
 import sys
-import time
-from datetime import date, datetime
+from datetime import datetime
 
 # ── Configuration ────────────────────────────────────────────────────────
 API = "http://64.225.49.118/api"
@@ -124,7 +122,7 @@ def api_get(endpoint):
         if r.status_code == 200:
             return r.json()
         return None
-    except:
+    except Exception:
         return None
 
 

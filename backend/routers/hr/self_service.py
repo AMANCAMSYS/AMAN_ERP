@@ -11,7 +11,7 @@ Endpoints under /hr/self-service:
 from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import Optional, List
+from typing import Optional
 from datetime import date
 import logging
 
@@ -20,10 +20,7 @@ from routers.auth import get_current_user, UserResponse, get_current_user_compan
 from utils.permissions import require_permission, require_module
 from utils.audit import log_activity
 from schemas.self_service import (
-    LeaveRequestCreate, LeaveRequestRead,
-    ProfileUpdateRequest,
-    PayslipRead, LeaveBalanceRead,
-    SelfServiceRequestRead,
+    LeaveRequestCreate, ProfileUpdateRequest,
 )
 
 logger = logging.getLogger(__name__)

@@ -7,8 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional, List, Any
-from datetime import datetime
-from pydantic import BaseModel
 import logging
 
 from database import get_db_connection
@@ -769,7 +767,7 @@ def create_role(
         return {"id": result[0], "message": "تم إنشاء الدور بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -834,7 +832,7 @@ def update_role(
         return {"message": "تم تحديث الدور بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -884,7 +882,7 @@ def delete_role(
         return {"message": "تم حذف الدور بنجاح"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

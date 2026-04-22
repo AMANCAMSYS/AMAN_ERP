@@ -66,7 +66,7 @@ class NotificationService:
                     reference_id=reference_id,
                     link=link,
                 )
-            except Exception as exc:
+            except Exception:
                 # T023: On failure, update delivery tracking columns
                 logger.warning(
                     "Failed to dispatch %s notification to user %s (%s)",

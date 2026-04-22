@@ -13,8 +13,7 @@ Covers:
 """
 import pytest
 from datetime import date, timedelta
-from decimal import Decimal
-from helpers import assert_valid_response, assert_error_response
+from helpers import assert_valid_response
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -60,6 +60,7 @@ def get_advanced_workflow(request: Request, workflow_id: int, current_user=Depen
 @limiter.limit("100/minute")
 def update_workflow_conditions(
     request: Request,
+    workflow_id: int,
     conditions: list,
     current_user=Depends(get_current_user)
 ):
@@ -80,6 +81,7 @@ def update_workflow_conditions(
 @limiter.limit("100/minute")
 def update_workflow_sla(
     request: Request,
+    workflow_id: int,
     data: WorkflowSLAUpdate,
     current_user=Depends(get_current_user)
 ):
@@ -143,7 +145,7 @@ def check_sla_escalations(request: Request, current_user=Depends(get_current_use
             "escalated": escalated,
             "message": f"تم تصعيد {escalated} طلب"
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -180,7 +182,7 @@ def auto_approve_below_threshold(request: Request, current_user=Depends(get_curr
             "auto_approved": len(auto_approved),
             "message": f"تمت الموافقة التلقائية على {len(auto_approved)} طلب"
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

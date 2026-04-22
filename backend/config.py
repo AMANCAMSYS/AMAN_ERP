@@ -105,6 +105,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
 
 
 @lru_cache()
@@ -120,7 +121,8 @@ def setup_pgpass():
     SEC-006: Write a .pgpass file so that CLI tools (psql, pg_dump, etc.)
     never need PGPASSWORD in the environment.  File is chmod 0600.
     """
-    import os, stat
+    import os
+    import stat
     home = os.path.expanduser("~")
     # System users (e.g. Docker non-root) may have home=/nonexistent
     if not os.path.isdir(home):

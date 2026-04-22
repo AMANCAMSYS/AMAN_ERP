@@ -9,8 +9,8 @@ Standards: IFRS, IAS 1/2/7/19/32, IFRS 15/16, GAZT Nitaqat, PMI PMBOK
 """
 
 from sqlalchemy import text
-from datetime import date, timedelta, datetime
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import date, timedelta
+from typing import Any, Optional, Tuple
 import logging
 
 logger = logging.getLogger(__name__)

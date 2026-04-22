@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
-from datetime import datetime
 import logging
 
 from database import get_db_connection

@@ -3,7 +3,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy import text
 from datetime import datetime, timedelta, date
 
-from config import settings
 from database import engine as system_engine, _get_engine
 from utils.email import send_email
 from utils.exports import generate_pdf, generate_excel

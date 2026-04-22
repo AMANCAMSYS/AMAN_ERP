@@ -5,10 +5,9 @@ AMAN ERP - Projects Module
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile
 from utils.i18n import http_error, i18n_message
-import shutil
 import os
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
@@ -16,8 +15,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    get_base_currency, update_account_balance,
-    compute_line_amounts, compute_invoice_totals
+    get_base_currency, compute_line_amounts, compute_invoice_totals
 )
 from utils.audit import log_activity
 from utils.fiscal_lock import check_fiscal_period_open
@@ -37,8 +35,7 @@ from schemas.projects import (
     ProjectCreate, ProjectUpdate, TaskCreate, TaskUpdate,
     ProjectExpenseCreate, ProjectRevenueCreate,
     TimesheetCreate, TimesheetUpdate, TimesheetApprove,
-    ProjectInvoiceCreate, ProjectDocumentCreate,
-    ChangeOrderCreate, ChangeOrderUpdate, ProjectCloseRequest,
+    ProjectInvoiceCreate, ChangeOrderCreate, ChangeOrderUpdate, ProjectCloseRequest,
     ProjectRiskCreate, ProjectRiskUpdate, TaskDependencyCreate
 )
 
@@ -54,7 +51,6 @@ async def get_projects(
     current_user: dict = Depends(get_current_user)
 ):
     """جلب قائمة المشاريع مع ملخص مالي"""
-    from utils.permissions import validate_branch_access
     validated_branch = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:

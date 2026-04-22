@@ -2,7 +2,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
-from typing import Optional
 import logging
 
 from database import get_db_connection
@@ -259,7 +258,7 @@ def generate_pdf(
         db.commit()
 
         return {"pdf_path": pdf_path}
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(404, "invalid_data"))
     except Exception as e:

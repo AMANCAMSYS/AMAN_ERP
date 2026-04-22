@@ -6,7 +6,6 @@ import pytest
 import sys
 import os
 import psycopg2
-from datetime import date, timedelta
 from decimal import Decimal
 
 # إضافة مسار backend لكي يتمكن pytest من استيراد الوحدات
@@ -15,10 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 from main import app
-from config import settings
 from database import get_db_connection
 
 DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_73ab0722"

@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from schemas.forecast import ForecastAdjustRequest, ForecastGenerateRequest, ForecastRead, ForecastPeriodRead
+from schemas.forecast import ForecastAdjustRequest, ForecastGenerateRequest
 from services.demand_forecast_service import generate_demand_forecast, manual_adjust
 from utils.permissions import require_permission
 
@@ -35,7 +35,7 @@ def generate_forecast(
             user_id=current_user.id,
         )
         return result
-    except ValueError as e:
+    except ValueError:
         logger.exception("Internal error")
         raise HTTPException(**http_error(400, "invalid_data"))
     finally:

@@ -6,7 +6,8 @@ Verifies that cached balances match their source-of-truth sub-ledgers:
   2. treasury_accounts.current_balance == linked accounts.balance (converted to treasury currency)
   3. parties.current_balance == SUM(debit-credit) FROM party_transactions
 """
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, text

@@ -3,7 +3,7 @@ AMAN ERP — Delivery Orders Router
 أوامر التسليم: مستند وسيط بين أمر البيع والفاتورة
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional
@@ -18,7 +18,7 @@ from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
-    update_account_balance, get_base_currency
+    get_base_currency
 )
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
@@ -344,7 +344,7 @@ def confirm_delivery_order(do_id: int, current_user: dict = Depends(get_current_
         return {"message": "تم تأكيد أمر التسليم وخصم المخزون", "status": "confirmed"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -598,7 +598,7 @@ def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_u
         return {"message": "تم إلغاء أمر التسليم", "status": "cancelled"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

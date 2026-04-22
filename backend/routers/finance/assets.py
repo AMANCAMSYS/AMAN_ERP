@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
@@ -80,7 +80,7 @@ def create_asset_transfer(data: AssetTransferCreate, current_user: dict = Depend
         return dict(result._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -103,7 +103,7 @@ def approve_transfer(transfer_id: int, current_user: dict = Depends(get_current_
         return {"message": "Transfer approved, asset moved to new branch"}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -156,7 +156,7 @@ def create_revaluation(data: AssetRevaluationCreate, current_user: dict = Depend
         return dict(result._mapping)
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -675,7 +675,7 @@ def create_asset(asset: AssetCreate, current_user: dict = Depends(get_current_us
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -744,7 +744,6 @@ def create_lease_contract(lease: LeaseContractCreate, current_user: dict = Depen
         # Dr. Right-of-Use Asset (1600) / Cr. Lease Liability (2300)
         journal_entry_id = None
         if rou_value > 0:
-            from utils.accounting import update_account_balance
             rou_acc = conn.execute(text(
                 "SELECT id FROM accounts WHERE account_code IN ('1600','1610','1500') AND is_active = TRUE ORDER BY account_code LIMIT 1"
             )).fetchone()
@@ -821,7 +820,7 @@ def create_lease_contract(lease: LeaseContractCreate, current_user: dict = Depen
             "journal_entry_id": journal_entry_id,
             "message": "تم إنشاء عقد الإيجار بنجاح" + (" مع قيد محاسبي" if journal_entry_id else "")
         }
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -955,7 +954,7 @@ def post_lease_payment(lease_id: int, payment: LeasePaymentCreate, current_user:
     except HTTPException:
         conn.rollback()
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Error posting lease payment")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1014,7 +1013,7 @@ def update_asset(asset_id: int, data: AssetUpdate, current_user: dict = Depends(
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1094,7 +1093,7 @@ def post_depreciation(asset_id: int, schedule_id: int, current_user: dict = Depe
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1135,7 +1134,6 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         """), {"id": asset_id}).fetchone()
 
         if last_posted and asset.life_years:
-            from dateutil.relativedelta import relativedelta
             last_dep_date = last_posted.date if hasattr(last_posted.date, 'year') else date.fromisoformat(str(last_posted.date))
             # Calculate months from last posted depreciation to disposal date
             months_elapsed = (disposal.disposal_date.year - last_dep_date.year) * 12 + (disposal.disposal_date.month - last_dep_date.month)
@@ -1170,7 +1168,6 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
         gain_loss = (_dec(disposal.disposal_price) - book_value).quantize(_D2, ROUND_HALF_UP)
         
         # Use UUID OR simple generation
-        import uuid
         ts = datetime.now().strftime('%Y%m%d%H%M%S')
         je_num = f"JE-ASSET-DISP-{asset_id}-{ts}"
         
@@ -1231,7 +1228,7 @@ def dispose_asset(asset_id: int, disposal: AssetDisposal, current_user: dict = D
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Operation failed")
         logger.exception("Internal error")
@@ -1254,7 +1251,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
-        from utils.accounting import get_base_currency, update_account_balance
+        from utils.accounting import get_base_currency
 
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id FOR UPDATE"), {"id": asset_id}).fetchone()
         if not asset:
@@ -1324,7 +1321,7 @@ def transfer_asset(asset_id: int, transfer: AssetTransfer, current_user: dict = 
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1346,7 +1343,7 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
     conn = get_db_connection(current_user.company_id)
     trans = conn.begin()
     try:
-        from utils.accounting import get_base_currency, update_account_balance
+        from utils.accounting import get_base_currency
 
         asset = conn.execute(text("SELECT * FROM assets WHERE id = :id FOR UPDATE"), {"id": asset_id}).fetchone()
         if not asset or asset.status == 'disposed':
@@ -1445,7 +1442,7 @@ def revalue_asset(asset_id: int, reval: AssetRevaluation, current_user: dict = D
     except HTTPException:
         trans.rollback()
         raise
-    except Exception as e:
+    except Exception:
         trans.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1569,7 +1566,7 @@ def add_insurance(asset_id: int, data: InsuranceCreate, current_user: dict = Dep
         }).fetchone()
         conn.commit()
         return dict(result._mapping)
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1607,7 +1604,7 @@ def add_maintenance(asset_id: int, data: MaintenanceCreate, current_user: dict =
                      {"d": data.scheduled_date, "id": asset_id})
         conn.commit()
         return dict(result._mapping)
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))
@@ -1692,7 +1689,6 @@ def run_impairment_test(asset_id: int, test_data: ImpairmentTestInput, current_u
                          {"v": new_value, "id": asset_id})
 
             # Create journal entry: Dr. Impairment Loss (6800) / Cr. Accumulated Impairment (1699)
-            from utils.accounting import update_account_balance
             imp_loss_acc = conn.execute(text(
                 "SELECT id FROM accounts WHERE account_code IN ('6800','6810','5800') AND is_active = TRUE ORDER BY account_code LIMIT 1"
             )).fetchone()
@@ -1743,7 +1739,7 @@ def run_impairment_test(asset_id: int, test_data: ImpairmentTestInput, current_u
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Internal error")
         raise HTTPException(**http_error(500, "internal_error"))

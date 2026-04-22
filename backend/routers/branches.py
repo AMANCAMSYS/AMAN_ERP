@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from typing import List
 from database import get_db_connection
@@ -78,7 +77,7 @@ def list_branches(
                 "created_at": row.created_at
             })
         return branches
-    except Exception as e:
+    except Exception:
         logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
@@ -177,7 +176,7 @@ def create_branch(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -275,7 +274,7 @@ def update_branch(
         
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception("Operation failed")
         raise HTTPException(status_code=500, detail="Internal server error")
