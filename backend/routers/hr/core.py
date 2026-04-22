@@ -719,7 +719,10 @@ def approve_loan(loan_id: int, current_user: UserResponse = Depends(get_current_
         loan = conn.execute(text("SELECT * FROM employee_loans WHERE id=:id FOR UPDATE"), {"id": loan_id}).fetchone()
         if not loan or loan.status != 'pending':
             raise HTTPException(status_code=400, detail="Invalid loan status")
-            
+
+        # Enforce fiscal period lock before any GL posting on approval
+        check_fiscal_period_open(conn, datetime.now().date())
+
         # Update Status
         conn.execute(text("UPDATE employee_loans SET status='active', approved_by=:uid WHERE id=:id"), 
                      {"uid": current_user.get("id") if isinstance(current_user, dict) else current_user.id, "id": loan_id})
@@ -797,7 +800,7 @@ def generate_payroll(period_id: int, current_user: UserResponse = Depends(get_cu
         # Fetch GOSI settings (active)
         gosi = conn.execute(text("SELECT * FROM gosi_settings WHERE is_active = TRUE ORDER BY id DESC LIMIT 1")).fetchone()
         gosi_emp_pct = _dec(gosi.employee_share_percentage) if gosi else Decimal('9.75')
-        gosi_empr_pct = _dec(gosi.employer_share_percentage) if gosi else Decimal('11.75')
+        gosi_empr_pct = _dec(gosi.employer_share_percentage) if gosi else Decimal('12.00')
         gosi_max_sal = _dec(gosi.max_contributable_salary) if gosi else Decimal('45000')
 
         base_currency = get_base_currency(conn)

@@ -308,7 +308,10 @@ async def generate_retainer_invoices(
         base_currency = get_base_currency(db)
         ar_acc = get_mapped_account_id(db, "acc_map_ar")
         rev_acc = get_mapped_account_id(db, "acc_map_sales_rev") or get_mapped_account_id(db, "acc_map_project_revenue")
-        
+
+        # Enforce fiscal period lock before auto-billing GL posting
+        check_fiscal_period_open(db, target_date)
+
         generated = []
         
         for proj in projects:
@@ -1817,6 +1820,9 @@ async def approve_timesheets(
             if not ts:
                 continue
 
+            # Enforce fiscal period lock before posting labor cost JE
+            check_fiscal_period_open(db, ts.date)
+
             # Calculate Rate
             rate = _dec(ts.hourly_cost or 0)
             if rate == 0:
@@ -2015,6 +2021,9 @@ async def create_project_invoice(
     """إنشاء فاتورة مبيعات من المشروع"""
     db = get_db_connection(current_user.company_id)
     try:
+        # Enforce fiscal period lock before invoice JE
+        check_fiscal_period_open(db, invoice_data.invoice_date)
+
         # Verify Project
         project = db.execute(text("SELECT * FROM projects WHERE id = :id"), {"id": project_id}).fetchone()
         if not project:

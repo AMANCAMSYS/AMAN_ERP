@@ -24,6 +24,7 @@ from utils.accounting import (
     get_base_currency
 )
 from services.gl_service import create_journal_entry as gl_create_journal_entry
+from utils.fiscal_lock import check_fiscal_period_open
 
 router = APIRouter(prefix="/hr", tags=["HR - WPS & Compliance"])
 logger = logging.getLogger(__name__)
@@ -516,6 +517,9 @@ def settle_end_of_service(body: EOSSettlementRequest, current_user=Depends(get_c
 
         delta = relativedelta(term_date, join_date)
         total_years = _dec(delta.years) + (_dec(delta.months) / Decimal('12')) + (_dec(delta.days) / Decimal('365.25'))
+
+        # Enforce fiscal period lock before any GL posting
+        check_fiscal_period_open(db, term_date)
 
         base_salary = _dec(emp.basic_salary)
         total_salary = base_salary + _dec(emp.housing_allowance) + _dec(emp.transport_allowance)
