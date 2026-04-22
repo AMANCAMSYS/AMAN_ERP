@@ -158,7 +158,7 @@ def revoke_api_key(key_id: int, current_user=Depends(get_current_user)):
 
 # ======================== API-002: Webhooks ========================
 
-@router.get("/webhooks/events")
+@router.get("/webhooks/events", dependencies=[Depends(require_permission(["settings.view", "admin"]))])
 def list_webhook_events(current_user=Depends(get_current_user)):
     """List all available webhook events."""
     return WEBHOOK_EVENTS

@@ -981,7 +981,7 @@ def get_available_widgets(current_user=Depends(get_current_user)):
 # Industry-specific endpoints
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/industry-widgets")
+@router.get("/industry-widgets", dependencies=[Depends(require_permission("dashboard.view"))])
 def get_industry_widgets(current_user = Depends(get_current_user)):
     """Return industry-specific dashboard widgets based on company's industry type."""
     company_id = get_user_company_id(current_user)
@@ -1063,7 +1063,7 @@ def _get_industry_widgets(industry_type: str, db) -> list:
     return widgets
 
 
-@router.get("/gl-rules")
+@router.get("/gl-rules", dependencies=[Depends(require_permission("accounting.view"))])
 def get_company_gl_rules(current_user = Depends(get_current_user)):
     """Return GL auto-posting rules for the company's industry type."""
     company_id = get_user_company_id(current_user)
@@ -1085,7 +1085,7 @@ def get_company_gl_rules(current_user = Depends(get_current_user)):
         db.close()
 
 
-@router.get("/coa-summary")
+@router.get("/coa-summary", dependencies=[Depends(require_permission("accounting.view"))])
 def get_company_coa_summary(current_user = Depends(get_current_user)):
     """Return COA template summary for the company's industry type."""
     company_id = get_user_company_id(current_user)

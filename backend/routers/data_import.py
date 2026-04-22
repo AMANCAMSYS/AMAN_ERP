@@ -66,7 +66,7 @@ IMPORT_CONFIGS = {
 }
 
 
-@router.get("/entity-types")
+@router.get("/entity-types", dependencies=[Depends(require_permission("data_import.view"))])
 def list_importable_entities(current_user=Depends(get_current_user)):
     """قائمة الكيانات المتاحة للاستيراد"""
     return [
@@ -80,7 +80,7 @@ def list_importable_entities(current_user=Depends(get_current_user)):
     ]
 
 
-@router.get("/template/{entity_type}")
+@router.get("/template/{entity_type}", dependencies=[Depends(require_permission("data_import.view"))])
 def download_template(entity_type: str, current_user=Depends(get_current_user)):
     """تحميل قالب Excel/CSV للاستيراد"""
     if entity_type not in IMPORT_CONFIGS:
