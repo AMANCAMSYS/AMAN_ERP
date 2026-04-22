@@ -12,6 +12,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access, require_module
 from utils.audit import log_activity
+from utils.fiscal_lock import check_fiscal_period_open
 from utils.accounting import (
     generate_sequential_number,
     get_mapped_account_id,
@@ -677,6 +678,9 @@ def create_tax_payment(
         new_id = result.fetchone()[0]
 
         # ===== ACCOUNTING INTEGRATION =====
+        # ACC-F (Phase 5 / TAX-F01): enforce fiscal lock on tax payment posting
+        check_fiscal_period_open(db, data.payment_date)
+
         vat_account_id = get_mapped_account_id(db, "acc_map_vat_out")
         if not vat_account_id:
             raise HTTPException(status_code=400, detail="حساب ضريبة المخرجات (VAT Output) غير محدد في الإعدادات")

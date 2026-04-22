@@ -25,7 +25,7 @@ from utils.accounting import (
     get_mapped_account_id,
     get_base_currency
 )
-from utils.fiscal_lock import create_fiscal_lock_table
+from utils.fiscal_lock import create_fiscal_lock_table, check_fiscal_period_open
 from utils.duplicate_detection import find_duplicate_parties, find_duplicate_products
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 
@@ -903,6 +903,9 @@ def post_zakat_entry(fiscal_year: int, current_user: dict = Depends(get_current_
         amount = Decimal(str(zakat.zakat_amount))
         if amount <= 0:
             raise HTTPException(400, "مبلغ الزكاة صفر")
+
+        # Phase 5 / ZAK-F01: enforce fiscal lock on zakat posting date
+        check_fiscal_period_open(db, f"{fiscal_year}-12-31")
 
         currency = get_base_currency(db)
 
