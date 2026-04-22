@@ -16,8 +16,11 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
+from collections import defaultdict, deque
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -35,6 +38,30 @@ except Exception:  # pragma: no cover - defensive
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/finance/payments", tags=["payments"])
+
+
+# ── PAY-F1: pre-signature rate limit (per client IP + provider) ──────────
+# Sliding-window limiter kept in-process to shed trivial DoS traffic before
+# we do the (expensive) signature verification and DB writes.
+_WEBHOOK_RL_WINDOW_SEC = 60
+_WEBHOOK_RL_MAX_HITS = 120  # 2 rps per (ip, provider)
+_webhook_hits: Dict[str, Deque[float]] = defaultdict(deque)
+_webhook_rl_lock = threading.Lock()
+
+
+def _webhook_rate_limit(ip: str, provider: str) -> bool:
+    """Return True when the caller is under the limit, False when throttled."""
+    key = f"{ip}:{provider}"
+    now = time.monotonic()
+    cutoff = now - _WEBHOOK_RL_WINDOW_SEC
+    with _webhook_rl_lock:
+        bucket = _webhook_hits[key]
+        while bucket and bucket[0] < cutoff:
+            bucket.popleft()
+        if len(bucket) >= _WEBHOOK_RL_MAX_HITS:
+            return False
+        bucket.append(now)
+    return True
 
 
 def _close(db):
@@ -183,6 +210,18 @@ async def webhook(provider: str, company_id: str, request: Request):
     `https://…/finance/payments/webhook/{provider}/{company_id}` so the
     tenant is known from the URL and we can load the right secrets.
     """
+    # PAY-F1: cheap pre-signature throttle (per caller IP + provider).
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    if not _webhook_rate_limit(client_ip, provider):
+        logger.warning("webhook rate-limited ip=%s provider=%s", client_ip, provider)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="too many webhook requests",
+        )
+
     raw = await request.body()
     headers = {k: v for k, v in request.headers.items()}
 

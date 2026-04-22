@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from utils.i18n import http_error
 from sqlalchemy import text
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 
@@ -404,14 +404,28 @@ def create_partial_invoice(order_id: int, data: dict, current_user=Depends(get_c
         inv_num = f"INV-{uuid.uuid4().hex[:8].upper()}"
         total = 0
 
+        # SALES-F1: accept optional invoice_date; default to today if not provided.
+        raw_invoice_date = data.get("invoice_date")
+        invoice_date_val = None
+        if raw_invoice_date:
+            try:
+                invoice_date_val = (
+                    raw_invoice_date
+                    if hasattr(raw_invoice_date, "isoformat")
+                    else datetime.fromisoformat(str(raw_invoice_date)).date()
+                )
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="invalid invoice_date format (expected ISO 8601)")
+
         inv = db.execute(text("""
             INSERT INTO invoices (invoice_number, party_id, branch_id, invoice_date, type,
                 status, is_partial, parent_order_id, created_by)
-            VALUES (:num, :cid, :bid, NOW(), 'sale', 'draft', true, :oid, :uid)
+            VALUES (:num, :cid, :bid, COALESCE(:inv_date, CURRENT_DATE), 'sale', 'draft', true, :oid, :uid)
             RETURNING id
         """), {
             "num": inv_num, "cid": order.customer_id,
             "bid": getattr(order, 'branch_id', None),
+            "inv_date": invoice_date_val,
             "oid": order_id, "uid": current_user.id,
         }).fetchone()
 

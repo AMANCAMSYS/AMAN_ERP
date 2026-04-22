@@ -37,6 +37,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
@@ -282,27 +283,58 @@ class ZATCAAdapter(EInvoiceAdapter):
             "invoice": base64.b64encode(built["xml"].encode("utf-8")).decode("ascii"),
         }
         endpoint = "/invoices/reporting/single" if self.config.phase == "report" else "/invoices/clearance/single"
-        try:
-            r = requests.post(
-                self.config.api_base.rstrip("/") + endpoint,
-                json=payload,
-                auth=(self.config.pcsid, self.config.secret),
-                headers={"Accept-Version": "V2", "Content-Type": "application/json"},
-                timeout=self.config.timeout_seconds,
-                verify=self.config.verify_ssl,
-            )
-            ok = r.status_code in (200, 202)
-            body = r.json() if "application/json" in (r.headers.get("Content-Type") or "") else {"raw": r.text}
-            return SubmissionResult(
-                status="accepted" if ok else "rejected",
-                document_uuid=payload["uuid"],
-                response={"http_status": r.status_code, "body": body, "qr": built["qr"],
-                          "hash": built["hash"]},
-                error_message=None if ok else f"HTTP {r.status_code}",
-            )
-        except requests.RequestException as e:
-            logger.exception("ZATCA submit failed")
-            return SubmissionResult(status="error", error_message=str(e))
+        # EINV-F1: bounded exponential-backoff retry on transient failures
+        # (network errors and 5xx). Terminal 4xx responses are not retried.
+        max_attempts = int(getattr(self.config, "max_retries", 3) or 3)
+        backoff_base = float(getattr(self.config, "retry_backoff_seconds", 1.5) or 1.5)
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                r = requests.post(
+                    self.config.api_base.rstrip("/") + endpoint,
+                    json=payload,
+                    auth=(self.config.pcsid, self.config.secret),
+                    headers={"Accept-Version": "V2", "Content-Type": "application/json"},
+                    timeout=self.config.timeout_seconds,
+                    verify=self.config.verify_ssl,
+                )
+                ok = r.status_code in (200, 202)
+                retriable = r.status_code in (408, 429, 500, 502, 503, 504)
+                body = r.json() if "application/json" in (r.headers.get("Content-Type") or "") else {"raw": r.text}
+
+                if retriable and attempt < max_attempts:
+                    sleep_for = backoff_base * (2 ** (attempt - 1))
+                    logger.warning(
+                        "ZATCA transient HTTP %s (attempt %s/%s); retrying in %.1fs",
+                        r.status_code, attempt, max_attempts, sleep_for,
+                    )
+                    time.sleep(sleep_for)
+                    continue
+
+                return SubmissionResult(
+                    status="accepted" if ok else "rejected",
+                    document_uuid=payload["uuid"],
+                    response={"http_status": r.status_code, "body": body, "qr": built["qr"],
+                              "hash": built["hash"], "attempts": attempt},
+                    error_message=None if ok else f"HTTP {r.status_code}",
+                )
+            except requests.RequestException as e:
+                last_exc = e
+                if attempt < max_attempts:
+                    sleep_for = backoff_base * (2 ** (attempt - 1))
+                    logger.warning(
+                        "ZATCA network error (attempt %s/%s): %s — retrying in %.1fs",
+                        attempt, max_attempts, e, sleep_for,
+                    )
+                    time.sleep(sleep_for)
+                    continue
+                logger.exception("ZATCA submit failed after %s attempts", attempt)
+                return SubmissionResult(
+                    status="error",
+                    error_message=f"{e} (after {attempt} attempts)",
+                )
+        # Unreachable, but keeps the type checker happy.
+        return SubmissionResult(status="error", error_message=str(last_exc) if last_exc else "unknown")
 
     def fetch_status(self, document_uuid: str) -> SubmissionResult:
         # ZATCA's real-time clearance is synchronous; this is a stub for

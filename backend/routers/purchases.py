@@ -737,7 +737,26 @@ def receive_purchase_order(
         
         if po.status not in ('approved', 'partial'):
             raise HTTPException(status_code=400, detail="يجب اعتماد أمر الشراء أولاً قبل الاستلام")
-        
+
+        # QA-F1: block receiving when any quality inspection tied to this PO is FAILED.
+        try:
+            failed_insp = db.execute(text("""
+                SELECT COUNT(*) FROM quality_inspections
+                WHERE reference_type = 'purchase_order'
+                  AND reference_id = :po_id
+                  AND UPPER(COALESCE(status, '')) IN ('FAILED', 'REJECTED')
+            """), {"po_id": id}).scalar() or 0
+            if failed_insp > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail="لا يمكن استلام هذا الأمر: يوجد فحص جودة فاشل مرتبط به"
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # quality_inspections table may not exist yet on some tenants; skip silently.
+            pass
+
         # Get all lines with their current received quantities
         lines = db.execute(text("""
             SELECT l.id, l.product_id, l.quantity, l.unit_price, COALESCE(l.received_quantity, 0) as received_quantity,
@@ -1181,6 +1200,25 @@ async def create_purchase_invoice(
             """), {"po_id": invoice.original_invoice_id}).fetchall()
             for pol in po_lines:
                 po_received_map[pol.product_id] = _dec(pol.received_quantity or 0)
+
+            # QA-F1: block invoicing when a linked quality inspection has FAILED.
+            try:
+                failed_insp = db.execute(text("""
+                    SELECT COUNT(*) FROM quality_inspections
+                    WHERE reference_type = 'purchase_order'
+                      AND reference_id = :po_id
+                      AND UPPER(COALESCE(status, '')) IN ('FAILED', 'REJECTED')
+                """), {"po_id": invoice.original_invoice_id}).scalar() or 0
+                if failed_insp > 0:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="لا يمكن إنشاء فاتورة شراء: يوجد فحص جودة فاشل على أمر الشراء"
+                    )
+            except HTTPException:
+                raise
+            except Exception:
+                # quality_inspections table may not exist on some tenants; skip silently.
+                pass
 
         # 3. Calculate Totals (TASK-027: unified via compute_invoice_totals)
         from utils.accounting import compute_invoice_totals as _cit, compute_line_amounts as _cla
