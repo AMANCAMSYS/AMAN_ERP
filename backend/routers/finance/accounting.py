@@ -341,6 +341,29 @@ async def create_account(
     """إنشاء حساب جديد في شجرة الحسابات"""
     db = get_db_connection(current_user.company_id)
     try:
+        # ACC-FIX-04 (P1): Validate account_type enum against DB CHECK constraint values.
+        valid_types = {"asset", "liability", "equity", "revenue", "expense"}
+        if account.account_type not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"نوع الحساب غير صالح. القيم المسموحة: {sorted(valid_types)}",
+            )
+
+        # ACC-FIX-04 (P1): Validate parent_id FK exists and has the same account_type
+        # so the chart of accounts stays consistent (no Asset under Revenue).
+        if account.parent_id is not None:
+            parent = db.execute(
+                text("SELECT id, account_type, is_header FROM accounts WHERE id = :pid"),
+                {"pid": account.parent_id},
+            ).fetchone()
+            if not parent:
+                raise HTTPException(status_code=400, detail="الحساب الأب غير موجود")
+            if parent.account_type != account.account_type:
+                raise HTTPException(
+                    status_code=400,
+                    detail="نوع الحساب يجب أن يطابق نوع الحساب الأب",
+                )
+
         # Check if account number already exists
         exists = db.execute(text("SELECT 1 FROM accounts WHERE account_number = :num"), {"num": account.account_number}).fetchone()
         if exists:

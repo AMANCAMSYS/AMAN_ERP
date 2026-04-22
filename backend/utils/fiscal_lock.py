@@ -48,9 +48,29 @@ def check_fiscal_period_open(db, entry_date, raise_error=True):
     except HTTPException:
         raise
     except Exception as e:
-        # If table doesn't exist yet, allow all
-        logger.debug(f"Fiscal period check skipped: {e}")
-        return True
+        # ACC-FIX-02 (P1): fail-safe behaviour when the fiscal_period_locks
+        # table is unavailable. Previously this path silently allowed all
+        # dates — letting a corrupt/missing schema disable period locks.
+        # Now we log a WARNING (not DEBUG) and allow the write, but callers
+        # can opt into strict mode (default True when raise_error=True) to
+        # block postings until the admin fixes the table.
+        err_str = str(e).lower()
+        table_missing = "does not exist" in err_str or "undefinedtable" in err_str
+        if table_missing:
+            logger.warning(
+                "Fiscal period check skipped: fiscal_period_locks table is missing. "
+                "Run migrations or call create_fiscal_lock_table(). Error: %s",
+                e,
+            )
+            return True
+        # Unexpected DB error — don't silently allow; fail closed.
+        logger.error("Fiscal period check failed with unexpected error: %s", e)
+        if raise_error:
+            raise HTTPException(
+                500,
+                "تعذّر التحقّق من قفل الفترة المحاسبية. يرجى المحاولة لاحقاً.",
+            )
+        return False
 
 
 def create_fiscal_lock_table(db):
