@@ -1,8 +1,8 @@
 # AMAN ERP — مقارنة شاملة مع الأنظمة العالمية
 
-> **تاريخ المقارنة:** 21 أبريل 2026
+> **تاريخ المقارنة:** 22 أبريل 2026
 > **إصدار AMAN:** `main` @ latest
-> **الغرض:** تقييم موضوعي لموقع نظام AMAN مقابل أبرز أنظمة تخطيط موارد المؤسسات عالمياً (Odoo, SAP Business One, Microsoft Dynamics 365 Business Central, NetSuite, Zoho Books, QuickBooks Enterprise).
+> **الغرض:** تقييم موضوعي لموقع نظام AMAN مقابل أبرز أنظمة تخطيط موارد المؤسسات عالمياً (Odoo EE, SAP Business One, Microsoft Dynamics 365 Business Central, NetSuite, Zoho Books, QuickBooks Enterprise).
 
 ---
 
@@ -10,14 +10,15 @@
 
 | المقياس | AMAN ERP | التقييم |
 |---|---|---|
-| **نطاق الوحدات** | 10 وحدات رئيسية + 56 router + ~872 endpoint | يعادل Odoo Enterprise / Dynamics 365 BC |
-| **قاعدة الكود** | FastAPI + React 18 + PostgreSQL + Redis | Stack حديث full‑open‑source |
-| **اللغات/التوطين** | عربي/إنجليزي كامل مع RTL | متفوّق على معظم المنافسين الغربيين |
-| **الامتثال السعودي/الخليجي** | ZATCA Phase 2، WPS، GOSI، السعودة، WHT | **أفضل من الجميع في GCC** عدا SAP المحلية |
-| **الأمان** | JWT + 2FA + CSRF + HttpOnly + gitleaks CI | على مستوى المؤسسات |
-| **التعدّدية** | Multi‑tenant + Multi‑company + Multi‑branch + Multi‑currency | يطابق NetSuite/Dynamics |
-| **النضج الوظيفي** | 95%+ مكتمل في المحاسبة/المبيعات/المخزون/HR | قابل للإنتاج |
-| **نقاط ضعف** | لا يوجد AI/ML جاهز، لا Marketplace extensions عامة | فجوة أمام Odoo/NetSuite |
+| **نطاق الوحدات** | 16 قسم وظيفي · 56+ router · ~872 endpoint · 170+ صفحة React | يعادل Odoo Enterprise / D365 BC ويتفوّق على Zoho / QuickBooks |
+| **قاعدة الكود** | FastAPI + React 18 + PostgreSQL + Redis + Nginx | Stack حديث مفتوح بالكامل |
+| **اللغات/التوطين** | عربي/إنجليزي كامل مع RTL layout + formulas + printout | متفوّق على معظم المنافسين الغربيين |
+| **الامتثال GCC/MENA** | ZATCA Ph2 · UAE FTA · Egypt ETA · WPS · GOSI · السعودة · WHT · الزكاة | **الأعلى في GCC/MENA** بدون localization مدفوعة |
+| **الأمان** | JWT + 2FA TOTP + CSRF + HttpOnly + gitleaks + SQL‑safety linter + فحص GL discipline CI | مستوى مؤسسات |
+| **التعدّدية** | Multi‑tenant (DB‑per‑company) + Multi‑company + Multi‑branch + Multi‑currency + Multi‑book (IFRS/Local GAAP) | يطابق NetSuite/D365 |
+| **التكاملات** | Stripe · Tap · PayTabs · DHL · Aramex · Taqnyat · Unifonic · Twilio · MT940 Bank Feeds | 🏆 تغطية خليجية نادرة |
+| **النضج الوظيفي** | 95%+ مكتمل في المحاسبة/المبيعات/المخزون/HR/التصنيع | قابل للإنتاج |
+| **نقاط ضعف** | AI/ML حقيقي محدود · Marketplace عام غير موجود · MES real‑time جزئي | فجوة أمام NetSuite/SAP S4 |
 
 ---
 
@@ -31,166 +32,334 @@
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | دليل حسابات متعدّد المستويات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | قيود يومية متعدّدة العملات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| فترات مالية + قفل | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| إقفال سنوي مع reversals | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| مطابقة بنكية + CSV import | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| موازنات + cost centers | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| IFRS 15 (revenue recognition) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| IFRS 9 (ECL provisions) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
-| IAS 36 (impairment) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
-| Subscription MRR/ARR | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| قوالب قيود متكرّرة (Recurring Templates) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| فترات مالية + Fiscal Lock | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| إقفال سنوي + Closing Entries + Reversals | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| أرصدة افتتاحية (Opening Balances) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| مقارنة الفترات (Period Comparison) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| مطابقة بنكية + CSV + **MT940 Bank Feeds** | 🏆 | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| موازنات + cost centers + cost center hierarchy | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| IFRS 15 (Revenue Recognition) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| IFRS 9 (ECL Provisions) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
+| IAS 36 (Impairment) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
+| IFRS 16 (Lease Contracts) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Multi‑Book (IFRS + Local GAAP)** | ✅ | ⚠️ | ✅ | ⚠️ | 🏆 | ❌ | ❌ |
 | Intercompany | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| FX revaluation | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| ZATCA Phase 2 QR | 🏆 | ⚠️ | ✅ (localization) | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| FX Revaluation | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 
-**موقع AMAN:** يتفوّق على Zoho و QuickBooks في المعايير الدولية (IFRS 15/9، IAS 36). يعادل SAP B1/Dynamics/NetSuite في المحاسبة الأساسية مع أفضلية في ZATCA.
+**موقع AMAN:** يتفوّق على Zoho و QuickBooks في كل المعايير الدولية. يعادل SAP B1/D365/NetSuite في المحاسبة الأساسية مع أفضلية Multi‑book + MT940.
 
-### 2.2 المبيعات و CRM و POS
+### 2.2 الخزينة والعمليات المالية (Treasury)
+
+> **قسم جديد:** عمق الخزينة في AMAN هو أحد أقوى نقاطه التنافسية في MENA.
+
+| الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **شيكات تحت التحصيل + دورة حياة كاملة** | 🏆 | ⚠️ localization | ✅ (MENA) | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **شيكات دفع آجلة (Post‑dated)** | 🏆 | ⚠️ | ✅ (MENA) | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| Notes Receivable / Payable | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| سجل تقادم الشيكات (Checks Aging) | ✅ | ❌ | ✅ | ⚠️ | ⚠️ | ❌ | ❌ |
+| Cash Flow Forecasting (بنظام دوري) | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| Payment Gateways (Stripe + **Tap + PayTabs**) | 🏆 | ✅ (Stripe) | ⚠️ | ⚠️ | ✅ | ✅ | ✅ |
+| Bank Feeds (MT940 + CSV + OFX) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| FX Revaluation دورية | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+
+**موقع AMAN:** 🏆 **الأقوى في MENA** — دورة شيكات آجلة كاملة + بوابات دفع خليجية داخلية، وهي مميزات تتطلب localization مدفوعة في SAP وغير متوفّرة في Zoho/QB.
+
+### 2.3 المبيعات و CRM و POS
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QuickBooks |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| عروض أسعار → SO → فاتورة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Credit / Debit notes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| CPQ (Configure-Price-Quote) | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
-| قوائم أسعار العميل/الفرع | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| عمولات مبيعات | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| POS مع طباعة حرارية + QR | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ |
-| إدارة ورديّات POS | ✅ | ✅ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ |
-| CRM (فرص، تذاكر، حملات) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| عروض أسعار → SO → **Delivery Order** → فاتورة | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| Credit / Debit Notes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **CPQ Engine** (Configurator + Rules + PDF) | 🏆 | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| قوائم أسعار (عميل/فرع/تاريخ) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| عمولات المبيعات + قواعد | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 | مبيعات متعدّدة الفروع | 🏆 | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **CRM:** Leads + Opportunities + Pipeline | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| **Lead Scoring + Customer Segmentation** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Knowledge Base + Tickets + Campaigns** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **POS** + طباعة حرارية + QR ZATCA | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **POS Offline Mode + Sync** | ✅ | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| **POS Kitchen Display (KDS) + Customer Display** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **POS Table Management** (مطاعم) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| إدارة ورديّات POS + Cash Count | ✅ | ✅ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ |
+| **Loyalty Programs + Points** | ✅ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **Promotions Engine** (rules‑based) | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
 
-**موقع AMAN:** يغطي طيفاً أوسع من POS + CRM + CPQ في نظام واحد، ممّا يشبه NetSuite لكن بتكلفة مفتوحة المصدر.
+**موقع AMAN:** يغطّي طيفاً نادراً: CPQ + CRM + POS offline + KDS + Loyalty + Promotions في نظام واحد مفتوح — يضاهي NetSuite/Odoo ويتفوّق بوضوح على Zoho/QB/SAP B1.
 
-### 2.3 المشتريات وإدارة الموردين
+### 2.4 المشتريات وإدارة الموردين
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QuickBooks |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| طلب شراء (PR) → RFQ → PO | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| استلام + مرتجعات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Blanket PO | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Landed cost | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| موافقات متعدّدة المستويات | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| تقييم أداء المورّد | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| PR → RFQ → PO → GRN | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| استلام + مرتجعات + Shipments | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Blanket PO + Releases | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Purchase Agreements (اتفاقيات إطارية) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Landed Cost (شحن + جمارك + تأمين) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Three‑Way Matching** (PO/GRN/Invoice + Tolerances) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| تقييم أداء المورّد (Supplier Ratings) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| موافقات متعدّدة المستويات + SLA + Escalation | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
 
-### 2.4 المخزون وسلسلة الإمداد
+### 2.5 المخزون وسلسلة الإمداد
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QuickBooks |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | مستودعات متعدّدة + تحويلات | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| Batch/Lot + serials | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Bin Locations** (مواقع داخل المستودع) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| **Product Variants** (مقاس/لون/مادة) | ✅ | 🏆 | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Product Kits** (مجموعات منتجات) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| Batch/Lot + Serial tracking | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | FIFO / LIFO / WAC | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| Cost layer policy versioning | 🏆 | ❌ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ |
-| Reorder points / MRP | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
-| Cycle count | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| Barcode + QR | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| GL entry على التحويل متعدّد‑الأصناف | ✅ (جديد: INV‑L04) | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **Cost Layer Policy Versioning** | 🏆 | ❌ | ⚠️ | ❌ | ⚠️ | ❌ | ❌ |
+| Reorder Points + MRP الأساسي | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Demand Forecasting** (إحصائي) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
+| Cycle Count + Stock Adjustments | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **Quality Inspections** | ✅ | ✅ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
+| Barcode + QR + Scanning UI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| GL Entry على التحويلات متعدّدة الأصناف | ✅ (INV‑L04) | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| Product Ledger (سجلّ حركة تفصيلي) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 
-### 2.5 التصنيع
+### 2.6 التصنيع
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| BOM متعدّد المستويات | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Work orders + Routing | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Work centers + equipment | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Shop‑floor entry | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
-| Standard costing + variance | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| MES real‑time | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
+| BOM متعدّد المستويات + Phantom | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Work Orders + Routing + Operations | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Work Centers + Equipment Registry | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **MRP‑II Planning** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Capacity Planning + Load** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Production Scheduler** (drag‑and‑drop) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| **Job Cards + Shop‑floor Entry** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| Standard Costing + Variance Analysis | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Direct Labor Report** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Equipment Maintenance + CMMS** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| Production Analytics + WO Status Report | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| MES Real‑time (IoT على أرض المصنع) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
 
-### 2.6 الموارد البشرية والرواتب
+### 2.7 الموارد البشرية والرواتب
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QuickBooks |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| بيانات موظّفين + هيكل | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| حضور + انصراف | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
-| إجازات + Accruals | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
-| Payroll + Payslips | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ |
-| **GOSI** (9.75% + 12%) | 🏆 | ⚠️ | localization | ❌ | ⚠️ | Zoho People only | ❌ |
-| **WPS SIF export** | 🏆 | ❌ | localization | ❌ | ❌ | ⚠️ | ❌ |
-| **لوحة السعودة** | 🏆 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| بيانات موظّفين + هيكل تنظيمي + Documents | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| حضور + انصراف + Geo‑fencing | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| إجازات + Accruals + **Leave Carryover** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| **Salary Structures** (مركّبات راتب مرنة) | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ |
+| Payroll + Payslips + مسيرات | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ |
+| **GOSI** (9.75% + 12% automatic) | 🏆 | ⚠️ | localization | ❌ | ⚠️ | Zoho People only | ❌ |
+| **WPS SIF Export** (بنك مركزي سعودي) | 🏆 | ❌ | localization | ❌ | ❌ | ⚠️ | ❌ |
+| **لوحة السعودة + نسب الاحتساب** | 🏆 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | WHT | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
-| Self‑service | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
-| Recruiting + Training | ✅ | ✅ | ❌ | ⚠️ | ✅ | ✅ (Zoho Recruit) | ❌ |
+| **Custody Management** (عهد الموظفين) | 🏆 | ❌ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
+| **Violations / Disciplinary Actions** | 🏆 | ❌ | ❌ | ❌ | ⚠️ | ⚠️ | ❌ |
+| **EOS Settlement** (نهاية خدمة خليجية) | 🏆 | ❌ | localization | ❌ | ❌ | ⚠️ | ❌ |
+| **Loans + Advances** | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **Overtime Requests + Approvals** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| Self‑service Portal | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| Recruitment + Training Programs | ✅ | ✅ | ❌ | ⚠️ | ✅ | ✅ (Recruit) | ❌ |
 
-**موقع AMAN:** الأقوى في GCC HR — GOSI + WPS + السعودة مبنية داخل النظام، وهذا يحتاج دفع إضافي في SAP/Odoo.
+**موقع AMAN:** 🏆 **الأقوى في GCC** — GOSI + WPS + السعودة + Custody + Violations + EOS خليجي مبنية داخلياً. SAP وOdoo يطلبان localization apps مدفوعة؛ Zoho/QB لا يغطّيان هذه المنطقة أصلاً.
 
-### 2.7 المشاريع
+### 2.8 المشاريع
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite SRP | Zoho | QB |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| WBS + Gantt | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
-| Timesheets | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| مصروفات مشروع | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| Revenue Recognition على المشروع | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Resource planning | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| WBS + **Gantt Chart** | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| Timesheets + Approval | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| مصروفات مشروع + فواتير | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| Revenue Recognition (IFRS 15 على المشروع) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Resource Planning + Allocation + Calendar** | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **Risk Register** | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| **Project Financials Report** (P&L على المشروع) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Resource Utilization Report** | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
 
-### 2.8 الأصول الثابتة
+### 2.9 الأصول الثابتة
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| FA register | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| Straight‑line depreciation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| Declining‑balance / Units | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
-| Disposal + gain/loss | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| صيانة + سجلّ معدات | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| FA Register + Categories + Tags | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Straight‑line Depreciation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Declining‑balance / Units‑of‑production | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| Disposal + Gain/Loss Entry | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Maintenance + Equipment Registry | ✅ | ✅ | ⚠️ | ✅ | ✅ | ❌ | ❌ |
+| **Lease Contracts (IFRS 16)** + جدول إطفاء | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Revaluation + Impairment (IAS 36) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
 
-### 2.9 التقارير والذكاء الأعمالي
+### 2.10 الخدمات وإدارة الوثائق (Service & DMS)
+
+> **قسم جديد:** Field Service + Document Management غير مغطّى في المقارنات السابقة.
+
+| الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Service Requests + Work Orders | ✅ | ✅ | ✅ | ✅ (Field Service) | ✅ | ⚠️ (Desk) | ❌ |
+| Technician Assignment + Routing | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| Service Costs + Billing | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Document Management** (رفع + إصدارات + بحث) | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
+| Document Versioning + Audit | ✅ | ✅ | ❌ | ⚠️ | ✅ | ⚠️ | ❌ |
+
+### 2.11 العقود و CPQ (Contract Lifecycle + Configure‑Price‑Quote)
+
+> **قسم جديد:** CLM + CPQ كوحدات مستقلة.
+
+| الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Contract Master + Terms + Milestones | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **Contract Amendments** + إصدارات | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| Contract → Invoice Automation | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **CPQ Product Configurator** | 🏆 | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| Configuration Rules + Validation | 🏆 | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| CPQ → Quote → PDF | ✅ | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+
+### 2.12 الاشتراكات والفوترة المتكرّرة (Subscription Billing)
+
+> **قسم جديد:** ليست مجرّد MRR/ARR بل دورة كاملة.
+
+| الميزة | AMAN | Odoo Subs | SAP B1 | D365 BC | NetSuite SuiteBilling | Zoho Billing | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Subscription Plans + Tiers | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
+| Enrollments + Customer Lifecycle | ✅ | ✅ | ❌ | ⚠️ | ✅ | ✅ | ❌ |
+| Plan Changes + **Prorations** | ✅ | ⚠️ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| Recurring Invoicing + Auto‑charge | ✅ | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ |
+| Dunning + Retry Logic | ✅ | ⚠️ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| MRR / ARR / Churn Metrics | ✅ | ⚠️ | ❌ | ⚠️ | ✅ | ⚠️ | ❌ |
+
+### 2.13 التقارير والذكاء الأعمالي
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | الميزانية العمومية + P&L | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Cashflow statement | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Cashflow Statement | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AR/AP Aging | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Dashboard معرّف بالدور | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| KPI Dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Scheduled reports + email | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Dashboard معرّف بالدور (10 أدوار) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| KPI Dashboard + **Industry KPI Widgets** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Report Builder** (self‑service) | ✅ | ⚠️ Studio | ⚠️ | ✅ | 🏆 SuiteAnalytics | ✅ Analytics | ⚠️ |
+| **Industry Reports** (صناعة‑محدّدة) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
+| **Shared Reports** + صلاحيات | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Scheduled Reports + Email + 11 أنواع | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | تقارير عربية RTL | 🏆 | ⚠️ | localization | ⚠️ | ⚠️ | ⚠️ | ❌ |
-| AI‑driven forecasting | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ |
+| AI‑driven Forecasting & Anomaly Detection | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ⚠️ |
 | Power BI / Looker embed | ❌ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 
-### 2.10 المنصّة (البنية والأمان)
+### 2.14 الامتثال الضريبي متعدّد الولايات (Multi‑Jurisdiction Tax)
+
+> **قسم جديد:** AMAN يملك محرّك ضرائب فريد مع فوترة إلكترونية متعدّدة الدول.
 
 | الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Multi‑tenant (DB‑per‑company) | ✅ | ⚠️ (row‑level) | ⚠️ | ✅ | ✅ | ✅ | ❌ |
-| Multi‑company + branches | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| JWT + 2FA TOTP | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| SSO (SAML/OAuth) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| RBAC بصلاحيات دقيقة | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| Audit trail كامل | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
-| CSRF / HttpOnly cookies | ✅ | ⚠️ | — | — | — | — | — |
-| Rate limiting (login + global) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| gitleaks CI + secret scanning | ✅ | ❌ | — | — | — | — | — |
-| Prometheus + Grafana | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ | ❌ |
-| Mobile app (iOS/Android) | ✅ (RN) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| i18n AR/EN + RTL كامل | 🏆 | ⚠️ | localization | ⚠️ | ⚠️ | ⚠️ | ❌ |
-| REST API + webhooks | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| App marketplace | ❌ | 🏆 | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| **ZATCA Phase 2 + QR** (السعودية) | 🏆 | ⚠️ loc | ✅ loc | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **UAE FTA E‑invoicing** | 🏆 | ⚠️ loc | ✅ loc | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **Egypt ETA E‑invoicing** | 🏆 | ⚠️ loc | ⚠️ | ⚠️ | ❌ | ⚠️ | ❌ |
+| **Zakat Calculator** (السعودية) | 🏆 | ❌ | loc | ❌ | ❌ | ❌ | ❌ |
+| VAT Report (تقرير ضريبة مضافة) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Tax Calendar + Reminders | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| Tax Audit Trail | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **Tax Regimes per‑Branch** (multi‑jurisdiction) | 🏆 | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| WHT (استقطاعات مصدر) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
+| Tax Compliance non‑GCC (EU VAT / US SalesTax) | ⚠️ | ✅ | ✅ | ✅ | ✅ (Avalara) | ⚠️ | ✅ (Avalara) |
+
+**موقع AMAN:** 🏆 **الأعلى في MENA** — الدولة الوحيدة التي تبني ZATCA + FTA + ETA معاً داخل النواة، مع حاسبة زكاة أصلية. خارج MENA يجب إدراج Avalara/Vertex.
+
+### 2.15 التكاملات الخارجية (Integrations)
+
+> **قسم جديد:** ناقل تكاملات AMAN قوي إقليمياً.
+
+| الفئة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **E‑Invoicing متعدّد الدول** (ZATCA + FTA + ETA) | 🏆 | ⚠️ loc | ✅ loc | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **Payment Gateways:** Stripe / **Tap / PayTabs** | 🏆 | ✅ Stripe | ⚠️ | ⚠️ | ✅ | ✅ | ✅ |
+| **Shipping Carriers:** DHL / **Aramex** | 🏆 | ✅ DHL | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **SMS Gateways:** **Taqnyat / Unifonic** / Twilio | 🏆 | ⚠️ Twilio | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
+| **Bank Feeds:** MT940 + CSV + OFX | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| REST API + OpenAPI Spec | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Webhooks + Outbox Relay Pattern** | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| **Event Bus (Redis Streams)** | ✅ | ❌ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
+| **WebSocket Real‑time** | ✅ | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ |
+
+**موقع AMAN:** 🏆 **مجموعة تكاملات خليجية أصلية** لا يوفّرها أيّ من المنافسين دون وسيط.
+
+### 2.16 Workflows والموافقات المتقدّمة
+
+| الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite SuiteFlow | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Workflows متعدّدة الخطوات | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ Blueprint | ❌ |
+| Min/Max Amount Triggers | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **SLA Hours + Escalation Tree** | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Parallel Approvals** | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Auto‑approve Threshold** | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| موافقات عبر كل الوحدات (PO/HR/GL) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+
+### 2.17 المنصّة (البنية والأمان والتشغيل)
+
+| الميزة | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho | QB |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **Multi‑tenant (DB‑per‑company)** | ✅ | ⚠️ row‑level | ⚠️ | ✅ | ✅ | ✅ | ❌ |
+| **Tenant Isolation Middleware** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Multi‑company + Multi‑branch | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| JWT + 2FA TOTP + Session Mgmt | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| SSO (SAML 2.0 + OAuth + LDAP + Group→Role) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| RBAC بصلاحيات دقيقة (192 permission + aliases) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Password Policy + Security Events Log | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Audit Trail (field‑level diff + immutable) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| CSRF + HttpOnly Cookies + CSP Headers | ✅ | ⚠️ | — | — | — | — | — |
+| Rate Limiting (login + global + per‑endpoint) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| **Field Encryption at Rest** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| **PII Masking** (GDPR/PDPL‑aligned) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ⚠️ | ❌ |
+| **Optimistic Lock + Fiscal Lock** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **SQL Safety Linter في CI** | 🏆 | ❌ | — | — | — | — | — |
+| **GL Posting Discipline Checker** (CI) | 🏆 | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
+| gitleaks CI + Secret Scanning | ✅ | ❌ | — | — | — | — | — |
+| **Duplicate Detection** (parties/products) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| Prometheus Metrics + **Alerting Rules** + Grafana | ✅ | ⚠️ | ⚠️ | ✅ | ⚠️ | ❌ | ❌ |
+| **Nginx Hardening** (SSL + SecHeaders + HTTP/2 + RL) | ✅ | ⚠️ | — | — | — | — | — |
+| **Backup / Restore UI + Scripts** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| Docker Compose prod (isolated net + no exposed DB) | ✅ | ⚠️ | — | — | — | — | — |
+| Alembic DB Migrations (versioned schema) | ✅ | ✅ | ✅ | ✅ | ✅ | — | ⚠️ |
+| **Plugin Registry** (internal extension SDK) | ✅ | 🏆 Apps | ⚠️ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| App Marketplace عام | ❌ | 🏆 | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| Mobile App (React Native) + Offline Sync + Conflict Resolution | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Mobile Device Registration + Push Notifications | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
+| **i18n AR/EN + RTL كامل** (Layout+Formulas+Printout) | 🏆 | ⚠️ | localization | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| Localized Error Messages (errors.ar.json) | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| **Global Search** (cross‑module) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| **Dark Mode + Theme Toggle** | ✅ | ✅ | ❌ | ✅ | ⚠️ | ✅ | ⚠️ |
+| **Onboarding Wizard + Industry Setup** | ✅ | ✅ | ⚠️ | ⚠️ SuiteSuccess | ✅ | ✅ | ⚠️ |
+| Notifications (WS + Email + SMS + In‑app) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
+| **Data Import Framework** (per‑entity configs) | ✅ | ✅ | ✅ DTW | ✅ RapidStart | ✅ SmartBundles | ✅ | ⚠️ |
 
 ---
 
 ## 3 · المقارنة حسب النموذج الاقتصادي
 
-| البعد | AMAN | Odoo EE | SAP Business One | Dynamics 365 BC | NetSuite | Zoho Books | QuickBooks |
+| البعد | AMAN | Odoo EE | SAP B1 | D365 BC | NetSuite | Zoho Books | QuickBooks |
 |---|---|---|---|---|---|---|---|
-| **الترخيص** | مملوك خاص / مفتوح داخلياً | Odoo EE ($) + Community (مجاني) | Perpetual + SAAS | SAAS per‑user | SAAS per‑user | SAAS per‑user | Desktop + SAAS |
+| **الترخيص** | مملوك خاص / مفتوح داخلياً | Odoo EE ($) + Community (مجاني) | Perpetual + SaaS | SaaS per‑user | SaaS per‑user | SaaS per‑user | Desktop + SaaS |
 | **التكلفة ($/user/month)** | 0 (self‑hosted) | ~31 | ~94 | ~70 | ~99+ | ~15 | ~30 |
-| **النشر** | Docker / cloud / on‑prem | SaaS / on‑prem | SAP Cloud / on‑prem | Azure cloud | Oracle cloud فقط | SaaS فقط | Desktop / SaaS |
-| **التخصيص** | مفتوح كامل | Python modules | SDK | AL / Extensions | SuiteScript | محدود | محدود جداً |
-| **البيانات** | تحت تحكّم العميل | عميل/مستضاف | متنوّع | Microsoft data center | Oracle cloud | Zoho cloud | Intuit cloud |
-| **اللغات GCC** | 🏆 كامل | ⚠️ عبر localization apps | ✅ localization | ⚠️ partner add‑ons | ⚠️ partner | ⚠️ partial | ❌ |
+| **النشر** | Docker / Cloud / On‑prem | SaaS / On‑prem | SAP Cloud / On‑prem | Azure Cloud | Oracle Cloud فقط | SaaS فقط | Desktop / SaaS |
+| **التخصيص** | مفتوح كامل + Plugin Registry | Python Modules | SDK | AL / Extensions | SuiteScript | محدود | محدود جداً |
+| **البيانات** | تحت تحكّم العميل | عميل/مستضاف | متنوّع | Microsoft DC | Oracle Cloud | Zoho Cloud | Intuit Cloud |
+| **اللغات GCC** | 🏆 كامل داخلي | ⚠️ عبر localization apps | ✅ localization مدفوعة | ⚠️ Partner Add‑ons | ⚠️ Partner | ⚠️ partial | ❌ |
+| **بوّابات GCC** (Tap/PayTabs/Aramex/Taqnyat) | 🏆 مدمج | ❌ | ⚠️ | ❌ | ❌ | ⚠️ | ❌ |
 
 ---
 
 ## 4 · المميّزات التنافسية لـ AMAN (🏆)
 
-1. **امتثال سعودي/خليجي عميق داخل النواة** — ZATCA Phase 2 + WPS + GOSI + السعودة + WHT + ضرائب متعدّدة النسب بحسب الفرع، بدون شراء localization modules منفصلة.
-2. **Multi‑tenant database‑per‑company** — عزل بياني حقيقي، أقوى أمنياً من row‑level tenancy المعتمد في Odoo/Zoho.
-3. **Policy‑versioned cost layers (FIFO/LIFO)** — تتبّع إصدارات سياسات التكلفة مع تاريخ صلاحية، ميزة نادرة خارج SAP.
-4. **IFRS 15/9 + IAS 36 مبنية داخلياً** — تمييز على Zoho و QuickBooks، وحتى Odoo في بعض الحالات.
-5. **RTL عربي حقيقي** — ليس مجرّد ترجمة نصوص؛ Layout كامل + formulas + printout.
-6. **Open stack (FastAPI + React + PG + Redis)** — صفر lock‑in، سهل التوسعة.
-7. **أمان جاهز للإنتاج** — CSRF + HttpOnly + gitleaks + CSP + 2FA + rate limiting بشكل إفتراضي.
-8. **نظام موافقات متعدّد المستويات عبر كل الوحدات** — purchasing / HR / journal entries / expenses.
+1. **الامتثال MENA العميق داخل النواة** — ZATCA Phase 2 + UAE FTA + Egypt ETA + WPS + GOSI + السعودة + WHT + **الزكاة**، بدون شراء localization modules منفصلة.
+2. **الخزينة الخليجية الكاملة** — دورة شيكات آجلة (post‑dated) + Notes Receivable/Payable + Checks Aging، ميزة نادرة خارج SAP B1 localization.
+3. **بوّابات إقليمية أصلية** — Tap + PayTabs + Aramex + Taqnyat + Unifonic مدمجة داخل النواة.
+4. **Multi‑tenant Database‑per‑Company** — عزل بياني حقيقي أقوى أمنياً من row‑level tenancy في Odoo/Zoho.
+5. **Multi‑Book Accounting** (IFRS + Local GAAP) — par مع NetSuite، فوق Odoo/D365/Zoho/QB.
+6. **Policy‑versioned Cost Layers (FIFO/LIFO)** — إصدارات سياسات التكلفة مع تاريخ صلاحية، نادرة خارج SAP.
+7. **IFRS 15 / 9 / 16 + IAS 36 مبنية داخلياً** — تمييز واضح على Zoho/QB وحتى Odoo.
+8. **RTL عربي حقيقي** — ليس ترجمة نصوص فحسب، بل Layout كامل + Formulas + Printout + Invoice templates.
+9. **CPQ Engine أصلي** + Three‑Way Matching + Advanced Workflow (SLA/Escalation/Parallel) — يُضاهي NetSuite بتكلفة صفر.
+10. **POS متكامل** مع Offline + KDS + Customer Display + Table Mgmt + Loyalty + Promotions.
+11. **HR خليجي شامل** — Custody + Violations + EOS + Loans + Leave Carryover — ميزات لا توجد حتى في localization apps المدفوعة.
+12. **منصّة DevSecOps أصلية** — SQL Safety Linter CI + GL Posting Discipline Checker + gitleaks + CSRF + HttpOnly + CSP + Field Encryption + PII Masking + Fiscal Lock + Optimistic Lock.
+13. **Event Bus (Redis) + Outbox Pattern + WebSocket Real‑time** — بنية enterprise للأحداث والإشعارات المباشرة.
+14. **Plugin Registry + Industry Setup** — هيكل قابل للتوسعة جاهز لـ marketplace داخلي مستقبلاً.
+15. **Open stack** (FastAPI + React + PG + Redis + Nginx) — صفر lock‑in.
 
 ---
 
@@ -198,34 +367,38 @@
 
 | الفجوة | الخطر | الحل المقترح |
 |---|---|---|
-| AI‑driven forecasting & anomaly detection | متوسّط | إضافة scikit‑learn/Prophet على cashflow + demand forecast |
-| Marketplace للتوسعات | منخفض (نظام مغلق حالياً) | لاحقاً: plugin SDK + store |
-| Power BI / Looker embed | منخفض | API موجود، يمكن توصيله |
-| MES real‑time (IoT على أرض المصنع) | للصناعة الثقيلة فقط | MQTT / OPC‑UA plugin |
-| Declining‑balance depreciation | منخفض | إضافة method enum + formula |
-| E‑signature مدمج (DocuSign‑like) | منخفض | تكامل خارجي |
-| Tax compliance non‑GCC (VAT EU, US sales tax) | مرتفع لو targeting أسواق أخرى | Tax engine plugin (Avalara/Vertex) |
-| Deep reporting designer (like Crystal/SSRS) | منخفض | تم تغطيته بـ scheduled reports |
+| AI‑driven Forecasting & Anomaly Detection حقيقي | متوسّط | إضافة scikit‑learn/Prophet/ARIMA على Cash Flow + Demand Forecast |
+| **App Marketplace عام** (مقابل Plugin Registry الداخلي) | منخفض | تحويل Plugin Registry إلى SDK + store عام |
+| Power BI / Looker / Metabase embed | منخفض | REST API جاهز — يحتاج مجرّد توثيق |
+| **MES Real‑time** (IoT على أرض المصنع) | للصناعة الثقيلة فقط | MQTT / OPC‑UA plugin |
+| **Declining‑balance / Units‑of‑production** depreciation | منخفض | إضافة method enum + formula (أسبوع عمل) |
+| E‑signature مدمج (DocuSign‑like) | منخفض | تكامل خارجي عبر webhooks |
+| Tax compliance **خارج GCC** (EU VAT / US SalesTax) | مرتفع لو targeting أسواق أخرى | Avalara/Vertex plugin |
+| Deep Reporting Designer (Crystal/SSRS grade) | منخفض | Report Builder يغطّي 80%، متبقّي formulas معقّدة |
 
 ---
 
-## 6 · الخلاصة
+## 6 · الخلاصة والتصنيف السوقي
 
-> **AMAN ERP يقف في الفئة الوسطى‑العليا بين Odoo Enterprise و Dynamics 365 BC من حيث نطاق المزايا، ويتفوّق على كلّيهما (وعلى SAP B1) في الامتثال السعودي/الخليجي واللغة العربية.**
+> **AMAN ERP يقف في الفئة الوسطى‑العليا بين Odoo Enterprise و Dynamics 365 BC من حيث نطاق المزايا، ويتفوّق على الجميع (بما فيهم SAP B1) في الامتثال MENA واللغة العربية والبوابات الخليجية.**
 
 **التصنيف حسب السوق المستهدف:**
 
 | السوق / الحجم | البديل الأمثل | موقع AMAN |
 |---|---|---|
-| SMB خليجي/سعودي (≤ 200 موظف) | **AMAN** | 🥇 الأفضل (GOSI + WPS + ZATCA مدمج) |
-| Mid‑market إقليمي (200–2000) | AMAN / D365 BC | 🥈 منافس قوي |
-| Enterprise عالمي (+2000) | SAP S/4HANA / Oracle Fusion | فجوة: يحتاج MES/AI |
-| خدمات محترفة + Projects | AMAN / NetSuite SRP | 🥈 منافس |
-| تجارة تجزئة + POS | AMAN / Odoo | 🥇 POS قوي |
-| تصنيع متقدّم (MES) | SAP / Infor | فجوة MES |
+| SMB خليجي/سعودي (≤ 200 موظف) | **AMAN** | 🥇 الأفضل (GOSI + WPS + ZATCA + Tap + PayTabs + Aramex) |
+| SMB مصري | **AMAN** | 🥇 الأفضل (ETA e‑invoicing أصلي) |
+| SMB إماراتي | **AMAN** | 🥇 الأفضل (FTA e‑invoicing أصلي) |
+| Mid‑market إقليمي (200–2000) | AMAN / D365 BC | 🥈 منافس قوي مع Multi‑book + Subscriptions + CPQ |
+| Enterprise عالمي (+2000) | SAP S/4HANA / Oracle Fusion | فجوة: يحتاج MES real‑time + AI forecasting |
+| خدمات محترفة + Projects | AMAN / NetSuite SRP | 🥇 منافس قوي (Gantt + Risk + Rev Rec + Resource Planning) |
+| تجارة تجزئة + POS | AMAN / Odoo | 🥇 POS قوي (Offline + KDS + Loyalty) |
+| تصنيع متوسّط/خفيف | AMAN / Odoo MRP | 🥇 MRP‑II + Capacity + Scheduler |
+| تصنيع ثقيل متقدّم (MES) | SAP / Infor | فجوة MES real‑time |
+| مكاتب محاسبة + مراجعين | AMAN / Zoho | 🥇 Multi‑company + Audit Trail عميق |
 
-**التوصية:** AMAN جاهز للإنتاج للسوق السعودي/الخليجي في SMB و Mid‑market بكفاءة تضاهي الأنظمة التجارية بتكلفة ترخيص صفرية.
+**التوصية:** AMAN ERP **جاهز للإنتاج** للسوق السعودي/الخليجي/المصري في SMB و Mid‑market بكفاءة تضاهي الأنظمة التجارية بتكلفة ترخيص صفرية، ومع **تمييز تنافسي حقيقي** في 15 نقطة موثّقة أعلاه.
 
 ---
 
-_آخر تحديث: 21 أبريل 2026_
+_آخر تحديث: 22 أبريل 2026_
