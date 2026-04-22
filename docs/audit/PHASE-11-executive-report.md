@@ -15,7 +15,7 @@ Four follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-1 Quick Wins | `e646558` | SALES-F1, QA-F1, MFG-F1, PAY-F1, EINV-F1, baseline refresh | `ci` #176 green (after `413b32e` baseline fix) |
 | Sprint-2 IDOR + DB constraints | `e7a4796` | ACC-F5, CRM-F1, INV-F2, MFG-F2, PH10-B3 | `ci` #178 green, `security-scan` #53 green |
 | Sprint-2b UX + observability | `95efa4a` | POS-UI-F1, ACC-F6, INV-F4 | `ci` #179 green, `security-scan` #54 green |
-| Sprint-2c Authz + SSRF hardening | `d4f5a82` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | pending |
+| Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | pending |
 
 **Updated distribution** (open only, post-Sprint-2c):
 
@@ -101,7 +101,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | SEC-07 | Logging/PII | P2 | Fixed | PII masking not enforced | Added `check_pii_logging.py` CI gate |
 | SEC-08 | Auth/2FA | P3 | Open | Admin 2FA token in env | Move encrypted to DB |
 | SEC-09 | Sessions | P3 | Open | No concurrent session limits | Enforce max sessions per user |
-| SEC-10 | Integrations | P2 | Fixed (`d4f5a82`) | No outbound webhook allowlist | `WEBHOOK_HOSTNAME_ALLOWLIST` env honoured in `validate_webhook_url` |
+| SEC-10 | Integrations | P2 | Fixed (`49f5d66`) | No outbound webhook allowlist | `WEBHOOK_HOSTNAME_ALLOWLIST` env honoured in `validate_webhook_url` |
 | SEC-11 | SSO | P2 | Open | SAML/OAuth/LDAP deep audit deferred | Follow-up audit |
 | SEC-12 | Dashboard | P3 | Open | Metadata endpoints ungated | Superseded by IN-F1 in Phase 9 |
 
@@ -138,7 +138,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ACC-F1 | Accounting | P1 | Fixed | `fiscal_lock` silently allowed on missing table | Fail-safe warning/error |
 | ACC-F2 | Accounting | P1 | Open | Two fiscal-lock tables (duplicate sources) | Unify into single table |
 | ACC-F3 | Accounting | P1 | Fixed | `create_account` lacked enum/parent validation | Added checks |
-| ACC-F4 | Accounting | P1 | Fixed (`d4f5a82`) | JE void lacks source-doc authz | Source→perm map + 403 for non-admin non-holder |
+| ACC-F4 | Accounting | P1 | Fixed (`49f5d66`) | JE void lacks source-doc authz | Source→perm map + 403 for non-admin non-holder |
 | ACC-F5 | Accounting | P2 | Fixed (`e646558`) | `/journal-entries` not filtered by branch | `branch_id` filter + allowed_branches |
 | ACC-F6 | Audit | P2 | Fixed (`95efa4a`) | Audit log errors swallowed silently | `exc_info=True` + context on every failure |
 | ACC-F7 | Accounting | P1 | Open | Tenant missing IFRS ledger | Bootstrap migration |
