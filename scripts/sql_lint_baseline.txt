@@ -511,7 +511,7 @@ backend/services/scheduler.py:194
 backend/services/scheduler.py:195
 backend/services/sso_service.py:299
 backend/services/sso_service.py:499
-backend/utils/accounting.py:78
+backend/utils/accounting.py:89
 backend/utils/duplicate_detection.py:154
 backend/utils/exports.py:418
 backend/utils/exports.py:420
