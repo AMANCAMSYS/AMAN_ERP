@@ -134,7 +134,7 @@ def get_supplier(
         db.close()
 
 
-@suppliers_router.post("/suppliers", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("buying.create"))])
+@suppliers_router.post("/suppliers", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission(["parties.manage", "buying.create"]))])
 def create_supplier(
     supplier: SupplierCreate,
     current_user: dict = Depends(get_current_user)
@@ -205,7 +205,7 @@ def create_supplier(
         db.close()
 
 
-@suppliers_router.put("/suppliers/{id}", response_model=SupplierResponse, dependencies=[Depends(require_permission("buying.edit"))])
+@suppliers_router.put("/suppliers/{id}", response_model=SupplierResponse, dependencies=[Depends(require_permission(["parties.manage", "buying.edit"]))])
 def update_supplier(
     id: int,
     supplier: SupplierCreate,
@@ -281,7 +281,7 @@ def update_supplier(
         db.close()
 
 
-@suppliers_router.delete("/suppliers/{id}", dependencies=[Depends(require_permission("buying.delete"))])
+@suppliers_router.delete("/suppliers/{id}", dependencies=[Depends(require_permission(["parties.manage", "buying.delete"]))])
 def delete_supplier(
     id: int,
     request: Request,

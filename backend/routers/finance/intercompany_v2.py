@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Entity Group CRUD
 # ---------------------------------------------------------------------------
 
-@router.get("/entities", dependencies=[Depends(require_permission("accounting.view"))])
+@router.get("/entities", dependencies=[Depends(require_permission(["intercompany.view", "accounting.view"]))])
 @limiter.limit("200/minute")
 def list_entities(request: Request, current_user=Depends(get_current_user)):
     """Return entity group tree."""
@@ -37,7 +37,7 @@ def list_entities(request: Request, current_user=Depends(get_current_user)):
     return intercompany_service.get_entity_tree(str(company_id))
 
 
-@router.post("/entities", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
+@router.post("/entities", status_code=201, dependencies=[Depends(require_permission(["intercompany.manage", "accounting.edit"]))])
 @limiter.limit("100/minute")
 def create_entity(request: Request, data: EntityGroupCreate, current_user=Depends(get_current_user)):
     """Create a new entity group node."""
@@ -50,7 +50,7 @@ def create_entity(request: Request, data: EntityGroupCreate, current_user=Depend
 # Intercompany Transactions
 # ---------------------------------------------------------------------------
 
-@router.post("/transactions", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
+@router.post("/transactions", status_code=201, dependencies=[Depends(require_permission(["intercompany.manage", "accounting.edit"]))])
 @limiter.limit("100/minute")
 def create_transaction(request: Request, data: IntercompanyTransactionCreate, current_user=Depends(get_current_user)):
     """Create intercompany transaction with reciprocal JEs."""
@@ -63,7 +63,7 @@ def create_transaction(request: Request, data: IntercompanyTransactionCreate, cu
         raise HTTPException(**http_error(400, "invalid_data"))
 
 
-@router.get("/transactions", dependencies=[Depends(require_permission("accounting.view"))])
+@router.get("/transactions", dependencies=[Depends(require_permission(["intercompany.view", "accounting.view"]))])
 @limiter.limit("200/minute")
 def list_transactions(
     request: Request,
@@ -76,7 +76,7 @@ def list_transactions(
     return intercompany_service.get_transactions(str(company_id), status_filter, entity_id)
 
 
-@router.get("/transactions/{txn_id}", dependencies=[Depends(require_permission("accounting.view"))])
+@router.get("/transactions/{txn_id}", dependencies=[Depends(require_permission(["intercompany.view", "accounting.view"]))])
 @limiter.limit("200/minute")
 def get_transaction(request: Request, txn_id: int, current_user=Depends(get_current_user)):
     """Get a single intercompany transaction."""
@@ -91,7 +91,7 @@ def get_transaction(request: Request, txn_id: int, current_user=Depends(get_curr
 # Consolidation
 # ---------------------------------------------------------------------------
 
-@router.post("/consolidate", dependencies=[Depends(require_permission("accounting.edit"))])
+@router.post("/consolidate", dependencies=[Depends(require_permission(["intercompany.manage", "accounting.edit"]))])
 @limiter.limit("100/minute")
 def consolidate(request: Request, data: ConsolidationRequest, current_user=Depends(get_current_user)):
     """Run consolidation elimination for an entity group."""
@@ -113,7 +113,7 @@ def consolidate(request: Request, data: ConsolidationRequest, current_user=Depen
 # Balances Report
 # ---------------------------------------------------------------------------
 
-@router.get("/balances", dependencies=[Depends(require_permission("accounting.view"))])
+@router.get("/balances", dependencies=[Depends(require_permission(["intercompany.view", "accounting.view"]))])
 @limiter.limit("200/minute")
 def get_balances(request: Request, current_user=Depends(get_current_user)):
     """Report outstanding intercompany balances."""
@@ -125,7 +125,7 @@ def get_balances(request: Request, current_user=Depends(get_current_user)):
 # Account Mappings
 # ---------------------------------------------------------------------------
 
-@router.get("/mappings", dependencies=[Depends(require_permission("accounting.view"))])
+@router.get("/mappings", dependencies=[Depends(require_permission(["intercompany.view", "accounting.view"]))])
 @limiter.limit("200/minute")
 def list_mappings(request: Request, current_user=Depends(get_current_user)):
     """List intercompany account mappings."""
@@ -133,7 +133,7 @@ def list_mappings(request: Request, current_user=Depends(get_current_user)):
     return intercompany_service.get_account_mappings(str(company_id))
 
 
-@router.post("/mappings", status_code=201, dependencies=[Depends(require_permission("accounting.edit"))])
+@router.post("/mappings", status_code=201, dependencies=[Depends(require_permission(["intercompany.manage", "accounting.edit"]))])
 @limiter.limit("100/minute")
 def create_mapping(request: Request, data: AccountMappingCreate, current_user=Depends(get_current_user)):
     """Create a new intercompany account mapping."""

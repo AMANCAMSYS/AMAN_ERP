@@ -135,7 +135,7 @@ def get_customer_transactions(customer_id: int, current_user: dict = Depends(get
         db.close()
 
 
-@customers_router.post("/customers", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("sales.create"))])
+@customers_router.post("/customers", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission(["parties.manage", "sales.create"]))])
 def create_customer(request: Request, customer: CustomerCreate, current_user: dict = Depends(get_current_user)):
     """إنشاء عميل جديد"""
     db = get_db_connection(current_user.company_id)
@@ -214,7 +214,7 @@ def get_customer(customer_id: int, current_user: dict = Depends(get_current_user
         db.close()
 
 
-@customers_router.put("/customers/{customer_id}", response_model=dict, dependencies=[Depends(require_permission("sales.edit"))])
+@customers_router.put("/customers/{customer_id}", response_model=dict, dependencies=[Depends(require_permission(["parties.manage", "sales.edit"]))])
 def update_customer(customer_id: int, customer: CustomerCreate, request: Request, current_user: dict = Depends(get_current_user)):
     """تحديث عميل"""
     db = get_db_connection(current_user.company_id)

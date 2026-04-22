@@ -72,7 +72,7 @@ def _get_user_id(current_user):
 # Match listing & detail
 # ---------------------------------------------------------------------------
 
-@router.get("/matches", dependencies=[Depends(require_permission("buying.view"))])
+@router.get("/matches", dependencies=[Depends(require_permission(["matching.view", "buying.view"]))])
 def list_matches(
     status: Optional[str] = None,
     branch_id: Optional[int] = Query(None),
@@ -121,7 +121,7 @@ def list_matches(
         db.close()
 
 
-@router.get("/matches/{match_id}", dependencies=[Depends(require_permission("buying.view"))])
+@router.get("/matches/{match_id}", dependencies=[Depends(require_permission(["matching.view", "buying.view"]))])
 def get_match(match_id: int, current_user=Depends(get_current_user)):
     company_id = _get_company_id(current_user)
     db = get_db_connection(company_id)
@@ -192,7 +192,7 @@ def get_match(match_id: int, current_user=Depends(get_current_user)):
 # Approve / Reject held matches
 # ---------------------------------------------------------------------------
 
-@router.put("/matches/{match_id}/approve", dependencies=[Depends(require_permission("buying.edit"))])
+@router.put("/matches/{match_id}/approve", dependencies=[Depends(require_permission(["matching.approve", "buying.edit"]))])
 def approve_match(
     match_id: int,
     body: MatchActionRequest,
@@ -223,7 +223,7 @@ def approve_match(
         db.close()
 
 
-@router.put("/matches/{match_id}/reject", dependencies=[Depends(require_permission("buying.edit"))])
+@router.put("/matches/{match_id}/reject", dependencies=[Depends(require_permission(["matching.approve", "buying.edit"]))])
 def reject_match(
     match_id: int,
     body: MatchActionRequest,
@@ -258,7 +258,7 @@ def reject_match(
 # Tolerance configuration
 # ---------------------------------------------------------------------------
 
-@router.get("/tolerances", dependencies=[Depends(require_permission("buying.view"))])
+@router.get("/tolerances", dependencies=[Depends(require_permission(["matching.view", "buying.view"]))])
 def list_tolerances(current_user=Depends(get_current_user)):
     company_id = _get_company_id(current_user)
     db = get_db_connection(company_id)
@@ -283,7 +283,7 @@ def list_tolerances(current_user=Depends(get_current_user)):
         db.close()
 
 
-@router.post("/tolerances", dependencies=[Depends(require_permission("buying.edit"))])
+@router.post("/tolerances", dependencies=[Depends(require_permission(["matching.manage", "buying.edit"]))])
 def save_tolerance(body: ToleranceSave, current_user=Depends(get_current_user)):
     company_id = _get_company_id(current_user)
     user_id = _get_user_id(current_user)

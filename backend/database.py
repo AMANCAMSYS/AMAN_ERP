@@ -3418,17 +3418,22 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
     connection_url = settings.get_company_database_url(company_id)
 
     def split_sql_statements(sql_block: str) -> list[str]:
-        """Split SQL safely, preserving PostgreSQL $$...$$ and $tag$...$tag$ blocks."""
+        """Split SQL safely, preserving PostgreSQL $$...$$ and $tag$...$tag$ blocks,
+        plus single-line (--) and block (/* */) SQL comments. A ';' inside a
+        comment or quoted/dollar-quoted string MUST NOT terminate a statement.
+        """
         statements = []
         current = []
         in_single_quote = False
         in_double_quote = False
         dollar_quote_tag = None
         i = 0
+        n = len(sql_block)
 
-        while i < len(sql_block):
+        while i < n:
             char = sql_block[i]
 
+            # Inside a dollar-quoted block: only the matching tag closes it.
             if dollar_quote_tag:
                 if sql_block.startswith(dollar_quote_tag, i):
                     current.append(dollar_quote_tag)
@@ -3439,16 +3444,47 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 i += 1
                 continue
 
-            if not in_single_quote and not in_double_quote and char == "$":
-                match = re.match(r"\$[A-Za-z0-9_]*\$", sql_block[i:])
-                if match:
-                    dollar_quote_tag = match.group(0)
-                    current.append(dollar_quote_tag)
-                    i += len(dollar_quote_tag)
+            # Outside any quote/comment: detect the start of comments first
+            # so that ';' inside them does not split statements.
+            if not in_single_quote and not in_double_quote:
+                # Single-line comment: -- ... <newline>
+                if char == "-" and i + 1 < n and sql_block[i + 1] == "-":
+                    newline_idx = sql_block.find("\n", i)
+                    if newline_idx == -1:
+                        current.append(sql_block[i:])
+                        i = n
+                    else:
+                        current.append(sql_block[i:newline_idx + 1])
+                        i = newline_idx + 1
                     continue
+                # Block comment: /* ... */ (PostgreSQL allows nesting)
+                if char == "/" and i + 1 < n and sql_block[i + 1] == "*":
+                    depth = 1
+                    j = i + 2
+                    while j < n and depth > 0:
+                        if sql_block[j] == "/" and j + 1 < n and sql_block[j + 1] == "*":
+                            depth += 1
+                            j += 2
+                            continue
+                        if sql_block[j] == "*" and j + 1 < n and sql_block[j + 1] == "/":
+                            depth -= 1
+                            j += 2
+                            continue
+                        j += 1
+                    current.append(sql_block[i:j])
+                    i = j
+                    continue
+                # Dollar-quote opener
+                if char == "$":
+                    match = re.match(r"\$[A-Za-z0-9_]*\$", sql_block[i:])
+                    if match:
+                        dollar_quote_tag = match.group(0)
+                        current.append(dollar_quote_tag)
+                        i += len(dollar_quote_tag)
+                        continue
 
             if char == "'" and not in_double_quote:
-                if in_single_quote and i + 1 < len(sql_block) and sql_block[i + 1] == "'":
+                if in_single_quote and i + 1 < n and sql_block[i + 1] == "'":
                     current.append("''")
                     i += 2
                     continue
@@ -3481,22 +3517,49 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
         return statements
 
     def run_company_alembic_stamp_head() -> Tuple[bool, str]:
-        """Stamp Alembic head for a freshly created company database."""
+        """Stamp Alembic head for a freshly created company database.
+
+        Tries the in-process Alembic Python API first (most reliable, no PATH
+        dependency); falls back to subprocess invocations if needed.
+        """
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         alembic_ini = os.path.join(backend_dir, "alembic.ini")
+
+        # 1) Preferred: use Alembic's Python API directly. This works whether
+        # the parent process is uvicorn, pytest, or a script — no shell PATH
+        # required, and no fragile "python -m alembic" entry-point.
+        try:
+            from alembic.config import Config as _AlembicConfig
+            from alembic import command as _alembic_command
+
+            cfg = _AlembicConfig(alembic_ini)
+            cfg.cmd_opts = type(
+                "X", (), {"autogenerate": False, "x": [f"company={company_id}"]}
+            )()
+            # Older Alembic ignores cmd_opts.x; set the attribute used by env.py too.
+            try:
+                cfg.attributes["x"] = [f"company={company_id}"]
+            except Exception:
+                pass
+            _alembic_command.stamp(cfg, "head")
+            logger.info(f"✅ Alembic head stamped (api) for {db_name}")
+            return True, "ok"
+        except Exception as api_exc:
+            api_error = f"alembic api: {api_exc}"
+            logger.warning(f"Alembic API stamp failed for {db_name}: {api_exc}; trying subprocess fallback")
+
+        # 2) Subprocess fallback: prefer alembic.config (callable as module),
+        # then the alembic console script.
         alembic_args = [
-            "-c",
-            alembic_ini,
-            "-x",
-            f"company={company_id}",
-            "stamp",
-            "head",
+            "-c", alembic_ini,
+            "-x", f"company={company_id}",
+            "stamp", "head",
         ]
         candidate_commands = [
-            [sys.executable, "-m", "alembic", *alembic_args],
+            [sys.executable, "-m", "alembic.config", *alembic_args],
             ["alembic", *alembic_args],
         ]
-        errors = []
+        errors = [api_error]
 
         for alembic_cmd in candidate_commands:
             try:
@@ -3515,7 +3578,7 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 continue
 
             if result.returncode == 0:
-                logger.info(f"✅ Alembic head stamped for {db_name}")
+                logger.info(f"✅ Alembic head stamped (subprocess) for {db_name}")
                 return True, "ok"
 
             stderr = (result.stderr or "").strip()
@@ -5805,9 +5868,13 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_dashboard_widgets_dashboard ON analytics_dashboard_widgets(dashboard_id);
 
     -- Materialized Views for BI Dashboard
+    -- AUDIT-FIX-2026-04-22: column/table names aligned with the actual tenant
+    -- schema (see backend/database.py block 4-22). Previously these MVs were
+    -- silently skipped during tenant bootstrap because they referenced
+    -- nonexistent columns/tables (issue: "16 MVs disabled" in audit plan).
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_revenue_summary AS
         SELECT date_trunc('month', invoice_date) AS month,
-               SUM(total_amount) AS total_revenue,
+               SUM(total) AS total_revenue,
                COUNT(*) AS invoice_count
         FROM invoices
         WHERE invoice_type = 'sale' AND status = 'posted'
@@ -5816,7 +5883,7 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_expense_summary AS
         SELECT date_trunc('month', invoice_date) AS month,
-               SUM(total_amount) AS total_expenses,
+               SUM(total) AS total_expenses,
                COUNT(*) AS invoice_count
         FROM invoices
         WHERE invoice_type = 'purchase' AND status = 'posted'
@@ -5825,17 +5892,22 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_cash_position AS
         SELECT ta.id AS account_id,
-               ta.account_name,
-               COALESCE(SUM(tt.amount), 0) AS balance
+               ta.name AS account_name,
+               COALESCE(SUM(CASE
+                   WHEN tt.transaction_type IN ('deposit','receipt','transfer_in') THEN tt.amount
+                   WHEN tt.transaction_type IN ('withdraw','payment','transfer_out') THEN -tt.amount
+                   ELSE 0
+               END), 0) AS balance
         FROM treasury_accounts ta
-        LEFT JOIN treasury_transactions tt ON tt.account_id = ta.id AND tt.status = 'completed'
-        GROUP BY ta.id, ta.account_name;
+        LEFT JOIN treasury_transactions tt
+               ON tt.treasury_id = ta.id AND tt.status = 'completed'
+        GROUP BY ta.id, ta.name;
     CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_cash_account ON mv_cash_position(account_id);
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_top_customers AS
         SELECT i.party_id,
                p.name AS customer_name,
-               SUM(i.total_amount) AS total_revenue,
+               SUM(i.total) AS total_revenue,
                COUNT(*) AS order_count
         FROM invoices i
         JOIN parties p ON p.id = i.party_id
@@ -5845,10 +5917,10 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ar_aging AS
         SELECT party_id,
-               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN balance_due ELSE 0 END) AS current_bucket,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN balance_due ELSE 0 END) AS bucket_30,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_60,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_90_plus
+               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS current_bucket,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_30,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_60,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '90 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_90_plus
         FROM invoices
         WHERE invoice_type = 'sale' AND status IN ('posted', 'partially_paid')
         GROUP BY party_id;
@@ -5856,10 +5928,10 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ap_aging AS
         SELECT party_id,
-               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN balance_due ELSE 0 END) AS current_bucket,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN balance_due ELSE 0 END) AS bucket_30,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_60,
-               SUM(CASE WHEN NOW() - due_date > INTERVAL '90 days' THEN balance_due ELSE 0 END) AS bucket_90_plus
+               SUM(CASE WHEN NOW() - due_date <= INTERVAL '30 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS current_bucket,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '30 days' AND NOW() - due_date <= INTERVAL '60 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_30,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '60 days' AND NOW() - due_date <= INTERVAL '90 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_60,
+               SUM(CASE WHEN NOW() - due_date >  INTERVAL '90 days' THEN (total - COALESCE(paid_amount,0)) ELSE 0 END) AS bucket_90_plus
         FROM invoices
         WHERE invoice_type = 'purchase' AND status IN ('posted', 'partially_paid')
         GROUP BY party_id;
@@ -5867,16 +5939,16 @@ def get_extended_features_tables_sql() -> str:
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_inventory_turnover AS
         SELECT product_id,
-               SUM(CASE WHEN movement_type = 'out' THEN quantity ELSE 0 END) AS total_sold,
+               SUM(CASE WHEN transaction_type = 'out' THEN quantity ELSE 0 END) AS total_sold,
                AVG(quantity) AS avg_stock
-        FROM inventory_movements
+        FROM inventory_transactions
         GROUP BY product_id;
     CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_inv_turn_product ON mv_inventory_turnover(product_id);
 
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sales_pipeline AS
         SELECT stage,
                COUNT(*) AS deal_count,
-               SUM(expected_revenue) AS total_value
+               SUM(expected_value) AS total_value
         FROM sales_opportunities
         GROUP BY stage;
     CREATE UNIQUE INDEX IF NOT EXISTS ux_mv_pipeline_stage ON mv_sales_pipeline(stage);
@@ -6800,25 +6872,16 @@ def get_gl_integrity_guards_sql() -> str:
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 
-    CREATE TABLE IF NOT EXISTS bank_statement_lines (
-        id SERIAL PRIMARY KEY,
-        statement_id INTEGER NOT NULL REFERENCES bank_statements(id) ON DELETE CASCADE,
-        line_no INTEGER NOT NULL,
-        value_date DATE,
-        posting_date DATE,
-        amount NUMERIC(18,2) NOT NULL,
-        currency VARCHAR(10),
-        tx_type VARCHAR(20),
-        reference VARCHAR(120),
-        bank_reference VARCHAR(120),
-        description TEXT,
-        matched_entry_id INTEGER,
-        match_status VARCHAR(20) DEFAULT 'unmatched',
-        raw JSONB
-    );
-    CREATE INDEX IF NOT EXISTS idx_bsl_statement ON bank_statement_lines (statement_id);
-    CREATE INDEX IF NOT EXISTS idx_bsl_unmatched
-        ON bank_statement_lines (match_status) WHERE match_status = 'unmatched';
+    -- AUDIT-FIX-2026-04-22: The original block-22 redefinition of
+    -- bank_statement_lines (with columns statement_id/match_status/...) is a
+    -- no-op because the table is already created in block 4 with a different
+    -- (reconciliation-focused) schema. The duplicate CREATE TABLE was harmless
+    -- but the two follow-up indexes targeted the unused schema and failed.
+    -- Indexes that match the actual schema:
+    CREATE INDEX IF NOT EXISTS idx_bsl_reconciliation
+        ON bank_statement_lines (reconciliation_id);
+    CREATE INDEX IF NOT EXISTS idx_bsl_unreconciled
+        ON bank_statement_lines (is_reconciled) WHERE is_reconciled = FALSE;
 
     CREATE TABLE IF NOT EXISTS wht_rules (
         id SERIAL PRIMARY KEY,

@@ -321,6 +321,20 @@ AVAILABLE_PERMISSIONS = [
     # ═══════════════════════ Mobile App Access ═══════════════════════
     {"key": "mobile.sync", "section": "mobile", "label_ar": "مزامنة بيانات تطبيق الموبايل", "label_en": "Mobile App Data Sync"},
     {"key": "mobile.dashboard", "section": "mobile", "label_ar": "عرض لوحة الموبايل", "label_en": "View Mobile Dashboard"},
+
+    # ═══════════════════════ Umbrella / legacy-alias perms (registered so UI & frontend can reference them) ═══════════════════════
+    # These are expanded through PERMISSION_ALIASES in utils/permissions.py:
+    #   sales.manage → sales.view + sales.create + sales.edit + sales.delete
+    #   buying.manage → buying.view + buying.create + buying.edit + buying.delete
+    #   approvals.action ↔ approvals.approve (same semantic; different legacy name)
+    #   data_import.execute ↔ data_import.create
+    #   stock.create_product / stock.delete_product ↔ products.create / products.delete
+    {"key": "sales.manage", "section": "sales", "label_ar": "إدارة المبيعات (عرض/إنشاء/تعديل/حذف)", "label_en": "Manage Sales (View/Create/Edit/Delete)"},
+    {"key": "buying.manage", "section": "buying", "label_ar": "إدارة المشتريات (عرض/إنشاء/تعديل/حذف)", "label_en": "Manage Purchases (View/Create/Edit/Delete)"},
+    {"key": "approvals.action", "section": "approvals", "label_ar": "تنفيذ إجراء اعتماد (اسم بديل لـ approvals.approve)", "label_en": "Perform Approval Action (alias for approvals.approve)"},
+    {"key": "data_import.execute", "section": "data_import", "label_ar": "تنفيذ عمليات الاستيراد (اسم بديل لـ data_import.create)", "label_en": "Execute Import Jobs (alias for data_import.create)"},
+    {"key": "stock.create_product", "section": "stock", "label_ar": "إنشاء منتج من شاشة المخزون", "label_en": "Create Product from Stock UI"},
+    {"key": "stock.delete_product", "section": "stock", "label_ar": "حذف منتج من شاشة المخزون", "label_en": "Delete Product from Stock UI"},
 ]
 
 # Section labels for the frontend permission picker UI

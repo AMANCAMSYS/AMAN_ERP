@@ -58,11 +58,11 @@ def _resolve_company_id_public(company_id: Optional[str], company_code: Optional
 
 
 # ---------------------------------------------------------------------------
-# Admin endpoints (require auth.sso_manage)
+# Admin endpoints (require sso.manage)
 # ---------------------------------------------------------------------------
 
 @router.get("/config", response_model=List[SsoConfigRead],
-            dependencies=[Depends(require_permission("auth.sso_manage"))])
+            dependencies=[Depends(require_permission("sso.manage"))])
 async def list_sso_configs(current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -83,7 +83,7 @@ async def list_sso_configs(current_user=Depends(get_current_user)):
 
 
 @router.post("/config", response_model=SsoConfigRead, status_code=201,
-             dependencies=[Depends(require_permission("auth.sso_manage"))])
+             dependencies=[Depends(require_permission("sso.manage"))])
 async def create_sso_config(body: SsoConfigCreate, current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -98,7 +98,7 @@ async def create_sso_config(body: SsoConfigCreate, current_user=Depends(get_curr
 
 
 @router.put("/config/{config_id}", response_model=SsoConfigRead,
-            dependencies=[Depends(require_permission("auth.sso_manage"))])
+            dependencies=[Depends(require_permission("sso.manage"))])
 async def update_sso_config(config_id: int, body: SsoConfigUpdate, current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -123,7 +123,7 @@ async def update_sso_config(config_id: int, body: SsoConfigUpdate, current_user=
 
 
 @router.delete("/config/{config_id}", status_code=200,
-               dependencies=[Depends(require_permission("auth.sso_manage"))])
+               dependencies=[Depends(require_permission("sso.manage"))])
 async def deactivate_sso_config(config_id: int, current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -140,11 +140,11 @@ async def deactivate_sso_config(config_id: int, current_user=Depends(get_current
 
 
 # ---------------------------------------------------------------------------
-# Group-role mappings (require auth.sso_manage)
+# Group-role mappings (require sso.manage)
 # ---------------------------------------------------------------------------
 
 @router.get("/mappings", response_model=List[GroupRoleMappingRead],
-            dependencies=[Depends(require_permission("auth.sso_manage"))])
+            dependencies=[Depends(require_permission("sso.manage"))])
 async def list_mappings(sso_configuration_id: Optional[int] = None, current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -158,7 +158,7 @@ async def list_mappings(sso_configuration_id: Optional[int] = None, current_user
 
 
 @router.post("/mappings", response_model=GroupRoleMappingRead, status_code=201,
-             dependencies=[Depends(require_permission("auth.sso_manage"))])
+             dependencies=[Depends(require_permission("sso.manage"))])
 async def create_mapping(body: GroupRoleMappingCreate, current_user=Depends(get_current_user)):
     company_id = _get_company_id_from_user(current_user)
     try:
@@ -176,7 +176,7 @@ async def create_mapping(body: GroupRoleMappingCreate, current_user=Depends(get_
 # ---------------------------------------------------------------------------
 
 @router.post("/ldap/test",
-             dependencies=[Depends(require_permission("auth.sso_manage"))])
+             dependencies=[Depends(require_permission("sso.manage"))])
 async def test_ldap(body: LdapTestRequest):
     result = sso_service.test_ldap_connection(
         ldap_host=body.ldap_host,

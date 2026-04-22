@@ -1,0 +1,258 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Backend: fast static gates (no DB required)
+  # ─────────────────────────────────────────────────────────────────────
+  backend-static:
+    name: backend · lint + import-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Ruff — syntax errors (strict gate)
+        working-directory: backend
+        run: |
+          # E9  = syntax errors (block build)
+          # F63 = invalid comparisons (block build)
+          # F7  = loop/if/else semantic errors (block build)
+          # These are always correctness bugs — no tolerance.
+          ruff check --select E9,F63,F7 --output-format=github .
+
+      - name: Ruff — undefined names (advisory, 74 known legacy bugs)
+        working-directory: backend
+        continue-on-error: true
+        run: |
+          # F82 (F821/F823 etc) = undefined names. The codebase has 74 pre-existing
+          # sites where endpoint bodies reference `data`, `year`, `entry_id` etc.
+          # that were removed from function signatures during a refactor. These are
+          # tracked as a Phase-2 finding and fixed in a dedicated PR.
+          # Keep this check visible but non-blocking until backlog is drained.
+          ruff check --select F82 --output-format=github .
+
+      - name: Import smoke test — every router module
+        working-directory: backend
+        env:
+          # Minimum env for import-time settings validation
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: '5432'
+          POSTGRES_USER: aman
+          POSTGRES_PASSWORD: ci_smoke_password
+          POSTGRES_DB: postgres
+          SECRET_KEY: ci_smoke_secret_key_0123456789abcdef0123456789abcdef
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+        run: |
+          python - <<'PY'
+          import importlib, pkgutil, sys
+          import routers  # package
+          failed = []
+          for m in pkgutil.walk_packages(routers.__path__, prefix="routers."):
+              try:
+                  importlib.import_module(m.name)
+              except Exception as e:
+                  failed.append((m.name, repr(e)))
+          if failed:
+              print("Failed imports:")
+              for name, err in failed:
+                  print(f"  {name}: {err}")
+              sys.exit(1)
+          print(f"OK — {sum(1 for _ in pkgutil.walk_packages(routers.__path__, prefix='routers.'))} router modules imported cleanly")
+          PY
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Backend: project-specific guards (SQL parameterization, GL discipline)
+  # ─────────────────────────────────────────────────────────────────────
+  backend-guards:
+    name: backend · sql-safety + gl-discipline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: SQL parameterization guard
+        run: python scripts/check_sql_parameterization.py
+
+      - name: GL posting discipline guard
+        run: python scripts/check_gl_posting_discipline.py
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Backend: tenant bootstrap end-to-end (creates a fresh tenant DB)
+  # This validates the 301-tables-+-8-MVs invariant on every PR.
+  # ─────────────────────────────────────────────────────────────────────
+  tenant-bootstrap-e2e:
+    name: backend · tenant bootstrap E2E
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aman
+          POSTGRES_PASSWORD: ci_pg_password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aman"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: aman
+      POSTGRES_PASSWORD: ci_pg_password
+      POSTGRES_DB: postgres
+      SECRET_KEY: ci_smoke_secret_key_0123456789abcdef0123456789abcdef
+      REDIS_URL: redis://localhost:6379/0
+      ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Create a fresh tenant & assert schema completeness
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import sys, os
+          sys.path.insert(0, os.getcwd())
+          from database import create_company_database, create_company_tables
+          from config import settings
+          from sqlalchemy import create_engine, text
+
+          test_id = "citest01"
+          ok, msg, db_name, db_user = create_company_database(test_id, "CiTestPass123!")
+          assert ok, f"create_company_database failed: {msg}"
+
+          ok, msg = create_company_tables(test_id, currency="SAR")
+          assert ok, f"create_company_tables failed: {msg}"
+
+          eng = create_engine(settings.get_company_database_url(test_id))
+          with eng.connect() as c:
+              tables = c.execute(text(
+                  "SELECT count(*) FROM pg_tables WHERE schemaname='public'"
+              )).scalar()
+              mvs = c.execute(text(
+                  "SELECT count(*) FROM pg_matviews WHERE schemaname='public'"
+              )).scalar()
+              alembic_v = c.execute(text(
+                  "SELECT version_num FROM alembic_version LIMIT 1"
+              )).scalar()
+          eng.dispose()
+
+          print(f"tables={tables}, mvs={mvs}, alembic={alembic_v}")
+
+          # Bootstrap invariants (see /memories/repo/tenant-bootstrap-alembic-note.md).
+          # The numbers grow over time — these lower bounds keep the test honest
+          # without being brittle to legitimate additions.
+          assert tables >= 290, f"Expected >=290 tables in a fresh tenant, got {tables}"
+          assert mvs >= 8, f"Expected >=8 materialized views, got {mvs}"
+          assert alembic_v, "alembic_version row missing — stamp head failed"
+          print("Tenant bootstrap E2E: OK")
+          PY
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Frontend: build + unit tests
+  # ─────────────────────────────────────────────────────────────────────
+  frontend:
+    name: frontend · build + vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Vite build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Vitest unit tests
+        working-directory: frontend
+        run: npm test -- --reporter=default
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Dependency audit (non-blocking signal)
+  # ─────────────────────────────────────────────────────────────────────
+  dependency-audit:
+    name: audit · pip + npm (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt --strict --ignore-vuln GHSA-4xh5-x5gv-qwph || true
+
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high || true

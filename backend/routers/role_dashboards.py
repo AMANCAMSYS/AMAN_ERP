@@ -107,7 +107,7 @@ def get_auto_dashboard(
 
 @router.get("/executive",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("dashboard.view"))],
+            dependencies=[Depends(require_permission(["dashboard.executive", "dashboard.view"]))],
             summary="Executive Dashboard — CEO KPIs")
 @cached("role_dashboard_exec", expire=120)
 def get_executive_dashboard(
@@ -128,7 +128,7 @@ def get_executive_dashboard(
 
 @router.get("/financial",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("accounting.view"))],
+            dependencies=[Depends(require_permission(["dashboard.financial", "accounting.view"]))],
             summary="Financial Dashboard — CFO KPIs")
 @cached("role_dashboard_fin", expire=120)
 def get_financial_dashboard(
@@ -149,7 +149,7 @@ def get_financial_dashboard(
 
 @router.get("/sales",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("sales.view"))],
+            dependencies=[Depends(require_permission(["dashboard.sales", "sales.view"]))],
             summary="Sales Dashboard — Sales Manager KPIs")
 @cached("role_dashboard_sales", expire=120)
 def get_sales_dashboard(
@@ -170,7 +170,7 @@ def get_sales_dashboard(
 
 @router.get("/procurement",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("buying.view"))],
+            dependencies=[Depends(require_permission(["dashboard.procurement", "buying.view"]))],
             summary="Procurement Dashboard — Purchase Manager KPIs")
 @cached("role_dashboard_proc", expire=120)
 def get_procurement_dashboard(
@@ -191,7 +191,7 @@ def get_procurement_dashboard(
 
 @router.get("/warehouse",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission(["stock.view", "inventory.view"]))],
+            dependencies=[Depends(require_permission(["dashboard.warehouse", "stock.view", "inventory.view"]))],
             summary="Warehouse Dashboard — Inventory Manager KPIs")
 @cached("role_dashboard_wh", expire=120)
 def get_warehouse_dashboard(
@@ -212,7 +212,7 @@ def get_warehouse_dashboard(
 
 @router.get("/hr",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("hr.view"))],
+            dependencies=[Depends(require_permission(["dashboard.hr", "hr.view"]))],
             summary="HR Dashboard — HR Manager KPIs")
 @cached("role_dashboard_hr", expire=120)
 def get_hr_dashboard(
@@ -233,7 +233,7 @@ def get_hr_dashboard(
 
 @router.get("/manufacturing",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("manufacturing.view"))],
+            dependencies=[Depends(require_permission(["dashboard.manufacturing", "manufacturing.view"]))],
             summary="Manufacturing Dashboard — Production KPIs")
 @cached("role_dashboard_mfg", expire=120)
 def get_manufacturing_dashboard(
@@ -254,7 +254,7 @@ def get_manufacturing_dashboard(
 
 @router.get("/projects",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("projects.view"))],
+            dependencies=[Depends(require_permission(["dashboard.projects", "projects.view"]))],
             summary="Projects Dashboard — Project Manager KPIs")
 @cached("role_dashboard_proj", expire=120)
 def get_projects_dashboard(
@@ -275,7 +275,7 @@ def get_projects_dashboard(
 
 @router.get("/pos",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("pos.view"))],
+            dependencies=[Depends(require_permission(["dashboard.pos", "pos.view"]))],
             summary="POS Dashboard — Cashier KPIs")
 @cached("role_dashboard_pos", expire=60)
 def get_pos_dashboard(
@@ -296,7 +296,7 @@ def get_pos_dashboard(
 
 @router.get("/crm",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("sales.view"))],
+            dependencies=[Depends(require_permission(["dashboard.crm", "sales.view"]))],
             summary="CRM Dashboard — Sales Rep KPIs")
 @cached("role_dashboard_crm", expire=120)
 def get_crm_dashboard(
@@ -317,7 +317,7 @@ def get_crm_dashboard(
 
 @router.get("/industry",
             response_model=Dict[str, Any],
-            dependencies=[Depends(require_permission("dashboard.view"))],
+            dependencies=[Depends(require_permission(["dashboard.industry", "dashboard.view"]))],
             summary="Industry KPIs — auto-detected by company sector")
 @cached("role_dashboard_industry", expire=300)
 def get_industry_dashboard(

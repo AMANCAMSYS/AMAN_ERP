@@ -107,6 +107,13 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     "finance.accounting_read": ["finance.accounting_view"],
     # Finance bank-feed reconciliation: manage implies view
     "finance.reconciliation_manage": ["finance.reconciliation_view"],
+    # === 2026-04-22 audit: umbrella & legacy aliases ===
+    # sales.manage / buying.manage umbrellas used by frontend Settings tabs
+    "sales.manage":   ["sales.view", "sales.create", "sales.edit", "sales.delete"],
+    "buying.manage":  ["buying.view", "buying.create", "buying.edit", "buying.delete", "buying.approve", "buying.receive"],
+    # costing.* legacy keys route to canonical inventory.costing_*
+    "costing.view":   ["inventory.costing_view"],
+    "costing.manage": ["inventory.costing_manage", "inventory.costing_view"],
 }
 
 
