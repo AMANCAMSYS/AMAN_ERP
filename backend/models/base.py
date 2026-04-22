@@ -40,5 +40,5 @@ class SoftDeleteMixin:
 
     @classmethod
     def active(cls):
-        return cls.is_deleted == False
+        return cls.is_deleted == False  # noqa: E712 — SQLAlchemy filter expression, not Python bool
 

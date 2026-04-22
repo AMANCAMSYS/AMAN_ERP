@@ -6,6 +6,33 @@
 
 ---
 
+## 0. Post-Phase-11 Execution Update (23 أبريل 2026)
+
+Four follow-up sprints have been merged onto `main` after this report was first filed. The **Status** column in sections 2.x has been updated in-place with the closing SHA; this summary captures totals.
+
+| Sprint | HEAD | Items closed | CI |
+|---|---|---|---|
+| Sprint-1 Quick Wins | `e646558` | SALES-F1, QA-F1, MFG-F1, PAY-F1, EINV-F1, baseline refresh | `ci` #176 green (after `413b32e` baseline fix) |
+| Sprint-2 IDOR + DB constraints | `e7a4796` | ACC-F5, CRM-F1, INV-F2, MFG-F2, PH10-B3 | `ci` #178 green, `security-scan` #53 green |
+| Sprint-2b UX + observability | `95efa4a` | POS-UI-F1, ACC-F6, INV-F4 | `ci` #179 green, `security-scan` #54 green |
+| Sprint-2c Authz + SSRF hardening | `d4f5a82` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | pending |
+
+**Updated distribution** (open only, post-Sprint-2c):
+
+| Severity | Fixed (was) | Fixed (now) | Open (now) |
+|---|---|---|---|
+| P0 | 0 | 0 | 2 |
+| P1 | 14 | 22 | 14 |
+| P2 | 6 | 17 | 31 |
+| P3 | 0 | 3 | 19 |
+| **Δ closed this round** | — | **+22** | — |
+
+Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
+
+Local pytest: 881 pass / 94 fail / 5 err / 145 skip on commit `e7a4796` (was 779/115/10/209 before this round).
+
+---
+
 ## 1. Executive Summary (2-page digest for leadership)
 
 AMAN ERP passed a structured 10-phase audit covering scope/baseline, security/RBAC, platform/DevOps, accounting core, treasury/tax, supply chain, sales hub, workforce, integrations/UX, and E2E regression. This phase unifies the results.
@@ -74,21 +101,21 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | SEC-07 | Logging/PII | P2 | Fixed | PII masking not enforced | Added `check_pii_logging.py` CI gate |
 | SEC-08 | Auth/2FA | P3 | Open | Admin 2FA token in env | Move encrypted to DB |
 | SEC-09 | Sessions | P3 | Open | No concurrent session limits | Enforce max sessions per user |
-| SEC-10 | Integrations | P3 | Open | No outbound webhook allowlist | Add URL allowlist |
+| SEC-10 | Integrations | P2 | Fixed (`d4f5a82`) | No outbound webhook allowlist | `WEBHOOK_HOSTNAME_ALLOWLIST` env honoured in `validate_webhook_url` |
 | SEC-11 | SSO | P2 | Open | SAML/OAuth/LDAP deep audit deferred | Follow-up audit |
 | SEC-12 | Dashboard | P3 | Open | Metadata endpoints ungated | Superseded by IN-F1 in Phase 9 |
 
 ### 2.3 Phase 03 – Platform / DevOps (22)
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
-| PLAT-TEST-01 | Tests | P1 | Open | 983 test ERRORs from invalid bcrypt env hash | Fix `ADMIN_PASSWORD_HASH` |
-| PLAT-TEST-02 | Tests | P2 | Open | No conftest-generated hash (historical) | Conftest now does this dynamically |
+| PLAT-TEST-01 | Tests | P1 | Fixed | 983 test ERRORs from invalid bcrypt env hash | Conftest dynamic `ADMIN_PASSWORD_HASH` generation |
+| PLAT-TEST-02 | Tests | P2 | Fixed | No conftest-generated hash (historical) | Conftest now does this dynamically |
 | PLAT-TEST-03 | Coverage | P1 | Open | pytest coverage never measured | Run `pytest --cov` after TEST-01 |
 | PLAT-TEST-04 | E2E | P2 | Open | No Playwright/Cypress tests | Add 5–8 critical E2E scenarios |
-| PLAT-CQ-01 | Code Quality | P2 | Open | 701 auto-fixable ruff issues | Run `ruff check --fix` in dedicated PR |
-| PLAT-CQ-02 | Code Quality | P1 | Open | 74 F821 undefined-name (runtime risk) | Manual review and fix each |
+| PLAT-CQ-01 | Code Quality | P2 | Fixed | 701 auto-fixable ruff issues | `ruff --fix` applied; no safe-fixes remain |
+| PLAT-CQ-02 | Code Quality | P1 | Fixed | 74 F821 undefined-name (runtime risk) | Ruff F821 now reports zero |
 | PLAT-CQ-03 | Refactor | P2 | Open | `database.py` is 6930 LOC | Split into 4 modules |
-| PLAT-CQ-04 | Code Quality | P2 | Open | 5 bare-except blocks | Replace with specific exceptions |
+| PLAT-CQ-04 | Code Quality | P2 | Fixed | 5 bare-except blocks | AST scan reports zero bare excepts |
 | PLAT-DB-01 | DB/Perf | P2 | Open | 0 of 16 planned MVs created | Create the 16 materialized views |
 | PLAT-DB-02 | DB/Cleanup | P3 | Open | 3 stale test tenant DBs | Drop after user confirmation |
 | PLAT-DB-03 | DB/Integrity | P2 | Open | Alembic downgrade never tested | Add CI downgrade/upgrade job |
@@ -111,9 +138,9 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ACC-F1 | Accounting | P1 | Fixed | `fiscal_lock` silently allowed on missing table | Fail-safe warning/error |
 | ACC-F2 | Accounting | P1 | Open | Two fiscal-lock tables (duplicate sources) | Unify into single table |
 | ACC-F3 | Accounting | P1 | Fixed | `create_account` lacked enum/parent validation | Added checks |
-| ACC-F4 | Accounting | P1 | Open | JE void lacks source-doc authz | Gate void by source type |
-| ACC-F5 | Accounting | P2 | Open | `/journal-entries` not filtered by branch | Add branch_id filter |
-| ACC-F6 | Audit | P2 | Open | Audit log errors swallowed silently | Re-raise on audit write failure |
+| ACC-F4 | Accounting | P1 | Fixed (`d4f5a82`) | JE void lacks source-doc authz | Source→perm map + 403 for non-admin non-holder |
+| ACC-F5 | Accounting | P2 | Fixed (`e646558`) | `/journal-entries` not filtered by branch | `branch_id` filter + allowed_branches |
+| ACC-F6 | Audit | P2 | Fixed (`95efa4a`) | Audit log errors swallowed silently | `exc_info=True` + context on every failure |
 | ACC-F7 | Accounting | P1 | Open | Tenant missing IFRS ledger | Bootstrap migration |
 | ACC-F8 | Accounting | P2 | Open | Multi-book posting optional | Enforce parallel posting |
 | ACC-F9 | FX | P1 | Open | FX revaluation endpoint incomplete | Complete posting + scheduler |
@@ -140,24 +167,24 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | TAX-F3 | Tax | P2 | Open | `branch_tax_settings` empty, no UI | Migration + UI |
 | ZAK-F1 | Zakat | P1 | Fixed | Zakat posting bypassed fiscal lock | Added fiscal check |
 | ZAK-F2 | Zakat | P2 | Open | Zakat base uses fragile LIKE patterns | Canonical table |
-| EINV-F1 | E-Invoicing | P2 | Open | ZATCA submission without retry | `@retry` with backoff |
+| EINV-F1 | E-Invoicing | P2 | Fixed (`e646558`) | ZATCA submission without retry | `@retry` with backoff added |
 | EINV-F2 | E-Invoicing | P2 | Open | No outbox relay for failed submissions | Periodic relay |
 | EINV-F3 | E-Invoicing | P3 | Open | UAE FTA / EG ETA stubs | ASP onboarding |
-| PAY-F1 | Payments | P1 | Open | Webhook endpoint lacks pre-sig rate limit | Throttle per-IP |
+| PAY-F1 | Payments | P1 | Fixed (`e646558`) | Webhook endpoint lacks pre-sig rate limit | Per-IP limiter before signature verify |
 | PAY-F2 | Payments | P2 | Open | No auto-match webhook → allocations | Auto-reconcile |
 
 ### 2.6 Phase 06 – Supply Chain (16: 9 findings + 7 rejected)
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
 | INV-F1 | Inventory | P2 | Open | Raw `stock_movements` endpoints bypass GL | Restrict or auto-post |
-| INV-F2 | Inventory | P2 | Open | No `CHECK(quantity >= 0)` | DB constraint + migration |
+| INV-F2 | Inventory | P2 | Fixed (`e7a4796`) | No `CHECK(quantity >= 0)` | DB CHECK constraint in `database.py` |
 | INV-F3 | Inventory | P3 | Open | Landed cost rounding absorbed by one line | Distribute residual |
-| INV-F4 | Inventory | P3 | Open | Expiry alerts ignore timezone | Normalize to UTC |
-| MFG-F1 | Manufacturing | P2 | Open | 3-way matching manual | Auto-trigger on PO invoice |
-| MFG-F2 | Manufacturing | P2 | Open | BOM percentage not bounded | CHECK `<= 100` |
-| MFG-F3 | Manufacturing | P3 | Open | WO status arbitrary strings | Enum state-machine |
+| INV-F4 | Inventory | P3 | Fixed (`95efa4a`) | Expiry alerts ignore timezone | `datetime.now(timezone.utc).date()` |
+| MFG-F1 | Manufacturing | P2 | Fixed (`e646558`) | 3-way matching manual | Auto-trigger in `receive_purchase_order` + `create_purchase_invoice` |
+| MFG-F2 | Manufacturing | P2 | Fixed (`e7a4796`) | BOM percentage not bounded | DB CHECK `<= 100` in `database.py` |
+| MFG-F3 | Manufacturing | P3 | Fixed | WO status arbitrary strings | DB CHECK enum in `production_orders.status` |
 | PUR-F1 | Purchasing | P2 | Open | PO approval lacks budget check | Query `budget_allocations` |
-| QA-F1 | Quality | P2 | Open | Failed inspection does not block GRN/invoice | Block on `FAILED` |
+| QA-F1 | Quality | P2 | Fixed (`e646558`) | Failed inspection does not block GRN/invoice | Block on `FAILED` in receipts+invoices |
 | MFG-FP-01 | Manufacturing | — | Rejected | FG receipt without GL (claim) | GL posted L1251–1289 |
 | INV-FP-01 | Inventory | — | Rejected | Landed cost without GL (claim) | GL posted L462 |
 | PUR-FP-01 | Purchasing | — | Rejected | AP liability missing (claim) | 7 `acc_map_ap` sites |
@@ -170,11 +197,12 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
 | SUB-F1 | Subscriptions | P1 | Open | No dunning for failed sub invoices | Dunning pipeline + scheduler |
-| CRM-F1 | CRM | P1 | Open | `branch_id` stored but not filtered | Add filter to list endpoints |
+| CRM-F1 | CRM | P1 | Fixed (`e7a4796`) | `branch_id` stored but not filtered | Branch filter on opportunities/tickets/campaigns |
 | CON-F1 | Contracts | P2 | Open | Milestone billing not implemented | `contract_milestones` + scheduler |
 | POS-F1 | POS | P2 | Open | Offline sync limited to PWA cache | Bulk sync + idempotency |
 | CRM-F2 | CRM | P3 | Open | Campaign idempotency weak | TX-wrap + resume |
-| SALES-F1 | Sales | P3 | Open | Partial invoice hardcodes `NOW()` | Accept date payload |
+| SALES-F1 | Sales | P3 | Fixed (`e646558`) | Partial invoice hardcodes `NOW()` | Accepts `invoice_date` payload |
+| POS-UI-F1 | POS | — | Fixed (`95efa4a`) | Product cards white in dark-mode | `data-theme=dark` overrides added |
 | POS-FP-01/02 | POS | — | Rejected | Loyalty/promotions missing (claims) | Present at pos.py:1162–1400+ |
 | CON-FP-01 | Contracts | — | Rejected | Amendments lack versioning (claim) | Immutable `contract_amendments` |
 | SALES-FP-01 | Sales | — | Rejected | Partial invoice bypasses fiscal lock (claim) | Lock at invoices.py:160 |
@@ -201,7 +229,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | IN-F1 | Dashboard | P1 | Fixed | 3 endpoints lacked permission | `require_permission` added |
 | IN-F2 | Data Import/External | P2 | Fixed | 3 catalog endpoints lacked permission | `require_permission` added |
 | IN-F3 | Integrations | P2 | Open | UAE FTA + EG ETA stubs | Live submission after ASP onboarding |
-| IN-F4 | Seed/Secrets | P2 | Open | Hardcoded passwords in seed scripts | Env vars |
+| IN-F4 | Seed/Secrets | P2 | Fixed | Hardcoded passwords in seed scripts | All seed scripts now require `AMAN_SEED_*` env vars |
 | IN-F5 | Integrations | P3 | Open | Adapters lack per-adapter retry knobs | Retry config |
 | IN-F6 | i18n | P3 | Open | Hardcoded Arabic router tags | i18n sweep |
 | IN-FP-01 | Notifications | — | Rejected | 7 IDOR claims | All scoped by `user_id=:uid` |
@@ -211,8 +239,8 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
 | PH10-B1 | Tests | P1 | Open | 100 pre-existing pytest failures | Investigate B/E/M/G/L cycles |
-| PH10-B2 | CI/CD | P1 | Open | CI `Install backend deps` failing | Fix resolver/wheels |
-| PH10-B3 | CI/CD | P1 | Open | SQL-safety baseline drifted | Refresh baseline |
+| PH10-B2 | CI/CD | P1 | Fixed | CI `Install backend deps` failing | Resolver fixed; CI #178/179 green |
+| PH10-B3 | CI/CD | P1 | Fixed (`413b32e` + `e7a4796`) | SQL-safety baseline drifted | Baseline refreshed for crm/accounting line-number shifts |
 | PH10-B4 | Tests | P2 | Open | No negative-path tests for `require_permission` | Role factory + 403 |
 | PH10-B5 | Tests | P2 | Open | No regression for `check_fiscal_period_open` | Lock period → expect 409 |
 | PH10-B6 | E2E | P2 | Open | No Playwright E2E for cycles A/E/H | Scaffold browser E2E |

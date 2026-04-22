@@ -9,6 +9,7 @@ import hmac
 import ipaddress
 import json
 import logging
+import os
 import socket
 import threading
 from datetime import datetime, timezone
@@ -60,6 +61,9 @@ def validate_webhook_url(url: str) -> None:
     - Only http/https schemes allowed
     - Hostname resolves to a public (non-private/reserved) IP
     - Blocks loopback, link-local, and private ranges
+    - SEC-10: optional hostname allowlist via WEBHOOK_HOSTNAME_ALLOWLIST
+      env var (comma-separated). When set, only those exact hostnames
+      (or sub-domains) are accepted. Leave unset to permit any public host.
 
     Raises ValueError if the URL is unsafe.
     """
@@ -71,6 +75,20 @@ def validate_webhook_url(url: str) -> None:
     hostname = parsed.hostname
     if not hostname:
         raise ValueError("URL must include a hostname")
+
+    # SEC-10: hostname allowlist (outbound webhook policy)
+    raw_allow = os.environ.get("WEBHOOK_HOSTNAME_ALLOWLIST", "").strip()
+    if raw_allow:
+        allow = [h.strip().lower().lstrip(".") for h in raw_allow.split(",") if h.strip()]
+        host_l = hostname.lower()
+        matched = any(
+            host_l == a or host_l.endswith("." + a)
+            for a in allow
+        )
+        if not matched:
+            raise ValueError(
+                f"Hostname '{hostname}' is not in WEBHOOK_HOSTNAME_ALLOWLIST"
+            )
 
     try:
         addr_infos = socket.getaddrinfo(hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)

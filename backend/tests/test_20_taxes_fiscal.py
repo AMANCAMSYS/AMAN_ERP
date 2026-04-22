@@ -28,7 +28,7 @@ class TestTaxRateScenarios:
         r = client.get("/api/taxes/rates?is_active=true", headers=admin_headers)
         assert_valid_response(r)
         for rate in r.json():
-            assert rate.get("is_active") == True
+            assert rate.get("is_active")
 
     def test_get_tax_rate_detail(self, client, admin_headers):
         """✅ تفاصيل نوع ضريبة"""

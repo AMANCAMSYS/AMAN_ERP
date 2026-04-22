@@ -285,7 +285,7 @@ class TestCurrencyRevaluation:
             # التحقق من أن جميع العملات نشطة
             for curr in items:
                 if "is_active" in curr:
-                    assert curr["is_active"] == True
+                    assert curr["is_active"]
 
     def test_create_new_currency(self, client, admin_headers):
         """اختبار إضافة عملة جديدة"""
