@@ -107,3 +107,8 @@ docs/audit/backlog.xlsx
 .coverage
 coverage.xml
 htmlcov/
+
+# Local backup of broken mobile scaffold — do not commit
+mobile/android.bak_incomplete/
+')
+')

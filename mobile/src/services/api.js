@@ -21,7 +21,16 @@ function _devServerHost() {
 }
 
 const _host = _devServerHost();
-const API_BASE = __DEV__ ? `http://${_host}:8000/api` : 'https://erp.aman.sa/api';
+
+// Toggle this when running the mobile app in debug mode:
+// - true  => use production server data (amanerp.me)
+// - false => use local backend via Metro host detection
+const USE_SERVER_DATA_IN_DEV = true;
+const DEV_SERVER_API_BASE = 'http://amanerp.me/api';
+
+const API_BASE = __DEV__
+  ? (USE_SERVER_DATA_IN_DEV ? DEV_SERVER_API_BASE : `http://${_host}:8000/api`)
+  : 'https://erp.aman.sa/api';
 
 function normalizeInventoryProduct(item) {
   return {
