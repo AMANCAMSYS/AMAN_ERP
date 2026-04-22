@@ -10,7 +10,7 @@
 
 | المقياس | AMAN ERP | التقييم |
 |---|---|---|
-| **نطاق الوحدات** | 16 قسم وظيفي · 56+ router · ~872 endpoint · 170+ صفحة React | يعادل Odoo Enterprise / D365 BC ويتفوّق على Zoho / QuickBooks |
+| **نطاق الوحدات** | 17 قسم وظيفي · 56+ router · ~872 endpoint · 170+ صفحة React · 12 صناعة مؤهلة | يعادل Odoo Enterprise / D365 BC ويتفوّق على Zoho / QuickBooks |
 | **قاعدة الكود** | FastAPI + React 18 + PostgreSQL + Redis + Nginx | Stack حديث مفتوح بالكامل |
 | **اللغات/التوطين** | عربي/إنجليزي كامل مع RTL layout + formulas + printout | متفوّق على معظم المنافسين الغربيين |
 | **الامتثال GCC/MENA** | ZATCA Ph2 · UAE FTA · Egypt ETA · WPS · GOSI · السعودة · WHT · الزكاة | **الأعلى في GCC/MENA** بدون localization مدفوعة |
@@ -41,10 +41,14 @@
 | موازنات + cost centers + cost center hierarchy | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
 | IFRS 15 (Revenue Recognition) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | IFRS 9 (ECL Provisions) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
+| **IAS 2 (NRV Inventory Write‑Down)** | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
 | IAS 36 (Impairment) | ✅ | ❌ | ✅ | ⚠️ | ✅ | ❌ | ❌ |
 | IFRS 16 (Lease Contracts) | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Multi‑Book (IFRS + Local GAAP)** | ✅ | ⚠️ | ✅ | ⚠️ | 🏆 | ❌ | ❌ |
-| Intercompany | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Intercompany Reciprocal JE | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Consolidation + Elimination Entries + Entity Tree** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Industry CoA Templates** (12 نشاط SOCPA/IFRS) | 🏆 | ⚠️ | ⚠️ | ⚠️ | ✅ (SuiteSuccess) | ❌ | ❌ |
+| **Industry GL Auto‑Posting Rules** | 🏆 | ❌ | ⚠️ (FMS) | ⚠️ | ⚠️ (SuiteScript) | ❌ | ❌ |
 | FX Revaluation | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 
 **موقع AMAN:** يتفوّق على Zoho و QuickBooks في كل المعايير الدولية. يعادل SAP B1/D365/NetSuite في المحاسبة الأساسية مع أفضلية Multi‑book + MT940.
@@ -72,6 +76,8 @@
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | عروض أسعار → SO → **Delivery Order** → فاتورة | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | Credit / Debit Notes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **فوترة جزئية (Partial Invoicing)** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **حد ائتمان ذكي (Smart Credit Limit Check)** | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **CPQ Engine** (Configurator + Rules + PDF) | 🏆 | ⚠️ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
 | قوائم أسعار (عميل/فرع/تاريخ) | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | عمولات المبيعات + قواعد | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ |
@@ -158,6 +164,8 @@
 | **Overtime Requests + Approvals** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
 | Self‑service Portal | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
 | Recruitment + Training Programs | ✅ | ✅ | ❌ | ⚠️ | ✅ | ✅ (Recruit) | ❌ |
+| **Performance Reviews + Goals + Composite Scoring** | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ (People) | ❌ |
+| تقييم ذاتي + تقييم مدير + دورات مراجعة | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ❌ |
 
 **موقع AMAN:** 🏆 **الأقوى في GCC** — GOSI + WPS + السعودة + Custody + Violations + EOS خليجي مبنية داخلياً. SAP وOdoo يطلبان localization apps مدفوعة؛ Zoho/QB لا يغطّيان هذه المنطقة أصلاً.
 
@@ -232,7 +240,8 @@
 | Cashflow Statement | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AR/AP Aging | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Dashboard معرّف بالدور (10 أدوار) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
-| KPI Dashboard + **Industry KPI Widgets** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Custom Dashboard Builder** (widgets + 8 data sources) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ SuiteAnalytics | ✅ Analytics | ❌ |
+| KPI Dashboard + **Industry KPI Widgets** (7 قطاعات وفق NRF/USALI/PMI/AICPA) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Report Builder** (self‑service) | ✅ | ⚠️ Studio | ⚠️ | ✅ | 🏆 SuiteAnalytics | ✅ Analytics | ⚠️ |
 | **Industry Reports** (صناعة‑محدّدة) | ✅ | ⚠️ | ✅ | ⚠️ | ✅ | ⚠️ | ❌ |
 | **Shared Reports** + صلاحيات | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ | ❌ |
@@ -272,6 +281,7 @@
 | **SMS Gateways:** **Taqnyat / Unifonic** / Twilio | 🏆 | ⚠️ Twilio | ⚠️ | ⚠️ | ✅ | ✅ | ❌ |
 | **Bank Feeds:** MT940 + CSV + OFX | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
 | REST API + OpenAPI Spec | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **API Key Lifecycle** (scopes + rate‑limit + expiry + revoke) | ✅ | ⚠️ OAuth | ⚠️ | ✅ | ✅ | ✅ | ❌ |
 | **Webhooks + Outbox Relay Pattern** | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
 | **Event Bus (Redis Streams)** | ✅ | ❌ | ⚠️ | ⚠️ | ✅ | ❌ | ❌ |
 | **WebSocket Real‑time** | ✅ | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | ❌ |
@@ -324,6 +334,7 @@
 | **Global Search** (cross‑module) | ✅ | ✅ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
 | **Dark Mode + Theme Toggle** | ✅ | ✅ | ❌ | ✅ | ⚠️ | ✅ | ⚠️ |
 | **Onboarding Wizard + Industry Setup** | ✅ | ✅ | ⚠️ | ⚠️ SuiteSuccess | ✅ | ✅ | ⚠️ |
+| **Per‑Tenant Module Customization** (Industry‑driven module set) | ✅ | ⚠️ | ⚠️ | ✅ Extensions | ✅ Feature Flags | ❌ | ❌ |
 | Notifications (WS + Email + SMS + In‑app) | ✅ | ⚠️ | ⚠️ | ✅ | ✅ | ✅ | ⚠️ |
 | **Data Import Framework** (per‑entity configs) | ✅ | ✅ | ✅ DTW | ✅ RapidStart | ✅ SmartBundles | ✅ | ⚠️ |
 
@@ -359,7 +370,9 @@
 12. **منصّة DevSecOps أصلية** — SQL Safety Linter CI + GL Posting Discipline Checker + gitleaks + CSRF + HttpOnly + CSP + Field Encryption + PII Masking + Fiscal Lock + Optimistic Lock.
 13. **Event Bus (Redis) + Outbox Pattern + WebSocket Real‑time** — بنية enterprise للأحداث والإشعارات المباشرة.
 14. **Plugin Registry + Industry Setup** — هيكل قابل للتوسعة جاهز لـ marketplace داخلي مستقبلاً.
-15. **Open stack** (FastAPI + React + PG + Redis + Nginx) — صفر lock‑in.
+15. **Industry‑Ready فعليًا** — 12 قالب دليل حسابات (SOCPA/IFRS) + قواعد ترحيل GL حسب النشاط + KPIs وفق NRF/USALI/PMI/AICPA/DSCSA.
+16. **المحاسبة المتقدّمة** — IAS 2 NRV + Consolidation مع Elimination Entries + Entity Tree — ميزات enterprise نادرة خارج NetSuite/SAP.
+17. **Open stack** (FastAPI + React + PG + Redis + Nginx) — صفر lock‑in.
 
 ---
 
@@ -397,7 +410,7 @@
 | تصنيع ثقيل متقدّم (MES) | SAP / Infor | فجوة MES real‑time |
 | مكاتب محاسبة + مراجعين | AMAN / Zoho | 🥇 Multi‑company + Audit Trail عميق |
 
-**التوصية:** AMAN ERP **جاهز للإنتاج** للسوق السعودي/الخليجي/المصري في SMB و Mid‑market بكفاءة تضاهي الأنظمة التجارية بتكلفة ترخيص صفرية، ومع **تمييز تنافسي حقيقي** في 15 نقطة موثّقة أعلاه.
+**التوصية:** AMAN ERP **جاهز للإنتاج** للسوق السعودي/الخليجي/المصري في SMB و Mid‑market بكفاءة تضاهي الأنظمة التجارية بتكلفة ترخيص صفرية، ومع **تمييز تنافسي حقيقي** في 17 نقطة موثّقة أعلاه.
 
 ---
 
