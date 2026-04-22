@@ -74,20 +74,19 @@ def check_fiscal_period_open(db, entry_date, raise_error=True):
 
 
 def create_fiscal_lock_table(db):
-    """Create the fiscal_period_locks table if it doesn't exist"""
-    db.execute(text("""
-        CREATE TABLE IF NOT EXISTS fiscal_period_locks (
-            id SERIAL PRIMARY KEY,
-            period_name VARCHAR(100) NOT NULL,
-            period_start DATE NOT NULL,
-            period_end DATE NOT NULL,
-            is_locked BOOLEAN DEFAULT FALSE,
-            locked_at TIMESTAMPTZ,
-            locked_by INTEGER,
-            unlocked_at TIMESTAMPTZ,
-            unlocked_by INTEGER,
-            reason TEXT,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )
-    """))
-    db.commit()
+    """DEPRECATED (ACC-F2).
+
+    The canonical schema for ``fiscal_period_locks`` lives in
+    ``backend/database.py :: create_all_tables()`` (with full foreign-key
+    constraints). This helper is kept as a no-op for backward compatibility
+    with legacy callers (notably ``routers/system_completion.py``). It must
+    not shadow the authoritative definition; if the table is somehow
+    missing it is a bootstrap bug, not something this helper should silently
+    paper over.
+    """
+    import logging as _lg
+    _lg.getLogger(__name__).info(
+        "create_fiscal_lock_table() is deprecated; fiscal_period_locks is "
+        "created by database.create_all_tables()."
+    )
+    return None

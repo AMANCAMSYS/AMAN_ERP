@@ -693,3 +693,242 @@ def get_contract_kpis(contract_id: int, current_user=Depends(get_current_user)):
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
+
+
+# ==========================================================================
+# CON-F1: Contract Milestones (Phase-11 Sprint-4)
+# ==========================================================================
+
+@router.get(
+    "/{contract_id}/milestones",
+    dependencies=[Depends(require_permission("contracts.view"))],
+)
+def list_contract_milestones(contract_id: int, current_user=Depends(get_current_user)):
+    """List milestones for a contract."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        contract = db.execute(
+            text("SELECT id FROM contracts WHERE id = :id"),
+            {"id": contract_id},
+        ).fetchone()
+        if not contract:
+            raise HTTPException(**http_error(404, "contract_not_found"))
+
+        rows = db.execute(
+            text(
+                """
+                SELECT id, contract_id, sequence, name, description, due_date,
+                       amount, status, completed_at, billed_at, invoice_id,
+                       notes, created_at, updated_at
+                FROM contract_milestones
+                WHERE contract_id = :cid
+                ORDER BY sequence, id
+                """
+            ),
+            {"cid": contract_id},
+        ).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing milestones: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post(
+    "/{contract_id}/milestones",
+    dependencies=[Depends(require_permission("contracts.edit"))],
+)
+def create_contract_milestone(
+    contract_id: int,
+    payload: dict,
+    current_user=Depends(get_current_user),
+):
+    """Create a milestone for a contract."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        contract = db.execute(
+            text("SELECT id, status FROM contracts WHERE id = :id"),
+            {"id": contract_id},
+        ).fetchone()
+        if not contract:
+            raise HTTPException(**http_error(404, "contract_not_found"))
+
+        name = (payload.get("name") or "").strip()
+        if not name:
+            raise HTTPException(**http_error(400, "milestone_name_required"))
+        amount = _float(payload.get("amount") or 0)
+        if amount < 0:
+            raise HTTPException(**http_error(400, "milestone_amount_invalid"))
+
+        row = db.execute(
+            text(
+                """
+                INSERT INTO contract_milestones
+                    (contract_id, sequence, name, description, due_date,
+                     amount, status, notes, created_by)
+                VALUES
+                    (:cid, :seq, :name, :desc, :due, :amt, 'pending',
+                     :notes, :uid)
+                RETURNING id
+                """
+            ),
+            {
+                "cid": contract_id,
+                "seq": int(payload.get("sequence") or 1),
+                "name": name,
+                "desc": payload.get("description"),
+                "due": payload.get("due_date"),
+                "amt": amount,
+                "notes": payload.get("notes"),
+                "uid": current_user.id,
+            },
+        ).fetchone()
+        db.commit()
+        return {"id": row.id, "status": "pending"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating milestone: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post(
+    "/{contract_id}/milestones/{milestone_id}/complete",
+    dependencies=[Depends(require_permission("contracts.edit"))],
+)
+def complete_contract_milestone(
+    contract_id: int,
+    milestone_id: int,
+    current_user=Depends(get_current_user),
+):
+    """Mark a milestone as completed (ready to bill)."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        ms = db.execute(
+            text(
+                "SELECT id, status FROM contract_milestones "
+                "WHERE id = :mid AND contract_id = :cid"
+            ),
+            {"mid": milestone_id, "cid": contract_id},
+        ).fetchone()
+        if not ms:
+            raise HTTPException(**http_error(404, "milestone_not_found"))
+        if ms.status not in ("pending",):
+            raise HTTPException(**http_error(400, "milestone_not_pending"))
+        db.execute(
+            text(
+                "UPDATE contract_milestones "
+                "SET status = 'completed', completed_at = CURRENT_TIMESTAMP, "
+                "    updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = :mid"
+            ),
+            {"mid": milestone_id},
+        )
+        db.commit()
+        return {"id": milestone_id, "status": "completed"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error completing milestone: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post(
+    "/{contract_id}/milestones/{milestone_id}/bill",
+    dependencies=[Depends(require_permission("contracts.manage"))],
+)
+def bill_contract_milestone(
+    contract_id: int,
+    milestone_id: int,
+    current_user=Depends(get_current_user),
+):
+    """Generate an invoice for a completed milestone.
+
+    Minimal implementation: creates a draft AR invoice for the milestone
+    amount linked back via ``contract_milestones.invoice_id`` and flips the
+    milestone to ``billed``. Accounting posting follows the standard invoice
+    flow (invoice remains ``draft`` until posted through the regular
+    approval path).
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        contract = db.execute(
+            text(
+                "SELECT id, party_id, currency FROM contracts "
+                "WHERE id = :id"
+            ),
+            {"id": contract_id},
+        ).fetchone()
+        if not contract:
+            raise HTTPException(**http_error(404, "contract_not_found"))
+
+        ms = db.execute(
+            text(
+                "SELECT id, name, amount, status FROM contract_milestones "
+                "WHERE id = :mid AND contract_id = :cid FOR UPDATE"
+            ),
+            {"mid": milestone_id, "cid": contract_id},
+        ).fetchone()
+        if not ms:
+            raise HTTPException(**http_error(404, "milestone_not_found"))
+        if ms.status != "completed":
+            raise HTTPException(**http_error(400, "milestone_not_completed"))
+
+        # Create minimal draft invoice
+        inv = db.execute(
+            text(
+                """
+                INSERT INTO invoices
+                    (invoice_type, party_id, contract_id, invoice_date,
+                     currency, subtotal, total, status, notes, created_by)
+                VALUES
+                    ('sale', :pid, :cid, CURRENT_DATE, :cur,
+                     :amt, :amt, 'draft', :notes, :uid)
+                RETURNING id
+                """
+            ),
+            {
+                "pid": contract.party_id,
+                "cid": contract_id,
+                "cur": contract.currency or "SAR",
+                "amt": _float(ms.amount or 0),
+                "notes": f"Milestone: {ms.name}",
+                "uid": current_user.id,
+            },
+        ).fetchone()
+
+        db.execute(
+            text(
+                "UPDATE contract_milestones "
+                "SET status = 'billed', billed_at = CURRENT_TIMESTAMP, "
+                "    invoice_id = :iid, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = :mid"
+            ),
+            {"iid": inv.id, "mid": milestone_id},
+        )
+        db.commit()
+        return {
+            "id": milestone_id,
+            "status": "billed",
+            "invoice_id": inv.id,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error billing milestone: {e}")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()

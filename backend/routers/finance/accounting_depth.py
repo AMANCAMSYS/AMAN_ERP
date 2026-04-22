@@ -402,6 +402,26 @@ def einvoice_submit(body: EInvoiceSubmitRequest,
             "r": json.dumps(result.response or {}, default=str, ensure_ascii=False),
             "err": result.error_message,
         }).fetchone()
+
+        # EINV-F2: enqueue failed submissions for automatic retry via outbox
+        if (result.status or "").lower() in ("failed", "error", "rejected"):
+            try:
+                db.execute(text("""
+                    INSERT INTO einvoice_outbox
+                        (invoice_id, adapter, payload, status, attempts,
+                         last_error, last_attempt_at, next_attempt_at)
+                    VALUES (:iid, :adp, CAST(:pl AS JSONB), 'pending', 1,
+                            :err, CURRENT_TIMESTAMP,
+                            CURRENT_TIMESTAMP + INTERVAL '5 minutes')
+                """), {
+                    "iid": body.invoice_id,
+                    "adp": body.jurisdiction.upper(),
+                    "pl": json.dumps(payload, default=str, ensure_ascii=False),
+                    "err": result.error_message or "submission failed",
+                })
+            except Exception:
+                logger.exception("failed to enqueue outbox retry")
+
         db.commit()
         return {
             "submission_id": row.id,
@@ -483,5 +503,147 @@ def einvoice_refresh(submission_id: int, current_user=Depends(get_current_user))
         db.rollback()
         logger.exception("einvoice refresh failed")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error")
+    finally:
+        _close(db)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EINV-F2 — E-invoice outbox relay (Phase-11 Sprint-4)
+# ═══════════════════════════════════════════════════════════════════════════
+
+MAX_OUTBOX_ATTEMPTS = 6  # exponential back-off caps out at ~5.3 hours
+
+
+@router.post(
+    "/einvoice/outbox/relay",
+    dependencies=[Depends(require_permission("finance.accounting_post"))],
+)
+def einvoice_outbox_relay(
+    limit: int = 20,
+    current_user=Depends(get_current_user),
+):
+    """Retry pending e-invoice submissions from the outbox.
+
+    Picks up to ``limit`` rows whose ``next_attempt_at`` is due, re-invokes
+    the configured adapter, and records the outcome. Rows that exceed
+    ``MAX_OUTBOX_ATTEMPTS`` are marked ``giveup`` for manual review.
+    """
+    db = get_db_connection(current_user.company_id)
+    processed, succeeded, failed, giveup = 0, 0, 0, 0
+    try:
+        rows = db.execute(
+            text(
+                """
+                SELECT id, invoice_id, adapter, payload, attempts
+                FROM einvoice_outbox
+                WHERE status = 'pending'
+                  AND next_attempt_at <= CURRENT_TIMESTAMP
+                ORDER BY next_attempt_at
+                LIMIT :lim
+                FOR UPDATE SKIP LOCKED
+                """
+            ),
+            {"lim": int(max(1, min(limit, 100)))},
+        ).fetchall()
+
+        for r in rows:
+            processed += 1
+            payload = r.payload if isinstance(r.payload, dict) else {}
+            payload.setdefault("id", r.invoice_id)
+            attempts = int(r.attempts or 0) + 1
+            try:
+                adapter = get_adapter(r.adapter or "SA")
+                result = adapter.submit(payload)
+                outcome = (result.status or "").lower()
+                if outcome in ("success", "accepted", "ok", "cleared", "reported"):
+                    db.execute(
+                        text(
+                            "UPDATE einvoice_outbox SET status = 'submitted', "
+                            "attempts = :a, last_attempt_at = CURRENT_TIMESTAMP, "
+                            "response = CAST(:r AS JSONB), last_error = NULL, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = :id"
+                        ),
+                        {
+                            "a": attempts,
+                            "r": json.dumps(result.response or {}, default=str, ensure_ascii=False),
+                            "id": r.id,
+                        },
+                    )
+                    succeeded += 1
+                else:
+                    raise RuntimeError(result.error_message or outcome or "unknown failure")
+            except Exception as exc:
+                if attempts >= MAX_OUTBOX_ATTEMPTS:
+                    db.execute(
+                        text(
+                            "UPDATE einvoice_outbox SET status = 'giveup', "
+                            "attempts = :a, last_attempt_at = CURRENT_TIMESTAMP, "
+                            "last_error = :err, updated_at = CURRENT_TIMESTAMP "
+                            "WHERE id = :id"
+                        ),
+                        {"a": attempts, "err": str(exc)[:500], "id": r.id},
+                    )
+                    giveup += 1
+                else:
+                    # Exponential back-off: 5min * 2^(attempts-1), capped by worker
+                    db.execute(
+                        text(
+                            "UPDATE einvoice_outbox SET attempts = :a, "
+                            "last_attempt_at = CURRENT_TIMESTAMP, "
+                            "next_attempt_at = CURRENT_TIMESTAMP + "
+                            "    (INTERVAL '5 minutes' * POWER(2, :a - 1)), "
+                            "last_error = :err, updated_at = CURRENT_TIMESTAMP "
+                            "WHERE id = :id"
+                        ),
+                        {"a": attempts, "err": str(exc)[:500], "id": r.id},
+                    )
+                    failed += 1
+        db.commit()
+        return {
+            "processed": processed,
+            "succeeded": succeeded,
+            "failed": failed,
+            "giveup": giveup,
+        }
+    except Exception:
+        db.rollback()
+        logger.exception("einvoice outbox relay failed")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "internal_error")
+    finally:
+        _close(db)
+
+
+@router.get(
+    "/einvoice/outbox",
+    dependencies=[Depends(require_permission("finance.accounting_view"))],
+)
+def einvoice_outbox_list(
+    status_filter: Optional[str] = None,
+    limit: int = 50,
+    current_user=Depends(get_current_user),
+):
+    """List outbox entries (for monitoring and manual retry UIs)."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        if status_filter:
+            rows = db.execute(
+                text(
+                    "SELECT id, invoice_id, adapter, status, attempts, "
+                    "last_error, last_attempt_at, next_attempt_at, created_at "
+                    "FROM einvoice_outbox WHERE status = :s "
+                    "ORDER BY id DESC LIMIT :lim"
+                ),
+                {"s": status_filter, "lim": limit},
+            ).fetchall()
+        else:
+            rows = db.execute(
+                text(
+                    "SELECT id, invoice_id, adapter, status, attempts, "
+                    "last_error, last_attempt_at, next_attempt_at, created_at "
+                    "FROM einvoice_outbox ORDER BY id DESC LIMIT :lim"
+                ),
+                {"lim": limit},
+            ).fetchall()
+        return [dict(r._mapping) for r in rows]
     finally:
         _close(db)

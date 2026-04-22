@@ -404,3 +404,160 @@ def change_plan(enrollment_id: int, body: PlanChangeRequest, current_user=Depend
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
+
+
+# ==========================================================================
+# SUB-F1: Dunning (Phase-11 Sprint-4)
+# ==========================================================================
+
+@router.post(
+    "/dunning/scan",
+    dependencies=[Depends(require_permission("finance.subscription_manage"))],
+)
+def scan_dunning(current_user=Depends(get_current_user)):
+    """Scan overdue subscription invoices and open/update dunning cases.
+
+    Idempotent: re-running refreshes ``amount_outstanding`` / ``days_overdue``
+    and escalates ``dunning_level`` based on configurable day buckets
+    (30/60/90/120 days).
+    """
+    db = get_db_connection(current_user.company_id)
+    opened, updated = 0, 0
+    try:
+        # Pull all overdue unpaid subscription invoices
+        rows = db.execute(text("""
+            SELECT si.id AS sub_inv_id,
+                   si.invoice_id AS inv_id,
+                   COALESCE(i.party_id, se.customer_id) AS party_id,
+                   COALESCE(i.total, si.amount) AS total_amt,
+                   COALESCE(i.paid_amount, 0) AS paid_amt,
+                   COALESCE(i.due_date, si.billing_period_end) AS due_date,
+                   COALESCE(i.currency, 'SAR') AS currency
+            FROM subscription_invoices si
+            LEFT JOIN invoices i ON i.id = si.invoice_id
+            LEFT JOIN subscription_enrollments se ON se.id = si.enrollment_id
+            WHERE si.status IN ('pending', 'issued', 'overdue')
+              AND COALESCE(i.due_date, si.billing_period_end) < CURRENT_DATE
+        """)).fetchall()
+
+        for r in rows:
+            outstanding = float(r.total_amt or 0) - float(r.paid_amt or 0)
+            if outstanding <= 0:
+                continue
+            days = (
+                __import__("datetime").date.today() - r.due_date
+            ).days if r.due_date else 0
+            level = 1
+            if days > 120:
+                level = 5
+            elif days > 90:
+                level = 4
+            elif days > 60:
+                level = 3
+            elif days > 30:
+                level = 2
+
+            existing = db.execute(
+                text(
+                    "SELECT id FROM dunning_cases "
+                    "WHERE subscription_invoice_id = :sid "
+                    "AND status NOT IN ('resolved', 'written_off')"
+                ),
+                {"sid": r.sub_inv_id},
+            ).fetchone()
+            if existing:
+                db.execute(
+                    text(
+                        "UPDATE dunning_cases SET "
+                        "amount_outstanding = :amt, days_overdue = :d, "
+                        "dunning_level = :lvl, updated_at = CURRENT_TIMESTAMP "
+                        "WHERE id = :id"
+                    ),
+                    {"amt": outstanding, "d": days, "lvl": level, "id": existing.id},
+                )
+                updated += 1
+            else:
+                db.execute(
+                    text(
+                        "INSERT INTO dunning_cases "
+                        "(invoice_id, subscription_invoice_id, party_id, "
+                        " amount_outstanding, currency, days_overdue, "
+                        " dunning_level, status) VALUES "
+                        "(:iid, :sid, :pid, :amt, :cur, :d, :lvl, 'open')"
+                    ),
+                    {
+                        "iid": r.inv_id,
+                        "sid": r.sub_inv_id,
+                        "pid": r.party_id,
+                        "amt": outstanding,
+                        "cur": r.currency,
+                        "d": days,
+                        "lvl": level,
+                    },
+                )
+                opened += 1
+        db.commit()
+        return {"opened": opened, "updated": updated, "scanned": len(rows)}
+    except Exception:
+        db.rollback()
+        logger.exception("Dunning scan failed")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.get(
+    "/dunning/open",
+    dependencies=[Depends(require_permission("finance.subscription_view"))],
+)
+def list_open_dunning(current_user=Depends(get_current_user)):
+    """List open dunning cases (for collection workflows)."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        rows = db.execute(text("""
+            SELECT d.id, d.invoice_id, d.subscription_invoice_id, d.party_id,
+                   d.amount_outstanding, d.currency, d.days_overdue,
+                   d.dunning_level, d.status, d.last_reminder_at,
+                   d.next_action_at, p.name AS party_name
+            FROM dunning_cases d
+            LEFT JOIN parties p ON p.id = d.party_id
+            WHERE d.status IN ('open', 'notified', 'escalated')
+            ORDER BY d.dunning_level DESC, d.days_overdue DESC
+        """)).fetchall()
+        return [dict(r._mapping) for r in rows]
+    except Exception:
+        logger.exception("List dunning failed")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+@router.post(
+    "/dunning/{case_id}/resolve",
+    dependencies=[Depends(require_permission("finance.subscription_manage"))],
+)
+def resolve_dunning(case_id: int, current_user=Depends(get_current_user)):
+    """Mark a dunning case as resolved (payment received / reconciled)."""
+    db = get_db_connection(current_user.company_id)
+    try:
+        res = db.execute(
+            text(
+                "UPDATE dunning_cases SET status = 'resolved', "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = :id "
+                "AND status NOT IN ('resolved', 'written_off') RETURNING id"
+            ),
+            {"id": case_id},
+        ).fetchone()
+        if not res:
+            raise HTTPException(**http_error(404, "dunning_not_found"))
+        db.commit()
+        return {"id": case_id, "status": "resolved"}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Resolve dunning failed")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()

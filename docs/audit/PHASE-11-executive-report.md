@@ -16,17 +16,18 @@ Five follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-2 IDOR + DB constraints | `e7a4796` | ACC-F5, CRM-F1, INV-F2, MFG-F2, PH10-B3 | `ci` #178 green, `security-scan` #53 green |
 | Sprint-2b UX + observability | `95efa4a` | POS-UI-F1, ACC-F6, INV-F4 | `ci` #179 green, `security-scan` #54 green |
 | Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | `ci` #181 green, `security-scan` #56 green |
-| Sprint-3 Governance + UX extension | _this sprint_ | PUR-F1, SEC-09, IN-F5, CRM-F2, INV-F3 (verified), MFG-F3 (verified), POS-UI-F1 (extended to Returns/Held-Orders/Close-Session modals) | pending |
+| Sprint-3 Governance + UX extension | `cbeaadb` | PUR-F1, SEC-09, IN-F5, CRM-F2, INV-F3 (verified), MFG-F3 (verified), POS-UI-F1 (extended to Returns/Held-Orders/Close-Session modals) | `ci` run on cbeaadb, `security-scan` #57 green |
+| Sprint-4 Billing workflows + ZATCA outbox | _this sprint_ | CON-F1 (contract milestones), SUB-F1 (dunning cases), EINV-F2 (e-invoice outbox + relay), ACC-F2 (dedup fiscal-lock schema) | pending |
 
-**Updated distribution** (open only, post-Sprint-3):
+**Updated distribution** (open only, post-Sprint-4):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 14 | 24 | 12 |
-| P2 | 6 | 22 | 26 |
-| P3 | 0 | 4 | 18 |
-| **Δ closed this round (Sprint-3)** | — | **+6** | — |
+| P1 | 24 | 26 | 10 |
+| P2 | 22 | 24 | 24 |
+| P3 | 4 | 4 | 18 |
+| **Δ closed this round (Sprint-4)** | — | **+4** | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 
@@ -137,7 +138,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
 | ACC-F1 | Accounting | P1 | Fixed | `fiscal_lock` silently allowed on missing table | Fail-safe warning/error |
-| ACC-F2 | Accounting | P1 | Open | Two fiscal-lock tables (duplicate sources) | Unify into single table |
+| ACC-F2 | Accounting | P1 | Fixed (Sprint-4) | Two fiscal-lock tables (duplicate sources) | `fiscal_period_locks` consolidated to canonical `backend/database.py` schema (with FK constraints); `utils/fiscal_lock.create_fiscal_lock_table()` downgraded to deprecated no-op — single source of truth |
 | ACC-F3 | Accounting | P1 | Fixed | `create_account` lacked enum/parent validation | Added checks |
 | ACC-F4 | Accounting | P1 | Fixed (`49f5d66`) | JE void lacks source-doc authz | Source→perm map + 403 for non-admin non-holder |
 | ACC-F5 | Accounting | P2 | Fixed (`e646558`) | `/journal-entries` not filtered by branch | `branch_id` filter + allowed_branches |
@@ -169,7 +170,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ZAK-F1 | Zakat | P1 | Fixed | Zakat posting bypassed fiscal lock | Added fiscal check |
 | ZAK-F2 | Zakat | P2 | Open | Zakat base uses fragile LIKE patterns | Canonical table |
 | EINV-F1 | E-Invoicing | P2 | Fixed (`e646558`) | ZATCA submission without retry | `@retry` with backoff added |
-| EINV-F2 | E-Invoicing | P2 | Open | No outbox relay for failed submissions | Periodic relay |
+| EINV-F2 | E-Invoicing | P2 | Fixed (Sprint-4) | No outbox relay for failed submissions | `einvoice_outbox` table added; failed submissions auto-enqueued from `einvoice_submit`; `POST /finance/accounting-depth/einvoice/outbox/relay` worker-safe endpoint (FOR UPDATE SKIP LOCKED) with exponential back-off + giveup after 6 attempts |
 | EINV-F3 | E-Invoicing | P3 | Open | UAE FTA / EG ETA stubs | ASP onboarding |
 | PAY-F1 | Payments | P1 | Fixed (`e646558`) | Webhook endpoint lacks pre-sig rate limit | Per-IP limiter before signature verify |
 | PAY-F2 | Payments | P2 | Open | No auto-match webhook → allocations | Auto-reconcile |
@@ -197,9 +198,9 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 ### 2.7 Phase 07 – Sales Hub (10: 6 findings + 4 rejected)
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
-| SUB-F1 | Subscriptions | P1 | Open | No dunning for failed sub invoices | Dunning pipeline + scheduler |
+| SUB-F1 | Subscriptions | P1 | Fixed (Sprint-4) | No dunning for failed sub invoices | `dunning_cases` table + `/finance/subscriptions/dunning/scan` scanner (levels 1–5 by days overdue: 30/60/90/120) + list + resolve endpoints |
 | CRM-F1 | CRM | P1 | Fixed (`e7a4796`) | `branch_id` stored but not filtered | Branch filter on opportunities/tickets/campaigns |
-| CON-F1 | Contracts | P2 | Open | Milestone billing not implemented | `contract_milestones` + scheduler |
+| CON-F1 | Contracts | P2 | Fixed (Sprint-4) | Milestone billing not implemented | `contract_milestones` table + REST CRUD (`GET/POST /contracts/{id}/milestones`, `/complete`, `/bill`) that auto-spawn a draft AR invoice and flip milestone to `billed` with `invoice_id` link |
 | POS-F1 | POS | P2 | Open | Offline sync limited to PWA cache | Bulk sync + idempotency |
 | CRM-F2 | CRM | P3 | Fixed (Sprint-3) | Campaign idempotency weak | `SELECT … FOR UPDATE` on `marketing_campaigns` row before recipient insert |
 | SALES-F1 | Sales | P3 | Fixed (`e646558`) | Partial invoice hardcodes `NOW()` | Accepts `invoice_date` payload |

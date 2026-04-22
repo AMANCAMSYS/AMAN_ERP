@@ -2787,6 +2787,27 @@ def get_contract_tables_sql() -> str:
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_contract_items_contract ON contract_items(contract_id);
+
+    -- CON-F1: contract milestone-based billing
+    CREATE TABLE IF NOT EXISTS contract_milestones (
+        id SERIAL PRIMARY KEY,
+        contract_id INTEGER NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+        sequence INTEGER DEFAULT 1,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        due_date DATE,
+        amount DECIMAL(18, 4) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'billed', 'cancelled')),
+        completed_at TIMESTAMPTZ,
+        billed_at TIMESTAMPTZ,
+        invoice_id INTEGER REFERENCES invoices(id),
+        notes TEXT,
+        created_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_contract_milestones_contract ON contract_milestones(contract_id);
+    CREATE INDEX IF NOT EXISTS idx_contract_milestones_status ON contract_milestones(status, due_date);
     """
 
 
@@ -5874,6 +5895,46 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_deferred_rev_enrollment ON deferred_revenue_schedules(enrollment_id);
     CREATE INDEX IF NOT EXISTS ix_deferred_rev_recognition ON deferred_revenue_schedules(recognition_date, status);
     CREATE INDEX IF NOT EXISTS ix_deferred_rev_invoice ON deferred_revenue_schedules(subscription_invoice_id);
+
+    -- SUB-F1: Dunning cases for overdue subscription / normal invoices
+    CREATE TABLE IF NOT EXISTS dunning_cases (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+        subscription_invoice_id INTEGER REFERENCES subscription_invoices(id) ON DELETE CASCADE,
+        party_id INTEGER REFERENCES parties(id),
+        amount_outstanding DECIMAL(18, 4) DEFAULT 0,
+        currency VARCHAR(3) DEFAULT 'SAR',
+        days_overdue INTEGER DEFAULT 0,
+        dunning_level INTEGER DEFAULT 1 CHECK (dunning_level BETWEEN 1 AND 5),
+        status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'notified', 'escalated', 'resolved', 'written_off')),
+        last_reminder_at TIMESTAMPTZ,
+        next_action_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT chk_dunning_source
+            CHECK (invoice_id IS NOT NULL OR subscription_invoice_id IS NOT NULL)
+    );
+    CREATE INDEX IF NOT EXISTS ix_dunning_status ON dunning_cases(status, next_action_at);
+    CREATE INDEX IF NOT EXISTS ix_dunning_party ON dunning_cases(party_id);
+
+    -- EINV-F2: e-invoice outbox for resubmitting failed ZATCA/FTA/ETA payloads
+    CREATE TABLE IF NOT EXISTS einvoice_outbox (
+        id SERIAL PRIMARY KEY,
+        invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        adapter VARCHAR(20) NOT NULL DEFAULT 'zatca',
+        payload JSONB,
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'submitted', 'failed', 'giveup')),
+        attempts INTEGER DEFAULT 0,
+        last_error TEXT,
+        last_attempt_at TIMESTAMPTZ,
+        next_attempt_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        response JSONB,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS ix_einvoice_outbox_due ON einvoice_outbox(status, next_attempt_at);
+    CREATE INDEX IF NOT EXISTS ix_einvoice_outbox_invoice ON einvoice_outbox(invoice_id);
 
     -- ========== US6: Employee Self-Service ==========
     CREATE TABLE IF NOT EXISTS self_service_requests (
