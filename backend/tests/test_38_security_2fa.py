@@ -4,7 +4,10 @@ Security: 2FA, Password Change, Password Policy, Sessions
 ═══════════════════════════════════════════════════════════════
 """
 
+import os
 import pytest
+
+_TEST_PW = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -63,7 +66,7 @@ class TestPasswordManagement:
     def test_change_password_mismatch(self, client, admin_headers):
         """❌ رفض تغيير كلمة المرور عند عدم تطابق التأكيد"""
         r = client.post("/api/security/change-password", json={
-            "current_password": "As123321",
+            "current_password": _TEST_PW,
             "new_password": "New@Pass123",
             "confirm_password": "Different@Pass123",
         }, headers=admin_headers)
@@ -72,7 +75,7 @@ class TestPasswordManagement:
     def test_change_password_weak(self, client, admin_headers):
         """❌ رفض كلمة مرور ضعيفة"""
         r = client.post("/api/security/change-password", json={
-            "current_password": "As123321",
+            "current_password": _TEST_PW,
             "new_password": "123",
             "confirm_password": "123",
         }, headers=admin_headers)

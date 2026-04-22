@@ -32,7 +32,10 @@ from fastapi.testclient import TestClient
 from main import app
 from database import get_db_connection
 
-DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_d24b1b1c"
+DB_URL = os.environ.get(
+    "AMAN_TEST_DB_URL",
+    "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_d24b1b1c",
+)
 
 TOLERANCE = Decimal("0.01")
 

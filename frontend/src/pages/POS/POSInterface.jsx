@@ -98,6 +98,22 @@ const POSInterface = () => {
         }
     }, [searchQuery, products]);
 
+    // --- Cart Totals ---
+    const cartTotals = useMemo(() => {
+        let subtotal = 0;
+        let totalTax = 0;
+
+        cart.forEach(item => {
+            const itemTotal = item.price * item.quantity;
+            subtotal += itemTotal;
+            const itemTax = itemTotal * (item.tax_rate / 100);
+            totalTax += itemTax;
+        });
+
+        const total = Math.max(0, subtotal + totalTax - globalDiscount);
+        return { subtotal, discount: globalDiscount, tax: totalTax, total };
+    }, [cart, globalDiscount]);
+
     // Broadcast cart changes to Customer Display
     useEffect(() => {
         if (broadcastRef.current) {
@@ -183,20 +199,6 @@ const POSInterface = () => {
         }));
     };
 
-    const cartTotals = useMemo(() => {
-        let subtotal = 0;
-        let totalTax = 0;
-
-        cart.forEach(item => {
-            const itemTotal = item.price * item.quantity;
-            subtotal += itemTotal;
-            const itemTax = itemTotal * (item.tax_rate / 100);
-            totalTax += itemTax;
-        });
-
-        const total = Math.max(0, subtotal + totalTax - globalDiscount);
-        return { subtotal, discount: globalDiscount, tax: totalTax, total };
-    }, [cart, globalDiscount]);
 
     // --- Checkout Logic ---
     const openSplitPayment = () => {

@@ -25,15 +25,18 @@ Pre-existing data (from v1/v2 seeds):
   - CustomerGroups: 3, JournalEntries: 8, Roles: 8
 """
 
+import os
 import requests
 import sys
 from datetime import datetime
 
-# ── Configuration ────────────────────────────────────────────────────────
-API = "http://64.225.49.118/api"
-USERNAME = "vvvv"
-PASSWORD = "As123321"
-COMPANY_CODE = "ba2f6dc3"
+# ── Configuration ( all sensitive values from env ) ───────────────────────────────────────────────────────────────────────────────────────────────────────
+API = os.environ.get("AMAN_SEED_API", "http://localhost:8000/api")
+USERNAME = os.environ.get("AMAN_SEED_USERNAME")
+PASSWORD = os.environ.get("AMAN_SEED_PASSWORD")
+COMPANY_CODE = os.environ.get("AMAN_SEED_COMPANY_CODE", "ba2f6dc3")
+if not USERNAME or not PASSWORD:
+    raise RuntimeError("AMAN_SEED_USERNAME and AMAN_SEED_PASSWORD must be set before running seed_v3_comprehensive.py")
 
 # ── Known Account IDs ────────────────────────────────────────────────────
 ACC = {

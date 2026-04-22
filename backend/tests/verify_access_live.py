@@ -1,11 +1,15 @@
 
 import requests
 
-BASE_URL = "http://localhost:8000/api"
+import os
+
+BASE_URL = os.environ.get("AMAN_BASE_URL", "http://localhost:8000/api")
 COMPANY_ID = "99900001"
 HQ_USER = "user.hq.1"
 JED_USER = "user.br-jed.1"
-PASSWORD = "123456"
+PASSWORD = os.environ.get("AMAN_VERIFY_PASSWORD", "")
+if not PASSWORD:
+    raise RuntimeError("AMAN_VERIFY_PASSWORD must be set before running verify_access_live.py")
 
 def get_token(username, password):
     try:

@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 # Constants for Seeding
 COMPANY_ID = "TEST001"
-ADMIN_PASSWORD = "admin"
+ADMIN_PASSWORD = os.environ.get("AMAN_SEED_ADMIN_PASSWORD") or os.environ.get("AMAN_ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("AMAN_SEED_ADMIN_PASSWORD (or AMAN_ADMIN_PASSWORD) must be set before running seed_data.py")
 NUM_BRANCHES = 5
 NUM_ACCOUNTS = 1000
 NUM_PARTIES = 5000

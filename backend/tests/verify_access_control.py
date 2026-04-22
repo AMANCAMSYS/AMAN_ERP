@@ -19,7 +19,9 @@ COMPANY_ID = "99900001"
 DB_NAME = f"aman_{COMPANY_ID}"
 HQ_USER = "user.hq.1"
 JED_USER = "user.br-jed.1"
-PASSWORD = "123456"
+PASSWORD = os.environ.get("AMAN_VERIFY_PASSWORD", "")
+if not PASSWORD:
+    raise RuntimeError("AMAN_VERIFY_PASSWORD must be set before running verify_access_control.py")
 
 def get_token(username, password):
     response = client.post("/api/auth/login", data={"username": username, "password": password})
