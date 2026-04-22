@@ -32,7 +32,7 @@ from fastapi.testclient import TestClient
 from main import app
 from database import get_db_connection
 
-DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_73ab0722"
+DB_URL = "postgresql://aman:YourPassword123%21%40%23@localhost:5432/aman_d24b1b1c"
 
 TOLERANCE = Decimal("0.01")
 
@@ -45,9 +45,9 @@ TEST_ADMIN_USERNAME = "admin"
 TEST_ADMIN_PASSWORD = _TEST_ADMIN_PW
 
 # Company user credentials (for API tests that need company_id)
-TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "aaaa")
+TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "bbbb")
 TEST_COMPANY_PASSWORD = os.environ.get("AMAN_TEST_PASSWORD", "As123321")
-TEST_COMPANY_ID = "73ab0722"
+TEST_COMPANY_ID = "d24b1b1c"
 
 
 # ═══════════════════════════════════════════════════════════════

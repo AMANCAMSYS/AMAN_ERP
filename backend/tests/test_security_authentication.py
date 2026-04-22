@@ -31,7 +31,7 @@ class TestAuthenticationSecurity:
                 "username": os.environ.get("AMAN_TEST_USER", "aaaa"),
                 "password": password,
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         assert response.status_code == 200
@@ -48,7 +48,7 @@ class TestAuthenticationSecurity:
                 "username": "admin",
                 "password": "wrong_password_12345",
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         assert response.status_code in [401, 404]
@@ -61,7 +61,7 @@ class TestAuthenticationSecurity:
                 "username": "nonexistent_user_xyz_12345",
                 "password": "any_password",
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         assert response.status_code in [401, 404]
@@ -84,7 +84,7 @@ class TestAuthenticationSecurity:
                     "username": unique_username,
                     "password": "wrong_password",
                     "grant_type": "password",
-                    "company_code": "73ab0722"
+                    "company_code": "d24b1b1c"
                 }
             )
             if response.status_code == 429:
@@ -143,7 +143,7 @@ class TestAuthenticationSecurity:
                 "username": username,
                 "password": password,
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         
@@ -180,7 +180,7 @@ class TestAuthenticationSecurity:
                 "username": username,
                 "password": password,
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         # قد نحصل على 429 بسبب rate limiting من اختبارات سابقة
@@ -277,7 +277,7 @@ class TestAuthenticationSecurity:
                     "username": username,
                     "password": f"wrong_password_{i}",
                     "grant_type": "password",
-                    "company_code": "73ab0722"
+                    "company_code": "d24b1b1c"
                 }
             )
             if i >= 5:  # بعد 5 محاولات
@@ -307,7 +307,7 @@ class TestAuthenticationSecurity:
                     "username": base_username,  # استخدام نفس username للاختبار
                     "password": password,
                     "grant_type": "password",
-                    "company_code": "73ab0722"
+                    "company_code": "d24b1b1c"
                 }
             )
             results.append(response.status_code)
@@ -444,7 +444,7 @@ class TestAuthenticationSecurity:
                 "username": username.upper(),
                 "password": password,
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         # يجب أن يفشل إذا كان النظام case-sensitive
@@ -476,7 +476,7 @@ class TestAuthenticationSecurity:
                 "username": long_string,
                 "password": long_string,
                 "grant_type": "password",
-                "company_code": "73ab0722"
+                "company_code": "d24b1b1c"
             }
         )
         # يجب أن يُرفض بشكل آمن (400/413/422) أو rate limited (429)
