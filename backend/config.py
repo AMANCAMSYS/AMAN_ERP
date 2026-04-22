@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # SEC-03: Clock skew tolerance (seconds) for JWT exp/nbf/iat validation.
+    # Tolerates minor clock drift between servers (e.g., container vs host).
+    JWT_LEEWAY_SECONDS: int = 30
     
     # Admin password hash (bcrypt). Generate with: python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('your_password'))"
     ADMIN_PASSWORD_HASH: Optional[str] = None

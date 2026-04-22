@@ -437,7 +437,8 @@ async def notifications_ws(ws: WebSocket, token: Optional[str] = None):
         return
 
     try:
-        payload = jwt.decode(actual_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        payload = jwt.decode(actual_token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM],
+                             options={"leeway": app_settings.JWT_LEEWAY_SECONDS})
         user_id = payload.get("user_id")
         company_id = payload.get("company_id")
         if not user_id or not company_id:

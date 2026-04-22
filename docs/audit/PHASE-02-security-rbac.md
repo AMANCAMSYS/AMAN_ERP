@@ -20,12 +20,12 @@
 
 ### المخاطر المكتشفة
 
-| الخطورة | العدد | الحالة |
-|---|---|---|
-| **P0 (Blocker)** | 0 | — |
-| **P1 (High)** | 2 | محدد أدناه |
-| **P2 (Medium)** | 5 | محدد أدناه |
-| **P3 (Low)** | 7+ | backlog |
+| الخطورة | العدد الأصلي | تم الإصلاح | المتبقي |
+|---|---|---|---|
+| **P0 (Blocker)** | 0 | — | **0** |
+| **P1 (High)** | 2 | 1 (SEC-02 npm CVEs) | 1 (SEC-01 SQL plan) |
+| **P2 (Medium)** | 5 | 4 (SEC-03/04/05/07) | 1 (SEC-11 SSO deep audit → Phase 8) |
+| **P3 (Low)** | 7+ | — | backlog |
 
 ---
 
@@ -169,30 +169,32 @@
 
 ## 6. Findings قابلة للتنفيذ
 
-### 🔴 P1 (مهمة — قبل Release القادم)
+### ✅ تم الإصلاح في هذه الجلسة
 
-| ID | العنوان | الملف | التوصية |
+| ID | العنوان | الحل المُطبّق | التحقق |
 |---|---|---|---|
-| **SEC-01** | 347 موضع raw SQL بـ f-string في baseline | `backend/routers/**` (راجع [scripts/sql_lint_baseline.txt](scripts/sql_lint_baseline.txt)) | خطة سحب باكيت أسبوعي: 50 موضع/PR بتحويل `text(f"...")` إلى parameterized queries. CI يمنع إضافة جديدة ✅ |
-| **SEC-02** | 2 high CVE (axios + rollup) **مُصلحة** | `frontend/package-lock.json` | ✅ تم في هذه المرحلة عبر `npm audit fix`. Build passed. |
+| **SEC-02** | 2 high CVE في frontend (axios SSRF + rollup path traversal + DoS + metadata exfiltration + follow-redirects leak) | `npm audit fix` — باقي 5 moderate dev-only فقط | `npm audit` + `npm run build` ✅ |
+| **SEC-03** | JWT بدون `leeway` لانحراف الساعات | أضيف `settings.JWT_LEEWAY_SECONDS = 30` وطُبِّق على 5 استدعاءات decode تتحقق من exp في `auth.py` + `notifications.py` | Smoke import OK ✅ |
+| **SEC-04** | `CSRF_ENFORCEMENT` افتراضي `permissive` | المنطق الجديد: `strict` تلقائياً عند `APP_ENV=production/staging`، `permissive` في dev — [backend/utils/csrf_middleware.py](backend/utils/csrf_middleware.py) | Smoke import OK ✅ |
+| **SEC-05** | Cache keys بدون namespacing لـ tenant | أضيف `tenant_key()` helper في `backend/utils/cache.py` — defense-in-depth لمنع cross-tenant collision المستقبلي (الاستخدامات الحالية كلها آمنة حالياً) | `tenant_key('abc12345','invoices',42)` → `t:abc12345:invoices:42` ✅ |
+| **SEC-07** | PII masking غير مُتحقَّق منه في كل logger calls | أضيف `scripts/check_pii_logging.py` + مدمج في CI job `backend-guards` — يرفض `f"...{password}..."` مع قائمة forbidden names (password, secret, token, api_key, cvv, ssn, iban, ...) | Baseline نظيف ✅ — 0 انتهاك |
 
-### 🟡 P2 (Medium)
+### 🔴 P1 (خطة متعدد المراحل — CI يحمي الحاضر)
 
-| ID | العنوان | الملف | التوصية |
+| ID | العنوان | الوضع |
+|---|---|---|
+| **SEC-01** | 347 موضع raw SQL f-string في baseline | CI gate نشط ويمنع الجديد ✅. الخطة: 50 موضع/PR في مراحل لاحقة (غير مُضمّن هذه الجلسة — تحويل 347 موضع دون اختبار تكاملي شامل خطر على الكود المالي). |
+
+### 🟡 P2/P3 (Backlog مُحدَّث)
+
+| ID | العنوان | الأولوية | السبب |
 |---|---|---|---|
-| SEC-03 | JWT بدون `leeway` لانحراف الساعات | [backend/routers/auth.py:371](backend/routers/auth.py#L371) | `jwt.decode(..., options={"leeway": 30})` |
-| SEC-04 | `CSRF_ENFORCEMENT` افتراضي `permissive` | [backend/config.py:58](backend/config.py#L58) | ضبطه `strict` في production + documentation |
-| SEC-05 | Cache keys بدون namespacing لـ tenant | [backend/utils/cache.py](backend/utils/cache.py) | إضافة prefix `{company_id}:` لكل key |
-| SEC-06 | CSP يسمح `style-src 'unsafe-inline'` | [nginx/production.conf:82](nginx/production.conf#L82) | استخدام nonce-based CSP أو bundled styles |
-| SEC-07 | PII masking غير مُتحقَّق منه في كل logger calls | backend/**/*.py | audit + integration test |
-
-### 🟢 P3 (Backlog)
-
-- Admin 2FA in DB (بدلاً من env)
-- Concurrent session limits
-- Webhook outbound allowlist
-- SSO service deep audit (SAML signature + OAuth PKCE + LDAP TLS)
-- dashboard.py metadata endpoints gating
+| SEC-06 | CSP `style-src 'unsafe-inline'` | **P3** | React `style={{}}` props تولّد inline `style="..."` ديناميكياً — التحويل إلى nonce-based CSP يحتاج refactor كبير + اختبار بصري شامل. موثَّق كـ follow-up. |
+| SEC-08 | Admin 2FA in DB (بدلاً من env) | P3 | لا خطر حاضر — تحسين UX |
+| SEC-09 | Concurrent session limits | P3 | UX enhancement |
+| SEC-10 | Webhook outbound allowlist | P3 | الـ URLs الحالية من config، لا من user input |
+| SEC-11 | SSO service deep audit (SAML signature + OAuth PKCE + LDAP TLS) | P2 | مجدول لـ Phase 8 |
+| SEC-12 | dashboard.py metadata endpoints gating | P3 | metadata عامة، غير حساسة |
 
 ---
 

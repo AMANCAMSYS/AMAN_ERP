@@ -119,6 +119,24 @@ else:
     cache = MemoryCache()
 
 
+def tenant_key(company_id: Any, *parts: Any) -> str:
+    """
+    SEC-05: Build a cache key that is guaranteed to be tenant-scoped.
+
+    Always use this helper (or the @cached decorator with company_specific=True)
+    when caching tenant data. Passing raw keys like f"invoices:{id}" to
+    cache.get/set directly risks cross-tenant collision if two tenants share
+    numeric IDs.
+
+    Example:
+        key = tenant_key(current_user.company_id, "invoices", invoice_id)
+        # → "t:abc12345:invoices:42"
+    """
+    if not company_id:
+        raise ValueError("tenant_key() requires a non-empty company_id")
+    return "t:" + ":".join(str(p) for p in (company_id, *parts))
+
+
 def cached(prefix: str, expire: int = 300, company_specific: bool = True):
     """
     Decorator for caching FastAPI endpoint responses.

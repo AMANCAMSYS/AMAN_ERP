@@ -434,7 +434,8 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
 
 def decode_token(token: str) -> dict:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                          options={"leeway": settings.JWT_LEEWAY_SECONDS})
     except JWTError:
         return None
 
@@ -840,7 +841,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
         
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"leeway": settings.JWT_LEEWAY_SECONDS})
         if payload.get("token_use") == "refresh":
             raise credentials_exception
         username: str = payload.get("sub")
@@ -1206,7 +1208,8 @@ async def refresh_token(
         raise credentials_exception
         
     try:
-        payload = jwt.decode(provided_refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(provided_refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"leeway": settings.JWT_LEEWAY_SECONDS})
         if payload.get("token_use") != "refresh":
             raise credentials_exception
 
@@ -1619,7 +1622,8 @@ async def verify_2fa_login(request: Request, body: TwoFALoginRequest):
     )
 
     try:
-        payload = jwt.decode(body.temp_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(body.temp_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM],
+                             options={"leeway": settings.JWT_LEEWAY_SECONDS})
         if payload.get("token_use") != "2fa_challenge":
             raise credentials_exception
     except JWTError:

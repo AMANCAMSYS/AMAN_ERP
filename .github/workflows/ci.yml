@@ -104,6 +104,9 @@ jobs:
       - name: GL posting discipline guard
         run: python scripts/check_gl_posting_discipline.py
 
+      - name: PII / secret logging guard (SEC-07)
+        run: python scripts/check_pii_logging.py
+
   # ─────────────────────────────────────────────────────────────────────
   # Backend: tenant bootstrap end-to-end (creates a fresh tenant DB)
   # This validates the 301-tables-+-8-MVs invariant on every PR.

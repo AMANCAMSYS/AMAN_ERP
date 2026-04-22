@@ -46,7 +46,13 @@ EXEMPT_PREFIXES = (
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        mode = (settings.CSRF_ENFORCEMENT or "permissive").lower()
+        # SEC-04: default to "strict" in production/staging, "permissive" in dev.
+        # Explicit CSRF_ENFORCEMENT env var overrides the environment-based default.
+        raw_mode = (settings.CSRF_ENFORCEMENT or "").strip().lower()
+        if not raw_mode:
+            env = (getattr(settings, "APP_ENV", "") or "").strip().lower()
+            raw_mode = "strict" if env in ("production", "staging") else "permissive"
+        mode = raw_mode
         if mode == "off":
             return await call_next(request)
 

@@ -20,7 +20,7 @@ backend/routers/audit.py:293
 backend/routers/audit.py:296
 backend/routers/audit.py:302
 backend/routers/audit.py:312
-backend/routers/auth.py:1085
+backend/routers/auth.py:1087
 backend/routers/branches.py:309
 backend/routers/companies.py:220
 backend/routers/companies.py:221
