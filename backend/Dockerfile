@@ -8,10 +8,15 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# System build deps (psycopg2 needs libpq-dev, reportlab needs fonts)
+# System build deps (psycopg2 needs libpq-dev, python-ldap needs libldap2-dev, xmlsec needs libxmlsec1-dev)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    libldap2-dev \
+    libsasl2-dev \
+    libxmlsec1-dev \
+    libxml2-dev \
+    pkg-config \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
