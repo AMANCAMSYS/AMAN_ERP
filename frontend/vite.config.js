@@ -14,10 +14,10 @@ export default defineConfig(({ mode }) => ({
         rollupOptions: {
             output: {
                 manualChunks: {
-                    'vendor-react': ['react', 'react-dom', 'react-router-dom', 'react-is'],
+                    // Keep react-i18n together with React runtime to avoid chunk init ordering issues.
+                    'vendor-react': ['react', 'react-dom', 'react-router-dom', 'react-is', 'i18next', 'i18next-browser-languagedetector', 'react-i18next'],
                     'vendor-charts': ['echarts', 'echarts-for-react', 'recharts'],
                     'vendor-forms': ['react-hook-form', 'react-datepicker'],
-                    'vendor-i18n': ['i18next', 'i18next-browser-languagedetector', 'react-i18next'],
                     'vendor-grid': ['react-grid-layout', 'react-window', 'react-virtualized-auto-sizer'],
                     'vendor-ui': ['lucide-react', 'react-icons', 'react-hot-toast', 'dompurify', 'dayjs', 'axios'],
                 },
