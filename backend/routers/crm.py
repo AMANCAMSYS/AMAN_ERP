@@ -15,7 +15,7 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, require_module
+from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.accounting import generate_sequential_number
 from utils.audit import log_activity
 from services.notification_service import notification_service
@@ -106,8 +106,11 @@ OPPORTUNITY_ALLOWED_FIELDS = {
 def list_opportunities(
     stage: Optional[str] = None,
     assigned_to: Optional[int] = None,
+    branch_id: Optional[int] = None,
     current_user=Depends(get_current_user)
 ):
+    # CRM-F1: enforce branch scope on list
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         query = """
@@ -119,6 +122,19 @@ def list_opportunities(
             WHERE 1=1
         """
         params = {}
+        if branch_id:
+            query += " AND o.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+        else:
+            allowed = getattr(current_user, "allowed_branches", None) or (
+                current_user.get("allowed_branches") if isinstance(current_user, dict) else None
+            )
+            perms = getattr(current_user, "permissions", None) or (
+                current_user.get("permissions") if isinstance(current_user, dict) else []
+            ) or []
+            if allowed and "*" not in perms:
+                query += " AND o.branch_id = ANY(:allowed_branches)"
+                params["allowed_branches"] = list(allowed)
         if stage:
             query += " AND o.stage = :stage"
             params["stage"] = stage
@@ -320,8 +336,11 @@ def list_tickets(
     status_filter: Optional[str] = None,
     priority: Optional[str] = None,
     assigned_to: Optional[int] = None,
+    branch_id: Optional[int] = None,
     current_user=Depends(get_current_user)
 ):
+    # CRM-F1: enforce branch scope on list
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         query = """
@@ -332,6 +351,19 @@ def list_tickets(
             WHERE 1=1
         """
         params = {}
+        if branch_id:
+            query += " AND t.branch_id = :branch_id"
+            params["branch_id"] = branch_id
+        else:
+            allowed = getattr(current_user, "allowed_branches", None) or (
+                current_user.get("allowed_branches") if isinstance(current_user, dict) else None
+            )
+            perms = getattr(current_user, "permissions", None) or (
+                current_user.get("permissions") if isinstance(current_user, dict) else []
+            ) or []
+            if allowed and "*" not in perms:
+                query += " AND t.branch_id = ANY(:allowed_branches)"
+                params["allowed_branches"] = list(allowed)
         if status_filter:
             query += " AND t.status = :status"
             params["status"] = status_filter
@@ -615,12 +647,28 @@ class CampaignUpdate(BaseModel):
 def list_campaigns(
     status: Optional[str] = None,
     campaign_type: Optional[str] = None,
+    branch_id: Optional[int] = None,
     current_user=Depends(get_current_user)
 ):
+    # CRM-F1: enforce branch scope on list
+    branch_id = validate_branch_access(current_user, branch_id)
     db = get_db_connection(current_user.company_id)
     try:
         conditions = ["1=1"]
         params = {}
+        if branch_id:
+            conditions.append("c.branch_id = :branch_id")
+            params["branch_id"] = branch_id
+        else:
+            allowed = getattr(current_user, "allowed_branches", None) or (
+                current_user.get("allowed_branches") if isinstance(current_user, dict) else None
+            )
+            perms = getattr(current_user, "permissions", None) or (
+                current_user.get("permissions") if isinstance(current_user, dict) else []
+            ) or []
+            if allowed and "*" not in perms:
+                conditions.append("c.branch_id = ANY(:allowed_branches)")
+                params["allowed_branches"] = list(allowed)
         if status:
             conditions.append("status = :status")
             params["status"] = status

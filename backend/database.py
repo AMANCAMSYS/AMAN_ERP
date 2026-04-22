@@ -3888,6 +3888,62 @@ def create_company_tables(company_id: str, currency: str = "SAR") -> Tuple[bool,
                 except Exception:
                     pass  # Ignore if table doesn't have updated_at
 
+            # ── INV-F2 + MFG-F2: defensive CHECK constraints (idempotent) ──
+            # Non-negative inventory quantities and bounded BOM percentages.
+            # Added via DO-blocks so existing tenants get them on next bootstrap
+            # and fresh tenants get them from the CREATE TABLE statements above.
+            try:
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF to_regclass('public.inventory') IS NOT NULL
+                           AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_inventory_qty_nonneg') THEN
+                            BEGIN
+                                ALTER TABLE inventory
+                                    ADD CONSTRAINT ck_inventory_qty_nonneg
+                                    CHECK (quantity >= 0) NOT VALID;
+                            EXCEPTION WHEN others THEN
+                                RAISE NOTICE 'ck_inventory_qty_nonneg skipped: %', SQLERRM;
+                            END;
+                        END IF;
+
+                        IF to_regclass('public.inventory') IS NOT NULL
+                           AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_inventory_reserved_nonneg') THEN
+                            BEGIN
+                                ALTER TABLE inventory
+                                    ADD CONSTRAINT ck_inventory_reserved_nonneg
+                                    CHECK (reserved_quantity >= 0) NOT VALID;
+                            EXCEPTION WHEN others THEN
+                                RAISE NOTICE 'ck_inventory_reserved_nonneg skipped: %', SQLERRM;
+                            END;
+                        END IF;
+
+                        IF to_regclass('public.bom_components') IS NOT NULL
+                           AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_bom_components_waste_bounded') THEN
+                            BEGIN
+                                ALTER TABLE bom_components
+                                    ADD CONSTRAINT ck_bom_components_waste_bounded
+                                    CHECK (waste_percentage >= 0 AND waste_percentage <= 100) NOT VALID;
+                            EXCEPTION WHEN others THEN
+                                RAISE NOTICE 'ck_bom_components_waste_bounded skipped: %', SQLERRM;
+                            END;
+                        END IF;
+
+                        IF to_regclass('public.bom_components') IS NOT NULL
+                           AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_bom_components_costshare_bounded') THEN
+                            BEGIN
+                                ALTER TABLE bom_components
+                                    ADD CONSTRAINT ck_bom_components_costshare_bounded
+                                    CHECK (cost_share_percentage >= 0 AND cost_share_percentage <= 100) NOT VALID;
+                            EXCEPTION WHEN others THEN
+                                RAISE NOTICE 'ck_bom_components_costshare_bounded skipped: %', SQLERRM;
+                            END;
+                        END IF;
+                    END $$;
+                """))
+            except Exception as e:
+                logger.warning(f"CHECK constraints (INV-F2/MFG-F2) skipped: {e}")
+
         migration_ok, migration_msg = run_company_alembic_stamp_head()
         if not migration_ok:
             return False, f"فشل ترحيل Alembic: {migration_msg}"
