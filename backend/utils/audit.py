@@ -78,7 +78,11 @@ def log_activity(
         logger.info(f"📝 AUDIT: {username} -> {action} ({resource_id})")
 
     except Exception as e:
-        logger.error(f"❌ FAILED TO LOG AUDIT: {e}")
+        # ACC-F6: never swallow silently — emit full stack for observability
+        logger.error(
+            f"❌ FAILED TO LOG AUDIT: user={username} action={action} resource={resource_type}:{resource_id} err={e}",
+            exc_info=True,
+        )
         if critical:
             # TASK-021: fail-closed — reject the operation so the caller
             # rolls back. The audit trail is a non-negotiable prerequisite

@@ -1247,3 +1247,99 @@
     background: linear-gradient(135deg, #0066b2, #00a86b);
     color: #fff;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   DARK-THEME OVERRIDES (POS-UI-F1)
+   Fix hardcoded light backgrounds bleeding into dark mode.
+   ═══════════════════════════════════════════════════════════ */
+[data-theme="dark"] .product-card {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .product-card-image {
+    background: linear-gradient(135deg, #1b2a41 0%, #24364f 100%);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .product-card-image .placeholder-text {
+    color: #475569;
+}
+
+[data-theme="dark"] .product-stock-badge {
+    background: rgba(30, 41, 59, 0.85);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .product-add-overlay {
+    background: rgba(15, 23, 42, 0.85);
+}
+
+[data-theme="dark"] .product-add-overlay .add-icon {
+    background: var(--bg-card);
+    color: var(--pos-primary-light);
+}
+
+[data-theme="dark"] .product-card-name {
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .product-card-price {
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .product-card-price .price {
+    color: var(--pos-primary-light);
+}
+
+[data-theme="dark"] .product-card-price .currency {
+    color: var(--text-muted);
+}
+
+/* Stock-status cards (low/out) */
+[data-theme="dark"] .stock-badge.warning,
+[data-theme="dark"] .pos-card.stock-warning {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .stock-badge.danger,
+[data-theme="dark"] .pos-card.stock-danger {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+/* Cart / summary cards */
+[data-theme="dark"] .pos-cart,
+[data-theme="dark"] .pos-cart-summary,
+[data-theme="dark"] .pos-products-grid,
+[data-theme="dark"] .pos-main,
+[data-theme="dark"] .pos-header {
+    background: var(--bg-surface);
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .pos-header {
+    border-bottom-color: var(--border-color);
+}
+
+/* Modal & inputs in dark mode */
+[data-theme="dark"] .modal-input,
+[data-theme="dark"] .pos-input,
+[data-theme="dark"] .pos-select {
+    background: var(--bg-secondary);
+    color: var(--text-main);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .pos-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* Empty-state */
+[data-theme="dark"] .pos-empty-state {
+    color: var(--text-muted);
+}
+
+}

@@ -4,7 +4,7 @@ from utils.i18n import http_error
 from sqlalchemy import text
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import json
 import logging
@@ -3943,7 +3943,9 @@ async def drug_expiry_report(
     """تقرير الأدوية/المنتجات قريبة الانتهاء"""
     db = get_db_connection(current_user.company_id)
     try:
-        today = date.today()
+        # INV-F4: normalize to UTC so cut-offs are deterministic regardless
+        # of the server host timezone.
+        today = datetime.now(timezone.utc).date()
         cutoff = today + timedelta(days=days_ahead)
 
         # من جدول product_batches
