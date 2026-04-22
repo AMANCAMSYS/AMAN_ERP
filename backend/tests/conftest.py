@@ -13,6 +13,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # إضافة مسار tests لكي يتمكن من استيراد helpers
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# ═══════════════════════════════════════════════════════════════
+# 🔐 PLAT-TEST-02: توليد ADMIN_PASSWORD_HASH ديناميكياً قبل تحميل التطبيق
+# يضمن أن تكون كلمة مرور الأدمن في الاختبارات متطابقة مع الـ hash المستخدم
+# في auth.py، بغض النظر عن حالة .env.
+# ═══════════════════════════════════════════════════════════════
+_TEST_ADMIN_PW = os.environ.get("AMAN_ADMIN_PASSWORD", "admin123")
+os.environ.setdefault("AMAN_ADMIN_PASSWORD", _TEST_ADMIN_PW)
+try:
+    import bcrypt as _bcrypt
+    os.environ["ADMIN_PASSWORD_HASH"] = _bcrypt.hashpw(
+        _TEST_ADMIN_PW.encode("utf-8"), _bcrypt.gensalt(rounds=4)
+    ).decode("utf-8")
+except Exception:  # pragma: no cover - bcrypt always available in test env
+    pass
+
 from fastapi.testclient import TestClient
 from main import app
 from database import get_db_connection
@@ -27,7 +42,7 @@ TOLERANCE = Decimal("0.01")
 
 # System admin credentials
 TEST_ADMIN_USERNAME = "admin"
-TEST_ADMIN_PASSWORD = os.environ.get("AMAN_ADMIN_PASSWORD", "admin")  # bcrypt hash is in .env
+TEST_ADMIN_PASSWORD = _TEST_ADMIN_PW
 
 # Company user credentials (for API tests that need company_id)
 TEST_COMPANY_USERNAME = os.environ.get("AMAN_TEST_USER", "aaaa")

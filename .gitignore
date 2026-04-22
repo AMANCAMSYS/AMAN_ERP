@@ -102,3 +102,8 @@ docs/audit/synthetic-data-seed/tenant-ids.yaml
 docs/audit/dep-inventory/
 docs/audit/baseline/perf-baseline.md
 docs/audit/backlog.xlsx
+
+# Coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
