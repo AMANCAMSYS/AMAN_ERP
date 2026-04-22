@@ -38,9 +38,9 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   build backend frontend worker 2>&1 | grep -E "^(Step|Successfully built|#)" || true
 
 echo ""
-echo "=== 3. Restart services ==="
+echo "=== 3. Restart backend + worker first (keep frontend serving) ==="
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  up -d --no-deps backend frontend worker
+  up -d --no-deps backend worker
 
 echo ""
 echo "=== 4. Health check (waiting for backend) ==="
@@ -61,7 +61,27 @@ for i in 1 2 3 4 5 6; do
 done
 
 echo ""
-echo "=== 5. Verify health ==="
+echo "=== 5. Restart frontend after backend is healthy ==="
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  up -d --no-deps frontend
+
+echo "Waiting for frontend to be reachable..."
+for i in 1 2 3 4 5 6; do
+  sleep 5
+  if curl -sf http://localhost/ > /dev/null 2>&1; then
+    echo "✅ Frontend reachable after ${i}x5s"
+    break
+  fi
+  echo "   Waiting frontend... attempt $i/6"
+  if [ "$i" = "6" ]; then
+    echo "❌ ERROR: frontend not reachable after 30s"
+    docker logs --tail 40 aman_frontend || true
+    exit 1
+  fi
+done
+
+echo ""
+echo "=== 6. Verify health ==="
 curl -s http://localhost:8000/health | python3 -m json.tool
 
 echo ""
