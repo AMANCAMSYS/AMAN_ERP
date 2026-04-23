@@ -218,8 +218,14 @@ jobs:
           PY
 
   # ─────────────────────────────────────────────────────────────────────
-  # Alembic migrations: upgrade head → downgrade -1 → upgrade head
-  # Catches missing downgrade() implementations and irreversible migrations.
+  # Alembic migrations: bootstrap a tenant via database.create_company_tables
+  # (which stamps head), then verify downgrade -1 → upgrade head round-trips.
+  #
+  # Note: in this codebase the canonical schema lives in database.py — the
+  # alembic baseline (0001) is stamped, not run. Calling `alembic upgrade
+  # head` on an empty DB is invalid because 0002+ ALTER tables that were
+  # never created. The tenant bootstrap path is the only valid starting
+  # point for the round-trip.
   # ─────────────────────────────────────────────────────────────────────
   alembic-roundtrip:
     name: backend · alembic up/down/up
@@ -230,7 +236,7 @@ jobs:
         env:
           POSTGRES_USER: aman
           POSTGRES_PASSWORD: ci_pg_password
-          POSTGRES_DB: aman_alembic_ci
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
@@ -243,8 +249,7 @@ jobs:
       POSTGRES_PORT: '5432'
       POSTGRES_USER: aman
       POSTGRES_PASSWORD: ci_pg_password
-      POSTGRES_DB: aman_alembic_ci
-      DATABASE_URL: postgresql://aman:ci_pg_password@localhost:5432/aman_alembic_ci
+      POSTGRES_DB: postgres
       SECRET_KEY: ci_alembic_secret_key_0123456789abcdef0123456789abcdef
       REDIS_URL: redis://localhost:6379/0
       ENVIRONMENT: test
@@ -266,14 +271,28 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-      - name: Round-trip alembic migrations
+      - name: Bootstrap tenant + round-trip alembic
         working-directory: backend
         run: |
           set -e
-          alembic upgrade head
-          # If only one revision exists, downgrade -1 collapses to base; that's fine.
-          alembic downgrade -1 || alembic downgrade base
-          alembic upgrade head
+          # 1. Bootstrap a tenant DB via the canonical path. This creates the
+          #    full schema from database.py and stamps alembic at head.
+          python - <<'PY'
+          import sys, os
+          sys.path.insert(0, os.getcwd())
+          from database import create_company_database, create_company_tables
+          ok, msg, _, _ = create_company_database("rtrip01", "RoundtripPass1!")
+          assert ok, f"create_company_database failed: {msg}"
+          ok, msg = create_company_tables("rtrip01", currency="SAR")
+          assert ok, f"create_company_tables failed: {msg}"
+          print("Tenant bootstrapped + alembic stamped at head")
+          PY
+
+          # 2. Round-trip the most recent revision against that tenant DB.
+          #    env.py honours -x company=<id> to switch its connection target.
+          alembic -x company=rtrip01 downgrade -1
+          alembic -x company=rtrip01 upgrade head
+          echo "Alembic round-trip OK"
 
   # ─────────────────────────────────────────────────────────────────────
   # Frontend: build + unit tests
