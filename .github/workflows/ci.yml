@@ -218,6 +218,54 @@ jobs:
           PY
 
   # ─────────────────────────────────────────────────────────────────────
+  # Alembic migrations: upgrade head → downgrade -1 → upgrade head
+  # Catches missing downgrade() implementations and irreversible migrations.
+  # ─────────────────────────────────────────────────────────────────────
+  alembic-roundtrip:
+    name: backend · alembic up/down/up
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aman
+          POSTGRES_PASSWORD: ci_pg_password
+          POSTGRES_DB: aman_alembic_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aman"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: aman
+      POSTGRES_PASSWORD: ci_pg_password
+      POSTGRES_DB: aman_alembic_ci
+      DATABASE_URL: postgresql://aman:ci_pg_password@localhost:5432/aman_alembic_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Round-trip alembic migrations
+        working-directory: backend
+        run: |
+          set -e
+          alembic upgrade head
+          # If only one revision exists, downgrade -1 collapses to base; that's fine.
+          alembic downgrade -1 || alembic downgrade base
+          alembic upgrade head
+
+  # ─────────────────────────────────────────────────────────────────────
   # Frontend: build + unit tests
   # ─────────────────────────────────────────────────────────────────────
   frontend:

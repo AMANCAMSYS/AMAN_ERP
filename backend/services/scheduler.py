@@ -373,6 +373,122 @@ def retry_failed_notifications():
             logger.error(f"Error retrying notifications in {db_name}: {e}")
 
 
+def auto_fx_revaluation():
+    """Monthly FX revaluation pass across all tenant databases.
+
+    Looks up the latest exchange rate per active foreign currency from
+    ``currency_rates`` and posts unrealized FX gain/loss adjustments via the
+    same logic exposed at ``/api/finance/accounting-depth/fx-revaluation``.
+    Idempotent per (company, currency, period) using an idempotency key.
+    """
+    logger.info("⏰ Running monthly FX revaluation across tenants...")
+
+    databases = []
+    try:
+        with system_engine.connect() as conn:
+            result = conn.execute(text("SELECT datname FROM pg_database WHERE datname LIKE 'aman_%'"))
+            databases = [row[0] for row in result.fetchall()]
+    except Exception as e:
+        logger.error(f"❌ Failed to list DBs for FX revaluation: {e}")
+        return
+
+    today = date.today()
+    period = today.strftime("%Y-%m")
+    for db_name in databases:
+        company_id = db_name.replace("aman_", "", 1)
+        if company_id == "system":
+            continue
+        try:
+            from services import gl_service
+            from utils.accounting import get_mapped_account_id
+            from utils.fiscal_lock import check_fiscal_period_open
+
+            engine = _get_company_engine_for_db(db_name)
+            with engine.connect() as conn:
+                base_ccy = conn.execute(
+                    text("SELECT value FROM settings WHERE key='base_currency' LIMIT 1")
+                ).scalar() or "SAR"
+                rates = conn.execute(text("""
+                    SELECT DISTINCT ON (currency_code) currency_code, rate
+                    FROM currency_rates
+                    WHERE currency_code <> :base
+                    ORDER BY currency_code, rate_date DESC
+                """), {"base": base_ccy}).fetchall()
+                if not rates:
+                    continue
+
+                gain_acc = get_mapped_account_id(conn, "acc_map_fx_gain") or get_mapped_account_id(conn, "acc_map_unrealized_fx_gain")
+                loss_acc = get_mapped_account_id(conn, "acc_map_fx_loss") or get_mapped_account_id(conn, "acc_map_unrealized_fx_loss")
+                if not (gain_acc and loss_acc):
+                    logger.warning(f"⚠️ FX revaluation: missing FX gain/loss accounts in {db_name}")
+                    continue
+
+                try:
+                    check_fiscal_period_open(conn, today.isoformat())
+                except Exception as e:
+                    logger.warning(f"⚠️ FX revaluation skipped for {db_name}: {e}")
+                    continue
+
+                for r in rates:
+                    ccy, new_rate = r.currency_code, float(r.rate)
+                    balances = conn.execute(text("""
+                        SELECT a.id AS account_id,
+                               COALESCE(SUM(jl.debit_currency - jl.credit_currency), 0) AS fx_balance,
+                               COALESCE(SUM(jl.debit - jl.credit), 0) AS local_balance
+                        FROM journal_lines jl
+                        JOIN accounts a ON a.id = jl.account_id
+                        JOIN journal_entries je ON je.id = jl.journal_entry_id
+                        WHERE jl.currency = :ccy
+                          AND a.account_type IN ('asset','liability')
+                          AND je.status = 'posted'
+                        GROUP BY a.id
+                        HAVING COALESCE(SUM(jl.debit_currency - jl.credit_currency), 0) <> 0
+                    """), {"ccy": ccy}).fetchall()
+
+                    lines = []
+                    total_adj = 0.0
+                    for b in balances:
+                        revalued = float(b.fx_balance) * new_rate
+                        adj = revalued - float(b.local_balance)
+                        if abs(adj) < 0.005:
+                            continue
+                        if adj > 0:
+                            lines.append({"account_id": b.account_id, "debit": adj, "credit": 0,
+                                          "description": f"FX reval {ccy} @ {new_rate}"})
+                        else:
+                            lines.append({"account_id": b.account_id, "debit": 0, "credit": -adj,
+                                          "description": f"FX reval {ccy} @ {new_rate}"})
+                        total_adj += adj
+                    if not lines:
+                        continue
+                    if total_adj > 0:
+                        lines.append({"account_id": gain_acc, "debit": 0, "credit": total_adj,
+                                      "description": f"Unrealized FX gain {ccy}"})
+                    else:
+                        lines.append({"account_id": loss_acc, "debit": -total_adj, "credit": 0,
+                                      "description": f"Unrealized FX loss {ccy}"})
+
+                    try:
+                        gl_service.create_journal_entry(
+                            conn,
+                            company_id=company_id,
+                            date=today.isoformat(),
+                            description=f"Auto FX revaluation {ccy} {period}",
+                            lines=lines,
+                            user_id=0,
+                            username="scheduler.fx_revaluation",
+                            source="fx_revaluation",
+                            idempotency_key=f"fx_reval:{company_id}:{ccy}:{period}",
+                        )
+                        conn.commit()
+                        logger.info(f"✅ FX revaluation posted for {db_name} / {ccy}")
+                    except Exception as e:
+                        conn.rollback()
+                        logger.warning(f"⚠️ FX revaluation post failed in {db_name}/{ccy}: {e}")
+        except Exception as e:
+            logger.error(f"❌ FX revaluation error in {db_name}: {e}")
+
+
 def start_scheduler():
     scheduler.add_job(check_scheduled_reports, 'interval', minutes=5, id='scheduled_reports',
                       max_instances=1, coalesce=True, misfire_grace_time=60)
@@ -384,5 +500,7 @@ def start_scheduler():
                       max_instances=1, coalesce=True, misfire_grace_time=60)  # Daily
     scheduler.add_job(retry_failed_notifications, 'interval', minutes=1, id='notification_retry',
                       max_instances=1, coalesce=True, misfire_grace_time=60)  # Every minute
+    scheduler.add_job(auto_fx_revaluation, 'cron', day=1, hour=2, id='fx_monthly_reval',
+                      max_instances=1, coalesce=True, misfire_grace_time=300)
     scheduler.start()
     logger.info("🚀 Scheduler started.")

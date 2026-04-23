@@ -621,3 +621,48 @@ du -sh /opt/aman/backend/uploads/
 # استهلاك الحاويات
 docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
 ```
+
+## Webhook DLQ + e-invoice outbox relay
+
+Both webhooks and the e-invoice outbox use the same retry pattern:
+
+* On failure the row is left in the source table with `attempts++`.
+* The retry worker (`backend/services/scheduler.py::retry_failed_notifications`
+  for webhooks; the on-demand `/api/finance/accounting-depth/einvoice/outbox/relay`
+  endpoint for invoices) waits an exponential backoff of `min(2^attempts, WEBHOOK_RETRY_BACKOFF_CAP_SEC)` seconds.
+* After **6 attempts** the row is moved to the DLQ status (`webhook_dlq` table
+  for webhooks, `einvoice_outbox.status='giveup'` for invoices) and stops being
+  retried automatically.
+
+### Manual replay
+
+```bash
+# Webhook DLQ replay (drain N rows back to pending)
+psql -U aman -d aman_<company_id> -c \
+  "UPDATE webhook_dlq SET status='pending', attempts=0 \
+   WHERE id IN (SELECT id FROM webhook_dlq WHERE status='giveup' ORDER BY id LIMIT 50);"
+
+# E-invoice outbox replay
+psql -U aman -d aman_<company_id> -c \
+  "UPDATE einvoice_outbox SET status='pending', attempts=0 \
+   WHERE id IN (SELECT id FROM einvoice_outbox WHERE status='giveup' ORDER BY id LIMIT 50);"
+
+# Trigger an immediate relay sweep
+curl -sS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  http://localhost:8000/api/finance/accounting-depth/einvoice/outbox/relay \
+  -d '{"limit": 100}' -H 'Content-Type: application/json'
+```
+
+### Tunables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `WEBHOOK_RETRY_BACKOFF_CAP_SEC` | `300` | upper bound for exponential backoff |
+| `WEBHOOK_RETRY_MAX_ATTEMPTS` | `6` | move to DLQ after this many tries |
+| `EINVOICE_OUTBOX_BATCH` | `50` | rows processed per relay invocation |
+
+### Monitoring
+
+* Prometheus alert: `WebhookDLQGrowth` fires when `webhook_dlq` count grows by > 10 in 1h.
+* Same alert pattern recommended for `einvoice_outbox` (status='giveup').
+* Dashboard panel: "Outbox lag" — `MAX(EXTRACT(EPOCH FROM NOW() - created_at))` for `pending` rows.

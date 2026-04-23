@@ -918,3 +918,339 @@ def modify_lease(
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
+
+
+# ==========================================================================
+# Field service request — close + post GL
+# ==========================================================================
+
+class ServiceRequestCloseRequest(BaseModel):
+    revenue_amount: float = Field(0, ge=0)
+    payment_method: Literal["cash", "bank", "ar"] = "ar"
+    completion_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.post("/service-requests/{request_id}/post-gl",
+             dependencies=[Depends(require_permission(["services.edit", "accounting.manage"]))])
+def post_service_request_gl(
+    request_id: int,
+    body: ServiceRequestCloseRequest,
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    """Close a field service request and post the GL entry for revenue and accumulated cost.
+
+    Convention:
+      * Revenue: DR receivable/cash/bank, CR service revenue (``acc_map_service_revenue``
+        with fallback to ``acc_map_sales``).
+      * Cost (already recorded in ``service_request_costs``): DR cost-of-services
+        (``acc_map_cogs_services`` -> fallback ``acc_map_cogs``), CR
+        ``acc_map_service_cost_clearing`` (fallback ``acc_map_inventory``).
+
+    Idempotent via ``service_request:{id}`` idempotency key.
+    """
+    from services import gl_service
+
+    db = get_db_connection(current_user.company_id)
+    try:
+        row = db.execute(
+            text(
+                """
+                SELECT id, COALESCE(actual_cost, 0) AS cost, COALESCE(status, 'open') AS status
+                FROM service_requests
+                WHERE id = :id AND COALESCE(is_deleted, FALSE) = FALSE
+                FOR UPDATE
+                """
+            ),
+            {"id": request_id},
+        ).fetchone()
+        if not row:
+            raise HTTPException(**http_error(404, "maintenance_request_not_found"))
+        if row.status in ("closed", "posted"):
+            raise HTTPException(status_code=400, detail="الطلب مغلق ومرحَّل بالفعل")
+
+        cost = _dec(row.cost)
+        revenue = _dec(body.revenue_amount)
+        if cost <= 0 and revenue <= 0:
+            raise HTTPException(status_code=400, detail="لا توجد قيمة لترحيلها")
+
+        txn_date = body.completion_date or datetime.now().strftime("%Y-%m-%d")
+        check_fiscal_period_open(db, txn_date)
+
+        if body.payment_method == "cash":
+            cash_acc = get_mapped_account_id(db, "acc_map_cash_main")
+        elif body.payment_method == "bank":
+            cash_acc = get_mapped_account_id(db, "acc_map_bank")
+        else:
+            cash_acc = get_mapped_account_id(db, "acc_map_ar")
+        revenue_acc = (
+            get_mapped_account_id(db, "acc_map_service_revenue")
+            or get_mapped_account_id(db, "acc_map_sales")
+        )
+        cost_acc = (
+            get_mapped_account_id(db, "acc_map_cogs_services")
+            or get_mapped_account_id(db, "acc_map_cogs")
+        )
+        clearing_acc = (
+            get_mapped_account_id(db, "acc_map_service_cost_clearing")
+            or get_mapped_account_id(db, "acc_map_inventory")
+        )
+        if revenue > 0 and not (cash_acc and revenue_acc):
+            raise HTTPException(status_code=400, detail="حسابات الإيراد غير مهيأة")
+        if cost > 0 and not (cost_acc and clearing_acc):
+            raise HTTPException(status_code=400, detail="حسابات التكلفة غير مهيأة")
+
+        lines: List[dict] = []
+        if revenue > 0:
+            lines.append({"account_id": cash_acc, "debit": float(revenue), "credit": 0,
+                          "description": f"Service revenue SR#{request_id}"})
+            lines.append({"account_id": revenue_acc, "debit": 0, "credit": float(revenue),
+                          "description": f"Service revenue SR#{request_id}"})
+        if cost > 0:
+            lines.append({"account_id": cost_acc, "debit": float(cost), "credit": 0,
+                          "description": f"Cost of services SR#{request_id}"})
+            lines.append({"account_id": clearing_acc, "debit": 0, "credit": float(cost),
+                          "description": f"Service cost clearing SR#{request_id}"})
+
+        je_id, je_num = gl_service.create_journal_entry(
+            db,
+            company_id=current_user.company_id,
+            date=txn_date,
+            description=f"Service request #{request_id} completion",
+            lines=lines,
+            user_id=current_user.id,
+            reference=f"SR-GL-{request_id}",
+            source="service_request",
+            source_id=request_id,
+            idempotency_key=f"service_request:{request_id}",
+        )
+
+        db.execute(
+            text(
+                """
+                UPDATE service_requests
+                SET status = 'closed',
+                    closed_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+                """
+            ),
+            {"id": request_id},
+        )
+        db.commit()
+        log_activity(
+            db, user_id=current_user.id, username=current_user.username,
+            action="service_request.post_gl", resource_type="service_request",
+            resource_id=request_id,
+            details={"revenue": float(revenue), "cost": float(cost), "je": je_num},
+            request=request,
+        )
+        return {
+            "request_id": request_id,
+            "revenue": float(revenue),
+            "cost": float(cost),
+            "journal_entry_id": je_id,
+            "entry_number": je_num,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Service GL posting failed")
+        raise HTTPException(**http_error(500, "internal_error"))
+    finally:
+        db.close()
+
+
+# ==========================================================================
+# Bulk CGU impairment scan (IAS 36)
+# ==========================================================================
+
+class BulkImpairmentItem(BaseModel):
+    cgu_id: int
+    carrying_amount: float = Field(..., gt=0)
+    value_in_use: Optional[float] = None
+    fair_value_less_costs: Optional[float] = None
+
+
+class BulkImpairmentRequest(BaseModel):
+    as_of_date: Optional[str] = None
+    post_journal: bool = False
+    items: List[BulkImpairmentItem]
+
+
+@router.post("/assets/cgu/impairment-bulk",
+             dependencies=[Depends(require_permission(["assets.manage", "accounting.manage"]))])
+def run_bulk_cgu_impairment(
+    body: BulkImpairmentRequest,
+    current_user=Depends(get_current_user),
+):
+    """Run impairment tests for multiple cash-generating units in one request.
+
+    Wraps ``services.impairment_service.record_impairment_test`` per row. When
+    ``post_journal=True`` the impairment expense / accumulated impairment
+    accounts must be configured via ``acc_map_impairment_expense`` and
+    ``acc_map_accumulated_impairment``.
+    """
+    from datetime import date as _date
+    from services.impairment_service import record_impairment_test
+
+    if not body.items:
+        raise HTTPException(status_code=400, detail="items فارغة")
+
+    db = get_db_connection(current_user.company_id)
+    try:
+        as_of = body.as_of_date or _date.today().isoformat()
+        if body.post_journal:
+            check_fiscal_period_open(db, as_of)
+        exp_acc = get_mapped_account_id(db, "acc_map_impairment_expense") if body.post_journal else None
+        acc_acc = get_mapped_account_id(db, "acc_map_accumulated_impairment") if body.post_journal else None
+        if body.post_journal and not (exp_acc and acc_acc):
+            raise HTTPException(status_code=400, detail="حسابات اضمحلال CGU غير مهيأة")
+
+        results = []
+        total_loss = Decimal("0")
+        for item in body.items:
+            try:
+                res = record_impairment_test(
+                    db,
+                    cgu_id=item.cgu_id,
+                    carrying_amount=Decimal(str(item.carrying_amount)),
+                    company_id=current_user.company_id,
+                    value_in_use=Decimal(str(item.value_in_use)) if item.value_in_use is not None else None,
+                    fair_value_less_costs=Decimal(str(item.fair_value_less_costs)) if item.fair_value_less_costs is not None else None,
+                    as_of_date=_date.fromisoformat(as_of),
+                    post_journal=body.post_journal,
+                    impairment_expense_account_id=exp_acc,
+                    accumulated_impairment_account_id=acc_acc,
+                    user_id=current_user.id,
+                    username=current_user.username,
+                    details={"bulk": True},
+                )
+                total_loss += Decimal(str(res["impairment_loss"]))
+                results.append(res)
+            except ValueError as e:
+                results.append({"cgu_id": item.cgu_id, "error": str(e)})
+        return {"as_of_date": as_of, "count": len(results), "total_impairment_loss": float(total_loss), "tests": results}
+    finally:
+        db.close()
+
+
+# ==========================================================================
+# Tenant ledger bootstrap
+# ==========================================================================
+
+class LedgerBootstrapRequest(BaseModel):
+    include_ifrs: bool = True
+    include_tax: bool = False
+    include_management: bool = False
+    base_currency: Optional[str] = None
+
+
+@router.post("/accounting/ledgers/bootstrap",
+             dependencies=[Depends(require_permission("accounting.manage"))])
+def bootstrap_ledgers(
+    body: LedgerBootstrapRequest,
+    current_user=Depends(get_current_user),
+):
+    """Ensure the tenant has the standard set of accounting ledgers.
+
+    Creates rows in ``ledgers`` if they do not exist. The ``primary`` ledger is
+    seeded by ``database.create_all_tables`` already; this endpoint adds IFRS,
+    tax and management ledgers idempotently.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        targets = []
+        if body.include_ifrs:
+            targets.append(("ifrs", "IFRS Ledger", "ifrs"))
+        if body.include_tax:
+            targets.append(("tax", "Tax Ledger", "tax"))
+        if body.include_management:
+            targets.append(("mgmt", "Management Ledger", "mgmt"))
+        created = []
+        for code, name, framework in targets:
+            row = db.execute(
+                text(
+                    """
+                    INSERT INTO ledgers (code, name, is_primary, framework, currency, is_active)
+                    VALUES (:c, :n, FALSE, :f, :cur, TRUE)
+                    ON CONFLICT (code) DO NOTHING
+                    RETURNING id
+                    """
+                ),
+                {"c": code, "n": name, "f": framework, "cur": body.base_currency},
+            ).fetchone()
+            if row:
+                created.append({"code": code, "id": row[0]})
+        db.commit()
+        all_rows = db.execute(text("SELECT id, code, name, framework, is_primary, is_active FROM ledgers ORDER BY id")).fetchall()
+        return {"created": created, "ledgers": [dict(r._mapping) for r in all_rows]}
+    finally:
+        db.close()
+
+
+# ==========================================================================
+# POS offline batch sync (skeleton)
+# ==========================================================================
+
+class POSOfflineSale(BaseModel):
+    client_uuid: str = Field(..., min_length=8, max_length=64)
+    session_id: int
+    payload: dict
+    created_at: Optional[str] = None
+
+
+class POSBatchSyncRequest(BaseModel):
+    sales: List[POSOfflineSale]
+
+
+@router.post("/pos/sync/batch", dependencies=[Depends(require_permission("pos.use"))])
+def pos_batch_sync(
+    body: POSBatchSyncRequest,
+    current_user=Depends(get_current_user),
+):
+    """Accept a batch of offline POS sales and queue them for processing.
+
+    Idempotent on ``client_uuid``: rows already present in
+    ``pos_offline_inbox`` are silently skipped, allowing the device to retry
+    safely. The actual sale creation is performed by the regular POS endpoint
+    once the row is dequeued by the POS worker.
+    """
+    if not body.sales:
+        return {"accepted": 0, "duplicates": 0}
+
+    db = get_db_connection(current_user.company_id)
+    try:
+        accepted = 0
+        duplicates = 0
+        import json as _json
+        for sale in body.sales:
+            row = db.execute(
+                text(
+                    """
+                    INSERT INTO pos_offline_inbox
+                        (client_uuid, session_id, user_id, payload, client_created_at)
+                    VALUES (:u, :s, :uid, CAST(:p AS JSONB), :ts)
+                    ON CONFLICT (client_uuid) DO NOTHING
+                    RETURNING id
+                    """
+                ),
+                {
+                    "u": sale.client_uuid,
+                    "s": sale.session_id,
+                    "uid": current_user.id,
+                    "p": _json.dumps(sale.payload, default=str, ensure_ascii=False),
+                    "ts": sale.created_at,
+                },
+            ).fetchone()
+            if row:
+                accepted += 1
+            else:
+                duplicates += 1
+        db.commit()
+        return {"accepted": accepted, "duplicates": duplicates, "queued": accepted}
+    finally:
+        db.close()

@@ -370,10 +370,17 @@ class TestZakatAndVAT:
         if not has_table:
             pytest.skip("tax_rates table does not exist")
 
+        # Schema: tax_rates(tax_name, tax_name_en, rate_value, is_active, ...)
         db.execute("""
-            SELECT rate FROM tax_rates
-            WHERE name LIKE '%قيمة مضافة%' OR name LIKE '%VAT%'
-            AND is_active = true
+            SELECT rate_value FROM tax_rates
+            WHERE is_active = TRUE
+              AND (
+                tax_name ILIKE '%قيمة مضافة%'
+                OR tax_name ILIKE '%VAT%'
+                OR COALESCE(tax_name_en, '') ILIKE '%VAT%'
+                OR COALESCE(tax_code, '') ILIKE '%VAT%'
+              )
+            ORDER BY id
             LIMIT 1
         """)
         row = db.fetchone()

@@ -6026,6 +6026,21 @@ def get_extended_features_tables_sql() -> str:
     );
     CREATE INDEX IF NOT EXISTS ix_zakat_base_category ON zakat_base_items(category);
 
+    -- POS offline batch sync inbox (deduped by client_uuid)
+    CREATE TABLE IF NOT EXISTS pos_offline_inbox (
+        id SERIAL PRIMARY KEY,
+        client_uuid VARCHAR(64) UNIQUE NOT NULL,
+        session_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        payload JSONB NOT NULL,
+        client_created_at TIMESTAMPTZ,
+        received_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(20) NOT NULL DEFAULT 'queued',
+        processed_at TIMESTAMPTZ,
+        error TEXT
+    );
+    CREATE INDEX IF NOT EXISTS ix_pos_offline_inbox_status ON pos_offline_inbox(status, received_at);
+
 
     -- ========== US6: Employee Self-Service ==========
     CREATE TABLE IF NOT EXISTS self_service_requests (
