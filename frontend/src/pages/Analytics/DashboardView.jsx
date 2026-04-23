@@ -5,7 +5,7 @@ import { dashboardAPI } from '../../services/dashboard'
 import BackButton from '../../components/common/BackButton'
 import {
     BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import DateInput from '../../components/common/DateInput';
 
@@ -109,7 +109,6 @@ function ChartWidget({ widget }) {
                             <XAxis dataKey={labelKey} tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} />
                             <Tooltip />
-                            <Legend />
                             {numericKeys.slice(0, 3).map((k, i) => (
                                 <Bar key={k} dataKey={k} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                             ))}
@@ -131,7 +130,6 @@ function ChartWidget({ widget }) {
                             <XAxis dataKey={labelKey} tick={{ fontSize: 11 }} />
                             <YAxis tick={{ fontSize: 11 }} />
                             <Tooltip />
-                            <Legend />
                             {numericKeys.slice(0, 3).map((k, i) => (
                                 <Line key={k} type="monotone" dataKey={k} stroke={CHART_COLORS[i % CHART_COLORS.length]} />
                             ))}
@@ -159,7 +157,6 @@ function ChartWidget({ widget }) {
                                 ))}
                             </Pie>
                             <Tooltip />
-                            <Legend />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>

@@ -5,7 +5,7 @@ import { api } from '../../utils/api';
 import { useBranch } from '../../context/BranchContext';
 import { useToast } from '../../context/ToastContext';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import BackButton from '../../components/common/BackButton';
 import DateInput from '../../components/common/DateInput';
@@ -174,7 +174,6 @@ const DetailedProfitLoss = () => {
                             <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={60} />
                             <YAxis />
                             <Tooltip />
-                            <Legend />
                             <Bar dataKey={t('reports.detailed_pl.revenue')} fill="#10B981" />
                             <Bar dataKey={t('reports.detailed_pl.cogs')} fill="#EF4444" />
                             <Bar dataKey={t('reports.detailed_pl.gross_profit')} fill="#3B82F6" />

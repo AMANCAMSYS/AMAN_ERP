@@ -4,7 +4,7 @@ import { reportsAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import { getCurrency } from '../../../utils/auth';
 import { formatNumber } from '../../../utils/format';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import BackButton from '../../../components/common/BackButton';
 import { PageLoading } from '../../../components/common/LoadingStates'
 
@@ -49,7 +49,6 @@ const PayrollReport = () => {
                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                                 formatter={(value) => [`${formatNumber(value)} ${currency}`, '']}
                             />
-                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
                             <Bar dataKey="total_gross" name={t('hr.payroll.gross', 'Gross Salary')} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
                             <Bar dataKey="total_net" name={t('hr.payroll.net', 'Net Salary')} fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
                         </BarChart>

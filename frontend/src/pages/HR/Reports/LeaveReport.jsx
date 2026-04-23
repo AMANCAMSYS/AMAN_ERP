@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { reportsAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import CustomDatePicker from '../../../components/common/CustomDatePicker';
 import BackButton from '../../../components/common/BackButton';
 import { PageLoading } from '../../../components/common/LoadingStates'
@@ -95,7 +95,6 @@ const LeaveReport = () => {
                                         ))}
                                     </Pie>
                                     <Tooltip formatter={(value) => [`${value} ${t('common.days')}`, t('hr.leaves.days')]} />
-                                    <Legend iconType="circle" />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
