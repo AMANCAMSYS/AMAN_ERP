@@ -14,7 +14,7 @@ import logging
 
 logger = logging.getLogger("aman.notifications")
 
-router = APIRouter(prefix="/notifications", tags=["الإشعارات"])
+router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 class NotificationResponse(BaseModel):
     id: int

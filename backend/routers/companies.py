@@ -23,7 +23,7 @@ from utils.permissions import require_permission
 from utils.limiter import limiter
 from utils.audit import log_activity
 
-router = APIRouter(prefix="/companies", tags=["إدارة الشركات"])
+router = APIRouter(prefix="/companies", tags=["Companies"])
 logger = logging.getLogger(__name__)
 
 

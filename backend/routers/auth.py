@@ -24,7 +24,7 @@ from utils.audit import log_activity, log_system_activity
 from utils.limiter import limiter
 from utils.auth_cookies import set_auth_cookies, clear_auth_cookies
 
-router = APIRouter(prefix="/auth", tags=["المصادقة"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
 logger = logging.getLogger(__name__)
@@ -1871,7 +1871,7 @@ def _require_system_admin(current_user):
         )
 
 
-@router.post("/admin/2fa/setup", tags=["المصادقة"])
+@router.post("/admin/2fa/setup", tags=["Authentication"])
 def admin_2fa_setup(
     body: AdminTwoFASetup,
     current_user=Depends(get_current_user),
@@ -1913,7 +1913,7 @@ def admin_2fa_setup(
     return {"secret": secret, "provisioning_uri": uri}
 
 
-@router.post("/admin/2fa/verify", tags=["المصادقة"])
+@router.post("/admin/2fa/verify", tags=["Authentication"])
 def admin_2fa_verify(
     body: AdminTwoFAVerify,
     current_user=Depends(get_current_user),
@@ -1954,7 +1954,7 @@ def admin_2fa_verify(
         db.close()
 
 
-@router.post("/admin/2fa/disable", tags=["المصادقة"])
+@router.post("/admin/2fa/disable", tags=["Authentication"])
 def admin_2fa_disable(
     body: AdminTwoFASetup,
     current_user=Depends(get_current_user),

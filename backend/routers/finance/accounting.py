@@ -21,7 +21,7 @@ from schemas.accounting import AccountCreate, AccountUpdate, FiscalYearCreate, F
 from utils.cache import cache
 from utils.limiter import limiter
 
-router = APIRouter(prefix="/accounting", tags=["المحاسبة"])
+router = APIRouter(prefix="/accounting", tags=["Accounting"])
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal("0.01")

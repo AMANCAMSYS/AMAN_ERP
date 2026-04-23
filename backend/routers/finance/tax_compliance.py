@@ -19,7 +19,7 @@ from utils.audit import log_activity
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 
-router = APIRouter(prefix="/tax-compliance", tags=["الامتثال الضريبي"], dependencies=[Depends(require_module("taxes"))])
+router = APIRouter(prefix="/tax-compliance", tags=["Tax Compliance"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal("0.01")

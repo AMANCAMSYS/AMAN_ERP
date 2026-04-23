@@ -15,7 +15,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module
 from utils.tenant_isolation import resolve_target_company_id
 
-router = APIRouter(prefix="/audit", tags=["سجلات المراقبة"], dependencies=[Depends(require_module("audit"))])
+router = APIRouter(prefix="/audit", tags=["Audit Logs"], dependencies=[Depends(require_module("audit"))])
 logger = logging.getLogger(__name__)
 
 

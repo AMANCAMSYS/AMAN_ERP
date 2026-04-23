@@ -44,7 +44,7 @@ class RevenueScheduleCreate(BaseModel):
 
 rev_router = APIRouter(
     prefix="/accounting/revenue-recognition",
-    tags=["الاعتراف بالإيرادات"],
+    tags=["Revenue Recognition"],
 )
 
 

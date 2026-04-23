@@ -4201,6 +4201,15 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                     VALUES (:number, :code, :name, :name_en, :type, :parent_id, :currency) RETURNING id
                 """), {"number": acc[0], "code": acc[1], "name": acc[2], "name_en": acc[3], "type": acc[4], "parent_id": parent_id, "currency": currency})
                 inserted_ids[acc[0]] = result.fetchone()[0]
+
+            # ACC-DB-02 (Phase-11 Sprint-6): flag all parents as header accounts so
+            # postings are only allowed on leaf nodes. A parent is any account that
+            # appears as parent_id for another row.
+            conn.execute(text("""
+                UPDATE accounts
+                SET is_header = TRUE
+                WHERE id IN (SELECT DISTINCT parent_id FROM accounts WHERE parent_id IS NOT NULL)
+            """))
             
             # Default settings
             default_currency = currency
@@ -5641,6 +5650,20 @@ def get_system_completion_tables_sql() -> str:
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER REFERENCES delivery_orders(id) ON DELETE SET NULL;
     -- TREAS-F4 (Phase-11 Sprint-5): absolute tolerance for bank recon auto-match
     ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS tolerance_amount DECIMAL(18, 4) DEFAULT 0;
+
+    -- WF-F6 (Phase-11 Sprint-6): parallel / any-of / all-of approval steps
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS step_group INTEGER DEFAULT 0;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS quorum_required INTEGER DEFAULT 1;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS approvals_collected INTEGER DEFAULT 0;
+
+    -- ACC-F13 / ACC-F12 (Phase-11 Sprint-6): richer depreciation + revaluation tracking
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS depreciation_method VARCHAR(40) DEFAULT 'straight_line';
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS expected_production_units DECIMAL(18, 4);
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS cumulative_production_units DECIMAL(18, 4) DEFAULT 0;
+    ALTER TABLE assets ADD COLUMN IF NOT EXISTS revaluation_reserve DECIMAL(18, 4) DEFAULT 0;
+
+    -- WF-F7 (Phase-11 Sprint-6): track when SLA escalation last ran to avoid duplicate notifies
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS sla_escalated_at TIMESTAMPTZ;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(5) DEFAULT NULL;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_saudi BOOLEAN DEFAULT FALSE;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS eos_eligible BOOLEAN DEFAULT TRUE;
@@ -5940,6 +5963,69 @@ def get_extended_features_tables_sql() -> str:
     );
     CREATE INDEX IF NOT EXISTS ix_einvoice_outbox_due ON einvoice_outbox(status, next_attempt_at);
     CREATE INDEX IF NOT EXISTS ix_einvoice_outbox_invoice ON einvoice_outbox(invoice_id);
+
+    -- ==========================================================================
+    -- Phase-11 Sprint-6: configuration + workflow + treasury hardening tables
+    -- ==========================================================================
+
+    -- WF-M1: overtime rate multipliers (replaces hardcoded 1.5/2.0)
+    CREATE TABLE IF NOT EXISTS overtime_rates_config (
+        id SERIAL PRIMARY KEY,
+        rate_key VARCHAR(40) UNIQUE NOT NULL,
+        description VARCHAR(200),
+        multiplier DECIMAL(6, 3) NOT NULL CHECK (multiplier > 0),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO overtime_rates_config (rate_key, description, multiplier) VALUES
+      ('weekday_ot', 'Weekday overtime multiplier', 1.500),
+      ('weekend_ot', 'Weekend / public holiday overtime', 2.000),
+      ('night_shift', 'Night-shift premium', 1.250)
+    ON CONFLICT (rate_key) DO NOTHING;
+
+    -- WF-M2: document access control per department / role (complements existing DMS)
+    CREATE TABLE IF NOT EXISTS document_permissions (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        department_id INTEGER REFERENCES departments(id) ON DELETE CASCADE,
+        role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES company_users(id) ON DELETE CASCADE,
+        access_level VARCHAR(10) NOT NULL DEFAULT 'view' CHECK (access_level IN ('view','edit','owner')),
+        granted_by INTEGER REFERENCES company_users(id),
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT chk_doc_perm_target CHECK (
+            department_id IS NOT NULL OR role_id IS NOT NULL OR user_id IS NOT NULL
+        )
+    );
+    CREATE INDEX IF NOT EXISTS ix_doc_perm_doc ON document_permissions(document_id);
+    CREATE INDEX IF NOT EXISTS ix_doc_perm_dept ON document_permissions(department_id);
+
+    -- WF-F8: geofences and their bindings to branches (attendance check-in)
+    CREATE TABLE IF NOT EXISTS geofences (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
+        center_lat DECIMAL(10, 7) NOT NULL,
+        center_lng DECIMAL(10, 7) NOT NULL,
+        radius_m INTEGER NOT NULL CHECK (radius_m > 0),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS ix_geofences_branch ON geofences(branch_id);
+
+    -- ZAK-F2: canonical zakat base items mapping (replaces fragile LIKE matching)
+    CREATE TABLE IF NOT EXISTS zakat_base_items (
+        id SERIAL PRIMARY KEY,
+        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        category VARCHAR(30) NOT NULL CHECK (category IN ('asset','deductible','addition','exclude')),
+        weight DECIMAL(6, 4) DEFAULT 1.0000,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (account_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_zakat_base_category ON zakat_base_items(category);
+
 
     -- ========== US6: Employee Self-Service ==========
     CREATE TABLE IF NOT EXISTS self_service_requests (

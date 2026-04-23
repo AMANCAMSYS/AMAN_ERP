@@ -23,7 +23,7 @@ from utils.accounting import (
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 
-router = APIRouter(prefix="/purchases/landed-costs", tags=["التكاليف المُضافة"], dependencies=[Depends(require_module("landed_costs"))])
+router = APIRouter(prefix="/purchases/landed-costs", tags=["Landed Costs"], dependencies=[Depends(require_module("landed_costs"))])
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal('0.01')

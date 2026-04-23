@@ -20,7 +20,7 @@ from schemas.intercompany import (
 )
 from services import intercompany_service
 
-router = APIRouter(prefix="/accounting/intercompany", tags=["المعاملات بين الشركات v2"])
+router = APIRouter(prefix="/accounting/intercompany", tags=["Intercompany v2"])
 logger = logging.getLogger(__name__)
 
 

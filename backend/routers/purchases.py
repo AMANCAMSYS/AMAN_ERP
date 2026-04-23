@@ -23,7 +23,7 @@ from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry as gl_create_journal_entry
 from schemas.purchases import PurchaseCreate, SupplierGroupCreate, POCreate, POReceiveRequest, SupplierPaymentCreate
 
-router = APIRouter(prefix="/buying", tags=["المشتريات"], dependencies=[Depends(require_module("buying"))])
+router = APIRouter(prefix="/buying", tags=["Purchases"], dependencies=[Depends(require_module("buying"))])
 logger = logging.getLogger(__name__)
 
 # --- Endpoints ---

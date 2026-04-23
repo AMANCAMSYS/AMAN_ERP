@@ -16,7 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/approvals", tags=["الاعتمادات"], dependencies=[Depends(require_module("approvals"))])
+router = APIRouter(prefix="/approvals", tags=["Approvals"], dependencies=[Depends(require_module("approvals"))])
 
 
 # ===================== Schemas =====================
@@ -494,11 +494,14 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
         if data.action not in ('approve', 'reject', 'return'):
             raise HTTPException(400, "الإجراء غير صالح. يجب أن يكون: approve, reject, return")
 
-        # T018: Check for existing action on this step
-        existing_action_count = db.execute(text(
-            "SELECT COUNT(*) FROM approval_actions WHERE request_id = :rid AND step = :step"
-        ), {"rid": request_id, "step": request.current_step}).scalar()
-        if existing_action_count > 0:
+        # WF-F6 (Phase-11 Sprint-6): quorum-aware duplicate guard.
+        # Block the same user from acting twice on the same step, but allow
+        # multiple distinct approvers when ``quorum_required > 1``.
+        already_by_user = db.execute(text(
+            "SELECT COUNT(*) FROM approval_actions "
+            "WHERE request_id = :rid AND step = :step AND actioned_by = :uid"
+        ), {"rid": request_id, "step": request.current_step, "uid": current_user.id}).scalar()
+        if already_by_user:
             raise HTTPException(409, "already_actioned")
 
         # Record the action
@@ -518,7 +521,32 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
         steps = workflow.steps if isinstance(workflow.steps, list) else json.loads(workflow.steps or "[]")
         total_steps = len(steps)
 
+        # Quorum: how many approvals required for the current step, and how many collected.
+        quorum_required = getattr(request, "quorum_required", None) or 1
+        try:
+            step_quorum = int(steps[request.current_step - 1].get("quorum", quorum_required))
+        except Exception:
+            step_quorum = quorum_required
+        approvals_collected = db.execute(text(
+            "SELECT COUNT(*) FROM approval_actions "
+            "WHERE request_id = :rid AND step = :step AND action = 'approve'"
+        ), {"rid": request_id, "step": request.current_step}).scalar() or 0
+        # persist running tally
+        db.execute(text(
+            "UPDATE approval_requests SET approvals_collected = :c WHERE id = :id"
+        ), {"c": approvals_collected, "id": request_id})
+
         if data.action == 'approve':
+            if approvals_collected < step_quorum:
+                # Quorum not yet met — stay on the current step, wait for more approvers
+                db.commit()
+                return {
+                    "ok": True,
+                    "step": request.current_step,
+                    "approvals_collected": approvals_collected,
+                    "quorum_required": step_quorum,
+                    "status": "awaiting_quorum",
+                }
             if request.current_step >= total_steps:
                 # Final approval - mark as approved
                 db.execute(text("""

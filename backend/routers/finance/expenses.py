@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 from schemas.expenses import ExpenseCreate, ExpenseUpdate, ExpenseApproval, ExpensePolicyCreate, ExpensePolicyUpdate, ExpenseValidation
 
-router = APIRouter(prefix="/expenses", tags=["المصاريف"], dependencies=[Depends(require_module("expenses"))])
+router = APIRouter(prefix="/expenses", tags=["Expenses"], dependencies=[Depends(require_module("expenses"))])
 
 EXPENSE_TYPES = [
     "travel", "meals", "supplies", "transportation", "entertainment",

@@ -27,7 +27,7 @@ def _dec(v) -> Decimal:
     """Convert any numeric value to Decimal safely."""
     return Decimal(str(v)) if v is not None else Decimal('0')
 
-router = APIRouter(prefix="/treasury", tags=["الخزينة والمصروفات"], dependencies=[Depends(require_module("treasury"))])
+router = APIRouter(prefix="/treasury", tags=["Treasury & Expenses"], dependencies=[Depends(require_module("treasury"))])
 logger = logging.getLogger(__name__)
 
 # --- Endpoints ---

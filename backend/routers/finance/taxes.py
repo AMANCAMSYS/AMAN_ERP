@@ -21,7 +21,7 @@ from utils.accounting import (
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 
-router = APIRouter(prefix="/taxes", tags=["الضرائب"], dependencies=[Depends(require_module("taxes"))])
+router = APIRouter(prefix="/taxes", tags=["Taxes"], dependencies=[Depends(require_module("taxes"))])
 logger = logging.getLogger(__name__)
 from schemas.taxes import TaxRateCreate, TaxRateUpdate, TaxGroupCreate, TaxReturnCreate, TaxPaymentCreate
 

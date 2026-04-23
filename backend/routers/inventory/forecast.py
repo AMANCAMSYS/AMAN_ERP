@@ -12,7 +12,7 @@ from schemas.forecast import ForecastAdjustRequest, ForecastGenerateRequest
 from services.demand_forecast_service import generate_demand_forecast, manual_adjust
 from utils.permissions import require_permission
 
-forecast_router = APIRouter(prefix="/forecast", tags=["التنبؤ بالطلب"])
+forecast_router = APIRouter(prefix="/forecast", tags=["Demand Forecasting"])
 logger = logging.getLogger(__name__)
 
 

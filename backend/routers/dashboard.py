@@ -12,7 +12,7 @@ from utils.permissions import require_permission, validate_branch_access
 from utils.cache import cached
 import time
 
-router = APIRouter(prefix="/dashboard", tags=["لوحة التحكم"])
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 logger = logging.getLogger(__name__)
 
 # Cache for system stats to avoid slowness

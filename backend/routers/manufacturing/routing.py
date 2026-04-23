@@ -21,7 +21,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission
 
 logger = logging.getLogger(__name__)
-routing_router = APIRouter(prefix="/manufacturing/routing", tags=["مسارات التصنيع"])
+routing_router = APIRouter(prefix="/manufacturing/routing", tags=["Manufacturing Routing"])
 
 
 # ── helpers ───────────────────────────────────────────────────────────

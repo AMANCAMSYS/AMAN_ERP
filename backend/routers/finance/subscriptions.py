@@ -38,7 +38,7 @@ from utils.permissions import require_permission
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/finance/subscriptions", tags=["إدارة الاشتراكات"])
+router = APIRouter(prefix="/finance/subscriptions", tags=["Subscriptions"])
 
 
 # ── Plans ──

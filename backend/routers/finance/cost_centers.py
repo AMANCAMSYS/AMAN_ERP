@@ -12,7 +12,7 @@ from schemas.cost_centers import CostCenterCreate, CostCenterUpdate, CostCenterR
 import logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/cost-centers", tags=["مراكز التكلفة"], dependencies=[Depends(require_module("cost_centers"))])
+router = APIRouter(prefix="/cost-centers", tags=["Cost Centers"], dependencies=[Depends(require_module("cost_centers"))])
 
 # --- Endpoints ---
 

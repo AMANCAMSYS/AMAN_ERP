@@ -17,7 +17,7 @@ from utils.treasury_gl import ensure_treasury_gl_accounts
 import logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/notes", tags=["أوراق القبض والدفع"], dependencies=[Depends(require_module("treasury"))])
+router = APIRouter(prefix="/notes", tags=["Notes Receivable/Payable"], dependencies=[Depends(require_module("treasury"))])
 
 _D2 = Decimal('0.01')
 

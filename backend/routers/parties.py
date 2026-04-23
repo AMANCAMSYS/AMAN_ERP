@@ -9,7 +9,7 @@ from utils.permissions import require_permission
 import logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/parties", tags=["الجهات (العملاء والموردين)"])
+router = APIRouter(prefix="/parties", tags=["Parties"])
 
 @router.get("/customers", response_model=dict, dependencies=[Depends(require_permission(["parties.view", "sales.view"]))])
 async def get_customers(

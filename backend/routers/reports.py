@@ -15,7 +15,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, validate_branch_access
 from utils.cache import cached
 
-router = APIRouter(prefix="/reports", tags=["التقارير"])
+router = APIRouter(prefix="/reports", tags=["Reports"])
 
 
 # ---------------------------------------------------------------------------

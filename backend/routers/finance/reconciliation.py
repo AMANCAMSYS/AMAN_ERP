@@ -17,7 +17,7 @@ from utils.permissions import require_permission, require_module, validate_branc
 from utils.audit import log_activity
 from schemas.reconciliation import ReconciliationCreate, StatementLineCreate, MatchRequest, UnmatchRequest
 
-router = APIRouter(prefix="/reconciliation", tags=["تسوية البنك"], dependencies=[Depends(require_module("accounting"))])
+router = APIRouter(prefix="/reconciliation", tags=["Bank Reconciliation"], dependencies=[Depends(require_module("accounting"))])
 
 _D2 = Decimal("0.01")
 

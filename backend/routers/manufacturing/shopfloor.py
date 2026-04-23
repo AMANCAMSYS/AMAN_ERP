@@ -28,7 +28,7 @@ from schemas.shopfloor import (
 from utils.audit import log_activity
 from utils.permissions import require_permission
 
-shopfloor_router = APIRouter(prefix="/manufacturing/shopfloor", tags=["أرضية الإنتاج"])
+shopfloor_router = APIRouter(prefix="/manufacturing/shopfloor", tags=["Shop Floor"])
 logger = logging.getLogger(__name__)
 
 

@@ -21,7 +21,7 @@ from schemas.assets import (
 import logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/assets", tags=["الأصول الثابتة"], dependencies=[Depends(require_module("assets"))])
+router = APIRouter(prefix="/assets", tags=["Fixed Assets"], dependencies=[Depends(require_module("assets"))])
 
 _D2 = Decimal("0.01")
 _D4 = Decimal("0.0001")

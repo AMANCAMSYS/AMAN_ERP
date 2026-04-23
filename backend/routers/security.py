@@ -17,7 +17,7 @@ import re
 
 logger = logging.getLogger("aman.security")
 
-router = APIRouter(prefix="/security", tags=["الأمان"])
+router = APIRouter(prefix="/security", tags=["Security"])
 
 
 # ===================== 2FA Schemas =====================

@@ -138,6 +138,15 @@ def create_journal_entry(
     # if ledgers table is absent (older tenants / pre-bootstrap).
     if ledger_id is None:
         try:
+            active_count = db.execute(
+                text("SELECT COUNT(*) FROM ledgers WHERE is_active = TRUE")
+            ).scalar() or 0
+            # ACC-F8 (Phase-11 Sprint-6): require explicit ledger when >1 active book.
+            if active_count > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="ledger_id مطلوب عند تفعيل أكثر من دفتر محاسبي",
+                )
             row_l = db.execute(text(
                 "SELECT id FROM ledgers "
                 "WHERE is_active = TRUE "
@@ -146,6 +155,8 @@ def create_journal_entry(
             )).fetchone()
             if row_l:
                 ledger_id = row_l[0]
+        except HTTPException:
+            raise
         except Exception:
             ledger_id = None  # ledgers table not provisioned yet — safe to omit
     
@@ -216,6 +227,18 @@ def create_journal_entry(
         
         account_id = line["account_id"]
         line_currency = line.get("currency") or currency
+
+        # ACC-DB-02 (Phase-11 Sprint-6): reject postings on header/group accounts.
+        # is_header may be missing on legacy CoA rows — tolerate NULL.
+        is_header = db.execute(
+            text("SELECT COALESCE(is_header, FALSE) FROM accounts WHERE id = :id"),
+            {"id": account_id},
+        ).scalar()
+        if is_header:
+            raise HTTPException(
+                status_code=400,
+                detail=f"لا يمكن الترحيل على حساب إجمالي (header) رقم {account_id}",
+            )
         
         if line.get("amount_currency"):
             line_amount_currency = _dec(line["amount_currency"]).quantize(_D2, ROUND_HALF_UP)

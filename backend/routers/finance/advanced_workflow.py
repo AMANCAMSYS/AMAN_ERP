@@ -17,7 +17,7 @@ from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.limiter import limiter
 
-router = APIRouter(prefix="/workflow", tags=["سير العمل المتقدم"])
+router = APIRouter(prefix="/workflow", tags=["Advanced Workflow"])
 logger = logging.getLogger(__name__)
 
 

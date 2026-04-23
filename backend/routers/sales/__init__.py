@@ -12,7 +12,7 @@ from .sales_improvements import sales_improvements_router
 from .cpq import cpq_router
 from utils.permissions import require_module
 
-router = APIRouter(prefix="/sales", tags=["المبيعات"], dependencies=[Depends(require_module("sales"))])
+router = APIRouter(prefix="/sales", tags=["Sales"], dependencies=[Depends(require_module("sales"))])
 
 router.include_router(customers_router)
 router.include_router(invoices_router)

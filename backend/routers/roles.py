@@ -16,7 +16,7 @@ from utils.tenant_isolation import resolve_target_company_id
 from schemas.roles import RoleCreate, RoleUpdate
 from utils.audit import log_activity
 
-router = APIRouter(prefix="/roles", tags=["إدارة الأدوار"])
+router = APIRouter(prefix="/roles", tags=["Roles Management"])
 logger = logging.getLogger(__name__)
 
 

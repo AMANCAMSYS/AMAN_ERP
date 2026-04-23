@@ -15,7 +15,7 @@ from datetime import datetime
 
 logger = logging.getLogger("aman.data_import")
 
-router = APIRouter(prefix="/data-import", tags=["استيراد/تصدير البيانات"])
+router = APIRouter(prefix="/data-import", tags=["Data Import/Export"])
 
 
 # ===================== Supported Entity Types =====================

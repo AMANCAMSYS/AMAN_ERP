@@ -22,7 +22,7 @@ from services.kpi_service import (
 )
 from services.industry_kpi_service import get_industry_kpis
 
-router = APIRouter(prefix="/dashboard/role", tags=["لوحات الأداء الوظيفية"])
+router = APIRouter(prefix="/dashboard/role", tags=["Role Dashboards"])
 logger = logging.getLogger(__name__)
 
 

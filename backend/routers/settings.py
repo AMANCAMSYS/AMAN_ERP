@@ -18,7 +18,7 @@ from utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/settings", tags=["إعدادات الشركة"])
+router = APIRouter(prefix="/settings", tags=["Company Settings"])
 
 # ── Settings Validation Map ──────────────────────────────────────────────────
 # Maps known setting keys to their expected type and constraints.

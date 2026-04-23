@@ -23,7 +23,7 @@ from utils.accounting import (
 from utils.fiscal_lock import check_fiscal_period_open
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 
-router = APIRouter(prefix="/sales/delivery-orders", tags=["أوامر التسليم"])
+router = APIRouter(prefix="/sales/delivery-orders", tags=["Delivery Orders"])
 logger = logging.getLogger(__name__)
 
 _D2 = Decimal('0.01')

@@ -24,7 +24,7 @@ from utils.permissions import require_permission, validate_branch_access
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/finance/cashflow", tags=["التنبؤ بالتدفقات النقدية"])
+router = APIRouter(prefix="/finance/cashflow", tags=["Cash Flow Forecast"])
 
 
 # ── POST /generate ──

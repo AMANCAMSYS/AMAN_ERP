@@ -30,7 +30,7 @@ _D4 = Decimal('0.0001')
 def _dec(v) -> Decimal:
     return Decimal(str(v)) if v is not None else Decimal('0')
 
-router = APIRouter(prefix="/projects", tags=["المشاريع"], dependencies=[Depends(require_module("projects"))])
+router = APIRouter(prefix="/projects", tags=["Projects"], dependencies=[Depends(require_module("projects"))])
 from schemas.projects import (
     ProjectCreate, ProjectUpdate, TaskCreate, TaskUpdate,
     ProjectExpenseCreate, ProjectRevenueCreate,

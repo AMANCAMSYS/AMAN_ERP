@@ -20,7 +20,7 @@ from utils.accounting import generate_sequential_number
 from utils.audit import log_activity
 from services.notification_service import notification_service
 
-router = APIRouter(prefix="/crm", tags=["إدارة العلاقات CRM"], dependencies=[Depends(require_module("crm"))])
+router = APIRouter(prefix="/crm", tags=["CRM"], dependencies=[Depends(require_module("crm"))])
 logger = logging.getLogger(__name__)
 
 
