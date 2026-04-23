@@ -191,7 +191,24 @@ async def lifespan(app: FastAPI):
             CREATE INDEX IF NOT EXISTS idx_system_activity_log_company 
                 ON system_activity_log(company_id);
         """))
-        
+
+        # SEC-08: DB-backed system-admin 2FA (replaces env-only ADMIN_TOTP_SECRET)
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_admin_2fa (
+                id SERIAL PRIMARY KEY,
+                admin_username VARCHAR(100) UNIQUE NOT NULL,
+                secret_key VARCHAR(255) NOT NULL,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                backup_codes TEXT,
+                verified_at TIMESTAMP,
+                last_used_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_system_admin_2fa_username
+                ON system_admin_2fa(admin_username);
+        """))
+
         conn.commit()
     logger.info("✅ Database connected")
     

@@ -29,13 +29,31 @@ def generate_cashflow_forecast(
     horizon_days: int,
     mode: str,
     user_id: int,
+    scenario_weights: dict | None = None,
 ) -> dict:
     """Build a cashflow forecast and persist it.
 
     Returns dict with ``forecast_id`` and ``line_count``.
+
+    TREAS-F3 (Phase-11 Sprint-5): optional ``scenario_weights`` produces a
+    probability-weighted projected balance. Accepted keys: ``best``, ``likely``,
+    ``worst``. Values must sum to ~1.0. When provided:
+      * inflow × (best: 1.0, likely: weight, worst: 0.5)
+      * outflow × (best: 0.7, likely: 1.0, worst: 1.2)
+    to model collection delays and cost overruns.
     """
     today = date.today()
     end_date = today + timedelta(days=horizon_days)
+
+    weights = None
+    if scenario_weights:
+        _w = {k: _dec(scenario_weights.get(k, 0)) for k in ("best", "likely", "worst")}
+        s = _w["best"] + _w["likely"] + _w["worst"]
+        if s <= 0:
+            weights = None
+        else:
+            # Normalize
+            weights = {k: (_w[k] / s) for k in _w}
 
     # 1) Create the forecast header
     row = db.execute(
@@ -118,7 +136,23 @@ def generate_cashflow_forecast(
     lines.sort(key=lambda l: l["date"])
     running_balance = _ZERO
     for line in lines:
-        running_balance += line["inflow"] - line["outflow"]
+        if weights:
+            # Probability-weighted scenario math (TREAS-F3)
+            inf = line["inflow"]
+            out = line["outflow"]
+            weighted_inf = (
+                inf * Decimal("1.0") * weights["best"]
+                + inf * Decimal("1.0") * weights["likely"]
+                + inf * Decimal("0.5") * weights["worst"]
+            )
+            weighted_out = (
+                out * Decimal("0.7") * weights["best"]
+                + out * Decimal("1.0") * weights["likely"]
+                + out * Decimal("1.2") * weights["worst"]
+            )
+            running_balance += weighted_inf - weighted_out
+        else:
+            running_balance += line["inflow"] - line["outflow"]
         line["balance"] = running_balance
 
     # 4) Persist lines

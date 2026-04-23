@@ -543,3 +543,147 @@ def get_receipt_details(voucher_id: int, current_user: dict = Depends(get_curren
         raise HTTPException(**http_error(500, "internal_error"))
     finally:
         db.close()
+
+
+# ==========================================================================
+# PAY-F2 — Auto-match unapplied customer receipts to open invoices
+# Phase-11 Sprint-5
+# ==========================================================================
+
+@vouchers_router.post(
+    "/receipts/{voucher_id}/auto-match",
+    dependencies=[Depends(require_permission("sales.create"))],
+)
+def auto_match_receipt(
+    voucher_id: int,
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    """Automatically allocate the unapplied portion of a customer receipt.
+
+    Strategy (conservative — safe to run unattended):
+      1. Exact match: single unpaid invoice with remaining == unapplied.
+      2. FIFO fill: apply remainder to oldest open invoices until exhausted.
+    Only invoices for the same customer are considered.
+    """
+    db = get_db_connection(current_user.company_id)
+    try:
+        v = db.execute(
+            text(
+                """
+                SELECT id, party_id, amount
+                FROM vouchers
+                WHERE id = :id AND type = 'customer_receipt'
+                FOR UPDATE
+                """
+            ),
+            {"id": voucher_id},
+        ).fetchone()
+        if not v:
+            raise HTTPException(**http_error(404, "voucher_not_found"))
+
+        already = db.execute(
+            text("SELECT COALESCE(SUM(allocated_amount), 0) FROM payment_allocations WHERE voucher_id = :vid"),
+            {"vid": voucher_id},
+        ).scalar() or 0
+        unapplied = (_dec(v.amount) - _dec(already)).quantize(_D2, ROUND_HALF_UP)
+        if unapplied <= _D2:
+            return {"allocated": 0, "message": "no_unapplied_amount"}
+
+        # Fetch open invoices, FIFO
+        open_invs = db.execute(
+            text(
+                """
+                SELECT id, total, COALESCE(paid_amount, 0) AS paid_amount, invoice_date
+                FROM invoices
+                WHERE party_id = :pid
+                  AND status IN ('unpaid', 'partial', 'draft')
+                  AND COALESCE(paid_amount, 0) < total
+                ORDER BY invoice_date ASC, id ASC
+                FOR UPDATE
+                """
+            ),
+            {"pid": v.party_id},
+        ).fetchall()
+
+        if not open_invs:
+            return {"allocated": 0, "message": "no_open_invoices"}
+
+        allocations: list[dict] = []
+
+        # Pass 1 — exact match
+        for inv in open_invs:
+            remaining = (_dec(inv.total) - _dec(inv.paid_amount)).quantize(_D2, ROUND_HALF_UP)
+            if remaining == unapplied:
+                allocations.append({"invoice_id": inv.id, "amount": remaining})
+                unapplied = _dec("0")
+                break
+
+        # Pass 2 — FIFO fill
+        if unapplied > _D2:
+            for inv in open_invs:
+                if unapplied <= _D2:
+                    break
+                if any(a["invoice_id"] == inv.id for a in allocations):
+                    continue
+                remaining = (_dec(inv.total) - _dec(inv.paid_amount)).quantize(_D2, ROUND_HALF_UP)
+                if remaining <= 0:
+                    continue
+                pay = min(remaining, unapplied)
+                allocations.append({"invoice_id": inv.id, "amount": pay})
+                unapplied = (unapplied - pay).quantize(_D2, ROUND_HALF_UP)
+
+        if not allocations:
+            return {"allocated": 0, "message": "no_matches"}
+
+        for a in allocations:
+            db.execute(
+                text(
+                    """
+                    INSERT INTO payment_allocations (voucher_id, invoice_id, allocated_amount)
+                    VALUES (:vid, :iid, :amt)
+                    """
+                ),
+                {"vid": voucher_id, "iid": a["invoice_id"], "amt": a["amount"]},
+            )
+            db.execute(
+                text(
+                    """
+                    UPDATE invoices
+                    SET paid_amount = COALESCE(paid_amount, 0) + :amt,
+                        status = CASE
+                            WHEN (COALESCE(paid_amount, 0) + :amt) >= total THEN 'paid'
+                            WHEN (COALESCE(paid_amount, 0) + :amt) > 0 THEN 'partial'
+                            ELSE status
+                        END
+                    WHERE id = :iid
+                    """
+                ),
+                {"amt": a["amount"], "iid": a["invoice_id"]},
+            )
+
+        total_alloc = sum(a["amount"] for a in allocations)
+        db.commit()
+        log_activity(
+            db,
+            user_id=current_user.id,
+            username=current_user.username,
+            action="payments.auto_match",
+            resource_type="voucher",
+            resource_id=str(voucher_id),
+            details={"allocations": [dict(a, amount=float(a["amount"])) for a in allocations]},
+            request=request,
+        )
+        return {
+            "allocated": float(total_alloc),
+            "allocation_count": len(allocations),
+            "allocations": [{"invoice_id": a["invoice_id"], "amount": float(a["amount"])} for a in allocations],
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()

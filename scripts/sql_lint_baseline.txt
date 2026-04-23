@@ -2,10 +2,10 @@ backend/database.py:170
 backend/database.py:171
 backend/database.py:172
 backend/database.py:173
-backend/database.py:3699
-backend/database.py:3754
-backend/database.py:3778
-backend/database.py:3902
+backend/database.py:3702
+backend/database.py:3757
+backend/database.py:3781
+backend/database.py:3905
 backend/routers/approvals.py:345
 backend/routers/approvals.py:351
 backend/routers/approvals.py:403
@@ -20,7 +20,7 @@ backend/routers/audit.py:293
 backend/routers/audit.py:296
 backend/routers/audit.py:302
 backend/routers/audit.py:312
-backend/routers/auth.py:1108
+backend/routers/auth.py:1146
 backend/routers/branches.py:308
 backend/routers/companies.py:217
 backend/routers/companies.py:218
@@ -77,8 +77,8 @@ backend/routers/finance/assets.py:259
 backend/routers/finance/assets.py:358
 backend/routers/finance/assets.py:445
 backend/routers/finance/budgets.py:746
-backend/routers/finance/cashflow.py:87
-backend/routers/finance/cashflow.py:90
+backend/routers/finance/cashflow.py:88
+backend/routers/finance/cashflow.py:91
 backend/routers/finance/checks.py:1114
 backend/routers/finance/checks.py:1121
 backend/routers/finance/checks.py:1171
@@ -106,7 +106,7 @@ backend/routers/finance/notes.py:461
 backend/routers/finance/notes.py:463
 backend/routers/finance/notes.py:750
 backend/routers/finance/notes.py:759
-backend/routers/finance/reconciliation.py:504
+backend/routers/finance/reconciliation.py:510
 backend/routers/finance/revenue_recognition.py:62
 backend/routers/finance/subscriptions.py:144
 backend/routers/finance/subscriptions.py:252

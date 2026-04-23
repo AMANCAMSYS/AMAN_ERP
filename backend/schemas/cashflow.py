@@ -13,6 +13,9 @@ class ForecastGenerateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     horizon_days: int = Field(default=90, ge=1, le=365)
     mode: Literal["contractual", "expected"] = "contractual"
+    # TREAS-F3 (Phase-11 Sprint-5): optional probability weights.
+    # Keys: best, likely, worst. Values should sum to ~1.0 (normalized).
+    scenario_weights: Optional[dict] = None
 
 
 # ── Line read ──

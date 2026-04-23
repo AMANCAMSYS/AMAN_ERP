@@ -17,17 +17,18 @@ Five follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-2b UX + observability | `95efa4a` | POS-UI-F1, ACC-F6, INV-F4 | `ci` #179 green, `security-scan` #54 green |
 | Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | `ci` #181 green, `security-scan` #56 green |
 | Sprint-3 Governance + UX extension | `cbeaadb` | PUR-F1, SEC-09, IN-F5, CRM-F2, INV-F3 (verified), MFG-F3 (verified), POS-UI-F1 (extended to Returns/Held-Orders/Close-Session modals) | `ci` run on cbeaadb, `security-scan` #57 green |
-| Sprint-4 Billing workflows + ZATCA outbox | _this sprint_ | CON-F1 (contract milestones), SUB-F1 (dunning cases), EINV-F2 (e-invoice outbox + relay), ACC-F2 (dedup fiscal-lock schema) | pending |
+| Sprint-4 Billing workflows + ZATCA outbox | `30df0ff` | CON-F1 (contract milestones), SUB-F1 (dunning cases), EINV-F2 (e-invoice outbox + relay), ACC-F2 (dedup fiscal-lock schema) | `ci` run on 30df0ff, `security-scan` #58 green |
+| Sprint-5 Admin 2FA + inventory/treasury hardening | _this sprint_ | SEC-08 (DB-backed admin 2FA), INV-F1 (stock adjustment + GL), PAY-F2 (receipt auto-match), TAX-F2 (WHT certificate PDF), TREAS-F4 (recon tolerance), TREAS-F3 (scenario-weighted cashflow), ACC-F11 (verified), WF-F9 (verified) | pending |
 
-**Updated distribution** (open only, post-Sprint-4):
+**Updated distribution** (open only, post-Sprint-5):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 24 | 26 | 10 |
-| P2 | 22 | 24 | 24 |
-| P3 | 4 | 4 | 18 |
-| **Δ closed this round (Sprint-4)** | — | **+4** | — |
+| P1 | 26 | 26 | 10 |
+| P2 | 24 | 28 | 20 |
+| P3 | 4 | 8 | 14 |
+| **Δ closed this round (Sprint-5)** | — | **+8** | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 

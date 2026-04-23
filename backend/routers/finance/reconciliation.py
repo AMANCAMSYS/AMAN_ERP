@@ -475,7 +475,8 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
     db = get_db_connection(current_user.company_id)
     try:
         rec_info = db.execute(text("""
-            SELECT r.status, t.gl_account_id, r.statement_date, r.branch_id
+            SELECT r.status, t.gl_account_id, r.statement_date, r.branch_id,
+                   COALESCE(r.tolerance_amount, 0) AS tolerance_amount
             FROM bank_reconciliations r
             JOIN treasury_accounts t ON r.treasury_account_id = t.id
             WHERE r.id = :id
@@ -485,6 +486,11 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
             raise HTTPException(**http_error(404, "reconciliation_not_found"))
         if rec_info.status != 'draft':
             raise HTTPException(status_code=400, detail="لا يمكن المطابقة في تسوية معتمدة")
+
+        # TREAS-F4: per-reconciliation absolute tolerance (0 = exact match)
+        amt_tol = _dec(rec_info.tolerance_amount)
+        if amt_tol < _D2:
+            amt_tol = _D2
 
         # Get unmatched statement lines
         stmt_lines = db.execute(text("""
@@ -544,11 +550,12 @@ def auto_match(id: int, tolerance_days: int = 3, current_user: dict = Depends(ge
                     if day_diff > tolerance_days:
                         continue
 
-                # Amount matching: bank debit=withdrawal matches GL credit, bank credit=deposit matches GL debit
+                # Amount matching with TREAS-F4 tolerance: bank debit=withdrawal
+                # matches GL credit, bank credit=deposit matches GL debit.
                 amount_match = False
-                if sl_debit > 0 and jl_credit > 0 and abs(sl_debit - jl_credit) <= _D2:
+                if sl_debit > 0 and jl_credit > 0 and abs(sl_debit - jl_credit) <= amt_tol:
                     amount_match = True
-                elif sl_credit > 0 and jl_debit > 0 and abs(sl_credit - jl_debit) <= _D2:
+                elif sl_credit > 0 and jl_debit > 0 and abs(sl_credit - jl_debit) <= amt_tol:
                     amount_match = True
 
                 if amount_match:

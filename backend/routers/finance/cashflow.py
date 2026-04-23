@@ -47,6 +47,7 @@ def generate_forecast(
             horizon_days=body.horizon_days,
             mode=body.mode,
             user_id=current_user.id,
+            scenario_weights=body.scenario_weights,
         )
         row = db.execute(
             text("SELECT * FROM cashflow_forecasts WHERE id = :fid"),

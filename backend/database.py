@@ -909,6 +909,9 @@ def get_treasury_base_tables_sql() -> str:
         end_balance DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'draft',
         notes TEXT,
+        -- TREAS-F4 (Phase-11 Sprint-5): absolute tolerance used when auto-matching
+        -- bank lines against ledger entries (defaults to zero = strict match).
+        tolerance_amount DECIMAL(18, 4) DEFAULT 0,
         created_by INTEGER REFERENCES company_users(id),
         branch_id INTEGER REFERENCES branches(id),
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -5636,6 +5639,8 @@ def get_system_completion_tables_sql() -> str:
 
     -- ===== ADD COLUMNS TO EXISTING TABLES =====
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER REFERENCES delivery_orders(id) ON DELETE SET NULL;
+    -- TREAS-F4 (Phase-11 Sprint-5): absolute tolerance for bank recon auto-match
+    ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS tolerance_amount DECIMAL(18, 4) DEFAULT 0;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(5) DEFAULT NULL;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_saudi BOOLEAN DEFAULT FALSE;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS eos_eligible BOOLEAN DEFAULT TRUE;
