@@ -1,8 +1,14 @@
 """
 Inventory Module - Stock Receipt & Delivery
+
+Note: ``/receipt`` and ``/delivery`` mutate inventory quantities WITHOUT
+posting a journal entry. They are kept for backward compatibility with
+legacy integrations only. New code MUST use ``/adjustment`` (which posts
+a balanced JE through ``gl_service.create_journal_entry`` and is gated
+by ``stock.adjust`` permission + fiscal-lock check).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from utils.i18n import http_error
 from sqlalchemy import text
 from datetime import datetime
@@ -24,9 +30,20 @@ logger = logging.getLogger(__name__)
 def create_stock_receipt(
     movement: StockMovementCreate,
     request: Request,
+    response: Response,
     current_user: dict = Depends(get_current_user)
 ):
-    """إضافة مخزون (استلام بضاعة)"""
+    """Legacy receipt endpoint (no GL posting).
+
+    DEPRECATED: prefer POST /stock-movements/adjustment which posts a
+    balanced JE and runs the fiscal-lock check.
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = '</api/inventory/stock-movements/adjustment>; rel="successor-version"'
+    logger.warning(
+        "deprecated stock_movements/receipt called by user_id=%s company=%s",
+        getattr(current_user, "id", None), getattr(current_user, "company_id", None),
+    )
     db = get_db_connection(current_user.company_id)
     try:
         # Validate warehouse
@@ -118,9 +135,20 @@ def create_stock_receipt(
 def create_stock_delivery(
     movement: StockMovementCreate,
     request: Request,
+    response: Response,
     current_user: dict = Depends(get_current_user)
 ):
-    """صرف مخزون (تسليم بضاعة)"""
+    """Legacy delivery endpoint (no GL posting).
+
+    DEPRECATED: prefer POST /stock-movements/adjustment which posts a
+    balanced JE and runs the fiscal-lock check.
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = '</api/inventory/stock-movements/adjustment>; rel="successor-version"'
+    logger.warning(
+        "deprecated stock_movements/delivery called by user_id=%s company=%s",
+        getattr(current_user, "id", None), getattr(current_user, "company_id", None),
+    )
     db = get_db_connection(current_user.company_id)
     try:
         # Validate warehouse

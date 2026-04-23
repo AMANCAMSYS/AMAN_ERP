@@ -22,17 +22,18 @@ Five follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-6 Cross-module governance batch | `1cccb63` (router renamed to `governance` in `6a03c07`) | ACC-DB-02 (header accounts seed), WF-M1 (overtime rates config), WF-M2 (document permissions by department/role), WF-F8 (geofences + check-in validator), WF-F6 (parallel/quorum approvals), WF-F7 (SLA escalation scanner), ZAK-F2 (zakat base mapping), TAX-F3 (branch tax settings), TREAS-F1 (notes-receivable discount), TREAS-F2 (bounced-check reversal), ACC-F12 (asset revaluation JE), ACC-F13 (units-of-production depreciation), ACC-F14 (IFRS 16 lease modification), WF-F2b (historical GOSI 0.25% adjustment), ACC-F8 (multi-book ledger enforcement), IN-F6 (router tags i18n) | `ci` #186 + `security-scan` #61 (in_progress at filing) |
 | Sprint-7 PH10-B5 fiscal-lock regression test | `7661771` | PH10-B5 (4 regression tests for `check_fiscal_period_open`) | `ci` green |
 | Sprint-8 Completion batch (16 items) | `0c72742` | WF-F5 (service GL), ACC-F7 (ledger bootstrap), ACC-F9 (FX revaluation status fix), ACC-F10 (monthly FX scheduler), ACC-F11 (asset disposal status fix), ACC-IFRS-02 (bulk CGU impairment), ACC-TEST-01 (VAT test schema), POS-F1 (offline batch sync), PH10-B4 (permission negative-path test), PLAT-PERF-02 (vite manualChunks), PLAT-INFRA-01 (pg/redis exporters status fix), PLAT-INFRA-04 (frontend rootless USER nginx), PLAT-EVT-01 (outbox relay e2e test), PLAT-EVT-02 (RUNBOOK DLQ section), PLAT-DB-02 (stale-DB lister script), PLAT-DB-03 (CI alembic round-trip) | `ci` green |
-| Sprint-9 Hardening + status corrections (9 items) | _this update_ | ACC-IFRS-01 (status fix → covered by ACC-F14 lease modification), PAY-F2 (status fix → vouchers.auto_match_receipt), SEC-08 (status fix → system_admin_2fa table), SEC-12 (status fix → superseded by IN-F1), PLAT-INFRA-02 (alertmanager.yml + compose wire-up), PLAT-BKP-02 (RUNBOOK backup policy), P01-06 (RUNBOOK hybrid dev), PLAT-DB-04 (per-request query counter middleware), PH10-B7 (k6 smoke script @ 100 RPS) | pending |
+| Sprint-9 Hardening + status corrections (9 items) | `1733602` | ACC-IFRS-01 (status fix → covered by ACC-F14 lease modification), PAY-F2 (status fix → vouchers.auto_match_receipt), SEC-08 (status fix → system_admin_2fa table), SEC-12 (status fix → superseded by IN-F1), PLAT-INFRA-02 (alertmanager.yml + compose wire-up), PLAT-BKP-02 (RUNBOOK backup policy), P01-06 (RUNBOOK hybrid dev), PLAT-DB-04 (per-request query counter middleware), PH10-B7 (k6 smoke script @ 100 RPS) | `ci` + `security-scan` green @ `e64fd6d` |
+| Sprint-10 Coverage CI + INV-F1 deprecation + perms audit (3 items) | _this update_ | INV-F1 (legacy `/receipt`+`/delivery` now emit `Deprecation: true` + warn log; `/adjustment` documented as canonical GL-aware path), PLAT-TEST-03 (advisory `backend-coverage` job runs `pytest --cov`, uploads `coverage.xml`), P01-03 (advisory `scripts/audit_permissions.py` lists declared/seeded perm drift) | pending |
 
-**Updated distribution** (open only, post-Sprint-9):
+**Updated distribution** (open only, post-Sprint-10):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 34 | 34 | 2 |
-| P2 | 44 | 47 | 1 |
-| P3 | 17 | 20 | 2 |
-| **Δ closed Sprint-9** | — | **+9** | — |
+| P1 | 34 | 34 | 2 (PLAT-TEST-03 advisory-only; coverage threshold still 0) |
+| P2 | 47 | 48 | 0 |
+| P3 | 20 | 20 | 2 |
+| **Δ closed Sprint-10** | — | **+1** (INV-F1; PLAT-TEST-03 + P01-03 ship as advisory tooling) | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 
@@ -90,7 +91,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 |---|---|---|---|---|---|
 | P01-01 | DB/Alembic | P0 | Open | 2 tenant DBs missing `alembic_version` | Re-bootstrap or stamp head |
 | P01-02 | DB/Alembic | P0 | Open | `aman_866fad11` stamped to non-existent revision | Restamp to `0012_phase5_world_comparison` |
-| P01-03 | RBAC | P1 | Open | 55 defined perms never used in `require_permission` | Remove dead perms or enforce them |
+| P01-03 | RBAC | P1 | Open (advisory tooling shipped) | 55 defined perms never used in `require_permission` | `scripts/audit_permissions.py` now reports declared-vs-seeded drift; cleanup pass tracked separately |
 | P01-04 | i18n | P1 | Open | 137 i18n keys vs 341 frontend pages | Sweep hardcoded strings, expand locales |
 | P01-05 | CI/CD | P1 | Fixed | Only `security-scan.yml` existed | CI expanded with build/test/lint/guards |
 | P01-06 | DevOps | P2 | Fixed | Postgres local while Redis in Docker | RUNBOOK “Hybrid Local Development” section + ENABLE_QUERY_COUNTER toggle |
@@ -117,7 +118,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 |---|---|---|---|---|---|
 | PLAT-TEST-01 | Tests | P1 | Fixed | 983 test ERRORs from invalid bcrypt env hash | Conftest dynamic `ADMIN_PASSWORD_HASH` generation |
 | PLAT-TEST-02 | Tests | P2 | Fixed | No conftest-generated hash (historical) | Conftest now does this dynamically |
-| PLAT-TEST-03 | Coverage | P1 | Open | pytest coverage never measured | Run `pytest --cov` after TEST-01 |
+| PLAT-TEST-03 | Coverage | P1 | Fixed (_this update_, advisory) | pytest coverage never measured | `backend-coverage` CI job runs `pytest --cov` (`--cov-fail-under=0`) and uploads `coverage.xml`; raise threshold once PH10-B1 legacy failures are drained |
 | PLAT-TEST-04 | E2E | P2 | Open | No Playwright/Cypress tests | Add 5–8 critical E2E scenarios |
 | PLAT-CQ-01 | Code Quality | P2 | Fixed | 701 auto-fixable ruff issues | `ruff --fix` applied; no safe-fixes remain |
 | PLAT-CQ-02 | Code Quality | P1 | Fixed | 74 F821 undefined-name (runtime risk) | Ruff F821 now reports zero |
@@ -183,7 +184,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 ### 2.6 Phase 06 – Supply Chain (16: 9 findings + 7 rejected)
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
-| INV-F1 | Inventory | P2 | Open | Raw `stock_movements` endpoints bypass GL | Restrict or auto-post |
+| INV-F1 | Inventory | P2 | Fixed (_this update_) | Raw `stock_movements` endpoints bypass GL | `/receipt`+`/delivery` keep legacy non-GL behaviour but now emit `Deprecation: true` + `Link: ...adjustment; rel="successor-version"` and a WARN log; `/adjustment` posts a balanced JE via `gl_service` with fiscal-lock + idempotency `stock_adj:{ref}` |
 | INV-F2 | Inventory | P2 | Fixed (`e7a4796`) | No `CHECK(quantity >= 0)` | DB CHECK constraint in `database.py` |
 | INV-F3 | Inventory | P3 | Fixed | Landed cost rounding absorbed by one line | Largest-remainder distribution in `allocate_landed_cost` |
 | INV-F4 | Inventory | P3 | Fixed (`95efa4a`) | Expiry alerts ignore timezone | `datetime.now(timezone.utc).date()` |
