@@ -27,9 +27,9 @@ def bare_user(db_connection):
     role_row = db_connection.execute(
         text(
             """
-            INSERT INTO roles (name, description, permissions, is_system)
+            INSERT INTO roles (role_name, description, permissions, is_system_role)
             VALUES (:n, 'negative-path test role', CAST('[]' AS JSONB), FALSE)
-            ON CONFLICT (name) DO UPDATE SET permissions = CAST('[]' AS JSONB)
+            ON CONFLICT (role_name) DO UPDATE SET permissions = CAST('[]' AS JSONB)
             RETURNING id
             """
         ),
@@ -38,22 +38,22 @@ def bare_user(db_connection):
     role_id = role_row[0]
 
     # Hash via the same path the API uses to keep the test honest.
-    from utils.security import hash_password
+    from database import hash_password
 
     db_connection.execute(
         text(
             """
-            INSERT INTO users (username, password_hash, role_id, role, is_active, is_superuser)
-            VALUES (:u, :p, :rid, 'user', TRUE, FALSE)
+            INSERT INTO company_users (username, password, role, permissions, is_active)
+            VALUES (:u, :p, :role_name, CAST('[]' AS JSONB), TRUE)
             """
         ),
-        {"u": username, "p": hash_password(password), "rid": role_id},
+        {"u": username, "p": hash_password(password), "role_name": f"role_neg_{suffix}"},
     )
     db_connection.commit()
     try:
         yield username, password
     finally:
-        db_connection.execute(text("DELETE FROM users WHERE username = :u"), {"u": username})
+        db_connection.execute(text("DELETE FROM company_users WHERE username = :u"), {"u": username})
         db_connection.execute(text("DELETE FROM roles WHERE id = :r"), {"r": role_id})
         db_connection.commit()
 

@@ -666,3 +666,89 @@ curl -sS -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 * Prometheus alert: `WebhookDLQGrowth` fires when `webhook_dlq` count grows by > 10 in 1h.
 * Same alert pattern recommended for `einvoice_outbox` (status='giveup').
 * Dashboard panel: "Outbox lag" — `MAX(EXTRACT(EPOCH FROM NOW() - created_at))` for `pending` rows.
+
+## Hybrid Local Development (Postgres native + Redis Docker)
+
+For day-to-day development we run the database on the host and only put Redis
+in a container. This avoids the slow file-system overhead of bind-mounting the
+entire repo into the backend container while still giving us a clean Redis.
+
+### One-time setup
+
+```bash
+# 1. PostgreSQL (Debian/Ubuntu)
+sudo apt-get install -y postgresql postgresql-contrib
+sudo -u postgres createuser --superuser aman
+sudo -u postgres createdb -O aman aman_main
+
+# 2. Redis as a container
+docker run -d --name aman_redis -p 127.0.0.1:6379:6379 redis:7-alpine
+```
+
+### Daily startup
+
+```bash
+# 1. Activate the venv
+source .venv/bin/activate
+
+# 2. Export env vars (or use .env)
+export DATABASE_URL=postgresql://aman@localhost:5432/aman_main
+export REDIS_URL=redis://localhost:6379/0
+export ENABLE_QUERY_COUNTER=1            # optional N+1 observer
+
+# 3. Apply migrations
+cd backend && alembic upgrade head && cd ..
+
+# 4. Run backend + frontend
+./safe-start.sh                          # uses logs/*.pid
+```
+
+### Toggling between hybrid and full-Docker
+
+* Hybrid: `docker compose up -d redis` then `./safe-start.sh`.
+* Full stack: `docker compose up -d` (uses bundled Postgres + Redis).
+* Stop hybrid: `./safe-stop.sh && docker stop aman_redis`.
+
+## Backup & Restore Policy
+
+Backups live under `/var/backups/aman/` on the production host and are
+written by `scripts/backup_postgres.sh` (system DB + every tenant DB).
+
+### Schedule (cron)
+
+```
+# /etc/cron.d/aman-backup
+30 2 * * *   aman   /opt/aman/scripts/backup_postgres.sh daily
+0  3 * * 0   aman   /opt/aman/scripts/backup_postgres.sh weekly
+0  4 1 * *   aman   /opt/aman/scripts/backup_postgres.sh monthly
+```
+
+### Retention
+
+| Tier    | Keep on disk | Off-site copy |
+|---------|--------------|---------------|
+| daily   | 14 days      | last 7 mirrored to S3 nightly |
+| weekly  | 8 weeks      | mirrored to S3 weekly         |
+| monthly | 12 months    | mirrored to S3 monthly        |
+
+Pruning is part of `backup_postgres.sh` (uses `find -mtime`). S3 lifecycle
+rules enforce the off-site retention as a second line of defence.
+
+### Restore drill
+
+```bash
+# Restore the latest daily snapshot of company DB c_42
+sudo -u postgres /opt/aman/scripts/restore_postgres.sh \
+    --target c_42 --from /var/backups/aman/daily/$(ls -1 /var/backups/aman/daily | tail -1)
+```
+
+A full restore drill MUST be executed every quarter against staging and the
+result logged in `docs/audit/` with the start/finish timestamps and the row
+counts of the top 10 tables before/after restore (sanity check).
+
+### Verification
+
+* Each snapshot is followed by `pg_restore -l` to confirm the dump is readable.
+* Nightly checksum (sha256) is appended to `/var/backups/aman/CHECKSUMS`.
+* Prometheus alert `BackupOlderThan26h` fires when the newest daily file is
+  more than 26 hours old.

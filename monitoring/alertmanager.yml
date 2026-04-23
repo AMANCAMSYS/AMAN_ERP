@@ -1,0 +1,72 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Alertmanager configuration for AMAN ERP.
+#
+# Routing strategy:
+#   * Critical alerts go to ops-critical (Slack #ops-alerts + email on-call).
+#   * Warning alerts batch into ops-warning (Slack #ops-warnings, no email).
+#   * The default catch-all goes to the warning channel so nothing is silently
+#     dropped if a new alert is added without an explicit route.
+#
+# Operators must populate:
+#   * SLACK_WEBHOOK_URL_OPS     — Slack incoming webhook URL.
+#   * ALERT_EMAIL_TO            — comma-separated on-call address list.
+#   * ALERT_EMAIL_FROM, SMTP_*  — outbound SMTP credentials (see env file).
+# ──────────────────────────────────────────────────────────────────────────────
+
+global:
+  resolve_timeout: 5m
+  smtp_from: ${ALERT_EMAIL_FROM:-alerts@aman-erp.local}
+  smtp_smarthost: ${SMTP_HOST:-smtp.example.com}:${SMTP_PORT:-587}
+  smtp_auth_username: ${SMTP_USERNAME:-}
+  smtp_auth_password: ${SMTP_PASSWORD:-}
+  smtp_require_tls: true
+
+route:
+  receiver: ops-warning
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: ops-critical
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers: [severity="warning"]
+      receiver: ops-warning
+
+receivers:
+  - name: ops-critical
+    slack_configs:
+      - api_url: ${SLACK_WEBHOOK_URL_OPS:-https://hooks.slack.com/services/REPLACE}
+        channel: '#ops-alerts'
+        send_resolved: true
+        title: '[CRITICAL] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+    email_configs:
+      - to: ${ALERT_EMAIL_TO:-oncall@example.com}
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL] AMAN: {{ .CommonLabels.alertname }}'
+
+  - name: ops-warning
+    slack_configs:
+      - api_url: ${SLACK_WEBHOOK_URL_OPS:-https://hooks.slack.com/services/REPLACE}
+        channel: '#ops-warnings'
+        send_resolved: true
+        title: '[WARN] {{ .CommonLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+
+inhibit_rules:
+  # If a node is down, suppress lower-severity alerts about that node.
+  - source_matchers: [severity="critical", alertname="InstanceDown"]
+    target_matchers: [severity="warning"]
+    equal: [instance]

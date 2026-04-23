@@ -21,17 +21,18 @@ Five follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-5 Admin 2FA + inventory/treasury hardening | `07658be` | SEC-08 (DB-backed admin 2FA), INV-F1 (stock adjustment + GL), PAY-F2 (receipt auto-match), TAX-F2 (WHT certificate PDF), TREAS-F4 (recon tolerance), TREAS-F3 (scenario-weighted cashflow), ACC-F11 (verified), WF-F9 (verified) | `ci` green |
 | Sprint-6 Cross-module governance batch | `1cccb63` (router renamed to `governance` in `6a03c07`) | ACC-DB-02 (header accounts seed), WF-M1 (overtime rates config), WF-M2 (document permissions by department/role), WF-F8 (geofences + check-in validator), WF-F6 (parallel/quorum approvals), WF-F7 (SLA escalation scanner), ZAK-F2 (zakat base mapping), TAX-F3 (branch tax settings), TREAS-F1 (notes-receivable discount), TREAS-F2 (bounced-check reversal), ACC-F12 (asset revaluation JE), ACC-F13 (units-of-production depreciation), ACC-F14 (IFRS 16 lease modification), WF-F2b (historical GOSI 0.25% adjustment), ACC-F8 (multi-book ledger enforcement), IN-F6 (router tags i18n) | `ci` #186 + `security-scan` #61 (in_progress at filing) |
 | Sprint-7 PH10-B5 fiscal-lock regression test | `7661771` | PH10-B5 (4 regression tests for `check_fiscal_period_open`) | `ci` green |
-| Sprint-8 Completion batch (16 items) | _this update_ | WF-F5 (service GL), ACC-F7 (ledger bootstrap), ACC-F9 (FX revaluation status fix), ACC-F10 (monthly FX scheduler), ACC-F11 (asset disposal status fix), ACC-IFRS-02 (bulk CGU impairment), ACC-TEST-01 (VAT test schema), POS-F1 (offline batch sync), PH10-B4 (permission negative-path test), PLAT-PERF-02 (vite manualChunks), PLAT-INFRA-01 (pg/redis exporters status fix), PLAT-INFRA-04 (frontend rootless USER nginx), PLAT-EVT-01 (outbox relay e2e test), PLAT-EVT-02 (RUNBOOK DLQ section), PLAT-DB-02 (stale-DB lister script), PLAT-DB-03 (CI alembic round-trip) | pending |
+| Sprint-8 Completion batch (16 items) | `0c72742` | WF-F5 (service GL), ACC-F7 (ledger bootstrap), ACC-F9 (FX revaluation status fix), ACC-F10 (monthly FX scheduler), ACC-F11 (asset disposal status fix), ACC-IFRS-02 (bulk CGU impairment), ACC-TEST-01 (VAT test schema), POS-F1 (offline batch sync), PH10-B4 (permission negative-path test), PLAT-PERF-02 (vite manualChunks), PLAT-INFRA-01 (pg/redis exporters status fix), PLAT-INFRA-04 (frontend rootless USER nginx), PLAT-EVT-01 (outbox relay e2e test), PLAT-EVT-02 (RUNBOOK DLQ section), PLAT-DB-02 (stale-DB lister script), PLAT-DB-03 (CI alembic round-trip) | `ci` green |
+| Sprint-9 Hardening + status corrections (9 items) | _this update_ | ACC-IFRS-01 (status fix → covered by ACC-F14 lease modification), PAY-F2 (status fix → vouchers.auto_match_receipt), SEC-08 (status fix → system_admin_2fa table), SEC-12 (status fix → superseded by IN-F1), PLAT-INFRA-02 (alertmanager.yml + compose wire-up), PLAT-BKP-02 (RUNBOOK backup policy), P01-06 (RUNBOOK hybrid dev), PLAT-DB-04 (per-request query counter middleware), PH10-B7 (k6 smoke script @ 100 RPS) | pending |
 
-**Updated distribution** (open only, post-Sprint-8):
+**Updated distribution** (open only, post-Sprint-9):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 30 | 34 | 2 |
-| P2 | 36 | 44 | 4 |
-| P3 | 13 | 17 | 5 |
-| **Δ closed Sprint-8** | — | **+16** | — |
+| P1 | 34 | 34 | 2 |
+| P2 | 44 | 47 | 1 |
+| P3 | 17 | 20 | 2 |
+| **Δ closed Sprint-9** | — | **+9** | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 
@@ -92,7 +93,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | P01-03 | RBAC | P1 | Open | 55 defined perms never used in `require_permission` | Remove dead perms or enforce them |
 | P01-04 | i18n | P1 | Open | 137 i18n keys vs 341 frontend pages | Sweep hardcoded strings, expand locales |
 | P01-05 | CI/CD | P1 | Fixed | Only `security-scan.yml` existed | CI expanded with build/test/lint/guards |
-| P01-06 | DevOps | P2 | Open | Postgres local while Redis in Docker | Document hybrid dev setup in RUNBOOK |
+| P01-06 | DevOps | P2 | Fixed | Postgres local while Redis in Docker | RUNBOOK “Hybrid Local Development” section + ENABLE_QUERY_COUNTER toggle |
 | P01-07 | Code Quality | P2 | Open | 3,328 raw SQL sites flagged | Baseline captured, CI gate added |
 
 ### 2.2 Phase 02 – Security / RBAC (12)
@@ -105,11 +106,11 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | SEC-05 | Cache/Tenant | P2 | Fixed | Cache keys missing tenant namespace | Added `tenant_key()` helper |
 | SEC-06 | CSP | P3 | Open | `style-src 'unsafe-inline'` | Nonce-based CSP migration |
 | SEC-07 | Logging/PII | P2 | Fixed | PII masking not enforced | Added `check_pii_logging.py` CI gate |
-| SEC-08 | Auth/2FA | P3 | Open | Admin 2FA token in env | Move encrypted to DB |
+| SEC-08 | Auth/2FA | P3 | Fixed | Admin 2FA token in env | `auth.py:493-557` reads encrypted secret from `system_admin_2fa` table; env `ADMIN_TOTP_SECRET` is fallback only and `last_used_at` is updated on success |
 | SEC-09 | Sessions | P3 | Fixed (Sprint-3) | No concurrent session limits | `MAX_CONCURRENT_SESSIONS` env enforced in login flow (oldest active sessions are deactivated) |
 | SEC-10 | Integrations | P2 | Fixed (`49f5d66`) | No outbound webhook allowlist | `WEBHOOK_HOSTNAME_ALLOWLIST` env honoured in `validate_webhook_url` |
 | SEC-11 | SSO | P2 | Open | SAML/OAuth/LDAP deep audit deferred | Follow-up audit |
-| SEC-12 | Dashboard | P3 | Open | Metadata endpoints ungated | Superseded by IN-F1 in Phase 9 |
+| SEC-12 | Dashboard | P3 | Fixed | Metadata endpoints ungated | Superseded by IN-F1 `require_permission` additions in Phase 9 |
 
 ### 2.3 Phase 03 – Platform / DevOps (22)
 | ID | Module | Sev | Status | Evidence | Fix |
@@ -125,18 +126,18 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | PLAT-DB-01 | DB/Perf | P2 | Open | 0 of 16 planned MVs created | Create the 16 materialized views |
 | PLAT-DB-02 | DB/Cleanup | P3 | Fixed | 3 stale test tenant DBs | Read-only inspector `scripts/list_stale_test_dbs.py --days N` lists candidates (operator confirms before any drop) |
 | PLAT-DB-03 | DB/Integrity | P2 | Fixed | Alembic downgrade never tested | New CI job `alembic-roundtrip` runs `upgrade head → downgrade -1 → upgrade head` against ephemeral postgres |
-| PLAT-DB-04 | Performance | P2 | Open | N+1 queries unmeasured | SQLAlchemy event logger on staging |
+| PLAT-DB-04 | Performance | P2 | Fixed | N+1 queries unmeasured | `utils/query_counter.py` ASGI middleware + SQLAlchemy `before_cursor_execute` listener; opt-in via `ENABLE_QUERY_COUNTER=1`; emits `X-DB-Query-Count` header and warns at >50 queries/request |
 | PLAT-PERF-01 | Performance | P1 | Open | p50/p95/p99 never measured | Run `test_performance_api` |
 | PLAT-PERF-02 | Bundle | P3 | Fixed | 1.2MB + 1.1MB JS chunks | `vite.config.js` now splits vendor into react/router/charts/ui/date/export chunks via `manualChunks` |
 | PLAT-PERF-03 | Performance | P2 | Open | Lighthouse not run | Audit login/dashboard/invoice |
 | PLAT-INFRA-01 | Monitoring | P2 | Fixed | pg/redis exporters commented out | `postgres-exporter` + `redis-exporter` services live in `docker-compose.yml`; `monitoring/prometheus.yml` scrapes both |
-| PLAT-INFRA-02 | Alerting | P2 | Open | Alertmanager targets empty | Configure Slack/email |
+| PLAT-INFRA-02 | Alerting | P2 | Fixed | Alertmanager targets empty | `monitoring/alertmanager.yml` with Slack `#ops-alerts`/`#ops-warnings` routes + email on critical, wired into `docker-compose.yml` and `prometheus.yml` |
 | PLAT-INFRA-03 | Security | P3 | Open | CSP `unsafe-inline` | Nonce migration |
 | PLAT-INFRA-04 | Hardening | P3 | Fixed | Frontend rootfs writable | Frontend `Dockerfile` now drops to `USER nginx`, listens on `:8080` (rootless), chowns cache/log dirs; safe with `--read-only` + tmpfs |
 | PLAT-EVT-01 | Events | P2 | Fixed | Outbox relay e2e untested | `tests/test_einvoice_outbox_relay.py` inserts a pending row, calls the relay, asserts it leaves the `pending` bucket |
 | PLAT-EVT-02 | Webhooks | P2 | Fixed | DLQ / retry budget undocumented | New `RUNBOOK.md` section *Webhook DLQ + e-invoice outbox relay* covers backoff cap, max attempts, manual replay, monitoring |
 | PLAT-BKP-01 | DR | P1 | Open | Restore drill never performed | Run drill on staging |
-| PLAT-BKP-02 | DR | P2 | Open | Backup policy undocumented | Daily/weekly/monthly runbook |
+| PLAT-BKP-02 | DR | P2 | Fixed | Backup policy undocumented | RUNBOOK “Backup & Restore Policy” section: cron schedule, retention matrix (14d/8w/12m), restore drill, verification & alert |
 
 ### 2.4 Phase 04 – Accounting Core (17)
 | ID | Module | Sev | Status | Evidence | Fix |
@@ -156,7 +157,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ACC-F13 | Assets | P2 | Fixed (`1cccb63`) | Units-of-production depreciation missing | `POST /governance/assets/{id}/depreciate-uop` (depreciable base ÷ expected units × produced units) |
 | ACC-F14 | Assets | P3 | Fixed (`1cccb63`) | IFRS 16 lease modification not handled | `POST /governance/leases/{id}/modify` with P&L plug via `acc_map_lease_modification` |
 | ACC-DB-02 | CoA | P2 | Fixed (`1cccb63`) | 0 header accounts (no hierarchy) | All parent rows flagged `is_header=TRUE`; `gl_service` rejects postings on header accounts |
-| ACC-IFRS-01 | IFRS 16 | P3 | Open | Lease modification missing | Remeasurement flow |
+| ACC-IFRS-01 | IFRS 16 | P3 | Fixed | Lease modification missing | Covered by ACC-F14: `POST /governance/leases/{id}/modify` performs IFRS 16 remeasurement of liability and ROU asset, P&L plug via `acc_map_lease_modification` |
 | ACC-IFRS-02 | IAS 36 | P3 | Fixed | Bulk CGU impairment run missing | `POST /governance/assets/cgu/impairment-bulk` wraps `services.impairment_service.record_impairment_test` per CGU; supports optional JE posting via `acc_map_impairment_expense` / `acc_map_accumulated_impairment` |
 | ACC-TEST-01 | Tests | P1 | Fixed | `test_vat_rate_standard` schema mismatch | Test now queries the actual `tax_rates(tax_name, tax_name_en, rate_value, is_active)` columns instead of legacy `name`/`rate` |
 | ACC-TEST-02/03 | Tests | P3 | Open | 2 critical tests use wrong API URLs | Correct paths |
@@ -177,7 +178,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | EINV-F2 | E-Invoicing | P2 | Fixed (Sprint-4) | No outbox relay for failed submissions | `einvoice_outbox` table added; failed submissions auto-enqueued from `einvoice_submit`; `POST /finance/accounting-depth/einvoice/outbox/relay` worker-safe endpoint (FOR UPDATE SKIP LOCKED) with exponential back-off + giveup after 6 attempts |
 | EINV-F3 | E-Invoicing | P3 | Open | UAE FTA / EG ETA stubs | ASP onboarding |
 | PAY-F1 | Payments | P1 | Fixed (`e646558`) | Webhook endpoint lacks pre-sig rate limit | Per-IP limiter before signature verify |
-| PAY-F2 | Payments | P2 | Open | No auto-match webhook → allocations | Auto-reconcile |
+| PAY-F2 | Payments | P2 | Fixed | No auto-match webhook → allocations | `routers/sales/vouchers.py:557` `auto_match_receipt` allocates customer receipts against open AR invoices (FIFO) and writes a `payments.auto_match` audit log entry |
 
 ### 2.6 Phase 06 – Supply Chain (16: 9 findings + 7 rejected)
 | ID | Module | Sev | Status | Evidence | Fix |
@@ -250,7 +251,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | PH10-B4 | Tests | P2 | Fixed | No negative-path tests for `require_permission` | `tests/test_permission_negative_path.py` creates a user with empty-permission role, asserts 403 on `/api/governance/overtime-rates` and 401/403 on unauthenticated request |
 | PH10-B5 | Tests | P2 | Fixed (this update) | No regression for `check_fiscal_period_open` | `tests/test_fiscal_lock_regression.py` (4 cases: locked→HTTP 400, soft False, open→True, string-date input) |
 | PH10-B6 | E2E | P2 | Open | No Playwright E2E for cycles A/E/H | Scaffold browser E2E |
-| PH10-B7 | Load | P3 | Open | No Locust/k6 scripts | Smoke at 100 RPS |
+| PH10-B7 | Load | P3 | Fixed | No Locust/k6 scripts | `scripts/load_smoke.k6.js` constant-arrival-rate 100 RPS x 60s, p95<800ms / err<1% thresholds |
 | PH10-PG-01 | Tests | — | Fixed | Phase 9 gates had 0 regression coverage | 12 tests added |
 
 ---

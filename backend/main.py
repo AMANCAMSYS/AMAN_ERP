@@ -444,6 +444,15 @@ app.add_middleware(InputSanitizationMiddleware)
 from utils.csrf_middleware import CSRFMiddleware
 app.add_middleware(CSRFMiddleware)
 
+# Optional N+1 query observer (disabled unless ENABLE_QUERY_COUNTER=1).
+from utils.query_counter import QueryCounterMiddleware, install_engine_listener
+app.add_middleware(QueryCounterMiddleware)
+try:
+    from database import engine as _system_engine
+    install_engine_listener(_system_engine)
+except Exception:
+    pass
+
 # ── Prometheus Metrics ─────────────────────────────────────────────────────────
 try:
     from prometheus_fastapi_instrumentator import Instrumentator

@@ -183,6 +183,7 @@ volumes:
   redis_data:
   uploads:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
 
 # ── Networks ─────────────────────────────────────────────────────────────────

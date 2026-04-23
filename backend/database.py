@@ -78,6 +78,11 @@ def _get_engine(company_id: str):
         pool_size=5,
         max_overflow=10
     )
+    try:
+        from utils.query_counter import install_engine_listener
+        install_engine_listener(_engines[company_id])
+    except Exception:
+        pass
     return _engines[company_id]
 
 def get_db_connection(company_id: str):

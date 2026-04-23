@@ -10,7 +10,7 @@ rule_files:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []          # Add alertmanager URL here if configured
+        - targets: ['alertmanager:9093']
 
 scrape_configs:
   # ── AMAN Backend metrics ────────────────────────────────────────────────────
