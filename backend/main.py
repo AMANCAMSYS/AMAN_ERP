@@ -62,9 +62,9 @@ from routers import role_dashboards
 from routers import delivery_orders, landed_costs, hr_wps_compliance
 from routers import system_completion
 from routers import sso, matching, mobile
-from routers import sms as sms_router  # Phase 6 ext — SMS gateways
-from routers import shipping as shipping_router  # Phase 6 ext — carriers
-from routers import sprint6 as sprint6_router  # Phase-11 Sprint-6 batch
+from routers import sms as sms_router  # SMS gateways
+from routers import shipping as shipping_router  # carriers
+from routers import governance as governance_router
 
 # OPS-001: Structured logging — JSON in production, human-readable in dev
 from utils.logging_config import setup_logging, RequestIDMiddleware
@@ -547,7 +547,7 @@ app.include_router(matching.router, prefix="/api")
 app.include_router(mobile.router, prefix="/api")
 app.include_router(sms_router.router, prefix="/api")
 app.include_router(shipping_router.router, prefix="/api")
-app.include_router(sprint6_router.router, prefix="/api")
+app.include_router(governance_router.router, prefix="/api")
 
 
 @app.get("/")

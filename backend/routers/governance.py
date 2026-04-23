@@ -1,30 +1,19 @@
-"""Phase-11 Sprint-6 — configuration + workflow + treasury hardening endpoints.
+"""Cross-module governance endpoints.
 
-Covers:
-  * WF-M1  — overtime rates config CRUD
-  * WF-M2  — document permissions per department/role/user
-  * WF-F8  — geofences + check-in distance check
-  * WF-F6  — approval-request quorum metadata
-  * WF-F7  — SLA escalation scanner
-  * WF-F2b — GOSI historical 0.25% adjustment
-  * ZAK-F2 — zakat base items mapping
-  * TAX-F3 — branch-level tax settings CRUD
-  * TREAS-F1 — notes-receivable discount posting
-  * TREAS-F2 — bounced check reversal
-  * ACC-F12 — asset revaluation with OCI JE
-  * ACC-F13 — units-of-production depreciation
-  * ACC-F14 — IFRS 16 lease modification (light remeasurement)
+Covers finance, treasury, HR, approvals and document controls that sit above
+individual domain routers: configuration tables, posting adjustments, quorum
+escalation, geofencing and asset/lease remeasurement.
 """
 
 from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -38,7 +27,7 @@ from utils.permissions import require_permission
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/sprint6", tags=["phase-11-sprint-6"])
+router = APIRouter(prefix="/governance", tags=["Governance"])
 
 _D2 = Decimal("0.01")
 
@@ -50,7 +39,7 @@ def _dec(v) -> Decimal:
 
 
 # ==========================================================================
-# WF-M1 — Overtime rates config
+# Overtime rates configuration
 # ==========================================================================
 
 class OvertimeRate(BaseModel):
@@ -97,7 +86,7 @@ def upsert_overtime_rate(body: OvertimeRate, current_user=Depends(get_current_us
 
 
 # ==========================================================================
-# WF-M2 — Document permissions
+# Document permissions
 # ==========================================================================
 
 class DocPermissionCreate(BaseModel):
@@ -162,7 +151,7 @@ def list_document_permissions(doc_id: int, current_user=Depends(get_current_user
 
 
 # ==========================================================================
-# WF-F8 — Geofences + check-in validator
+# Geofences + check-in validation
 # ==========================================================================
 
 class GeofenceCreate(BaseModel):
@@ -243,7 +232,7 @@ def validate_checkin_location(body: CheckInValidate, current_user=Depends(get_cu
 
 
 # ==========================================================================
-# WF-F7 — SLA escalation scanner
+# Approval SLA escalation scanner
 # ==========================================================================
 
 @router.post("/approvals/sla/escalate", dependencies=[Depends(require_permission("approvals.manage"))])
@@ -289,13 +278,13 @@ def scan_and_escalate_sla(current_user=Depends(get_current_user)):
 
 
 # ==========================================================================
-# WF-F2b — Historical GOSI 0.25% adjustment
+# Historical GOSI delta back-fill
 # ==========================================================================
 
 @router.post("/hr/gosi/historical-adjust", dependencies=[Depends(require_permission(["hr.manage", "accounting.manage"]))])
 def adjust_historical_gosi(request: Request, current_user=Depends(get_current_user)):
     """Back-fill the 0.25 % employer-GOSI delta for payroll entries booked before
-    the 2024 rate correction. Touches only entries flagged ``gosi_adjusted IS NOT TRUE``."""
+    the rate correction. Touches only entries flagged ``gosi_adjusted IS NOT TRUE``."""
     db = get_db_connection(current_user.company_id)
     try:
         db.execute(text("ALTER TABLE payroll_entries ADD COLUMN IF NOT EXISTS gosi_adjusted BOOLEAN DEFAULT FALSE"))
@@ -325,7 +314,7 @@ def adjust_historical_gosi(request: Request, current_user=Depends(get_current_us
 
 
 # ==========================================================================
-# ZAK-F2 — Zakat base items mapping
+# Zakat base items mapping
 # ==========================================================================
 
 class ZakatBaseItem(BaseModel):
@@ -378,7 +367,7 @@ def upsert_zakat_base_item(body: ZakatBaseItem, current_user=Depends(get_current
 
 
 # ==========================================================================
-# TAX-F3 — Branch tax settings
+# Branch tax settings
 # ==========================================================================
 
 class BranchTaxSetting(BaseModel):
@@ -392,7 +381,6 @@ class BranchTaxSetting(BaseModel):
 def list_branch_tax_settings(current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        # The schema of branch_tax_settings varies; return whatever is there.
         rows = db.execute(text("SELECT * FROM branch_tax_settings")).fetchall()
         return [dict(r._mapping) for r in rows]
     finally:
@@ -403,7 +391,6 @@ def list_branch_tax_settings(current_user=Depends(get_current_user)):
 def upsert_branch_tax_setting(body: BranchTaxSetting, current_user=Depends(get_current_user)):
     db = get_db_connection(current_user.company_id)
     try:
-        # Ensure minimum columns exist (idempotent; safe across tenants)
         db.execute(text("ALTER TABLE branch_tax_settings ADD COLUMN IF NOT EXISTS default_tax_rate DECIMAL(6,3) DEFAULT 15"))
         db.execute(text("ALTER TABLE branch_tax_settings ADD COLUMN IF NOT EXISTS tax_exempt BOOLEAN DEFAULT FALSE"))
         db.execute(text("ALTER TABLE branch_tax_settings ADD COLUMN IF NOT EXISTS notes TEXT"))
@@ -428,7 +415,7 @@ def upsert_branch_tax_setting(body: BranchTaxSetting, current_user=Depends(get_c
 
 
 # ==========================================================================
-# TREAS-F1 — Notes receivable discount (bank discount with interest)
+# Notes receivable discount (bank discount with interest)
 # ==========================================================================
 
 class NoteDiscountRequest(BaseModel):
@@ -534,7 +521,7 @@ def discount_note_receivable(
 
 
 # ==========================================================================
-# TREAS-F2 — Bounced check reversal
+# Bounced check reversal
 # ==========================================================================
 
 class BounceRequest(BaseModel):
@@ -549,11 +536,7 @@ def bounce_check_receivable(
     body: BounceRequest,
     current_user=Depends(get_current_user),
 ):
-    """Reverse the originating deposit JE when a customer check bounces.
-
-    Walks prior postings on the check and creates offsetting lines; marks the
-    check as ``bounced``.
-    """
+    """Reverse the originating deposit JE when a customer check bounces and mark the check as ``bounced``."""
     from services import gl_service
 
     db = get_db_connection(current_user.company_id)
@@ -620,7 +603,7 @@ def bounce_check_receivable(
 
 
 # ==========================================================================
-# ACC-F12 — Asset revaluation JE (to OCI / revaluation reserve)
+# Asset revaluation (OCI / revaluation reserve)
 # ==========================================================================
 
 class AssetRevaluationRequest(BaseModel):
@@ -670,7 +653,6 @@ def revalue_asset(
             raise HTTPException(status_code=400, detail="حسابات الأصل / احتياطي إعادة التقييم غير مهيأة")
 
         if delta > 0:
-            # Upward — DR Asset / CR Revaluation Reserve
             lines = [
                 {"account_id": asset_acc, "debit": float(delta), "credit": 0, "description": f"Revaluation up asset #{asset_id}"},
                 {"account_id": reserve_acc, "debit": 0, "credit": float(delta), "description": f"Revaluation reserve asset #{asset_id}"},
@@ -721,7 +703,7 @@ def revalue_asset(
 
 
 # ==========================================================================
-# ACC-F13 — Units-of-production depreciation
+# Units-of-production depreciation
 # ==========================================================================
 
 class UoPDepreciationRequest(BaseModel):
@@ -764,7 +746,6 @@ def depreciate_asset_uop(
         units = _dec(body.units_produced)
         period_dep = (per_unit * units).quantize(_D2)
 
-        # Cap by remaining book value
         book = _dec(row.book_value)
         if period_dep > book:
             period_dep = book
@@ -823,7 +804,7 @@ def depreciate_asset_uop(
 
 
 # ==========================================================================
-# ACC-F14 — IFRS 16 lease modification (light remeasurement endpoint)
+# IFRS 16 lease modification (remeasurement)
 # ==========================================================================
 
 class LeaseModificationRequest(BaseModel):
@@ -842,8 +823,7 @@ def modify_lease(
 ):
     """Apply an IFRS 16 modification: adjust lease liability and ROU asset to new carrying amounts.
 
-    Posts the delta via ``gl_service``. Requires a ``leases`` table with
-    ``liability_account_id`` and ``rou_asset_account_id`` columns.
+    Requires a ``leases`` table with ``liability_account_id`` and ``rou_asset_account_id`` columns.
     """
     from services import gl_service
 
@@ -889,7 +869,6 @@ def modify_lease(
         elif dliab < 0:
             lines.append({"account_id": row.liability_account_id, "debit": float(-dliab), "credit": 0, "description": f"Lease #{lease_id} liability down"})
 
-        # Balance — plug difference into a P&L modification account
         total_debit = sum(Decimal(str(l["debit"])) for l in lines)
         total_credit = sum(Decimal(str(l["credit"])) for l in lines)
         balance = (total_debit - total_credit).quantize(_D2)

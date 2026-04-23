@@ -494,9 +494,9 @@ def take_approval_action(request_id: int, data: ApprovalActionSchema, current_us
         if data.action not in ('approve', 'reject', 'return'):
             raise HTTPException(400, "الإجراء غير صالح. يجب أن يكون: approve, reject, return")
 
-        # WF-F6 (Phase-11 Sprint-6): quorum-aware duplicate guard.
-        # Block the same user from acting twice on the same step, but allow
-        # multiple distinct approvers when ``quorum_required > 1``.
+        # Quorum-aware duplicate guard: block the same user from acting twice
+        # on the same step, but allow multiple distinct approvers when
+        # ``quorum_required > 1``.
         already_by_user = db.execute(text(
             "SELECT COUNT(*) FROM approval_actions "
             "WHERE request_id = :rid AND step = :step AND actioned_by = :uid"

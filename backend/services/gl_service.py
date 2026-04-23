@@ -133,15 +133,15 @@ def create_journal_entry(
     # 2. Header
     entry_number = generate_sequential_number(db, "JE", "journal_entries", "entry_number")
 
-    # Multi-book: resolve ledger_id (Phase 6). If caller didn't specify, pick
-    # the tenant's primary ledger (prefer local_gaap framework). Silent no-op
-    # if ledgers table is absent (older tenants / pre-bootstrap).
+    # Multi-book: resolve ledger_id. If caller didn't specify, pick the tenant's
+    # primary ledger (prefer local_gaap framework). Silent no-op if ledgers
+    # table is absent (older tenants / pre-bootstrap).
     if ledger_id is None:
         try:
             active_count = db.execute(
                 text("SELECT COUNT(*) FROM ledgers WHERE is_active = TRUE")
             ).scalar() or 0
-            # ACC-F8 (Phase-11 Sprint-6): require explicit ledger when >1 active book.
+            # Require explicit ledger when more than one active book exists.
             if active_count > 1:
                 raise HTTPException(
                     status_code=400,
@@ -228,8 +228,8 @@ def create_journal_entry(
         account_id = line["account_id"]
         line_currency = line.get("currency") or currency
 
-        # ACC-DB-02 (Phase-11 Sprint-6): reject postings on header/group accounts.
-        # is_header may be missing on legacy CoA rows — tolerate NULL.
+        # Reject postings on header/group accounts. ``is_header`` may be missing
+        # on legacy CoA rows — tolerate NULL.
         is_header = db.execute(
             text("SELECT COALESCE(is_header, FALSE) FROM accounts WHERE id = :id"),
             {"id": account_id},

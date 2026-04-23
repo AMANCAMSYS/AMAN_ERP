@@ -909,8 +909,8 @@ def get_treasury_base_tables_sql() -> str:
         end_balance DECIMAL(18, 4) DEFAULT 0,
         status VARCHAR(20) DEFAULT 'draft',
         notes TEXT,
-        -- TREAS-F4 (Phase-11 Sprint-5): absolute tolerance used when auto-matching
-        -- bank lines against ledger entries (defaults to zero = strict match).
+        -- Absolute tolerance used when auto-matching bank lines against
+        -- ledger entries (defaults to zero = strict match).
         tolerance_amount DECIMAL(18, 4) DEFAULT 0,
         created_by INTEGER REFERENCES company_users(id),
         branch_id INTEGER REFERENCES branches(id),
@@ -4202,9 +4202,9 @@ def initialize_company_default_data(company_id: str, admin_username: str,
                 """), {"number": acc[0], "code": acc[1], "name": acc[2], "name_en": acc[3], "type": acc[4], "parent_id": parent_id, "currency": currency})
                 inserted_ids[acc[0]] = result.fetchone()[0]
 
-            # ACC-DB-02 (Phase-11 Sprint-6): flag all parents as header accounts so
-            # postings are only allowed on leaf nodes. A parent is any account that
-            # appears as parent_id for another row.
+            # Flag all parents as header accounts so postings are only allowed
+            # on leaf nodes. A parent is any account that appears as
+            # parent_id for another row.
             conn.execute(text("""
                 UPDATE accounts
                 SET is_header = TRUE
@@ -5648,21 +5648,21 @@ def get_system_completion_tables_sql() -> str:
 
     -- ===== ADD COLUMNS TO EXISTING TABLES =====
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_order_id INTEGER REFERENCES delivery_orders(id) ON DELETE SET NULL;
-    -- TREAS-F4 (Phase-11 Sprint-5): absolute tolerance for bank recon auto-match
+    -- Absolute tolerance for bank recon auto-match
     ALTER TABLE bank_reconciliations ADD COLUMN IF NOT EXISTS tolerance_amount DECIMAL(18, 4) DEFAULT 0;
 
-    -- WF-F6 (Phase-11 Sprint-6): parallel / any-of / all-of approval steps
+    -- Parallel / any-of / all-of approval steps
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS step_group INTEGER DEFAULT 0;
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS quorum_required INTEGER DEFAULT 1;
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS approvals_collected INTEGER DEFAULT 0;
 
-    -- ACC-F13 / ACC-F12 (Phase-11 Sprint-6): richer depreciation + revaluation tracking
+    -- Richer depreciation + revaluation tracking for fixed assets
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS depreciation_method VARCHAR(40) DEFAULT 'straight_line';
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS expected_production_units DECIMAL(18, 4);
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS cumulative_production_units DECIMAL(18, 4) DEFAULT 0;
     ALTER TABLE assets ADD COLUMN IF NOT EXISTS revaluation_reserve DECIMAL(18, 4) DEFAULT 0;
 
-    -- WF-F7 (Phase-11 Sprint-6): track when SLA escalation last ran to avoid duplicate notifies
+    -- Track when SLA escalation last ran to avoid duplicate notifies
     ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS sla_escalated_at TIMESTAMPTZ;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS nationality VARCHAR(5) DEFAULT NULL;
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_saudi BOOLEAN DEFAULT FALSE;
@@ -5965,10 +5965,10 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_einvoice_outbox_invoice ON einvoice_outbox(invoice_id);
 
     -- ==========================================================================
-    -- Phase-11 Sprint-6: configuration + workflow + treasury hardening tables
+    -- Cross-module configuration + workflow + treasury hardening tables
     -- ==========================================================================
 
-    -- WF-M1: overtime rate multipliers (replaces hardcoded 1.5/2.0)
+    -- Overtime rate multipliers (replaces hardcoded 1.5 / 2.0)
     CREATE TABLE IF NOT EXISTS overtime_rates_config (
         id SERIAL PRIMARY KEY,
         rate_key VARCHAR(40) UNIQUE NOT NULL,
@@ -5984,7 +5984,7 @@ def get_extended_features_tables_sql() -> str:
       ('night_shift', 'Night-shift premium', 1.250)
     ON CONFLICT (rate_key) DO NOTHING;
 
-    -- WF-M2: document access control per department / role (complements existing DMS)
+    -- Document access control per department / role (complements existing DMS)
     CREATE TABLE IF NOT EXISTS document_permissions (
         id SERIAL PRIMARY KEY,
         document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -6001,7 +6001,7 @@ def get_extended_features_tables_sql() -> str:
     CREATE INDEX IF NOT EXISTS ix_doc_perm_doc ON document_permissions(document_id);
     CREATE INDEX IF NOT EXISTS ix_doc_perm_dept ON document_permissions(department_id);
 
-    -- WF-F8: geofences and their bindings to branches (attendance check-in)
+    -- Geofences and their bindings to branches (attendance check-in)
     CREATE TABLE IF NOT EXISTS geofences (
         id SERIAL PRIMARY KEY,
         name VARCHAR(150) NOT NULL,
@@ -6014,7 +6014,7 @@ def get_extended_features_tables_sql() -> str:
     );
     CREATE INDEX IF NOT EXISTS ix_geofences_branch ON geofences(branch_id);
 
-    -- ZAK-F2: canonical zakat base items mapping (replaces fragile LIKE matching)
+    -- Canonical zakat base items mapping (replaces fragile LIKE matching)
     CREATE TABLE IF NOT EXISTS zakat_base_items (
         id SERIAL PRIMARY KEY,
         account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
