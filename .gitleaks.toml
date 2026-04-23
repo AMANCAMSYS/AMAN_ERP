@@ -13,6 +13,10 @@ paths = [
     '''docs/.*\.md$''',
     '''hardcoded_strings\.json$''',
     '''keys_to_translate\.json$''',
+    # Workflow files contain only CI placeholder secrets (e.g. the
+    # SECRET_KEY env var used by alembic round-trip + coverage jobs).
+    # Real secrets are referenced via ${{ secrets.* }} and never committed.
+    '''\.github/workflows/.*\.ya?ml$''',
 ]
 # Words that commonly appear in dummy config / docs but are not live secrets.
 regexes = [
@@ -20,4 +24,5 @@ regexes = [
     '''your_secret''',
     '''example_(token|key|secret)''',
     '''dev_aman_redis''',
+    '''ci_alembic_secret_key_[0-9a-f]+''',
 ]
