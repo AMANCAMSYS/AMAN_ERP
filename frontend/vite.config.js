@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => ({
                     if (!id.includes('node_modules')) return undefined
                     if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'vendor-react'
                     if (/[\\/]node_modules[\\/](react-router|react-router-dom|history)[\\/]/.test(id)) return 'vendor-router'
-                    if (/[\\/]node_modules[\\/](recharts|reselect|es-toolkit|d3-[a-z]+|victory-vendor)[\\/]/.test(id)) return 'vendor-charts'
                     if (/[\\/]node_modules[\\/](@mui|@emotion|@mantine)[\\/]/.test(id)) return 'vendor-ui'
                     if (/[\\/]node_modules[\\/](dayjs|date-fns|luxon|moment)[\\/]/.test(id)) return 'vendor-date'
                     if (/[\\/]node_modules[\\/](xlsx|jspdf|html2canvas|file-saver)[\\/]/.test(id)) return 'vendor-export'
