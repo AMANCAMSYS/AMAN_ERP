@@ -18,17 +18,19 @@ Five follow-up sprints have been merged onto `main` after this report was first 
 | Sprint-2c Authz + SSRF hardening | `49f5d66` | ACC-F4, SEC-10, PLAT-CQ-01/02/04 verified zero | `ci` #181 green, `security-scan` #56 green |
 | Sprint-3 Governance + UX extension | `cbeaadb` | PUR-F1, SEC-09, IN-F5, CRM-F2, INV-F3 (verified), MFG-F3 (verified), POS-UI-F1 (extended to Returns/Held-Orders/Close-Session modals) | `ci` run on cbeaadb, `security-scan` #57 green |
 | Sprint-4 Billing workflows + ZATCA outbox | `30df0ff` | CON-F1 (contract milestones), SUB-F1 (dunning cases), EINV-F2 (e-invoice outbox + relay), ACC-F2 (dedup fiscal-lock schema) | `ci` run on 30df0ff, `security-scan` #58 green |
-| Sprint-5 Admin 2FA + inventory/treasury hardening | _this sprint_ | SEC-08 (DB-backed admin 2FA), INV-F1 (stock adjustment + GL), PAY-F2 (receipt auto-match), TAX-F2 (WHT certificate PDF), TREAS-F4 (recon tolerance), TREAS-F3 (scenario-weighted cashflow), ACC-F11 (verified), WF-F9 (verified) | pending |
+| Sprint-5 Admin 2FA + inventory/treasury hardening | `07658be` | SEC-08 (DB-backed admin 2FA), INV-F1 (stock adjustment + GL), PAY-F2 (receipt auto-match), TAX-F2 (WHT certificate PDF), TREAS-F4 (recon tolerance), TREAS-F3 (scenario-weighted cashflow), ACC-F11 (verified), WF-F9 (verified) | `ci` green |
+| Sprint-6 Cross-module governance batch | `1cccb63` (router renamed to `governance` in `6a03c07`) | ACC-DB-02 (header accounts seed), WF-M1 (overtime rates config), WF-M2 (document permissions by department/role), WF-F8 (geofences + check-in validator), WF-F6 (parallel/quorum approvals), WF-F7 (SLA escalation scanner), ZAK-F2 (zakat base mapping), TAX-F3 (branch tax settings), TREAS-F1 (notes-receivable discount), TREAS-F2 (bounced-check reversal), ACC-F12 (asset revaluation JE), ACC-F13 (units-of-production depreciation), ACC-F14 (IFRS 16 lease modification), WF-F2b (historical GOSI 0.25% adjustment), ACC-F8 (multi-book ledger enforcement), IN-F6 (router tags i18n) | `ci` #186 + `security-scan` #61 (in_progress at filing) |
+| Sprint-7 PH10-B5 fiscal-lock regression test | _this update_ | PH10-B5 (4 regression tests for `check_fiscal_period_open`) | pending |
 
-**Updated distribution** (open only, post-Sprint-5):
+**Updated distribution** (open only, post-Sprint-7):
 
 | Severity | Fixed (was) | Fixed (now) | Open (now) |
 |---|---|---|---|
 | P0 | 0 | 0 | 2 |
-| P1 | 26 | 26 | 10 |
-| P2 | 24 | 28 | 20 |
-| P3 | 4 | 8 | 14 |
-| **Δ closed this round (Sprint-5)** | — | **+8** | — |
+| P1 | 26 | 30 | 6 |
+| P2 | 28 | 36 | 12 |
+| P3 | 8 | 13 | 9 |
+| **Δ closed Sprint-6 + Sprint-7** | — | **+17** | — |
 
 Architectural rule enforced during these sprints: **all table schemas live in `backend/database.py`** (303 tables verified). Alembic migration `0013_inventory_mfg_check_constraints` was deleted in Sprint-2 and its CHECK constraints moved into `create_all_tables()` as idempotent `DO`-blocks.
 
@@ -145,14 +147,14 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | ACC-F5 | Accounting | P2 | Fixed (`e646558`) | `/journal-entries` not filtered by branch | `branch_id` filter + allowed_branches |
 | ACC-F6 | Audit | P2 | Fixed (`95efa4a`) | Audit log errors swallowed silently | `exc_info=True` + context on every failure |
 | ACC-F7 | Accounting | P1 | Open | Tenant missing IFRS ledger | Bootstrap migration |
-| ACC-F8 | Accounting | P2 | Open | Multi-book posting optional | Enforce parallel posting |
+| ACC-F8 | Accounting | P2 | Fixed (`1cccb63`) | Multi-book posting optional | `gl_service.create_journal_entry` rejects calls without `ledger_id` when more than one active book exists |
 | ACC-F9 | FX | P1 | Open | FX revaluation endpoint incomplete | Complete posting + scheduler |
 | ACC-F10 | FX | P2 | Open | No periodic FX revaluation job | Add month-end scheduler |
 | ACC-F11 | Assets | P2 | Open | Disposal without gain/loss JE | Post proceeds vs book_value delta |
-| ACC-F12 | Assets | P2 | Open | Revaluation stored without JE | Post to OCI / revaluation reserve |
-| ACC-F13 | Assets | P2 | Open | Units-of-production depreciation missing | Implement UoP method |
-| ACC-F14 | Assets | P3 | Open | IFRS 16 lease modification not handled | Remeasurement endpoint |
-| ACC-DB-02 | CoA | P2 | Open | 0 header accounts (no hierarchy) | Add header accounts |
+| ACC-F12 | Assets | P2 | Fixed (`1cccb63`) | Revaluation stored without JE | `POST /governance/assets/{id}/revalue` posts up/down JE against `acc_map_revaluation_reserve` |
+| ACC-F13 | Assets | P2 | Fixed (`1cccb63`) | Units-of-production depreciation missing | `POST /governance/assets/{id}/depreciate-uop` (depreciable base ÷ expected units × produced units) |
+| ACC-F14 | Assets | P3 | Fixed (`1cccb63`) | IFRS 16 lease modification not handled | `POST /governance/leases/{id}/modify` with P&L plug via `acc_map_lease_modification` |
+| ACC-DB-02 | CoA | P2 | Fixed (`1cccb63`) | 0 header accounts (no hierarchy) | All parent rows flagged `is_header=TRUE`; `gl_service` rejects postings on header accounts |
 | ACC-IFRS-01 | IFRS 16 | P3 | Open | Lease modification missing | Remeasurement flow |
 | ACC-IFRS-02 | IAS 36 | P3 | Open | Bulk CGU impairment run missing | Add bulk endpoint |
 | ACC-TEST-01 | Tests | P1 | Open | `test_vat_rate_standard` schema mismatch | Fix test |
@@ -161,15 +163,15 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 ### 2.5 Phase 05 – Treasury & Tax (13)
 | ID | Module | Sev | Status | Evidence | Fix |
 |---|---|---|---|---|---|
-| TREAS-F1 | Treasury/Notes | P2 | Open | No discount/interest/endorsement endpoints | Add endpoints + GL |
-| TREAS-F2 | Treasury/Checks | P2 | Open | Bounce does not reverse prior discount JEs | Walk `check_history` |
-| TREAS-F3 | Cashflow | P3 | Open | Forecast deterministic | Add scenario weights |
-| TREAS-F4 | Recon | P3 | Open | Per-account tolerance not configurable | Add `tolerance_amount` |
+| TREAS-F1 | Treasury/Notes | P2 | Fixed (`1cccb63`) | No discount/interest/endorsement endpoints | `POST /governance/treasury/notes-receivable/{id}/discount` (DR Bank net + DR Interest Expense + CR Notes Receivable face) |
+| TREAS-F2 | Treasury/Checks | P2 | Fixed (`1cccb63`) | Bounce does not reverse prior discount JEs | `POST /governance/treasury/checks-receivable/{id}/bounce` reinstates AR and reverses bank deposit |
+| TREAS-F3 | Cashflow | P3 | Fixed (`07658be`) | Forecast deterministic | Scenario weights honoured |
+| TREAS-F4 | Recon | P3 | Fixed (`07658be`) | Per-account tolerance not configurable | `tolerance_amount` column |
 | TAX-F1 | Tax | P1 | Fixed | Tax payment bypassed fiscal lock | Added `check_fiscal_period_open` |
-| TAX-F2 | Tax/WHT | P2 | Open | No WHT certificate PDF generation | Add `/wht/{id}/certificate` |
-| TAX-F3 | Tax | P2 | Open | `branch_tax_settings` empty, no UI | Migration + UI |
+| TAX-F2 | Tax/WHT | P2 | Fixed (`07658be`) | No WHT certificate PDF generation | `/wht/{id}/certificate` |
+| TAX-F3 | Tax | P2 | Fixed (`1cccb63`) | `branch_tax_settings` empty, no UI | Self-healing schema + `GET/PUT /governance/tax/branch-settings` |
 | ZAK-F1 | Zakat | P1 | Fixed | Zakat posting bypassed fiscal lock | Added fiscal check |
-| ZAK-F2 | Zakat | P2 | Open | Zakat base uses fragile LIKE patterns | Canonical table |
+| ZAK-F2 | Zakat | P2 | Fixed (`1cccb63`) | Zakat base uses fragile LIKE patterns | `zakat_base_items` table + `GET/POST /governance/zakat/base-items` |
 | EINV-F1 | E-Invoicing | P2 | Fixed (`e646558`) | ZATCA submission without retry | `@retry` with backoff added |
 | EINV-F2 | E-Invoicing | P2 | Fixed (Sprint-4) | No outbox relay for failed submissions | `einvoice_outbox` table added; failed submissions auto-enqueued from `einvoice_submit`; `POST /finance/accounting-depth/einvoice/outbox/relay` worker-safe endpoint (FOR UPDATE SKIP LOCKED) with exponential back-off + giveup after 6 attempts |
 | EINV-F3 | E-Invoicing | P3 | Open | UAE FTA / EG ETA stubs | ASP onboarding |
@@ -215,16 +217,16 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 |---|---|---|---|---|---|
 | WF-F1 | HR/Payroll | P1 | Fixed | EOS bypassed fiscal lock | `check_fiscal_period_open` added |
 | WF-F2 | HR/Payroll | P1 | Fixed | GOSI employer rate 11.75% (pre-2014) | Updated to 12% |
-| WF-F2b | HR/Payroll | P2 | Open | Historical GOSI 0.25% delta | Manual SQL adjustment |
+| WF-F2b | HR/Payroll | P2 | Fixed (`1cccb63`) | Historical GOSI 0.25% delta | `POST /governance/hr/gosi/historical-adjust` (idempotent via `gosi_adjusted` flag) |
 | WF-F3 | HR | P1 | Fixed | Loan disbursement bypassed fiscal lock | Fiscal check added |
 | WF-F4 | Projects | P1 | Fixed | 3 project GL paths lacked fiscal lock | Added in Retainer/Timesheet/Invoice |
 | WF-F5 | Field Services | P1 | Open | No GL posting in `services.py` | Design account mapping |
-| WF-F6 | Approvals | P1 | Open | No parallel/any-of/all-of approvals | `step_group` + quorum |
-| WF-F7 | Approvals | P1 | Open | No SLA escalation | Celery beat |
-| WF-F8 | HR/Attendance | P2 | Open | No geo-fencing on check-in | `geofences` + lat/long |
-| WF-F9 | Approvals | P2 | Open | No auto-approve under threshold | `auto_approve_under` flag |
-| WF-M1 | HR | P3 | Open | Overtime 1.5/2.0 hardcoded | Settings table |
-| WF-M2 | DMS | P3 | Open | Document ACL not per-department | Granular access control |
+| WF-F6 | Approvals | P1 | Fixed (`1cccb63`) | No parallel/any-of/all-of approvals | `step_group` + `quorum_required` + `approvals_collected` columns; quorum-aware duplicate guard in `take_approval_action` |
+| WF-F7 | Approvals | P1 | Fixed (`1cccb63`) | No SLA escalation | `POST /governance/approvals/sla/escalate` scanner (idempotent via `sla_escalated_at`) |
+| WF-F8 | HR/Attendance | P2 | Fixed (`1cccb63`) | No geo-fencing on check-in | `geofences` table + `POST /governance/attendance/validate-location` (haversine) |
+| WF-F9 | Approvals | P2 | Fixed (`07658be`) | No auto-approve under threshold | `auto_approve_under` flag |
+| WF-M1 | HR | P3 | Fixed (`1cccb63`) | Overtime 1.5/2.0 hardcoded | `overtime_rates_config` table + `GET/PUT /governance/overtime-rates` |
+| WF-M2 | DMS | P3 | Fixed (`1cccb63`) | Document ACL not per-department | `document_permissions` table + `POST/GET /governance/documents/{id}/permissions` (department/role/user grants) |
 
 ### 2.9 Phase 09 – Integrations / UX (8: 6 findings + 2 rejected)
 | ID | Module | Sev | Status | Evidence | Fix |
@@ -234,7 +236,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | IN-F3 | Integrations | P2 | Open | UAE FTA + EG ETA stubs | Live submission after ASP onboarding |
 | IN-F4 | Seed/Secrets | P2 | Fixed | Hardcoded passwords in seed scripts | All seed scripts now require `AMAN_SEED_*` env vars |
 | IN-F5 | Integrations | P3 | Fixed (Sprint-3) | Adapters lack per-adapter retry knobs | `WEBHOOK_RETRY_MAX_ATTEMPTS`, `WEBHOOK_TIMEOUT_MAX_SEC`, `WEBHOOK_RETRY_BACKOFF_BASE`, `WEBHOOK_RETRY_BACKOFF_CAP_SEC` env overrides |
-| IN-F6 | i18n | P3 | Open | Hardcoded Arabic router tags | i18n sweep |
+| IN-F6 | i18n | P3 | Fixed (`1cccb63`) | Hardcoded Arabic router tags | Router tags swapped to canonical English across 36 routers |
 | IN-FP-01 | Notifications | — | Rejected | 7 IDOR claims | All scoped by `user_id=:uid` |
 | IN-FP-02 | Dashboard | — | Rejected | `/system-stats` public (claim) | `system_admin` check L372 |
 
@@ -245,7 +247,7 @@ Full 120-row register — one row per finding. Columns: `ID | Phase | Module | S
 | PH10-B2 | CI/CD | P1 | Fixed | CI `Install backend deps` failing | Resolver fixed; CI #178/179 green |
 | PH10-B3 | CI/CD | P1 | Fixed (`413b32e` + `e7a4796`) | SQL-safety baseline drifted | Baseline refreshed for crm/accounting line-number shifts |
 | PH10-B4 | Tests | P2 | Open | No negative-path tests for `require_permission` | Role factory + 403 |
-| PH10-B5 | Tests | P2 | Open | No regression for `check_fiscal_period_open` | Lock period → expect 409 |
+| PH10-B5 | Tests | P2 | Fixed (this update) | No regression for `check_fiscal_period_open` | `tests/test_fiscal_lock_regression.py` (4 cases: locked→HTTP 400, soft False, open→True, string-date input) |
 | PH10-B6 | E2E | P2 | Open | No Playwright E2E for cycles A/E/H | Scaffold browser E2E |
 | PH10-B7 | Load | P3 | Open | No Locust/k6 scripts | Smoke at 100 RPS |
 | PH10-PG-01 | Tests | — | Fixed | Phase 9 gates had 0 regression coverage | 12 tests added |
