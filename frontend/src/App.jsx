@@ -352,7 +352,6 @@ const CampaignList = React.lazy(() => import('./pages/Campaign/CampaignList'))
 const CampaignForm = React.lazy(() => import('./pages/Campaign/CampaignForm'))
 const CampaignReport = React.lazy(() => import('./pages/Campaign/CampaignReport'))
 const KnowledgeBase = React.lazy(() => import('./pages/CRM/KnowledgeBase'))
-const CRMDashboard = React.lazy(() => import('./pages/CRM/CRMDashboard'))
 const LeadScoring = React.lazy(() => import('./pages/CRM/LeadScoring'))
 const CustomerSegments = React.lazy(() => import('./pages/CRM/CustomerSegments'))
 const PipelineAnalytics = React.lazy(() => import('./pages/CRM/PipelineAnalytics'))
@@ -876,7 +875,6 @@ function App() {
                 <Route path="/crm/campaigns/:id/report" element={<PrivateRoute permission="crm.campaign_view"><CampaignReport /></PrivateRoute>} />
                 <Route path="/crm/legacy-campaigns" element={<PrivateRoute permission="sales.view"><MarketingCampaigns /></PrivateRoute>} />
                 <Route path="/crm/knowledge-base" element={<PrivateRoute permission="sales.view"><KnowledgeBase /></PrivateRoute>} />
-                <Route path="/crm/dashboard" element={<PrivateRoute permission="sales.view"><CRMDashboard /></PrivateRoute>} />
                 <Route path="/crm/lead-scoring" element={<PrivateRoute permission="sales.view"><LeadScoring /></PrivateRoute>} />
                 <Route path="/crm/segments" element={<PrivateRoute permission="sales.view"><CustomerSegments /></PrivateRoute>} />
                 <Route path="/crm/analytics" element={<PrivateRoute permission="sales.view"><PipelineAnalytics /></PrivateRoute>} />

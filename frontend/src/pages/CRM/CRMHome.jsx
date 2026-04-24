@@ -56,8 +56,7 @@ function CRMHome() {
 
     // ── Overview state ──────────────────────────────────────────────────────
     const [overviewLoading, setOverviewLoading] = useState(true)
-    const [pipeline, setPipeline] = useState({ total_opportunities: 0, total_value: 0, stages: [] })
-    const [ticketStats, setTicketStats] = useState({ open: 0, critical: 0 })
+    const [dashboardData, setDashboardData] = useState(null)
 
     // ── Opportunities state ─────────────────────────────────────────────────
     const [opportunities, setOpportunities] = useState([])
@@ -121,17 +120,8 @@ function CRMHome() {
     const fetchOverview = async () => {
         try {
             setOverviewLoading(true)
-            const [pipelineRes, ticketRes] = await Promise.all([
-                crmAPI.getPipelineSummary(),
-                crmAPI.getTicketStats()
-            ])
-            const stagesData = pipelineRes.data?.pipeline || []
-            setPipeline({
-                total_opportunities: stagesData.reduce((sum, s) => sum + (parseInt(s.count) || 0), 0),
-                total_value: stagesData.reduce((sum, s) => sum + (parseFloat(s.total_value) || 0), 0),
-                stages: stagesData
-            })
-            setTicketStats({ open: ticketRes.data?.open_count ?? 0, critical: ticketRes.data?.critical_open ?? 0 })
+            const res = await crmAPI.getDashboard()
+            setDashboardData(res.data)
         } catch (err) { console.error('Failed to fetch CRM overview', err) }
         finally { setOverviewLoading(false) }
     }
@@ -214,104 +204,92 @@ function CRMHome() {
                 <p className="workspace-subtitle">{t('crm.subtitle')}</p>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics Grid at the very top */}
             <div className="metrics-grid">
-                <div className="metric-card">
-                    <div className="metric-label">{t('crm.total_opportunities')}</div>
-                    <div className="metric-value text-primary">{overviewLoading ? '...' : pipeline.total_opportunities}</div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #3b82f6' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>📊</span> {t('crm.total_opportunities', 'إجمالي الفرص')}
+                    </div>
+                    <div className="metric-value text-primary">{overviewLoading ? '...' : dashboardData?.kpis?.total_opportunities || 0}</div>
                 </div>
-                <div className="metric-card">
-                    <div className="metric-label">{t('crm.pipeline_value')}</div>
-                    <div className="metric-value text-success">{overviewLoading ? '...' : formatNumber(pipeline.total_value)} <small>{currency}</small></div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #22c55e' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>💰</span> {t('crm.pipeline_value', 'قيمة خط الأنابيب')}
+                    </div>
+                    <div className="metric-value text-success">{overviewLoading ? '...' : formatNumber(dashboardData?.kpis?.pipeline_value || 0)} <small>{currency}</small></div>
                 </div>
-                <div className="metric-card">
-                    <div className="metric-label">{t('crm.open_tickets')}</div>
-                    <div className="metric-value text-warning">{overviewLoading ? '...' : ticketStats.open}</div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #f97316' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>🎫</span> {t('crm.open_tickets', 'التذاكر المفتوحة')}
+                    </div>
+                    <div className="metric-value text-warning">{overviewLoading ? '...' : dashboardData?.tickets?.open_tickets || 0}</div>
                 </div>
-                <div className="metric-card">
-                    <div className="metric-label">{t('crm.critical_tickets')}</div>
-                    <div className="metric-value text-danger">{overviewLoading ? '...' : ticketStats.critical}</div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #ef4444' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>🔥</span> {t('crm.critical_tickets', 'تذاكر حرجة')}
+                    </div>
+                    <div className="metric-value text-danger">{overviewLoading ? '...' : dashboardData?.tickets?.critical_tickets || 0}</div>
+                </div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>📣</span> {t('crm.active_campaigns', 'الحملات النشطة')}
+                    </div>
+                    <div className="metric-value" style={{ color: '#8b5cf6' }}>{overviewLoading ? '...' : dashboardData?.campaigns?.active || 0}</div>
+                </div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #10b981' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>🏆</span> {t('crm.win_rate', 'معدل الفوز')}
+                    </div>
+                    <div className="metric-value text-success">{overviewLoading ? '...' : `${dashboardData?.kpis?.win_rate || 0}%`}</div>
+                </div>
+                <div className="metric-card" style={{ borderLeft: '4px solid #0ea5e9' }}>
+                    <div className="metric-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '16px' }}>🤝</span> {t('crm.avg_deal_size', 'متوسط حجم الصفقة')}
+                    </div>
+                    <div className="metric-value text-info">{overviewLoading ? '...' : formatNumber(dashboardData?.kpis?.avg_deal_size || 0)} <small>{currency}</small></div>
                 </div>
             </div>
 
-            {/* Grouped Navigation Cards */}
-            <div className="modules-grid" style={{ gap: '16px', marginTop: '16px' }}>
-
-                {/* Sales Activities */}
-                <div className="card">
-                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🤝 {t('crm.sales_activities', 'النشاطات التجارية')}
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-                        <button className="btn btn-outline" onClick={() => setActiveTab('opportunities')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            💼 {t('crm.tab_opportunities')}
-                        </button>
-                        <button className="btn btn-primary btn-sm" onClick={openCreateOpp} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            + {t('crm.new_opportunity')}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Customer Support */}
-                <div className="card">
-                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🎧 {t('crm.customer_support', 'دعم العملاء')}
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-                        <button className="btn btn-outline" onClick={() => setActiveTab('tickets')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            🎫 {t('crm.tab_tickets')}
-                        </button>
-                        <button className="btn btn-primary btn-sm" onClick={openCreateTicket} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                            + {t('crm.new_ticket')}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Advanced CRM Tools */}
-                <div className="card">
-                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        🔧 {t('crm.advanced_tools', 'الأدوات المتقدمة')}
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-                        <Link to="/crm/dashboard" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            📊 {t('crm.dashboard_title', 'لوحة التحكم')}
-                        </Link>
-                        <Link to="/crm/lead-scoring" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            ⭐ {t('crm.lead_scoring', 'تقييم العملاء')}
-                        </Link>
-                        <Link to="/crm/segments" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            👥 {t('crm.customer_segments', 'شرائح العملاء')}
-                        </Link>
-                        <Link to="/crm/analytics" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            📈 {t('crm.analytics', 'التحليلات')}
-                        </Link>
-                        <Link to="/crm/contacts" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            📇 {t('crm.contacts', 'جهات الاتصال')}
-                        </Link>
-                        <Link to="/crm/forecasts" className="btn btn-info btn-sm" style={{ textAlign: 'center' }}>
-                            🔮 {t('crm.sales_forecasts', 'التنبؤات')}
-                        </Link>
-                    </div>
-                </div>
-
-                {/* Marketing */}
-                <div className="card">
-                    <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        📣 {t('crm.marketing', 'التسويق')}
-                    </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-                        {getIndustryFeature('crm.campaigns') && hasPermission('crm.campaign_view') && (
-                            <Link to="/crm/campaigns" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                                📣 {t('crm.campaigns.title', 'الحملات التسويقية')}
-                            </Link>
-                        )}
-                        {getIndustryFeature('crm.knowledge_base') && (
-                            <Link to="/crm/knowledge-base" className="btn btn-outline" style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-                                📚 {t('crm.knowledge_base.title', 'قاعدة المعرفة')}
-                            </Link>
-                        )}
-                    </div>
-                </div>
+            {/* Apps / Modules Row */}
+            <style>{`
+                .crm-module-card { transition: all 0.2s ease-in-out; border: 1px solid var(--border-color, #e5e7eb); border-radius: 12px; background: var(--bg-primary, #fff); }
+                .crm-module-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-color: var(--primary, #0d6efd); }
+            `}</style>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '16px', marginTop: '20px', marginBottom: '16px' }}>
+                <Link to="/crm/lead-scoring" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '28px' }}>⭐</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.lead_scoring', 'التقييم')}</div>
+                </Link>
+                <Link to="/crm/segments" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '28px' }}>👥</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.customer_segments', 'الشرائح')}</div>
+                </Link>
+                <Link to="/crm/analytics" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '28px' }}>📈</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.analytics', 'التحليلات')}</div>
+                </Link>
+                <Link to="/crm/contacts" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '28px' }}>📇</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.contacts', 'جهات الاتصال')}</div>
+                </Link>
+                <Link to="/crm/forecasts" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ fontSize: '28px' }}>🔮</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.sales_forecasts', 'التنبؤات')}</div>
+                </Link>
+                
+                {getIndustryFeature('crm.campaigns') && hasPermission('crm.campaign_view') && (
+                    <Link to="/crm/campaigns" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ fontSize: '28px' }}>📣</div>
+                        <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.campaigns.title', 'الحملات')}</div>
+                    </Link>
+                )}
+                
+                {getIndustryFeature('crm.knowledge_base') && (
+                    <Link to="/crm/knowledge-base" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ fontSize: '28px' }}>📚</div>
+                        <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.knowledge_base.title', 'المعرفة')}</div>
+                    </Link>
+                )}
             </div>
 
             {/* Tabs */}
@@ -322,58 +300,116 @@ function CRMHome() {
                         className={`tab ${activeTab === tab ? 'active' : ''}`}
                         onClick={() => setActiveTab(tab)}
                     >
-                        {tab === 'overview'      && t('crm.tab_overview')}
-                        {tab === 'opportunities' && t('crm.tab_opportunities')}
-                        {tab === 'tickets'       && t('crm.tab_tickets')}
+                        {tab === 'overview'      && t('crm.tab_overview', 'نظرة عامة')}
+                        {tab === 'opportunities' && t('crm.tab_opportunities', 'الفرص')}
+                        {tab === 'tickets'       && t('crm.tab_tickets', 'تذاكر الدعم')}
                     </button>
                 ))}
             </div>
 
+
+
             {/* ── Overview Tab ───────────────────────────────────────────────── */}
             {activeTab === 'overview' && (
-                <div className="card mt-4">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h3 className="section-title" style={{ margin: 0 }}>{t('crm.pipeline_summary')}</h3>
-                    </div>
+                <div className="mt-4">
                     {overviewLoading ? (
                         <PageLoading />
-                    ) : (
-                        <div className="data-table-container">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>{t('crm.stage')}</th>
-                                        <th>{t('crm.opportunity_count')}</th>
-                                        <th>{t('crm.value')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(pipeline.stages || []).map(stage => (
-                                        <tr key={stage.stage}>
-                                            <td>
-                                                <span className="badge" style={{ background: stageColors[stage.stage] || '#6b7280', color: '#fff' }}>
-                                                    {stageLabels[stage.stage] || stage.stage}
-                                                </span>
-                                            </td>
-                                            <td>{stage.count}</td>
-                                            <td>{formatNumber(stage.total_value)} {currency}</td>
-                                        </tr>
-                                    ))}
-                                    {(!pipeline.stages || pipeline.stages.length === 0) && (
-                                        <tr><td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>{t('common.no_data')}</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                    ) : dashboardData ? (
+                        <>
 
+                            <div className="crm-dashboard-summary" style={{ display: 'block', marginTop: '24px' }}>
+                                <div>
+                                    {/* Pipeline by Stage */}
+                                    {dashboardData.pipeline_by_stage && dashboardData.pipeline_by_stage.length > 0 && (
+                                        <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                                            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-secondary, #fafafa)' }}>
+                                                <h3 className="section-title" style={{ margin: 0, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ color: '#3b82f6' }}>📈</span> {t('crm.pipeline_by_stage', 'خط الأنابيب حسب المرحلة')}
+                                                </h3>
+                                            </div>
+                                            <div className="data-table-container" style={{ margin: 0, border: 'none', borderRadius: 0 }}>
+                                                <table className="data-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style={{ paddingLeft: '24px' }}>{t('common.stage', 'المرحلة')}</th>
+                                                            <th style={{ textAlign: 'center' }}>{t('common.count', 'العدد')}</th>
+                                                            <th style={{ textAlign: 'left', paddingRight: '24px' }}>{t('common.value', 'القيمة')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {dashboardData.pipeline_by_stage.map((s, i) => (
+                                                            <tr key={i}>
+                                                                <td style={{ paddingLeft: '24px' }}>
+                                                                    <span className={`badge ${s.stage === 'won' ? 'badge-success' : s.stage === 'lost' ? 'badge-danger' : 'badge-primary'}`} style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                                                                        {t(`crm.stage_${s.stage}`, s.stage)}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{s.count}</td>
+                                                                <td style={{ textAlign: 'left', paddingRight: '24px', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                                                                    {formatNumber(s.total_value)} <span style={{ fontSize: '0.8em', color: 'var(--text-muted)' }}>{currency}</span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Lead Score Distribution */}
+                                {dashboardData.lead_score_distribution && dashboardData.lead_score_distribution.length > 0 && (
+                                    <div className="card" style={{ padding: '24px', marginTop: '24px' }}>
+                                        <h3 className="section-title" style={{ marginBottom: '20px', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ color: '#eab308' }}>⭐</span> {t('crm.lead_score_distribution', 'توزيع التقييم للعملاء المحتملين')}
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                            {dashboardData.lead_score_distribution.map((d, i) => {
+                                                const color = d.grade === 'A' ? '#22c55e' : d.grade === 'B' ? '#3b82f6' : d.grade === 'C' ? '#f97316' : '#ef4444'
+                                                const percentage = Math.max(4, Math.min(100, (d.count / Math.max(...dashboardData.lead_score_distribution.map(x => x.count || 0), 1)) * 100))
+                                                
+                                                return (
+                                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                        <div style={{ 
+                                                            width: '40px', height: '40px', borderRadius: '10px', 
+                                                            background: `${color}15`, color: color,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontWeight: 'bold', fontSize: '1.1rem'
+                                                        }}>
+                                                            {d.grade}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                                                                <span>{t(`crm.grade_title_${d.grade}`, `تصنيف ${d.grade}`)}</span>
+                                                                <span style={{ color: 'var(--text-main)' }}>{d.count}</span>
+                                                            </div>
+                                                            <div style={{ height: '8px', borderRadius: '4px', background: 'var(--bg-hover)', overflow: 'hidden' }}>
+                                                                <div style={{ 
+                                                                    width: `${percentage}%`, height: '100%', 
+                                                                    background: color, borderRadius: '4px',
+                                                                    transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                                                                }} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="empty-state">{t('common.no_data')}</div>
+                    )}
                 </div>
             )}
 
             {/* ── Opportunities Tab ───────────────────────────────────────────── */}
             {activeTab === 'opportunities' && (
-                <div className="card mt-4">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div className="mt-4">
+                    <div className="card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_opportunities')}</h3>
                             <select className="form-input" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
@@ -440,10 +476,11 @@ function CRMHome() {
                     )}
 
                     {showOppModal && (
-                        <div className="modal-backdrop" onClick={() => setShowOppModal(false)}>
+                        <div className="modal-overlay" onClick={() => setShowOppModal(false)}>
                             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
                                 <div className="modal-header">
-                                    <h3>{isOppEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h3>
+                                    <h2 className="modal-title">{isOppEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h2>
+                                    <button type="button" className="btn-icon" onClick={() => setShowOppModal(false)}>✕</button>
                                 </div>
                                 <div className="modal-body">
                                     <form id="opp-form" onSubmit={handleOppSubmit}>
@@ -455,14 +492,14 @@ function CRMHome() {
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('common.customer')}</label>
-                                                    <select className="form-input" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
+                                                    <select className="form-select" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
                                                         <option value="">{t('crm.select_customer')}</option>
                                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.stage')}</label>
-                                                    <select className="form-input" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
+                                                    <select className="form-select" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
                                                         {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                                                     </select>
                                                 </div>
@@ -497,6 +534,7 @@ function CRMHome() {
                             </div>
                         </div>
                     )}
+                    </div>
                 </div>
             )}
 
@@ -620,9 +658,12 @@ function CRMHome() {
                     )}
 
                     {showTicketModal && (
-                        <div className="modal-backdrop" onClick={() => setShowTicketModal(false)}>
+                        <div className="modal-overlay" onClick={() => setShowTicketModal(false)}>
                             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-                                <div className="modal-header"><h3>{t('crm.new_ticket')}</h3></div>
+                                <div className="modal-header">
+                                    <h2 className="modal-title">{t('crm.new_ticket')}</h2>
+                                    <button type="button" className="btn-icon" onClick={() => setShowTicketModal(false)}>✕</button>
+                                </div>
                                 <div className="modal-body">
                                     <form id="ticket-form" onSubmit={handleTicketSubmit}>
                                         <div className="form-section">
@@ -637,14 +678,14 @@ function CRMHome() {
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('common.customer')}</label>
-                                                    <select className="form-input" value={ticketForm.customer_id} onChange={e => setTicketForm(p => ({ ...p, customer_id: e.target.value }))}>
+                                                    <select className="form-select" value={ticketForm.customer_id} onChange={e => setTicketForm(p => ({ ...p, customer_id: e.target.value }))}>
                                                         <option value="">{t('crm.select_customer')}</option>
                                                         {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="form-label">{t('crm.priority')}</label>
-                                                    <select className="form-input" value={ticketForm.priority} onChange={e => setTicketForm(p => ({ ...p, priority: e.target.value }))} required>
+                                                    <select className="form-select" value={ticketForm.priority} onChange={e => setTicketForm(p => ({ ...p, priority: e.target.value }))} required>
                                                         {priorityOptions.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                                                     </select>
                                                 </div>
