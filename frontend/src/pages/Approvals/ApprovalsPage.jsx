@@ -8,7 +8,7 @@ import BackButton from '../../components/common/BackButton';
 import { formatNumber } from '../../utils/format';
 import { getCurrency, hasPermission } from '../../utils/auth';
 import SimpleModal from '../../components/common/SimpleModal';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const ApprovalsPage = () => {

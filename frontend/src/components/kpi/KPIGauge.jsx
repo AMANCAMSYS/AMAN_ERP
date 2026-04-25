@@ -1,7 +1,5 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import ReactECharts from 'echarts-for-react';
-import { formatNumber } from '../../utils/format';
 
 /**
  * KPIGauge — radial gauge for single percentage KPIs (e.g. OEE, Saudization, Gross Margin).
@@ -31,8 +29,6 @@ const KPIGauge = ({
     suffix = '%',
     size = 200,
 }) => {
-    const { i18n } = useTranslation();
-
     const axisLineColors = STATUS_GAUGE_COLORS[status] || STATUS_GAUGE_COLORS.neutral;
 
     const option = {

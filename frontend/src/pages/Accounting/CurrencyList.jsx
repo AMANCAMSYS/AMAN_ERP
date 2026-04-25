@@ -5,7 +5,6 @@ import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
 import { Plus, Edit2, Trash2, History, RefreshCw, DollarSign, X } from 'lucide-react'
 
-import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 import DataTable from '../../components/common/DataTable';
 import SearchFilter from '../../components/common/SearchFilter';

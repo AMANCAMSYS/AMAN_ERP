@@ -12,7 +12,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 const LeaseContracts = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const { showToast } = useToast();
     const currency = getCurrency();
     const [activeTab, setActiveTab] = useState('list');

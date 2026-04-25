@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { accountingAPI } from '../../utils/api'
 import { useToast } from '../../context/ToastContext'
 import { formatNumber } from '../../utils/format'
-import { getCurrency, hasPermission } from '../../utils/auth'
+import { hasPermission } from '../../utils/auth'
 import { formatDate } from '../../utils/dateUtils'
 import DataTable from '../../components/common/DataTable'
 import SearchFilter from '../../components/common/SearchFilter'
@@ -14,7 +14,6 @@ function JournalEntryList() {
     const { t, i18n } = useTranslation()
     const navigate = useNavigate()
     const { showToast } = useToast()
-    const currency = getCurrency()
     const isRTL = i18n.language === 'ar'
     const canCreate = hasPermission('accounting.create_journal_entry')
     const canPost = hasPermission('accounting.post_journal_entry')

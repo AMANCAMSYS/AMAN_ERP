@@ -55,12 +55,6 @@ const RoleManagement = () => {
         return isRTL ? (sec?.label_ar || key) : (sec?.label_en || key);
     };
 
-    // Get the actual section key for a permission (uses API metadata, not just key prefix)
-    const getPermSection = (key) => {
-        if (key === '*') return '*';
-        return permLabelMap[key]?.section || key.split('.')[0];
-    };
-
     useEffect(() => {
         if (user?.role === 'system_admin') {
             fetchCompanies();
@@ -179,7 +173,7 @@ const RoleManagement = () => {
         setFormData({ ...formData, permissions: [] });
     };
 
-    const toggleSectionPermissions = (sectionKey, perms) => {
+    const toggleSectionPermissions = (perms) => {
         const permKeys = perms.map(p => p.key);
         const allSelected = permKeys.every(k => formData.permissions.includes(k));
         if (allSelected) {
@@ -513,7 +507,7 @@ const RoleManagement = () => {
                                                         <button
                                                             type="button"
                                                             className={`btn-section-toggle ${allSelected ? 'active' : ''}`}
-                                                            onClick={(e) => { e.stopPropagation(); toggleSectionPermissions(sectionKey, perms); }}
+                                                            onClick={(e) => { e.stopPropagation(); toggleSectionPermissions(perms); }}
                                                         >
                                                             {allSelected
                                                                 ? <><LucideIcons.CheckSquare size={14} /> {t('admin.roles.deselect')}</>

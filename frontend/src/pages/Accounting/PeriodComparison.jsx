@@ -5,7 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 // Report types use t() keys

@@ -10,7 +10,7 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 
 function TaxAudit() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { currentBranch } = useBranch()
     const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const [endDate, setEndDate] = useState(new Date())

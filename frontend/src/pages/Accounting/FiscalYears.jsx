@@ -6,7 +6,7 @@ import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
 
 import DateInput from '../../components/common/DateInput';
-import { formatDate, formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate, formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 function FiscalYears() {

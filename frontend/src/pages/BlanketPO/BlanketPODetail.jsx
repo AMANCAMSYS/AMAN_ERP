@@ -8,7 +8,7 @@ import { formatNumber } from '../../utils/format';
 import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
-import { Play, Package, DollarSign, Clock, AlertTriangle } from 'lucide-react';
+import { Play, Package, DollarSign, AlertTriangle } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 const BlanketPODetail = () => {

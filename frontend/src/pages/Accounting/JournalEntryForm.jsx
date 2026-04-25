@@ -91,7 +91,7 @@ const JournalEntryForm = () => {
 
     const handleSubmit = async (e, entryStatus = 'posted') => {
         if (e) e.preventDefault();
-        const { totalDebit, totalCredit, difference } = calculateTotals();
+        const { totalDebit, difference } = calculateTotals();
 
         if (Math.abs(difference) > 0.01) {
             toast.error(t('accounting.journal.unbalanced_error', 'Journal Entry must be balanced'));

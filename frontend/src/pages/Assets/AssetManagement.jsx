@@ -4,7 +4,7 @@ import { assetsAPI, branchesAPI } from '../../services';
 import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
-import { Plus, ArrowRightLeft, CheckCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Plus, ArrowRightLeft, CheckCircle, RefreshCw } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { Spinner } from '../../components/common/LoadingStates'

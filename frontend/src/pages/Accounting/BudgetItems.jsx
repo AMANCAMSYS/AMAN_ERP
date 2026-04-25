@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Save, Search } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { budgetsAPI, accountingAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
@@ -9,8 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { Spinner } from '../../components/common/LoadingStates'
 
 const BudgetItems = () => {
-    const { t, i18n } = useTranslation();
-    const navigate = useNavigate();
+    const { t } = useTranslation();
     const { id } = useParams();
 
     const [loading, setLoading] = useState(true);

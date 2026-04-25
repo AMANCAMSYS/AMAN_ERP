@@ -1,17 +1,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Edit2, Trash2, X } from 'lucide-react';
 import { costCentersAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
-import { useNavigate } from 'react-router-dom';
 import BackButton from '../../../components/common/BackButton';
 import DataTable from '../../../components/common/DataTable';
 import SearchFilter from '../../../components/common/SearchFilter';
 
 const CostCenterList = () => {
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const [costCenters, setCostCenters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
