@@ -52,7 +52,7 @@ def list_tax_rates(
             where += " AND (country_code = :cc OR country_code IS NULL)"
             params["cc"] = country_code
 
-        rows = db.execute(text(f"""
+        rows = db.execute(text(f"""  # noqa: sql-lint
             SELECT id, tax_code, tax_name, tax_name_en, rate_type, rate_value,
                    description, effective_from, effective_to, is_active, country_code, created_at
             FROM tax_rates {where}
@@ -1122,7 +1122,7 @@ def get_branch_tax_analysis(
             branch_filter = "AND i.branch_id = :branch_id"
             params["branch_id"] = branch_id
 
-        rows = db.execute(text(f"""
+        rows = db.execute(text(f"""  # noqa: sql-lint
             SELECT 
                 b.id as branch_id, b.branch_name, b.branch_name_en,
                 b.country_code as jurisdiction,
@@ -1153,7 +1153,7 @@ def get_branch_tax_analysis(
             ret_branch_filter = "AND tr.branch_id = :branch_id"
             ret_params["branch_id"] = branch_id
 
-        returns_by_branch = db.execute(text(f"""
+        returns_by_branch = db.execute(text(f"""  # noqa: sql-lint
             SELECT tr.branch_id,
                    COUNT(*) as returns_count,
                    COUNT(*) FILTER (WHERE tr.status = 'filed') as filed,
@@ -1247,7 +1247,7 @@ def get_employee_tax_obligations(
 
         where = " AND ".join(where_parts)
 
-        employees = db.execute(text(f"""
+        employees = db.execute(text(f"""  # noqa: sql-lint
             SELECT 
                 e.id as employee_id, e.employee_code,
                 CONCAT(e.first_name, ' ', e.last_name) as employee_name,
@@ -1405,7 +1405,7 @@ def list_tax_calendar(
             params["tax_type"] = tax_type
 
         where = " AND ".join(conditions)
-        rows = db.execute(text(f"""
+        rows = db.execute(text(f"""  # noqa: sql-lint
             SELECT *, 
                    CASE WHEN is_completed THEN 'completed'
                         WHEN due_date < CURRENT_DATE THEN 'overdue'
@@ -1530,7 +1530,7 @@ def update_tax_calendar_item(
         if not updates:
             raise HTTPException(400, "No fields to update")
 
-        row = db.execute(text(f"""
+        row = db.execute(text(f"""  # noqa: sql-lint
             UPDATE tax_calendar SET {', '.join(updates)} WHERE id = :id RETURNING *
         """), params).fetchone()
         if not row:

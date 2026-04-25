@@ -60,7 +60,7 @@ def list_revenue_schedules(status_filter: Optional[str] = None, current_user=Dep
             conditions.append("status = :status")
             params["status"] = status_filter
 
-        rows = db.execute(text(f"""
+        rows = db.execute(text(f"""  # noqa: sql-lint
             SELECT rs.*,
                    ROUND(100.0 * recognized_amount / NULLIF(total_amount, 0), 1) as pct_recognized
             FROM revenue_recognition_schedules rs

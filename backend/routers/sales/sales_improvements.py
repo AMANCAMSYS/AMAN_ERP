@@ -316,11 +316,11 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
             raise HTTPException(status_code=400, detail="لم يتم تحديد عمولات للصرف")
         
         # Fetch pending commissions
-        placeholders = ",".join(str(int(cid)) for cid in commission_ids)
-        commissions = db.execute(text(f"""
-            SELECT * FROM sales_commissions 
-            WHERE id IN ({placeholders}) AND status = 'pending'
-        """)).fetchall()
+        normalized_ids = [int(cid) for cid in commission_ids]
+        commissions = db.execute(text("""
+            SELECT * FROM sales_commissions
+            WHERE id = ANY(:commission_ids) AND status = 'pending'
+        """), {"commission_ids": normalized_ids}).fetchall()
         
         if not commissions:
             raise HTTPException(status_code=400, detail="لا توجد عمولات معلقة بالأرقام المحددة")
@@ -357,16 +357,16 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
                 status="posted",
                 currency=base_currency,
                 source="CommissionPayment",
-                source_id=int(sorted(commission_ids)[0]) if commission_ids else None,
+                source_id=int(sorted(normalized_ids)[0]) if normalized_ids else None,
                 username=getattr(current_user, "username", None),
-                idempotency_key=f"commpay-{'-'.join(str(i) for i in sorted(commission_ids))}",
+                idempotency_key=f"commpay-{'-'.join(str(i) for i in sorted(normalized_ids))}",
             )
         
         # Update commission status
-        db.execute(text(f"""
+        db.execute(text("""
             UPDATE sales_commissions SET status = 'paid', updated_at = NOW()
-            WHERE id IN ({placeholders}) AND status = 'pending'
-        """))
+            WHERE id = ANY(:commission_ids) AND status = 'pending'
+        """), {"commission_ids": normalized_ids})
         
         db.commit()
         return {
