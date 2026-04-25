@@ -13,24 +13,24 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 // ─── Stage / Status / Priority maps ───────────────────────────────────────────
 const stageBadgeColors = {
-    lead:        { background: '#3b82f6', color: '#fff' },
-    qualified:   { background: '#eab308', color: '#fff' },
-    proposal:    { background: '#f97316', color: '#fff' },
+    lead: { background: '#3b82f6', color: '#fff' },
+    qualified: { background: '#eab308', color: '#fff' },
+    proposal: { background: '#f97316', color: '#fff' },
     negotiation: { background: '#8b5cf6', color: '#fff' },
-    won:         { background: '#22c55e', color: '#fff' },
-    lost:        { background: '#ef4444', color: '#fff' }
+    won: { background: '#22c55e', color: '#fff' },
+    lost: { background: '#ef4444', color: '#fff' }
 }
 const statusBadgeStyles = {
-    open:        { background: '#3b82f6', color: '#fff' },
+    open: { background: '#3b82f6', color: '#fff' },
     in_progress: { background: '#eab308', color: '#fff' },
-    resolved:    { background: '#22c55e', color: '#fff' },
-    closed:      { background: '#6b7280', color: '#fff' }
+    resolved: { background: '#22c55e', color: '#fff' },
+    closed: { background: '#6b7280', color: '#fff' }
 }
 const priorityBadgeStyles = {
     critical: { background: '#ef4444', color: '#fff' },
-    high:     { background: '#f97316', color: '#fff' },
-    medium:   { background: '#eab308', color: '#fff' },
-    low:      { background: '#22c55e', color: '#fff' }
+    high: { background: '#f97316', color: '#fff' },
+    medium: { background: '#eab308', color: '#fff' },
+    low: { background: '#22c55e', color: '#fff' }
 }
 const detailPanelStyle = {
     background: 'var(--bg-secondary,#f9fafb)',
@@ -47,7 +47,7 @@ const commentStyle = (isInternal) => ({
 // ══════════════════════════════════════════════════════════════════════════════
 function CRMHome() {
     const { t } = useTranslation()
-  const { showToast } = useToast()
+    const { showToast } = useToast()
     const currency = getCurrency()
     const [activeTab, setActiveTab] = useState('overview')
 
@@ -84,26 +84,26 @@ function CRMHome() {
     const [customers, setCustomers] = useState([])
 
     const stageOptions = [
-        { value: 'lead',        label: t('crm.stage_lead') },
-        { value: 'qualified',   label: t('crm.stage_qualified') },
-        { value: 'proposal',    label: t('crm.stage_proposal') },
+        { value: 'lead', label: t('crm.stage_lead') },
+        { value: 'qualified', label: t('crm.stage_qualified') },
+        { value: 'proposal', label: t('crm.stage_proposal') },
         { value: 'negotiation', label: t('crm.stage_negotiation') },
-        { value: 'won',         label: t('crm.stage_won') },
-        { value: 'lost',        label: t('crm.stage_lost') }
+        { value: 'won', label: t('crm.stage_won') },
+        { value: 'lost', label: t('crm.stage_lost') }
     ]
     const statusOptions = [
-        { value: 'open',        label: t('crm.status_open') },
+        { value: 'open', label: t('crm.status_open') },
         { value: 'in_progress', label: t('crm.status_in_progress') },
-        { value: 'resolved',    label: t('crm.status_resolved') },
-        { value: 'closed',      label: t('crm.status_closed') }
+        { value: 'resolved', label: t('crm.status_resolved') },
+        { value: 'closed', label: t('crm.status_closed') }
     ]
     const priorityOptions = [
         { value: 'critical', label: t('crm.priority_critical') },
-        { value: 'high',     label: t('crm.priority_high') },
-        { value: 'medium',   label: t('crm.priority_medium') },
-        { value: 'low',      label: t('crm.priority_low') }
+        { value: 'high', label: t('crm.priority_high') },
+        { value: 'medium', label: t('crm.priority_medium') },
+        { value: 'low', label: t('crm.priority_low') }
     ]
-    ]
+
 
     // ── Effects ─────────────────────────────────────────────────────────────
     useEffect(() => { fetchOverview(); fetchCustomers() }, [])
@@ -270,14 +270,14 @@ function CRMHome() {
                     <div style={{ fontSize: '28px' }}>🔮</div>
                     <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.sales_forecasts', 'التنبؤات')}</div>
                 </Link>
-                
+
                 {getIndustryFeature('crm.campaigns') && hasPermission('crm.campaign_view') && (
                     <Link to="/crm/campaigns" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                         <div style={{ fontSize: '28px' }}>📣</div>
                         <div style={{ fontSize: '13px', fontWeight: '600' }}>{t('crm.campaigns.title', 'الحملات')}</div>
                     </Link>
                 )}
-                
+
                 {getIndustryFeature('crm.knowledge_base') && (
                     <Link to="/crm/knowledge-base" className="crm-module-card" style={{ padding: '20px 12px', textAlign: 'center', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                         <div style={{ fontSize: '28px' }}>📚</div>
@@ -294,9 +294,9 @@ function CRMHome() {
                         className={`tab ${activeTab === tab ? 'active' : ''}`}
                         onClick={() => setActiveTab(tab)}
                     >
-                        {tab === 'overview'      && t('crm.tab_overview', 'نظرة عامة')}
+                        {tab === 'overview' && t('crm.tab_overview', 'نظرة عامة')}
                         {tab === 'opportunities' && t('crm.tab_opportunities', 'الفرص')}
-                        {tab === 'tickets'       && t('crm.tab_tickets', 'تذاكر الدعم')}
+                        {tab === 'tickets' && t('crm.tab_tickets', 'تذاكر الدعم')}
                     </button>
                 ))}
             </div>
@@ -361,11 +361,11 @@ function CRMHome() {
                                             {dashboardData.lead_score_distribution.map((d, i) => {
                                                 const color = d.grade === 'A' ? '#22c55e' : d.grade === 'B' ? '#3b82f6' : d.grade === 'C' ? '#f97316' : '#ef4444'
                                                 const percentage = Math.max(4, Math.min(100, (d.count / Math.max(...dashboardData.lead_score_distribution.map(x => x.count || 0), 1)) * 100))
-                                                
+
                                                 return (
                                                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                        <div style={{ 
-                                                            width: '40px', height: '40px', borderRadius: '10px', 
+                                                        <div style={{
+                                                            width: '40px', height: '40px', borderRadius: '10px',
                                                             background: `${color}15`, color: color,
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             fontWeight: 'bold', fontSize: '1.1rem'
@@ -378,8 +378,8 @@ function CRMHome() {
                                                                 <span style={{ color: 'var(--text-main)' }}>{d.count}</span>
                                                             </div>
                                                             <div style={{ height: '8px', borderRadius: '4px', background: 'var(--bg-hover)', overflow: 'hidden' }}>
-                                                                <div style={{ 
-                                                                    width: `${percentage}%`, height: '100%', 
+                                                                <div style={{
+                                                                    width: `${percentage}%`, height: '100%',
                                                                     background: color, borderRadius: '4px',
                                                                     transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
                                                                 }} />
@@ -404,130 +404,130 @@ function CRMHome() {
                 <div className="mt-4">
                     <div className="card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_opportunities')}</h3>
-                            <select className="form-input" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
-                                <option value="">{t('crm.all_stages')}</option>
-                                {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <h3 className="section-title" style={{ margin: 0 }}>{t('crm.tab_opportunities')}</h3>
+                                <select className="form-input" style={{ width: '180px' }} value={filterStage} onChange={e => setFilterStage(e.target.value)}>
+                                    <option value="">{t('crm.all_stages')}</option>
+                                    {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
+                            </div>
+                            <button className="btn btn-primary btn-sm" onClick={openCreateOpp}>+ {t('crm.new_opportunity')}</button>
                         </div>
-                        <button className="btn btn-primary btn-sm" onClick={openCreateOpp}>+ {t('crm.new_opportunity')}</button>
-                    </div>
 
-                    {oppLoading ? (
-                        <PageLoading />
-                    ) : opportunities.length === 0 ? (
-                        <div className="empty-state">{t('crm.no_opportunities')}</div>
-                    ) : (
-                        <div className="data-table-container">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>{t('crm.title_label')}</th>
-                                        <th>{t('common.customer')}</th>
-                                        <th>{t('crm.stage')}</th>
-                                        <th>{t('crm.probability')}</th>
-                                        <th>{t('crm.expected_value')}</th>
-                                        <th>{t('crm.expected_close')}</th>
-                                        <th>{t('crm.responsible')}</th>
-                                        <th>{t('common.actions')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {opportunities.map(opp => (
-                                        <tr key={opp.id}>
-                                            <td>{opp.title}</td>
-                                            <td>{opp.customer_name || '-'}</td>
-                                            <td><span className="badge" style={stageBadgeColors[opp.stage] || {}}>{getStageLabel(opp.stage)}</span></td>
-                                            <td>{opp.probability}%</td>
-                                            <td>{formatNumber(opp.expected_value)} {currency}</td>
-                                            <td>{opp.expected_close_date || '-'}</td>
-                                            <td>{opp.assigned_name || '-'}</td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button className="btn btn-secondary btn-sm" onClick={() => openEditOpp(opp)}>{t('crm.edit')}</button>
-                                                    <button className="btn btn-danger btn-sm" onClick={() => setDeleteOppConfirm(opp.id)}>{t('common.delete')}</button>
-                                                </div>
-                                            </td>
+                        {oppLoading ? (
+                            <PageLoading />
+                        ) : opportunities.length === 0 ? (
+                            <div className="empty-state">{t('crm.no_opportunities')}</div>
+                        ) : (
+                            <div className="data-table-container">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('crm.title_label')}</th>
+                                            <th>{t('common.customer')}</th>
+                                            <th>{t('crm.stage')}</th>
+                                            <th>{t('crm.probability')}</th>
+                                            <th>{t('crm.expected_value')}</th>
+                                            <th>{t('crm.expected_close')}</th>
+                                            <th>{t('crm.responsible')}</th>
+                                            <th>{t('common.actions')}</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                    </thead>
+                                    <tbody>
+                                        {opportunities.map(opp => (
+                                            <tr key={opp.id}>
+                                                <td>{opp.title}</td>
+                                                <td>{opp.customer_name || '-'}</td>
+                                                <td><span className="badge" style={stageBadgeColors[opp.stage] || {}}>{getStageLabel(opp.stage)}</span></td>
+                                                <td>{opp.probability}%</td>
+                                                <td>{formatNumber(opp.expected_value)} {currency}</td>
+                                                <td>{opp.expected_close_date || '-'}</td>
+                                                <td>{opp.assigned_name || '-'}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 6 }}>
+                                                        <button className="btn btn-secondary btn-sm" onClick={() => openEditOpp(opp)}>{t('crm.edit')}</button>
+                                                        <button className="btn btn-danger btn-sm" onClick={() => setDeleteOppConfirm(opp.id)}>{t('common.delete')}</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
-                    {deleteOppConfirm && (
-                        <div className="modal-backdrop" onClick={() => setDeleteOppConfirm(null)}>
-                            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-                                <div className="modal-header"><h3>{t('crm.confirm_delete')}</h3></div>
-                                <div className="modal-body"><p>{t('crm.confirm_delete_opportunity')}</p></div>
-                                <div className="modal-footer">
-                                    <button className="btn btn-danger" onClick={() => handleDeleteOpp(deleteOppConfirm)}>{t('common.delete')}</button>
-                                    <button className="btn btn-secondary" onClick={() => setDeleteOppConfirm(null)}>{t('common.cancel')}</button>
+                        {deleteOppConfirm && (
+                            <div className="modal-backdrop" onClick={() => setDeleteOppConfirm(null)}>
+                                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                                    <div className="modal-header"><h3>{t('crm.confirm_delete')}</h3></div>
+                                    <div className="modal-body"><p>{t('crm.confirm_delete_opportunity')}</p></div>
+                                    <div className="modal-footer">
+                                        <button className="btn btn-danger" onClick={() => handleDeleteOpp(deleteOppConfirm)}>{t('common.delete')}</button>
+                                        <button className="btn btn-secondary" onClick={() => setDeleteOppConfirm(null)}>{t('common.cancel')}</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {showOppModal && (
-                        <div className="modal-overlay" onClick={() => setShowOppModal(false)}>
-                            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-                                <div className="modal-header">
-                                    <h2 className="modal-title">{isOppEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h2>
-                                    <button type="button" className="btn-icon" onClick={() => setShowOppModal(false)}>✕</button>
-                                </div>
-                                <div className="modal-body">
-                                    <form id="opp-form" onSubmit={handleOppSubmit}>
-                                        <div className="form-section">
-                                            <div className="form-grid">
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.title_label')}</label>
-                                                    <input type="text" className="form-input" value={oppForm.title} onChange={e => setOppForm(p => ({ ...p, title: e.target.value }))} required />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('common.customer')}</label>
-                                                    <select className="form-select" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
-                                                        <option value="">{t('crm.select_customer')}</option>
-                                                        {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.stage')}</label>
-                                                    <select className="form-select" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
-                                                        {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.probability')} (%)</label>
-                                                    <input type="number" className="form-input" min="0" max="100" value={oppForm.probability} onChange={e => setOppForm(p => ({ ...p, probability: e.target.value }))} />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.expected_value')}</label>
-                                                    <input type="number" className="form-input" min="0" step="0.01" value={oppForm.expected_value} onChange={e => setOppForm(p => ({ ...p, expected_value: e.target.value }))} />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.expected_close')}</label>
-                                                    <DateInput className="form-input" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label className="form-label">{t('crm.source')}</label>
-                                                    <input type="text" className="form-input" value={oppForm.source} onChange={e => setOppForm(p => ({ ...p, source: e.target.value }))} />
-                                                </div>
-                                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                                    <label className="form-label">{t('common.notes')}</label>
-                                                    <textarea className="form-input" rows={3} value={oppForm.notes} onChange={e => setOppForm(p => ({ ...p, notes: e.target.value }))} />
+                        {showOppModal && (
+                            <div className="modal-overlay" onClick={() => setShowOppModal(false)}>
+                                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                                    <div className="modal-header">
+                                        <h2 className="modal-title">{isOppEdit ? t('crm.edit_opportunity') : t('crm.new_opportunity')}</h2>
+                                        <button type="button" className="btn-icon" onClick={() => setShowOppModal(false)}>✕</button>
+                                    </div>
+                                    <div className="modal-body">
+                                        <form id="opp-form" onSubmit={handleOppSubmit}>
+                                            <div className="form-section">
+                                                <div className="form-grid">
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.title_label')}</label>
+                                                        <input type="text" className="form-input" value={oppForm.title} onChange={e => setOppForm(p => ({ ...p, title: e.target.value }))} required />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('common.customer')}</label>
+                                                        <select className="form-select" value={oppForm.customer_id} onChange={e => setOppForm(p => ({ ...p, customer_id: e.target.value }))}>
+                                                            <option value="">{t('crm.select_customer')}</option>
+                                                            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.stage')}</label>
+                                                        <select className="form-select" value={oppForm.stage} onChange={e => setOppForm(p => ({ ...p, stage: e.target.value }))} required>
+                                                            {stageOptions.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.probability')} (%)</label>
+                                                        <input type="number" className="form-input" min="0" max="100" value={oppForm.probability} onChange={e => setOppForm(p => ({ ...p, probability: e.target.value }))} />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.expected_value')}</label>
+                                                        <input type="number" className="form-input" min="0" step="0.01" value={oppForm.expected_value} onChange={e => setOppForm(p => ({ ...p, expected_value: e.target.value }))} />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.expected_close')}</label>
+                                                        <DateInput className="form-input" value={oppForm.expected_close_date} onChange={e => setOppForm(p => ({ ...p, expected_close_date: e.target.value }))} />
+                                                    </div>
+                                                    <div className="form-group">
+                                                        <label className="form-label">{t('crm.source')}</label>
+                                                        <input type="text" className="form-input" value={oppForm.source} onChange={e => setOppForm(p => ({ ...p, source: e.target.value }))} />
+                                                    </div>
+                                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                                        <label className="form-label">{t('common.notes')}</label>
+                                                        <textarea className="form-input" rows={3} value={oppForm.notes} onChange={e => setOppForm(p => ({ ...p, notes: e.target.value }))} />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div className="modal-footer">
-                                    <button type="submit" form="opp-form" className="btn btn-primary">{isOppEdit ? t('common.update') : t('common.create')}</button>
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowOppModal(false)}>{t('common.cancel')}</button>
+                                        </form>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button type="submit" form="opp-form" className="btn btn-primary">{isOppEdit ? t('common.update') : t('common.create')}</button>
+                                        <button type="button" className="btn btn-secondary" onClick={() => setShowOppModal(false)}>{t('common.cancel')}</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
                     </div>
                 </div>
             )}
