@@ -13,7 +13,6 @@ function Register() {
         i18n.changeLanguage(nextLang)
     }
 
-    const navigate = useNavigate()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState(null)

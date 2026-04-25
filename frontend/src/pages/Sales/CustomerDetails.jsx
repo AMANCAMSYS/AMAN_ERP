@@ -16,7 +16,6 @@ export default function CustomerDetails() {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const { id } = useParams()
-    const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState({ customer: {}, invoices: [], receipts: [] })

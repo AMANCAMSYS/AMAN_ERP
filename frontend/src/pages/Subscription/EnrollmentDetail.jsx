@@ -18,7 +18,6 @@ const STATUS_COLORS = {
 function EnrollmentDetail() {
     const { t } = useTranslation()
     const { id } = useParams()
-    const navigate = useNavigate()
     const [enrollment, setEnrollment] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)

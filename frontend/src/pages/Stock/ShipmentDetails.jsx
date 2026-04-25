@@ -3,12 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const ShipmentDetails = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const { showToast } = useToast();

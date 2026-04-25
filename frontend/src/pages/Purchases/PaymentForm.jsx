@@ -214,16 +214,6 @@ function PaymentForm() {
     };
 
     const handleAmountChange = (e) => {
-        const newAmount = Number(e.target.value) || 0;
-        setFormData({ ...formData, amount: newAmount });
-
-        // Auto-allocate when amount changes and we have invoices
-        if (outstandingInvoices.length > 0) {
-            const allocations = autoAllocate(newAmount, outstandingInvoices);
-            setFormData(prev => ({ ...prev, amount: newAmount, allocations }));
-        }
-    };
-
     const handleAutoAllocate = () => {
         if (formData.amount > 0 && outstandingInvoices.length > 0) {
             const allocations = autoAllocate(formData.amount, outstandingInvoices);

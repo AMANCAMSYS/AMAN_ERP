@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import {
-    Calculator, CheckCircle, Printer, RefreshCw,
-    Users
+    CheckCircle, Printer, RefreshCw
 } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { getCurrency, hasPermission } from '../../utils/auth';
@@ -18,7 +17,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const PayrollDetails = () => {
     const { t } = useTranslation();
     const { id } = useParams();
-    const navigate = useNavigate();
     const currency = getCurrency();
     const companyCurrency = currency;
     const { currentBranch } = useBranch();

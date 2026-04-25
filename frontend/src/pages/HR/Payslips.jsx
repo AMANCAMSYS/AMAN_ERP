@@ -6,7 +6,7 @@ import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
-import { FileText, Calculator, Download, Eye, Printer, Mail, X } from 'lucide-react';
+import { FileText, Calculator, Eye, Printer, X } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'

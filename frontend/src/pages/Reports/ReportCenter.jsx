@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { hasPermission, getUser } from '../../utils/auth';
-import { INDUSTRY_TYPES, resolveIndustryCode } from '../../config/industryModules';
+import { resolveIndustryCode } from '../../config/industryModules';
 import BackButton from '../../components/common/BackButton';
 
 // Industry-specific report groups mapping

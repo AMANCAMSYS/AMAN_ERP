@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { roleDashboardAPI } from '../../services/roleDashboard';
 import { getUser } from '../../utils/auth';
-import Card from '../../components/common/Card';
 import {
     Crown, Calculator, TrendingUp, ShoppingCart, Warehouse, Users,
     Factory, FolderKanban, Monitor, Handshake, BarChart3, Compass,
@@ -36,7 +35,6 @@ const COLOR_MAP = {
 const KPIHub = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
-    const user = getUser();
     const isRTL = i18n.dir() === 'rtl';
 
     const [dashboards, setDashboards] = useState([]);

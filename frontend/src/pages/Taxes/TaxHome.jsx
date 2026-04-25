@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { taxesAPI, companiesAPI } from '../../utils/api'
+import { taxesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { useBranch } from '../../context/BranchContext'

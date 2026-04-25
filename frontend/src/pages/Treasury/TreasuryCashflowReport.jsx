@@ -10,7 +10,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function TreasuryCashflowReport() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { currentBranch } = useBranch();
     const currency = getCurrency();
 

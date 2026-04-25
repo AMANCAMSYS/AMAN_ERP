@@ -8,7 +8,7 @@ import { useBranch } from '../../context/BranchContext';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 
 import DateInput from '../../components/common/DateInput';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 import { PageLoading } from '../../components/common/LoadingStates'

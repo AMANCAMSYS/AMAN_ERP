@@ -12,7 +12,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 function DeliveryOrderDetails() {
     const { id } = useParams()
     const { t } = useTranslation()
-    const navigate = useNavigate()
     const { showToast } = useToast()
     const currency = getCurrency()
     const [order, setOrder] = useState(null)

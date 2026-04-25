@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-    ArrowRight, Edit2, Trash2, Plus, CheckCircle2,
+    Edit2, Trash2, Plus, CheckCircle2,
     DollarSign, TrendingUp, TrendingDown, ClipboardList,
-    FolderKanban, Users, Calendar, BarChart3, Clock, FileText, Download, File
+    FolderKanban, Calendar, BarChart3, Clock, FileText, Download, File
 } from 'lucide-react';
 import { projectsAPI, treasuryAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';

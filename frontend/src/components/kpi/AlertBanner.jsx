@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, AlertCircle, Info, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 
 /**
  * AlertBanner — displays alerts with severity level from the KPI engine.

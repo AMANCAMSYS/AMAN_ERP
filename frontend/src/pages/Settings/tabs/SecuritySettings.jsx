@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Key, Lock, Clock, Smartphone, Trash2, AlertTriangle, Monitor, Globe } from 'lucide-react';
+import { ShieldCheck, Key, Clock, Smartphone, Trash2, AlertTriangle, Monitor } from 'lucide-react';
 import api from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
 import SimpleModal from '../../../components/common/SimpleModal';

@@ -11,8 +11,7 @@ import { useToast } from '../../context/ToastContext';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function ReceiptDetails() {
-    const { t, i18n } = useTranslation();
-    const { showToast } = useToast();
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();

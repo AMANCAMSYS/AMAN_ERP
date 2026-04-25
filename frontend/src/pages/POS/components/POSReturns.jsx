@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { RotateCcw, Search, Package, Check, X, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw, Search, Package, Check, X } from 'lucide-react';
 import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';

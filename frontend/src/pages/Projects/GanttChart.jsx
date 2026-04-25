@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { format, differenceInDays, addDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import './GanttChart.css';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 
 export default function GanttChart({ tasks = [] }) {

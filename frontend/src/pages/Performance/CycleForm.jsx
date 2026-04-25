@@ -35,7 +35,7 @@ const CycleForm = () => {
                 self_assessment_deadline: form.self_assessment_deadline || null,
                 manager_review_deadline: form.manager_review_deadline || null,
             };
-            const res = await hrAdvancedAPI.createCycle(payload);
+            await hrAdvancedAPI.createCycle(payload);
             navigate('/hr/performance/cycles');
         } catch (e) {
             alert(e.response?.data?.detail || 'Error');

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { externalAPI } from '../../utils/api';
 import '../../components/ModuleStyles.css';
 
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import { useTranslation } from 'react-i18next';
 import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'

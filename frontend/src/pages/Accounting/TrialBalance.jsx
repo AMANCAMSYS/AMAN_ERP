@@ -88,15 +88,6 @@ function TrialBalance() {
 
     if (loading) return <PageLoading />
 
-    // Group by high-level type for summary
-    const summaryData = [
-        { name: t('accounting.coa.types.asset'), value: accounts.filter(a => a.account_type === 'asset').reduce((s, a) => s + parseFloat(a.balance || 0), 0) },
-        { name: t('accounting.coa.types.liability'), value: accounts.filter(a => a.account_type === 'liability').reduce((s, a) => s + parseFloat(a.balance || 0), 0) },
-        { name: t('accounting.coa.types.equity'), value: accounts.filter(a => a.account_type === 'equity').reduce((s, a) => s + parseFloat(a.balance || 0), 0) },
-        { name: t('accounting.coa.types.revenue'), value: accounts.filter(a => a.account_type === 'revenue').reduce((s, a) => s + parseFloat(a.balance || 0), 0) },
-        { name: t('accounting.coa.types.expense'), value: accounts.filter(a => a.account_type === 'expense').reduce((s, a) => s + parseFloat(a.balance || 0), 0) },
-    ]
-
     return (
         <div className="workspace fade-in">
             <div className="workspace-header">

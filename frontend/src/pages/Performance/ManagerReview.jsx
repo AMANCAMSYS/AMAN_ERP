@@ -13,7 +13,6 @@ const ManagerReview = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const { id } = useParams();
-    const navigate = useNavigate();
     const [review, setReview] = useState(null);
     const [goals, setGoals] = useState([]);
     const [scores, setScores] = useState({});

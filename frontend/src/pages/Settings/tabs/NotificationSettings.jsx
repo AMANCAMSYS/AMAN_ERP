@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Mail, Bell, Server, CheckCircle, XCircle, Sliders } from 'lucide-react';
+import { Mail, Bell, Server, CheckCircle, Sliders } from 'lucide-react';
 import api from '../../../utils/api';
 import { notificationsAPI } from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';

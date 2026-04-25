@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { getUser, getCompanyId, logout, hasPermission } from '../utils/auth'
-import { inventoryAPI } from '../utils/api'
 import { notificationsAPI } from '../utils/api' // New generic API
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../context/BranchContext'

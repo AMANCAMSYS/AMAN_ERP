@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Clock, Calendar, Users } from 'lucide-react';
+import { Clock, Calendar } from 'lucide-react';
 
 const HRSettings = ({ settings, handleSettingChange }) => {
     const { t } = useTranslation();

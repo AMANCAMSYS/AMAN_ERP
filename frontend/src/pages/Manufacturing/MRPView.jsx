@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ClipboardList, AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
+import { AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
 import api from '../../utils/api'
 import { toastEmitter } from '../../utils/toastEmitter'
 import { formatNumber } from '../../utils/format'

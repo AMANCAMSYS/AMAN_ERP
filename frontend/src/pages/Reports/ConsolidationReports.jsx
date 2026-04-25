@@ -10,7 +10,6 @@ import DateInput from '../../components/common/DateInput';
 function ConsolidationReports() {
     const { t } = useTranslation()
     const { showToast } = useToast()
-    const currency = getCurrency()
     const [reportType, setReportType] = useState('trial_balance')
     const [dateFrom, setDateFrom] = useState('')
     const [dateTo, setDateTo] = useState('')

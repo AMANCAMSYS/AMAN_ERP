@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { posAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Tag, Trash2, Edit, Gift } from 'lucide-react';
+import { Plus, Tag, Trash2, Gift } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';

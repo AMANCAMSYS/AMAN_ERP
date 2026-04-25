@@ -12,7 +12,7 @@ import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 function SalesDebitNotes() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
   const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()

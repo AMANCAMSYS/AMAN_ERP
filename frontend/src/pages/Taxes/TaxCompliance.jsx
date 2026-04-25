@@ -20,7 +20,6 @@ function TaxCompliance() {
     const { t, i18n } = useTranslation()
     const { showToast } = useToast()
     const { currentBranch } = useBranch()
-    const currency = getCurrency()
 
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('overview')

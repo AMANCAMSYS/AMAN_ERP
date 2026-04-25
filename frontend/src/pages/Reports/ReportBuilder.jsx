@@ -15,7 +15,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ReportBuilder() {
     const { t, i18n } = useTranslation();
-    const navigate = useNavigate();
     const isRTL = i18n.language === 'ar';
 
     const [loading, setLoading] = useState(false);

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { assetsAPI, branchesAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Trash2, Calendar, DollarSign, Activity, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { Trash2, Calendar, DollarSign, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { getCurrency } from '../../utils/auth';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';

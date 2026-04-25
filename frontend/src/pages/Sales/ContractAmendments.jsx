@@ -11,7 +11,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 const ContractAmendments = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('amendments');
     const [contracts, setContracts] = useState([]);

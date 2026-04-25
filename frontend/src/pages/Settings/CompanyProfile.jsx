@@ -4,7 +4,7 @@ import { companiesAPI } from '../../utils/api';
 import { getCompanyId } from '../../utils/auth';
 import {
     Building2, Mail, Phone, MapPin, Hash, Globe,
-    Calendar, ShieldCheck, CreditCard, Camera, Copy, CheckCheck
+    Calendar, ShieldCheck, CreditCard, Copy, CheckCheck
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
@@ -14,7 +14,6 @@ const CompanyProfile = () => {
     const [company, setCompany] = useState(null);
     const [loading, setLoading] = useState(true);
     const companyId = getCompanyId();
-    const isRTL = i18n.dir() === 'rtl';
     const [copied, setCopied] = useState(false);
 
     const copyCode = () => {

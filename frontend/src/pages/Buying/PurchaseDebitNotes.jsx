@@ -13,7 +13,7 @@ import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 function PurchaseDebitNotes() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
   const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()

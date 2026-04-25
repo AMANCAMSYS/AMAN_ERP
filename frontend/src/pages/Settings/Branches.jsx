@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { branchesAPI, currenciesAPI } from '../../utils/api';
 import SimpleModal from '../../components/common/SimpleModal';
 import { useBranch } from '../../context/BranchContext';
-import { Plus, Edit, Trash, MapPin, CheckCircle, XCircle, Globe, Banknote } from 'lucide-react';
+import { Plus, Edit, Trash, MapPin, XCircle, Banknote } from 'lucide-react';
 import { hasPermission } from '../../utils/auth';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../index.css';

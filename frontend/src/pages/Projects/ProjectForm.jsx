@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Save, FolderKanban, Users, Calendar, DollarSign } from 'lucide-react';
+import { Save, FolderKanban, Users, Calendar } from 'lucide-react';
 import { projectsAPI, salesAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
@@ -15,7 +15,6 @@ export default function ProjectForm() {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEdit = !!id;
-    const isRTL = i18n.language === 'ar';
 
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);

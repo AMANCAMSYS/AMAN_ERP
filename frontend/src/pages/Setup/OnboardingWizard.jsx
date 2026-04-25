@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { getIndustryTypesList, getEnabledModulesForIndustry, ALWAYS_ENABLED_MODULES, VARIABLE_MODULES, INDUSTRY_TYPES } from '../../config/industryModules'
+import { getIndustryTypesList, getEnabledModulesForIndustry, ALWAYS_ENABLED_MODULES, VARIABLE_MODULES } from '../../config/industryModules'
 import { useIndustryType } from '../../hooks/useIndustryType'
 import { getUser, updateUser, getCompanyId } from '../../utils/auth'
 import api from '../../services/apiClient'
@@ -19,7 +19,6 @@ const TOTAL_STEPS = 4
 
 function OnboardingWizard() {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const { setIndustryType } = useIndustryType()
   const isRTL = i18n.language === 'ar'
   const user = getUser()

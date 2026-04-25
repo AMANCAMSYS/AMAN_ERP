@@ -11,7 +11,6 @@ function LandedCostDetails() {
     const { id } = useParams()
     const { t } = useTranslation()
     const { showToast } = useToast()
-    const navigate = useNavigate()
     const currency = getCurrency()
     const [lc, setLC] = useState(null)
     const [loading, setLoading] = useState(true)

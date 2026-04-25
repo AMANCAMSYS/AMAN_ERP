@@ -10,7 +10,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 const KPIDashboard = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const currency = getCurrency() || 'SAR';
     const { showToast } = useToast();
     const [kpiData, setKpiData] = useState(null);
