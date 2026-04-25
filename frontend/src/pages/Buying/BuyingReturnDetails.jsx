@@ -9,7 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function BuyingReturnDetails() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
     const { showToast } = useToast()

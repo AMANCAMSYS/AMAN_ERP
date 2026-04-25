@@ -10,7 +10,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const SupplierRatings = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
-    const isRTL = i18n.language === 'ar';
     const [ratings, setRatings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);

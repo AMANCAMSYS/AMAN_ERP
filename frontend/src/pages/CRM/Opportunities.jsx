@@ -10,15 +10,6 @@ import DateInput from '../../components/common/DateInput';
 import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 
-const stageBadgeStyles = {
-    lead: 'badge-info',
-    qualified: 'badge-warning',
-    proposal: 'badge-warning',
-    negotiation: 'badge-info',
-    won: 'badge-success',
-    lost: 'badge-danger'
-}
-
 const stageBadgeColors = {
     lead: { background: '#3b82f6', color: '#fff' },
     qualified: { background: '#eab308', color: '#fff' },

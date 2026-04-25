@@ -16,8 +16,6 @@ const RFQList = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { showToast } = useToast();
-    const currency = getCurrency();
-    const isRTL = i18n.language === 'ar';
     const [rfqs, setRfqs] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);

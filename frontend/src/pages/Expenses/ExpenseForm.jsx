@@ -11,8 +11,7 @@ import FormField from '../../components/common/FormField';
 import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 export default function ExpenseForm() {
-  const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar';
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();

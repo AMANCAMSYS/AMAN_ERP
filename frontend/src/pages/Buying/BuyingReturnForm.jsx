@@ -84,7 +84,6 @@ function BuyingReturnForm() {
             // Map items with max_quantity
             const returnItems = invoice.items.map(item => {
                 const remaining = item.remaining_quantity !== undefined ? Number(item.remaining_quantity) : Number(item.quantity)
-                const quantity = remaining
                 const unitPrice = Number(item.unit_price)
                 const discount = Number(item.discount)
                 // Calculate percentage from original invoice data if possible, or usually it's just value. 

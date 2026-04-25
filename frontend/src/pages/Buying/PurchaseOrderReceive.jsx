@@ -4,7 +4,6 @@ import { purchasesAPI, inventoryAPI } from '../../utils/api';
 import { getCurrency } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '../../utils/format';
 import '../../components/ModuleStyles.css';
 import { useToast } from '../../context/ToastContext';
 import BackButton from '../../components/common/BackButton';

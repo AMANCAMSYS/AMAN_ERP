@@ -11,7 +11,7 @@ import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 
 const BlanketPOList = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { showToast } = useToast();
     const currency = getCurrency();

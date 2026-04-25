@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { purchasesAPI, inventoryAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
@@ -13,9 +12,8 @@ import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 function PurchaseCreditNotes() {
-    const { t, i18n } = useTranslation()
-  const { showToast } = useToast()
-    const navigate = useNavigate()
+        const { t } = useTranslation()
+        const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 
