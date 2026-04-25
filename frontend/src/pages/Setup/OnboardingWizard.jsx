@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getIndustryTypesList, getEnabledModulesForIndustry, ALWAYS_ENABLED_MODULES, VARIABLE_MODULES } from '../../config/industryModules'
 import { useIndustryType } from '../../hooks/useIndustryType'
@@ -63,7 +62,6 @@ function OnboardingWizard() {
   const toggleModule = (key) => {
     if (!VARIABLE_MODULES.includes(key)) return
     setModuleOverrides(prev => {
-      const base = selectedIndustry ? getEnabledModulesForIndustry(selectedIndustry) : []
       const isCurrentlyEnabled = enabledModules.includes(key)
       return { ...prev, [key]: !isCurrentlyEnabled }
     })

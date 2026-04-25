@@ -15,12 +15,12 @@ import Timesheets from './Timesheets';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
-import { formatShortDate, formatDateTime, formatDate } from '../../utils/dateUtils';
+import { formatShortDate, formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ProjectDetails() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { id } = useParams();
 

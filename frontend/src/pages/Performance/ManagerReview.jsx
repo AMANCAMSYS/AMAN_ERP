@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { hrAdvancedAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { Star, Send, CheckCircle, Plus, Trash2 } from 'lucide-react';

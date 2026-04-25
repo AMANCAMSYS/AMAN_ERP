@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
-import { Plus, Edit2, Trash2, DollarSign } from 'lucide-react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';

@@ -10,7 +10,6 @@ import {
     DollarSign,
     FileText,
     Activity,
-    Calculator,
 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';

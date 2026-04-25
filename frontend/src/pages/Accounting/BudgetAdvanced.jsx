@@ -10,10 +10,9 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const BudgetAdvanced = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const currency = getCurrency();
-    const isRTL = i18n.language === 'ar';
     const [activeTab, setActiveTab] = useState('costcenter');
     const [ccBudgets, setCcBudgets] = useState([]);
     const [multiYear, setMultiYear] = useState([]);

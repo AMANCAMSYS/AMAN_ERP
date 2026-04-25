@@ -10,7 +10,7 @@ import { formatNumber } from '../../utils/format';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const ContractAmendments = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('amendments');
     const [contracts, setContracts] = useState([]);

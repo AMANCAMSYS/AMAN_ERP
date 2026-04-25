@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { companiesAPI } from '../utils/api'
 import { useTranslation } from 'react-i18next'
 import BackButton from '../components/common/BackButton'

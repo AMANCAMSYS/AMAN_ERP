@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { roleDashboardAPI } from '../../services/roleDashboard';
-import { getUser } from '../../utils/auth';
 import {
     Crown, Calculator, TrendingUp, ShoppingCart, Warehouse, Users,
     Factory, FolderKanban, Monitor, Handshake, BarChart3, Compass,

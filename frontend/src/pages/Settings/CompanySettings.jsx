@@ -8,7 +8,7 @@ import {
     Settings, Wallet, Palette, ShoppingCart, Truck, Users, Box, FileText,
     Heart, Monitor, Bell, BarChart3, ShieldCheck, Link, Zap, Receipt,
     Briefcase, CheckSquare, Share2, GitBranch, History, Database,
-    ChevronRight, Sparkles, Key, Globe, Scale, Building2, Upload, Layers
+    Sparkles, Key, Globe, Scale, Building2, Upload, Layers
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import GeneralSettings from './tabs/GeneralSettings';
@@ -41,7 +41,6 @@ const CompanySettings = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const user = getUser();
-    const isRTL = i18n.dir() === 'rtl';
 
     // UI State derived from URL
     const activeTab = searchParams.get('tab') || 'general';

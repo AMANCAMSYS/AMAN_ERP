@@ -11,7 +11,7 @@ import BackButton from '../../components/common/BackButton';
 import { Spinner } from '../../components/common/LoadingStates'
 
 const StockMovements = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { currentBranch } = useBranch();
     const { showToast } = useToast();
     const [movements, setMovements] = useState([]);

@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { taxComplianceAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { useToast } from '../../context/ToastContext'
-import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
-import { ShieldCheck, Globe, Building2, FileText, AlertTriangle, CheckCircle } from 'lucide-react'
+import { ShieldCheck, Globe, Building2, FileText, CheckCircle } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
 import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 

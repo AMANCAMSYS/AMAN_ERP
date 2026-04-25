@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Boxes, Package, ArrowRight, CheckCircle, Search } from 'lucide-react';
+import { Boxes, Package, ArrowRight, Search } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'

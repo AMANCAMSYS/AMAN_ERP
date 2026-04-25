@@ -15,7 +15,7 @@ import SearchFilter from '../../components/common/SearchFilter';
 import BackButton from '../../components/common/BackButton';
 
 const LeaveList = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [leaves, setLeaves] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);

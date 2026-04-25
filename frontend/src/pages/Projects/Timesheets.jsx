@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { format, startOfWeek, endOfWeek, addDays, eachDayOfInterval } from 'date-fns';
+import { format, startOfWeek, addDays, eachDayOfInterval } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { ChevronRight, ChevronLeft, Save, CheckCircle2 } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';

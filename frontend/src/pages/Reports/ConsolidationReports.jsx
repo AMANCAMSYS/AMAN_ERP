@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { consolidationAPI } from '../../utils/api'
-import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../../context/ToastContext'
 import BackButton from '../../components/common/BackButton'

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { salesAPI } from '../../utils/api'
 import { FileText, Banknote, Calendar, CreditCard, Building } from 'lucide-react'
 import { useTranslation } from 'react-i18next'

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../utils/api';
 import { formatNumber } from '../../utils/format';
-import { TrendingUp, TrendingDown, ShoppingCart, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, ShoppingCart } from 'lucide-react';
 
 const SalesSummaryWidget = ({ config = {}, currency = '' }) => {
     const { t } = useTranslation();

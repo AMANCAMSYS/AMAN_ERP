@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ShoppingCart, CheckCircle } from 'lucide-react'
 import api from '../../utils/api'
@@ -11,7 +11,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function MRPView() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { id } = useParams()
     const { showToast } = useToast()
 

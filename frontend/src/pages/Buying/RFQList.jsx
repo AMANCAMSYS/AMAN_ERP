@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { purchasesAPI, inventoryAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { getCurrency } from '../../utils/auth';
 import { Plus, Send, GitCompare, ArrowRightCircle, FileText, ChevronDown, X } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
@@ -12,7 +11,7 @@ import DataTable from '../../components/common/DataTable';
 import SearchFilter from '../../components/common/SearchFilter';
 
 const RFQList = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [rfqs, setRfqs] = useState([]);
     const [suppliers, setSuppliers] = useState([]);

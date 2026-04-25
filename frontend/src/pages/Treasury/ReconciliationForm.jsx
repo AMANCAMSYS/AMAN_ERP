@@ -13,7 +13,7 @@ import BackButton from '../../components/common/BackButton';
 import FormField from '../../components/common/FormField';
 import { PageLoading } from '../../components/common/LoadingStates'
 const ReconciliationForm = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
     const { id } = useParams();
     const navigate = useNavigate();

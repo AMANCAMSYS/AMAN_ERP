@@ -9,7 +9,7 @@ import '../../components/ModuleStyles.css';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const KPIDashboard = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const currency = getCurrency() || 'SAR';
     const { showToast } = useToast();
     const [kpiData, setKpiData] = useState(null);

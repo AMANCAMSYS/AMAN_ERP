@@ -7,7 +7,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 
 const TableManagement = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);

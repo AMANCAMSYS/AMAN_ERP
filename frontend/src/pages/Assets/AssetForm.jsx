@@ -12,7 +12,7 @@ import FormField from '../../components/common/FormField';
 import { Spinner } from '../../components/common/LoadingStates'
 
 const AssetForm = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { id } = useParams();
     const isEdit = !!id;

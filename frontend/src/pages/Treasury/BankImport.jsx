@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { treasuryAPI } from '../../utils/api'
-import { getCurrency } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
 import { useToast } from '../../context/ToastContext'

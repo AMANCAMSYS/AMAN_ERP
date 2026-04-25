@@ -7,7 +7,6 @@ import { formatShortDate } from '../../utils/dateUtils'
 import { formatNumber } from '../../utils/format'
 import { Printer, CreditCard, Calendar, User, FileText, CheckCircle, Info } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
-import { useToast } from '../../context/ToastContext';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function ReceiptDetails() {

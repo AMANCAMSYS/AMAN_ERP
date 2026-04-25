@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     Save, Play, Plus, Trash2, Filter,
@@ -15,7 +14,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ReportBuilder() {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
 
     const [loading, setLoading] = useState(false);
     const [previewData, setPreviewData] = useState(null);

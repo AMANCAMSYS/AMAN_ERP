@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react'; // Re-triggering Vite rebuild after backend fix
 import {
-    Check,
-    Activity,
+        Activity,
     Database,
     BrainCircuit,
     Globe,

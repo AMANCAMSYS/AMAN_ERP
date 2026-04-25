@@ -9,7 +9,7 @@ import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 const CustodyManagement = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [items, setItems] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);

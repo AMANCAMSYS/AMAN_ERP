@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { purchasesAPI, inventoryAPI } from '../../utils/api';
-import { getCurrency } from '../../utils/auth';
 import { useBranch } from '../../context/BranchContext';
 import { useTranslation } from 'react-i18next';
 import '../../components/ModuleStyles.css';

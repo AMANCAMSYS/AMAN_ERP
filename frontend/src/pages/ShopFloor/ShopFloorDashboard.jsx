@@ -59,7 +59,7 @@ const ShopFloorDashboard = () => {
         } catch { /* WebSocket not available */ }
 
         return () => {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+            if (ws.readyState === WebSocket.OPEN) ws.close();
         };
     }, [loadDashboard, t]);
 

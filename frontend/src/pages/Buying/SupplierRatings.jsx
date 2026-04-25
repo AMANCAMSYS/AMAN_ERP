@@ -8,7 +8,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const SupplierRatings = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [ratings, setRatings] = useState([]);
     const [loading, setLoading] = useState(true);

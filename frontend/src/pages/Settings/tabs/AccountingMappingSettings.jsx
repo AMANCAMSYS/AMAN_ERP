@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, CreditCard, ArrowLeftRight, RefreshCw, Calendar } from 'lucide-react';
+import { GitMerge, Landmark, ShoppingCart, Receipt, Factory, Users, Briefcase, CreditCard, ArrowLeftRight, RefreshCw } from 'lucide-react';
 import api, { accountingAPI } from '../../../utils/api';
 import { toastEmitter } from '../../../utils/toastEmitter';
 import DateInput from '../../../components/common/DateInput';

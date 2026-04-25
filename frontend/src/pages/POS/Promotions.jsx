@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { posAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Tag, Trash2, Gift } from 'lucide-react';
+import { Plus, Tag, Trash2 } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 const Promotions = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [promotions, setPromotions] = useState([]);
     const [loading, setLoading] = useState(true);

@@ -13,7 +13,7 @@ function useSearchablePages() {
     const isSystemAdmin = user?.role === 'system_admin'
     const isModuleEnabled = (moduleKey) => {
       if (isSystemAdmin) return true
-      if (!enabledModules || enabledModules.length === 0) return true
+      if (enabledModules.length === 0) return true
       return enabledModules.includes(moduleKey)
     }
 

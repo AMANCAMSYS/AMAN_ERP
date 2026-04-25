@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { purchasesAPI, inventoryAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
-import { getCurrency } from '../../utils/auth';
 import { Plus, FileCheck, Play, ShoppingCart } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 
