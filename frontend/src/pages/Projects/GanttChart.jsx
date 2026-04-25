@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { format, differenceInDays, addDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { format, differenceInDays, addDays } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import './GanttChart.css';
 import { formatDate } from '../../utils/dateUtils';
@@ -22,7 +22,7 @@ export default function GanttChart({ tasks = [] }) {
     }
 
     // Calculate Timeline Range
-    const { startDate, endDate, totalDays, dates } = useMemo(() => {
+    const { startDate, totalDays, dates } = useMemo(() => {
         if (validTasks.length === 0) return { startDate: new Date(), endDate: new Date(), totalDays: 0, dates: [] };
 
         const starts = validTasks.map(t => new Date(t.start_date));

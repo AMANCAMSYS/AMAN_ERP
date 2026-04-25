@@ -14,8 +14,7 @@ import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 function PurchaseDebitNotes() {
     const { t } = useTranslation()
-  const { showToast } = useToast()
-    const navigate = useNavigate()
+    const { showToast } = useToast()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 

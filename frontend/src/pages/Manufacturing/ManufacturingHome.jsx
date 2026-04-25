@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { formatNumber } from '../../utils/format';
 import {
     FaIndustry, FaRoute, FaLayerGroup, FaClipboardList, FaCogs, FaChartLine, FaPlus, FaIdCard, FaBoxes, FaTools, FaCalendarAlt
 } from 'react-icons/fa';

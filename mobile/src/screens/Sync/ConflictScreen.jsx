@@ -9,7 +9,7 @@ import {
 import { useNetwork } from '../../../App';
 import { mobileAPI } from '../../services/api';
 import { getDeviceId } from '../../services/syncService';
-import { resolveConflict, diffVersions } from '../../services/conflictResolver';
+import { resolveConflict } from '../../services/conflictResolver';
 
 export default function ConflictScreen() {
   const { isConnected } = useNetwork();

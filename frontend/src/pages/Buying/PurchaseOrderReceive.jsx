@@ -21,7 +21,7 @@ function PurchaseOrderReceive() {
     const [submitting, setSubmitting] = useState(false);
     const [selectedWarehouse, setSelectedWarehouse] = useState('');
     const [receiveQtys, setReceiveQtys] = useState({});
-    const currency = getCurrency();
+
 
     useEffect(() => {
         fetchData();

@@ -213,7 +213,6 @@ function PaymentForm() {
         }
     };
 
-    const handleAmountChange = (e) => {
     const handleAutoAllocate = () => {
         if (formData.amount > 0 && outstandingInvoices.length > 0) {
             const allocations = autoAllocate(formData.amount, outstandingInvoices);

@@ -10,7 +10,7 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const LoyaltyPrograms = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
-    const isRTL = i18n.language === 'ar';
+
     const [programs, setPrograms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);

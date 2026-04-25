@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import './POSInterface.css';
 import './components/POSComponents.css';
 import { useNavigate } from 'react-router-dom';

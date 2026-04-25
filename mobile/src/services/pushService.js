@@ -2,7 +2,7 @@
  * Push notification handler — registers device with FCM,
  * receives and displays push notifications.
  */
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import { mobileAPI } from './api';
 import { getDeviceId } from './syncService';
 

@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // For USB debug: use adb reverse → 127.0.0.1 works.
 // For wireless debug: phone connects via laptop's LAN IP.
 // We detect the Metro server host from the bundle URL and derive the backend IP.
-import { Platform, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 function _devServerHost() {
   if (!__DEV__) return null;
   // React Native exposes the packager host through the native module

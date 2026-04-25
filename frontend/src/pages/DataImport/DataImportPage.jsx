@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Check, AlertTriangle, FileText, Play, Info, Eye } from 'lucide-react';
+import { Download, AlertTriangle, FileText, Play, Info, Eye } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import api from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
