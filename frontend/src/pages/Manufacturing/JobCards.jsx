@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Play, Pause, CheckCircle, Clock, User as UserIcon, Factory } from 'lucide-react'
+import { Play, Pause, CheckCircle, Clock, Factory } from 'lucide-react'
 import api from '../../utils/api'
 import { toastEmitter } from '../../utils/toastEmitter'
 import { useToast } from '../../context/ToastContext'

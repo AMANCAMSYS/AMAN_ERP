@@ -8,7 +8,7 @@ import {
     FaIndustry, FaRoute, FaLayerGroup, FaClipboardList, FaCogs, FaChartLine, FaPlus, FaIdCard, FaBoxes, FaTools, FaCalendarAlt
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const ManufacturingHome = () => {

@@ -3,8 +3,7 @@ import { Clock, Package, User, Trash2, Play, X } from 'lucide-react';
 import api from '../../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../context/ToastContext';
-import { formatShortDate, formatDateTime } from '../../../utils/dateUtils';
-import { formatNumber } from '../../../utils/format';
+import { formatDateTime } from '../../../utils/dateUtils';
 import { Spinner } from '../../../components/common/LoadingStates'
 
 
@@ -47,7 +46,7 @@ const HeldOrders = ({ onResume, onClose }) => {
         }
 
         try {
-            const response = await api.delete(`/pos/orders/${orderId}/cancel-held`);
+            await api.delete(`/pos/orders/${orderId}/cancel-held`);
 
             setHeldOrders(heldOrders.filter(o => o.id !== orderId));
             showToast(t('pos.order_cancelled'), 'success');

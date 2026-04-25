@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    User, Mail, Phone,
+    Mail, Phone,
     CheckCircle, XCircle, Shield,
     DollarSign, MoreVertical
 } from 'lucide-react';

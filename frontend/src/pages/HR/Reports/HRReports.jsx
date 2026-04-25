@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { BarChart2, Calendar, FileText } from 'lucide-react';
 import PayrollReport from './PayrollReport';
 import LeaveReport from './LeaveReport';
@@ -9,9 +9,7 @@ import BackButton from '../../../components/common/BackButton';
 import { ModuleKPISection } from '../../../components/kpi';
 
 const HRReports = () => {
-    const { t, i18n } = useTranslation();
-    const navigate = useNavigate();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState(location.state?.tab || 'payroll');
 

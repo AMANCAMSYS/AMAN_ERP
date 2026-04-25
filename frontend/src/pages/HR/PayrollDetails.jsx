@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    Calculator, CheckCircle, ArrowLeft, Printer, RefreshCw,
-    AlertTriangle, DollarSign, Users, FileText
+    Calculator, CheckCircle, Printer, RefreshCw,
+    DollarSign, Users
 } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { getCurrency, hasPermission } from '../../utils/auth';

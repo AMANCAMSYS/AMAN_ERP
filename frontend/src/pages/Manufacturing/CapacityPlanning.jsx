@@ -10,7 +10,6 @@ import DateInput from '../../components/common/DateInput';
 
 const CapacityPlanning = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('oee');
     const [oeeData, setOeeData] = useState(null);

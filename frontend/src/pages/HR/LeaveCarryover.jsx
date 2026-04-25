@@ -11,7 +11,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const LeaveCarryover = () => {
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
-    const isRTL = i18n.language === 'ar';
     const [balances, setBalances] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);

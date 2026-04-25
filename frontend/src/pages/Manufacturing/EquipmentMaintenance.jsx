@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTools, FaPlus, FaSearch, FaHistory, FaCalendarCheck, FaExclamationTriangle } from 'react-icons/fa';
+import { FaTools, FaPlus, FaHistory, FaCalendarCheck, FaExclamationTriangle } from 'react-icons/fa';
 import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 const EquipmentMaintenance = () => {
@@ -89,16 +89,6 @@ const EquipmentMaintenance = () => {
             fetchData();
         } catch (error) {
             toastEmitter.emit(t('common.error'), 'error');
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active': return 'bg-green-100 text-green-800';
-            case 'maintenance': return 'bg-yellow-100 text-yellow-800';
-            case 'broken': return 'bg-red-100 text-red-800';
-            case 'retired': return 'bg-gray-100 text-gray-800';
-            default: return 'bg-gray-100';
         }
     };
 

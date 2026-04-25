@@ -5,7 +5,7 @@ import api from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
 import { Layout, Store, Calculator, Info, ArrowLeft, Play, Wallet } from 'lucide-react';
-import { getIndustryType, getIndustryFeature } from '../../hooks/useIndustryType';
+import { getIndustryFeature } from '../../hooks/useIndustryType';
 
 const POSHome = () => {
     const { t, i18n } = useTranslation();

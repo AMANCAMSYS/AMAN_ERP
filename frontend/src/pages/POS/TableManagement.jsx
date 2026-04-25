@@ -9,7 +9,6 @@ import BackButton from '../../components/common/BackButton';
 const TableManagement = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
-    const isRTL = i18n.language === 'ar';
     const [tables, setTables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);

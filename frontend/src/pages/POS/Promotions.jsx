@@ -10,7 +10,6 @@ import BackButton from '../../components/common/BackButton';
 const Promotions = () => {
     const { t, i18n } = useTranslation();
     const { showToast } = useToast();
-    const isRTL = i18n.language === 'ar';
     const [promotions, setPromotions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);

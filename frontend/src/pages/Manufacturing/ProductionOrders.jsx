@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
-    FaClipboardList, FaPlus, FaSearch, FaEye, FaCheckCircle, FaClock, FaTimesCircle
+    FaClipboardList, FaPlus, FaSearch, FaEye, FaClock, FaTimesCircle
 } from 'react-icons/fa';
 import DateInput from '../../components/common/DateInput';
 import '../../components/ModuleStyles.css';

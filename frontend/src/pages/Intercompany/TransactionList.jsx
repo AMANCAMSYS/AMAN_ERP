@@ -13,7 +13,6 @@ function TransactionList() {
     const { t } = useTranslation()
     const { showToast } = useToast()
     const navigate = useNavigate()
-    const currency = getCurrency()
     const [transactions, setTransactions] = useState([])
     const [loading, setLoading] = useState(true)
     const [statusFilter, setStatusFilter] = useState('')

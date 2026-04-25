@@ -3,7 +3,7 @@ import { manufacturingAPI, costCentersAPI, accountingAPI } from '../../utils/api
 import { useTranslation } from 'react-i18next';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
-    FaIndustry, FaPlus, FaEdit, FaTrash, FaSearch, FaDollarSign, FaClock
+    FaIndustry, FaPlus, FaEdit, FaTrash, FaDollarSign, FaClock
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';

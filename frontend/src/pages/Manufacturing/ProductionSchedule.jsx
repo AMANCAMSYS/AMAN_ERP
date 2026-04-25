@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaCalendarAlt, FaFilter, FaList, FaStream, FaSearch, FaBox, FaCogs, FaClock } from 'react-icons/fa';
+import { FaCalendarAlt, FaFilter, FaList, FaStream, FaBox, FaCogs, FaClock } from 'react-icons/fa';
 import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 
 import DateInput from '../../components/common/DateInput';
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 

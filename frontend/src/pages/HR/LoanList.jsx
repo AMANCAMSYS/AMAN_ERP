@@ -14,9 +14,8 @@ import SearchFilter from '../../components/common/SearchFilter';
 import BackButton from '../../components/common/BackButton';
 
 const LoanList = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
-    const isRTL = i18n.language === 'ar';
     const { currentBranch } = useBranch();
     const [loans, setLoans] = useState([]);
     const [employees, setEmployees] = useState([]);

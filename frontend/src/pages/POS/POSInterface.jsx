@@ -15,7 +15,7 @@ import {
     ShoppingCart, Plus, Minus,
     Store, X, Wifi, WifiOff,
     Banknote, CreditCard as CardIcon, Split,
-    UserCircle, Printer, Save,
+    UserCircle, Printer,
     Clock, LayoutGrid, ArrowRightLeft, Smartphone, Package, RotateCcw
 } from 'lucide-react';
 import { formatShortDate, formatDateTime } from '../../utils/dateUtils';

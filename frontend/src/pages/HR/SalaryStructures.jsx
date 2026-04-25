@@ -3,15 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
-import { hasPermission } from '../../utils/auth';
-import { Plus, Edit2, Trash2, DollarSign, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, DollarSign } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 
 const SalaryStructures = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const [structures, setStructures] = useState([]);
     const [components, setComponents] = useState([]);
     const [loading, setLoading] = useState(true);

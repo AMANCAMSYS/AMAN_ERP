@@ -4,7 +4,7 @@ import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { 
   ArrowLeft, Edit, Trash2, CheckCircle, XCircle, FileText, 
-  DollarSign, User, Receipt 
+  DollarSign, User 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
@@ -16,8 +16,7 @@ import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 
 export default function ExpenseDetails() {
-  const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar';
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();

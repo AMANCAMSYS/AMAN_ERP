@@ -12,10 +12,7 @@ import {
     FileText,
     Activity,
     UserPlus,
-    Calendar,
-    Clock,
     Calculator,
-    Download
 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';

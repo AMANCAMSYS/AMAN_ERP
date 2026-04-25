@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Plus, Edit2, Users, BookOpen } from 'lucide-react';
+import { Plus, Edit2, Users } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 
