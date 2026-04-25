@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FaTools, FaPlus, FaHistory, FaCalendarCheck, FaExclamationTriangle } from 'react-icons/fa';
+import { FaTools, FaPlus, FaHistory } from 'react-icons/fa';
 import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';

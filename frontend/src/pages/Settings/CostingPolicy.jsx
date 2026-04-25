@@ -4,7 +4,6 @@ import {
     Check,
     Activity,
     Database,
-    BarChart3,
     BrainCircuit,
     Globe,
     Store,
@@ -49,7 +48,7 @@ const CostingPolicy = () => {
             setHistory(historyRes.data);
 
             const branchCount = branchesRes.data.length;
-            let rec = { type: 'global_wac', reason: '', score: 90 };
+            let rec;
 
             if (branchCount <= 1) {
                 rec = {

@@ -22,7 +22,7 @@ const LazyImage = ({ src, alt, className, style, placeholder, ...props }) => {
         }
 
         return () => {
-            if (observer) observer.disconnect()
+            observer.disconnect()
         }
     }, [])
 

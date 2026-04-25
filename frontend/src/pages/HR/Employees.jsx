@@ -553,7 +553,7 @@ const Employees = () => {
                                                             <input
                                                                 type="text"
                                                                 className="form-input"
-                                                                required={!isEditMode && formData.create_user}
+                                                                required={formData.create_user}
                                                                 value={formData.username}
                                                                 onChange={e => setFormData({ ...formData, username: e.target.value })}
                                                                 autoComplete="new-password"
@@ -564,7 +564,7 @@ const Employees = () => {
                                                             <input
                                                                 type="password"
                                                                 className="form-input"
-                                                                required={!isEditMode && formData.create_user}
+                                                                required={formData.create_user}
                                                                 value={formData.password}
                                                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
                                                                 autoComplete="new-password"

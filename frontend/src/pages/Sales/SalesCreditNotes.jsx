@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { salesAPI, inventoryAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
 import { formatShortDate } from '../../utils/dateUtils'
@@ -15,7 +14,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 function SalesCreditNotes() {
         const { t } = useTranslation()
   const { showToast } = useToast()
-    const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
 

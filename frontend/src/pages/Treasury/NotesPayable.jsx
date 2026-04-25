@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCurrency } from '../../utils/auth';
 import { useTranslation } from 'react-i18next';
 import { notesAPI, treasuryAPI, inventoryAPI } from '../../utils/api';
-import { FileText, Plus, Eye, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { Plus, Eye, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { useBranch } from '../../context/BranchContext';
 

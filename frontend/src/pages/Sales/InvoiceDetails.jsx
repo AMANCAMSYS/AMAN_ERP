@@ -12,7 +12,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function InvoiceDetails() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { showToast } = useToast()
     const { id } = useParams()
     const navigate = useNavigate()

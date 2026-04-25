@@ -35,7 +35,6 @@ function ExpenseForm() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const branchId = currentBranch?.id || null
                 const gas = await accountingAPI.list()
                 setGlAccounts(gas.data.filter(a => a.account_type === 'expense'))
                 // Set default branch if not set

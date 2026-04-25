@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, CreditCard, Clock, Receipt } from 'lucide-react';
+import { Users, Receipt } from 'lucide-react';
 import api from '../../../utils/api';
 
 const SalesSettings = ({ settings, handleSettingChange, currency }) => {

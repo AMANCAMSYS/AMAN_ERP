@@ -20,9 +20,6 @@ const stageBadgeColors = {
     won:         { background: '#22c55e', color: '#fff' },
     lost:        { background: '#ef4444', color: '#fff' }
 }
-const stageColors = {
-    lead: '#3b82f6', qualified: '#eab308', proposal: '#f97316', negotiation: '#8b5cf6'
-}
 const statusBadgeStyles = {
     open:        { background: '#3b82f6', color: '#fff' },
     in_progress: { background: '#eab308', color: '#fff' },
@@ -106,10 +103,7 @@ function CRMHome() {
         { value: 'medium',   label: t('crm.priority_medium') },
         { value: 'low',      label: t('crm.priority_low') }
     ]
-    const stageLabels = {
-        lead: t('crm.stage_lead'), qualified: t('crm.stage_qualified'),
-        proposal: t('crm.stage_proposal'), negotiation: t('crm.stage_negotiation')
-    }
+    ]
 
     // ── Effects ─────────────────────────────────────────────────────────────
     useEffect(() => { fetchOverview(); fetchCustomers() }, [])

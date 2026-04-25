@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Plus, Edit2, Trash2, AlertTriangle, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 
@@ -10,7 +10,6 @@ import DateInput from '../../components/common/DateInput';
 import BackButton from '../../components/common/BackButton';
 const EmployeeDocuments = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const [docs, setDocs] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(true);

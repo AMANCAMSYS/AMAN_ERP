@@ -6,7 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import { getCurrency } from '../../utils/auth'
 import { formatNumber } from '../../utils/format'
 import { formatShortDate } from '../../utils/dateUtils'
-import { ShieldCheck, Globe, Building2, FileText, AlertTriangle, CheckCircle, ChevronDown } from 'lucide-react'
+import { ShieldCheck, Globe, Building2, FileText, AlertTriangle, CheckCircle } from 'lucide-react'
 import BackButton from '../../components/common/BackButton';
 import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
@@ -132,11 +132,7 @@ function TaxCompliance() {
         }
     }
 
-    const getStatusIcon = (status) => {
-        if (status === 'compliant' || status === 'active') return <CheckCircle size={16} style={{ color: 'var(--success)' }} />
-        if (status === 'warning' || status === 'pending') return <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
-        return <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
-    }
+
 
     if (loading && !overview) return <PageLoading />
 

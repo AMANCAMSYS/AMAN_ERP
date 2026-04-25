@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { BarChart2, Calendar, FileText } from 'lucide-react';
+import { BarChart2, Calendar } from 'lucide-react';
 import PayrollReport from './PayrollReport';
 import LeaveReport from './LeaveReport';
 import '../../../components/ModuleStyles.css';

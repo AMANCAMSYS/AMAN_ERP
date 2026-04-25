@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Heart, Gift, Users } from 'lucide-react';
+import { Gift, Users } from 'lucide-react';
 
 const CRMSettings = ({ settings, handleSettingChange, currency }) => {
     const { t } = useTranslation();

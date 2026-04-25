@@ -10,7 +10,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 function BankImport() {
     const { t } = useTranslation()
     const { showToast } = useToast()
-    const currency = getCurrency()
     const [batches, setBatches] = useState([])
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, FileKey, Globe, Loader, Clock } from 'lucide-react';
+import { ShieldCheck, Globe, Loader, Clock } from 'lucide-react';
 import api from '../../../utils/api';
 import { useToast } from '../../../context/ToastContext';
 import { getCountry } from '../../../utils/auth';

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { manufacturingAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { useToast } from '../../context/ToastContext';
-import { Gauge, Plus, Save, X, Activity, Settings, Edit3 } from 'lucide-react';
+import { Gauge, Plus, Activity, Settings, Edit3 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 import DateInput from '../../components/common/DateInput';

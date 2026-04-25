@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitPullRequest, CheckCircle, AlertTriangle } from 'lucide-react';
+import { GitPullRequest, AlertTriangle } from 'lucide-react';
 
 const WorkflowSettings = ({ settings, handleSettingChange, currency }) => {
     const { t } = useTranslation();

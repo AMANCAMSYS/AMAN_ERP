@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { hrAdvancedAPI, hrAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { Plus, Edit2, AlertOctagon } from 'lucide-react';
+import { Plus, Edit2 } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 

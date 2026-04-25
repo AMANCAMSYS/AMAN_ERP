@@ -9,7 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function InventoryValuation() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { currentBranch } = useBranch()
     const { showToast } = useToast()
     const [data, setData] = useState([])

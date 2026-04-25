@@ -1,15 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { manufacturingAPI, inventoryAPI, api } from '../../utils/api';
+import { manufacturingAPI, inventoryAPI } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
-    FaClipboardList, FaPlus, FaSearch, FaEye, FaClock, FaTimesCircle
+    FaClipboardList, FaPlus, FaEye, FaClock, FaTimesCircle
 } from 'react-icons/fa';
-import DateInput from '../../components/common/DateInput';
 import '../../components/ModuleStyles.css';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 

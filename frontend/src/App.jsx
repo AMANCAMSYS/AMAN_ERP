@@ -421,8 +421,6 @@ const CostLayerList = React.lazy(() => import('./pages/Costing/CostLayerList'))
 const CostingMethodForm = React.lazy(() => import('./pages/Costing/CostingMethodForm'))
 const ValuationReport = React.lazy(() => import('./pages/Costing/ValuationReport'))
 
-// Notification Preferences
-const NotificationPreferences = React.lazy(() => import('./pages/Settings/NotificationPreferences'))
 
 
 function PrivateRoute({ children, permission, role, skipIndustryCheck = false }) {

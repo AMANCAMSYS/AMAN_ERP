@@ -12,7 +12,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const Recruitment = () => {
     const { t, i18n } = useTranslation();
     const { currentBranch } = useBranch();
-    const isRTL = i18n.language === 'ar';
     const [activeTab, setActiveTab] = useState('openings');
     const [openings, setOpenings] = useState([]);
     const [applications, setApplications] = useState([]);

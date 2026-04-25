@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, startOfWeek, endOfWeek, addDays, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, startOfWeek, addDays, eachDayOfInterval } from 'date-fns';
 import { arSA, enUS } from 'date-fns/locale';
 import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, User, AlertCircle } from 'lucide-react';
 import { projectsAPI } from '../../utils/api';
