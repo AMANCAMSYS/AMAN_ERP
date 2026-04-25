@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     # Name of the HttpOnly cookie carrying the refresh token.
     REFRESH_COOKIE_NAME: str = "refresh_token"
     # Cookies are flagged Secure in staging/production automatically.
-    COOKIE_SAMESITE: str = "strict"
+    COOKIE_SAMESITE: str = "lax"
 
     # ── TASK-028: Scheduler / Worker split ─────────────────────
     # in_process : web process starts APScheduler in-thread (single-replica dev)

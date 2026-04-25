@@ -579,7 +579,7 @@ async def login(
             )
 
             # TASK-030: set HttpOnly refresh cookie + CSRF cookie.
-            set_auth_cookies(response, refresh_token)
+            set_auth_cookies(response, refresh_token, request)
 
             return Token(
                 access_token=access_token,
@@ -853,7 +853,7 @@ async def login(
                     logger.warning(f"Failed to create user_session: {sess_err}")
 
                 # TASK-030: set HttpOnly refresh cookie + CSRF cookie.
-                set_auth_cookies(response, refresh_token)
+                set_auth_cookies(response, refresh_token, request)
 
                 return Token(
                     access_token=access_token,
@@ -1220,7 +1220,7 @@ async def logout(
 
 
 @router.get("/csrf")
-async def get_csrf_token(response: Response):
+async def get_csrf_token(request: Request, response: Response):
     """
     TASK-030: bootstrap endpoint. Sets a fresh non-HttpOnly `csrf_token`
     cookie (readable by JS) and returns its value in the JSON body so
@@ -1229,7 +1229,7 @@ async def get_csrf_token(response: Response):
     random value used for the double-submit-cookie check.
     """
     from utils.auth_cookies import set_csrf_cookie
-    token = set_csrf_cookie(response)
+    token = set_csrf_cookie(response, request=request)
     return {"csrf_token": token}
 
 
@@ -1359,7 +1359,7 @@ async def refresh_token(
         add_token_to_blacklist(provided_refresh_token, username=username, reason="refresh_rotate")
 
         # TASK-030: rotate HttpOnly refresh cookie + CSRF cookie.
-        set_auth_cookies(response, new_refresh_token)
+        set_auth_cookies(response, new_refresh_token, request)
 
         return {
             "access_token": new_access_token,
