@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, DollarSign, AlertCircle, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 
 const StatsCard = ({ title, value, trend, trendValue, currency, isLongText }) => {

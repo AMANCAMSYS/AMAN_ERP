@@ -9,7 +9,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 
 const SalaryStructures = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const [structures, setStructures] = useState([]);
     const [components, setComponents] = useState([]);
     const [loading, setLoading] = useState(true);

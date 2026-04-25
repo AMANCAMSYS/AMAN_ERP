@@ -13,12 +13,11 @@ import BackButton from '../../components/common/BackButton';
 import { useToast } from '../../context/ToastContext'
 import { PageLoading } from '../../components/common/LoadingStates'
 function SalesCreditNotes() {
-    const { t, i18n } = useTranslation()
+        const { t } = useTranslation()
   const { showToast } = useToast()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
     const currency = getCurrency()
-    const isRTL = i18n.language === 'ar'
 
     const [items, setItems] = useState([])
     const [loading, setLoading] = useState(true)

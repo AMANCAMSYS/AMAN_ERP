@@ -13,9 +13,7 @@ import { PageLoading } from '../../components/common/LoadingStates'
 export default function MRPView() {
     const { t, i18n } = useTranslation()
     const { id } = useParams()
-    const navigate = useNavigate()
     const { showToast } = useToast()
-    const isRTL = i18n.language === 'ar'
 
     const [mrp, setMrp] = useState(null)
     const [loading, setLoading] = useState(true)

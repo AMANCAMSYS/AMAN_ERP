@@ -9,8 +9,7 @@ import DateInput from '../../components/common/DateInput';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const ProjectRisks = () => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState('');

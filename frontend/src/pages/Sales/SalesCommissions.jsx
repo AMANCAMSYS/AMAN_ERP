@@ -4,16 +4,15 @@ import { salesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
 import { formatNumber } from '../../utils/format';
-import { Plus, DollarSign, Calculator, TrendingUp } from 'lucide-react';
+import { Plus, DollarSign, Calculator } from 'lucide-react';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const SalesCommissions = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const currency = getCurrency();
-    const isRTL = i18n.language === 'ar';
     const [commissions, setCommissions] = useState([]);
     const [rules, setRules] = useState([]);
     const [summary, setSummary] = useState(null);

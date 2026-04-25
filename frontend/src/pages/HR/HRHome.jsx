@@ -7,11 +7,9 @@ import { formatNumber } from '../../utils/format';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
     Users,
-    Briefcase,
     DollarSign,
     FileText,
     Activity,
-    UserPlus,
     Calculator,
 } from 'lucide-react';
 import '../../index.css';

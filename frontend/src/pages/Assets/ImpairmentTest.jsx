@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { assetsAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
-import { AlertTriangle, Play, DollarSign, TrendingDown, FileText, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Play, DollarSign, TrendingDown, FileText } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { companiesAPI } from '../../utils/api'
-import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next';
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';

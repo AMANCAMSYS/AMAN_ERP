@@ -14,7 +14,6 @@ import '../../components/ModuleStyles.css';
 const BlanketPODetail = () => {
     const { id } = useParams();
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const { showToast } = useToast();
     const currency = getCurrency();
     const [bpo, setBpo] = useState(null);

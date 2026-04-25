@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { 
-  ArrowLeft, Edit, Trash2, CheckCircle, XCircle, FileText, 
+  Edit, Trash2, CheckCircle, XCircle, FileText, 
   DollarSign, User 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

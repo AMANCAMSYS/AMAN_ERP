@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react'; // Re-triggering Vite rebuild after backend fix
 import {
     Check,
-    AlertTriangle,
     Activity,
     Database,
     BarChart3,

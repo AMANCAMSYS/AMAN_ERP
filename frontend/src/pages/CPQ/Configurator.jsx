@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cpqAPI } from '../../utils/api';
-import { Check, X, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Check, ShoppingCart, AlertTriangle } from 'lucide-react';
 import '../../index.css';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';

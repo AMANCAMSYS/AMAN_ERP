@@ -11,10 +11,8 @@ import { formatDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 const PurchaseAgreements = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
-    const currency = getCurrency();
-    const isRTL = i18n.language === 'ar';
     const [agreements, setAgreements] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);

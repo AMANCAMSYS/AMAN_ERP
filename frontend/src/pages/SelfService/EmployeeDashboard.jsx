@@ -10,9 +10,8 @@ import '../../components/ModuleStyles.css';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const EmployeeDashboard = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
-    const isRTL = i18n.language === 'ar';
     const [balance, setBalance] = useState(null);
     const [recentLeaves, setRecentLeaves] = useState([]);
     const [recentPayslips, setRecentPayslips] = useState([]);

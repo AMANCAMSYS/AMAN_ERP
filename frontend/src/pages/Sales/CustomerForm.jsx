@@ -45,7 +45,6 @@ function CustomerForm() {
                 if (isEdit) {
                     const customerRes = await salesAPI.getCustomer(id)
                     const c = customerRes.data;
-                    const decimalPlaces = getUser()?.decimal_places ?? 2;
                     setFormData({
                         name: c.name || '',
                         name_en: c.name_en || '',

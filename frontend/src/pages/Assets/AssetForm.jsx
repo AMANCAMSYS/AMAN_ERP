@@ -4,7 +4,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { assetsAPI, branchesAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
-import { toInputDate } from '../../utils/dateUtils';
 import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { Save, Building, DollarSign, Calendar, Hash, Briefcase, MapPin } from 'lucide-react';
@@ -17,7 +16,6 @@ const AssetForm = () => {
     const navigate = useNavigate();
     const { id } = useParams();
     const isEdit = !!id;
-    const isRTL = i18n.language === 'ar';
     const currency = getCurrency();
     const { register, handleSubmit, reset, control, formState: { errors } } = useForm();
     const [submitting, setSubmitting] = useState(false);

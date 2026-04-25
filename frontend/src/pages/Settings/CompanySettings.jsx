@@ -8,7 +8,7 @@ import {
     Settings, Wallet, Palette, ShoppingCart, Truck, Users, Box, FileText,
     Heart, Monitor, Bell, BarChart3, ShieldCheck, Link, Zap, Receipt,
     Briefcase, CheckSquare, Share2, GitBranch, History, Database,
-    ChevronRight, Sparkles, TrendingUp, Key, Globe, Scale, Building2, Upload, Layers
+    ChevronRight, Sparkles, Key, Globe, Scale, Building2, Upload, Layers
 } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import GeneralSettings from './tabs/GeneralSettings';

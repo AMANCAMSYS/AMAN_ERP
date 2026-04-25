@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GitBranch, Plus, Trash2 } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import api from '../../../utils/api';
 
 const BranchesSettings = ({ settings, handleSettingChange }) => {

@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-    ArrowRight, Save, Play, Plus, Trash2, Filter,
+    Save, Play, Plus, Trash2, Filter,
     Columns, Database, FileText, Download
 } from 'lucide-react';
 import { customReportsAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import '../../components/ModuleStyles.css';
 
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 

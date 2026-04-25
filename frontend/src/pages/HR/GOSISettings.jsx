@@ -9,8 +9,7 @@ import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
 
 const GOSISettings = () => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const [settings, setSettings] = useState(null);
     const [calculations, setCalculations] = useState([]);
     const [loading, setLoading] = useState(true);

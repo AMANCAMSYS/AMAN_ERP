@@ -9,7 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const LeaveCarryover = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { currentBranch } = useBranch();
     const [balances, setBalances] = useState([]);
     const [employees, setEmployees] = useState([]);

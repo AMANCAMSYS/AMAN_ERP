@@ -3,7 +3,7 @@ import { manufacturingAPI, inventoryAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { toastEmitter } from '../../utils/toastEmitter';
 import {
-    FaLayerGroup, FaPlus, FaEdit, FaTrash, FaTimesCircle, FaBoxes, FaPercentage
+    FaLayerGroup, FaPlus, FaEdit, FaTrash, FaTimesCircle, FaBoxes
 } from 'react-icons/fa';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';

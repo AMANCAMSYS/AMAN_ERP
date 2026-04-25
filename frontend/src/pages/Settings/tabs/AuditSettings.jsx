@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Clock, Shield } from 'lucide-react';
+import { Clock, Shield } from 'lucide-react';
 
 const AuditSettings = ({ settings, handleSettingChange }) => {
     const { t } = useTranslation();

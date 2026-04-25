@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { useBranch } from '../../context/BranchContext';
-import { Plus, Clock, Receipt, Search, X } from 'lucide-react';
+import { Plus, Receipt, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';

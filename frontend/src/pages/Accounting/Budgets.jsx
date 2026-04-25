@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, FileText, BarChart2, X, Trash2, AlertTriangle, PlayCircle, Lock, TrendingUp, TrendingDown } from 'lucide-react';
+import { FileText, BarChart2, X, Trash2, AlertTriangle, PlayCircle, Lock, TrendingUp, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { budgetsAPI } from '../../utils/api';

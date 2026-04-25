@@ -95,7 +95,6 @@ function PaymentForm() {
         for (const inv of sortedInvoices) {
             if (remaining <= 0) break;
 
-            const invCurrency = inv.currency || baseCurrency;
             const invRate = Number(inv.exchange_rate) || 1.0;
             const vRate = Number(exchangeRate) || 1.0;
 

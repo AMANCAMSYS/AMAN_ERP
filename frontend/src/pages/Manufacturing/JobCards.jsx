@@ -10,9 +10,8 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function JobCards() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { showToast } = useToast()
-    const isRTL = i18n.language === 'ar'
 
     const [operations, setOperations] = useState([])
     const [loading, setLoading] = useState(true)
