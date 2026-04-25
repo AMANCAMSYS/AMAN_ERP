@@ -18,7 +18,7 @@ import { formatNumber } from '../../utils/format';
  */
 
 const KPIChart = ({ chart, currency = '', height: propHeight }) => {
-    const { i18n, t } = useTranslation();
+    const { i18n } = useTranslation();
     const isRTL = i18n.dir() === 'rtl';
 
     if (!chart || !chart.datasets) return null;

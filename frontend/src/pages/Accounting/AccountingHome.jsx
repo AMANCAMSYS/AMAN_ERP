@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { purchasesAPI, accountingAPI } from '../../utils/api'
+import { accountingAPI } from '../../utils/api'
 import { getCurrency, hasPermission } from '../../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'

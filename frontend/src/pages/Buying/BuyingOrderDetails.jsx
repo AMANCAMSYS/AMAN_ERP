@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { getCurrency } from '../../utils/auth'
 import { purchasesAPI } from '../../utils/api'
 import { useTranslation } from 'react-i18next'
@@ -9,7 +9,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function BuyingOrderDetails() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
     const { showToast } = useToast()

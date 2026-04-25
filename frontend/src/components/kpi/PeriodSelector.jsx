@@ -29,8 +29,7 @@ const PeriodSelector = ({
     endDate,
     showCustom = true,
 }) => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.dir() === 'rtl';
+    const { t } = useTranslation();
 
     const labels = {
         today: t('kpi.period_today'),

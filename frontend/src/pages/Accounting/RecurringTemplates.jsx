@@ -6,7 +6,7 @@ import { getCurrency } from '../../utils/auth'
 import BackButton from '../../components/common/BackButton'
 
 import DateInput from '../../components/common/DateInput';
-import { formatDate, formatDateTime } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 

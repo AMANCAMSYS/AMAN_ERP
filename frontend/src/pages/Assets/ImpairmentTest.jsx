@@ -9,7 +9,6 @@ import '../../components/ModuleStyles.css';
 
 const ImpairmentTest = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
     const { showToast } = useToast();
     const currency = getCurrency();
     const [assets, setAssets] = useState([]);

@@ -12,11 +12,10 @@ import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import { PageLoading, Spinner } from '../../components/common/LoadingStates'
 
 const ApprovalsPage = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { showToast } = useToast();
     const currency = getCurrency();
-    const isRTL = i18n.language === 'ar';
     const [activeTab, setActiveTab] = useState('pending'); // pending, requests, workflows, advanced
 
     // Permissions

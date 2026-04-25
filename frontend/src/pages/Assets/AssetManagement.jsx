@@ -10,7 +10,7 @@ import BackButton from '../../components/common/BackButton';
 import { Spinner } from '../../components/common/LoadingStates'
 
 const AssetManagement = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const currency = getCurrency();
     const [activeTab, setActiveTab] = useState('transfers');

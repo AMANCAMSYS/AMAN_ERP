@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { logout, getUser, hasPermission } from '../utils/auth'
+import { getUser, hasPermission } from '../utils/auth'
 import { useTranslation } from 'react-i18next'
 import { getIndustryType } from '../hooks/useIndustryType'
 import { isModuleEnabledForIndustry } from '../config/industryModules'
@@ -25,7 +25,7 @@ function Sidebar({ isOpen, isMobile, onClose, onToggle }) {
         const isModuleEnabled = (moduleKey) => {
             if (isSystemAdmin) return true
             // الأولوية للقائمة المخصصة من enabled_modules
-            if (enabledModules && enabledModules.length > 0) {
+            if (enabledModules.length > 0) {
                 return enabledModules.includes(moduleKey)
             }
             // مصفوفة النشاط التجاري (fallback)

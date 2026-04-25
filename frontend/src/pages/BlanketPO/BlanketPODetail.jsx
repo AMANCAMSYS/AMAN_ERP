@@ -13,7 +13,7 @@ import '../../components/ModuleStyles.css';
 
 const BlanketPODetail = () => {
     const { id } = useParams();
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { showToast } = useToast();
     const currency = getCurrency();

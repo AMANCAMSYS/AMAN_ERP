@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { X, AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
 import { toastEmitter } from '../utils/toastEmitter';
 import './Toast.css';

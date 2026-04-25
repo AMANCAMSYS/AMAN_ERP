@@ -1,18 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { } from 'lucide-react'
 import { budgetsAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
 import { getCurrency } from '../../utils/auth'
-import { toInputDate } from '../../utils/dateUtils'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 function BudgetReport() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { currentBranch } = useBranch()
     const [budgets, setBudgets] = useState([])
     const [selectedBudgetId, setSelectedBudgetId] = useState('')
@@ -57,8 +55,6 @@ function BudgetReport() {
             setLoading(false)
         }
     }
-
-    const navigate = useNavigate()
 
     useEffect(() => {
         if (selectedBudgetId && budgets.length > 0) {
