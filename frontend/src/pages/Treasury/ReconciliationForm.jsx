@@ -14,7 +14,7 @@ import FormField from '../../components/common/FormField';
 import { PageLoading } from '../../components/common/LoadingStates'
 const ReconciliationForm = () => {
     const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+
     const { id } = useParams();
     const navigate = useNavigate();
     const { currentBranch } = useBranch();

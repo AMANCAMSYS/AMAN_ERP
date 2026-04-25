@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { hrAdvancedAPI, hrAPI } from '../../utils/api';
+import { hrAdvancedAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { formatNumber } from '../../utils/format';
 import { Plus, Edit2, Trash2, DollarSign } from 'lucide-react';

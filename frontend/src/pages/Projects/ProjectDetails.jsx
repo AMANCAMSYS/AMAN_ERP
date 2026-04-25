@@ -23,7 +23,7 @@ export default function ProjectDetails() {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const { id } = useParams();
-    const isRTL = i18n.language === 'ar';
+
     const fileInputRef = useRef(null);
 
     const [project, setProject] = useState(null);
