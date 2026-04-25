@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Calculator, CheckCircle, ArrowLeft, Printer, RefreshCw,
-    AlertTriangle, DollarSign, Wallet, Users, FileText
+    AlertTriangle, DollarSign, Users, FileText
 } from 'lucide-react';
 import { hrAPI } from '../../utils/api';
 import { getCurrency, hasPermission } from '../../utils/auth';
@@ -16,7 +16,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const PayrollDetails = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const { id } = useParams();
     const navigate = useNavigate();
     const currency = getCurrency();
@@ -110,7 +110,6 @@ const PayrollDetails = () => {
     if (!period) return <div className="page-center text-error">{t('hr.payroll.period_not_found', 'Payroll period not found')}</div>;
 
     const isDraft = period.status === 'draft';
-    const isRTL = i18n.language === 'ar';
 
     return (
         <div className="workspace fade-in">

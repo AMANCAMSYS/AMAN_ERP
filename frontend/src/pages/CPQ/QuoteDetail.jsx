@@ -14,7 +14,6 @@ const QuoteDetail = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
     const { quoteId } = useParams();
-    const navigate = useNavigate();
     const { showToast } = useToast();
     const [quote, setQuote] = useState(null);
     const [loading, setLoading] = useState(true);

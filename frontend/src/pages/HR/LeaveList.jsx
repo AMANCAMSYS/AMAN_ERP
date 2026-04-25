@@ -4,7 +4,6 @@ import {
     Plus, Check, X, Clock,
     CheckCircle, XCircle
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { hrAPI } from '../../utils/api';
 import { toastEmitter } from '../../utils/toastEmitter';
 import { hasPermission } from '../../utils/auth';
@@ -17,8 +16,6 @@ import BackButton from '../../components/common/BackButton';
 
 const LeaveList = () => {
     const { t, i18n } = useTranslation();
-    const navigate = useNavigate();
-    const isRTL = i18n.language === 'ar';
     const [leaves, setLeaves] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);

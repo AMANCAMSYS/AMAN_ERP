@@ -4,7 +4,7 @@ import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { 
   ArrowLeft, Edit, Trash2, CheckCircle, XCircle, FileText, 
-  DollarSign, User, Clock, Receipt 
+  DollarSign, User, Receipt 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';

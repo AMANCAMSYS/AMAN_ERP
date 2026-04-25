@@ -78,7 +78,6 @@ function MarketingCampaigns() {
     // Summary stats
     const totalBudget = campaigns.reduce((s, c) => s + (c.budget || 0), 0);
     const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
-    const totalSent = campaigns.reduce((s, c) => s + (c.total_sent || 0), 0);
     const totalConversions = campaigns.reduce((s, c) => s + (c.total_responded || 0), 0);
 
     return (

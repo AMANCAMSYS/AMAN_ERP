@@ -10,8 +10,7 @@ import '../../components/ModuleStyles.css';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 const ExpensePolicies = () => {
-    const { t, i18n } = useTranslation();
-    const isRTL = i18n.language === 'ar';
+    const { t } = useTranslation();
     const { showToast } = useToast();
     const currency = getCurrency();
     const [policies, setPolicies] = useState([]);

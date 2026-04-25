@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { crmAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';
@@ -45,7 +45,6 @@ function MetricBar({ label, value, total, color }) {
 export default function CampaignReport() {
     const { id } = useParams();
     const { t } = useTranslation();
-    const navigate = useNavigate();
     const { showToast } = useToast();
     const [campaign, setCampaign] = useState(null);
     const [recipients, setRecipients] = useState([]);

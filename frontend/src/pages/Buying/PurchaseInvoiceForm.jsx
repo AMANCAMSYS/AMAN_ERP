@@ -105,12 +105,6 @@ function PurchaseInvoiceForm() {
         fetchResources()
     }, [location.state, currentBranch])
 
-    // Filter warehouses based on current branch
-    const filteredWarehouses = warehouses.filter(wh => {
-        if (!currentBranch) return true // Show all if no branch selected
-        return wh.branch_id === currentBranch.id
-    })
-
     // Auto-select warehouse and Reset if branch mismatch
     useEffect(() => {
         const availableWh = warehouses.filter(wh => !currentBranch || wh.branch_id === currentBranch.id)

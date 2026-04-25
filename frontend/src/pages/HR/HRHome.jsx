@@ -10,9 +10,7 @@ import {
     Briefcase,
     DollarSign,
     FileText,
-    Settings,
     Activity,
-    Plus,
     UserPlus,
     Calendar,
     Clock,
@@ -27,7 +25,6 @@ import { Spinner } from '../../components/common/LoadingStates'
 const HRHome = () => {
     const { t, i18n } = useTranslation();
     const navigate = useNavigate();
-    const isRTL = i18n.language === 'ar';
     const [stats, setStats] = useState({ employees: 0, present: 0, payroll: 0, leaves: 0 });
 
     // End of Service Calculator

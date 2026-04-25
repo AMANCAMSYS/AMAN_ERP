@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    User, Mail, Phone, Briefcase,
+    User, Mail, Phone,
     CheckCircle, XCircle, Shield,
-    DollarSign, Plus, Search, MoreVertical
+    DollarSign, MoreVertical
 } from 'lucide-react';
 import { hrAPI, branchesAPI, rolesAPI, currenciesAPI } from '../../utils/api';
 import { formatNumber } from '../../utils/format';

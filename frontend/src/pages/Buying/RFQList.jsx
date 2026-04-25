@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { purchasesAPI, inventoryAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { getCurrency } from '../../utils/auth';
@@ -14,7 +13,6 @@ import SearchFilter from '../../components/common/SearchFilter';
 
 const RFQList = () => {
     const { t, i18n } = useTranslation();
-    const navigate = useNavigate();
     const { showToast } = useToast();
     const [rfqs, setRfqs] = useState([]);
     const [suppliers, setSuppliers] = useState([]);

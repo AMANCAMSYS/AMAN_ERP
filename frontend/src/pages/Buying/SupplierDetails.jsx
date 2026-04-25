@@ -6,12 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { useBranch } from '../../context/BranchContext'
 import { getCurrency } from '../../utils/auth'
 import { useToast } from '../../context/ToastContext'
-import { formatShortDate, formatDateTime } from '../../utils/dateUtils';
+import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function SupplierDetails() {
-    const { t, i18n } = useTranslation()
+    const { t } = useTranslation()
     const { id } = useParams()
     const navigate = useNavigate()
     const { currentBranch } = useBranch()
