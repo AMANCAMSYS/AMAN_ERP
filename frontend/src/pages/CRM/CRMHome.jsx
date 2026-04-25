@@ -576,8 +576,8 @@ function CRMHome() {
                                 </thead>
                                 <tbody>
                                     {tickets.map(ticket => (
-                                        <>
-                                            <tr key={ticket.id} onClick={() => toggleExpand(ticket.id)} style={{ cursor: 'pointer' }}>
+                                        <React.Fragment key={ticket.id}>
+                                            <tr onClick={() => toggleExpand(ticket.id)} style={{ cursor: 'pointer' }}>
                                                 <td>{ticket.ticket_number}</td>
                                                 <td>{ticket.subject}</td>
                                                 <td>{ticket.customer_name || '-'}</td>
@@ -587,7 +587,7 @@ function CRMHome() {
                                                 <td>{formatDate(ticket.created_at)}</td>
                                             </tr>
                                             {expandedId === ticket.id && (
-                                                <tr key={`detail-${ticket.id}`}>
+                                                <tr>
                                                     <td colSpan={7} style={{ padding: 0 }}>
                                                         <div style={detailPanelStyle}>
                                                             {detailLoading ? (
@@ -650,7 +650,7 @@ function CRMHome() {
                                                     </td>
                                                 </tr>
                                             )}
-                                        </>
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                             </table>

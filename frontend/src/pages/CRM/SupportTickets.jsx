@@ -248,9 +248,8 @@ function SupportTickets() {
                     </thead>
                     <tbody>
                         {tickets.map(ticket => (
-                            <>
+                            <React.Fragment key={ticket.id}>
                                 <tr
-                                    key={ticket.id}
                                     onClick={() => toggleExpand(ticket.id)}
                                     style={{ cursor: 'pointer' }}
                                 >
@@ -273,7 +272,7 @@ function SupportTickets() {
 
                                 {/* Expanded Detail Row */}
                                 {expandedId === ticket.id && (
-                                    <tr key={`detail-${ticket.id}`}>
+                                    <tr>
                                         <td colSpan={7} style={{ padding: 0 }}>
                                             <div style={detailPanelStyle}>
                                                 {detailLoading ? (
@@ -361,7 +360,7 @@ function SupportTickets() {
                                         </td>
                                     </tr>
                                 )}
-                            </>
+                            </React.Fragment>
                         ))}
                     </tbody>
                 </table>

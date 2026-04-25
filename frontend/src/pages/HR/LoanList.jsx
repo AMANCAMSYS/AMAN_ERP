@@ -62,8 +62,10 @@ const LoanList = () => {
                 hrAPI.listLoans(params),
                 hrAPI.listEmployees(params)
             ]);
-            setLoans(Array.isArray(loansRes.data) ? loansRes.data : loansRes || []);
-            setEmployees(Array.isArray(employeesRes.data) ? employeesRes.data : employeesRes || []);
+            const loansData = loansRes?.data;
+            const employeesData = employeesRes?.data;
+            setLoans(Array.isArray(loansData) ? loansData : loansData || []);
+            setEmployees(Array.isArray(employeesData) ? employeesData : employeesData || []);
         } catch (error) {
             toastEmitter.emit(t('common.error'), 'error');
             const detail = error.response?.data?.detail;

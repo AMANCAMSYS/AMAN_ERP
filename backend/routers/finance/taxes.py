@@ -1040,6 +1040,9 @@ def create_tax_settlement(
         
         entry_number = None
         if settle_amount > Decimal("0"):
+            # Fiscal-period lock: tax settlement posts at today's date.
+            check_fiscal_period_open(db, date.today())
+
             je_lines = [
                 {
                     "account_id": vat_out_id, "debit": float(settle_amount), "credit": 0,

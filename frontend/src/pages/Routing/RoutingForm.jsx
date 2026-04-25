@@ -43,8 +43,10 @@ const RoutingForm = () => {
                     inventoryAPI.listProducts({ limit: 1000 }),
                     manufacturingAPI.listWorkCenters(),
                 ]);
-                setProducts(pRes.data.products || pRes.data || []);
-                setWorkCenters(wcRes.data || []);
+                const productsData = pRes?.data;
+                const workCentersData = wcRes?.data;
+                setProducts(productsData?.products || productsData || []);
+                setWorkCenters(workCentersData || []);
             } catch (e) { console.error(e); }
         };
         loadRefs();

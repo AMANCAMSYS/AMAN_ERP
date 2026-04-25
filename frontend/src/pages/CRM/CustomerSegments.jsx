@@ -97,45 +97,53 @@ function CustomerSegments() {
 
             {/* Create Form */}
             {showForm && (
-                <div className="section-card" style={{ marginBottom: 16 }}>
-                    <h3 className="section-title">{t('crm.new_segment', 'شريحة جديدة')}</h3>
-                    <form onSubmit={handleCreate}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.name', 'الاسم')}</label>
-                                <input className="form-input" required value={form.name}
-                                    onChange={e => setForm({ ...form, name: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.description', 'الوصف')}</label>
-                                <input className="form-input" value={form.description}
-                                    onChange={e => setForm({ ...form, description: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.color', 'اللون')}</label>
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    {COLORS.map(c => (
-                                        <div key={c} onClick={() => setForm({ ...form, color: c })}
-                                            style={{
-                                                width: 28, height: 28, borderRadius: '50%', backgroundColor: c,
-                                                cursor: 'pointer', border: form.color === c ? '3px solid #1f2937' : '2px solid transparent',
-                                                transition: '0.15s'
-                                            }} />
-                                    ))}
+                <div className="modal-overlay" onClick={() => setShowForm(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, width: '92%' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">{t('crm.new_segment', 'شريحة جديدة')}</h2>
+                            <button type="button" className="btn-icon" onClick={() => setShowForm(false)}>✕</button>
+                        </div>
+                        <form onSubmit={handleCreate}>
+                            <div className="modal-body">
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('common.name', 'الاسم')}</label>
+                                        <input className="form-input" required value={form.name}
+                                            onChange={e => setForm({ ...form, name: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('common.description', 'الوصف')}</label>
+                                        <input className="form-input" value={form.description}
+                                            onChange={e => setForm({ ...form, description: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.color', 'اللون')}</label>
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            {COLORS.map(c => (
+                                                <div key={c} onClick={() => setForm({ ...form, color: c })}
+                                                    style={{
+                                                        width: 28, height: 28, borderRadius: '50%', backgroundColor: c,
+                                                        cursor: 'pointer', border: form.color === c ? '3px solid #1f2937' : '2px solid transparent',
+                                                        transition: '0.15s'
+                                                    }} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 24 }}>
+                                        <input type="checkbox" id="auto_assign" checked={form.auto_assign}
+                                            onChange={e => setForm({ ...form, auto_assign: e.target.checked })} />
+                                        <label htmlFor="auto_assign" className="form-label" style={{ margin: 0 }}>
+                                            {t('crm.auto_assign', 'تعيين تلقائي')}
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 24 }}>
-                                <input type="checkbox" id="auto_assign" checked={form.auto_assign}
-                                    onChange={e => setForm({ ...form, auto_assign: e.target.checked })} />
-                                <label htmlFor="auto_assign" className="form-label" style={{ margin: 0 }}>
-                                    {t('crm.auto_assign', 'تعيين تلقائي')}
-                                </label>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>{t('common.cancel', 'إلغاء')}</button>
+                                <button type="submit" className="btn btn-primary">{t('common.save', 'حفظ')}</button>
                             </div>
-                        </div>
-                        <div style={{ marginTop: 12 }}>
-                            <button type="submit" className="btn btn-primary btn-sm">{t('common.save', 'حفظ')}</button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             )}
 

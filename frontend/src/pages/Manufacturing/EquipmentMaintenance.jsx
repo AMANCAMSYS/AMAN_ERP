@@ -247,17 +247,17 @@ const EquipmentMaintenance = () => {
                             <div className="modal-body">
                                 <div className="form-group">
                                     <label className="form-label">{t('common.name')}</label>
-                                    <input type="text" className="form-input-sm w-full" required
+                                    <input type="text" className="form-input" required
                                         value={equipForm.name} onChange={e => setEquipForm({ ...equipForm, name: e.target.value })} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('common.code')}</label>
-                                    <input type="text" className="form-input-sm w-full" required
+                                    <input type="text" className="form-input" required
                                         value={equipForm.code} onChange={e => setEquipForm({ ...equipForm, code: e.target.value })} />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('common.status_title')}</label>
-                                    <select className="form-select-sm w-full" value={equipForm.status} onChange={e => setEquipForm({ ...equipForm, status: e.target.value })}>
+                                    <select className="form-select" value={equipForm.status} onChange={e => setEquipForm({ ...equipForm, status: e.target.value })}>
                                         <option value="active">{t('status.active')}</option>
                                         <option value="maintenance">{t('status.maintenance')}</option>
                                         <option value="broken">{t('status.broken')}</option>
@@ -266,7 +266,7 @@ const EquipmentMaintenance = () => {
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">{t('manufacturing.next_maintenance_date')}</label>
-                                    <DateInput className="form-input-sm w-full"
+                                    <DateInput className="form-input"
                                         value={formatDate(equipForm.next_maintenance_date)} onChange={e => setEquipForm({ ...equipForm, next_maintenance_date: e.target.value })} />
                                 </div>
                             </div>

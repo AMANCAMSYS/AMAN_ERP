@@ -93,7 +93,7 @@ export default function ApprovalList() {
       </View>
 
       {!!item.description && (
-        <Text style={styles.desc}>{item.description || item.notes}</Text>
+        <Text style={styles.desc}>{item.description}</Text>
       )}
 
       {item.amount != null && (

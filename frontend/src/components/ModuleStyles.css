@@ -101,6 +101,10 @@
     margin-bottom: 24px;
 }
 
+.crm-dashboard-summary {
+    align-items: start;
+}
+
 .metric-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -654,6 +658,10 @@
         gap: 10px;
     }
 
+    .crm-dashboard-summary {
+        grid-template-columns: 1fr !important;
+    }
+
     .section-card {
         padding: 16px;
         border-radius: 12px;
@@ -708,6 +716,10 @@
     .metrics-grid {
         grid-template-columns: 1fr !important;
         gap: 8px;
+    }
+
+    .crm-dashboard-summary {
+        grid-template-columns: 1fr !important;
     }
 
     .metric-card {

@@ -187,68 +187,75 @@ const ProjectRisks = () => {
 
             {/* Risk Form */}
             {showForm && activeTab === 'risks' && (
-                <div className="section-card mb-4">
-                    <h4 className="mb-3">{editingId ? t('project_risks.edit_risk', 'تعديل الخطر') : t('project_risks.new_risk', 'خطر جديد')}</h4>
-                    <form onSubmit={handleRiskSubmit}>
-                        <div className="row g-3">
-                            <div className="col-md-6">
-                                <div className="form-group">
-                                    <label className="form-label">{t('common.title', 'العنوان')} *</label>
-                                    <input className="form-input" required value={form.title}
-                                        onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
-                                </div>
-                            </div>
-                            <div className="col-md-3">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.probability', 'الاحتمالية')} (0-1)</label>
-                                    <input className="form-input" type="number" step="0.1" min="0" max="1" value={form.probability}
-                                        onChange={e => setForm(p => ({ ...p, probability: e.target.value }))} />
-                                </div>
-                            </div>
-                            <div className="col-md-3">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.impact', 'التأثير')} (0-1)</label>
-                                    <input className="form-input" type="number" step="0.1" min="0" max="1" value={form.impact}
-                                        onChange={e => setForm(p => ({ ...p, impact: e.target.value }))} />
-                                </div>
-                            </div>
-                            <div className="col-md-3">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.risk_score', 'درجة الخطر')}</label>
-                                    <div className="form-input" style={{ background: riskColor(form.probability * form.impact), color: '#fff', textAlign: 'center', fontWeight: 700 }}>
-                                        {(form.probability * form.impact).toFixed(2)}
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '880px', width: '92%' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">{editingId ? t('project_risks.edit_risk', 'تعديل الخطر') : t('project_risks.new_risk', 'خطر جديد')}</h2>
+                            <button type="button" className="btn-icon" onClick={resetRiskForm}>✕</button>
+                        </div>
+                        <form onSubmit={handleRiskSubmit}>
+                            <div className="modal-body">
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('common.title', 'العنوان')} *</label>
+                                            <input className="form-input" required value={form.title}
+                                                onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('project_risks.probability', 'الاحتمالية')} (0-1)</label>
+                                            <input className="form-input" type="number" step="0.1" min="0" max="1" value={form.probability}
+                                                onChange={e => setForm(p => ({ ...p, probability: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('project_risks.impact', 'التأثير')} (0-1)</label>
+                                            <input className="form-input" type="number" step="0.1" min="0" max="1" value={form.impact}
+                                                onChange={e => setForm(p => ({ ...p, impact: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('project_risks.risk_score', 'درجة الخطر')}</label>
+                                            <div className="form-input" style={{ background: riskColor(form.probability * form.impact), color: '#fff', textAlign: 'center', fontWeight: 700 }}>
+                                                {(form.probability * form.impact).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('project_risks.status', 'الحالة')}</label>
+                                            <select className="form-select" value={form.status}
+                                                onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
+                                                {Object.entries(riskStatuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="col-md-3">
+                                        <div className="form-group">
+                                            <label className="form-label">{t('project_risks.due_date', 'تاريخ الاستحقاق')}</label>
+                                            <DateInput className="form-input" value={form.due_date}
+                                                onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                    <div className="col-md-12">
+                                        <div className="form-group" style={{ marginBottom: 0 }}>
+                                            <label className="form-label">{t('project_risks.mitigation_plan', 'خطة التخفيف')}</label>
+                                            <textarea className="form-input" rows={2} value={form.mitigation_plan}
+                                                onChange={e => setForm(p => ({ ...p, mitigation_plan: e.target.value }))} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="col-md-3">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.status', 'الحالة')}</label>
-                                    <select className="form-input" value={form.status}
-                                        onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-                                        {Object.entries(riskStatuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                                    </select>
-                                </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={resetRiskForm}>{t('common.cancel', 'إلغاء')}</button>
+                                <button type="submit" className="btn btn-primary">{t('common.save', 'حفظ')}</button>
                             </div>
-                            <div className="col-md-3">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.due_date', 'تاريخ الاستحقاق')}</label>
-                                    <DateInput className="form-input" value={form.due_date}
-                                        onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} />
-                                </div>
-                            </div>
-                            <div className="col-md-12">
-                                <div className="form-group">
-                                    <label className="form-label">{t('project_risks.mitigation_plan', 'خطة التخفيف')}</label>
-                                    <textarea className="form-input" rows={2} value={form.mitigation_plan}
-                                        onChange={e => setForm(p => ({ ...p, mitigation_plan: e.target.value }))} />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="d-flex gap-2 mt-3">
-                            <button type="submit" className="btn btn-primary"><Save size={16} className="me-1" /> {t('common.save', 'حفظ')}</button>
-                            <button type="button" className="btn btn-outline-secondary" onClick={resetRiskForm}><X size={16} className="me-1" /> {t('common.cancel', 'إلغاء')}</button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             )}
 

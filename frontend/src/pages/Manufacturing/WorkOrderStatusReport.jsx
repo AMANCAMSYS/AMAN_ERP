@@ -61,7 +61,7 @@ const WorkOrderStatusReport = () => {
     };
 
     const getProgress = (o) => {
-        if (!o.quantity || o.quantity === 0) return 0;
+        if (!o.quantity) return 0;
         return Math.min(100, Math.round((o.produced_quantity || 0) / o.quantity * 100));
     };
 
@@ -136,14 +136,14 @@ const WorkOrderStatusReport = () => {
                                 <div style={{ flex: 1 }}>
                                     <div style={{ background: '#e5e7eb', borderRadius: 999, height: 16, overflow: 'hidden' }}>
                                         <div style={{
-                                            width: `${totalOrders > 0 ? ((byStatus.completed?.count || 0) / totalOrders * 100) : 0}%`,
+                                            width: `${((byStatus.completed?.count || 0) / totalOrders * 100)}%`,
                                             background: 'linear-gradient(90deg, #22c55e, #16a34a)',
                                             height: '100%', borderRadius: 999, transition: 'width 0.5s'
                                         }} />
                                     </div>
                                 </div>
                                 <span style={{ fontWeight: 700, fontSize: 18, color: '#22c55e', minWidth: 60, textAlign: 'center' }}>
-                                    {formatNumber(totalOrders > 0 ? ((byStatus.completed?.count || 0) / totalOrders * 100) : 0, 1)}%
+                                    {formatNumber(((byStatus.completed?.count || 0) / totalOrders * 100), 1)}%
                                 </span>
                             </div>
                         </div>

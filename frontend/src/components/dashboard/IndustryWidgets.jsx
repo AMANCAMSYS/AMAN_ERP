@@ -48,9 +48,7 @@ export default function IndustryWidgets() {
   }
 
   const meta = INDUSTRY_META[industryType] || INDUSTRY_META.general
-  const industryLabel = isRTL
-    ? t(`industry_types.${industryType}`, industryType)
-    : t(`industry_types.${industryType}`, industryType)
+  const industryLabel = t(`industry_types.${industryType}`, industryType)
 
   return (
     <div style={{

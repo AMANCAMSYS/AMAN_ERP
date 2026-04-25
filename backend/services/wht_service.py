@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 
 from . import gl_service
+from utils.fiscal_lock import check_fiscal_period_open
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,8 @@ def post_payment_with_wht(
         lines, br, bank_account_id=bank_account_id,
         expense_account_id=expense_account_id,
     )
+    # Fiscal-period lock: block posting into a closed period.
+    check_fiscal_period_open(db, date)
     jid, num = gl_service.create_journal_entry(
         db, company_id=company_id, date=date, description=description,
         lines=full_lines, user_id=user_id, **kwargs,

@@ -200,65 +200,72 @@ const CapacityPlanning = () => {
 
                     {/* Plan Form */}
                     {showForm && (
-                        <div className="section-card mb-4">
-                            <h4 className="mb-3">{editingId ? t('capacity_planning.edit_plan', 'تعديل الخطة') : t('capacity_planning.new_capacity_plan', 'خطة سعة جديدة')}</h4>
-                            <form onSubmit={handlePlanSubmit}>
-                                <div className="row g-3">
-                                    <div className="col-md-4">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.plan_name', 'اسم الخطة')} *</label>
-                                            <input className="form-input" required value={form.plan_name}
-                                                onChange={e => setForm(p => ({ ...p, plan_name: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-4">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.work_center', 'مركز العمل')}</label>
-                                            <input className="form-input" value={form.work_center_id}
-                                                onChange={e => setForm(p => ({ ...p, work_center_id: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.from', 'من')}</label>
-                                            <DateInput className="form-input" value={form.plan_date_from}
-                                                onChange={e => setForm(p => ({ ...p, plan_date_from: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-2">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.to', 'إلى')}</label>
-                                            <DateInput className="form-input" value={form.plan_date_to}
-                                                onChange={e => setForm(p => ({ ...p, plan_date_to: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-3">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.planned_capacity', 'السعة المخططة (ساعات)')}</label>
-                                            <input className="form-input" type="number" value={form.planned_capacity_hours}
-                                                onChange={e => setForm(p => ({ ...p, planned_capacity_hours: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-3">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('capacity_planning.planned_output', 'الإنتاج المخطط (وحدات)')}</label>
-                                            <input className="form-input" type="number" value={form.planned_output_units}
-                                                onChange={e => setForm(p => ({ ...p, planned_output_units: e.target.value }))} />
-                                        </div>
-                                    </div>
-                                    <div className="col-md-6">
-                                        <div className="form-group">
-                                            <label className="form-label">{t('common.notes', 'ملاحظات')}</label>
-                                            <textarea className="form-input" rows={2} value={form.notes}
-                                                onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
-                                        </div>
-                                    </div>
+                        <div className="modal-overlay">
+                            <div className="modal-content" style={{ maxWidth: '880px', width: '92%' }}>
+                                <div className="modal-header">
+                                    <h2 className="modal-title">{editingId ? t('capacity_planning.edit_plan', 'تعديل الخطة') : t('capacity_planning.new_capacity_plan', 'خطة سعة جديدة')}</h2>
+                                    <button type="button" className="btn-icon" onClick={resetForm}>✕</button>
                                 </div>
-                                <div className="d-flex gap-2 mt-3">
-                                    <button type="submit" className="btn btn-primary"><Save size={16} className="me-1" /> {t('common.save', 'حفظ')}</button>
-                                    <button type="button" className="btn btn-outline-secondary" onClick={resetForm}><X size={16} className="me-1" /> {t('common.cancel', 'إلغاء')}</button>
-                                </div>
-                            </form>
+                                <form onSubmit={handlePlanSubmit}>
+                                    <div className="modal-body">
+                                        <div className="row g-3">
+                                            <div className="col-md-4">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.plan_name', 'اسم الخطة')} *</label>
+                                                    <input className="form-input" required value={form.plan_name}
+                                                        onChange={e => setForm(p => ({ ...p, plan_name: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-4">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.work_center', 'مركز العمل')}</label>
+                                                    <input className="form-input" value={form.work_center_id}
+                                                        onChange={e => setForm(p => ({ ...p, work_center_id: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.from', 'من')}</label>
+                                                    <DateInput className="form-input" value={form.plan_date_from}
+                                                        onChange={e => setForm(p => ({ ...p, plan_date_from: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-2">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.to', 'إلى')}</label>
+                                                    <DateInput className="form-input" value={form.plan_date_to}
+                                                        onChange={e => setForm(p => ({ ...p, plan_date_to: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-3">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.planned_capacity', 'السعة المخططة (ساعات)')}</label>
+                                                    <input className="form-input" type="number" value={form.planned_capacity_hours}
+                                                        onChange={e => setForm(p => ({ ...p, planned_capacity_hours: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-3">
+                                                <div className="form-group">
+                                                    <label className="form-label">{t('capacity_planning.planned_output', 'الإنتاج المخطط (وحدات)')}</label>
+                                                    <input className="form-input" type="number" value={form.planned_output_units}
+                                                        onChange={e => setForm(p => ({ ...p, planned_output_units: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                            <div className="col-md-6">
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label className="form-label">{t('common.notes', 'ملاحظات')}</label>
+                                                    <textarea className="form-input" rows={2} value={form.notes}
+                                                        onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button type="button" className="btn btn-secondary" onClick={resetForm}>{t('common.cancel', 'إلغاء')}</button>
+                                        <button type="submit" className="btn btn-primary">{t('common.save', 'حفظ')}</button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     )}
 

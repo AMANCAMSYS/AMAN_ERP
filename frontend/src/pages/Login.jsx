@@ -93,17 +93,22 @@ function Login() {
                 formData.password,
                 isSystemAdmin ? null : formData.company_code
             )
+            const loginData = response?.data
+
+            if (!loginData) {
+                throw new Error('Invalid login response')
+            }
 
             // Handle 2FA challenge
-            if (response.data?.requires_2fa) {
-                setTempToken(response.data.temp_token)
-                setTwoFAMessage(response.data.message || '')
+            if (loginData.requires_2fa) {
+                setTempToken(loginData.temp_token)
+                setTwoFAMessage(loginData.message || '')
                 setShow2FA(true)
                 setLoading(false)
                 return
             }
 
-            const { access_token, refresh_token, user, company_id } = response.data
+            const { access_token, refresh_token, user, company_id } = loginData
 
             setAuth(access_token, user, company_id, refresh_token)
 

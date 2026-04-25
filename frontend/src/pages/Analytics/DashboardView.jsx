@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { dashboardAPI } from '../../services/dashboard'
 import BackButton from '../../components/common/BackButton'
@@ -179,7 +179,6 @@ function WidgetRenderer({ widget }) {
 function DashboardView() {
     const { id } = useParams()
     const { t } = useTranslation()
-    const navigate = useNavigate()
     const [dashboard, setDashboard] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)

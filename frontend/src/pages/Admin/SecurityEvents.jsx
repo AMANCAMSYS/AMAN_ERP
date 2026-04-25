@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { securityAPI } from '../../services/security';
-import { useToast } from '../../context/ToastContext';
 import { Shield, AlertTriangle, Eye, Lock, RefreshCw, Activity } from 'lucide-react';
 import BackButton from '../../components/common/BackButton';
 import '../../components/ModuleStyles.css';
@@ -10,7 +9,6 @@ import { PageLoading } from '../../components/common/LoadingStates'
 const SecurityEvents = () => {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar';
-    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('events');
     const [events, setEvents] = useState([]);
     const [summary, setSummary] = useState({});

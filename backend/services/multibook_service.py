@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 
 from . import gl_service
+from utils.fiscal_lock import check_fiscal_period_open
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,9 @@ def post_multibook_journal_entry(
         ledger_ids = [r[0] for r in rows]
     if not ledger_ids:
         raise ValueError("no active ledgers configured for this tenant")
+
+    # Fiscal-period lock: block posting into a closed period (all ledgers).
+    check_fiscal_period_open(db, date)
 
     results: List[Dict[str, Any]] = []
     for ledger_id in ledger_ids:

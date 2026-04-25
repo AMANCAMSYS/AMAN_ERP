@@ -349,7 +349,7 @@ const RoleManagement = () => {
                                             : <LucideIcons.User size={20} />}
                                     </div>
                                     <div className="role-info">
-                                        <h3>{isRTL ? (role.role_name_ar || role.role_name) : (role.role_name_ar || role.role_name)}</h3>
+                                        <h3>{role.role_name_ar || role.role_name}</h3>
                                         {role.description && <p className="role-desc">{role.description}</p>}
                                         <span className="role-en-name">{role.role_name}</span>
                                     </div>

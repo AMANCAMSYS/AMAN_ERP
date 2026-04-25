@@ -124,100 +124,107 @@ function CRMContacts() {
 
             {/* Create / Edit Form */}
             {showForm && (
-                <div className="section-card" style={{ marginBottom: 16 }}>
-                    <h3 className="section-title">
-                        {editingId ? t('crm.edit_contact', 'تعديل جهة الاتصال') : t('crm.new_contact', 'جهة اتصال جديدة')}
-                    </h3>
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                                <label className="form-label">{t('common.customer', 'العميل')} *</label>
-                                <input
-                                    className="form-input"
-                                    placeholder={t('common.search', 'بحث باسم العميل...')}
-                                    value={customerSearch}
-                                    onChange={e => setCustomerSearch(e.target.value)}
-                                    style={{ marginBottom: 4 }}
-                                />
-                                {customers.length === 0 ? (
-                                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
-                                        {t('common.loading', 'جارٍ التحميل...')}
-                                    </p>
-                                ) : (
-                                    <select
-                                        className="form-input"
-                                        required
-                                        value={form.customer_id}
-                                        onChange={e => setForm({ ...form, customer_id: e.target.value })}
-                                    >
-                                        <option value="">{t('common.select_customer', '-- اختر العميل --')}</option>
-                                        {customers
-                                            .filter(c => !customerSearch ||
-                                                (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()))
-                                            .map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                    </select>
-                                )}
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.first_name', 'الاسم الأول')} *</label>
-                                <input className="form-input" required value={form.first_name}
-                                    onChange={e => setForm({ ...form, first_name: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.last_name', 'اسم العائلة')}</label>
-                                <input className="form-input" value={form.last_name}
-                                    onChange={e => setForm({ ...form, last_name: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.job_title', 'المسمى الوظيفي')}</label>
-                                <input className="form-input" value={form.job_title}
-                                    onChange={e => setForm({ ...form, job_title: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.email', 'البريد الإلكتروني')}</label>
-                                <input className="form-input" type="email" value={form.email}
-                                    onChange={e => setForm({ ...form, email: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('common.phone', 'الهاتف')}</label>
-                                <input className="form-input" value={form.phone} dir="ltr"
-                                    onChange={e => setForm({ ...form, phone: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.mobile', 'الجوال')}</label>
-                                <input className="form-input" value={form.mobile} dir="ltr"
-                                    onChange={e => setForm({ ...form, mobile: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.department', 'القسم')}</label>
-                                <input className="form-input" value={form.department}
-                                    onChange={e => setForm({ ...form, department: e.target.value })} />
-                            </div>
+                <div className="modal-overlay" onClick={resetForm}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 860, width: '92%' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">
+                                {editingId ? t('crm.edit_contact', 'تعديل جهة الاتصال') : t('crm.new_contact', 'جهة اتصال جديدة')}
+                            </h2>
+                            <button type="button" className="btn-icon" onClick={resetForm}>✕</button>
                         </div>
-                        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={form.is_primary}
-                                    onChange={e => setForm({ ...form, is_primary: e.target.checked })} />
-                                {t('crm.is_primary', 'جهة اتصال أساسية')}
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={form.is_decision_maker}
-                                    onChange={e => setForm({ ...form, is_decision_maker: e.target.checked })} />
-                                {t('crm.is_decision_maker', 'صانع قرار')}
-                            </label>
-                        </div>
-                        <div className="form-group" style={{ marginTop: 12 }}>
-                            <label className="form-label">{t('common.notes', 'ملاحظات')}</label>
-                            <textarea className="form-input" rows={2} value={form.notes}
-                                onChange={e => setForm({ ...form, notes: e.target.value })} />
-                        </div>
-                        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                            <button type="submit" className="btn btn-primary btn-sm">{t('common.save', 'حفظ')}</button>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>{t('common.cancel', 'إلغاء')}</button>
-                        </div>
-                    </form>
+                        <form onSubmit={handleSubmit}>
+                            <div className="modal-body">
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                                    <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                        <label className="form-label">{t('common.customer', 'العميل')} *</label>
+                                        <input
+                                            className="form-input"
+                                            placeholder={t('common.search', 'بحث باسم العميل...')}
+                                            value={customerSearch}
+                                            onChange={e => setCustomerSearch(e.target.value)}
+                                            style={{ marginBottom: 4 }}
+                                        />
+                                        {customers.length === 0 ? (
+                                            <p style={{ fontSize: 12, color: '#9ca3af', margin: '4px 0 0' }}>
+                                                {t('common.loading', 'جارٍ التحميل...')}
+                                            </p>
+                                        ) : (
+                                            <select
+                                                className="form-select"
+                                                required
+                                                value={form.customer_id}
+                                                onChange={e => setForm({ ...form, customer_id: e.target.value })}
+                                            >
+                                                <option value="">{t('common.select_customer', '-- اختر العميل --')}</option>
+                                                {customers
+                                                    .filter(c => !customerSearch ||
+                                                        (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()))
+                                                    .map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                            </select>
+                                        )}
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.first_name', 'الاسم الأول')} *</label>
+                                        <input className="form-input" required value={form.first_name}
+                                            onChange={e => setForm({ ...form, first_name: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.last_name', 'اسم العائلة')}</label>
+                                        <input className="form-input" value={form.last_name}
+                                            onChange={e => setForm({ ...form, last_name: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.job_title', 'المسمى الوظيفي')}</label>
+                                        <input className="form-input" value={form.job_title}
+                                            onChange={e => setForm({ ...form, job_title: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('common.email', 'البريد الإلكتروني')}</label>
+                                        <input className="form-input" type="email" value={form.email}
+                                            onChange={e => setForm({ ...form, email: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('common.phone', 'الهاتف')}</label>
+                                        <input className="form-input" value={form.phone} dir="ltr"
+                                            onChange={e => setForm({ ...form, phone: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.mobile', 'الجوال')}</label>
+                                        <input className="form-input" value={form.mobile} dir="ltr"
+                                            onChange={e => setForm({ ...form, mobile: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.department', 'القسم')}</label>
+                                        <input className="form-input" value={form.department}
+                                            onChange={e => setForm({ ...form, department: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={form.is_primary}
+                                            onChange={e => setForm({ ...form, is_primary: e.target.checked })} />
+                                        {t('crm.is_primary', 'جهة اتصال أساسية')}
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                        <input type="checkbox" checked={form.is_decision_maker}
+                                            onChange={e => setForm({ ...form, is_decision_maker: e.target.checked })} />
+                                        {t('crm.is_decision_maker', 'صانع قرار')}
+                                    </label>
+                                </div>
+                                <div className="form-group" style={{ marginTop: 12, marginBottom: 0 }}>
+                                    <label className="form-label">{t('common.notes', 'ملاحظات')}</label>
+                                    <textarea className="form-input" rows={2} value={form.notes}
+                                        onChange={e => setForm({ ...form, notes: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={resetForm}>{t('common.cancel', 'إلغاء')}</button>
+                                <button type="submit" className="btn btn-primary">{t('common.save', 'حفظ')}</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 

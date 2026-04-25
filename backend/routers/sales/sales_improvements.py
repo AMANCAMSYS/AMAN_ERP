@@ -19,6 +19,7 @@ from utils.permissions import require_permission
 from utils.audit import log_activity
 from utils.accounting import get_mapped_account_id, get_base_currency
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
+from utils.fiscal_lock import check_fiscal_period_open
 
 logger = logging.getLogger(__name__)
 sales_improvements_router = APIRouter()
@@ -334,6 +335,8 @@ def pay_commission(data: dict, current_user=Depends(get_current_user)):
         je_id = None
         je_number = None
         if commission_acc and bank_acc:
+            # Fiscal-period lock: block posting into a closed period.
+            check_fiscal_period_open(db, str(payment_date))
             sp_names = set()
             for c in commissions:
                 sp_names.add(c.salesperson_name or str(c.salesperson_id))

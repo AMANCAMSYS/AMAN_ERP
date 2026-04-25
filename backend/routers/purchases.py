@@ -2107,6 +2107,9 @@ def create_supplier_payment(request: Request, data: SupplierPaymentCreate, curre
         # Validate amount
         if data.amount is None or data.amount <= 0:
             raise HTTPException(**http_error(400, "amount_must_be_positive"))
+
+        # Fiscal-period lock: payment voucher posts at voucher_date.
+        check_fiscal_period_open(db, data.voucher_date)
         
         # Check supplier balance (total owed)
         supplier_balance = db.execute(text("""

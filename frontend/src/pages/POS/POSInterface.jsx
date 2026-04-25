@@ -92,7 +92,7 @@ const POSInterface = () => {
             const filtered = productsArray.filter(p =>
                 (p.name || '').toLowerCase().includes(lower) ||
                 (p.barcode && p.barcode.includes(lower)) ||
-                (p.code && (p.code || '').toLowerCase().includes(lower))
+                (p.code && p.code.toLowerCase().includes(lower))
             );
             setFilteredProducts(filtered);
         }

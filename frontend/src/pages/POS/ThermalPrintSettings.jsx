@@ -87,7 +87,7 @@ function generateReceiptText(order, config = {}) {
     }
     if (order.paid_amount > 0) {
         receipt += pad('المدفوع', formatNumber(order.paid_amount)) + '\n';
-        const change = (order.paid_amount || 0) - (order.total || 0);
+        const change = order.paid_amount - (order.total || 0);
         if (change > 0) receipt += pad('الباقي', formatNumber(change)) + '\n';
     }
 

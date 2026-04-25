@@ -142,44 +142,52 @@ function LeadScoring() {
 
             {/* Create Rule Form */}
             {showForm && tab === 'rules' && (
-                <div className="section-card" style={{ marginBottom: 16 }}>
-                    <h3 className="section-title">{t('crm.new_rule', 'قاعدة تقييم جديدة')}</h3>
-                    <form onSubmit={handleCreateRule}>
-                        <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.rule_name', 'اسم القاعدة')}</label>
-                                <input className="form-input" required value={form.rule_name}
-                                    onChange={e => setForm({ ...form, rule_name: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.field', 'الحقل')}</label>
-                                <select className="form-input" value={form.field_name}
-                                    onChange={e => setForm({ ...form, field_name: e.target.value })}>
-                                    {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.operator', 'المعامل')}</label>
-                                <select className="form-input" value={form.operator}
-                                    onChange={e => setForm({ ...form, operator: e.target.value })}>
-                                    {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.field_value', 'القيمة')}</label>
-                                <input className="form-input" value={form.field_value}
-                                    onChange={e => setForm({ ...form, field_value: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">{t('crm.score', 'النقاط')}</label>
-                                <input className="form-input" type="number" min="1" max="100" value={form.score}
-                                    onChange={e => setForm({ ...form, score: e.target.value })} />
-                            </div>
+                <div className="modal-overlay" onClick={() => setShowForm(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 880, width: '92%' }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">{t('crm.new_rule', 'قاعدة تقييم جديدة')}</h2>
+                            <button type="button" className="btn-icon" onClick={() => setShowForm(false)}>✕</button>
                         </div>
-                        <div style={{ marginTop: 12 }}>
-                            <button type="submit" className="btn btn-primary btn-sm">{t('common.save', 'حفظ')}</button>
-                        </div>
-                    </form>
+                        <form onSubmit={handleCreateRule}>
+                            <div className="modal-body">
+                                <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.rule_name', 'اسم القاعدة')}</label>
+                                        <input className="form-input" required value={form.rule_name}
+                                            onChange={e => setForm({ ...form, rule_name: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.field', 'الحقل')}</label>
+                                        <select className="form-select" value={form.field_name}
+                                            onChange={e => setForm({ ...form, field_name: e.target.value })}>
+                                            {FIELDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.operator', 'المعامل')}</label>
+                                        <select className="form-select" value={form.operator}
+                                            onChange={e => setForm({ ...form, operator: e.target.value })}>
+                                            {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.field_value', 'القيمة')}</label>
+                                        <input className="form-input" value={form.field_value}
+                                            onChange={e => setForm({ ...form, field_value: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">{t('crm.score', 'النقاط')}</label>
+                                        <input className="form-input" type="number" min="1" max="100" value={form.score}
+                                            onChange={e => setForm({ ...form, score: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>{t('common.cancel', 'إلغاء')}</button>
+                                <button type="submit" className="btn btn-primary">{t('common.save', 'حفظ')}</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
 

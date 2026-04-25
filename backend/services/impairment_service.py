@@ -53,6 +53,10 @@ def record_impairment_test(
         if not (user_id and company_id):
             raise ValueError("post_journal=True requires user_id + company_id")
         from services.gl_service import create_journal_entry
+        from utils.fiscal_lock import check_fiscal_period_open
+
+        # Fiscal-period lock: block posting into a closed period.
+        check_fiscal_period_open(db, str(as_of))
         journal_entry_id, _ = create_journal_entry(
             db,
             company_id=company_id,

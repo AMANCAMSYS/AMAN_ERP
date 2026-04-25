@@ -44,7 +44,7 @@ const KPIDashboard = () => {
     };
 
     const changeIndicator = (val) => {
-        if (!val || val === 0) return null;
+        if (!val || val == 0) return null;
         const isPositive = val > 0;
         return (
             <span className="d-flex align-items-center gap-1" style={{ fontSize: '0.8rem', color: isPositive ? '#2e7d32' : '#c62828' }}>

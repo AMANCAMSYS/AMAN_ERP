@@ -373,6 +373,10 @@ def create_revaluation(
         # 5. FIN-001: Create Journal Entry via centralized GL service
         try:
             from services.gl_service import create_journal_entry as gl_create_journal_entry
+            from utils.fiscal_lock import check_fiscal_period_open
+
+            # Fiscal-period lock: block posting into a closed period.
+            check_fiscal_period_open(db, str(req.rate_date))
 
             gl_lines = []
             for line in journal_entry_lines:

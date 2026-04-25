@@ -13,6 +13,7 @@ from routers.auth import get_current_user
 from utils.audit import log_activity
 from utils.permissions import require_permission
 from services.gl_service import create_journal_entry as gl_create_journal_entry
+from utils.fiscal_lock import check_fiscal_period_open
 from .schemas import StockTransferSingleCreate, StockTransferCreate
 
 transfers_router = APIRouter()
@@ -179,6 +180,9 @@ def create_stock_transfer(
             acc_inventory = get_mapped_account_id(db, "acc_map_inventory")
 
             if acc_inventory:
+                transfer_date = datetime.now().strftime("%Y-%m-%d")
+                # Fiscal-period lock: block posting into a closed period.
+                check_fiscal_period_open(db, transfer_date)
                 lines = [
                     {"account_id": acc_inventory, "debit": transfer_value, "credit": 0, "description": f"Transfer In - {dst_wh.warehouse_name}"},
                     {"account_id": acc_inventory, "debit": 0, "credit": transfer_value, "description": f"Transfer Out - {src_wh.warehouse_name}"},
@@ -186,7 +190,7 @@ def create_stock_transfer(
                 gl_create_journal_entry(
                     db,
                     company_id=current_user.company_id,
-                    date=datetime.now().strftime("%Y-%m-%d"),
+                    date=transfer_date,
                     description=f"تحويل مخزني: {src_wh.warehouse_name} → {dst_wh.warehouse_name}",
                     lines=lines,
                     user_id=user_id,

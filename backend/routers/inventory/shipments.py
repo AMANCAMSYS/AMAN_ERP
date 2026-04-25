@@ -16,6 +16,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
 from services.gl_service import create_journal_entry
+from utils.fiscal_lock import check_fiscal_period_open
 from .schemas import ShipmentCreate
 
 shipments_router = APIRouter()
@@ -433,6 +434,8 @@ def confirm_shipment(
             intransit_acc = get_mapped_account_id(db, "acc_map_in_transit")
             if inv_acc and intransit_acc:
                 today_str = datetime.utcnow().strftime("%Y-%m-%d")
+                # Fiscal-period lock: block posting into a closed period.
+                check_fiscal_period_open(db, today_str)
                 value_f = float(total_transit_value)
                 # Leg A: dispatch — Dr In-Transit / Cr Source Inventory
                 create_journal_entry(

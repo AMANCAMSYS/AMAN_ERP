@@ -3,7 +3,6 @@ import { taxesAPI } from '../../utils/api'
 import { useBranch } from '../../context/BranchContext'
 import { useTranslation } from 'react-i18next'
 import { formatNumber } from '../../utils/format'
-import { getCurrency } from '../../utils/auth'
 import CustomDatePicker from '../../components/common/CustomDatePicker'
 import { formatShortDate } from '../../utils/dateUtils';
 import BackButton from '../../components/common/BackButton';
@@ -18,7 +17,6 @@ function TaxAudit() {
     const [data, setData] = useState([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
-    const currency = getCurrency()
 
     const fetchData = async () => {
         try {

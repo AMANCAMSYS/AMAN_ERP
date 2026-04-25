@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { expensesAPI } from '../../utils/api';
 import { useToast } from '../../context/ToastContext';
 import { useBranch } from '../../context/BranchContext';
-import { Plus, Clock, Receipt } from 'lucide-react';
+import { Plus, Clock, Receipt, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../utils/format';
@@ -10,7 +10,6 @@ import { getCurrency } from '../../utils/auth';
 import CustomDatePicker from '../../components/common/CustomDatePicker';
 import { formatShortDate } from '../../utils/dateUtils';
 import DataTable from '../../components/common/DataTable';
-import SearchFilter from '../../components/common/SearchFilter';
 import BackButton from '../../components/common/BackButton';
 
 
@@ -220,24 +219,8 @@ export default function ExpenseList() {
         </div>
       </div>
 
-      {/* Quick Navigation Cards */}
+      {/* Quick Navigation Cards - Only Status Summary is kept */}
       <div className="modules-grid" style={{ gap: '16px', marginBottom: '16px' }}>
-
-        {/* Quick Actions */}
-        <div className="card">
-          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            {'\u26A1'} {t('expenses.quick_actions', '\u0627\u0644\u0625\u062C\u0631\u0627\u0621\u0627\u062A \u0627\u0644\u0633\u0631\u064A\u0639\u0629')}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate('/expenses/new')} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-              <Plus size={14} /> {t('expenses.addNew')}
-            </button>
-            <button className="btn btn-outline" onClick={() => { setStatusFilter('pending'); setFilters({ ...filters, approval_status: 'pending' }); }} style={{ textAlign: 'center', fontSize: '13px', padding: '10px 8px' }}>
-              <Clock size={14} /> {t('expenses.status.pending')}
-            </button>
-          </div>
-        </div>
-
         {/* Status Summary */}
         <div className="card">
           <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -258,90 +241,99 @@ export default function ExpenseList() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Filters Shortcut */}
-        <div className="card">
-          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            {'\uD83D\uDD0D'} {t('common.filter', '\u062A\u0635\u0641\u064A\u0629')}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginTop: '12px' }}>
-            <button className="btn btn-outline" onClick={() => { setFilters({ expense_type: '', approval_status: '', start_date: '', end_date: '' }); setSearch(''); setStatusFilter(''); setTypeFilter(''); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
-              {'\u2715'} {t('common.clear_filters', '\u0645\u0633\u062D \u0627\u0644\u0641\u0644\u0627\u062A\u0631')}
-            </button>
-            <button className="btn btn-outline" onClick={() => { setStatusFilter('approved'); setFilters({ ...filters, approval_status: 'approved' }); }} style={{ textAlign: 'center', fontSize: '13px', padding: '9px 8px' }}>
-              {'\u2705'} {t('expenses.status.approved')}
-            </button>
+      {/* Main Consolidated Filter Section */}
+      <div className="card mb-4" style={{ paddingBottom: '16px' }}>
+        <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0' }}>
+          {'\uD83D\uDD0D'} {t('common.filter', '\u062A\u0635\u0641\u064A\u0629')}
+        </h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Top Row: Search and Text Filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Search */}
+            <div style={{ position: 'relative', flex: '2 1 300px', minWidth: '250px' }}>
+              <Search size={16} style={{ position: 'absolute', right: isRTL ? '12px' : 'auto', left: isRTL ? 'auto' : '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                className="form-input w-full"
+                placeholder={t('expenses.searchPlaceholder', '\u0628\u062D\u062B \u0628\u0631\u0642\u0645 \u0627\u0644\u0645\u0635\u0631\u0648\u0641...')}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={isRTL ? { paddingRight: '36px' } : { paddingLeft: '36px' }}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  style={{ position: 'absolute', left: isRTL ? '12px' : 'auto', right: isRTL ? 'auto' : '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px' }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Type Dropdown */}
+            <select className="form-input" style={{ flex: '1 1 200px', minWidth: '150px' }} value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setFilters(prev => ({...prev, expense_type: e.target.value})); }}>
+              <option value="">{t('expenses.fields.type', '\u0646\u0648\u0639 \u0627\u0644\u0645\u0635\u0631\u0648\u0641')}</option>
+              <option value="materials">{t('expenses.types.materials')}</option>
+              <option value="labor">{t('expenses.types.labor')}</option>
+              <option value="services">{t('expenses.types.services')}</option>
+              <option value="travel">{t('expenses.types.travel')}</option>
+              <option value="rent">{t('expenses.types.rent')}</option>
+              <option value="utilities">{t('expenses.types.utilities')}</option>
+              <option value="salaries">{t('expenses.types.salaries')}</option>
+              <option value="other">{t('expenses.types.other')}</option>
+            </select>
+
+            {/* Status Dropdown */}
+            <select className="form-input" style={{ flex: '1 1 200px', minWidth: '150px' }} value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setFilters(prev => ({...prev, approval_status: e.target.value})); }}>
+              <option value="">{t('expenses.fields.status', '\u0627\u0644\u062D\u0627\u0644\u0629')}</option>
+              <option value="pending">{t('expenses.status.pending')}</option>
+              <option value="approved">{t('expenses.status.approved')}</option>
+              <option value="rejected">{t('expenses.status.rejected')}</option>
+            </select>
+          </div>
+
+          {/* Bottom Row: Dates and Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Start Date */}
+            <div style={{ flex: '1 1 180px', minWidth: '140px', maxWidth: '250px' }}>
+              <CustomDatePicker
+                selected={filters.start_date}
+                onChange={(val) => setFilters({ ...filters, start_date: val })}
+                placeholder={t('common.start_date', '\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0628\u062F\u0621')}
+                isClearable
+              />
+            </div>
+
+            {/* End Date */}
+            <div style={{ flex: '1 1 180px', minWidth: '140px', maxWidth: '250px' }}>
+              <CustomDatePicker
+                selected={filters.end_date}
+                onChange={(val) => setFilters({ ...filters, end_date: val })}
+                placeholder={t('common.end_date', '\u062A\u0627\u0631\u064A\u062E \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621')}
+                isClearable
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 auto', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {/* Quick Buttons */}
+              <button className="btn btn-outline" onClick={() => { setFilters({ expense_type: '', approval_status: '', start_date: '', end_date: '' }); setSearch(''); setStatusFilter(''); setTypeFilter(''); }} style={{ fontSize: '13px', padding: '9px 8px', whiteSpace: 'nowrap' }}>
+                {'\u2715'} {t('common.clear_filters', '\u0645\u0633\u062D \u0627\u0644\u0641\u0644\u0627\u062A\u0631')}
+              </button>
+              
+              <button className="btn btn-outline" onClick={() => { setStatusFilter('approved'); setFilters({ ...filters, approval_status: 'approved' }); }} style={{ fontSize: '13px', padding: '9px 8px', whiteSpace: 'nowrap' }}>
+                {'\u2705'} {t('expenses.status.approved', '\u0645\u0648\u0627\u0641\u0642 \u0639\u0644\u064A\u0647')}
+              </button>
+
+              <button className="btn btn-primary btn-sm" style={{ height: '38px', whiteSpace: 'nowrap', padding: '0 20px' }} onClick={loadData}>
+                {t('common.filter', '\u062A\u0635\u0641\u064A\u0629')}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Date Filters */}
-      <div className="card mb-4">
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ width: '180px' }}>
-            <CustomDatePicker
-              label={t('common.start_date')}
-              selected={filters.start_date}
-              onChange={(val) => setFilters({ ...filters, start_date: val })}
-              placeholder="YYYY/MM/DD"
-              isClearable
-            />
-          </div>
-          <div style={{ width: '180px' }}>
-            <CustomDatePicker
-              label={t('common.end_date')}
-              selected={filters.end_date}
-              onChange={(val) => setFilters({ ...filters, end_date: val })}
-              placeholder="YYYY/MM/DD"
-              isClearable
-            />
-          </div>
-          <button className="btn btn-primary btn-sm" style={{ height: '38px', whiteSpace: 'nowrap' }} onClick={loadData}>
-            {t('common.filter')}
-          </button>
-        </div>
-      </div>
-
-      <SearchFilter
-        value={search}
-        onChange={setSearch}
-        placeholder={t('expenses.searchPlaceholder', '\u0628\u062D\u062B \u0628\u0631\u0642\u0645 \u0627\u0644\u0645\u0635\u0631\u0648\u0641 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641 \u0623\u0648 \u0627\u0644\u0645\u0648\u0631\u062F...')}
-        filters={[
-          {
-            key: 'type',
-            label: t('expenses.fields.type'),
-            options: [
-              { value: 'materials', label: t('expenses.types.materials') },
-              { value: 'labor', label: t('expenses.types.labor') },
-              { value: 'services', label: t('expenses.types.services') },
-              { value: 'travel', label: t('expenses.types.travel') },
-              { value: 'rent', label: t('expenses.types.rent') },
-              { value: 'utilities', label: t('expenses.types.utilities') },
-              { value: 'salaries', label: t('expenses.types.salaries') },
-              { value: 'other', label: t('expenses.types.other') },
-            ],
-          },
-          {
-            key: 'status',
-            label: t('expenses.fields.status'),
-            options: [
-              { value: 'pending', label: t('expenses.status.pending') },
-              { value: 'approved', label: t('expenses.status.approved') },
-              { value: 'rejected', label: t('expenses.status.rejected') },
-            ],
-          },
-        ]}
-        filterValues={{ type: typeFilter, status: statusFilter }}
-        onFilterChange={(key, val) => {
-          if (key === 'type') {
-            setTypeFilter(val);
-            setFilters(prev => ({ ...prev, expense_type: val }));
-          } else if (key === 'status') {
-            setStatusFilter(val);
-            setFilters(prev => ({ ...prev, approval_status: val }));
-          }
-        }}
-      />
 
       <DataTable
         columns={columns}

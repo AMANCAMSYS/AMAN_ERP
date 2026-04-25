@@ -16,6 +16,7 @@ from utils.audit import log_activity
 from utils.accounting import get_base_currency
 from fastapi import Request
 from services.gl_service import create_journal_entry as gl_create_journal_entry
+from utils.fiscal_lock import check_fiscal_period_open
 
 from schemas.accounting import AccountCreate, AccountUpdate, FiscalYearCreate, FiscalYearClose, FiscalYearReopen
 from utils.cache import cache
@@ -595,9 +596,15 @@ async def create_journal_entry(
                 return {"success": True, "message": "قيد موجود مسبقاً (مفتاح تكرار)", "entry_number": existing.entry_number, "entry_id": existing.id, "status": existing.status, "idempotent": True}
 
         from services.gl_service import create_journal_entry as gl_create_journal_entry
-        
+
         entry_status = entry_data.get("status", "posted")
-        
+
+        # Fiscal-period lock: block posting into a closed period.
+        entry_date = entry_data.get("date")
+        if not entry_date:
+            raise HTTPException(status_code=400, detail="تاريخ القيد مطلوب")
+        check_fiscal_period_open(db, entry_date)
+
         journal_id, entry_number = gl_create_journal_entry(
             db=db,
             company_id=current_user.company_id,
@@ -1016,6 +1023,9 @@ async def void_journal_entry(
             raise HTTPException(status_code=400, detail="القيد لا يحتوي على أسطر")
         
         # 3. Create reversal entry via centralized GL service
+        # Fiscal-period lock: the reversal posts at today, so the current
+        # period must be open.
+        check_fiscal_period_open(db, date.today())
         rev_lines = []
         for line in lines:
             rev_lines.append({
@@ -1968,6 +1978,11 @@ def _create_entry_from_template(db, tmpl, lines, current_user):
     if tmpl.description:
         description = f"{tmpl.description} ({today.strftime('%Y-%m-%d')})"
 
+    # Fiscal-period lock: refuse to generate recurring posts into a
+    # closed period (only when we're about to post, not for drafts).
+    if entry_status == "posted":
+        check_fiscal_period_open(db, today)
+
     je_lines = []
     for line in lines:
         je_lines.append({
@@ -2087,6 +2102,9 @@ def save_opening_balances(
     try:
         lines = data.get("lines", [])
         entry_date = data.get("date", str(date.today()))
+
+        # Fiscal-period lock: opening balances must land in an open period.
+        check_fiscal_period_open(db, entry_date)
 
         # Filter to only lines with actual values
         valid_lines = [l for l in lines if _dec(l.get("debit", 0)) != 0 or _dec(l.get("credit", 0)) != 0]
@@ -2490,6 +2508,9 @@ def create_bad_debt_provision(request: Request, req: ProvisionRequest, current_u
         if not acc_bad_debt_exp or not acc_prov_doubtful:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حسابات الديون المعدومة في الإعدادات")
 
+        # Fiscal-period lock: provisions post at today's date.
+        check_fiscal_period_open(db, date.today())
+
         desc = req.description or "مخصص ديون معدومة"
         _, je_num = gl_create_journal_entry(
             db=db,
@@ -2551,6 +2572,9 @@ def create_leave_provision(request: Request, req: ProvisionRequest, current_user
         acc_leave_prov = get_mapped_account_id(db, "acc_map_provision_holiday")
         if not acc_leave_exp or not acc_leave_prov:
             raise HTTPException(status_code=400, detail="لم يتم تعيين حسابات الإجازات في الإعدادات")
+
+        # Fiscal-period lock: provisions post at today's date.
+        check_fiscal_period_open(db, date.today())
 
         desc = req.description or "مخصص إجازات الموظفين"
         _, je_num = gl_create_journal_entry(
@@ -2614,6 +2638,9 @@ def fx_revaluation(request: Request, req: FXRevaluationRequest, current_user: di
     trans = db.begin()
     try:
         base_currency = get_base_currency(db)
+
+        # Fiscal-period lock: FX revaluation posts at today's date.
+        check_fiscal_period_open(db, date.today())
 
         # Find unrealized FX gain/loss accounts
         gain_acc = db.execute(text("SELECT id FROM accounts WHERE account_number = '4202'")).fetchone()

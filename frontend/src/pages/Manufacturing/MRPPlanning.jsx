@@ -113,7 +113,7 @@ export default function MRPPlanning() {
                                                 onClick={() => navigate(`/manufacturing/mrp/${order.id}`)}
                                             >
                                                 {t('manufacturing.check_availability')}
-                                                {isRTL ? <ArrowRight size={14} /> : <ArrowRight size={14} />}
+                                                <ArrowRight size={14} />
                                             </button>
                                         </td>
                                     </tr>

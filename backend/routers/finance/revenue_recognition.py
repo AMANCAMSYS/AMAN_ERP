@@ -21,6 +21,7 @@ from sqlalchemy import text
 from database import get_db_connection
 from routers.auth import get_current_user
 from services.gl_service import create_journal_entry as gl_create_journal_entry
+from utils.fiscal_lock import check_fiscal_period_open
 from utils.i18n import http_error
 from utils.permissions import require_permission
 
@@ -192,6 +193,10 @@ def recognize_revenue_period(schedule_id: int, period_index: int = 0, current_us
             raise HTTPException(400, "تم الاعتراف بهذه الفترة مسبقاً")
 
         amount = _dec(period["amount"]).quantize(_D2, ROUND_HALF_UP)
+
+        # Fiscal-period lock: recognize posts at today's date.
+        recognition_date = datetime.now().date()
+        check_fiscal_period_open(db, recognition_date)
 
         deferred_acc = db.execute(
             text("SELECT id FROM accounts WHERE account_code LIKE '22%' LIMIT 1")

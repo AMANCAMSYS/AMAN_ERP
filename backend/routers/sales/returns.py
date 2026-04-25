@@ -13,6 +13,7 @@ from utils.audit import log_activity
 from utils.permissions import require_permission
 from utils.accounting import get_mapped_account_id
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
+from utils.fiscal_lock import check_fiscal_period_open
 from .schemas import SalesReturnCreate
 
 returns_router = APIRouter()
@@ -453,6 +454,9 @@ def approve_sales_return(return_id: int, request: Request, current_user: dict = 
             )
             line["amount_currency"] = amt_curr
             line["currency"] = header.currency
+
+        # Fiscal-period lock: block posting into a closed period.
+        check_fiscal_period_open(db, str(header.return_date))
 
         je_id, je_num = create_journal_entry(
             db=db,
