@@ -118,11 +118,21 @@ export function useNotificationSocket(onNotification) {
             clearTimeout(wsRef._connectTimer)
             if (wsRef.current) {
                 clearInterval(wsRef.current._pingInterval)
-                wsRef.current.close()
+                // Only close if already open — closing during CONNECTING
+                // triggers "WebSocket is closed before connection is established".
+                const ws = wsRef.current
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+                    ws.close()
+                } else if (ws.readyState === WebSocket.CONNECTING) {
+                    // Wait for the connection to establish, then close it
+                    ws.onopen = () => ws.close()
+                    ws.onerror = () => {} // suppress — we're discarding this socket
+                }
                 wsRef.current = null
             }
             attempt.current = 0
-            connect(controller.signal)
+            // Small delay lets the old socket fully tear down before reconnecting
+            reconnectTimer.current = setTimeout(() => connect(controller.signal), 300)
         }
         window.addEventListener('token_refreshed', handleTokenRefresh)
 
