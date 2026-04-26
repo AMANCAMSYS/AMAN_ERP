@@ -724,7 +724,8 @@ def list_journal_entries(
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         # Count
-        total = db.execute(text(f"""
+        total = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT COUNT(*) FROM journal_entries je WHERE {where_clause}
         """), params).scalar()
 
@@ -733,7 +734,8 @@ def list_journal_entries(
         params["limit"] = limit
         params["offset"] = offset
 
-        rows = db.execute(text(f"""
+        rows = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT je.*,
                    cu.username AS created_by_name,
                    COALESCE(SUM(jl.debit), 0) AS total_debit,
@@ -2231,7 +2233,8 @@ def preview_closing_entries(
         if branch_id:
             params["branch_id"] = branch_id
 
-        revenues = db.execute(text(f"""
+        revenues = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.credit - jl.debit), 0) as balance
             FROM accounts a
@@ -2245,7 +2248,8 @@ def preview_closing_entries(
             ORDER BY a.account_number
         """), params).fetchall()
 
-        expenses = db.execute(text(f"""
+        expenses = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT a.id, a.account_number, a.name, a.name_en,
                    COALESCE(SUM(jl.debit - jl.credit), 0) as balance
             FROM accounts a
@@ -2313,7 +2317,8 @@ def generate_closing_entries(
                 raise HTTPException(status_code=400, detail="لم يتم العثور على حساب الأرباح المبقاة")
             retained_earnings_id = ret.id
 
-        revenues = db.execute(text(f"""
+        revenues = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT a.id, a.account_number, a.name,
                    COALESCE(SUM(jl.credit - jl.debit), 0) as balance
             FROM accounts a
@@ -2326,7 +2331,8 @@ def generate_closing_entries(
             HAVING COALESCE(SUM(jl.credit - jl.debit), 0) != 0
         """), params).fetchall()
 
-        expenses = db.execute(text(f"""
+        expenses = db.execute(text(  # noqa: sql-lint
+            f"""
             SELECT a.id, a.account_number, a.name,
                    COALESCE(SUM(jl.debit - jl.credit), 0) as balance
             FROM accounts a
