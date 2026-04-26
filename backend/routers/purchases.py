@@ -2557,7 +2557,7 @@ def list_purchase_credit_notes(
         params["limit"] = limit
         params["offset"] = offset
 
-        rows = db.execute(text(f"""  # noqa: sql-lint
+        rows = db.execute(text(f"""
             SELECT i.*, p.name AS party_name,
                    ri.invoice_number AS related_invoice_number,
                    cu.username AS created_by_name
@@ -2825,7 +2825,7 @@ def list_purchase_debit_notes(
         params["limit"] = limit
         params["offset"] = offset
 
-        rows = db.execute(text(f"""  # noqa: sql-lint
+        rows = db.execute(text(f"""
             SELECT i.*, p.name AS party_name,
                    ri.invoice_number AS related_invoice_number,
                    cu.username AS created_by_name
@@ -3452,7 +3452,7 @@ def list_blanket_pos(
         where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
 
         try:
-            rows = db.execute(text(f"""  # noqa: sql-lint
+            rows = db.execute(text(f"""
                 SELECT b.*, p.name AS supplier_name
                 FROM blanket_purchase_orders b
                 LEFT JOIN parties p ON p.id = b.supplier_id
