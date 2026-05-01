@@ -247,7 +247,7 @@ def expiry_alert_template(item_type: str, item_name: str, expiry_date: str,
 
 # ===================== Notification Helper =====================
 
-def get_email_service_from_settings(db) -> Optional[EmailService]:
+def get_email_service_from_settings(db, *, tenant_id: Optional[str] = None) -> Optional[EmailService]:
     """Create an EmailService instance from company_settings."""
     try:
         settings = db.execute(text("""
@@ -259,6 +259,11 @@ def get_email_service_from_settings(db) -> Optional[EmailService]:
 
         if not config.get("smtp_host") or not config.get("smtp_username"):
             return None
+
+        # T2.5: smtp_password may be encrypted at rest; transparently decrypt.
+        if tenant_id:
+            from utils.secret_settings import decrypt_settings_map
+            config = decrypt_settings_map(config, tenant_id=tenant_id, only_keys=("smtp_password",))
 
         return EmailService(
             host=config["smtp_host"],
@@ -274,7 +279,7 @@ def get_email_service_from_settings(db) -> Optional[EmailService]:
         return None
 
 
-def get_sms_service_from_settings(db) -> Optional[SMSService]:
+def get_sms_service_from_settings(db, *, tenant_id: Optional[str] = None) -> Optional[SMSService]:
     """Create an SMSService instance from company_settings."""
     try:
         settings = db.execute(text("""
@@ -287,6 +292,11 @@ def get_sms_service_from_settings(db) -> Optional[SMSService]:
         if not config.get("sms_api_url") or not config.get("sms_api_key"):
             return None
 
+        # T2.5: sms_api_key may be encrypted at rest; transparently decrypt.
+        if tenant_id:
+            from utils.secret_settings import decrypt_settings_map
+            config = decrypt_settings_map(config, tenant_id=tenant_id, only_keys=("sms_api_key",))
+
         return SMSService(
             api_url=config["sms_api_url"],
             api_key=config["sms_api_key"],
@@ -297,7 +307,7 @@ def get_sms_service_from_settings(db) -> Optional[SMSService]:
         return None
 
 
-def send_notification_email(db, user_id: int, subject: str, html_body: str) -> bool:
+def send_notification_email(db, user_id: int, subject: str, html_body: str, *, tenant_id: Optional[str] = None) -> bool:
     """Send an email notification to a specific user using SMTP settings from company_settings."""
     try:
         # Get user's email
@@ -305,7 +315,7 @@ def send_notification_email(db, user_id: int, subject: str, html_body: str) -> b
         if not user or not user.email:
             return False
 
-        email_service = get_email_service_from_settings(db)
+        email_service = get_email_service_from_settings(db, tenant_id=tenant_id)
         if not email_service:
             logger.warning("SMTP not configured, skipping email notification")
             return False
@@ -316,14 +326,14 @@ def send_notification_email(db, user_id: int, subject: str, html_body: str) -> b
         return False
 
 
-def send_notification_sms(db, user_id: int, message: str) -> bool:
+def send_notification_sms(db, user_id: int, message: str, *, tenant_id: Optional[str] = None) -> bool:
     """Send an SMS notification to a specific user."""
     try:
         user = db.execute(text("SELECT phone FROM company_users WHERE id = :id"), {"id": user_id}).fetchone()
         if not user or not user.phone:
             return False
 
-        sms_service = get_sms_service_from_settings(db)
+        sms_service = get_sms_service_from_settings(db, tenant_id=tenant_id)
         if not sms_service:
             logger.warning("SMS not configured, skipping SMS notification")
             return False

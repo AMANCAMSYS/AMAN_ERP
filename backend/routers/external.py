@@ -22,6 +22,7 @@ from database import get_db_connection
 from routers.auth import get_current_user
 from utils.permissions import require_permission
 from utils.audit import log_activity
+from utils.sql_builder import validate_update_keys
 from utils.zatca import (
     verify_invoice_signature,
     generate_rsa_keypair, process_invoice_for_zatca
@@ -234,6 +235,7 @@ def update_webhook(webhook_id: int, data: WebhookUpdate, current_user=Depends(ge
         if not updates:
             raise HTTPException(**http_error(400, "no_data_to_update"))
         
+        validate_update_keys(updates.keys())  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates)
         updates["id"] = webhook_id
         db.execute(text(f"UPDATE webhooks SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -311,9 +313,9 @@ def generate_qr_code(
         )).scalar() or "000000000000000"
         
         # Get private key for signing (optional)
-        private_key = db.execute(text(
-            "SELECT setting_value FROM company_settings WHERE setting_key = 'zatca_private_key'"
-        )).scalar()
+        # T2.5: read via secret_settings helper so legacy plaintext or new ciphertext both work.
+        from utils.secret_settings import get_secret_setting
+        private_key = get_secret_setting(db, "zatca_private_key", tenant_id=current_user.company_id)
         
         result = process_invoice_for_zatca(
             db=db,
@@ -351,13 +353,22 @@ def generate_keypair(current_user=Depends(get_current_user)):
     try:
         private_pem, public_pem = generate_rsa_keypair()
         
-        # Store in company settings
+        # Store in company settings — T2.5: encrypt private key at rest.
+        from utils.secret_settings import set_secret_setting, is_secret_key
         for key, val in [("zatca_private_key", private_pem), ("zatca_public_key", public_pem)]:
-            db.execute(text("""
-                INSERT INTO company_settings (setting_key, setting_value, category)
-                VALUES (:key, :val, 'zatca')
-                ON CONFLICT (setting_key) DO UPDATE SET setting_value = :val
-            """), {"key": key, "val": val})
+            if is_secret_key(key):
+                set_secret_setting(db, key, val, tenant_id=current_user.company_id)
+                # Tag category for new rows (no-op if already set)
+                db.execute(text("""
+                    UPDATE company_settings SET category = 'zatca'
+                    WHERE setting_key = :key AND (category IS NULL OR category = '')
+                """), {"key": key})
+            else:
+                db.execute(text("""
+                    INSERT INTO company_settings (setting_key, setting_value, category)
+                    VALUES (:key, :val, 'zatca')
+                    ON CONFLICT (setting_key) DO UPDATE SET setting_value = :val
+                """), {"key": key, "val": val})
         
         db.commit()
         return {

@@ -337,8 +337,12 @@ Authorization: Bearer <token>
 """,
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    # SEC-T2.9: hide interactive API docs in production. They leak the full
+    # endpoint surface + payload schemas, which is a recon goldmine. Set
+    # APP_ENV=production (or EXPOSE_API_DOCS=false) to disable.
+    docs_url=("/api/docs" if (settings.APP_ENV != "production" and getattr(settings, "EXPOSE_API_DOCS", True)) else None),
+    redoc_url=("/api/redoc" if (settings.APP_ENV != "production" and getattr(settings, "EXPOSE_API_DOCS", True)) else None),
+    openapi_url=("/api/openapi.json" if (settings.APP_ENV != "production" and getattr(settings, "EXPOSE_API_DOCS", True)) else None),
     openapi_tags=[
         # ── Core & Auth ──
         {"name": "المصادقة", "description": "تسجيل الدخول، JWT tokens، المصادقة الثنائية (2FA)، إدارة الجلسات"},
@@ -466,14 +470,60 @@ except ImportError:
     logger.warning("⚠️ prometheus-fastapi-instrumentator not installed — metrics disabled")
 
 # Static Files (Logos, attachments)
+# T2.6 (audit #54, #167): the previous setup mounted /uploads and /api/uploads
+# as wide-open StaticFiles, exposing every tenant's documents to anyone who
+# guessed a filename. Now:
+#   • /uploads/logos/<file>   → public branding (intentional)
+#   • /uploads/<other>        → requires HMAC-signed query (?exp=…&sig=…)
+#                                issued by the API after a permission check.
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 try:
     os.makedirs(os.path.join(uploads_dir, "logos"), exist_ok=True)
 except PermissionError as e:
     logger.warning(f"⚠️  Cannot create uploads/logos: {e} — entrypoint should handle this")
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-# Also mount under /api/uploads for consistency with API-prefixed calls in some components
-app.mount("/api/uploads", StaticFiles(directory=uploads_dir), name="api_uploads")
+
+# Public branding subdirectory only.
+app.mount(
+    "/uploads/logos",
+    StaticFiles(directory=os.path.join(uploads_dir, "logos")),
+    name="uploads_logos",
+)
+
+
+@app.get("/uploads/{file_path:path}", include_in_schema=False)
+async def _serve_signed_upload(file_path: str, request: Request):
+    """Guarded fallback for non-logo uploads — requires signed URL."""
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    from utils.signed_urls import verify_signature, is_public_path
+
+    full_path = f"/uploads/{file_path}"
+    # Logos handled by the public mount above; this route only fires for
+    # paths that did not match it.
+    if is_public_path(full_path):
+        # Should never reach here in practice — defensive 404.
+        raise HTTPException(status_code=404)
+
+    exp = request.query_params.get("exp")
+    sig = request.query_params.get("sig")
+    ok, reason = verify_signature(full_path, exp, sig)
+    if not ok:
+        raise HTTPException(status_code=401, detail=f"unauthorized: {reason}")
+
+    # Path-traversal hardening: resolve and ensure it stays inside uploads_dir.
+    target = os.path.abspath(os.path.join(uploads_dir, file_path))
+    if not target.startswith(os.path.abspath(uploads_dir) + os.sep):
+        raise HTTPException(status_code=400, detail="invalid path")
+    if not os.path.isfile(target):
+        raise HTTPException(status_code=404)
+    return FileResponse(target)
+
+
+# Mirror under /api/uploads so the same signed URL works whether the caller
+# uses the API prefix or hits the bare path.
+@app.get("/api/uploads/{file_path:path}", include_in_schema=False)
+async def _serve_signed_upload_api(file_path: str, request: Request):
+    return await _serve_signed_upload(file_path, request)
 
 
 

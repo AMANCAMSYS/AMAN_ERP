@@ -191,6 +191,13 @@ async def execute_import(
         raise HTTPException(400, f"نوع الكيان غير مدعوم: {entity_type}")
 
     config = IMPORT_CONFIGS[entity_type]
+
+    # T2.1 / SEC-FIX-012: Defense-in-depth — validate config table & unique_key
+    # before any f-string interpolation, even though IMPORT_CONFIGS is hardcoded.
+    from utils.sql_safety import validate_sql_identifier
+    validate_sql_identifier(config["table"], "table name")
+    validate_sql_identifier(config["unique_key"], "unique key")
+
     content = await file.read()
     filename = file.filename.lower()
 
@@ -319,6 +326,11 @@ def export_data(
         raise HTTPException(400, f"نوع الكيان غير مدعوم: {entity_type}")
 
     config = IMPORT_CONFIGS[entity_type]
+
+    # T2.1 / SEC-FIX-012: Defense-in-depth — validate config table before f-string.
+    from utils.sql_safety import validate_sql_identifier
+    validate_sql_identifier(config["table"], "table name")
+
     db = get_db_connection(current_user.company_id)
 
     try:

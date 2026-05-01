@@ -172,7 +172,7 @@ async def create_and_send_notification(
                     <p>{data.message or ''}</p>
                     {"<a href='" + data.link + "' class='btn'>عرض التفاصيل</a>" if data.link else ""}
                 """)
-                results["email"] = send_notification_email(db, data.user_id, data.title, html)
+                results["email"] = send_notification_email(db, data.user_id, data.title, html, tenant_id=company_id)
             except Exception:
                 logger.exception("Email notification failed")
                 results["email"] = False
@@ -182,7 +182,7 @@ async def create_and_send_notification(
             try:
                 from services.email_service import send_notification_sms
                 sms_text = f"{data.title}: {data.message or ''}"[:160]
-                results["sms"] = send_notification_sms(db, data.user_id, sms_text)
+                results["sms"] = send_notification_sms(db, data.user_id, sms_text, tenant_id=company_id)
             except Exception:
                 logger.exception("SMS notification failed")
                 results["sms"] = False
@@ -269,11 +269,14 @@ async def update_notification_settings(
             if value == "********":  # Don't update masked values
                 continue
 
+            # T2.5: encrypt sensitive secrets (smtp_password, sms_api_key) at rest.
+            from utils.secret_settings import is_secret_key, encrypt_value
+            stored = encrypt_value(str(value), tenant_id=company_id) if is_secret_key(key) else str(value)
             db.execute(text("""
                 INSERT INTO company_settings (setting_key, setting_value)
                 VALUES (:key, :val)
                 ON CONFLICT (setting_key) DO UPDATE SET setting_value = :val
-            """), {"key": key, "val": str(value)})
+            """), {"key": key, "val": stored})
 
         db.commit()
         log_activity(
@@ -387,7 +390,7 @@ async def test_email_connection(current_user: dict = Depends(get_current_user)):
     try:
         from services.email_service import get_email_service_from_settings, get_base_template
 
-        service = get_email_service_from_settings(db)
+        service = get_email_service_from_settings(db, tenant_id=company_id)
         if not service:
             raise HTTPException(400, "إعدادات SMTP غير مكتملة")
 

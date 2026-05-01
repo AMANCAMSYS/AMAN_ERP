@@ -18,6 +18,7 @@ from routers.auth import get_current_user
 from utils.permissions import require_permission, require_module, validate_branch_access
 from utils.accounting import generate_sequential_number
 from utils.audit import log_activity
+from utils.sql_builder import validate_update_keys
 from services.notification_service import notification_service
 
 router = APIRouter(prefix="/crm", tags=["CRM"], dependencies=[Depends(require_module("crm"))])
@@ -259,6 +260,7 @@ async def update_opportunity(opp_id: int, data: OpportunityUpdate, request: Requ
             if "probability" not in updates:
                 updates["probability"] = OPPORTUNITY_STAGES[updates["stage"]]
         
+        validate_update_keys(updates.keys())  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates)
         updates["id"] = opp_id
         db.execute(text(f"UPDATE sales_opportunities SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -494,6 +496,7 @@ async def update_ticket(ticket_id: int, data: TicketUpdate, request: Request, cu
         elif updates.get("status") == "closed":
             updates["closed_at"] = datetime.now()
         
+        validate_update_keys(updates.keys())  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates)
         updates["id"] = ticket_id
         db.execute(text(f"UPDATE support_tickets SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
@@ -759,6 +762,7 @@ def update_campaign(campaign_id: int, data: CampaignUpdate, request: Request, cu
         if not updates:
             raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = campaign_id
+        validate_update_keys(k for k in updates if k != "id")  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE marketing_campaigns SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
@@ -1197,6 +1201,7 @@ def update_article(article_id: int, data: ArticleUpdate, request: Request, curre
         if not updates:
             raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = article_id
+        validate_update_keys(k for k in updates if k != "id")  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_knowledge_base SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
@@ -1281,6 +1286,7 @@ def update_scoring_rule(rule_id: int, data: LeadScoringRuleUpdate, request: Requ
         if not updates:
             raise HTTPException(**http_error(400, "no_data_to_update"))
         updates["id"] = rule_id
+        validate_update_keys(k for k in updates if k != "id")  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_lead_scoring_rules SET {set_clause} WHERE id = :id"), updates)
         db.commit()
@@ -1467,6 +1473,7 @@ def update_segment(seg_id: int, data: SegmentUpdate, request: Request, current_u
         if not updates:
             raise HTTPException(**http_error(400, "no_data"))
         updates["id"] = seg_id
+        validate_update_keys(k for k in updates if k != "id")  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_customer_segments SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()
@@ -1646,6 +1653,7 @@ def update_contact(contact_id: int, data: ContactUpdate, request: Request, curre
                            {"cid": contact.customer_id})
 
         updates["id"] = contact_id
+        validate_update_keys(k for k in updates if k != "id")  # T2.2 defense-in-depth
         set_clause = ", ".join(f"{k} = :{k}" for k in updates if k != "id")
         db.execute(text(f"UPDATE crm_contacts SET {set_clause}, updated_at = NOW() WHERE id = :id"), updates)
         db.commit()

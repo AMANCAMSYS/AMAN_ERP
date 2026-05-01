@@ -364,9 +364,9 @@ def collect_check_receivable(check_id: int, data: dict, current_user=Depends(get
             source_id=check_id
         )
 
-        # Update treasury balance
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid"),
-                   {"amt": float(amount), "tid": treasury_id})
+        # Update treasury balance — T1.3a idempotent recompute
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, treasury_id)
 
         db.execute(text("""
             UPDATE checks_receivable SET status = 'collected', collection_date = :cdate,
@@ -445,8 +445,9 @@ def bounce_check_receivable(check_id: int, data: dict, current_user=Depends(get_
                 source_id=check_id
             )
 
-            db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid"),
-                       {"amt": float(amount), "tid": check.treasury_account_id})
+            # Treasury balance decreases — T1.3a idempotent recompute
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, check.treasury_account_id)
         else:
             if not checks_account:
                 raise HTTPException(500, "حساب الشيكات تحت التحصيل (1205) غير موجود")
@@ -877,8 +878,9 @@ def clear_check_payable(check_id: int, data: dict, current_user=Depends(get_curr
             source_id=check_id,
         )
 
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid"),
-                   {"amt": float(amount), "tid": treasury_id})
+        # T1.3a idempotent recompute
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, treasury_id)
 
         db.execute(text("""
             UPDATE checks_payable SET status = 'cleared', clearance_date = :cdate,
@@ -968,9 +970,9 @@ def bounce_check_payable(check_id: int, data: dict, current_user=Depends(get_cur
                 source_id=check_id,
             )
 
-            # Treasury balance increases (money came back)
-            db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid"),
-                       {"amt": float(amount), "tid": check.treasury_account_id})
+            # Treasury balance increases (money came back) — T1.3a idempotent recompute
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, check.treasury_account_id)
         else:
             # Issued (not cleared) check bounced: reverse issuance only
             # Dr. 2105 / Cr. AP

@@ -70,7 +70,7 @@ def _prefetch_product_costs(db, product_ids: List[int], warehouse_id: int, polic
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_sensitive_permission
 from utils.accounting import get_mapped_account_id
 from utils.fiscal_lock import check_fiscal_period_open
 from .schemas import InvoiceCreate, InvoiceResponse
@@ -602,22 +602,10 @@ def create_sales_invoice(
             )
 
         # --- 7.5 Update Treasury Balance ---
+        # T1.3a: idempotent recompute from journal_lines (single source of truth)
         if invoice.treasury_id and gl_paid > 0:
-            # Get treasury currency to determine what amount to add
-            treas_info = db.execute(text("""
-                SELECT ta.currency as currency_code
-                FROM treasury_accounts ta
-                WHERE ta.id = :id
-            """), {"id": invoice.treasury_id}).fetchone()
-
-            if treas_info and treas_info.currency_code and treas_info.currency_code != base_currency:
-                # FC treasury: add amount in foreign currency
-                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"),
-                           {"amt": paid_amount, "id": invoice.treasury_id})
-            else:
-                # SAR treasury: add amount in base currency
-                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"),
-                           {"amt": gl_paid, "id": invoice.treasury_id})
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, invoice.treasury_id)
 
         # --- 8. Insert Currency Transaction (if Foreign Currency) ---
         if inv_currency != base_currency:
@@ -670,6 +658,48 @@ def create_sales_invoice(
             zatca_qr = zatca_result.get("qr_base64") if zatca_result else None
         except Exception as ze:
             logger.warning(f"ZATCA QR generation skipped for {inv_num}: {ze}")
+
+        # T1.5c (#6): ZATCA Phase 2 clearance — when enforcement is enabled
+        # and the tenant is in SA, submit synchronously to ZATCA and persist
+        # the remote outcome on the invoice. Hard rejection raises HTTP 422
+        # so the operator must correct the data; transient/offline failures
+        # mark the invoice `pending_clearance` and enqueue retry via outbox.
+        try:
+            from utils.zatca_clearance import attempt_clearance
+            jurisdiction = (db.execute(text(
+                "SELECT setting_value FROM company_settings "
+                "WHERE setting_key = 'jurisdiction' LIMIT 1"
+            )).scalar() or "SA")
+            clr = attempt_clearance(
+                db,
+                invoice_id=invoice_id,
+                jurisdiction=jurisdiction,
+                invoice_payload={
+                    "invoice_number": inv_num,
+                    "grand_total": float(grand_total),
+                    "tax_total": float(invoice.tax_amount or 0),
+                    "uuid": inv_num,
+                },
+            )
+            if clr["status"] == "rejected":
+                # Roll back: caller transaction will discard the invoice row.
+                db.rollback()
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "zatca_rejected",
+                        "message_ar": "رفضت هيئة الزكاة الفاتورة",
+                        "message_en": "ZATCA rejected the invoice",
+                        "error": clr.get("error"),
+                    },
+                )
+        except HTTPException:
+            raise
+        except Exception as ze:
+            # Never let an unexpected clearance error mask the invoice
+            # creation result; the local artefacts are already persisted
+            # and the operator can replay via the outbox endpoint.
+            logger.warning(f"ZATCA clearance attempt failed for {inv_num}: {ze}")
 
         # Notify finance team about new invoice
         try:
@@ -753,7 +783,7 @@ def get_invoice(
         }
     finally:
         db.close()
-@invoices_router.post("/invoices/{invoice_id}/cancel", dependencies=[Depends(require_permission("sales.create"))])
+@invoices_router.post("/invoices/{invoice_id}/cancel", dependencies=[Depends(require_sensitive_permission("sales.void"))])
 def cancel_invoice(
     invoice_id: int,
     request: Request,

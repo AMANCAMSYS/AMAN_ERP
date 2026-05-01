@@ -10,6 +10,7 @@ import logging
 from database import get_db_connection, hash_password
 from routers.auth import get_current_user, UserResponse, get_current_user_company
 from utils.permissions import require_permission, validate_branch_access, check_permission, require_module
+from utils.permissions import has_pii_access, mask_pii, mask_pii_list, EMPLOYEE_PII_FIELDS, PAYROLL_PII_FIELDS
 from utils.accounting import get_mapped_account_id, get_base_currency
 from utils.fiscal_lock import check_fiscal_period_open
 from utils.audit import log_activity
@@ -133,6 +134,9 @@ def get_employees(
                 "role": row.role or 'user'
             })
             
+        # T2.4: mask financial PII unless caller has hr.pii
+        if not has_pii_access(current_user):
+            employees = mask_pii_list(employees, EMPLOYEE_PII_FIELDS)
         return employees
     finally:
         conn.close()
@@ -1919,7 +1923,11 @@ def list_all_payslips(branch_id: Optional[int] = None, current_user: UserRespons
 
 
 @router.get("/employees/{emp_id}/payslips", dependencies=[Depends(require_permission("hr.view"))])
-def get_employee_payslips_route(emp_id: int, company_id: str = Depends(get_current_user_company)):
+def get_employee_payslips_route(
+    emp_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    company_id: str = Depends(get_current_user_company),
+):
     conn = get_db_connection(company_id)
     try:
         result = conn.execute(text("""
@@ -1938,20 +1946,36 @@ def get_employee_payslips_route(emp_id: int, company_id: str = Depends(get_curre
             WHERE pe.employee_id = :eid
             ORDER BY pp.start_date DESC
         """), {"eid": emp_id}).fetchall()
-        return [dict(row._mapping) for row in result]
+        rows = [dict(row._mapping) for row in result]
+        # T2.4: Allow employee to see their own payslips even without hr.pii;
+        # otherwise require hr.pii to expose financial figures.
+        if not has_pii_access(current_user):
+            uid = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+            owner = conn.execute(
+                text("SELECT user_id FROM employees WHERE id = :eid"),
+                {"eid": emp_id},
+            ).scalar()
+            if owner != uid:
+                rows = mask_pii_list(rows, PAYROLL_PII_FIELDS)
+        return rows
     finally:
         conn.close()
 
 
 @router.get("/payslips/{entry_id}", dependencies=[Depends(require_permission("hr.view"))])
-def get_payslip_detail(entry_id: int, company_id: str = Depends(get_current_user_company)):
+def get_payslip_detail(
+    entry_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    company_id: str = Depends(get_current_user_company),
+):
     conn = get_db_connection(company_id)
     try:
         row = conn.execute(text("""
             SELECT pe.*, e.first_name || ' ' || e.last_name as employee_name,
                    pp.status, pp.name as period_name,
                    EXTRACT(MONTH FROM pp.start_date)::int as month,
-                   EXTRACT(YEAR FROM pp.start_date)::int as year
+                   EXTRACT(YEAR FROM pp.start_date)::int as year,
+                   e.user_id as _employee_user_id
             FROM payroll_entries pe
             JOIN employees e ON pe.employee_id = e.id
             JOIN payroll_periods pp ON pe.period_id = pp.id
@@ -1959,7 +1983,14 @@ def get_payslip_detail(entry_id: int, company_id: str = Depends(get_current_user
         """), {"id": entry_id}).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Payslip not found")
-        return dict(row._mapping)
+        data = dict(row._mapping)
+        owner_user_id = data.pop("_employee_user_id", None)
+        # T2.4: mask unless caller has hr.pii or is the employee themselves
+        if not has_pii_access(current_user):
+            uid = current_user.get("id") if isinstance(current_user, dict) else current_user.id
+            if owner_user_id != uid:
+                data = mask_pii(data, PAYROLL_PII_FIELDS)
+        return data
     finally:
         conn.close()
 

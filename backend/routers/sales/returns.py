@@ -10,7 +10,7 @@ import logging
 from database import get_db_connection
 from routers.auth import get_current_user
 from utils.audit import log_activity
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_sensitive_permission
 from utils.accounting import get_mapped_account_id
 from services.gl_service import create_journal_entry  # TASK-015: centralized GL posting
 from utils.fiscal_lock import check_fiscal_period_open
@@ -221,7 +221,7 @@ def create_sales_return(request: Request, data: SalesReturnCreate, current_user:
         db.close()
 
 
-@returns_router.post("/returns/{return_id}/approve", dependencies=[Depends(require_permission("sales.create"))])
+@returns_router.post("/returns/{return_id}/approve", dependencies=[Depends(require_sensitive_permission("sales.approve_return"))])
 def approve_sales_return(return_id: int, request: Request, current_user: dict = Depends(get_current_user)):
     """اعتماد مرتجع المبيعات (تحديث المخزون وقيد محاسبي)"""
     db = get_db_connection(current_user.company_id)
@@ -422,21 +422,10 @@ def approve_sales_return(return_id: int, request: Request, current_user: dict = 
                 # Debit AR
                 je_lines.append({"account_id": acc_ar, "debit": gl_refund, "credit": 0, "description": f"AR Offset (Refund) - {header.return_number}"})
 
-            # Update Treasury Balance for refund
+            # Update Treasury Balance for refund — T1.3a idempotent recompute
             if hasattr(header, 'treasury_id') and header.treasury_id:
-                treas_info = db.execute(text("""
-                    SELECT ta.currency as currency_code
-                    FROM treasury_accounts ta
-                    WHERE ta.id = :id
-                """), {"id": header.treasury_id}).fetchone()
-
-                if treas_info and treas_info.currency_code and treas_info.currency_code != base_currency:
-                    treas_refund = _dec(header.refund_amount)  # FC amount
-                else:
-                    treas_refund = gl_refund  # Base amount
-
-                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"),
-                           {"amt": treas_refund, "id": header.treasury_id})
+                from utils.treasury_balance import recalc_treasury_from_gl
+                recalc_treasury_from_gl(db, header.treasury_id)
         # Inventory Reversal
         if total_cost_reversal > 0:
             je_lines.append({"account_id": acc_inventory, "debit": total_cost_reversal, "credit": 0, "description": f"Inv Increase - {header.return_number}"})

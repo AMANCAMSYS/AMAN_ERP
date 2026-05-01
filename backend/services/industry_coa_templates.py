@@ -97,6 +97,7 @@ CORE_ACCOUNTS = [
     ("42001",  "إيرادات متنوعة",                 "Miscellaneous Revenue",        "revenue",    "42",    False),
     ("42010",  "خصم مكتسب",                     "Discount Earned",              "revenue",    "42",    False),
     ("42020",  "أرباح فروق عملة",                "Foreign Exchange Gains",       "revenue",    "42",    False),
+    ("42021",  "أرباح فروق عملة (غير محققة)",     "Unrealized FX Gains",          "revenue",    "42",    False),
 
     # ──── تكلفة المبيعات ────
     ("5",      "تكلفة المبيعات",                 "Cost of Sales",                "expense",    None,    True),
@@ -128,6 +129,7 @@ CORE_ACCOUNTS = [
     ("7",      "مصاريف مالية وأخرى",             "Financial & Other Expenses",   "expense",    None,    True),
     ("71001",  "رسوم بنكية",                     "Bank Charges",                 "expense",    "7",     False),
     ("71010",  "خسائر فروق عملة",                "Foreign Exchange Losses",      "expense",    "7",     False),
+    ("71011",  "خسائر فروق عملة (غير محققة)",     "Unrealized FX Losses",         "expense",    "7",     False),
     ("71020",  "خصم ممنوح",                     "Discount Granted",             "expense",    "7",     False),
 ]
 

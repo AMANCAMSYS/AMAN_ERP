@@ -221,10 +221,9 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
             # Fiscal lock check before posting opening balance GL entry
             check_fiscal_period_open(db, date.today().isoformat())
 
-            # Update Treasury Balance (Current Balance is always in account currency)
-            db.execute(text("UPDATE treasury_accounts SET current_balance = :bal WHERE id = :id"), 
-                       {"bal": account.opening_balance, "id": new_treasury[0]})
-            
+            # T1.3a: Don't write current_balance manually here — it will be
+            # recomputed from journal_lines after the JE below is posted.
+
             # Credit Capital (3101 - Placeholder for Capital/Opening Balance)
             # Find Capital account or use 31 as root
             capital_acc = db.execute(text("SELECT id FROM accounts WHERE account_number = '31' OR account_code = 'CAP' LIMIT 1")).fetchone()
@@ -251,6 +250,10 @@ def create_treasury_account(request: Request, account: TreasuryAccountCreate, cu
                     source="treasury_account_opening",
                     source_id=new_treasury[0]
                 )
+
+                # T1.3a: recompute current_balance now that the opening JE is posted
+                from utils.treasury_balance import recalc_treasury_from_gl
+                recalc_treasury_from_gl(db, new_treasury[0])
         
         db.commit()
 
@@ -547,9 +550,9 @@ def create_expense(request: Request, data: TransactionCreate, current_user: dict
             "cur": treasury_currency,
         }).scalar()
         
-        # 4. Update Treasury Balance — after GL entry is posted
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), 
-                   {"amt": data.amount, "id": data.treasury_id})
+        # 4. Update Treasury Balance — T1.3a idempotent recompute (after GL entry posted)
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, data.treasury_id)
         
         db.commit()
 
@@ -700,9 +703,10 @@ def create_transfer(request: Request, data: TransactionCreate, current_user: dic
             "cur": source_currency,
         }).scalar()
         
-        # 3. Update Treasury Balances — after GL entry is posted
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"), {"amt": data.amount, "id": data.treasury_id})
-        db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"), {"amt": target_amount, "id": data.target_treasury_id})
+        # 3. Update Treasury Balances — T1.3a idempotent recompute (after GL entry posted)
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, data.treasury_id)
+        recalc_treasury_from_gl(db, data.target_treasury_id)
         
         db.commit()
 

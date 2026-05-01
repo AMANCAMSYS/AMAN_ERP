@@ -1336,9 +1336,8 @@ async def create_project_expense(
         )
 
         if expense.treasury_id:
-            db.execute(text(
-                "UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"
-            ), {"amt": amount, "id": expense.treasury_id})
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, expense.treasury_id)
 
         # 4. Update project actual cost
         db.execute(text("""
@@ -1963,6 +1962,7 @@ async def create_project_document(
 @router.get("/{project_id}/documents", dependencies=[Depends(require_permission("projects.view"))])
 async def get_project_documents(project_id: int, current_user: dict = Depends(get_current_user)):
     """جلب مستندات المشروع"""
+    from utils.signed_urls import sign_upload_path  # T2.6: time-limited download links
     db = get_db_connection(current_user.company_id)
     try:
         docs = db.execute(text("""
@@ -1972,7 +1972,15 @@ async def get_project_documents(project_id: int, current_user: dict = Depends(ge
             WHERE pd.project_id = :pid
             ORDER BY pd.created_at DESC
         """), {"pid": project_id}).fetchall()
-        return [dict(d._mapping) for d in docs]
+        out = []
+        for d in docs:
+            row = dict(d._mapping)
+            # Caller already passed the projects.view permission check above;
+            # we hand back a signed URL valid for 10 minutes.
+            if row.get("file_url"):
+                row["file_url"] = sign_upload_path(row["file_url"])
+            out.append(row)
+        return out
     finally:
         db.close()
 

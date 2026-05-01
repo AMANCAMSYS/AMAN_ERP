@@ -489,6 +489,99 @@ def auto_fx_revaluation():
             logger.error(f"❌ FX revaluation error in {db_name}: {e}")
 
 
+def check_zatca_csid_expiry():
+    """T1.5b (#7): Alert operators when an active ZATCA PCSID is approaching
+    expiry. Production CSIDs typically last 12 months; an expired CSID causes
+    every subsequent invoice submission to be rejected. We alert at 30/7/1
+    days remaining and store the last alerted threshold so we don't spam.
+
+    Tenants without the `zatca_csid` table (migration 0015 not applied yet)
+    are silently skipped — this job is forward-compatible with older DBs.
+    """
+    logger.info("⏰ Running ZATCA CSID expiry check...")
+    THRESHOLD_DAYS = (30, 7, 1)
+
+    try:
+        with system_engine.connect() as conn:
+            databases = [r[0] for r in conn.execute(
+                text("SELECT datname FROM pg_database WHERE datname LIKE 'aman_%'")
+            ).fetchall()]
+    except Exception as e:
+        logger.error(f"ZATCA CSID check: failed to list DBs: {e}")
+        return
+
+    for db_name in databases:
+        try:
+            engine = _get_company_engine_for_db(db_name)
+            with engine.connect() as conn:
+                # Forward-compatibility: skip tenants without the table.
+                if not conn.execute(text(
+                    "SELECT to_regclass('public.zatca_csid')"
+                )).scalar():
+                    continue
+
+                # 1) Auto-mark already-expired active rows.
+                conn.execute(text(
+                    "UPDATE zatca_csid SET status = 'expired', "
+                    "updated_at = CURRENT_TIMESTAMP "
+                    "WHERE status = 'active' AND expires_at <= CURRENT_TIMESTAMP"
+                ))
+
+                # 2) For each active CSID expiring soon, fire the strictest
+                # threshold not yet alerted.
+                rows = conn.execute(text(
+                    "SELECT id, environment, pcsid, expires_at, "
+                    "       EXTRACT(EPOCH FROM (expires_at - CURRENT_TIMESTAMP))/86400 AS days_left, "
+                    "       last_alert_threshold_days "
+                    "FROM zatca_csid WHERE status = 'active' "
+                    "  AND expires_at <= CURRENT_TIMESTAMP + INTERVAL '30 days'"
+                )).fetchall()
+
+                for r in rows:
+                    days_left = float(r.days_left or 0)
+                    last_t = r.last_alert_threshold_days
+                    # Choose the strictest threshold the row has crossed
+                    # but not yet alerted at.
+                    fire_at = None
+                    for t in THRESHOLD_DAYS:
+                        if days_left <= t and (last_t is None or t < last_t):
+                            fire_at = t
+                            break
+                    if fire_at is None:
+                        continue
+
+                    msg = (
+                        f"ZATCA CSID ({r.environment}) expires in "
+                        f"{days_left:.1f} day(s) — pcsid prefix "
+                        f"{(r.pcsid or '')[:8]}…; renew immediately."
+                    )
+                    logger.warning(f"[{db_name}] 🚨 {msg}")
+
+                    # Persist a notification if the table exists in this tenant.
+                    has_notifs = conn.execute(text(
+                        "SELECT to_regclass('public.notifications')"
+                    )).scalar()
+                    if has_notifs:
+                        try:
+                            conn.execute(text(
+                                "INSERT INTO notifications "
+                                "  (user_id, title, message, type, is_read, created_at) "
+                                "VALUES (NULL, :title, :msg, 'zatca_csid_expiry', "
+                                "        FALSE, CURRENT_TIMESTAMP)"
+                            ), {"title": "ZATCA CSID expiring soon", "msg": msg})
+                        except Exception:
+                            logger.exception(f"[{db_name}] failed to insert CSID notification")
+
+                    conn.execute(text(
+                        "UPDATE zatca_csid SET last_alert_at = CURRENT_TIMESTAMP, "
+                        "  last_alert_threshold_days = :t, "
+                        "  updated_at = CURRENT_TIMESTAMP WHERE id = :id"
+                    ), {"t": fire_at, "id": r.id})
+                conn.commit()
+        except Exception as e:
+            logger.error(f"ZATCA CSID check failed in {db_name}: {e}")
+
+
 def start_scheduler():
     scheduler.add_job(check_scheduled_reports, 'interval', minutes=5, id='scheduled_reports',
                       max_instances=1, coalesce=True, misfire_grace_time=60)
@@ -502,5 +595,7 @@ def start_scheduler():
                       max_instances=1, coalesce=True, misfire_grace_time=60)  # Every minute
     scheduler.add_job(auto_fx_revaluation, 'cron', day=1, hour=2, id='fx_monthly_reval',
                       max_instances=1, coalesce=True, misfire_grace_time=300)
+    scheduler.add_job(check_zatca_csid_expiry, 'interval', hours=12, id='zatca_csid_expiry',
+                      max_instances=1, coalesce=True, misfire_grace_time=600)
     scheduler.start()
     logger.info("🚀 Scheduler started.")

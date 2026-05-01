@@ -421,10 +421,11 @@ def run_depreciation(
     except HTTPException:
         conn.rollback()
         raise
-    except Exception as e:
+    except Exception:
         conn.rollback()
+        # SEC-T2.10: do not leak internal exception text to the client.
         logger.exception("Depreciation run failed")
-        raise HTTPException(status_code=500, detail=f"فشل ترحيل الإهلاك: {e}")
+        raise HTTPException(status_code=500, detail="تعذّر ترحيل الإهلاك")
     finally:
         conn.close()
 

@@ -264,11 +264,9 @@ def process_invoice_for_zatca(
     
     # Auto-fetch private key if available
     if not private_key_pem:
-        pk_row = db.execute(text("""
-            SELECT setting_value FROM company_settings WHERE setting_key = 'zatca_private_key'
-        """)).fetchone()
-        if pk_row:
-            private_key_pem = pk_row[0]
+        # T2.5: secret stored encrypted; helper falls back to plaintext for legacy rows.
+        from utils.secret_settings import get_secret_setting  # local import: avoid cycle
+        private_key_pem = get_secret_setting(db, "zatca_private_key", tenant_id=company_id)
     
     # 1. Get previous hash for chaining
     prev_hash_row = db.execute(text("""

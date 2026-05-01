@@ -1,9 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+
+// T2.7: HTML-escape user-controlled strings before injecting into the
+// customer-display popup. Cart item names come from the products table
+// (operator-editable) so a crafted product name like
+// `<img src=x onerror=...>` would otherwise execute in the popup window
+// where it can read the parent's localStorage / cookies.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 /**
  * POS-005: Customer Display + Cash Drawer Control
@@ -98,54 +114,71 @@ function CustomerDisplay() {
         const fg = isDark ? '#e0e0e0' : '#1a1a2e';
         const accent = '#4f46e5';
 
+        // T2.7: Build content with HTML-escaped variables, then sanitize the
+        // final body via DOMPurify before injection. We escape `cartItems[i].name`,
+        // `config.welcomeMessage`, `config.idleMessage`, and `config.thankYouMessage`
+        // because those values originate from operator input or the products table.
+        const safeAccent = escapeHtml(accent);
         let content = '';
         if (displayState === 'welcome') {
             content = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;">
                     <div style="font-size:48px;">🛒</div>
-                    <div style="font-size:32px;font-weight:700;color:${accent}">${config.welcomeMessage}</div>
-                    <div style="font-size:18px;opacity:0.7">${config.idleMessage}</div>
+                    <div style="font-size:32px;font-weight:700;color:${safeAccent}">${escapeHtml(config.welcomeMessage)}</div>
+                    <div style="font-size:18px;opacity:0.7">${escapeHtml(config.idleMessage)}</div>
                 </div>
             `;
         } else if (displayState === 'scanning') {
-            const itemsHtml = cartItems.map(i => `
+            const itemsHtml = cartItems.map(i => {
+                const qty = i.qty || i.quantity || 1;
+                const lineTotal = i.total || (i.price * qty);
+                return `
                 <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid ${isDark ? '#333' : '#eee'}">
-                    <span>${i.name} × ${i.qty || i.quantity || 1}</span>
-                    <span>${formatNumber(i.total || (i.price * (i.qty || i.quantity || 1)))} ${currency}</span>
+                    <span>${escapeHtml(i.name)} × ${escapeHtml(qty)}</span>
+                    <span>${escapeHtml(formatNumber(lineTotal))} ${escapeHtml(currency)}</span>
                 </div>
-            `).join('');
+            `;
+            }).join('');
             content = `
                 <div style="padding:30px;">
-                    <div style="font-size:20px;font-weight:600;margin-bottom:20px;">{t('pos.items_added')}</div>
+                    <div style="font-size:20px;font-weight:600;margin-bottom:20px;">${escapeHtml(t('pos.items_added', 'العناصر المُضافة'))}</div>
                     ${itemsHtml}
-                    <div style="display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:3px solid ${accent};font-size:28px;font-weight:700;">
-                        <span>{t('pos.receipt.total')}</span>
-                        <span style="color:${accent}">${formatNumber(total)} ${currency}</span>
+                    <div style="display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:3px solid ${safeAccent};font-size:28px;font-weight:700;">
+                        <span>${escapeHtml(t('pos.receipt.total', 'الإجمالي'))}</span>
+                        <span style="color:${safeAccent}">${escapeHtml(formatNumber(total))} ${escapeHtml(currency)}</span>
                     </div>
                 </div>
             `;
         } else if (displayState === 'total') {
             content = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:16px;">
-                    <div style="font-size:24px;opacity:0.7">{t('pos.receipt.amount_due')}</div>
-                    <div style="font-size:64px;font-weight:700;color:${accent}">${formatNumber(total)} ${currency}</div>
-                    <div style="font-size:18px;opacity:0.5">${cartItems.length} عناصر</div>
+                    <div style="font-size:24px;opacity:0.7">${escapeHtml(t('pos.receipt.amount_due', 'المبلغ المستحق'))}</div>
+                    <div style="font-size:64px;font-weight:700;color:${safeAccent}">${escapeHtml(formatNumber(total))} ${escapeHtml(currency)}</div>
+                    <div style="font-size:18px;opacity:0.5">${escapeHtml(cartItems.length)} عناصر</div>
                 </div>
             `;
         } else {
             content = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:20px;">
                     <div style="font-size:64px;">✅</div>
-                    <div style="font-size:32px;font-weight:700;color:#10b981">${config.thankYouMessage}</div>
+                    <div style="font-size:32px;font-weight:700;color:#10b981">${escapeHtml(config.thankYouMessage)}</div>
                 </div>
             `;
         }
 
+        // Write a static skeleton (DOCTYPE + head + style — no dynamic data),
+        // then populate body via sanitized innerHTML. DOMPurify strips any
+        // <script>, on*= handlers, javascript: URIs, etc.
+        const safeBg = escapeHtml(bg);
+        const safeFg = escapeHtml(fg);
         win.document.open();
-        win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>شاشة العميل</title>
-        <style>*{margin:0;padding:0;box-sizing:border-box;} body{font-family:'Segoe UI',Tahoma,sans-serif;background:${bg};color:${fg};overflow:hidden;}</style>
-        </head><body>${content}</body></html>`);
+        win.document.write(
+            `<!DOCTYPE html><html dir="rtl"><head><title>شاشة العميل</title>` +
+            `<style>*{margin:0;padding:0;box-sizing:border-box;} body{font-family:'Segoe UI',Tahoma,sans-serif;background:${safeBg};color:${safeFg};overflow:hidden;}</style>` +
+            `</head><body></body></html>`
+        );
         win.document.close();
+        win.document.body.innerHTML = DOMPurify.sanitize(content, { ADD_ATTR: ['style'] });
     };
 
     useEffect(() => {

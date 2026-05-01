@@ -173,24 +173,10 @@ def create_customer_receipt(request: Request, data: CustomerReceiptCreate, curre
             idempotency_key=f"rcv-{voucher_num}",
         )
 
-        # 5. Update Treasury Balance
+        # 5. Update Treasury Balance — T1.3a idempotent recompute
         if hasattr(data, 'treasury_id') and data.treasury_id:
-            # Get treasury currency to determine what amount to add
-            treas_info = db.execute(text("""
-                SELECT ta.currency as currency_code
-                FROM treasury_accounts ta
-                WHERE ta.id = :id
-            """), {"id": data.treasury_id}).fetchone()
-
-            if treas_info and treas_info.currency_code and treas_info.currency_code != base_currency:
-                # FC treasury: add in foreign currency
-                treas_amount = _dec(data.amount)
-            else:
-                # SAR treasury: add in base currency
-                treas_amount = amount_base
-
-            db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"),
-                       {"amt": treas_amount, "id": data.treasury_id})
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, data.treasury_id)
 
         db.commit()
         invalidate_company_cache(str(current_user.company_id))

@@ -14,7 +14,7 @@ import logging
 
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission
+from utils.permissions import require_permission, require_sensitive_permission
 from utils.audit import log_activity
 from utils.accounting import (
     generate_sequential_number, get_mapped_account_id,
@@ -551,7 +551,7 @@ def create_invoice_from_delivery(do_id: int, current_user: dict = Depends(get_cu
 
 # ─── CANCEL ───────────────────────────────────────────────────────────────────
 
-@router.post("/{do_id}/cancel", dependencies=[Depends(require_permission("sales.create"))])
+@router.post("/{do_id}/cancel", dependencies=[Depends(require_sensitive_permission("sales.void"))])
 def cancel_delivery_order(do_id: int, current_user: dict = Depends(get_current_user)):
     """إلغاء أمر التسليم — إعادة المخزون إذا كان مؤكداً"""
     company_id = current_user.get("company_id")

@@ -266,9 +266,10 @@ def create_adjustment(
     except HTTPException:
         db.rollback()
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
-        logger.error(f"Stock adjustment error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"حدث خطأ أثناء حفظ التسوية: {str(e)}")
+        # SEC-T2.10: do not leak internal exception text to the client.
+        logger.exception("Stock adjustment failed")
+        raise HTTPException(status_code=500, detail="حدث خطأ أثناء حفظ التسوية")
     finally:
         db.close()

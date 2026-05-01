@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react'; // Re-triggering Vite rebuild after backend fix
 import {
-        Activity,
+    Activity,
     Database,
+    BarChart3,
     BrainCircuit,
     Globe,
     Store,
@@ -10,6 +11,7 @@ import {
     Info,
     History as HistoryIcon
 } from 'lucide-react';
+import api from '../../utils/api';
 import { costingPolicyAPI, branchesAPI } from '../../utils/api';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../context/ToastContext';
@@ -46,7 +48,7 @@ const CostingPolicy = () => {
             setHistory(historyRes.data);
 
             const branchCount = branchesRes.data.length;
-            let rec;
+            let rec = { type: 'global_wac', reason: '', score: 90 };
 
             if (branchCount <= 1) {
                 rec = {

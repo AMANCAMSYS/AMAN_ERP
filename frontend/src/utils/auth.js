@@ -1,17 +1,18 @@
 // Auth utilities
 
+// SEC-T2.8: access token now lives in memory only — see ./tokenStore.js.
+// `localStorage` MUST NOT contain a `token` key after login.
+import { getToken as memGetToken, setToken as memSetToken, clearToken as memClearToken } from './tokenStore'
+
 export function isAuthenticated() {
-    const token = localStorage.getItem('token');
+    const token = memGetToken();
     const user = localStorage.getItem('user');
     const isAuth = !!token && !!user && user !== 'undefined' && user !== 'null';
-    if (!isAuth && (token || user)) {
-        console.log("auth: partial credentials found:", { hasToken: !!token, hasUser: !!user, userValue: user });
-    }
     return isAuth;
 }
 
 export function getToken() {
-    return localStorage.getItem('token')
+    return memGetToken()
 }
 
 // SEC-C4b: refresh token is kept in an HttpOnly, SameSite=Strict cookie
@@ -144,8 +145,10 @@ export function updateUser(userData) {
 export function setAuth(token, user, companyId, _refreshToken = null) {
     // SEC-C4b: refresh token is received as an HttpOnly cookie from /auth/login
     // and /auth/refresh. We deliberately do NOT persist it in localStorage.
-    localStorage.setItem('token', token)
-    // Purge any stale refresh_token written by older builds.
+    // SEC-T2.8: access token is held only in memory (see ./tokenStore.js).
+    memSetToken(token)
+    // Purge any stale tokens written by older builds.
+    localStorage.removeItem('token')
     localStorage.removeItem('refresh_token')
     localStorage.setItem('user', JSON.stringify(user))
     if (companyId) {
@@ -161,6 +164,8 @@ export function setAuth(token, user, companyId, _refreshToken = null) {
 }
 
 export function clearAuth() {
+    memClearToken()
+    // Purge any legacy keys still lingering from previous builds.
     localStorage.removeItem('token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
@@ -171,4 +176,48 @@ export function clearAuth() {
 export function logout() {
     clearAuth()
     window.location.href = '/login'
+}
+
+// SEC-T2.8: silent refresh on app boot.
+//
+// After a full page reload the in-memory access token is gone but the HttpOnly
+// refresh-token cookie is still on the wire. If `user` is in localStorage we
+// optimistically call /auth/refresh once to recover an access token. On
+// failure we clear the partial session and force the user to log in again.
+//
+// Returns true if an access token is now available, false otherwise.
+export async function bootstrapAuth() {
+    // Already have a fresh token in memory (e.g. just logged in) — no work to do.
+    if (memGetToken()) return true
+
+    const userBlob = localStorage.getItem('user')
+    if (!userBlob || userBlob === 'undefined' || userBlob === 'null') {
+        // No previous session — nothing to recover.
+        return false
+    }
+
+    try {
+        const baseURL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || '/api'
+        const res = await fetch(`${baseURL}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        })
+        if (!res.ok) {
+            clearAuth()
+            return false
+        }
+        const data = await res.json().catch(() => null)
+        const newToken = data?.access_token
+        if (!newToken) {
+            clearAuth()
+            return false
+        }
+        memSetToken(newToken)
+        return true
+    } catch {
+        clearAuth()
+        return false
+    }
 }

@@ -54,9 +54,10 @@ def list_warehouses(branch_id: Optional[int] = None, current_user: dict = Depend
             "branch_id": r.branch_id,
             "branch_name": r.branch_name
         } for r in result]
-    except Exception as e:
-        logger.error(f"Error fetching warehouses: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching warehouses: {str(e)}")
+    except Exception:
+        # SEC-T2.10: do not leak internal exception text to the client.
+        logger.exception("Error fetching warehouses")
+        raise HTTPException(status_code=500, detail="تعذّر جلب المستودعات")
     finally:
         db.close()
 

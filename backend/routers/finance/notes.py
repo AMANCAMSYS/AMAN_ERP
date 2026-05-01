@@ -304,10 +304,9 @@ def collect_note_receivable(note_id: int, data: dict = None,
             source_id=note_id
         )
 
-        # Update treasury balance
-        db.execute(text("""
-            UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :tid
-        """), {"amt": amt, "tid": tid})
+        # Update treasury balance — T1.3a idempotent recompute
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, tid)
 
         db.execute(text("""
             UPDATE notes_receivable 
@@ -625,10 +624,9 @@ def pay_note_payable(note_id: int, data: dict = None,
             source_id=note_id
         )
 
-        # Update treasury balance
-        db.execute(text("""
-            UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :tid
-        """), {"amt": amt, "tid": tid})
+        # Update treasury balance — T1.3a idempotent recompute
+        from utils.treasury_balance import recalc_treasury_from_gl
+        recalc_treasury_from_gl(db, tid)
 
         db.execute(text("""
             UPDATE notes_payable 

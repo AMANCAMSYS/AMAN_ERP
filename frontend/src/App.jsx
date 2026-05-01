@@ -2,7 +2,7 @@ import React, { useEffect, useState, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useToast } from './context/ToastContext'
-import { isAuthenticated, hasPermission, getUser } from './utils/auth'
+import { isAuthenticated, hasPermission, getUser, bootstrapAuth } from './utils/auth'
 import { hasIndustryTypeSet } from './hooks/useIndustryType'
 import { requestManager } from './utils/requestManager'
 import { PageLoading } from './components/common/LoadingStates'
@@ -469,6 +469,17 @@ function PermissionDeniedRedirect() {
 function App() {
     const { i18n } = useTranslation();
     const location = useLocation();
+    // SEC-T2.8: on first render the in-memory access token is empty after a full
+    // page reload. We silently refresh against the HttpOnly cookie before rendering
+    // any route so authenticated users don't bounce through /login.
+    const [authReady, setAuthReady] = useState(false);
+    useEffect(() => {
+        let cancelled = false;
+        bootstrapAuth().finally(() => {
+            if (!cancelled) setAuthReady(true);
+        });
+        return () => { cancelled = true; };
+    }, []);
     const showFloatingThemeToggle = (
         location.pathname === '/login' ||
         location.pathname === '/register' ||
@@ -488,6 +499,11 @@ function App() {
             requestManager.abortAll();
         };
     }, [location.pathname]);
+
+    // SEC-T2.8: hold off rendering routes until silent refresh has resolved.
+    if (!authReady) {
+        return <PageLoader />;
+    }
 
     return (
         <Suspense fallback={<PageLoader />}>

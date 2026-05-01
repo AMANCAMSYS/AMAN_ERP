@@ -403,9 +403,20 @@ def einvoice_submit(body: EInvoiceSubmitRequest,
             "err": result.error_message,
         }).fetchone()
 
-        # EINV-F2: enqueue failed submissions for automatic retry via outbox
-        if (result.status or "").lower() in ("failed", "error", "rejected"):
+        # EINV-F2: enqueue submissions for automatic retry via outbox.
+        # T1.5a (#419z): treat "offline" success the same as a transient failure —
+        # the adapter built local artifacts but never reached ZATCA, so the
+        # payload MUST be persisted for later relay or the invoice is lost.
+        resp = result.response or {}
+        is_offline = bool(resp.get("offline"))
+        outcome = (result.status or "").lower()
+        needs_outbox = outcome in ("failed", "error", "rejected") or is_offline
+        if needs_outbox:
             try:
+                err_msg = result.error_message or (
+                    "offline: adapter unconfigured (no PCSID/secret) — payload saved for retry"
+                    if is_offline else "submission failed"
+                )
                 db.execute(text("""
                     INSERT INTO einvoice_outbox
                         (invoice_id, adapter, payload, status, attempts,
@@ -417,7 +428,7 @@ def einvoice_submit(body: EInvoiceSubmitRequest,
                     "iid": body.invoice_id,
                     "adp": body.jurisdiction.upper(),
                     "pl": json.dumps(payload, default=str, ensure_ascii=False),
-                    "err": result.error_message or "submission failed",
+                    "err": err_msg,
                 })
             except Exception:
                 logger.exception("failed to enqueue outbox retry")
@@ -555,7 +566,10 @@ def einvoice_outbox_relay(
                 adapter = get_adapter(r.adapter or "SA")
                 result = adapter.submit(payload)
                 outcome = (result.status or "").lower()
-                if outcome in ("success", "accepted", "ok", "cleared", "reported"):
+                # T1.5a (#419z): offline responses must NOT be marked submitted —
+                # the adapter built artifacts but did not reach ZATCA.
+                is_offline = bool((result.response or {}).get("offline"))
+                if outcome in ("success", "accepted", "ok", "cleared", "reported") and not is_offline:
                     db.execute(
                         text(
                             "UPDATE einvoice_outbox SET status = 'submitted', "

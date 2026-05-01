@@ -133,7 +133,7 @@ class NotificationService:
                 link=link,
             )
         elif channel == _CHANNEL_EMAIL:
-            self._send_email(db=db, recipient_id=recipient_id, title=title, body=body)
+            self._send_email(db=db, recipient_id=recipient_id, title=title, body=body, tenant_id=company_id)
         elif channel == _CHANNEL_PUSH:
             await self._send_push(
                 db=db,
@@ -205,13 +205,13 @@ class NotificationService:
         except Exception as exc:
             logger.debug("WebSocket push skipped (user not connected): %s", exc)
 
-    def _send_email(self, db, recipient_id: int, title: str, body: str) -> None:
+    def _send_email(self, db, recipient_id: int, title: str, body: str, *, tenant_id: Optional[str] = None) -> None:
         """Send email notification via existing email_service."""
         try:
             from services.email_service import send_notification_email
 
             html_body = f"<p>{body}</p>"
-            send_notification_email(db, recipient_id, title, html_body)
+            send_notification_email(db, recipient_id, title, html_body, tenant_id=tenant_id)
         except Exception as exc:
             logger.warning("Email notification failed for user %s: %s", recipient_id, exc)
 

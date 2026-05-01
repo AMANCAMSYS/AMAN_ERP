@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""                  # Leave empty to disable Sentry
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
+    # ── SEC-T2.9: Interactive API docs gating ──────────────────
+    # When False, /api/docs, /api/redoc and /api/openapi.json are disabled.
+    # Defaults to False in production (see main.py) regardless of this flag.
+    EXPOSE_API_DOCS: bool = True
+
     # ── TASK-030: HttpOnly refresh cookie + CSRF ───────────────
     # off | permissive (log only) | strict (reject on mismatch)
     CSRF_ENFORCEMENT: str = "permissive"
@@ -71,6 +76,14 @@ class Settings(BaseSettings):
     #              a separate `worker.py` process (required for N>1 web replicas
     #              to avoid duplicate job firings).
     SCHEDULER_MODE: str = "in_process"
+
+    # ── T1.5c: ZATCA Phase 2 enforcement ──────────────────────
+    # When True, sales invoices issued by SA tenants attempt synchronous
+    # clearance against ZATCA at creation time (via the einvoicing adapter).
+    # On rejection the request fails with HTTP 422; on transient/network
+    # failure the payload is enqueued in `einvoice_outbox` for relay.
+    # Default OFF so production rollout is opt-in per environment.
+    ZATCA_PHASE2_ENFORCE: bool = False
 
     # ── SEC-008: Validate SECRET_KEY strength ─────────────────
     @field_validator("SECRET_KEY")

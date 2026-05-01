@@ -1,9 +1,24 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import DOMPurify from 'dompurify';
 import { formatNumber } from '../../utils/format';
 import { getCurrency } from '../../utils/auth';
 import '../../components/ModuleStyles.css';
 import BackButton from '../../components/common/BackButton';
+
+// T2.7: HTML-escape user-controlled values before injecting them into the
+// print-preview popup. Even though the demo uses a hardcoded sample order,
+// printerConfig.companyName / vatNumber and the receipt body originate from
+// settings or product names and must not break out of the popup HTML.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 /**
  * POS-002: Thermal Printing Support
@@ -147,12 +162,22 @@ function ThermalPrintSettings() {
         if (printerConfig.type === 'browser') {
             const cleanText = text.replace(/[\x1B\x1D][\x00-\xFF]/g, '').replace(/[\x00-\x09\x0B\x0C\x0E-\x1F]/g, '');
             const win = window.open('', '_blank', 'width=400,height=600');
-            win.document.write(`<!DOCTYPE html><html dir="rtl"><head><title>Test Receipt</title>
-            <style>body { font-family: 'Courier New', monospace; font-size: ${printerConfig.width === '58mm' ? '10px' : '12px'}; 
-            width: ${printerConfig.width === '58mm' ? '220px' : '300px'}; margin: auto; padding: 10px; white-space: pre-wrap; }
-            @media print { @page { size: ${printerConfig.width} auto; margin: 2mm; } }</style>
-            </head><body>${cleanText.replace(/\n/g, '<br>')}</body></html>`);
+            // T2.7: escape the receipt text + width strings before injecting; the
+            // body HTML is then sanitized via DOMPurify as defense-in-depth.
+            const safeWidth = escapeHtml(printerConfig.width);
+            const fontSize = printerConfig.width === '58mm' ? '10px' : '12px';
+            const bodyWidth = printerConfig.width === '58mm' ? '220px' : '300px';
+            const bodyHtml = escapeHtml(cleanText).replace(/\n/g, '<br>');
+            win.document.open();
+            win.document.write(
+                `<!DOCTYPE html><html dir="rtl"><head><title>Test Receipt</title>` +
+                `<style>body { font-family: 'Courier New', monospace; font-size: ${fontSize}; ` +
+                `width: ${bodyWidth}; margin: auto; padding: 10px; white-space: pre-wrap; }` +
+                `@media print { @page { size: ${safeWidth} auto; margin: 2mm; } }</style>` +
+                `</head><body></body></html>`
+            );
             win.document.close();
+            win.document.body.innerHTML = DOMPurify.sanitize(bodyHtml, { ADD_ATTR: ['style'] });
             setTimeout(() => { win.print(); }, 300);
             setTestResult(t('pos.thermal.test_sent', 'تم إرسال الطباعة التجريبية'));
         } else if (printerConfig.type === 'network') {

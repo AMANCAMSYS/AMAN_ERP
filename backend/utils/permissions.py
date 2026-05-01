@@ -108,7 +108,11 @@ PERMISSION_ALIASES: Dict[str, List[str]] = {
     "finance.reconciliation_manage": ["finance.reconciliation_view"],
     # === 2026-04-22 audit: umbrella & legacy aliases ===
     # sales.manage / buying.manage umbrellas used by frontend Settings tabs
-    "sales.manage":   ["sales.view", "sales.create", "sales.edit", "sales.delete"],
+    # T2.3 (2026-05-01): sales.manage now also implies the new sensitive sub-permissions
+    # (void / approve_return / manage_credit_notes) so existing admin roles keep working.
+    # NOTE: sales.create does NOT alias to these — that's the whole point of T2.3.
+    "sales.manage":   ["sales.view", "sales.create", "sales.edit", "sales.delete",
+                       "sales.void", "sales.approve_return", "sales.manage_credit_notes"],
     "buying.manage":  ["buying.view", "buying.create", "buying.edit", "buying.delete", "buying.approve", "buying.receive"],
     # costing.* legacy keys route to canonical inventory.costing_*
     "costing.view":   ["inventory.costing_view"],
@@ -200,6 +204,8 @@ SENSITIVE_PERMISSIONS = {
     "accounting.manage", "accounting.edit",
     "treasury.manage", "treasury.edit",
     "sales.delete", "buying.delete",
+    # T2.3 (2026-05-01): granular sensitive sales operations
+    "sales.void", "sales.approve_return", "sales.manage_credit_notes",
     "hr.payroll", "hr.manage",
     "admin.users", "settings.manage",
 }
@@ -649,4 +655,55 @@ def log_permission_change(company_conn, admin_user_id: int, admin_username: str,
         })
     except Exception as e:
         logger.warning(f"Failed to log permission change: {e}")
+
+
+# ===================== T2.4: HR PII Masking =====================
+# Audit #49 — HR financial PII (salary, IBAN, bank account, allowances, GOSI)
+# must be hidden from `hr.view` users unless they also hold `hr.pii`.
+
+EMPLOYEE_PII_FIELDS = (
+    "salary", "housing_allowance", "transport_allowance", "other_allowances",
+    "hourly_cost", "iban", "bank_account", "bank_account_number",
+    "national_id", "gosi_number",
+)
+
+PAYROLL_PII_FIELDS = (
+    "basic_salary", "housing_allowance", "transport_allowance", "other_allowances",
+    "salary_components_earning", "salary_components_deduction", "overtime_amount",
+    "deductions", "gosi_employee_share", "violation_deduction", "loan_deduction",
+    "net_salary", "net_pay", "gross_salary",
+    "total_earnings", "total_allowances", "total_deductions",
+)
+
+# Mask sentinel returned in place of real values when caller lacks `hr.pii`.
+PII_MASK = None  # explicit None preserves JSON-serializable schema
+
+
+def has_pii_access(current_user: Any) -> bool:
+    """Return True if user holds `hr.pii` (directly or via alias)."""
+    if isinstance(current_user, dict):
+        perms = current_user.get("permissions") or []
+        role = current_user.get("role")
+    else:
+        perms = getattr(current_user, "permissions", []) or []
+        role = getattr(current_user, "role", None)
+    # System admins / GMs always see PII (they are the data owners).
+    if role in ("admin", "system_admin", "gm"):
+        return True
+    return check_permission(list(perms), "hr.pii")
+
+
+def mask_pii(record: Dict[str, Any], fields: tuple) -> Dict[str, Any]:
+    """Return a copy of ``record`` with PII ``fields`` set to ``PII_MASK``."""
+    if not isinstance(record, dict):
+        return record
+    out = dict(record)
+    for f in fields:
+        if f in out:
+            out[f] = PII_MASK
+    return out
+
+
+def mask_pii_list(records: List[Dict[str, Any]], fields: tuple) -> List[Dict[str, Any]]:
+    return [mask_pii(r, fields) for r in records]
 

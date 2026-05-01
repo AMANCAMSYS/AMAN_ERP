@@ -44,6 +44,9 @@ AVAILABLE_PERMISSIONS = [
     {"key": "sales.create", "section": "sales", "label_ar": "إنشاء فواتير وطلبات بيع", "label_en": "Create Invoices & Sales Orders"},
     {"key": "sales.edit", "section": "sales", "label_ar": "تعديل الفواتير", "label_en": "Edit Invoices"},
     {"key": "sales.delete", "section": "sales", "label_ar": "حذف / إلغاء فواتير", "label_en": "Delete / Cancel Invoices"},
+    {"key": "sales.void", "section": "sales", "label_ar": "إلغاء فاتورة معتمدة (Void)", "label_en": "Void Posted Invoice"},
+    {"key": "sales.approve_return", "section": "sales", "label_ar": "اعتماد مرتجع المبيعات", "label_en": "Approve Sales Return"},
+    {"key": "sales.manage_credit_notes", "section": "sales", "label_ar": "إصدار وإدارة الإشعارات الدائنة/المدينة", "label_en": "Issue & Manage Credit / Debit Notes"},
     {"key": "sales.reports", "section": "sales", "label_ar": "تقارير المبيعات", "label_en": "Sales Reports"},
 
     # ═══════════════════════ Purchases ═══════════════════════
@@ -108,6 +111,7 @@ AVAILABLE_PERMISSIONS = [
 
     # ═══════════════════════ HR & Payroll ═══════════════════════
     {"key": "hr.view", "section": "hr", "label_ar": "عرض بيانات الموظفين", "label_en": "View Employee Data"},
+    {"key": "hr.pii", "section": "hr", "label_ar": "عرض البيانات المالية والشخصية الحساسة (الرواتب، IBAN)", "label_en": "View Sensitive PII (Salary, IBAN, Bank)"},
     {"key": "hr.manage", "section": "hr", "label_ar": "إدارة الموظفين (إضافة، تعديل، حذف)", "label_en": "Manage Employees (Add, Edit, Delete)"},
     {"key": "hr.reports", "section": "hr", "label_ar": "تقارير الموارد البشرية", "label_en": "HR Reports"},
     {"key": "hr.attendance.view", "section": "hr", "label_ar": "عرض الحضور والانصراف", "label_en": "View Attendance"},

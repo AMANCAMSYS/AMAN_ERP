@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from database import get_db_connection
 from routers.auth import get_current_user
-from utils.permissions import require_permission, validate_branch_access
+from utils.permissions import require_permission, require_sensitive_permission, validate_branch_access
 from utils.audit import log_activity
 from utils.accounting import (
     get_mapped_account_id,
@@ -150,7 +150,7 @@ def get_sales_credit_note(note_id: int, current_user: dict = Depends(get_current
 
 
 @credit_notes_router.post("/credit-notes", status_code=status.HTTP_201_CREATED,
-                          dependencies=[Depends(require_permission("sales.create"))])
+                          dependencies=[Depends(require_sensitive_permission("sales.manage_credit_notes"))])
 def create_sales_credit_note(
     request: Request,
     data: dict = Body(...),
@@ -487,7 +487,7 @@ def get_sales_debit_note(note_id: int, current_user: dict = Depends(get_current_
 
 
 @credit_notes_router.post("/debit-notes", status_code=status.HTTP_201_CREATED,
-                          dependencies=[Depends(require_permission("sales.create"))])
+                          dependencies=[Depends(require_sensitive_permission("sales.manage_credit_notes"))])
 def create_sales_debit_note(
     request: Request,
     data: dict = Body(...),

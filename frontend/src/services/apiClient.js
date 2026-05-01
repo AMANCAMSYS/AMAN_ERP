@@ -5,6 +5,7 @@
 import axios from 'axios'
 import { toastEmitter } from '../utils/toastEmitter'
 import { requestManager } from '../utils/requestManager'
+import { getToken as memGetToken, setToken as memSetToken, clearToken as memClearToken } from '../utils/tokenStore'
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -80,7 +81,7 @@ async function proactiveRefresh() {
         );
         const newToken = refreshRes.data?.access_token;
         if (newToken) {
-            localStorage.setItem('token', newToken);
+            memSetToken(newToken);
             onRefreshed(newToken);
             window.dispatchEvent(new Event('token_refreshed'));
             return newToken;
@@ -102,7 +103,7 @@ api.interceptors.request.use(async (config) => {
         return config;
     }
 
-    let token = localStorage.getItem('token');
+    let token = memGetToken();
     if (token) {
         const expiry = getTokenExpiry(token);
         const now = Date.now();
@@ -187,7 +188,8 @@ api.interceptors.response.use(
             }
 
             // Refresh failed — clear session and redirect to login
-            localStorage.removeItem('token');
+            memClearToken();
+            localStorage.removeItem('token'); // purge any legacy value
             localStorage.removeItem('refresh_token'); // purge any legacy value
             localStorage.removeItem('user');
             localStorage.removeItem('company_id');

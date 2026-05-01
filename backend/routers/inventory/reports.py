@@ -238,11 +238,12 @@ def get_stock_movements(
         result = db.execute(text(query), params).fetchall()
         return [dict(r._mapping) for r in result]
 
-    except Exception as e:
-        logger.error(f"Error fetching stock movements: {str(e)}")
+    except Exception:
+        # SEC-T2.10: do not leak internal exception text to the client.
+        logger.exception("Error fetching stock movements")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"فشل جلب الحركات: {str(e)}"
+            detail="تعذّر جلب حركات المخزون"
         )
     finally:
         db.close()

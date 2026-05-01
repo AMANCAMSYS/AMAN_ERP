@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-    Save, Play, Plus, Trash2, Filter,
+import { 
+    Save, Play, Plus, Trash2, Filter, 
     Columns, Database, FileText, Download
 } from 'lucide-react';
 import { customReportsAPI } from '../../utils/api';
@@ -13,7 +13,7 @@ import BackButton from '../../components/common/BackButton';
 import { PageLoading } from '../../components/common/LoadingStates'
 
 export default function ReportBuilder() {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
 
     const [loading, setLoading] = useState(false);
     const [previewData, setPreviewData] = useState(null);

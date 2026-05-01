@@ -42,10 +42,10 @@ def get_notifications(
             notifications.append(n_dict)
 
         return notifications
-    except Exception as e:
-        logger.exception("Operation failed")
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch notifications: {str(e)}")
+    except Exception:
+        # SEC-T2.10: do not leak internal exception text to the client.
+        logger.exception("Failed to fetch inventory notifications")
+        raise HTTPException(status_code=500, detail="تعذّر جلب الإشعارات")
     finally:
         db.close()
 
@@ -66,10 +66,10 @@ def get_unread_count(
             WHERE (user_id = :user OR user_id IS NULL) AND is_read = FALSE
         """), {"user": user_id}).scalar()
         return {"count": count}
-    except Exception as e:
-        logger.exception("Operation failed")
-        logger.exception("Unexpected error")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch unread count: {str(e)}")
+    except Exception:
+        # SEC-T2.10: do not leak internal exception text to the client.
+        logger.exception("Failed to fetch unread notification count")
+        raise HTTPException(status_code=500, detail="تعذّر جلب عدد الإشعارات")
     finally:
         db.close()
 

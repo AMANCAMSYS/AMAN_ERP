@@ -295,12 +295,15 @@ def create_revaluation(
         code = currency.code
 
         # Check for duplicate revaluation on same date and currency
+        # FIX (T1.2): use source+source_id+entry_date (the actual entry_number is JE-XXXXX,
+        # so the prior `entry_number LIKE 'REV-%'` check NEVER matched).
         existing_reval = db.execute(text("""
-            SELECT id FROM journal_entries 
-            WHERE entry_number LIKE :prefix 
-            AND entry_date = :rate_date
-            AND status = 'posted'
-        """), {"prefix": f"REV-{code}-%", "rate_date": req.rate_date}).fetchone()
+            SELECT id FROM journal_entries
+            WHERE source = 'currency_revaluation'
+              AND source_id = :currency_id
+              AND entry_date = :rate_date
+              AND status = 'posted'
+        """), {"currency_id": req.currency_id, "rate_date": req.rate_date}).fetchone()
         if existing_reval:
             raise HTTPException(status_code=400, detail=f"تم إجراء إعادة تقييم لهذه العملة ({code}) بنفس التاريخ. يرجى إلغاء السابقة أولاً.")
 
@@ -311,14 +314,42 @@ def create_revaluation(
             return {"message": "No accounts found with this currency", "entries_created": 0}
 
         # 3. Get GL Account IDs for Unrealized Gain/Loss
-        acc_gain = db.execute(text("SELECT id FROM accounts WHERE account_code = 'UFX-GAIN'")).fetchone()
-        acc_loss = db.execute(text("SELECT id FROM accounts WHERE account_code = 'UFX-LOSS'")).fetchone()
-        
-        if not acc_gain or not acc_loss:
-            raise HTTPException(status_code=500, detail="Unrealized Gain/Loss accounts not found in Chart of Accounts")
-        
-        gain_id = acc_gain.id
-        loss_id = acc_loss.id
+        # FIX (T1.2): resolve via (a) company_settings mapping (acc_map_ufx_gain/loss),
+        # then (b) legacy account_code lookup, then (c) numeric COA code, then (d) name match.
+        from utils.accounting import get_mapped_account_id
+
+        def _resolve_ufx(side: str):
+            """side ∈ {'gain', 'loss'}"""
+            mapping_key = f"acc_map_ufx_{side}"
+            aid = get_mapped_account_id(db, mapping_key)
+            if aid:
+                return aid
+            legacy_code = "UFX-GAIN" if side == "gain" else "UFX-LOSS"
+            numeric_code = "42021" if side == "gain" else "71011"
+            name_pattern = "%Unrealized%FX%Gain%" if side == "gain" else "%Unrealized%FX%Loss%"
+            row = db.execute(text("""
+                SELECT id FROM accounts
+                WHERE account_code = :legacy
+                   OR account_code = :numeric
+                   OR account_number = :numeric
+                   OR name_en ILIKE :name_pat
+                ORDER BY (account_code = :legacy) DESC, (account_code = :numeric) DESC
+                LIMIT 1
+            """), {"legacy": legacy_code, "numeric": numeric_code, "name_pat": name_pattern}).fetchone()
+            return row.id if row else None
+
+        gain_id = _resolve_ufx("gain")
+        loss_id = _resolve_ufx("loss")
+
+        if not gain_id or not loss_id:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "حسابات فروقات العملة غير المحققة (UFX-GAIN / UFX-LOSS) غير موجودة في شجرة الحسابات. "
+                    "يرجى إنشاء الحسابين 42021 (Unrealized FX Gains) و 71011 (Unrealized FX Losses) "
+                    "أو ربطهما عبر إعدادات الشركة (acc_map_ufx_gain, acc_map_ufx_loss)."
+                ),
+            )
 
         # 4. Prepare Journal Entry
         journal_entry_lines = []

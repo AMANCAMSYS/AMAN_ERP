@@ -736,12 +736,10 @@ def create_order(
         # For now, we assume total_sales covers it all, but you might want 
         # specifically to log cash_sales and bank_sales for reconciliation.
         
-        # 6. Update Treasury Balance (Only for Cash payments linked to session treasury)
+        # 6. Update Treasury Balance — T1.3a idempotent recompute
         if treasury_id:
-            cash_amount = sum(_dec(p.amount) for p in order_in.payments if p.method == 'cash')
-            if cash_amount > 0:
-                db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance + :amt WHERE id = :id"),
-                           {"amt": cash_amount.quantize(_D2, ROUND_HALF_UP), "id": treasury_id})
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, treasury_id)
 
         # 7. Update Customer Balance (if customer-linked POS sale)
         if order_in.customer_id and order_in.status == 'paid':
@@ -754,7 +752,15 @@ def create_order(
                         WHERE id = :pid
                     """), {"amt": credit_payments.quantize(_D2, ROUND_HALF_UP), "pid": order_in.customer_id})
             except Exception:
-                pass  # Non-blocking — POS must not fail for party update
+                # SEC-T2.11: silently dropping a credit-balance UPDATE leaves the
+                # customer ledger out of sync with the GL. Surface the failure
+                # and let the outer transaction roll back instead of swallowing.
+                logger.exception("POS: failed to update party balance for credit sale")
+                db.rollback()
+                raise HTTPException(
+                    status_code=500,
+                    detail="تعذّر تحديث رصيد العميل لطلب البيع الآجل",
+                )
 
     db.commit()
 
@@ -1097,10 +1103,10 @@ def create_return(
             source_id=return_id
         )
 
-        # Update treasury balance only for cash refunds
+        # Update treasury balance only for cash refunds — T1.3a idempotent recompute
         if return_in.refund_method == 'cash' and session_treasury and session_treasury.treasury_account_id:
-            db.execute(text("UPDATE treasury_accounts SET current_balance = current_balance - :amt WHERE id = :id"),
-                       {"amt": total_refund_with_tax, "id": session_treasury.treasury_account_id})
+            from utils.treasury_balance import recalc_treasury_from_gl
+            recalc_treasury_from_gl(db, session_treasury.treasury_account_id)
     
     db.commit()
 

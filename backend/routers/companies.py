@@ -22,6 +22,7 @@ from schemas import CompanyCreateRequest, CompanyCreateResponse, CompanyListResp
 from utils.permissions import require_permission
 from utils.limiter import limiter
 from utils.audit import log_activity
+from utils.sql_builder import validate_update_keys
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 logger = logging.getLogger(__name__)
@@ -535,6 +536,7 @@ def update_company(
         if not update_data:
             return {"success": True, "message": "No changes provided"}
 
+        validate_update_keys(update_data.keys())  # T2.2 defense-in-depth
         set_clause = ", ".join([f"{k} = :{k}" for k in update_data.keys()])
         update_data["id"] = company_id
         

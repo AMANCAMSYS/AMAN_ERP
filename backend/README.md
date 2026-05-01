@@ -11,7 +11,7 @@ FastAPI-based backend for the AMAN ERP system.
 - **Server:** Uvicorn with `websockets` support
 - **Rate Limiting:** slowapi (10/min login, 120/min global)
 
-## 📁 هيكل المجلدات
+## 📁 
 
 ```
 backend/

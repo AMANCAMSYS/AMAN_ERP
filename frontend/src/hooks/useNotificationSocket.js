@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { getToken } from '../utils/tokenStore'
 
 /**
  * useNotificationSocket — React hook for real-time WebSocket notifications
@@ -16,7 +17,8 @@ export function useNotificationSocket(onNotification) {
     const attempt = useRef(0)
 
     const connect = useCallback((abortSignal) => {
-        const token = localStorage.getItem('token')
+        // SEC-T2.8: read access token from in-memory store (not localStorage).
+        const token = getToken()
         if (!token) return
 
         // Basic JWT expiry pre-check — avoid opening a WS with an expired token
